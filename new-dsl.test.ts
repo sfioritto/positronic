@@ -205,3 +205,47 @@ describe('step creation', () => {
   });
 });
 
+describe('workflow resumption', () => {
+  it('should resume workflow from a specific step with correct context chain', async () => {
+    const threeStepWorkflow = createWorkflow('Three Step Workflow')
+      .step("Step 1: Double", ({ context }) => ({
+        value: ((context as { value: number }).value || 2) * 2
+      }))
+      .step("Step 2: Add 10", ({ context }) => ({
+        value: context.value + 10
+      }))
+      .step("Step 3: Multiply by 3", ({ context }) => ({
+        value: context.value * 3
+      }));
+
+    const initialContext = { value: 2 };
+
+    // First run the workflow normally
+    let fullRun;
+    for await (const event of threeStepWorkflow.run({ initialContext })) {
+      fullRun = event;
+    }
+
+    if (!fullRun?.steps) {
+      throw new Error('Steps not found');
+    }
+
+    // Resume from step 2 by passing the completed first step
+    let resumedRun;
+    for await (const event of threeStepWorkflow.run({
+      initialContext,
+      initialCompletedSteps: [fullRun.steps[0]]
+    })) {
+      resumedRun = event;
+    }
+
+    // Verify the full run executed correctly
+    expect(fullRun.newContext.value).toBe(42); // ((2 * 2) + 10) * 3 = 42
+    expect(fullRun.steps.map(s => s.context.value)).toEqual([4, 14, 42]);
+
+    // Verify the resumed run started from step 2 with correct context
+    expect(resumedRun?.newContext.value).toBe(42);
+    expect(resumedRun?.steps.slice(1).map(s => s.context.value)).toEqual([14, 42]);
+  });
+});
+
