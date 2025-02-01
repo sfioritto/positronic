@@ -3,9 +3,12 @@ import type { Builder } from './new-dsl';
 
 
 export const simpleExtension = createExtension({
-  simple: (message: string) => {
-    return ({ context }) => ({ message: `${message}: cool${context?.cool || '? ...not cool yet'}` });
-  }
+  simple: (message: string) => ({
+    title: `Prints simple message: ${message}`,
+    action: ({ context }) => ({
+      message: `${message}: cool${context?.cool || '? ...not cool yet'}`
+    }),
+  })
 });
 
 export const anotherExtension = createExtension({

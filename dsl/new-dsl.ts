@@ -47,7 +47,7 @@ type Flatten<T> = T extends object
   : T;
 
 export type ExtensionMethod<TContextIn extends Context, TOptions extends object = {}> =
-  (...args: any[]) => Action<TContextIn, TOptions, TContextIn>;
+  (...args: any[]) => StepBlock<TContextIn, TOptions> | Action<TContextIn, TOptions>;
 
 export type ExtensionMethodOrObject<TContextIn extends Context, TOptions extends object = {}> =
   | ExtensionMethod<TContextIn, TOptions>
@@ -78,9 +78,21 @@ type MergeExtensions<
     : First & MergeExtensions<Rest>
   : never;
 
-type ExtensionResult<EM> = EM extends (...args: any[]) => (...args: any[]) => infer R
-  ? Awaited<R>
-  : never;
+type ExtensionReturn<R> = R extends StepBlock<any, any>
+  ? R extends { action: infer A }
+    ? A extends (...args: any[]) => infer Out
+      ? Awaited<Out>
+      : never
+    : never
+  : R extends (...args: any[]) => infer Out
+    ? Awaited<Out>
+    : never;
+
+type GetExtensionResult<T> = T extends { handler: (...args: any[]) => infer R }
+  ? ExtensionReturn<R>
+  : T extends (...args: any[]) => infer R
+    ? ExtensionReturn<R>
+    : never;
 
 // Helper type to extract the parameters of an extension method,
 // whether it is a bare function or an object with a handler method.
@@ -88,13 +100,6 @@ type GetParameters<T> = T extends { handler: (...args: infer P) => any }
   ? P
   : T extends (...args: infer P) => any
     ? P
-    : never;
-
-// Helper type to extract the result type of an extension's action.
-type GetExtensionResult<T> = T extends { handler: (...args: any[]) => infer R }
-  ? ExtensionResult<(...args: any[]) => R>
-  : T extends (...args: any[]) => any
-    ? ExtensionResult<T>
     : never;
 
 type BuilderExtension<
@@ -178,22 +183,33 @@ function createExtensionStep<
   key: string,
   extensionMethod: ExtensionMethodOrObject<ContextIn, Options>,
   args: any[]
-) {
-  let action: Action<ContextIn, Options>;
-  let titleSuffix = key;
+): StepBlock<ContextIn, Options> {
+  let stepResult: unknown;
+  let defaultTitle = key;
   if (typeof extensionMethod === 'function') {
-    action = extensionMethod(...args);
+    stepResult = extensionMethod(...args);
   } else {
-    // extensionMethod is wrapped with an optional title and a handler
-    action = extensionMethod.handler(...args);
+    stepResult = extensionMethod.handler(...args);
     if (extensionMethod.title) {
-      titleSuffix = extensionMethod.title;
+      defaultTitle = extensionMethod.title;
     }
   }
-  return {
-    title: titleSuffix,
-    action
-  };
+
+  // If stepResult adheres to our StepBlock shape, use its title & action.
+  // Otherwise, fallback to using the default title and assume it is just an action.
+  if (
+    stepResult &&
+    typeof stepResult === 'object' &&
+    'action' in stepResult &&
+    typeof (stepResult as any).title === 'string'
+  ) {
+    return stepResult as StepBlock<ContextIn, Options>;
+  } else {
+    return {
+      title: defaultTitle,
+      action: stepResult as Action<ContextIn, Options>
+    };
+  }
 }
 
 function createBuilder<
