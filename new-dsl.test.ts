@@ -130,3 +130,78 @@ describe('error handling', () => {
   });
 });
 
+describe('step creation', () => {
+  it('should create a step that updates context', async () => {
+    const workflow = createWorkflow('Simple Workflow')
+      .step("Simple step", ({ context }) => ({
+        ...context,
+        count: 1,
+        message: 'Count is now 1'
+      }));
+
+    let finalEvent;
+    for await (const event of workflow.run()) {
+      finalEvent = event;
+    }
+
+    // Verify the step executed correctly
+    expect(finalEvent?.status).toBe('complete');
+    expect(finalEvent?.newContext).toEqual({
+      count: 1,
+      message: 'Count is now 1'
+    });
+  });
+
+  it('should not modify the original context when step mutates context', async () => {
+    const originalContext = {
+      value: 1,
+      nested: { count: 0 }
+    };
+
+    const workflow = createWorkflow('Mutation Test Workflow')
+      .step("Mutating step", ({ context }) => {
+        // Attempt to mutate the input context
+        context.value = 99;
+        context.nested = { count: 99 };
+        return context;
+      });
+
+    let finalEvent;
+    for await (const event of workflow.run({ initialContext: originalContext })) {
+      finalEvent = event;
+    }
+
+    // Verify original context remains unchanged
+    expect(originalContext).toEqual({
+      value: 1,
+      nested: { count: 0 }
+    });
+  });
+
+  it('should maintain immutable results between steps', async () => {
+    const workflow = createWorkflow('Immutable Steps Workflow')
+      .step("First step", () => ({
+        value: 1
+      }))
+      .step("Second step", ({ context }) => {
+        // Attempt to modify previous step's context
+        context.value = 99;
+        return {
+          value: 2
+        };
+      });
+
+    let finalEvent;
+    for await (const event of workflow.run()) {
+      finalEvent = event;
+    }
+
+    // Verify that modifications didn't persist
+    if (!finalEvent?.steps) {
+      throw new Error('Steps not found');
+    }
+    expect(finalEvent.steps[0].context).toEqual({ value: 1 });
+    expect(finalEvent.steps[1].context).toEqual({ value: 2 });
+  });
+});
+
