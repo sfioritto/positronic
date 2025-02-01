@@ -1,6 +1,11 @@
 import { JsonObject, SerializedError } from "./types";
 import { WORKFLOW_EVENTS, STATUS } from './constants';
 
+/**
+ * Creates a deep clone of an object to prevent mutation of internal state.
+ * This is used throughout the workflow engine to ensure immutability and prevent
+ * side effects from consumer code modifying shared state.
+ */
 function clone<T>(original: T): T {
   return structuredClone(original) as T;
 }
@@ -251,10 +256,12 @@ function run<TContext extends Context, TOptions extends object>(
     options = {} as TOptions,
     initialCompletedSteps = []
   }: RunParams<TOptions, TContext> = {}) {
+    // Clone initial state to prevent mutations from affecting the original objects
     let currentContext = clone(initialContext) as Context;
     const completedSteps: SerializedStep[] = [...initialCompletedSteps];
 
     if (initialCompletedSteps.length > 0) {
+      // Clone the last completed step's context to ensure we start from an immutable snapshot
       currentContext = clone(initialCompletedSteps[initialCompletedSteps.length - 1].context);
     }
 
@@ -277,11 +284,13 @@ function run<TContext extends Context, TOptions extends object>(
 
     const remainingSteps = steps.slice(initialCompletedSteps.length);
     for (const step of remainingSteps) {
+      // Preserve the previous state for event emission
       const previousContext = clone(currentContext);
 
       try {
+        // Clone context before passing to user-provided action to prevent action from mutating shared state
         const result = await step.action({ context: clone(currentContext), options });
-        currentContext = clone(result);
+        currentContext = clone(result);  // Clone result to prevent subsequent mutations
 
         const completedStep = {
           title: step.title,
