@@ -79,7 +79,7 @@ await (async () => {
 // Example using multiple extensions with WorkflowConfig
 const multiExtensionWorkflow = createWorkflow(
   {
-    name: "Math Operations",
+    title: "Math Operations",
     description: "A workflow that performs math operations and async tasks"
   },
   [mathExtension, anotherExtension]
@@ -139,7 +139,7 @@ const fileWorkflow = createWorkflow<{}, FileExtension>("file example", [fileExte
 // Example builder with multiple steps and extensions using WorkflowConfig
 const myBuilder = createWorkflow(
   {
-    name: "Complex Builder Example",
+    title: "Complex Builder Example",
     description: "A complex workflow demonstrating multiple extensions and steps"
   },
   [simpleExtension, anotherExtension, mathExtension]

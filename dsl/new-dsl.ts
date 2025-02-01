@@ -11,7 +11,7 @@ function clone<T>(original: T): T {
 type Context = JsonObject;
 
 interface WorkflowConfig {
-  name: string;
+  title: string;
   description?: string;
 }
 
@@ -374,7 +374,7 @@ export const createWorkflow = <
   workflowConfig: string | WorkflowConfig,
   extensions: TExtensions | [] = []
 ) => {
-  const workflowName = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.name;
+  const workflowName = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
   const mergedExtensions = Object.assign({}, ...extensions) as MergeExtensions<TExtensions>;
   const extension = createExtension(mergedExtensions);
