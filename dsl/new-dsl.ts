@@ -67,12 +67,13 @@ type StepBlock<
   action: Action<TContextIn, TOptions>;
 };
 
-type MergeExtensions<T extends Extension<any>[]
-> = T extends [infer First extends Extension<any>, ...infer Rest extends Extension<any>[]]
-  ? Rest extends []
-    ? First
-    : First & MergeExtensions<Rest>
+type UnionToIntersection<U> = (
+  U extends any ? (k: U) => void : never
+) extends (k: infer I) => void
+  ? I
   : never;
+
+type MergeExtensions<TExtension extends Extension<Context>[]> = UnionToIntersection<TExtension[number]> & Extension<Context>;
 
 /**
  * Extracts the context type from a StepBlock's action or a direct function
