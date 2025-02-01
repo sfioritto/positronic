@@ -66,7 +66,7 @@ const myWorkflow = createWorkflow("Coverage Analysis", [simpleExtension])
 
 // Example of running a workflow and handling events
 await (async () => {
-  console.log(myWorkflow.title)
+  console.log(myWorkflow.workflowTitle)
   console.log('--------------------------------')
   for await (const event of myWorkflow.run()) {
     if (event.type === 'workflow:update') {
@@ -90,7 +90,7 @@ const multiExtensionWorkflow = createWorkflow(
 
 // Run the multi-extension workflow
 await (async () => {
-  console.log(multiExtensionWorkflow.title)
+  console.log(multiExtensionWorkflow.workflowTitle)
   console.log('--------------------------------')
   for await (const event of multiExtensionWorkflow.run()) {
     if (event.type === 'workflow:update') {
@@ -162,7 +162,7 @@ const myBuilder = createWorkflow(
   .step('final final step v3', ({ context }) => context);
 
 async function executeWorkflow() {
-  console.log(myBuilder.title)
+  console.log(myBuilder.workflowTitle)
   console.log('--------------------------------')
   for await (const event of myBuilder.run()) {
     if (event.type === 'workflow:update') {

@@ -17,8 +17,8 @@ export interface Event<
   TContextOut extends Context,
   TOptions extends object = {}
 > {
-  workflowName: string;
-  description?: string;
+  workflowTitle: string;
+  workflowDescription?: string;
   type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
   status: typeof STATUS[keyof typeof STATUS];
   previousContext: TContextIn;
@@ -99,39 +99,19 @@ type ExtensionMethodBuilder<
   TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>,
-  TMethod extends ExtensionMethod<any, any>
-> = (
-  ...args: Parameters<TMethod>
-) => Builder<
-  TContextIn & ExtractContextType<TMethod>,
-  TOptions,
-  TExtension
->;
-
-type NestedExtensionMethods<
-  TContextIn extends Context,
-  TOptions extends object,
-  TExtension extends Extension<Context>,
-  TNested extends Record<string, ExtensionMethod<any, any>>
-> = {
-  [P in keyof TNested]: ExtensionMethodBuilder<
-    TContextIn,
-    TOptions,
-    TExtension,
-    TNested[P]
-  >
-};
+  TMethod extends ExtensionMethod<any, any> | Record<string, ExtensionMethod<any, any>>
+> = TMethod extends ExtensionMethod<any, any>
+  ? (...args: Parameters<TMethod>) => Builder<TContextIn & ExtractContextType<TMethod>, TOptions, TExtension>
+  : TMethod extends Record<string, ExtensionMethod<any, any>>
+    ? { [P in keyof TMethod]: ExtensionMethodBuilder<TContextIn, TOptions, TExtension, TMethod[P]> }
+    : never;
 
 type ExtendedBuilder<
   TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
 > = {
-  [K in keyof TExtension]: TExtension[K] extends ExtensionMethod<any, any>
-    ? ExtensionMethodBuilder<TContextIn, TOptions, TExtension, TExtension[K]>
-    : TExtension[K] extends Record<string, ExtensionMethod<any, any>>
-      ? NestedExtensionMethods<TContextIn, TOptions, TExtension, TExtension[K]>
-      : never
+  [K in keyof TExtension]: ExtensionMethodBuilder<TContextIn, TOptions, TExtension, TExtension[K]>
 };
 
 interface RunParams<
@@ -141,6 +121,17 @@ interface RunParams<
   initialContext?: TContextIn;
   options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
+}
+
+interface BuilderProps<
+  TContext extends Context,
+  TOptions extends object,
+  TExtension extends Extension<Context>
+> {
+  extension: TExtension;
+  steps: StepBlock<any, TOptions>[];
+  workflowTitle: string;
+  workflowDescription?: string;
 }
 
 export type Builder<
@@ -159,8 +150,8 @@ export type Builder<
   run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<any, any, TOptions>, void, unknown>;
   extension: TExtension;
   steps: StepBlock<any, TOptions>[];
-  title: string;
-  description?: string;
+  workflowTitle: string;
+  workflowDescription?: string;
 } & ExtendedBuilder<Flatten<TContextIn>, TOptions, TExtension>;
 
 export const createWorkflow = <
@@ -177,8 +168,8 @@ export const createWorkflow = <
   return createBuilder<Context, TOptions, typeof extension>({
     extension,
     steps: [],
-    title: workflowName,
-    description
+    workflowTitle: workflowName,
+    workflowDescription: description
   });
 }
 
@@ -209,19 +200,51 @@ function createExtensionStep<
   };
 }
 
-function createBuilder<
+// This function is recursive, however, ExtensionMethod still allows
+// only one level of nesting. I made this recursive because it's a lot
+// easier to read and should make it easier to allow more nesting in the future.
+function bindExtension<
   TContext extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
 >(
-  props: {
-    extension: TExtension;
-    steps?: StepBlock<any, TOptions>[];
-    title: string;
-    description?: string;
-  }
-): Builder<TContext, TOptions, TExtension> {
-  const { extension, steps = [], title, description } = props;
+  builderProps: BuilderProps<TContext, TOptions, TExtension>
+) {
+  const createMethodHandler = (
+    methodName: string,
+    methodDefinition: ExtensionMethod<any, any> | Record<string, ExtensionMethod<any, any>>
+  ): any => {
+    if (typeof methodDefinition === 'function') {
+      return (...args: any[]) => {
+        const newStep = createExtensionStep(methodName, methodDefinition as ExtensionMethod<any, any>, args);
+        return createBuilder({
+          ...builderProps,
+          steps: [...builderProps.steps, newStep],
+        });
+      };
+    }
+    return Object.fromEntries(
+      Object.entries(methodDefinition).map(([nestedName, nestedMethod]) => [
+        nestedName,
+        createMethodHandler(`${methodName}.${nestedName}`, nestedMethod)
+      ])
+    );
+  };
+
+  return Object.fromEntries(
+    Object.entries(builderProps.extension).map(([methodName, methodDefinition]) => [
+      methodName,
+      createMethodHandler(methodName, methodDefinition)
+    ])
+  );
+}
+
+function createBuilder<
+  TContext extends Context,
+  TOptions extends object,
+  TExtension extends Extension<Context>
+>(props: BuilderProps<TContext, TOptions, TExtension>): Builder<TContext, TOptions, TExtension> {
+  const { extension, steps, workflowTitle, workflowDescription } = props;
 
   const builder = {
     step: (<TContextOut extends Context>(
@@ -229,56 +252,12 @@ function createBuilder<
       action: (params: { context: Flatten<TContext>; options: TOptions }) => TContextOut | Promise<TContextOut>
     ) => {
       const newStep: StepBlock<any, TOptions> = { title: stepTitle, action };
-      return createBuilder<TContextOut, TOptions, TExtension>({
-        extension,
+      return createBuilder({
+        ...props,
         steps: [...steps, newStep],
-        title,
-        description,
       });
     }),
-    ...Object.fromEntries(
-      Object.entries(extension).map(([methodName, methodDefinition]) => {
-        if (typeof methodDefinition === 'function') {
-          return [
-            methodName,
-            (...args: any[]) => {
-              const newStep = createExtensionStep(methodName, methodDefinition, args);
-              return createBuilder<TContext, TOptions, TExtension>({
-                extension,
-                steps: [...steps, newStep],
-                title,
-                description,
-              });
-            }
-          ];
-        } else {
-          // Handle nested extension methods
-          return [
-            methodName,
-            Object.fromEntries(
-              Object.entries(methodDefinition as object).map(([nestedMethodName, nestedMethod]) => {
-                return [
-                  nestedMethodName,
-                  (...args: any[]) => {
-                    const newStep = createExtensionStep(
-                      `${methodName}.${nestedMethodName}`,
-                      nestedMethod,
-                      args
-                    );
-                    return createBuilder<TContext, TOptions, TExtension>({
-                      extension,
-                      steps: [...steps, newStep],
-                      title,
-                      description,
-                    });
-                  }
-                ];
-              })
-            )
-          ];
-        }
-      })
-    ),
+    ...bindExtension(props),
     run: async function*({
       initialContext = {} as TContext,
       options = {} as TOptions,
@@ -292,8 +271,8 @@ function createBuilder<
       }
 
       yield clone({
-        workflowName: title,
-        description,
+        workflowTitle,
+        workflowDescription,
         type: initialCompletedSteps.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
         status: STATUS.RUNNING,
         previousContext: initialContext,
@@ -324,8 +303,8 @@ function createBuilder<
           completedSteps.push(completedStep);
 
           yield clone({
-            workflowName: title,
-            description,
+            workflowTitle,
+            workflowDescription,
             type: WORKFLOW_EVENTS.UPDATE,
             status: STATUS.RUNNING,
             previousContext,
@@ -352,8 +331,8 @@ function createBuilder<
           completedSteps.push(errorStep);
 
           yield clone({
-            workflowName: title,
-            description,
+            workflowTitle,
+            workflowDescription,
             type: WORKFLOW_EVENTS.ERROR,
             status: STATUS.ERROR,
             previousContext,
@@ -374,8 +353,8 @@ function createBuilder<
       }
 
       yield clone({
-        workflowName: title,
-        description,
+        workflowTitle,
+        workflowDescription,
         type: WORKFLOW_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
         previousContext: initialContext,
@@ -384,11 +363,7 @@ function createBuilder<
         options
       });
     },
-    // Expose the config on the builder
-    extension,
-    steps,
-    title,
-    description
+    ...props
   } as Builder<TContext, TOptions, TExtension>;
 
   return builder;

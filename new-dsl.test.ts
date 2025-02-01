@@ -81,7 +81,7 @@ describe('workflow creation', () => {
       workflowName: 'simple workflow',
       type: WORKFLOW_EVENTS.START
     }));
-    expect(event.description).toBeUndefined();
+    expect(event.workflowDescription).toBeUndefined();
   });
 });
 
