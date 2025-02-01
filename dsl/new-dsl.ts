@@ -95,7 +95,6 @@ type ExtractContextType<T> = T extends (...args: any[]) => infer R
   ? ExtensionReturn<R>
   : never;
 
-// Handle a single extension method
 type ExtensionMethodBuilder<
   TContextIn extends Context,
   TOptions extends object,
@@ -109,7 +108,6 @@ type ExtensionMethodBuilder<
   TExtension
 >;
 
-// Handle nested methods
 type NestedExtensionMethods<
   TContextIn extends Context,
   TOptions extends object,
@@ -124,8 +122,7 @@ type NestedExtensionMethods<
   >
 };
 
-// Combine them for the final type
-type BuilderExtension<
+type ExtendedBuilder<
   TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
@@ -164,7 +161,7 @@ export type Builder<
   steps: StepBlock<any, TOptions>[];
   title: string;
   description?: string;
-} & BuilderExtension<Flatten<TContextIn>, TOptions, TExtension>;
+} & ExtendedBuilder<Flatten<TContextIn>, TOptions, TExtension>;
 
 export const createWorkflow = <
   TOptions extends object = {},
