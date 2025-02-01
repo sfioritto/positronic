@@ -95,30 +95,46 @@ type ExtractContextType<T> = T extends (...args: any[]) => infer R
   ? ExtensionReturn<R>
   : never;
 
+// Handle a single extension method
+type ExtensionMethodBuilder<
+  TContextIn extends Context,
+  TOptions extends object,
+  TExtension extends Extension<Context>,
+  TMethod extends ExtensionMethod<any, any>
+> = (
+  ...args: Parameters<TMethod>
+) => Builder<
+  TContextIn & ExtractContextType<TMethod>,
+  TOptions,
+  TExtension
+>;
+
+// Handle nested methods
+type NestedExtensionMethods<
+  TContextIn extends Context,
+  TOptions extends object,
+  TExtension extends Extension<Context>,
+  TNested extends Record<string, ExtensionMethod<any, any>>
+> = {
+  [P in keyof TNested]: ExtensionMethodBuilder<
+    TContextIn,
+    TOptions,
+    TExtension,
+    TNested[P]
+  >
+};
+
+// Combine them for the final type
 type BuilderExtension<
   TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
 > = {
   [K in keyof TExtension]: TExtension[K] extends ExtensionMethod<any, any>
-    ? (
-        ...args: Parameters<TExtension[K]>
-      ) => Builder<
-        TContextIn & ExtractContextType<TExtension[K]>,
-        TOptions,
-        TExtension
-      >
-    : {
-        [P in keyof TExtension[K]]: TExtension[K][P] extends ExtensionMethod<any, any>
-          ? (
-              ...args: Parameters<TExtension[K][P]>
-            ) => Builder<
-              TContextIn & ExtractContextType<TExtension[K][P]>,
-              TOptions,
-              TExtension
-            >
-          : never
-      }
+    ? ExtensionMethodBuilder<TContextIn, TOptions, TExtension, TExtension[K]>
+    : TExtension[K] extends Record<string, ExtensionMethod<any, any>>
+      ? NestedExtensionMethods<TContextIn, TOptions, TExtension, TExtension[K]>
+      : never
 };
 
 interface RunParams<
