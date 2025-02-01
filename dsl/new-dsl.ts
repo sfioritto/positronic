@@ -221,23 +221,23 @@ function bindExtension<
   );
 }
 
-function run<TContext extends Context, TOptions extends object>(
+function run<TContextIn extends Context, TOptions extends object>(
   steps: StepBlock<any, TOptions>[],
   workflowTitle: string,
   workflowDescription?: string
 ) {
   return async function* run({
-    initialContext = {} as TContext,
+    initialContext = {} as TContextIn,
     options = {} as TOptions,
     initialCompletedSteps = []
-  }: RunParams<TOptions, TContext> = {}) {
+  }: RunParams<TOptions, TContextIn> = {}) {
     // Clone initial state to prevent mutations from affecting the original objects
-    let currentContext = clone(initialContext) as Context;
+    let currentContext = clone(initialContext) as TContextIn;
     const completedSteps: SerializedStep[] = [...initialCompletedSteps];
 
     if (initialCompletedSteps.length > 0) {
       // Clone the last completed step's context to ensure we start from an immutable snapshot
-      currentContext = clone(initialCompletedSteps[initialCompletedSteps.length - 1].context);
+      currentContext = clone(initialCompletedSteps[initialCompletedSteps.length - 1].context) as TContextIn;
     }
 
     yield clone({
@@ -338,16 +338,16 @@ function run<TContext extends Context, TOptions extends object>(
 }
 
 function createBuilder<
-  TContext extends Context,
+  TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
->(props: BuilderProps<TContext, TOptions, TExtension>): Builder<TContext, TOptions, TExtension> {
+>(props: BuilderProps<TContextIn, TOptions, TExtension>): Builder<TContextIn, TOptions, TExtension> {
   const { steps, workflowTitle, workflowDescription } = props;
 
   const builder = {
     step: (<TContextOut extends Context>(
       stepTitle: string,
-      action: (params: { context: Flatten<TContext>; options: TOptions }) => MaybePromise<TContextOut>
+      action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
     ) => {
       const newStep: StepBlock<any, TOptions> = { title: stepTitle, action };
       return createBuilder({
@@ -355,10 +355,10 @@ function createBuilder<
         steps: [...steps, newStep],
       });
     }),
-    run: run<TContext, TOptions>(steps, workflowTitle, workflowDescription),
+    run: run<TContextIn, TOptions>(steps, workflowTitle, workflowDescription),
     ...bindExtension(props),
     ...props
-  } as Builder<TContext, TOptions, TExtension>;
+  } as Builder<TContextIn, TOptions, TExtension>;
 
   return builder;
 }
