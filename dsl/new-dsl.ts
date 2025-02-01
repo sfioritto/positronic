@@ -35,11 +35,13 @@ interface SerializedStep {
   context: Context;
 }
 
+type MaybePromise<T> = T | Promise<T>;
+
 type Action<
   TContextIn extends Context,
   TOptions extends object = {},
   TContextOut extends Context = TContextIn & Context
-> = (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
+> = (params: { context: TContextIn; options: TOptions }) => MaybePromise<TContextOut>;
 
 type Flatten<T> = T extends object
   ? T extends Promise<infer R>
@@ -141,7 +143,7 @@ export type Builder<
 > = {
   step: <TContextOut extends Context>(
     title: string,
-    action: (params: { context: Flatten<TContextIn>; options: TOptions }) => TContextOut | Promise<TContextOut>
+    action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
   ) => Builder<
     Flatten<TContextOut>,
     TOptions,
@@ -361,7 +363,7 @@ function createBuilder<
   const builder = {
     step: (<TContextOut extends Context>(
       stepTitle: string,
-      action: (params: { context: Flatten<TContext>; options: TOptions }) => TContextOut | Promise<TContextOut>
+      action: (params: { context: Flatten<TContext>; options: TOptions }) => MaybePromise<TContextOut>
     ) => {
       const newStep: StepBlock<any, TOptions> = { title: stepTitle, action };
       return createBuilder({
