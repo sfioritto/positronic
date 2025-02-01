@@ -22,25 +22,25 @@ export const anotherExtension = createExtension({
 
 export const mathExtension = createExtension({
   math: {
-    add: {
-      title: "Addition",
-      handler: (a: number, b: number) => ({ context }) => {
+    add: (a: number, b: number) => ({
+      title: `Adding ${a} + ${b}...`,
+      action: ({ context }) => {
         const result = (context.result as number ?? 0) + a + b;
         return {
           ...context,
           result
         };
       }
-    },
-    multiply: {
-      title: "Multiplication",
-      handler: (a: number, b: number) => ({ context }) => ({
+    }),
+    multiply: (a: number, b: number) => ({
+      title: `Multiplying ${a} * ${b}...`,
+      action: ({ context }) => ({
         ...context,
         result: (context.result as number ?? 1) * a * b
       })
-    }
+    })
   }
-})
+});
 
 // Basic workflow example showing type inference with string name
 const myWorkflow = createWorkflow("Coverage Analysis", [simpleExtension])

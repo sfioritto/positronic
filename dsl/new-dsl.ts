@@ -49,16 +49,12 @@ type Flatten<T> = T extends object
 export type ExtensionMethod<TContextIn extends Context, TOptions extends object = {}> =
   (...args: any[]) => StepBlock<TContextIn, TOptions> | Action<TContextIn, TOptions>;
 
-export type ExtensionMethodOrObject<TContextIn extends Context, TOptions extends object = {}> =
-  | ExtensionMethod<TContextIn, TOptions>
-  | { title?: string; handler: ExtensionMethod<TContextIn, TOptions> };
-
 type Extension<
   TContextIn extends Context,
   TOptions extends object = {}
 > = {
-  [name: string]: ExtensionMethodOrObject<TContextIn, TOptions> | {
-    [name: string]: ExtensionMethodOrObject<TContextIn, TOptions>
+  [name: string]: ExtensionMethod<TContextIn, TOptions> | {
+    [name: string]: ExtensionMethod<TContextIn, TOptions>
   }
 };
 
@@ -88,26 +84,29 @@ type ExtensionReturn<R> = R extends StepBlock<any, any>
     ? Awaited<Out>
     : never;
 
-type GetExtensionResult<T> = T extends { handler: (...args: any[]) => infer R }
-  ? ExtensionReturn<R>
-  : T extends (...args: any[]) => infer R
-    ? ExtensionReturn<R>
-    : never;
+type GetExtensionResult<T> = T extends (...args: any[]) => infer R
+  ? R extends StepBlock<any, any>
+    ? R extends { action: infer A }
+      ? A extends (...args: any[]) => infer Out
+        ? Awaited<Out>
+        : never
+      : never
+    : R extends (...args: any[]) => infer Out
+      ? Awaited<Out>
+      : never
+  : never;
 
-// Helper type to extract the parameters of an extension method,
-// whether it is a bare function or an object with a handler method.
-type GetParameters<T> = T extends { handler: (...args: infer P) => any }
+// Simplified to only handle functions
+type GetParameters<T> = T extends (...args: infer P) => any
   ? P
-  : T extends (...args: infer P) => any
-    ? P
-    : never;
+  : never;
 
 type BuilderExtension<
   TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
 > = {
-  [K in keyof TExtension]: TExtension[K] extends ExtensionMethodOrObject<any, any>
+  [K in keyof TExtension]: TExtension[K] extends ExtensionMethod<any, any>
     ? (
         ...args: GetParameters<TExtension[K]>
       ) => Builder<
@@ -116,7 +115,7 @@ type BuilderExtension<
         TExtension
       >
     : {
-        [P in keyof TExtension[K]]: TExtension[K][P] extends ExtensionMethodOrObject<any, any>
+        [P in keyof TExtension[K]]: TExtension[K][P] extends ExtensionMethod<any, any>
           ? (
               ...args: GetParameters<TExtension[K][P]>
             ) => Builder<
@@ -181,22 +180,12 @@ function createExtensionStep<
   Options extends object
 >(
   key: string,
-  extensionMethod: ExtensionMethodOrObject<ContextIn, Options>,
+  extensionMethod: ExtensionMethod<ContextIn, Options>,
   args: any[]
 ): StepBlock<ContextIn, Options> {
-  let stepResult: unknown;
-  let defaultTitle = key;
-  if (typeof extensionMethod === 'function') {
-    stepResult = extensionMethod(...args);
-  } else {
-    stepResult = extensionMethod.handler(...args);
-    if (extensionMethod.title) {
-      defaultTitle = extensionMethod.title;
-    }
-  }
+  const stepResult = extensionMethod(...args);
 
-  // If stepResult adheres to our StepBlock shape, use its title & action.
-  // Otherwise, fallback to using the default title and assume it is just an action.
+  // If stepResult is a StepBlock, return it directly
   if (
     stepResult &&
     typeof stepResult === 'object' &&
@@ -204,12 +193,13 @@ function createExtensionStep<
     typeof (stepResult as any).title === 'string'
   ) {
     return stepResult as StepBlock<ContextIn, Options>;
-  } else {
-    return {
-      title: defaultTitle,
-      action: stepResult as Action<ContextIn, Options>
-    };
   }
+
+  // Otherwise wrap the action in a StepBlock with the default title
+  return {
+    title: key,
+    action: stepResult as Action<ContextIn, Options>
+  };
 }
 
 function createBuilder<
@@ -241,9 +231,7 @@ function createBuilder<
     }),
     ...Object.fromEntries(
       Object.entries(extension).map(([key, extProp]) => {
-        // Type guard for when an extension method is an object with a handler property
-        const isExtensionObject = (m: any): m is { handler: Function } => m && typeof m === 'object' && 'handler' in m;
-        if (typeof extProp === 'function' || isExtensionObject(extProp)) {
+        if (typeof extProp === 'function') {
           return [
             key,
             (...args: any[]) => {
