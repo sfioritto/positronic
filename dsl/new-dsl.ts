@@ -1,11 +1,9 @@
 import { JsonObject, SerializedError } from "./types";
 import { WORKFLOW_EVENTS, STATUS } from './constants';
 
-/**
- * Creates a deep clone of an object to prevent mutation of internal state.
- * This is used throughout the workflow engine to ensure immutability and prevent
- * side effects from consumer code modifying shared state.
- */
+// Creates a deep clone of an object to prevent mutation of internal state.
+// This is used throughout the workflow engine to ensure immutability and prevent
+// side effects from consumer code modifying shared state.
 function clone<T>(original: T): T {
   return structuredClone(original) as T;
 }
@@ -82,9 +80,7 @@ type UnionToIntersection<U> = (
 
 type MergeExtensions<TExtension extends Extension<Context>[]> = UnionToIntersection<TExtension[number]> & Extension<Context>;
 
-/**
- * Extracts the context type from a StepBlock's action or a direct function
- */
+// Extracts the context type from a StepBlock's action or a direct function
 type ExtensionReturn<R> = R extends StepBlock<any, any>
   ? R extends { action: infer A }
     ? A extends (...args: any[]) => infer Out
@@ -95,9 +91,7 @@ type ExtensionReturn<R> = R extends StepBlock<any, any>
     ? Awaited<Out>
     : never;
 
-/**
- * Extracts the context type from an extension method or step block
- */
+// Extracts the context type from an extension method or step block
 type ExtractContextType<T> = T extends (...args: any[]) => infer R
   ? ExtensionReturn<R>
   : never;
@@ -131,12 +125,12 @@ interface RunParams<
 }
 
 interface BuilderProps<
-  TContext extends Context,
+  TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
 > {
   extension: TExtension;
-  steps: StepBlock<any, TOptions>[];
+  steps: StepBlock<TContextIn, TOptions>[];
   workflowTitle: string;
   workflowDescription?: string;
 }
@@ -160,25 +154,6 @@ export type Builder<
   workflowTitle: string;
   workflowDescription?: string;
 } & ExtendedBuilder<Flatten<TContextIn>, TOptions, TExtension>;
-
-export const createWorkflow = <
-  TOptions extends object = {},
-  TExtensions extends Extension<Context>[] = [Extension<Context>]
->(
-  workflowConfig: string | WorkflowConfig,
-  extensions: TExtensions | [] = []
-) => {
-  const workflowName = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.name;
-  const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
-  const mergedExtensions = Object.assign({}, ...extensions) as MergeExtensions<TExtensions>;
-  const extension = createExtension(mergedExtensions);
-  return createBuilder<Context, TOptions, typeof extension>({
-    extension,
-    steps: [],
-    workflowTitle: workflowName,
-    workflowDescription: description
-  });
-}
 
 function createExtensionStep<
   ContextIn extends Context,
@@ -390,5 +365,25 @@ function createBuilder<
 
 export const createExtension = <
   TExtension extends Extension<Context>
->(ext: TExtension): TExtension => ext;
+  >(ext: TExtension): TExtension => ext;
+
+export const createWorkflow = <
+  TOptions extends object = {},
+  TExtensions extends Extension<Context>[] = [Extension<Context>]
+>(
+  workflowConfig: string | WorkflowConfig,
+  extensions: TExtensions | [] = []
+) => {
+  const workflowName = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.name;
+  const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
+  const mergedExtensions = Object.assign({}, ...extensions) as MergeExtensions<TExtensions>;
+  const extension = createExtension(mergedExtensions);
+  return createBuilder<Context, TOptions, typeof extension>({
+    extension,
+    steps: [],
+    workflowTitle: workflowName,
+    workflowDescription: description
+  });
+}
+
 
