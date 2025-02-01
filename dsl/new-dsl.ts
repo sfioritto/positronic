@@ -13,19 +13,20 @@ interface WorkflowConfig {
 }
 
 export interface Event<
-  ContextIn extends Context, ContextOut extends Context,
-  Options extends object = {}
+  TContextIn extends Context,
+  TContextOut extends Context,
+  TOptions extends object = {}
 > {
   workflowName: string;
   description?: string;
   type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
   status: typeof STATUS[keyof typeof STATUS];
-  previousContext: ContextIn;
-  newContext: ContextOut;
+  previousContext: TContextIn;
+  newContext: TContextOut;
   error?: SerializedError;
   completedStep?: SerializedStep;
   steps: SerializedStep[];
-  options: Options;
+  options: TOptions;
 }
 
 interface SerializedStep {
@@ -59,15 +60,14 @@ type Extension<
 };
 
 type StepBlock<
-  ContextIn extends Context,
-  Options extends object = {}
+  TContextIn extends Context,
+  TOptions extends object = {}
 > = {
   title: string;
-  action: Action<ContextIn, Options>;
+  action: Action<TContextIn, TOptions>;
 };
 
-type MergeExtensions<
-  T extends Extension<any>[]
+type MergeExtensions<T extends Extension<any>[]
 > = T extends [infer First extends Extension<any>, ...infer Rest extends Extension<any>[]]
   ? Rest extends []
     ? First
@@ -128,11 +128,11 @@ type BuilderExtension<
 };
 
 interface RunParams<
-  Options extends object = {},
-  ContextIn extends Context = Context
+  TOptions extends object = {},
+  TContextIn extends Context = Context
 > {
-  initialContext?: ContextIn;
-  options?: Options;
+  initialContext?: TContextIn;
+  options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
 }
 
@@ -160,15 +160,15 @@ export const createWorkflow = <
   TOptions extends object = {},
   TExtensions extends Extension<Context>[] = [Extension<Context>]
 >(
-  nameOrConfig: string | WorkflowConfig,
+  workflowConfig: string | WorkflowConfig,
   extensions: TExtensions | [] = []
 ) => {
-  const workflowName = typeof nameOrConfig === 'string' ? nameOrConfig : nameOrConfig.name;
-  const description = typeof nameOrConfig === 'string' ? undefined : nameOrConfig.description;
-  const extensionBlock = Object.assign({}, ...extensions) as MergeExtensions<TExtensions>;
-  const combinedExtension = createExtension(extensionBlock);
-  return createBuilder<Context, TOptions, typeof combinedExtension>({
-    extension: combinedExtension,
+  const workflowName = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.name;
+  const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
+  const mergedExtensions = Object.assign({}, ...extensions) as MergeExtensions<TExtensions>;
+  const extension = createExtension(mergedExtensions);
+  return createBuilder<Context, TOptions, typeof extension>({
+    extension,
     steps: [],
     title: workflowName,
     description
@@ -203,26 +203,26 @@ function createExtensionStep<
 }
 
 function createBuilder<
-  ContextIn extends Context,
-  Options extends object,
+  TContext extends Context,
+  TOptions extends object,
   TExtension extends Extension<Context>
 >(
   props: {
     extension: TExtension;
-    steps?: StepBlock<any, Options>[];
+    steps?: StepBlock<any, TOptions>[];
     title: string;
     description?: string;
   }
-): Builder<ContextIn, Options, TExtension> {
+): Builder<TContext, TOptions, TExtension> {
   const { extension, steps = [], title, description } = props;
 
   const builder = {
     step: (<TContextOut extends Context>(
       stepTitle: string,
-      action: (params: { context: Flatten<ContextIn>; options: Options }) => TContextOut | Promise<TContextOut>
+      action: (params: { context: Flatten<TContext>; options: TOptions }) => TContextOut | Promise<TContextOut>
     ) => {
-      const newStep: StepBlock<any, Options> = { title: stepTitle, action };
-      return createBuilder<TContextOut, Options, TExtension>({
+      const newStep: StepBlock<any, TOptions> = { title: stepTitle, action };
+      return createBuilder<TContextOut, TOptions, TExtension>({
         extension,
         steps: [...steps, newStep],
         title,
@@ -230,13 +230,13 @@ function createBuilder<
       });
     }),
     ...Object.fromEntries(
-      Object.entries(extension).map(([key, extProp]) => {
-        if (typeof extProp === 'function') {
+      Object.entries(extension).map(([methodName, methodDefinition]) => {
+        if (typeof methodDefinition === 'function') {
           return [
-            key,
+            methodName,
             (...args: any[]) => {
-              const newStep = createExtensionStep(key, extProp, args);
-              return createBuilder<ContextIn, Options, TExtension>({
+              const newStep = createExtensionStep(methodName, methodDefinition, args);
+              return createBuilder<TContext, TOptions, TExtension>({
                 extension,
                 steps: [...steps, newStep],
                 title,
@@ -245,16 +245,20 @@ function createBuilder<
             }
           ];
         } else {
-          // Nested extension case
+          // Handle nested extension methods
           return [
-            key,
+            methodName,
             Object.fromEntries(
-              Object.entries(extProp as object).map(([subKey, subMethod]) => {
+              Object.entries(methodDefinition as object).map(([nestedMethodName, nestedMethod]) => {
                 return [
-                  subKey,
+                  nestedMethodName,
                   (...args: any[]) => {
-                    const newStep = createExtensionStep(`${key}.${subKey}`, subMethod, args);
-                    return createBuilder<ContextIn, Options, TExtension>({
+                    const newStep = createExtensionStep(
+                      `${methodName}.${nestedMethodName}`,
+                      nestedMethod,
+                      args
+                    );
+                    return createBuilder<TContext, TOptions, TExtension>({
                       extension,
                       steps: [...steps, newStep],
                       title,
@@ -269,10 +273,10 @@ function createBuilder<
       })
     ),
     run: async function*({
-      initialContext = {} as ContextIn,
-      options = {} as Options,
+      initialContext = {} as TContext,
+      options = {} as TOptions,
       initialCompletedSteps = []
-    }: RunParams<Options, ContextIn> = {}) {
+    }: RunParams<TOptions, TContext> = {}) {
       let currentContext = clone(initialContext) as Context;
       const completedSteps: SerializedStep[] = [...initialCompletedSteps];
 
@@ -378,7 +382,7 @@ function createBuilder<
     steps,
     title,
     description
-  } as Builder<ContextIn, Options, TExtension>;
+  } as Builder<TContext, TOptions, TExtension>;
 
   return builder;
 }
