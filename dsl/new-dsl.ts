@@ -74,6 +74,9 @@ type MergeExtensions<T extends Extension<any>[]
     : First & MergeExtensions<Rest>
   : never;
 
+/**
+ * Extracts the context type from a StepBlock's action or a direct function
+ */
 type ExtensionReturn<R> = R extends StepBlock<any, any>
   ? R extends { action: infer A }
     ? A extends (...args: any[]) => infer Out
@@ -84,21 +87,11 @@ type ExtensionReturn<R> = R extends StepBlock<any, any>
     ? Awaited<Out>
     : never;
 
-type GetExtensionResult<T> = T extends (...args: any[]) => infer R
-  ? R extends StepBlock<any, any>
-    ? R extends { action: infer A }
-      ? A extends (...args: any[]) => infer Out
-        ? Awaited<Out>
-        : never
-      : never
-    : R extends (...args: any[]) => infer Out
-      ? Awaited<Out>
-      : never
-  : never;
-
-// Simplified to only handle functions
-type GetParameters<T> = T extends (...args: infer P) => any
-  ? P
+/**
+ * Extracts the context type from an extension method or step block
+ */
+type ExtractContextType<T> = T extends (...args: any[]) => infer R
+  ? ExtensionReturn<R>
   : never;
 
 type BuilderExtension<
@@ -108,18 +101,18 @@ type BuilderExtension<
 > = {
   [K in keyof TExtension]: TExtension[K] extends ExtensionMethod<any, any>
     ? (
-        ...args: GetParameters<TExtension[K]>
+        ...args: Parameters<TExtension[K]>
       ) => Builder<
-        TContextIn & GetExtensionResult<TExtension[K]>,
+        TContextIn & ExtractContextType<TExtension[K]>,
         TOptions,
         TExtension
       >
     : {
         [P in keyof TExtension[K]]: TExtension[K][P] extends ExtensionMethod<any, any>
           ? (
-              ...args: GetParameters<TExtension[K][P]>
+              ...args: Parameters<TExtension[K][P]>
             ) => Builder<
-              TContextIn & GetExtensionResult<TExtension[K][P]>,
+              TContextIn & ExtractContextType<TExtension[K][P]>,
               TOptions,
               TExtension
             >
