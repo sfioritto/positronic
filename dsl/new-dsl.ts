@@ -148,7 +148,7 @@ export type Builder<
     TOptions,
     TExtension
   >;
-  run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<any, any, TOptions>, void, unknown>;
+  run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<TContextIn, TContextIn, TOptions>, void, unknown>;
   extension: TExtension;
   steps: StepBlock<any, TOptions>[];
   workflowTitle: string;
