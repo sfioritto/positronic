@@ -221,122 +221,6 @@ function bindExtension<
   );
 }
 
-function run<TContextIn extends Context, TOptions extends object>(
-  steps: StepBlock<any, TOptions>[],
-  workflowTitle: string,
-  workflowDescription?: string
-) {
-  return async function* run({
-    initialContext = {} as TContextIn,
-    options = {} as TOptions,
-    initialCompletedSteps = []
-  }: RunParams<TOptions, TContextIn> = {}) {
-    // Clone initial state to prevent mutations from affecting the original objects
-    let currentContext = clone(initialContext) as TContextIn;
-    const completedSteps: SerializedStep[] = [...initialCompletedSteps];
-
-    if (initialCompletedSteps.length > 0) {
-      // Clone the last completed step's context to ensure we start from an immutable snapshot
-      currentContext = clone(initialCompletedSteps[initialCompletedSteps.length - 1].context) as TContextIn;
-    }
-
-    yield clone({
-      workflowTitle,
-      workflowDescription,
-      type: initialCompletedSteps.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
-      status: STATUS.RUNNING,
-      previousContext: initialContext,
-      newContext: currentContext,
-      steps: steps.map((step, index) =>
-        completedSteps[index] || {
-          title: step.title,
-          status: STATUS.PENDING,
-          context: currentContext
-        }
-      ),
-      options
-    });
-
-    const remainingSteps = steps.slice(initialCompletedSteps.length);
-    for (const step of remainingSteps) {
-      // Preserve the previous state for event emission
-      const previousContext = clone(currentContext);
-
-      try {
-        // Clone context before passing to user-provided action to prevent action from mutating shared state
-        const result = await step.action({ context: clone(currentContext), options });
-        currentContext = clone(result);  // Clone result to prevent subsequent mutations
-
-        const completedStep = {
-          title: step.title,
-          status: STATUS.COMPLETE,
-          context: currentContext
-        };
-        completedSteps.push(completedStep);
-
-        yield clone({
-          workflowTitle,
-          workflowDescription,
-          type: WORKFLOW_EVENTS.UPDATE,
-          status: STATUS.RUNNING,
-          previousContext,
-          newContext: currentContext,
-          completedStep,
-          steps: steps.map((s, index) =>
-            completedSteps[index] || {
-              title: s.title,
-              status: STATUS.PENDING,
-              context: currentContext
-            }
-          ),
-          options
-        });
-
-      } catch (error) {
-        console.error((error as Error).message);
-
-        const errorStep = {
-          title: step.title,
-          status: STATUS.ERROR,
-          context: currentContext
-        };
-        completedSteps.push(errorStep);
-
-        yield clone({
-          workflowTitle,
-          workflowDescription,
-          type: WORKFLOW_EVENTS.ERROR,
-          status: STATUS.ERROR,
-          previousContext,
-          newContext: currentContext,
-          error: error as SerializedError,
-          completedStep: errorStep,
-          steps: steps.map((s, index) =>
-            completedSteps[index] || {
-              title: s.title,
-              status: STATUS.PENDING,
-              context: currentContext
-            }
-          ),
-          options
-        });
-        return;
-      }
-    }
-
-    yield clone({
-      workflowTitle,
-      workflowDescription,
-      type: WORKFLOW_EVENTS.COMPLETE,
-      status: STATUS.COMPLETE,
-      previousContext: initialContext,
-      newContext: currentContext,
-      steps: completedSteps,
-      options
-    });
-  };
-}
-
 function createBuilder<
   TContextIn extends Context,
   TOptions extends object,
@@ -355,7 +239,111 @@ function createBuilder<
         steps: [...steps, newStep],
       });
     }),
-    run: run<TContextIn, TOptions>(steps, workflowTitle, workflowDescription),
+    run: async function* ({
+      initialContext = {} as TContextIn,
+      options = {} as TOptions,
+      initialCompletedSteps = []
+    }: RunParams<TOptions, TContextIn> = {}) {
+      let currentContext = clone(initialContext) as TContextIn;
+      const completedSteps: SerializedStep[] = [...initialCompletedSteps];
+
+      if (initialCompletedSteps.length > 0) {
+        currentContext = clone(initialCompletedSteps[initialCompletedSteps.length - 1].context) as TContextIn;
+      }
+
+      yield clone({
+        workflowTitle,
+        workflowDescription,
+        type: initialCompletedSteps.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
+        status: STATUS.RUNNING,
+        previousContext: initialContext,
+        newContext: currentContext,
+        steps: steps.map((step, index) =>
+          completedSteps[index] || {
+            title: step.title,
+            status: STATUS.PENDING,
+            context: currentContext
+          }
+        ),
+        options
+      });
+
+      const remainingSteps = steps.slice(initialCompletedSteps.length);
+      for (const step of remainingSteps) {
+        const previousContext = clone(currentContext);
+
+        try {
+          const result = await step.action({ context: clone(currentContext), options });
+          currentContext = clone(result);
+
+          const completedStep = {
+            title: step.title,
+            status: STATUS.COMPLETE,
+            context: currentContext
+          };
+          completedSteps.push(completedStep);
+
+          yield clone({
+            workflowTitle,
+            workflowDescription,
+            type: WORKFLOW_EVENTS.UPDATE,
+            status: STATUS.RUNNING,
+            previousContext,
+            newContext: currentContext,
+            completedStep,
+            steps: steps.map((s, index) =>
+              completedSteps[index] || {
+                title: s.title,
+                status: STATUS.PENDING,
+                context: currentContext
+              }
+            ),
+            options
+          });
+
+        } catch (error) {
+          console.error((error as Error).message);
+
+          const errorStep = {
+            title: step.title,
+            status: STATUS.ERROR,
+            context: currentContext
+          };
+          completedSteps.push(errorStep);
+
+          yield clone({
+            workflowTitle,
+            workflowDescription,
+            type: WORKFLOW_EVENTS.ERROR,
+            status: STATUS.ERROR,
+            previousContext,
+            newContext: currentContext,
+            error: error as SerializedError,
+            completedStep: errorStep,
+            steps: steps.map((s, index) =>
+              completedSteps[index] || {
+                title: s.title,
+                status: STATUS.PENDING,
+                context: currentContext
+              }
+            ),
+            options
+          });
+          return;
+        }
+      }
+
+      yield clone({
+        workflowTitle,
+        workflowDescription,
+        type: WORKFLOW_EVENTS.COMPLETE,
+        status: STATUS.COMPLETE,
+        previousContext: initialContext,
+        newContext: currentContext,
+        steps: completedSteps,
+        options
+      });
+    },
     ...bindExtension(props),
     ...props
   } as Builder<TContextIn, TOptions, TExtension>;
