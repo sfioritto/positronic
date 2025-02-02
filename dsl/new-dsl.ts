@@ -221,6 +221,138 @@ function bindExtension<
   );
 }
 
+class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
+  public hasError = false;
+  private currentContext: TContextIn;
+  private completedSteps: SerializedStep[] = [];
+  private readonly initialContext: TContextIn;
+
+  constructor(
+    private readonly steps: StepBlock<any, TOptions>[],
+    private readonly params: RunParams<TOptions, TContextIn>,
+    private readonly workflowTitle: string,
+    private readonly workflowDescription?: string,
+  ) {
+    this.initialContext = clone(params.initialContext || {} as TContextIn);
+    this.currentContext = clone(this.initialContext);
+    this.completedSteps = [...(params.initialCompletedSteps || [])];
+
+    if (this.completedSteps.length > 0) {
+      this.currentContext = clone(this.completedSteps[this.completedSteps.length - 1].context) as TContextIn;
+    }
+  }
+
+  async* initialize(): AsyncGenerator<Event<any, any, TOptions>> {
+    yield this.createEvent({
+      type: this.completedSteps.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
+      status: STATUS.RUNNING,
+      steps: this.mapPendingSteps()
+    });
+  }
+
+  async* processSteps(): AsyncGenerator<Event<any, any, TOptions>> {
+    const remainingSteps = this.steps.slice(this.completedSteps.length);
+
+    for (const step of remainingSteps) {
+      const previousContext = clone(this.currentContext);
+      try {
+        yield* this.executeStep(step, previousContext);
+      } catch (error) {
+        yield* this.handleStepError(step, error, previousContext);
+        return;
+      }
+    }
+  }
+
+  private async* executeStep(
+    step: StepBlock<any, TOptions>,
+    previousContext: Context
+  ): AsyncGenerator<Event<any, any, TOptions>> {
+    const result = await step.action({
+      context: clone(this.currentContext),
+      options: this.params.options || {} as TOptions
+    });
+    this.currentContext = clone(result);
+
+    const completedStep = {
+      title: step.title,
+      status: STATUS.COMPLETE,
+      context: this.currentContext
+    };
+    this.completedSteps.push(completedStep);
+
+    yield this.createEvent({
+      type: WORKFLOW_EVENTS.UPDATE,
+      status: STATUS.RUNNING,
+      previousContext,
+      completedStep,
+      steps: this.mapPendingSteps()
+    });
+  }
+
+  private async* handleStepError(
+    step: StepBlock<any, TOptions>,
+    error: unknown,
+    previousContext: Context
+  ): AsyncGenerator<Event<any, any, TOptions>> {
+    console.error((error as Error).message);
+    const errorStep = {
+      title: step.title,
+      status: STATUS.ERROR,
+      context: this.currentContext
+    };
+    this.completedSteps.push(errorStep);
+
+    yield this.createEvent({
+      type: WORKFLOW_EVENTS.ERROR,
+      status: STATUS.ERROR,
+      previousContext,
+      completedStep: errorStep,
+      error: error as SerializedError,
+      steps: this.mapPendingSteps()
+    });
+
+    this.hasError = true;
+  }
+
+  async* complete(): AsyncGenerator<Event<any, any, TOptions>> {
+    yield this.createEvent({
+      type: WORKFLOW_EVENTS.COMPLETE,
+      status: STATUS.COMPLETE,
+      previousContext: this.initialContext,
+      steps: this.completedSteps
+    });
+  }
+
+  private createEvent(params: {
+    type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
+    status: typeof STATUS[keyof typeof STATUS];
+    steps: SerializedStep[];
+    previousContext?: Context;
+    completedStep?: SerializedStep;
+    error?: SerializedError;
+  }): Event<any, any, TOptions> {
+    return clone({
+      workflowTitle: this.workflowTitle,
+      workflowDescription: this.workflowDescription,
+      previousContext: params.previousContext || this.initialContext,
+      newContext: this.currentContext,
+      options: this.params.options || {} as TOptions,
+      ...params
+    });
+  }
+
+  private mapPendingSteps(): SerializedStep[] {
+    return this.steps.map((s, index) =>
+      this.completedSteps[index] || {
+        title: s.title,
+        status: STATUS.PENDING,
+        context: this.currentContext
+      }
+    );
+  }
+}
+
 function createBuilder<
   TContextIn extends Context,
   TOptions extends object,
@@ -239,110 +371,20 @@ function createBuilder<
         steps: [...steps, newStep],
       });
     }),
-    run: async function* ({
-      initialContext = {} as TContextIn,
-      options = {} as TOptions,
-      initialCompletedSteps = []
-    }: RunParams<TOptions, TContextIn> = {}) {
-      let currentContext = clone(initialContext) as TContextIn;
-      const completedSteps: SerializedStep[] = [...initialCompletedSteps];
-
-      if (initialCompletedSteps.length > 0) {
-        currentContext = clone(initialCompletedSteps[initialCompletedSteps.length - 1].context) as TContextIn;
-      }
-
-      yield clone({
+    run: async function* (params: RunParams<TOptions, TContextIn> = {}) {
+      const eventStream = new WorkflowEventStream(
+        steps,
+        params,
         workflowTitle,
-        workflowDescription,
-        type: initialCompletedSteps.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
-        status: STATUS.RUNNING,
-        previousContext: initialContext,
-        newContext: currentContext,
-        steps: steps.map((step, index) =>
-          completedSteps[index] || {
-            title: step.title,
-            status: STATUS.PENDING,
-            context: currentContext
-          }
-        ),
-        options
-      });
+        workflowDescription
+      );
 
-      const remainingSteps = steps.slice(initialCompletedSteps.length);
-      for (const step of remainingSteps) {
-        const previousContext = clone(currentContext);
-
-        try {
-          const result = await step.action({ context: clone(currentContext), options });
-          currentContext = clone(result);
-
-          const completedStep = {
-            title: step.title,
-            status: STATUS.COMPLETE,
-            context: currentContext
-          };
-          completedSteps.push(completedStep);
-
-          yield clone({
-            workflowTitle,
-            workflowDescription,
-            type: WORKFLOW_EVENTS.UPDATE,
-            status: STATUS.RUNNING,
-            previousContext,
-            newContext: currentContext,
-            completedStep,
-            steps: steps.map((s, index) =>
-              completedSteps[index] || {
-                title: s.title,
-                status: STATUS.PENDING,
-                context: currentContext
-              }
-            ),
-            options
-          });
-
-        } catch (error) {
-          console.error((error as Error).message);
-
-          const errorStep = {
-            title: step.title,
-            status: STATUS.ERROR,
-            context: currentContext
-          };
-          completedSteps.push(errorStep);
-
-          yield clone({
-            workflowTitle,
-            workflowDescription,
-            type: WORKFLOW_EVENTS.ERROR,
-            status: STATUS.ERROR,
-            previousContext,
-            newContext: currentContext,
-            error: error as SerializedError,
-            completedStep: errorStep,
-            steps: steps.map((s, index) =>
-              completedSteps[index] || {
-                title: s.title,
-                status: STATUS.PENDING,
-                context: currentContext
-              }
-            ),
-            options
-          });
-          return;
-        }
+      yield* eventStream.initialize();
+      yield* eventStream.processSteps();
+      // Only complete if no error occurred
+      if (!eventStream.hasError) {
+        yield* eventStream.complete();
       }
-
-      yield clone({
-        workflowTitle,
-        workflowDescription,
-        type: WORKFLOW_EVENTS.COMPLETE,
-        status: STATUS.COMPLETE,
-        previousContext: initialContext,
-        newContext: currentContext,
-        steps: completedSteps,
-        options
-      });
     },
     ...bindExtension(props),
     ...props
