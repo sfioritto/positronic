@@ -1,5 +1,5 @@
 import { createWorkflow, createExtension } from './new-dsl';
-import type { Builder } from './new-dsl';
+import type { Workflow } from './new-dsl';
 
 
 export const simpleExtension = createExtension({
@@ -190,7 +190,7 @@ type ExpectedFinalContext = {
 };
 
 // Type test - extract the raw context type from the final builder state
-type ExtractContextType<T> = T extends Builder<infer Context, infer _Options, infer _Extension> ? Context : never;
+type ExtractContextType<T> = T extends Workflow<infer Context, infer _Options, infer _Extension> ? Context : never;
 
 type TestFinalContext = ExtractContextType<typeof myBuilder>;
 

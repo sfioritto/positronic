@@ -102,7 +102,7 @@ type ExtensionMethodBuilder<
   TExtension extends Extension<Context>,
   TMethod extends ExtensionMethod<any, any> | Record<string, ExtensionMethod<any, any>>
 > = TMethod extends ExtensionMethod<any, any>
-  ? (...args: Parameters<TMethod>) => Builder<TContextIn & ExtractContextType<TMethod>, TOptions, TExtension>
+  ? (...args: Parameters<TMethod>) => Workflow<TContextIn & ExtractContextType<TMethod>, TOptions, TExtension>
   : TMethod extends Record<string, ExtensionMethod<any, any>>
     ? { [P in keyof TMethod]: ExtensionMethodBuilder<TContextIn, TOptions, TExtension, TMethod[P]> }
     : never;
@@ -135,7 +135,7 @@ interface BuilderProps<
   workflowDescription?: string;
 }
 
-export type Builder<
+export type Workflow<
   TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
@@ -143,7 +143,7 @@ export type Builder<
   step: <TContextOut extends Context>(
     title: string,
     action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
-  ) => Builder<
+  ) => Workflow<
     Flatten<TContextOut>,
     TOptions,
     TExtension
@@ -199,7 +199,7 @@ function bindExtension<
     if (typeof methodDefinition === 'function') {
       return (...args: any[]) => {
         const newStep = createExtensionStep(methodName, methodDefinition as ExtensionMethod<any, any>, args);
-        return createBuilder({
+        return createWorkflowBuilder({
           ...builderProps,
           steps: [...builderProps.steps, newStep],
         });
@@ -353,11 +353,11 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
   }
 }
 
-function createBuilder<
+function createWorkflowBuilder<
   TContextIn extends Context,
   TOptions extends object,
   TExtension extends Extension<Context>
->(props: BuilderProps<TContextIn, TOptions, TExtension>): Builder<TContextIn, TOptions, TExtension> {
+>(props: BuilderProps<TContextIn, TOptions, TExtension>): Workflow<TContextIn, TOptions, TExtension> {
   const { steps, workflowTitle, workflowDescription } = props;
 
   const builder = {
@@ -366,7 +366,7 @@ function createBuilder<
       action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
     ) => {
       const newStep: StepBlock<any, TOptions> = { title: stepTitle, action };
-      return createBuilder({
+      return createWorkflowBuilder({
         ...props,
         steps: [...steps, newStep],
       });
@@ -388,7 +388,7 @@ function createBuilder<
     },
     ...bindExtension(props),
     ...props
-  } as Builder<TContextIn, TOptions, TExtension>;
+  } as Workflow<TContextIn, TOptions, TExtension>;
 
   return builder;
 }
@@ -408,7 +408,7 @@ export const createWorkflow = <
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
   const mergedExtensions = Object.assign({}, ...extensions) as MergeExtensions<TExtensions>;
   const extension = createExtension(mergedExtensions);
-  return createBuilder<Context, TOptions, typeof extension>({
+  return createWorkflowBuilder<Context, TOptions, typeof extension>({
     extension,
     steps: [],
     workflowTitle: workflowName,
