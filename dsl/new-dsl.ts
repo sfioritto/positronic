@@ -88,7 +88,7 @@ type WorkflowBlock<
   TWorkflowInitialContext extends Context = Context
 > = {
   title: string;
-  workflow: Workflow<TWorkflowInitialContext, any, TOptions, TWorkflowContext>;
+  workflow: Workflow<TWorkflowInitialContext, any, TOptions>;
   initialContext: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext);
   reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>;
   _type: 'workflow_step';
@@ -174,21 +174,23 @@ interface BuilderProps<
 export type Workflow<
   TContextIn extends Context,
   TExtension extends Extension<Context>,
-  TOptions extends object = {},
-  TFinalContext extends Context = TContextIn
+  TOptions extends object = {}
 > = {
   step: <TContextOut extends Context>(
     title: string,
     action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
-  ) => Workflow<Flatten<TContextOut>, TExtension, TOptions, Flatten<TContextOut>>;
+  ) => Workflow<TContextOut, TExtension, TOptions>;
+
   workflow: <TWorkflowContext extends Context>(
     title: string,
-    workflow: Workflow<any, any, TOptions, TWorkflowContext>,
+    workflow: Workflow<any, any, TOptions> & { run: () => AsyncGenerator<Event<any, TWorkflowContext, TOptions>> },
     reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
-  ) => Workflow<TContextIn, TExtension, TOptions, TContextIn>;
+  ) => Workflow<TContextIn, TExtension, TOptions>;
+
   run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<TContextIn, TContextIn, TOptions>, void, unknown>;
+
   extension: TExtension;
-  steps: StepBlock<any, TOptions>[];
+  steps: Block<any, TOptions>[];
   workflowTitle: string;
   workflowDescription?: string;
 } & ExtendedBuilder<Flatten<TContextIn>, TOptions, TExtension>;
@@ -332,16 +334,17 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
     }
   }
 
-  private async* executeWorkflowStep(
-    step: WorkflowBlock<any, TOptions, any>,
+  private async* executeWorkflowStep<TWorkflowContext extends Context>(
+    step: WorkflowBlock<TContextIn, TOptions, TWorkflowContext>,
     previousContext: Context
   ): AsyncGenerator<Event<any, any, TOptions>> {
-    let lastEvent: Event<any, any, TOptions>;
-    for await (const event of step.workflow.run({
+    let lastEvent: Event<any, TWorkflowContext, TOptions>;
+    const workflow = step.workflow as Workflow<any, any, TOptions>;
+    for await (const event of workflow.run({
       initialContext: clone(this.currentContext),
       options: this.params.options
     })) {
-      lastEvent = event;
+      lastEvent = event as Event<any, TWorkflowContext, TOptions>;
       yield event;
     }
 
@@ -451,15 +454,13 @@ function createWorkflowBuilder<
     }),
     workflow: <TWorkflowContext extends Context>(
       title: string,
-      workflowToRun: Workflow<any, any, TOptions>,
-      reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>,
-      initialContext?: TWorkflowContext | ((context: TContextIn) => TWorkflowContext)
+      workflowToRun: Workflow<any, any, TOptions> & { run: () => AsyncGenerator<Event<any, TWorkflowContext, TOptions>> },
+      reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
     ) => {
       const newStep = {
         title,
         workflow: workflowToRun,
         reducer,
-        initialContext,
         _type: 'workflow_step'
       } as WorkflowBlock<TContextIn, TOptions, any, any>;
       return createWorkflowBuilder({

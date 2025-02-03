@@ -125,10 +125,10 @@ const usesNestedWorkflow = createWorkflow<{ features: string[] }>("uses nested w
   .workflow("options workflow", optionsWorkflow,
     ({ context, workflowContext }) => ({
       ...context,
-      hasSpeed: workflowContext.hasSpeed,
-      hasManeuver: workflowContext.hasManeuver
+      isFast: workflowContext.hasSpeed,
+      isManeuverable: workflowContext.hasManeuver
     }))
-  .step("uses nested workflow", ({ context }) => context);
+  .step("uses nested workflow", ({ context }) => ({ ...context, test: 'test' }));
 
 /*
 // Example using the files extension - not yet supported in new DSL
@@ -172,11 +172,14 @@ const myBuilder = createWorkflow(
 async function executeWorkflow(workflow: Workflow<any, any, any>) {
   console.log(workflow.workflowTitle)
   console.log('--------------------------------')
+  let lastEvent;
   for await (const event of workflow.run({ options: { features: ['speed', 'maneuver'] } })) {
+    lastEvent = event;
     if (event.type === 'workflow:update') {
       console.log('Event:', event.completedStep?.title);
     }
   }
+  console.log('last event:', lastEvent?.newContext);
   console.log('\n\n')
 }
 
