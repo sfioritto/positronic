@@ -122,7 +122,12 @@ const optionsWorkflow = createWorkflow<{ features: string[] }>("options test")
   });
 
 const usesNestedWorkflow = createWorkflow<{ features: string[] }>("uses nested workflow")
-  .workflow("options workflow", optionsWorkflow, ({ context, workflowContext }) => ({ ...context, test: workflowContext }))
+  .workflow("options workflow", optionsWorkflow,
+    ({ context, workflowContext }) => ({
+      ...context,
+      hasSpeed: workflowContext.hasSpeed,
+      hasManeuver: workflowContext.hasManeuver
+    }))
   .step("uses nested workflow", ({ context }) => context);
 
 /*
@@ -164,10 +169,10 @@ const myBuilder = createWorkflow(
   .simple('maybe not')
   .step('final final step v3', ({ context }) => context);
 
-async function executeWorkflow() {
-  console.log(myBuilder.workflowTitle)
+async function executeWorkflow(workflow: Workflow<any, any, any>) {
+  console.log(workflow.workflowTitle)
   console.log('--------------------------------')
-  for await (const event of myBuilder.run()) {
+  for await (const event of workflow.run({ options: { features: ['speed', 'maneuver'] } })) {
     if (event.type === 'workflow:update') {
       console.log('Event:', event.completedStep?.title);
     }
@@ -175,8 +180,8 @@ async function executeWorkflow() {
   console.log('\n\n')
 }
 
-await executeWorkflow();
-
+await executeWorkflow(myBuilder);
+await executeWorkflow(usesNestedWorkflow);
 // Type testing
 type AssertEquals<T, U> =
   0 extends (1 & T) ? false : // fails if T is any
