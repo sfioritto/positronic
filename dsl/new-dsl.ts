@@ -72,6 +72,46 @@ type StepBlock<
   action: Action<TContextIn, TOptions>;
 };
 
+// New types for workflow steps
+type WorkflowStepReducer<
+  TContextIn extends Context,
+  TWorkflowContext extends Context,
+  TContextOut extends Context = TContextIn
+> = (params: {
+  context: TContextIn;
+  workflowContext: TWorkflowContext
+}) => TContextOut;
+
+type WorkflowStep<
+  TContextIn extends Context,
+  TOptions extends object = {},
+  TWorkflowContext extends Context = Context,
+  TContextOut extends Context = TContextIn,
+  TWorkflowInitialContext extends Context = Context
+> = {
+  title: string;
+  workflow: Workflow<TWorkflowInitialContext, TOptions, any>;
+  initialContext: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext);
+  reducer: WorkflowStepReducer<TContextIn, TWorkflowContext, TContextOut>;
+  _type: 'workflow_step';
+};
+
+// Union type for all possible steps
+type Step<
+  TContextIn extends Context,
+  TOptions extends object = {},
+  TContextOut extends Context = TContextIn
+> = StepBlock<TContextIn, TOptions> | WorkflowStep<TContextIn, TOptions, any, TContextOut>;
+
+// Type guard to distinguish between step types
+function isWorkflowStep<
+  TContextIn extends Context,
+  TOptions extends object,
+  TContextOut extends Context
+>(step: Step<TContextIn, TOptions, TContextOut>): step is WorkflowStep<TContextIn, TOptions, any, TContextOut, any> {
+  return '_type' in step && step._type === 'workflow_step';
+}
+
 type UnionToIntersection<U> = (
   U extends any ? (k: U) => void : never
 ) extends (k: infer I) => void
