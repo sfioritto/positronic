@@ -166,7 +166,7 @@ interface BuilderProps<
   TExtension extends Extension<Context>
 > {
   extension: TExtension;
-  steps: StepBlock<TContextIn, TOptions>[];
+  steps: Block<TContextIn, TOptions>[];
   workflowTitle: string;
   workflowDescription?: string;
 }
@@ -184,6 +184,11 @@ export type Workflow<
     TOptions,
     TExtension
   >;
+  workflow: <TWorkflowContext extends Context>(
+    title: string,
+    workflow: Workflow<any, TOptions, any>,
+    reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
+  ) => Workflow<TContextIn, TOptions, TExtension>;
   run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<TContextIn, TContextIn, TOptions>, void, unknown>;
   extension: TExtension;
   steps: StepBlock<any, TOptions>[];
@@ -264,7 +269,7 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
   private readonly initialContext: TContextIn;
 
   constructor(
-    private readonly steps: StepBlock<any, TOptions>[],
+    private readonly steps: Block<any, TOptions>[],
     private readonly params: RunParams<TOptions, TContextIn>,
     private readonly workflowTitle: string,
     private readonly workflowDescription?: string,
@@ -301,14 +306,54 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
   }
 
   private async* executeStep(
-    step: StepBlock<any, TOptions>,
+    step: Block<any, TOptions>,
     previousContext: Context
   ): AsyncGenerator<Event<any, any, TOptions>> {
-    const result = await step.action({
-      context: clone(this.currentContext),
-      options: this.params.options || {} as TOptions
-    });
-    this.currentContext = clone(result);
+    if (isWorkflowStep(step)) {
+      yield* this.executeWorkflowStep(step, previousContext);
+    } else {
+      const result = await step.action({
+        context: clone(this.currentContext),
+        options: this.params.options || {} as TOptions
+      });
+      this.currentContext = clone(result);
+
+      const completedStep = {
+        title: step.title,
+        status: STATUS.COMPLETE,
+        context: this.currentContext
+      };
+      this.completedSteps.push(completedStep);
+
+      yield this.createEvent({
+        type: WORKFLOW_EVENTS.UPDATE,
+        status: STATUS.RUNNING,
+        previousContext,
+        completedStep,
+        steps: this.mapPendingSteps()
+      });
+    }
+  }
+
+  private async* executeWorkflowStep(
+    step: WorkflowBlock<any, TOptions, any>,
+    previousContext: Context
+  ): AsyncGenerator<Event<any, any, TOptions>> {
+    let lastEvent: Event<any, any, TOptions>;
+    for await (const event of step.workflow.run({
+      initialContext: clone(this.currentContext),
+      options: this.params.options
+    })) {
+      lastEvent = event;
+      yield event;
+    }
+
+    this.currentContext = clone(
+      step.reducer({
+        context: this.currentContext,
+        workflowContext: lastEvent!.newContext
+      })
+    );
 
     const completedStep = {
       title: step.title,
@@ -327,7 +372,7 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
   }
 
   private async* handleStepError(
-    step: StepBlock<any, TOptions>,
+    step: Block<any, TOptions>,
     error: unknown,
     previousContext: Context
   ): AsyncGenerator<Event<any, any, TOptions>> {
@@ -407,6 +452,23 @@ function createWorkflowBuilder<
         steps: [...steps, newStep],
       });
     }),
+    workflow: <TWorkflowContext extends Context>(
+      title: string,
+      workflowToRun: Workflow<any, TOptions, any>,
+      reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>,
+      initialContext?: TWorkflowContext | ((context: TContextIn) => TWorkflowContext)
+    ) => {
+      const newStep = {
+        title,
+        workflow: workflowToRun,
+        reducer,
+        _type: 'workflow_step'
+      } as WorkflowBlock<TContextIn, TOptions, any, any>;
+      return createWorkflowBuilder({
+        ...props,
+        steps: [...steps, newStep],
+      });
+    },
     run: async function* (params: RunParams<TOptions, TContextIn> = {}) {
       const eventStream = new WorkflowEventStream(
         steps,
