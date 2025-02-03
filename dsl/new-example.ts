@@ -6,6 +6,7 @@ export const simpleExtension = createExtension({
   simple: (message: string) => ({
     title: `Prints simple message: ${message}`,
     action: ({ context }) => ({
+      ...context,
       message: `${message}: cool${context?.cool || '? ...not cool yet'}`
     }),
   })
@@ -16,7 +17,7 @@ export const anotherExtension = createExtension({
     await new Promise((resolve) => {
       setTimeout(resolve, 500);
     });
-    return { another: 'another extension' };
+    return { ...context, another: 'another extension' };
   }
 });
 
@@ -100,12 +101,6 @@ await (async () => {
   console.log('\n\n')
 })();
 
-
-// Example with workflow options - not yet supported in new DSL
-const optionsExample = {
-  features: ['speed', 'maneuver'],
-}
-
 const optionsWorkflow = createWorkflow<{ features: string[] }>("options test")
   .step("Check features", ({ context, options }) => {
     return {
@@ -169,11 +164,14 @@ const myBuilder = createWorkflow(
   .simple('maybe not')
   .step('final final step v3', ({ context }) => context);
 
-async function executeWorkflow(workflow: Workflow<any, any, any>) {
+async function executeWorkflow(
+  workflow: Workflow<any, any, any>,
+  options?: any
+) {
   console.log(workflow.workflowTitle)
   console.log('--------------------------------')
   let lastEvent;
-  for await (const event of workflow.run({ options: { features: ['speed', 'maneuver'] } })) {
+  for await (const event of workflow.run({ options })) {
     lastEvent = event;
     if (event.type === 'workflow:update') {
       console.log('Event:', event.completedStep?.title);
@@ -184,7 +182,7 @@ async function executeWorkflow(workflow: Workflow<any, any, any>) {
 }
 
 await executeWorkflow(myBuilder);
-await executeWorkflow(usesNestedWorkflow);
+await executeWorkflow(usesNestedWorkflow, { features: ['speed', 'maneuver'] });
 // Type testing
 type AssertEquals<T, U> =
   0 extends (1 & T) ? false : // fails if T is any

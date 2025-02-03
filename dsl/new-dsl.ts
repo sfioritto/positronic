@@ -183,7 +183,7 @@ export type Workflow<
 
   workflow: <TWorkflowContext extends Context>(
     title: string,
-    workflow: Workflow<any, any, TOptions> & { run: () => AsyncGenerator<Event<any, TWorkflowContext, TOptions>> },
+    workflow: Workflow<TWorkflowContext, any, TOptions>,
     reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
   ) => Workflow<TContextIn, TExtension, TOptions>;
 
@@ -454,7 +454,7 @@ function createWorkflowBuilder<
     }),
     workflow: <TWorkflowContext extends Context>(
       title: string,
-      workflowToRun: Workflow<any, any, TOptions> & { run: () => AsyncGenerator<Event<any, TWorkflowContext, TOptions>> },
+      workflowToRun: Workflow<TWorkflowContext, any, TOptions>,
       reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
     ) => {
       const newStep = {
