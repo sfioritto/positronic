@@ -73,42 +73,38 @@ type StepBlock<
 };
 
 // New types for workflow steps
-type WorkflowStepReducer<
+type WorkflowBlockReducer<
   TContextIn extends Context,
   TWorkflowContext extends Context,
-  TContextOut extends Context = TContextIn
 > = (params: {
   context: TContextIn;
   workflowContext: TWorkflowContext
-}) => TContextOut;
+}) => TContextIn;
 
-type WorkflowStep<
+type WorkflowBlock<
   TContextIn extends Context,
   TOptions extends object = {},
   TWorkflowContext extends Context = Context,
-  TContextOut extends Context = TContextIn,
   TWorkflowInitialContext extends Context = Context
 > = {
   title: string;
   workflow: Workflow<TWorkflowInitialContext, TOptions, any>;
   initialContext: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext);
-  reducer: WorkflowStepReducer<TContextIn, TWorkflowContext, TContextOut>;
+  reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>;
   _type: 'workflow_step';
 };
 
-// Union type for all possible steps
-type Step<
+// Union type for all possible blocks
+type Block<
   TContextIn extends Context,
   TOptions extends object = {},
-  TContextOut extends Context = TContextIn
-> = StepBlock<TContextIn, TOptions> | WorkflowStep<TContextIn, TOptions, any, TContextOut>;
+> = StepBlock<TContextIn, TOptions> | WorkflowBlock<TContextIn, TOptions, any>;
 
 // Type guard to distinguish between step types
 function isWorkflowStep<
   TContextIn extends Context,
   TOptions extends object,
-  TContextOut extends Context
->(step: Step<TContextIn, TOptions, TContextOut>): step is WorkflowStep<TContextIn, TOptions, any, TContextOut, any> {
+>(step: Block<TContextIn, TOptions>): step is WorkflowBlock<TContextIn, TOptions, any> {
   return '_type' in step && step._type === 'workflow_step';
 }
 
