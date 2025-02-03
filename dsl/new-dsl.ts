@@ -88,7 +88,7 @@ type WorkflowBlock<
   TWorkflowInitialContext extends Context = Context
 > = {
   title: string;
-  workflow: Workflow<TWorkflowInitialContext, TOptions, any>;
+  workflow: Workflow<TWorkflowInitialContext, any, TOptions>;
   initialContext: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext);
   reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>;
   _type: 'workflow_step';
@@ -138,7 +138,7 @@ type ExtensionMethodBuilder<
   TExtension extends Extension<Context>,
   TMethod extends ExtensionMethod<any, any> | Record<string, ExtensionMethod<any, any>>
 > = TMethod extends ExtensionMethod<any, any>
-  ? (...args: Parameters<TMethod>) => Workflow<TContextIn & ExtractContextType<TMethod>, TOptions, TExtension>
+  ? (...args: Parameters<TMethod>) => Workflow<TContextIn & ExtractContextType<TMethod>, TExtension, TOptions>
   : TMethod extends Record<string, ExtensionMethod<any, any>>
     ? { [P in keyof TMethod]: ExtensionMethodBuilder<TContextIn, TOptions, TExtension, TMethod[P]> }
     : never;
@@ -162,8 +162,8 @@ interface RunParams<
 
 interface BuilderProps<
   TContextIn extends Context,
-  TOptions extends object,
-  TExtension extends Extension<Context>
+  TExtension extends Extension<Context>,
+  TOptions extends object
 > {
   extension: TExtension;
   steps: Block<TContextIn, TOptions>[];
@@ -173,22 +173,18 @@ interface BuilderProps<
 
 export type Workflow<
   TContextIn extends Context,
-  TOptions extends object,
-  TExtension extends Extension<Context>
+  TExtension extends Extension<Context>,
+  TOptions extends object = {}
 > = {
   step: <TContextOut extends Context>(
     title: string,
     action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
-  ) => Workflow<
-    Flatten<TContextOut>,
-    TOptions,
-    TExtension
-  >;
+  ) => Workflow<Flatten<TContextOut>, TExtension, TOptions>;
   workflow: <TWorkflowContext extends Context>(
     title: string,
-    workflow: Workflow<any, TOptions, any>,
+    workflow: Workflow<any, any, TOptions>,
     reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
-  ) => Workflow<TContextIn, TOptions, TExtension>;
+  ) => Workflow<TContextIn, TExtension, TOptions>;
   run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<TContextIn, TContextIn, TOptions>, void, unknown>;
   extension: TExtension;
   steps: StepBlock<any, TOptions>[];
@@ -231,7 +227,7 @@ function bindExtension<
   TOptions extends object,
   TExtension extends Extension<Context>
 >(
-  builderProps: BuilderProps<TContext, TOptions, TExtension>
+  builderProps: BuilderProps<TContext, TExtension, TOptions>
 ) {
   const createMethodHandler = (
     methodName: string,
@@ -436,9 +432,9 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
 
 function createWorkflowBuilder<
   TContextIn extends Context,
-  TOptions extends object,
-  TExtension extends Extension<Context>
->(props: BuilderProps<TContextIn, TOptions, TExtension>): Workflow<TContextIn, TOptions, TExtension> {
+  TExtension extends Extension<Context>,
+  TOptions extends object = {}
+>(props: BuilderProps<TContextIn, TExtension, TOptions>): Workflow<TContextIn, TExtension, TOptions> {
   const { steps, workflowTitle, workflowDescription } = props;
 
   const builder = {
@@ -454,7 +450,7 @@ function createWorkflowBuilder<
     }),
     workflow: <TWorkflowContext extends Context>(
       title: string,
-      workflowToRun: Workflow<any, TOptions, any>,
+      workflowToRun: Workflow<any, any, TOptions>,
       reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>,
       initialContext?: TWorkflowContext | ((context: TContextIn) => TWorkflowContext)
     ) => {
@@ -462,6 +458,7 @@ function createWorkflowBuilder<
         title,
         workflow: workflowToRun,
         reducer,
+        initialContext,
         _type: 'workflow_step'
       } as WorkflowBlock<TContextIn, TOptions, any, any>;
       return createWorkflowBuilder({
@@ -486,7 +483,7 @@ function createWorkflowBuilder<
     },
     ...bindExtension(props),
     ...props
-  } as Workflow<TContextIn, TOptions, TExtension>;
+  } as Workflow<TContextIn, TExtension, TOptions>;
 
   return builder;
 }
@@ -506,7 +503,7 @@ export const createWorkflow = <
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
   const mergedExtensions = Object.assign({}, ...extensions) as MergeExtensions<TExtensions>;
   const extension = createExtension(mergedExtensions);
-  return createWorkflowBuilder<Context, TOptions, typeof extension>({
+  return createWorkflowBuilder<Context, typeof extension, TOptions>({
     extension,
     steps: [],
     workflowTitle: workflowName,

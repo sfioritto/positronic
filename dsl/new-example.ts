@@ -121,6 +121,9 @@ const optionsWorkflow = createWorkflow<{ features: string[] }>("options test")
     };
   });
 
+const usesNestedWorkflow = createWorkflow<{ features: string[] }>("uses nested workflow")
+  .workflow("options workflow", optionsWorkflow, ({ context, workflowContext }) => ({ ...context, test: workflowContext }))
+  .step("uses nested workflow", ({ context }) => context);
 
 /*
 // Example using the files extension - not yet supported in new DSL
