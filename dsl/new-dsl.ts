@@ -184,7 +184,8 @@ export type Workflow<
   workflow: <TWorkflowContext extends Context>(
     title: string,
     workflow: Workflow<TWorkflowContext, any, TOptions>,
-    reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
+    reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>,
+    initialContext?: Context | ((context: Context) => TWorkflowContext)
   ) => Workflow<TContextIn, TExtension, TOptions>;
 
   run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<TContextIn, TContextIn, TOptions>, void, unknown>;
@@ -339,9 +340,12 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
     previousContext: Context
   ): AsyncGenerator<Event<any, any, TOptions>> {
     let lastEvent: Event<any, TWorkflowContext, TOptions>;
-    const workflow = step.workflow as Workflow<any, any, TOptions>;
+    const { initialContext, reducer, workflow } = step;
+    const initialContextValue = typeof initialContext === 'function'
+      ? initialContext(clone(this.currentContext))
+      : initialContext;
     for await (const event of workflow.run({
-      initialContext: clone(this.currentContext),
+      initialContext: initialContextValue,
       options: this.params.options
     })) {
       lastEvent = event as Event<any, TWorkflowContext, TOptions>;
@@ -349,7 +353,7 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
     }
 
     this.currentContext = clone(
-      step.reducer({
+      reducer({
         context: this.currentContext,
         workflowContext: lastEvent!.newContext
       })
@@ -455,11 +459,13 @@ function createWorkflowBuilder<
     workflow: <TWorkflowContext extends Context>(
       title: string,
       workflowToRun: Workflow<TWorkflowContext, any, TOptions>,
-      reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
+      reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>,
+      initialContext?: Context | ((context: Context) => TWorkflowContext)
     ) => {
       const newStep = {
         title,
         workflow: workflowToRun,
+        initialContext,
         reducer,
         _type: 'workflow_step'
       } as WorkflowBlock<TContextIn, TOptions, any, any>;
