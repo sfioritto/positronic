@@ -88,7 +88,7 @@ type WorkflowBlock<
   TWorkflowInitialContext extends Context = Context
 > = {
   title: string;
-  workflow: Workflow<TWorkflowInitialContext, any, TOptions>;
+  workflow: Workflow<TWorkflowInitialContext, any, TOptions, TWorkflowContext>;
   initialContext: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext);
   reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>;
   _type: 'workflow_step';
@@ -174,17 +174,18 @@ interface BuilderProps<
 export type Workflow<
   TContextIn extends Context,
   TExtension extends Extension<Context>,
-  TOptions extends object = {}
+  TOptions extends object = {},
+  TFinalContext extends Context = TContextIn
 > = {
   step: <TContextOut extends Context>(
     title: string,
     action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
-  ) => Workflow<Flatten<TContextOut>, TExtension, TOptions>;
+  ) => Workflow<Flatten<TContextOut>, TExtension, TOptions, Flatten<TContextOut>>;
   workflow: <TWorkflowContext extends Context>(
     title: string,
-    workflow: Workflow<any, any, TOptions>,
+    workflow: Workflow<any, any, TOptions, TWorkflowContext>,
     reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>
-  ) => Workflow<TContextIn, TExtension, TOptions>;
+  ) => Workflow<TContextIn, TExtension, TOptions, TContextIn>;
   run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<TContextIn, TContextIn, TOptions>, void, unknown>;
   extension: TExtension;
   steps: StepBlock<any, TOptions>[];
