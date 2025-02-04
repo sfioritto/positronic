@@ -155,7 +155,7 @@ interface RunParams<
   TOptions extends object = {},
   TContextIn extends Context = Context
 > {
-  initialContext?: TContextIn;
+  initialContext?: Partial<TContextIn>;
   options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
 }
@@ -274,7 +274,7 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
     private readonly workflowTitle: string,
     private readonly workflowDescription?: string,
   ) {
-    this.initialContext = clone(params.initialContext || {} as TContextIn);
+    this.initialContext = clone(params.initialContext || {}) as TContextIn;
     this.currentContext = clone(this.initialContext);
     this.completedSteps = [...(params.initialCompletedSteps || [])];
 

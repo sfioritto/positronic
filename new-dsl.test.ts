@@ -410,3 +410,78 @@ describe('nested workflows', () => {
   });
 });
 
+describe('workflow options', () => {
+  it('should pass options through to workflow events', async () => {
+    const workflow = createWorkflow<{ testOption: string }>('Options Workflow')
+      .step(
+        "Simple step",
+        ({ context, options }) => ({
+          value: (context as any).value + 1,
+          passedOption: options.testOption
+        })
+      );
+
+    const workflowOptions = {
+      testOption: 'test-value'
+    };
+
+    const workflowRun = workflow.run({
+      initialContext: { value: 1 },
+      options: workflowOptions
+    });
+
+    // Check start event
+    const startResult = await workflowRun.next();
+    expect(startResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.START,
+      options: workflowOptions
+    }));
+
+    // Check step completion
+    const stepResult = await workflowRun.next();
+    expect(stepResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.UPDATE,
+      options: workflowOptions,
+      newContext: {
+        value: 2,
+        passedOption: 'test-value'
+      }
+    }));
+
+    // Check workflow completion
+    const completeResult = await workflowRun.next();
+    expect(completeResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.COMPLETE,
+      options: workflowOptions,
+      newContext: {
+        value: 2,
+        passedOption: 'test-value'
+      }
+    }));
+  });
+
+  it('should provide empty object as default options', async () => {
+    const workflow = createWorkflow('Default Options Workflow')
+      .step(
+        "Simple step",
+        ({ options }) => ({
+          hasOptions: Object.keys(options).length === 0
+        })
+      );
+
+    const workflowRun = workflow.run({ initialContext: {} });
+
+    // Skip start event
+    await workflowRun.next();
+
+    // Check step completion
+    const stepResult = await workflowRun.next();
+    expect(stepResult.value).toEqual(expect.objectContaining({
+      options: {},
+      newContext: {
+        hasOptions: true
+      }
+    }));
+  });
+});
+
