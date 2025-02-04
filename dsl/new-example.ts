@@ -17,7 +17,10 @@ export const anotherExtension = createExtension({
     await new Promise((resolve) => {
       setTimeout(resolve, 500);
     });
-    return { ...context, another: 'another extension' };
+    return {
+      ...context,
+      another: 'another extension'
+    };
   }
 });
 
@@ -112,11 +115,12 @@ const optionsWorkflow = createWorkflow<{ features: string[] }>("options test")
   .step("Process features", ({ context }) => {
     return {
       ...context,
-      processed: true
+      processed: context.hasSpeed && context.hasManeuver
     };
   });
 
 const usesNestedWorkflow = createWorkflow<{ features: string[] }>("uses nested workflow")
+  .step("cool", ({ context }) => ({ ...context, cool: 'ness' }))
   .workflow("options workflow", optionsWorkflow,
     ({ context, workflowContext }) => ({
       ...context,
