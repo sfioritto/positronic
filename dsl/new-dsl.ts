@@ -8,7 +8,7 @@ function clone<T>(original: T): T {
   return structuredClone(original) as T;
 }
 
-type Context = JsonObject;
+export type Context = JsonObject;
 
 interface WorkflowConfig {
   title: string;
