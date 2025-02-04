@@ -562,5 +562,75 @@ describe('type inference', () => {
       completed: true
     });
   });
+
+  it('should correctly infer workflow reducer context types', async () => {
+    // Create an inner workflow with a specific context shape
+    const innerWorkflow = createWorkflow('Inner Context Test')
+      .step(
+        "Inner step",
+        () => ({
+          innerValue: 42,
+          metadata: { processed: true }
+        })
+      );
+
+    // Create outer workflow to test reducer type inference
+    const outerWorkflow = createWorkflow('Outer Context Test')
+      .step(
+        "First step",
+        () => ({
+          outerValue: 100,
+          status: 'ready'
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ context, workflowContext }) => {
+          // Type assertion for outer context
+          type ExpectedOuterContext = {
+            outerValue: number;
+            status: string;
+          };
+          type ActualOuterContext = typeof context;
+          type OuterContextTest = AssertEquals<
+            ActualOuterContext,
+            ExpectedOuterContext
+          >;
+          const _outerAssert: OuterContextTest = true;
+
+          // Type assertion for inner workflow context
+          type ExpectedInnerContext = {
+            innerValue: number;
+            metadata: { processed: true };
+          };
+          type ActualInnerContext = typeof workflowContext;
+          type InnerContextTest = AssertEquals<
+            ActualInnerContext,
+            ExpectedInnerContext
+          >;
+          const _innerAssert: InnerContextTest = true;
+
+          return {
+            ...context,
+            innerResult: workflowContext.innerValue,
+            processed: workflowContext.metadata.processed
+          };
+        }
+      );
+
+    // Run the workflow to verify runtime behavior
+    let finalEvent;
+    for await (const event of outerWorkflow.run()) {
+      finalEvent = event;
+    }
+
+    expect(finalEvent?.newContext).toEqual({
+      outerValue: 100,
+      status: 'ready',
+      innerResult: 42,
+      processed: true
+    });
+  });
 });
 
