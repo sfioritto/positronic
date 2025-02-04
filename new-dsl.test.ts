@@ -311,11 +311,11 @@ describe('nested workflows', () => {
     const innerStepResult = await workflowRun.next();
     expect(innerStepResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.UPDATE,
-      newContext: { value: 10 },
+      newContext: { inner: true, value: 10 },
       completedStep: expect.objectContaining({
         title: 'Double value',
         status: STATUS.COMPLETE,
-        context: { value: 10 }
+        context: { inner: true, value: 10 }
       })
     }));
 
@@ -324,7 +324,7 @@ describe('nested workflows', () => {
     expect(innerCompleteResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.COMPLETE,
       workflowTitle: 'Inner Workflow',
-      newContext: { value: 10 }
+      newContext: { inner: true, value: 10 }
     }));
 
     // Outer workflow step completion (nested workflow step)

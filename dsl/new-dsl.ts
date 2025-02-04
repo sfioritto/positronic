@@ -347,35 +347,51 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
     const initialContextValue = typeof initialContext === 'function'
       ? initialContext(clone(previousContext))
       : initialContext;
-    for await (const event of workflow.run({
-      initialContext: initialContextValue,
-      options: this.params.options
-    })) {
-      lastEvent = event as Event<any, TWorkflowContext, TOptions>;
-      yield event;
+
+    try {
+      const workflowRun = workflow.run({
+        initialContext: initialContextValue,
+        options: this.params.options
+      });
+
+      for await (const event of workflowRun) {
+        lastEvent = event as Event<any, TWorkflowContext, TOptions>;
+        yield event;
+
+        // If the event is an error, stop processing and propagate it up
+        if (event.type === WORKFLOW_EVENTS.ERROR) {
+          this.hasError = true;
+          return;
+        }
+      }
+
+      // Only process successful completion
+      this.currentContext = clone(
+        reducer({
+          context: this.currentContext,
+          workflowContext: lastEvent!.newContext
+        })
+      );
+
+      const completedStep = {
+        title: step.title,
+        status: STATUS.COMPLETE,
+        context: this.currentContext
+      };
+      this.completedSteps.push(completedStep);
+
+      yield this.createEvent({
+        type: WORKFLOW_EVENTS.UPDATE,
+        status: STATUS.RUNNING,
+        previousContext,
+        completedStep,
+        steps: this.mapPendingSteps()
+      });
+    } catch (error) {
+      yield* this.handleStepError(step, error, previousContext);
+      this.hasError = true;
+      return;
     }
-
-    this.currentContext = clone(
-      reducer({
-        context: this.currentContext,
-        workflowContext: lastEvent!.newContext
-      })
-    );
-
-    const completedStep = {
-      title: step.title,
-      status: STATUS.COMPLETE,
-      context: this.currentContext
-    };
-    this.completedSteps.push(completedStep);
-
-    yield this.createEvent({
-      type: WORKFLOW_EVENTS.UPDATE,
-      status: STATUS.RUNNING,
-      previousContext,
-      completedStep,
-      steps: this.mapPendingSteps()
-    });
   }
 
   private async* handleStepError(
@@ -383,7 +399,6 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
     error: unknown,
     previousContext: Context
   ): AsyncGenerator<Event<any, any, TOptions>> {
-    console.error((error as Error).message);
     const errorStep = {
       title: step.title,
       status: STATUS.ERROR,
@@ -491,6 +506,7 @@ function createWorkflowBuilder<
       if (!eventStream.hasError) {
         yield* eventStream.complete();
       }
+      return; // Add explicit return to ensure generator completes
     },
     ...bindExtension(props),
     ...props
