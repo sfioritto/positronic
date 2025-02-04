@@ -632,5 +632,55 @@ describe('type inference', () => {
       processed: true
     });
   });
+
+  it('should correctly infer step action context types', async () => {
+    const workflow = createWorkflow('Action Context Test')
+      .step(
+        "First step",
+        () => ({
+          count: 1,
+          metadata: { created: new Date().toISOString() }
+        })
+      )
+      .step(
+        "Second step",
+        ({ context }) => {
+          // Type assertion for action context
+          type ExpectedContext = {
+            count: number;
+            metadata: { created: string };
+          };
+          type ActualContext = typeof context;
+          type ContextTest = AssertEquals<
+            ActualContext,
+            ExpectedContext
+          >;
+          const _contextAssert: ContextTest = true;
+
+          return {
+            ...context,
+            count: context.count + 1,
+            metadata: {
+              ...context.metadata,
+              updated: new Date().toISOString()
+            }
+          };
+        }
+      );
+
+    // Run the workflow to verify runtime behavior
+    let finalEvent;
+    for await (const event of workflow.run()) {
+      finalEvent = event;
+    }
+
+    expect(finalEvent?.newContext).toMatchObject({
+      count: 2,
+      metadata: {
+        created: expect.any(String),
+        updated: expect.any(String)
+      }
+    });
+  });
 });
 
