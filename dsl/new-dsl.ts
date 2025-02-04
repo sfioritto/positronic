@@ -76,21 +76,23 @@ type StepBlock<
 type WorkflowBlockReducer<
   TContextIn extends Context,
   TWorkflowContext extends Context,
+  TContextOut extends Context = Context
 > = (params: {
   context: TContextIn;
   workflowContext: TWorkflowContext
-}) => TContextIn;
+}) => TContextOut;
 
 type WorkflowBlock<
   TContextIn extends Context,
   TOptions extends object = {},
   TWorkflowContext extends Context = Context,
-  TWorkflowInitialContext extends TWorkflowContext = TWorkflowContext
+  TWorkflowInitialContext extends TWorkflowContext = TWorkflowContext,
+  TContextOut extends Context = Context
 > = {
   title: string;
   workflow: Workflow<TWorkflowContext, any, TOptions>;
   initialContext: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext);
-  reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>;
+  reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext, TContextOut>;
   _type: 'workflow_step';
 };
 
@@ -181,12 +183,16 @@ export type Workflow<
     action: (params: { context: Flatten<TContextIn>; options: TOptions }) => MaybePromise<TContextOut>
   ) => Workflow<TContextOut, TExtension, TOptions>;
 
-  workflow: <TWorkflowInitialContext extends Context, TWorkflowContext extends Context>(
+  workflow: <
+    TWorkflowInitialContext extends Context,
+    TWorkflowContext extends Context,
+    TContextOut extends Context = Context
+  >(
     title: string,
     workflow: Workflow<TWorkflowContext, any, TOptions>,
-    reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>,
+    reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext, TContextOut>,
     initialContext?: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext)
-  ) => Workflow<TContextIn, TExtension, TOptions>;
+  ) => Workflow<TContextOut, TExtension, TOptions>;
 
   run(params?: RunParams<TOptions, TContextIn>): AsyncGenerator<Event<TContextIn, TContextIn, TOptions>, void, unknown>;
 
@@ -368,10 +374,10 @@ class WorkflowEventStream<TContextIn extends Context, TOptions extends object> {
       // Only process successful completion
       this.currentContext = clone(
         reducer({
-          context: this.currentContext,
+          context: this.currentContext as TContextIn,
           workflowContext: lastEvent!.newContext
         })
-      );
+      ) as TContextIn;
 
       const completedStep = {
         title: step.title,
@@ -474,10 +480,10 @@ function createWorkflowBuilder<
         steps: [...steps, newStep],
       });
     }),
-    workflow: <TWorkflowInitialContext extends Context, TWorkflowContext extends Context>(
+    workflow: <TWorkflowInitialContext extends Context, TWorkflowContext extends Context, TContextOut extends Context = Context>(
       title: string,
       workflowToRun: Workflow<TWorkflowContext, any, TOptions>,
-      reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext>,
+      reducer: WorkflowBlockReducer<TContextIn, TWorkflowContext, TContextOut>,
       initialContext?: TWorkflowInitialContext | ((context: TContextIn) => TWorkflowInitialContext)
     ) => {
       const newStep = {

@@ -2,6 +2,11 @@ import { createWorkflow, Event } from './dsl/new-dsl';
 import { WORKFLOW_EVENTS, STATUS } from './dsl/constants';
 import { JsonObject } from './dsl/types';
 
+type AssertEquals<T, U> =
+  0 extends (1 & T) ? false : // fails if T is any
+  0 extends (1 & U) ? false : // fails if U is any
+  [T] extends [U] ? [U] extends [T] ? true : false : false;
+
 describe('workflow creation', () => {
   it('should create a workflow with steps and run through them', async () => {
     const workflow = createWorkflow('test workflow')
@@ -482,6 +487,80 @@ describe('workflow options', () => {
         hasOptions: true
       }
     }));
+  });
+});
+
+describe('type inference', () => {
+  it('should correctly infer complex workflow context types', async () => {
+    // Create an inner workflow that uses the shared options type
+    const innerWorkflow = createWorkflow<{ features: string[] }>('Inner Type Test')
+      .step(
+        "Process features",
+        ({ options }) => ({
+          processedValue: options.features.includes('fast') ? 100 : 42,
+          featureCount: options.features.length
+        })
+      );
+
+    // Create a complex workflow using multiple features
+    const complexWorkflow = createWorkflow<{ features: string[] }>('Complex Type Test')
+      .step(
+        "First step",
+        ({ context, options }) => ({
+          initialFeatures: options.features,
+          value: 42
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ context, workflowContext }) => ({
+          ...context,
+          processedValue: workflowContext.processedValue,
+          totalFeatures: workflowContext.featureCount
+        }),
+      )
+      .step(
+        "Final step",
+        ({ context }) => ({
+          ...context,
+          completed: true
+        })
+      );
+
+    // Type test setup
+    type ExpectedContext = {
+      initialFeatures: string[];
+      value: number;
+      processedValue: number;
+      totalFeatures: number;
+      completed: true;
+    };
+
+    type ActualContext = Parameters<
+      Parameters<(typeof complexWorkflow)['step']>[1]
+    >[0]['context'];
+
+    // Type assertion - will fail compilation if types don't match
+    type TypeTest = AssertEquals<ActualContext, ExpectedContext>;
+    const _typeAssert: TypeTest = true;
+
+    // Run the workflow to verify runtime behavior matches types
+    let finalEvent;
+    for await (const event of complexWorkflow.run({
+      options: { features: ['fast', 'secure'] }
+    })) {
+      finalEvent = event;
+    }
+
+    // Verify the final context has all expected properties with correct types
+    expect(finalEvent?.newContext).toEqual({
+      initialFeatures: ['fast', 'secure'],
+      value: 42,
+      processedValue: 100,
+      totalFeatures: 2,
+      completed: true
+    });
   });
 });
 
