@@ -53,7 +53,7 @@ export class Workflow<TContext extends Context> {
       title,
       innerWorkflow,
       initialContext: initialContext || (() => ({} as TInnerContext)),
-      reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx })
+      reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx})
     };
     this.blocks.push(nestedBlock);
     return new Workflow<TNewContext>(this.defaultClient).withBlocks(this.blocks);
@@ -129,10 +129,12 @@ export function withExtensions<TContext extends Context, TE>(
 
 function customMathExtension<TContext extends { value: number }>(workflow: Workflow<TContext>) {
   return {
-    multiply: (factor: number) =>
-      workflow.step("Multiply", async ctx => {
-        return { ...ctx, value: ctx.value * factor };
-      })
+    nested: {
+      multiply: (factor: number) =>
+        workflow.step("Multiply", async ctx => {
+          return { ...ctx, value: ctx.value * factor };
+        }),
+    }
   };
 }
 
@@ -159,7 +161,7 @@ const testWorkflow = new Workflow<{ initial: string }>(new AnthropicClient())
     new Workflow<{ nested: boolean }>(new AnthropicClient())
       .step("Nested step", ctx => ({
         ...ctx,
-        nestedValue: "computed"
+        nestedValue: "computed",
       })),
     ({ context, workflowContext }) => ({
       ...context,
@@ -172,7 +174,7 @@ const testWorkflow = new Workflow<{ initial: string }>(new AnthropicClient())
 const workflowWithMath = withExtensions(
   testWorkflow,
   customMathExtension
-).multiply(2);
+).nested.multiply(2);
 
 // Type testing utilities
 type AssertEquals<T, U> =
