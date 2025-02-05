@@ -115,12 +115,12 @@ export class Workflow<TContext extends Context> {
   }
 }
 
-export type ExtendedWorkflow<TContext extends Context, TE> = Workflow<TContext> & TE;
+export type ExtendedWorkflow<TContext extends Context, TExtension> = Workflow<TContext> & TExtension;
 
-export function withExtensions<TContext extends Context, TE>(
+export function withExtensions<TContext extends Context, TExtension>(
   workflow: Workflow<TContext>,
-  extensionCreators: (wf: Workflow<TContext>) => TE
-): ExtendedWorkflow<TContext, TE> {
+  extensionCreators: (wf: Workflow<TContext>) => TExtension
+): ExtendedWorkflow<TContext, TExtension> {
   const extensions = extensionCreators(workflow);
   return Object.assign(workflow, extensions);
 }
