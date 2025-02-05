@@ -1,4 +1,6 @@
 import { Context } from "./new-dsl";
+import { z } from "zod";
+import { AnthropicClient } from "../clients/anthropic";
 
 export type StepBlock<TContextIn, TContextOut> = {
   type: 'step';
@@ -53,23 +55,38 @@ export class Workflow<TContext extends Context> {
     return new Workflow<TNewContext>().withBlocks(this.blocks);
   }
 
-  prompt<TResponse, TKey extends string>(
+  prompt<TResponseKey extends string, TSchema extends z.ZodObject<any>>(
     title: string,
     config: {
-      responseKey: TKey;
-      getResponse: (ctx: TContext) => Promise<TResponse>
+      template: (ctx: TContext) => string;
+      responseModel: {
+        schema: TSchema;
+        name: TResponseKey;
+      };
+      client?: AnthropicClient;
     }
-  ): Workflow<TContext & { [K in TKey]: TResponse }> {
-    const promptBlock: StepBlock<TContext, TContext & { [K in TKey]: TResponse }> = {
+  ): Workflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }> {
+    const promptBlock: StepBlock<
+      TContext,
+      TContext & { [K in TResponseKey]: z.infer<TSchema> }
+    > = {
       type: 'step',
       title,
       execute: async (ctx) => {
-        const response = await config.getResponse(ctx);
-        return { ...ctx, [config.responseKey]: response };
+        const client = config.client ?? new AnthropicClient();
+        const promptString = config.template(ctx);
+        const response = await client.execute(promptString, config.responseModel);
+
+        return {
+          ...ctx,
+          [config.responseModel.name]: response
+        };
       }
     };
     this.blocks.push(promptBlock);
-    return new Workflow<TContext & { [K in TKey]: TResponse }>().withBlocks(this.blocks);
+    return new Workflow<
+      TContext & { [K in TResponseKey]: z.infer<TSchema> }
+    >().withBlocks(this.blocks);
   }
 
   private withBlocks(blocks: Block<any, any>[]): this {
@@ -126,8 +143,11 @@ const testWorkflow = new Workflow<{ initial: string }>()
     sum: 42
   }))
   .prompt("Get user input", {
-    responseKey: "userResponse",
-    getResponse: async (ctx) => ({ cool: 'user response', id: 1 })
+    template: (ctx) => "Your prompt here",
+    responseModel: {
+      schema: z.object({ cool: z.string(), id: z.number() }),
+      name: "userResponse"
+    }
   })
   .step("Add user response", ctx => ctx)
   .workflow(
