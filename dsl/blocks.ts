@@ -117,11 +117,11 @@ export class Workflow<TContext extends Context> {
 
 export type ExtendedWorkflow<TContext extends Context, TExtension> = Workflow<TContext> & TExtension;
 
-export function withExtensions<TContext extends Context, TExtension>(
+export function withExtension<TContext extends Context, TExtension>(
   workflow: Workflow<TContext>,
-  extensionCreators: (wf: Workflow<TContext>) => TExtension
+  extensionCreator: (wf: Workflow<TContext>) => TExtension
 ): ExtendedWorkflow<TContext, TExtension> {
-  const extensions = extensionCreators(workflow);
+  const extensions = extensionCreator(workflow);
   return Object.assign(workflow, extensions);
 }
 
@@ -171,7 +171,7 @@ const testWorkflow = new Workflow<{ initial: string }>(new AnthropicClient())
   .step("Final Step", ctx => ctx);
 
 // Add math extension
-const workflowWithMath = withExtensions(
+const workflowWithMath = withExtension(
   testWorkflow,
   customMathExtension
 ).nested.multiply(2);
