@@ -1,10 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk'
 import type { PromptClient, ResponseModel } from '../types';
 import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from "llm-polyglot"
 import { z } from 'zod';
 import { config} from 'dotenv';
-import type { ClientOptions } from '@anthropic-ai/sdk';
 import type { InstructorClient } from '@instructor-ai/instructor';
 
 config();

@@ -1,6 +1,7 @@
 import { Context } from "./new-dsl";
 import { z } from "zod";
 import { AnthropicClient } from "../clients/anthropic";
+import type { PromptClient } from "../types";
 
 export type StepBlock<TContextIn, TContextOut> = {
   type: 'step';
@@ -12,7 +13,7 @@ type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = 
   type: 'workflow';
   title: string;
   innerWorkflow: Workflow<TInnerContext>;
-  initialChildContext: TInnerContext | ((outerCtx: TOuterContext) => TInnerContext);
+  initialContext: TInnerContext | ((outerCtx: TOuterContext) => TInnerContext);
   reducer: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
 };
 
@@ -22,8 +23,11 @@ type Block<TContextIn, TContextOut> =
 
 export class Workflow<TContext extends Context> {
   private blocks: Block<any, any>[] = [];
+  private defaultClient: PromptClient;
 
-  constructor() {}
+  constructor(defaultClient: PromptClient) {
+    this.defaultClient = defaultClient;
+  }
 
   step<TNewContext extends Context>(
     title: string,
@@ -35,24 +39,24 @@ export class Workflow<TContext extends Context> {
       execute: fn
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TNewContext>().withBlocks(this.blocks);
+    return new Workflow<TNewContext>(this.defaultClient).withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
     title: string,
     innerWorkflow: Workflow<TInnerContext>,
     reducer: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
-    initialChildContext?: TInnerContext | ((context: TContext) => TInnerContext)
+    initialContext?: TInnerContext | ((context: TContext) => TInnerContext)
   ) {
     const nestedBlock: WorkflowBlock<TContext, TInnerContext, TNewContext> = {
       type: 'workflow',
       title,
       innerWorkflow,
-      initialChildContext: initialChildContext || (() => ({} as TInnerContext)),
+      initialContext: initialContext || (() => ({} as TInnerContext)),
       reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx })
     };
     this.blocks.push(nestedBlock);
-    return new Workflow<TNewContext>().withBlocks(this.blocks);
+    return new Workflow<TNewContext>(this.defaultClient).withBlocks(this.blocks);
   }
 
   prompt<TResponseKey extends string, TSchema extends z.ZodObject<any>>(
@@ -63,7 +67,7 @@ export class Workflow<TContext extends Context> {
         schema: TSchema;
         name: TResponseKey;
       };
-      client?: AnthropicClient;
+      client?: PromptClient;
     }
   ): Workflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }> {
     const promptBlock: StepBlock<
@@ -73,7 +77,7 @@ export class Workflow<TContext extends Context> {
       type: 'step',
       title,
       execute: async (ctx) => {
-        const client = config.client ?? new AnthropicClient();
+        const client = config.client ?? this.defaultClient;
         const promptString = config.template(ctx);
         const response = await client.execute(promptString, config.responseModel);
 
@@ -86,7 +90,7 @@ export class Workflow<TContext extends Context> {
     this.blocks.push(promptBlock);
     return new Workflow<
       TContext & { [K in TResponseKey]: z.infer<TSchema> }
-    >().withBlocks(this.blocks);
+    >(this.defaultClient).withBlocks(this.blocks);
   }
 
   private withBlocks(blocks: Block<any, any>[]): this {
@@ -100,9 +104,9 @@ export class Workflow<TContext extends Context> {
       if (block.type === 'step') {
         ctx = await block.execute(ctx);
       } else if (block.type === 'workflow') {
-        const childInitial = typeof block.initialChildContext === 'function'
-          ? block.initialChildContext(ctx)
-          : block.initialChildContext;
+        const childInitial = typeof block.initialContext === 'function'
+          ? block.initialContext(ctx)
+          : block.initialContext;
         const innerCtx = await block.innerWorkflow.run();
         ctx = block.reducer(ctx, innerCtx);
       }
@@ -133,7 +137,7 @@ function customMathExtension<TContext extends { value: number }>(workflow: Workf
 }
 
 // Example workflow with all features for type testing
-const testWorkflow = new Workflow<{ initial: string }>()
+const testWorkflow = new Workflow<{ initial: string }>(new AnthropicClient())
   .step("Initialize value", ctx => ({
     ...ctx,
     value: 0
@@ -152,7 +156,7 @@ const testWorkflow = new Workflow<{ initial: string }>()
   .step("Add user response", ctx => ctx)
   .workflow(
     "Nested workflow",
-    new Workflow<{ nested: boolean }>()
+    new Workflow<{ nested: boolean }>(new AnthropicClient())
       .step("Nested step", ctx => ({
         ...ctx,
         nestedValue: "computed"
