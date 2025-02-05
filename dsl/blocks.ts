@@ -102,49 +102,69 @@ function customMathExtension<TContext extends { value: number }>(workflow: Workf
   };
 }
 
+// Type testing utilities
+type AssertEquals<T, U> =
+  0 extends (1 & T) ? false : // fails if T is any
+  0 extends (1 & U) ? false : // fails if U is any
+  [T] extends [U] ? [U] extends [T] ? true : false : false;
+
+// Example workflow with all features for type testing
+const testWorkflow = new Workflow({ initial: "value" })
+  .step("Initialize value", ctx => ({
+    ...ctx,
+    value: 0
+  }))
+  .step("Add numbers", async ctx => ({
+    ...ctx,
+    sum: 42
+  }))
+  .prompt("Get user input", {
+    responseKey: "userResponse",
+    getResponse: async (ctx) => `Response for ${ctx.initial}`
+  })
+  .workflow(
+    "Nested workflow",
+    new Workflow({ nested: true })
+      .step("Nested step", ctx => ({
+        ...ctx,
+        nestedValue: "computed"
+      })),
+    ({ context, workflowContext }) => ({
+      ...context,
+      fromNested: workflowContext.nestedValue
+    })
+  )
+  .step("Final Step", ctx => ctx);
+
+// Add math extension
+const workflowWithMath = withExtensions(
+  testWorkflow,
+  customMathExtension
+).multiply(2);
+
+// Expected final context type
+type ExpectedFinalContext = {
+  initial: string;
+  sum: number;
+  userResponse: string;
+  fromNested: string;
+  value: number;
+};
+
+// Extract the context type from the workflow
+type ExtractContextType<T> = T extends Workflow<infer Context> ? Context : never;
+
+// Get the actual final context type
+type ActualFinalContext = ExtractContextType<typeof workflowWithMath>;
+
+// This will show a type error if the types don't match
+type TypeTest = AssertEquals<ActualFinalContext, ExpectedFinalContext>;
+
+// Explicit type assertion
+const _typeTest: TypeTest = true;
+
+// Run the workflow to verify runtime behavior
 (async () => {
-  // Create an inner workflow expecting 'input' instead of already having 'doubled'
-  const innerWorkflow = new Workflow<{ input: number }>({ input: 0 })
-    .step("Double Value", async (ctx) => ({
-      doubled: ctx.input * 2
-    }));
-
-  // Create the main workflow
-  const mainWorkflow = new Workflow({ value: 5, message: "Hello" });
-
-  // Add the math extension
-  const workflowWithExtensions = withExtensions(mainWorkflow, customMathExtension);
-
-  // Build the workflow with nested components
-  const finalWorkflow = workflowWithExtensions
-    .multiply(3)  // value becomes 15
-    .step("Add Message", ctx => ({
-      ...ctx,
-      message: ctx.message + ", World!"
-    }))
-    .workflow(
-      "Run Inner Workflow",
-      innerWorkflow,
-      ({ context, workflowContext }) => ({
-        ...context,
-        doubledValue: workflowContext.doubled
-      }),
-      (ctx) => ({ doubled: ctx.value })
-    )
-    .prompt("Get User Input", {
-      responseKey: "userInput",
-      getResponse: async (ctx) => {
-        return `Doubled value was: ${ctx.doubledValue}`;
-      }
-    });
-
-  const result = await finalWorkflow.run();
-  console.log("Final Result:", result);
-  // Output will be something like:
-  // {
-  //   value: 15,
-  //   message: "Hello, World!",
-  //   doubledValue: 30,
-  //   userInput: "Doubled value was: 30"
-  // }
+  const result = await workflowWithMath.run();
+  console.log("Type test result:", result);
 })();
