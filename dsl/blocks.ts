@@ -158,7 +158,7 @@ const testWorkflow = new Workflow<{ initial: string }>(new AnthropicClient())
   .step("Add user response", ctx => ctx)
   .workflow(
     "Nested workflow",
-    new Workflow<{ nested: boolean }>(new AnthropicClient())
+    new Workflow(new AnthropicClient())
       .step("Nested step", ctx => ({
         ...ctx,
         nestedValue: "computed",
