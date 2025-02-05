@@ -17,14 +17,14 @@ type Block<TContextIn, TContextOut> =
 export class Workflow<TContext extends Context> {
   private blocks: Block<any, any>[] = [];
 
-  constructor(private initialContext: TContext) {}
+  constructor() {}
 
   step<TNewContext extends Context>(
     title: string,
     fn: StepBlock<TContext, TNewContext>
   ) {
     this.blocks.push(fn);
-    return new Workflow<TNewContext>(this.initialContext as any).withBlocks(this.blocks);
+    return new Workflow<TNewContext>().withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
@@ -41,7 +41,7 @@ export class Workflow<TContext extends Context> {
       reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx })
     };
     this.blocks.push(nestedBlock);
-    return new Workflow<TNewContext>(this.initialContext as any).withBlocks(this.blocks);
+    return new Workflow<TNewContext>().withBlocks(this.blocks);
   }
 
   prompt<TResponse, TKey extends string>(
@@ -56,7 +56,7 @@ export class Workflow<TContext extends Context> {
       return { ...ctx, [config.responseKey]: response };
     };
     this.blocks.push(promptBlock);
-    return new Workflow<TContext & { [K in TKey]: TResponse }>(this.initialContext as any).withBlocks(this.blocks);
+    return new Workflow<TContext & { [K in TKey]: TResponse }>().withBlocks(this.blocks);
   }
 
   private withBlocks(blocks: Block<any, any>[]): this {
@@ -64,8 +64,8 @@ export class Workflow<TContext extends Context> {
     return this;
   }
 
-  async run(): Promise<TContext> {
-    let ctx = this.initialContext;
+  async run(initialContext: TContext = {} as TContext): Promise<TContext> {
+    let ctx = initialContext;
     for (const block of this.blocks) {
       if (typeof block === 'function') {
         ctx = await block(ctx);
@@ -103,7 +103,7 @@ function customMathExtension<TContext extends { value: number }>(workflow: Workf
 }
 
 // Example workflow with all features for type testing
-const testWorkflow = new Workflow({ initial: "value" })
+const testWorkflow = new Workflow<{ initial: string }>()
   .step("Initialize value", ctx => ({
     ...ctx,
     value: 0
@@ -119,7 +119,7 @@ const testWorkflow = new Workflow({ initial: "value" })
   .step("Add user response", ctx => ctx)
   .workflow(
     "Nested workflow",
-    new Workflow({ nested: true })
+    new Workflow<{ nested: boolean }>()
       .step("Nested step", ctx => ({
         ...ctx,
         nestedValue: "computed"
