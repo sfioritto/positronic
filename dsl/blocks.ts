@@ -1,6 +1,10 @@
 import { Context } from "./new-dsl";
 
-export type StepBlock<TContextIn, TContextOut> = (ctx: TContextIn) => TContextOut | Promise<TContextOut>;
+export type StepBlock<TContextIn, TContextOut> = {
+  type: 'step';
+  title: string;
+  execute: (ctx: TContextIn) => TContextOut | Promise<TContextOut>;
+};
 
 type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = {
   type: 'workflow';
@@ -21,9 +25,14 @@ export class Workflow<TContext extends Context> {
 
   step<TNewContext extends Context>(
     title: string,
-    fn: StepBlock<TContext, TNewContext>
+    fn: (ctx: TContext) => TNewContext | Promise<TNewContext>
   ) {
-    this.blocks.push(fn);
+    const stepBlock: StepBlock<TContext, TNewContext> = {
+      type: 'step',
+      title,
+      execute: fn
+    };
+    this.blocks.push(stepBlock);
     return new Workflow<TNewContext>().withBlocks(this.blocks);
   }
 
@@ -51,9 +60,13 @@ export class Workflow<TContext extends Context> {
       getResponse: (ctx: TContext) => Promise<TResponse>
     }
   ): Workflow<TContext & { [K in TKey]: TResponse }> {
-    const promptBlock: StepBlock<TContext, TContext & { [K in TKey]: TResponse }> = async (ctx) => {
-      const response = await config.getResponse(ctx);
-      return { ...ctx, [config.responseKey]: response };
+    const promptBlock: StepBlock<TContext, TContext & { [K in TKey]: TResponse }> = {
+      type: 'step',
+      title,
+      execute: async (ctx) => {
+        const response = await config.getResponse(ctx);
+        return { ...ctx, [config.responseKey]: response };
+      }
     };
     this.blocks.push(promptBlock);
     return new Workflow<TContext & { [K in TKey]: TResponse }>().withBlocks(this.blocks);
@@ -67,8 +80,8 @@ export class Workflow<TContext extends Context> {
   async run(initialContext: TContext = {} as TContext): Promise<TContext> {
     let ctx = initialContext;
     for (const block of this.blocks) {
-      if (typeof block === 'function') {
-        ctx = await block(ctx);
+      if (block.type === 'step') {
+        ctx = await block.execute(ctx);
       } else if (block.type === 'workflow') {
         const childInitial = typeof block.initialChildContext === 'function'
           ? block.initialChildContext(ctx)
@@ -114,7 +127,7 @@ const testWorkflow = new Workflow<{ initial: string }>()
   }))
   .prompt("Get user input", {
     responseKey: "userResponse",
-    getResponse: async (ctx) => `Response for ${ctx.initial}`
+    getResponse: async (ctx) => ({ cool: 'user response', id: 1 })
   })
   .step("Add user response", ctx => ctx)
   .workflow(
@@ -147,7 +160,7 @@ type AssertEquals<T, U> =
 type ExpectedFinalContext = {
   initial: string;
   sum: number;
-  userResponse: string;
+  userResponse: { cool: string, id: number };
   fromNested: string;
   value: number;
 };
