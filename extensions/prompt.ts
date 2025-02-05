@@ -10,7 +10,6 @@ interface PromptConfig<TSchema extends z.ZodObject<any>> {
     name: string;
   };
   client?: PromptClient;
-  reducer?: (context: Context, result: z.infer<TSchema>) => Context;
 }
 
 export const promptExtension = createExtension({
@@ -22,16 +21,15 @@ export const promptExtension = createExtension({
   ) => ({
     title,
     action: async ({ context }) => {
-      const { template, responseModel, client: configClient, reducer } = config;
+      const { template, responseModel, client: configClient } = config;
       const client = configClient ?? new AnthropicClient();
       const promptString = template(context);
       const result = await client.execute(promptString, responseModel);
-      const newContext = reducer ? reducer(context, result) : {
+
+      return {
         ...context,
         [responseModel.name]: result
-      }
-
-      return newContext;
+      };
     }
   })
 });

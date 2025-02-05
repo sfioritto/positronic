@@ -122,43 +122,4 @@ describe('prompt extension', () => {
       "test-greeting": { response: "Hello, John!" }
     });
   });
-
-  it('should use a custom reducer to transform the result', async () => {
-    const schema = z.object({
-      count: z.number()
-    });
-
-    const mockClient = {
-      execute: jest.fn().mockResolvedValue({ count: 42 })
-    };
-
-    const workflow = createWorkflow("Test Workflow", [promptExtension])
-      .step("init", () => ({ total: 10 }))
-      .prompt("count", {
-        template: () => `Return a number`,
-        responseModel: {
-          schema,
-          name: 'count-result'
-        },
-        client: mockClient,
-        reducer: (context, result) => ({
-          ...context,
-          total: context.total + result.count
-        })
-      });
-
-    let finalEvent;
-    for await (const event of workflow.run()) {
-      finalEvent = event;
-    }
-
-    expect(mockClient.execute).toHaveBeenCalledWith(
-      'Return a number',
-      expect.any(Object)
-    );
-
-    expect(finalEvent?.newContext).toEqual({
-      total: 52  // 10 + 42
-    });
-  });
 });
