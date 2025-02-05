@@ -1,6 +1,6 @@
-export type Context = { [key: string]: any };
+import { Context } from "./new-dsl";
 
-export type Block<TContextIn, TContextOut> = (ctx: TContextIn) => TContextOut | Promise<TContextOut>;
+export type StepBlock<TContextIn, TContextOut> = (ctx: TContextIn) => TContextOut | Promise<TContextOut>;
 
 type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = {
   type: 'workflow';
@@ -10,19 +10,19 @@ type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = 
   reducer: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
 };
 
-type AnyBlock<TContextIn, TContextOut> =
-  | Block<TContextIn, TContextOut>
+type Block<TContextIn, TContextOut> =
+  | StepBlock<TContextIn, TContextOut>
   | WorkflowBlock<TContextIn, any, TContextOut>;
 
 export class Workflow<TContext extends Context> {
-  private blocks: AnyBlock<any, any>[] = [];
+  private blocks: Block<any, any>[] = [];
 
   constructor(private initialContext: TContext) {}
 
   step<TNewContext extends Context>(
     title: string,
-    fn: Block<TContext, TNewContext>
-  ): Workflow<TNewContext> {
+    fn: StepBlock<TContext, TNewContext>
+  ) {
     this.blocks.push(fn);
     return new Workflow<TNewContext>(this.initialContext as any).withBlocks(this.blocks);
   }
@@ -32,7 +32,7 @@ export class Workflow<TContext extends Context> {
     innerWorkflow: Workflow<TInnerContext>,
     reducer: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
     initialChildContext?: TInnerContext | ((context: TContext) => TInnerContext)
-  ): Workflow<TNewContext> {
+  ) {
     const nestedBlock: WorkflowBlock<TContext, TInnerContext, TNewContext> = {
       type: 'workflow',
       title,
@@ -51,7 +51,7 @@ export class Workflow<TContext extends Context> {
       getResponse: (ctx: TContext) => Promise<TResponse>
     }
   ): Workflow<TContext & { [K in TKey]: TResponse }> {
-    const promptBlock: Block<TContext, TContext & { [K in TKey]: TResponse }> = async (ctx) => {
+    const promptBlock: StepBlock<TContext, TContext & { [K in TKey]: TResponse }> = async (ctx) => {
       const response = await config.getResponse(ctx);
       return { ...ctx, [config.responseKey]: response };
     };
@@ -59,7 +59,7 @@ export class Workflow<TContext extends Context> {
     return new Workflow<TContext & { [K in TKey]: TResponse }>(this.initialContext as any).withBlocks(this.blocks);
   }
 
-  private withBlocks(blocks: AnyBlock<any, any>[]): this {
+  private withBlocks(blocks: Block<any, any>[]): this {
     this.blocks = blocks;
     return this;
   }
@@ -102,12 +102,6 @@ function customMathExtension<TContext extends { value: number }>(workflow: Workf
   };
 }
 
-// Type testing utilities
-type AssertEquals<T, U> =
-  0 extends (1 & T) ? false : // fails if T is any
-  0 extends (1 & U) ? false : // fails if U is any
-  [T] extends [U] ? [U] extends [T] ? true : false : false;
-
 // Example workflow with all features for type testing
 const testWorkflow = new Workflow({ initial: "value" })
   .step("Initialize value", ctx => ({
@@ -122,6 +116,7 @@ const testWorkflow = new Workflow({ initial: "value" })
     responseKey: "userResponse",
     getResponse: async (ctx) => `Response for ${ctx.initial}`
   })
+  .step("Add user response", ctx => ctx)
   .workflow(
     "Nested workflow",
     new Workflow({ nested: true })
@@ -141,6 +136,12 @@ const workflowWithMath = withExtensions(
   testWorkflow,
   customMathExtension
 ).multiply(2);
+
+// Type testing utilities
+type AssertEquals<T, U> =
+  0 extends (1 & T) ? false : // fails if T is any
+  0 extends (1 & U) ? false : // fails if U is any
+  [T] extends [U] ? [U] extends [T] ? true : false : false;
 
 // Expected final context type
 type ExpectedFinalContext = {
