@@ -133,7 +133,6 @@ const workflow = new Workflow(client)
     })
   })
   .step('Get User Data', async (ctx) => {
-    console.log(ctx.notAProperty);
     const response = await fetch('https://api.example.com/users/1');
     const data = await response.json();
     return {
@@ -145,3 +144,29 @@ const workflow = new Workflow(client)
     console.log(ctx.regularStepUserData);
     return ctx;
   });
+
+// Type testing
+type AssertEquals<T, U> =
+  0 extends (1 & T) ? false : // fails if T is any
+  0 extends (1 & U) ? false : // fails if U is any
+  [T] extends [U] ? [U] extends [T] ? true : false : false;
+
+// Expected final context type for our example workflow
+type ExpectedWorkflowContext = {
+  user: string;
+  regularStepUserData: any;
+  name: string;
+  age: number;
+  email: string;
+};
+
+// Extract the context type from the workflow
+type ExtractContextType<T> = T extends Workflow<infer Context> ? Context : never;
+
+type TestFinalContext = ExtractContextType<typeof workflow>;
+
+// This will show a type error if the types don't match
+type TestResult = AssertEquals<TestFinalContext, ExpectedWorkflowContext>;
+
+// If you want to be even more explicit, you can add a const assertion
+const _typeTest: TestResult = true;
