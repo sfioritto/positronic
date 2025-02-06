@@ -126,7 +126,11 @@ const workflow = new Workflow(client)
   })
   .fetch('Get User Data', {
     url: (ctx) => `https://api.example.com/users/${ctx.user}`,
-    responseKey: 'userData'
+    schema: z.object({
+      name: z.string(),
+      age: z.number(),
+      email: z.string().email()
+    })
   })
   .step('Get User Data', async (ctx) => {
     console.log(ctx.notAProperty);
