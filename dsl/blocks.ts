@@ -1,7 +1,34 @@
-import { Context } from "./new-dsl";
 import { z } from "zod";
 import { AnthropicClient } from "../clients/anthropic";
 import type { PromptClient } from "../types";
+import type { JsonObject, SerializedError } from "./types";
+import { STATUS, WORKFLOW_EVENTS } from './constants';
+import { addFetch } from './fetch';
+
+export type Context = JsonObject;
+
+export interface Event<
+  TContextIn extends Context,
+  TContextOut extends Context,
+  TOptions extends object = {}
+> {
+  workflowTitle: string;
+  workflowDescription?: string;
+  type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
+  status: typeof STATUS[keyof typeof STATUS];
+  previousContext: TContextIn;
+  newContext: TContextOut;
+  error?: SerializedError;
+  completedStep?: SerializedStep;
+  steps: SerializedStep[];
+  options: TOptions;
+}
+
+interface SerializedStep {
+  title: string;
+  status: typeof STATUS[keyof typeof STATUS];
+  context: Context;
+}
 
 export type StepBlock<TContextIn, TContextOut> = {
   type: 'step';
@@ -20,6 +47,15 @@ type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = 
 type Block<TContextIn, TContextOut> =
   | StepBlock<TContextIn, TContextOut>
   | WorkflowBlock<TContextIn, any, TContextOut>;
+
+interface RunParams<
+  TOptions extends object = {},
+  TContextIn extends Context = Context
+> {
+  initialContext?: TContextIn;
+  options?: TOptions;
+  initialCompletedSteps?: SerializedStep[];
+}
 
 export class Workflow<TContext extends Context = {}> {
   private blocks: Block<any, any>[] = [];
@@ -98,22 +134,113 @@ export class Workflow<TContext extends Context = {}> {
     return this;
   }
 
-  async run(initialContext: TContext = {} as TContext): Promise<TContext> {
-    let ctx = initialContext;
+  async *run(params: RunParams<{}, TContext> = {}): AsyncGenerator<Event<TContext, TContext>> {
+    let currentContext = structuredClone(params.initialContext || {}) as TContext;
+    const completedSteps: SerializedStep[] = [...(params.initialCompletedSteps || [])];
+
+    if (completedSteps.length > 0) {
+      currentContext = structuredClone(completedSteps[completedSteps.length - 1].context) as TContext;
+    }
+
+    // Rest of the implementation remains similar, but add options to events:
+    yield {
+      type: completedSteps.length > 0 ? 'workflow:restart' : 'workflow:start',
+      status: STATUS.RUNNING,
+      workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+      previousContext: currentContext,
+      newContext: currentContext,
+      steps: this.blocks.map(block => ({
+        title: block.title,
+        status: STATUS.PENDING,
+        context: currentContext
+      })),
+      options: params.options || {}
+    };
+
+    // Process each block
     for (const block of this.blocks) {
-      if (block.type === 'step') {
-        ctx = await block.execute(ctx);
-      } else if (block.type === 'workflow') {
-        const childInitial = typeof block.initialContext === 'function'
-          ? block.initialContext(ctx)
-          : block.initialContext;
-        const innerCtx = await block.innerWorkflow.run();
-        ctx = block.reducer(ctx, innerCtx);
+      const previousContext = structuredClone(currentContext);
+      try {
+        if (block.type === 'step') {
+          currentContext = await block.execute(currentContext);
+        } else if (block.type === 'workflow') {
+          const childInitial = typeof block.initialContext === 'function'
+            ? block.initialContext(currentContext)
+            : block.initialContext;
+          const innerCtx = await block.innerWorkflow.run(childInitial);
+          currentContext = block.reducer(currentContext, innerCtx);
+        }
+
+        const completedStep = {
+          title: block.title,
+          status: STATUS.COMPLETE,
+          context: currentContext
+        };
+        completedSteps.push(completedStep);
+
+        // Yield update event
+        yield {
+          type: 'workflow:update',
+          status: STATUS.RUNNING,
+          workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+          previousContext,
+          newContext: currentContext,
+          completedStep,
+          steps: this.blocks.map((b, i) =>
+            completedSteps[i] || {
+              title: b.title,
+              status: 'PENDING',
+              context: currentContext
+            }
+          ),
+          options: params.options || {}
+        };
+      } catch (error) {
+        const errorStep = {
+          title: block.title,
+          status: STATUS.ERROR,
+          context: currentContext
+        };
+        completedSteps.push(errorStep);
+
+        // Yield error event
+        yield {
+          type: 'workflow:error',
+          status: STATUS.ERROR,
+          workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+          previousContext,
+          newContext: currentContext,
+          completedStep: errorStep,
+          error: error as SerializedError,
+          steps: this.blocks.map((b, i) =>
+            completedSteps[i] || {
+              title: b.title,
+              status: 'PENDING',
+              context: currentContext
+            }
+          ),
+          options: params.options || {}
+        };
+        throw error;
       }
     }
-    return ctx;
+
+    // Yield complete event
+    yield {
+      type: 'workflow:complete',
+      status: STATUS.COMPLETE,
+      workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+      previousContext: params.initialContext || {} as TContext,
+      newContext: currentContext,
+      steps: completedSteps,
+      options: params.options || {}
+    };
+
+    return currentContext;
   }
 }
+
+addFetch();
 
 const client = new AnthropicClient();
 
@@ -132,18 +259,14 @@ const workflow = new Workflow(client)
       email: z.string().email()
     })
   })
-  .step('Get User Data', async (ctx) => {
-    const response = await fetch('https://api.example.com/users/1');
-    const data = await response.json();
+  .step("Uppercase user name", (ctx) => {
     return {
       ...ctx,
-      regularStepUserData: data
+      user: ctx.user.toUpperCase()
     };
-  })
-  .step('Use Data', (ctx) => {
-    console.log(ctx.regularStepUserData);
-    return ctx;
   });
+
+
 
 // Type testing
 type AssertEquals<T, U> =
@@ -154,7 +277,6 @@ type AssertEquals<T, U> =
 // Expected final context type for our example workflow
 type ExpectedWorkflowContext = {
   user: string;
-  regularStepUserData: any;
   name: string;
   age: number;
   email: string;
@@ -170,3 +292,15 @@ type TestResult = AssertEquals<TestFinalContext, ExpectedWorkflowContext>;
 
 // If you want to be even more explicit, you can add a const assertion
 const _typeTest: TestResult = true;
+
+(async () => {
+  try {
+    for await (const event of workflow.run()) {
+      console.log(`Step: ${event.completedStep?.title || event.type}`);
+      console.log('New Context:', event.newContext);
+      console.log('-------------------');
+    }
+  } catch (error) {
+    console.error('Workflow error:', error);
+  }
+})();

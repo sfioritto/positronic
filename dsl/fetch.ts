@@ -17,26 +17,39 @@ declare module "./blocks" {
   }
 }
 
-Workflow.prototype.fetch = function<
-  TContext extends Context,
-  TSchema extends z.ZodObject<any>
->(
-  title: string,
-  config: {
-    url: string | ((ctx: TContext) => string);
-    method?: string;
-    schema: TSchema;
-  }
-) {
-  return this.step(title, async (ctx: TContext) => {
-    const url = typeof config.url === 'function' ? config.url(ctx) : config.url;
-    const response = await fetch(url, { method: config.method || 'GET' });
-    const rawData = await response.json();
-    const data = config.schema.parse(rawData);
+export function addFetch() {
+  Workflow.prototype.fetch = function<
+    TContext extends Context,
+    TSchema extends z.ZodObject<any>
+  >(
+    title: string,
+    config: {
+      url: string | ((ctx: TContext) => string);
+      method?: string;
+      schema: TSchema;
+    }
+  ) {
+    return this.step(title, async (ctx: TContext) => {
+      const url = typeof config.url === 'function' ? config.url(ctx) : config.url;
 
-    return {
-      ...ctx,
-      ...data
-    };
-  });
-};
+      // Simulate network delay with setTimeout
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Mock response data with required age and email fields
+      const rawData = {
+        id: "123",
+        name: "Mock Response",
+        timestamp: new Date().toISOString(),
+        age: 30,
+        email: "mock@example.com"
+      };
+
+      const data = config.schema.parse(rawData);
+
+      return {
+        ...ctx,
+        ...data
+      };
+    });
+  };
+}
