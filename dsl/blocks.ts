@@ -30,10 +30,10 @@ interface SerializedStep {
   context: Context;
 }
 
-export type StepBlock<TContextIn, TContextOut> = {
+export type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
   type: 'step';
   title: string;
-  execute: (ctx: TContextIn) => TContextOut | Promise<TContextOut>;
+  execute: (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
 };
 
 type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = {
@@ -44,8 +44,8 @@ type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = 
   reducer: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
 };
 
-type Block<TContextIn, TContextOut> =
-  | StepBlock<TContextIn, TContextOut>
+type Block<TContextIn, TContextOut, TOptions extends object = {}> =
+  | StepBlock<TContextIn, TContextOut, TOptions>
   | WorkflowBlock<TContextIn, any, TContextOut>;
 
 interface RunParams<
@@ -53,12 +53,12 @@ interface RunParams<
   TContextIn extends Context = Context
 > {
   initialContext?: TContextIn;
-  options?: TOptions;
+  options: TOptions;
   initialCompletedSteps?: SerializedStep[];
 }
 
-export class Workflow<TContext extends Context = {}> {
-  private blocks: Block<any, any>[] = [];
+export class Workflow<TContext extends Context = {}, TOptions extends object = {}> {
+  private blocks: Block<any, any, TOptions>[] = [];
   private defaultClient: PromptClient;
 
   constructor(defaultClient: PromptClient) {
@@ -67,15 +67,15 @@ export class Workflow<TContext extends Context = {}> {
 
   step<TNewContext extends Context>(
     title: string,
-    fn: (ctx: TContext) => TNewContext | Promise<TNewContext>
+    fn: (params: { context: TContext; options: TOptions }) => TNewContext | Promise<TNewContext>
   ) {
-    const stepBlock: StepBlock<TContext, TNewContext> = {
+    const stepBlock: StepBlock<TContext, TNewContext, TOptions> = {
       type: 'step',
       title,
       execute: fn
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TNewContext>(this.defaultClient).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.defaultClient).withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
@@ -92,7 +92,7 @@ export class Workflow<TContext extends Context = {}> {
       reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx})
     };
     this.blocks.push(nestedBlock);
-    return new Workflow<TNewContext>(this.defaultClient).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.defaultClient).withBlocks(this.blocks);
   }
 
   prompt<TResponseKey extends string, TSchema extends z.ZodObject<any>>(
@@ -105,40 +105,42 @@ export class Workflow<TContext extends Context = {}> {
       };
       client?: PromptClient;
     }
-  ): Workflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }> {
+  ): Workflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }, TOptions> {
     const promptBlock: StepBlock<
       TContext,
-      TContext & { [K in TResponseKey]: z.infer<TSchema> }
+      TContext & { [K in TResponseKey]: z.infer<TSchema> },
+      TOptions
     > = {
       type: 'step',
       title,
-      execute: async (ctx) => {
+      execute: async ({ context, options }) => {
         const client = config.client ?? this.defaultClient;
-        const promptString = config.template(ctx);
+        const promptString = config.template(context);
         const response = await client.execute(promptString, config.responseModel);
 
         return {
-          ...ctx,
+          ...context,
           [config.responseModel.name]: response
         };
       }
     };
     this.blocks.push(promptBlock);
     return new Workflow<
-      TContext & { [K in TResponseKey]: z.infer<TSchema> }
+      TContext & { [K in TResponseKey]: z.infer<TSchema> },
+      TOptions
     >(this.defaultClient).withBlocks(this.blocks);
   }
 
-  private withBlocks(blocks: Block<any, any>[]): this {
+  private withBlocks(blocks: Block<any, any, TOptions>[]): this {
     this.blocks = blocks;
     return this;
   }
 
-  async *run(params: RunParams<{}, TContext> = {}): AsyncGenerator<Event<TContext, TContext>> {
+  async *run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
     // Clone all input params
-    const clonedParams: RunParams<{}, TContext> = {
+    const clonedParams: RunParams<TOptions, TContext> = {
       initialContext: params.initialContext ? structuredClone(params.initialContext) : {} as TContext,
-      options: params.options ? structuredClone(params.options) : {},
+      options: structuredClone(params.options),
       initialCompletedSteps: params.initialCompletedSteps ? structuredClone(params.initialCompletedSteps) : []
     };
 
@@ -154,7 +156,7 @@ export class Workflow<TContext extends Context = {}> {
    * by consumers of the workflow is in fact cloned. This guarantees that all input and output
    * data is immutable and safe to use by consumers of the workflow.
    */
-  private async *_run(params: RunParams<{}, TContext>): AsyncGenerator<Event<TContext, TContext>> {
+  private async *_run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
     let currentContext = params.initialContext as TContext;
     const completedSteps: SerializedStep[] = [...(params.initialCompletedSteps || [])];
 
@@ -173,7 +175,7 @@ export class Workflow<TContext extends Context = {}> {
         status: STATUS.PENDING,
         context: currentContext
       })),
-      options: params.options || {}
+      options: params.options
     };
 
     // Process each block
@@ -181,7 +183,10 @@ export class Workflow<TContext extends Context = {}> {
       const previousContext = currentContext;
       try {
         if (block.type === 'step') {
-          currentContext = await block.execute(currentContext);
+          currentContext = await block.execute({
+            context: currentContext,
+            options: params.options
+          });
         } else if (block.type === 'workflow') {
           const childInitial = typeof block.initialContext === 'function'
             ? block.initialContext(currentContext)
@@ -211,7 +216,7 @@ export class Workflow<TContext extends Context = {}> {
               context: currentContext
             }
           ),
-          options: params.options || {}
+          options: params.options
         };
       } catch (error) {
         const errorStep = {
@@ -236,7 +241,7 @@ export class Workflow<TContext extends Context = {}> {
               context: currentContext
             }
           ),
-          options: params.options || {}
+          options: params.options
         };
         throw error;
       }
@@ -249,7 +254,7 @@ export class Workflow<TContext extends Context = {}> {
       previousContext: params.initialContext || {} as TContext,
       newContext: currentContext,
       steps: completedSteps,
-      options: params.options || {}
+      options: params.options
     };
 
     return currentContext;
@@ -260,10 +265,10 @@ addFetch();
 
 const client = new AnthropicClient();
 
-const workflow = new Workflow(client)
-  .step('Get User name', (ctx) => {
+const workflow = new Workflow<{}, { apiKey: string }>(client)
+  .step('Get User name', ({ context, options }) => {
     return {
-      ...ctx,
+      ...context,
       user: 'bob'
     };
   })
@@ -275,14 +280,71 @@ const workflow = new Workflow(client)
       email: z.string().email()
     })
   })
-  .step("Uppercase user name", (ctx) => {
+  .step("Uppercase user name", ({ context }) => {
     return {
-      ...ctx,
-      user: ctx.user.toUpperCase()
+      ...context,
+      user: context.user.toUpperCase()
     };
   });
 
+// Test workflow with options
+interface ApiOptions {
+  apiKey: string;
+  baseUrl: string;
+  retryCount: number;
+}
 
+const optionsWorkflow = new Workflow<{}, ApiOptions>(client)
+  .step('Initialize Config', ({ context, options }) => ({
+    ...context,
+    config: {
+      endpoint: `${options.baseUrl}/api`,
+      auth: `Bearer ${options.apiKey}`,
+      maxRetries: options.retryCount
+    }
+  }))
+  .step('Make API Call', ({ context, options }) => ({
+    ...context,
+    response: `Called ${context.config.endpoint} with ${options.retryCount} retries`
+  }));
+
+// Type testing for options
+type ExpectedOptions = {
+  apiKey: string;
+  baseUrl: string;
+  retryCount: number;
+};
+
+// Extract the options type from the workflow
+type ExtractOptionsType<T> = T extends Workflow<any, infer Options> ? Options : never;
+
+type TestOptionsType = ExtractOptionsType<typeof optionsWorkflow>;
+
+// This will show a type error if the options types don't match
+type OptionsTestResult = AssertEquals<TestOptionsType, ExpectedOptions>;
+
+// Const assertion for options test
+const _optionsTypeTest: OptionsTestResult = true;
+
+// Test execution
+(async () => {
+  try {
+    for await (const event of optionsWorkflow.run({
+      options: {
+        apiKey: 'test-key',
+        baseUrl: 'https://api.example.com',
+        retryCount: 3
+      }
+    })) {
+      console.log(`Step: ${event.completedStep?.title || event.type}`);
+      console.log('Options:', event.options);
+      console.log('New Context:', event.newContext);
+      console.log('-------------------');
+    }
+  } catch (error) {
+    console.error('Workflow error:', error);
+  }
+})();
 
 // Type testing
 type AssertEquals<T, U> =
@@ -311,7 +373,7 @@ const _typeTest: TestResult = true;
 
 (async () => {
   try {
-    for await (const event of workflow.run()) {
+    for await (const event of workflow.run({ options: { apiKey: 'test' } })) {
       console.log(`Step: ${event.completedStep?.title || event.type}`);
       console.log('New Context:', event.newContext);
       console.log('-------------------');

@@ -29,8 +29,8 @@ export function addFetch() {
       schema: TSchema;
     }
   ) {
-    return this.step(title, async (ctx: TContext) => {
-      const url = typeof config.url === 'function' ? config.url(ctx) : config.url;
+    return this.step(title, async ({ context }) => {
+      const url = typeof config.url === 'function' ? config.url(context) : config.url;
 
       // Simulate network delay with setTimeout
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -47,7 +47,7 @@ export function addFetch() {
       const data = config.schema.parse(rawData);
 
       return {
-        ...ctx,
+        ...context,
         ...data
       };
     });
