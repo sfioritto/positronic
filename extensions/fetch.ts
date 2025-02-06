@@ -1,9 +1,9 @@
-import { WorkflowExtension, type Expand } from "./blocks";
-import type { Context } from "./new-dsl";
+import { Workflow, type Expand, type Context } from "../dsl/blocks";
 import { z } from "zod";
 
-declare module "./blocks" {
-  interface Workflow<TContext> {
+// Type augmentation - only available when this module is imported
+declare module "../dsl/blocks" {
+  export interface Workflow<TContext> {
     fetch<TSchema extends z.ZodObject<any>>(
       title: string,
       config: {
@@ -15,18 +15,9 @@ declare module "./blocks" {
   }
 }
 
-export const fetchExtension: WorkflowExtension = (workflow) => {
-  workflow.fetch = function<
-    TContext extends Context,
-    TSchema extends z.ZodObject<any>
-  >(
-    title: string,
-    config: {
-      url: string | ((ctx: TContext) => string);
-      method?: string;
-      schema: TSchema;
-    }
-  ) {
+// Wrap the prototype modification in a function that runs after module initialization
+(() => {
+  Workflow.prototype.fetch = function(title, config) {
     return this.step(title, async ({ context }) => {
       const url = typeof config.url === 'function' ? config.url(context) : config.url;
 
@@ -50,4 +41,4 @@ export const fetchExtension: WorkflowExtension = (workflow) => {
       };
     });
   };
-};
+})();

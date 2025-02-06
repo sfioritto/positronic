@@ -19,5 +19,14 @@
     "declarationMap": true,
     "sourceMap": true,
     "rootDir": "."
-  }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "extensions/**/*"
+  ]
 }
