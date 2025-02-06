@@ -1,5 +1,5 @@
 import { Workflow } from "./blocks";
-import type { Context, Flatten } from "./new-dsl";
+import type { Context } from "./new-dsl";
 
 type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 
@@ -20,7 +20,6 @@ Workflow.prototype.fetch = function <
   TContext extends Context,
   TResponseKey extends string
 >(
-  this: Workflow<TContext>,
   title: string,
   config: {
     url: string | ((ctx: TContext) => string);

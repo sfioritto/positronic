@@ -118,14 +118,14 @@ export class Workflow<TContext extends Context = {}> {
 const client = new AnthropicClient();
 
 const workflow = new Workflow(client)
-  .step('Just add a property', (ctx) => {
+  .step('Get User name', (ctx) => {
     return {
       ...ctx,
-      someProperty: 'This is a property'
+      user: 'bob'
     };
   })
   .fetch('Get User Data', {
-    url: 'https://api.example.com/users/1',
+    url: (ctx) => `https://api.example.com/users/${ctx.user}`,
     responseKey: 'userData'
   })
   .step('Get User Data', async (ctx) => {
