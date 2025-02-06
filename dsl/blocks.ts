@@ -135,14 +135,33 @@ export class Workflow<TContext extends Context = {}> {
   }
 
   async *run(params: RunParams<{}, TContext> = {}): AsyncGenerator<Event<TContext, TContext>> {
-    let currentContext = structuredClone(params.initialContext || {}) as TContext;
+    // Clone all input params
+    const clonedParams: RunParams<{}, TContext> = {
+      initialContext: params.initialContext ? structuredClone(params.initialContext) : {} as TContext,
+      options: params.options ? structuredClone(params.options) : {},
+      initialCompletedSteps: params.initialCompletedSteps ? structuredClone(params.initialCompletedSteps) : []
+    };
+
+    // Delegate to private run and clone all yielded events
+    for await (const event of this._run(clonedParams)) {
+      yield structuredClone(event);
+    }
+  }
+
+  /**
+   * This is separated from the public run() method to centralize all deep cloning
+   * operations to ensure that all data that should be cloned to prevent object mutation
+   * by consumers of the workflow is in fact cloned. This guarantees that all input and output
+   * data is immutable and safe to use by consumers of the workflow.
+   */
+  private async *_run(params: RunParams<{}, TContext>): AsyncGenerator<Event<TContext, TContext>> {
+    let currentContext = params.initialContext as TContext;
     const completedSteps: SerializedStep[] = [...(params.initialCompletedSteps || [])];
 
     if (completedSteps.length > 0) {
-      currentContext = structuredClone(completedSteps[completedSteps.length - 1].context) as TContext;
+      currentContext = completedSteps[completedSteps.length - 1].context as TContext;
     }
 
-    // Rest of the implementation remains similar, but add options to events:
     yield {
       type: completedSteps.length > 0 ? 'workflow:restart' : 'workflow:start',
       status: STATUS.RUNNING,
@@ -159,7 +178,7 @@ export class Workflow<TContext extends Context = {}> {
 
     // Process each block
     for (const block of this.blocks) {
-      const previousContext = structuredClone(currentContext);
+      const previousContext = currentContext;
       try {
         if (block.type === 'step') {
           currentContext = await block.execute(currentContext);
@@ -178,7 +197,6 @@ export class Workflow<TContext extends Context = {}> {
         };
         completedSteps.push(completedStep);
 
-        // Yield update event
         yield {
           type: 'workflow:update',
           status: STATUS.RUNNING,
@@ -203,7 +221,6 @@ export class Workflow<TContext extends Context = {}> {
         };
         completedSteps.push(errorStep);
 
-        // Yield error event
         yield {
           type: 'workflow:error',
           status: STATUS.ERROR,
@@ -225,7 +242,6 @@ export class Workflow<TContext extends Context = {}> {
       }
     }
 
-    // Yield complete event
     yield {
       type: 'workflow:complete',
       status: STATUS.COMPLETE,
