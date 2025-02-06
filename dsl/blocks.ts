@@ -4,8 +4,10 @@ import type { PromptClient } from "../types";
 import type { JsonObject, SerializedError } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { fetchExtension } from './fetch';
-
+import { slackExtension } from './slack';
 export type Context = JsonObject;
+
+export type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 
 export interface Event<
   TContextIn extends Context,
@@ -275,12 +277,16 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
 
 const client = new AnthropicClient();
 
-const workflow = new Workflow<{}, { apiKey: string }>(client, [fetchExtension])
+const workflow = new Workflow<{}, { apiKey: string }>(client, [fetchExtension, slackExtension])
   .step('Get User name', ({ context, options }) => {
     return {
       ...context,
       user: 'bob'
     };
+  })
+  .slack.message('Notify Start', {
+    channel: '#workflows',
+    message: ctx => `Starting workflow for user: ${ctx.user}`
   })
   .fetch('Get User Data', {
     url: (ctx) => `https://api.example.com/users/${ctx.user}`,
@@ -289,6 +295,10 @@ const workflow = new Workflow<{}, { apiKey: string }>(client, [fetchExtension])
       age: z.number(),
       email: z.string().email()
     })
+  })
+  .slack.notify('Alert Team', {
+    users: ['@alice', '@bob'],
+    message: ctx => `Retrieved data for ${ctx.name} (${ctx.email})`
   })
   .step("Uppercase user name", ({ context }) => {
     return {
@@ -368,6 +378,16 @@ type ExpectedWorkflowContext = {
   name: string;
   age: number;
   email: string;
+  lastSlackMessage: {
+    channel: string;
+    message: string;
+    timestamp: string;
+  };
+  lastSlackNotification: {
+    users: string[];
+    message: string;
+    timestamp: string;
+  };
 };
 
 // Extract the context type from the workflow

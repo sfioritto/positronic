@@ -1,8 +1,6 @@
-import { Workflow, WorkflowExtension } from "./blocks";
+import { WorkflowExtension, type Expand } from "./blocks";
 import type { Context } from "./new-dsl";
 import { z } from "zod";
-
-type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 
 declare module "./blocks" {
   interface Workflow<TContext> {
