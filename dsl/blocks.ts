@@ -3,7 +3,7 @@ import { AnthropicClient } from "../clients/anthropic";
 import type { PromptClient } from "../types";
 import type { JsonObject, SerializedError } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
-import { addFetch } from './fetch';
+import { fetchExtension } from './fetch';
 
 export type Context = JsonObject;
 
@@ -57,12 +57,24 @@ interface RunParams<
   initialCompletedSteps?: SerializedStep[];
 }
 
+export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
+
 export class Workflow<TContext extends Context = {}, TOptions extends object = {}> {
   private blocks: Block<any, any, TOptions>[] = [];
   private defaultClient: PromptClient;
+  private extensions: WorkflowExtension[];
 
-  constructor(defaultClient: PromptClient) {
+  constructor(
+    defaultClient: PromptClient,
+    extensions: WorkflowExtension[] = []
+  ) {
     this.defaultClient = defaultClient;
+    this.extensions = extensions;
+    console.log('Creating workflow with extensions:', extensions.length);
+    extensions.forEach(ext => {
+      console.log('Applying extension...');
+      ext(this);
+    });
   }
 
   step<TNewContext extends Context>(
@@ -75,7 +87,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       execute: fn
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TNewContext, TOptions>(this.defaultClient).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.defaultClient, this.extensions).withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
@@ -261,11 +273,9 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
   }
 }
 
-addFetch();
-
 const client = new AnthropicClient();
 
-const workflow = new Workflow<{}, { apiKey: string }>(client)
+const workflow = new Workflow<{}, { apiKey: string }>(client, [fetchExtension])
   .step('Get User name', ({ context, options }) => {
     return {
       ...context,

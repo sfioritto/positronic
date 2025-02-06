@@ -1,4 +1,4 @@
-import { Workflow } from "./blocks";
+import { Workflow, WorkflowExtension } from "./blocks";
 import type { Context } from "./new-dsl";
 import { z } from "zod";
 
@@ -17,8 +17,8 @@ declare module "./blocks" {
   }
 }
 
-export function addFetch() {
-  Workflow.prototype.fetch = function<
+export const fetchExtension: WorkflowExtension = (workflow) => {
+  workflow.fetch = function<
     TContext extends Context,
     TSchema extends z.ZodObject<any>
   >(
@@ -52,4 +52,4 @@ export function addFetch() {
       };
     });
   };
-}
+};
