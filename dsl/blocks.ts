@@ -21,7 +21,7 @@ type Block<TContextIn, TContextOut> =
   | StepBlock<TContextIn, TContextOut>
   | WorkflowBlock<TContextIn, any, TContextOut>;
 
-export class Workflow<TContext extends Context> {
+export class Workflow<TContext extends Context = {}> {
   private blocks: Block<any, any>[] = [];
   private defaultClient: PromptClient;
 
@@ -114,3 +114,30 @@ export class Workflow<TContext extends Context> {
     return ctx;
   }
 }
+
+const client = new AnthropicClient();
+
+const workflow = new Workflow(client)
+  .step('Just add a property', (ctx) => {
+    return {
+      ...ctx,
+      someProperty: 'This is a property'
+    };
+  })
+  .fetch('Get User Data', {
+    url: 'https://api.example.com/users/1',
+    responseKey: 'userData'
+  })
+  .step('Get User Data', async (ctx) => {
+    console.log(ctx.notAProperty);
+    const response = await fetch('https://api.example.com/users/1');
+    const data = await response.json();
+    return {
+      ...ctx,
+      regularStepUserData: data
+    };
+  })
+  .step('Use Data', (ctx) => {
+    console.log(ctx.regularStepUserData);
+    return ctx;
+  });
