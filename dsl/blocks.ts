@@ -234,7 +234,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
           steps: this.blocks.map((b, i) =>
             completedSteps[i] || {
               title: b.title,
-              status: 'PENDING',
+              status: STATUS.PENDING,
               context: currentContext
             }
           ),
@@ -260,7 +260,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
           steps: this.blocks.map((b, i) =>
             completedSteps[i] || {
               title: b.title,
-              status: 'PENDING',
+              status: STATUS.PENDING,
               context: currentContext
             }
           ),

@@ -93,3 +93,47 @@ describe('workflow creation', () => {
     expect(event.workflowDescription).toBeUndefined();
   });
 });
+
+describe('error handling', () => {
+  it('should handle errors in actions and maintain correct status', async () => {
+    const errorWorkflow = workflow('Error Workflow', mockClient)
+      // Step 1: Normal step
+      .step("First step", () => ({
+        value: 1
+      }))
+      // Step 2: Error step
+      .step("Error step", () => {
+        if (true) {
+          throw new Error('Test error');
+        }
+        return {
+          value: 1
+        };
+      })
+      // Step 3: Should never execute
+      .step("Never reached", ({ context }) => ({
+        value: context.value + 1
+      }));
+
+    let finalEvent;
+    try {
+      for await (const event of errorWorkflow.run({ options: {} })) {
+        finalEvent = event;
+      }
+    } catch (error) {
+      // Error is expected to be thrown
+    }
+
+    // Verify final state
+    expect(finalEvent?.status).toBe(STATUS.ERROR);
+    expect(finalEvent?.error?.message).toBe('Test error');
+
+    // Verify steps status
+    if (!finalEvent?.steps) {
+      throw new Error('Steps not found');
+    }
+    expect(finalEvent.steps[0].status).toBe(STATUS.COMPLETE);
+    expect(finalEvent.steps[1].status).toBe(STATUS.ERROR);
+    expect(finalEvent.steps[2].status).toBe(STATUS.PENDING);
+  });
+});
