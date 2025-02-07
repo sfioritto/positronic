@@ -78,7 +78,7 @@ interface FeatureOptions {
   apiKey: string;
 }
 
-const optionsWorkflow = workflow<FeatureOptions>("Options Workflow", client)
+const optionsWorkflow = workflow<{}, FeatureOptions>("Options Workflow", client)
   .step("Check features", ({ context, options }) => ({
     ...context,
     hasSpeed: options.features.includes('speed'),
@@ -96,7 +96,7 @@ const optionsWorkflow = workflow<FeatureOptions>("Options Workflow", client)
   }));
 
 // Example of nested workflows
-const nestedWorkflow = workflow<FeatureOptions>("Nested Workflow Example", client)
+const nestedWorkflow = workflow<{}, FeatureOptions>("Nested Workflow Example", client)
   .step("Initialize", ({ context }) => ({
     ...context,
     initialized: true
@@ -151,7 +151,7 @@ type AssertEquals<T, U> =
   [T] extends [U] ? [U] extends [T] ? true : false : false;
 
 // Extract types from workflows
-type ExtractContextType<T> = T extends Workflow<infer Context> ? Context : never;
+type ExtractContextType<T> = T extends Workflow<infer Context, any> ? Context : never;
 type ExtractOptionsType<T> = T extends Workflow<any, infer Options> ? Options : never;
 
 // Expected types for coverageWorkflow
@@ -193,6 +193,7 @@ type ExpectedOptionsContext = {
   features: string[];
   processed: boolean;
 };
+
 type TestOptionsOptions = ExtractOptionsType<typeof optionsWorkflow>;
 type TestOptionsContext = ExtractContextType<typeof optionsWorkflow>;
 const _optionsContextTypeTest: AssertEquals<TestOptionsContext, ExpectedOptionsContext> = true;
@@ -200,7 +201,7 @@ const _optionsOptionsTypeTest: AssertEquals<TestOptionsOptions, FeatureOptions> 
 
 // Expected types for nestedWorkflow
 type ExpectedNestedContext = {
-  initialized: boolean;
+  initialized: true;
   featureResults: {
     hasSpeed: boolean;
     hasManeuver: boolean;
@@ -216,5 +217,4 @@ const _nestedOptionsTypeTest: AssertEquals<TestNestedOptions, FeatureOptions> = 
 // Debug type inference
 type WorkflowType = typeof optionsWorkflow;
 type OptionsType = WorkflowType extends Workflow<any, infer O> ? O : never;
-type TestOptionsOptions = OptionsType;
 

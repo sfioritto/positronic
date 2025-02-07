@@ -14,7 +14,7 @@ export interface SlackNotification extends Context {
 
 // Type augmentation - only available when this module is imported
 declare module "../dsl/blocks" {
-  interface Workflow<TContext> {
+  interface Workflow<TContext, TOptions> {
     slack: {
       message(
         title: string,
@@ -22,7 +22,7 @@ declare module "../dsl/blocks" {
           channel: string;
           message: string | ((ctx: TContext) => string);
         }
-      ): Workflow<Expand<TContext & { lastSlackMessage: SlackMessage }>>;
+      ): Workflow<Expand<TContext & { lastSlackMessage: SlackMessage }>, TOptions>;
 
       notify(
         title: string,
@@ -30,7 +30,7 @@ declare module "../dsl/blocks" {
           users: string[];
           message: string | ((ctx: TContext) => string);
         }
-      ): Workflow<Expand<TContext & { lastSlackNotification: SlackNotification }>>;
+      ): Workflow<Expand<TContext & { lastSlackNotification: SlackNotification }>, TOptions>;
     }
   }
 }

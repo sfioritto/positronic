@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // Type augmentation - only available when this module is imported
 declare module "../dsl/blocks" {
-  export interface Workflow<TContext> {
+  export interface Workflow<TContext, TOptions> {
     fetch<TSchema extends z.ZodObject<any>>(
       title: string,
       config: {
@@ -11,7 +11,7 @@ declare module "../dsl/blocks" {
         method?: string;
         schema: TSchema;
       }
-    ): Workflow<Expand<TContext & z.infer<TSchema>>>;
+    ): Workflow<Expand<TContext & z.infer<TSchema>>, TOptions>;
   }
 }
 
