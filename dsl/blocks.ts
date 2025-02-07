@@ -61,12 +61,21 @@ interface RunParams<
 
 export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
 
+export function workflow<TContext extends Context = {}, TOptions extends object = {}>(
+  workflowConfig: string | { title: string; description?: string },
+  client: PromptClient
+) {
+  const title = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
+  const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
+  return new Workflow<TContext, TOptions>(client);
+}
+
 export class Workflow<TContext extends Context = {}, TOptions extends object = {}> {
   private blocks: Block<any, any, TOptions>[] = [];
-  private defaultClient: PromptClient;
+  private client: PromptClient;
 
-  constructor(defaultClient: PromptClient) {
-    this.defaultClient = defaultClient;
+  constructor(client: PromptClient) {
+    this.client = client;
   }
 
   step<TNewContext extends Context>(
@@ -79,7 +88,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       execute: fn
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TNewContext, TOptions>(this.defaultClient).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.client).withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
@@ -96,7 +105,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx})
     };
     this.blocks.push(nestedBlock);
-    return new Workflow<TNewContext, TOptions>(this.defaultClient).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.client).withBlocks(this.blocks);
   }
 
   prompt<TResponseKey extends string, TSchema extends z.ZodObject<any>>(
@@ -118,9 +127,11 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       type: 'step',
       title,
       execute: async ({ context, options }) => {
-        const client = config.client ?? this.defaultClient;
-        const promptString = config.template(context);
-        const response = await client.execute(promptString, config.responseModel);
+        const { client: workflowClient } = this;
+        const { client: stepClient, template, responseModel } = config;
+        const client = stepClient ?? workflowClient;
+        const promptString = template(context);
+        const response = await client.execute(promptString, responseModel);
 
         return {
           ...context,
@@ -132,7 +143,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
     return new Workflow<
       TContext & { [K in TResponseKey]: z.infer<TSchema> },
       TOptions
-    >(this.defaultClient).withBlocks(this.blocks);
+    >(this.client).withBlocks(this.blocks);
   }
 
   private withBlocks(blocks: Block<any, any, TOptions>[]): this {
@@ -267,7 +278,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
 
 const client = new AnthropicClient();
 
-const workflow = new Workflow<{}, { apiKey: string }>(client)
+const testWorkflow = workflow('test workflow', client)
   .step('Get User name', ({ context, options }) => {
     return {
       ...context,
@@ -383,7 +394,7 @@ type ExpectedWorkflowContext = {
 // Extract the context type from the workflow
 type ExtractContextType<T> = T extends Workflow<infer Context> ? Context : never;
 
-type TestFinalContext = ExtractContextType<typeof workflow>;
+type TestFinalContext = ExtractContextType<typeof testWorkflow>;
 
 // This will show a type error if the types don't match
 type TestResult = AssertEquals<TestFinalContext, ExpectedWorkflowContext>;
@@ -393,7 +404,7 @@ const _typeTest: TestResult = true;
 
 (async () => {
   try {
-    for await (const event of workflow.run({ options: { apiKey: 'test' } })) {
+    for await (const event of testWorkflow.run({ options: { apiKey: 'test' } })) {
       console.log(`Step: ${event.completedStep?.title || event.type}`);
       console.log('New Context:', event.newContext);
       console.log('-------------------');
