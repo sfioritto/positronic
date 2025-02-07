@@ -78,31 +78,31 @@ interface FeatureOptions {
   apiKey: string;
 }
 
-const optionsWorkflow = workflow<{}, FeatureOptions>("Options Workflow", client)
-  .step("Check features", ({ context, options }) => ({
+const optionsWorkflow = workflow<FeatureOptions>('Options Workflow', client)
+  .step('Check features', ({ context, options }) => ({
     ...context,
     hasSpeed: options.features.includes('speed'),
     hasManeuver: options.features.includes('maneuver')
   }))
-  .fetch("Get Feature Details", {
+  .fetch('Get Feature Details', {
     url: ctx => `https://api.example.com/features`,
     schema: z.object({
       features: z.array(z.string())
     })
   })
-  .step("Process features", ({ context }) => ({
+  .step('Process features', ({ context }) => ({
     ...context,
     processed: context.hasSpeed && context.hasManeuver
   }));
 
 // Example of nested workflows
-const nestedWorkflow = workflow<{}, FeatureOptions>("Nested Workflow Example", client)
-  .step("Initialize", ({ context }) => ({
+const nestedWorkflow = workflow<FeatureOptions>('Nested Workflow Example', client)
+  .step('Initialize', ({ context }) => ({
     ...context,
     initialized: true
   }))
   .workflow(
-    "Process Options",
+    'Process Options',
     optionsWorkflow,
     ({ context, workflowContext }) => ({
       ...context,
@@ -113,7 +113,7 @@ const nestedWorkflow = workflow<{}, FeatureOptions>("Nested Workflow Example", c
       }
     })
   )
-  .slack.notify("Feature Processing Complete", {
+  .slack.notify('Feature Processing Complete', {
     users: ['@devteam'],
     message: ctx => `Feature processing completed with results: ${JSON.stringify(ctx.featureResults)}`
   });
@@ -151,8 +151,8 @@ type AssertEquals<T, U> =
   [T] extends [U] ? [U] extends [T] ? true : false : false;
 
 // Extract types from workflows
-type ExtractContextType<T> = T extends Workflow<infer Context, any> ? Context : never;
-type ExtractOptionsType<T> = T extends Workflow<any, infer Options> ? Options : never;
+type ExtractContextType<T> = T extends Workflow<any, infer Context> ? Context : never;
+type ExtractOptionsType<T> = T extends Workflow<infer Options, any> ? Options : never;
 
 // Expected types for coverageWorkflow
 type ExpectedCoverageContext = {

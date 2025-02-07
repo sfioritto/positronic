@@ -41,7 +41,7 @@ export type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
 type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext, TOptions extends object = {}> = {
   type: 'workflow';
   title: string;
-  innerWorkflow: Workflow<TInnerContext, TOptions>;
+  innerWorkflow: Workflow<TOptions, TInnerContext>;
   initialContext: TInnerContext | ((outerCtx: TOuterContext) => TInnerContext);
   reducer: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
 };
@@ -61,16 +61,16 @@ interface RunParams<
 
 export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
 
-export function workflow<TContext extends Context = {}, TOptions extends object = {}>(
+export function workflow<TOptions extends object = {}, TContext extends Context = {}>(
   workflowConfig: string | { title: string; description?: string },
   client: PromptClient
 ) {
   const title = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
-  return new Workflow<TContext, TOptions>(client, title, description);
+  return new Workflow<TOptions, TContext>(client, title, description);
 }
 
-export class Workflow<TContext extends Context = {}, TOptions extends object = {}> {
+export class Workflow<TOptions extends object = {}, TContext extends Context = {}> {
   private blocks: Block<any, any, TOptions>[] = [];
   private client: PromptClient;
   private title: string;
@@ -92,12 +92,12 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       execute: fn
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TNewContext, TOptions>(this.client, this.title, this.description).withBlocks(this.blocks);
+    return new Workflow<TOptions, TNewContext>(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
     title: string,
-    innerWorkflow: Workflow<TInnerContext, TOptions>,
+    innerWorkflow: Workflow<TOptions, TInnerContext>,
     reducer: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
     initialContext?: TInnerContext | ((context: TContext) => TInnerContext)
   ) {
@@ -109,7 +109,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx})
     };
     this.blocks.push(nestedBlock);
-    return new Workflow<TNewContext, TOptions>(this.client, this.title, this.description).withBlocks(this.blocks);
+    return new Workflow<TOptions, TNewContext>(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
   prompt<TResponseKey extends string, TSchema extends z.ZodObject<any>>(
@@ -122,7 +122,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       };
       client?: PromptClient;
     }
-  ): Workflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }, TOptions> {
+  ): Workflow<TOptions, TContext & { [K in TResponseKey]: z.infer<TSchema> }> {
     const promptBlock: StepBlock<
       TContext,
       TContext & { [K in TResponseKey]: z.infer<TSchema> },
@@ -145,8 +145,8 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
     };
     this.blocks.push(promptBlock);
     return new Workflow<
-      TContext & { [K in TResponseKey]: z.infer<TSchema> },
-      TOptions
+      TOptions,
+      TContext & { [K in TResponseKey]: z.infer<TSchema> }
     >(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
@@ -326,7 +326,7 @@ interface ApiOptions {
   retryCount: number;
 }
 
-const optionsWorkflow = workflow<{}, ApiOptions>({ title: 'Options Workflow', description: 'This workflow demonstrates options handling' }, client)
+const optionsWorkflow = workflow<ApiOptions, {}>({ title: 'Options Workflow', description: 'This workflow demonstrates options handling' }, client)
   .step('Initialize Config', ({ context, options }) => ({
     ...context,
     config: {
@@ -348,7 +348,7 @@ type ExpectedOptions = {
 };
 
 // Extract the options type from the workflow
-type ExtractOptionsType<T> = T extends Workflow<any, infer Options> ? Options : never;
+type ExtractOptionsType<T> = T extends Workflow<infer Options, any> ? Options : never;
 
 type TestOptionsType = ExtractOptionsType<typeof optionsWorkflow>;
 
@@ -403,7 +403,7 @@ type ExpectedWorkflowContext = {
 };
 
 // Extract the context type from the workflow
-type ExtractContextType<T> = T extends Workflow<infer Context> ? Context : never;
+type ExtractContextType<T> = T extends Workflow<any, infer Context> ? Context : never;
 
 type TestFinalContext = ExtractContextType<typeof testWorkflow>;
 
