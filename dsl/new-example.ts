@@ -1,214 +1,145 @@
-import { createWorkflow, createExtension } from './new-dsl';
-import type { Workflow } from './new-dsl';
+import { workflow } from './blocks';
+import { AnthropicClient } from '../clients/anthropic';
+import { z } from 'zod';
+import '../extensions/slack';
+import '../extensions/fetch';
 
+const client = new AnthropicClient();
 
-export const simpleExtension = createExtension({
-  simple: (message: string) => ({
-    title: `Prints simple message: ${message}`,
-    action: ({ context }) => ({
-      ...context,
-      message: `${message}: cool${context?.cool || '? ...not cool yet'}`
-    }),
+// Basic workflow example showing context type inference
+const coverageWorkflow = workflow("Coverage Analysis", client)
+  .step("Get coverage", ({ context }) => ({
+    ...context,
+    coverage: { files: ["file1.ts", "file2.ts"] }
+  }))
+  .slack.message("Notify Coverage Start", {
+    channel: "#workflows",
+    message: ctx => `Starting coverage analysis for ${ctx.coverage.files.length} files`
   })
-});
+  .step("Find lowest coverage", ({ context }) => ({
+    ...context,
+    lowestCoverageFile: { path: context.coverage.files[0] }
+  }))
+  .slack.notify("Alert Team", {
+    users: ['@alice', '@bob'],
+    message: ctx => `Low coverage found in: ${ctx.lowestCoverageFile.path}`
+  });
 
-export const anotherExtension = createExtension({
-  another: () => async ({ context }) => {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 500);
-    });
-    return {
-      ...context,
-      another: 'another extension'
-    };
-  }
-});
-
-export const mathExtension = createExtension({
-  math: {
-    add: (a: number, b: number) => ({
-      title: `Adding ${a} + ${b}...`,
-      action: ({ context }) => {
-        const result = (context.result as number ?? 0) + a + b;
-        return {
-          ...context,
-          result
-        };
-      }
-    }),
-    multiply: (a: number, b: number) => ({
-      title: `Multiplying ${a} * ${b}...`,
-      action: ({ context }) => ({
-        ...context,
-        result: (context.result as number ?? 1) * a * b
+// Example using fetch extension
+const userDataWorkflow = workflow(
+  {
+    title: "User Data Operations",
+    description: "Fetches and processes user data"
+  },
+  client
+)
+  .step("Initialize user", ({ context }) => ({
+    ...context,
+    userId: "user123"
+  }))
+  .fetch("Get User Data", {
+    url: ctx => `https://api.example.com/users/${ctx.userId}`,
+    schema: z.object({
+      name: z.string(),
+      email: z.string().email(),
+      preferences: z.object({
+        theme: z.string(),
+        notifications: z.boolean()
       })
     })
-  }
-});
-
-// Basic workflow example showing type inference with string name
-const myWorkflow = createWorkflow("Coverage Analysis", [simpleExtension])
-  .simple("Initial message")
-  .step("Get coverage", ({ context }) => {
-    return {
-      ...context,
-      coverage: { files: ["file1.ts", "file2.ts"] }
-    };
   })
-  .step("Find lowest coverage", ({ context }) => {
-    return {
-      ...context,
-      lowestCoverageFile: { path: context.coverage.files[0] }
-    };
-  })
-  .step("For hovering over context", ({ context }) => {
-    return {
-      ...context,
-      hovered: !!context.lowestCoverageFile
-    };
+  .slack.message("User Data Retrieved", {
+    channel: "#user-updates",
+    message: ctx => `Retrieved data for ${ctx.name} (${ctx.email})`
   });
 
-// Example of running a workflow and handling events
-await (async () => {
-  console.log(myWorkflow.workflowTitle)
-  console.log('--------------------------------')
-  for await (const event of myWorkflow.run()) {
-    if (event.type === 'workflow:update') {
-      console.log(event.completedStep?.title)
-    }
-  }
-  console.log('\n\n')
-})();
-
-// Example using multiple extensions with WorkflowConfig
-const multiExtensionWorkflow = createWorkflow(
-  {
-    title: "Math Operations",
-    description: "A workflow that performs math operations and async tasks"
-  },
-  [mathExtension, anotherExtension]
-)
-  .math.add(5, 3)
-  .another()
-  .step("Final step", ({ context }) => context);
-
-// Run the multi-extension workflow
-await (async () => {
-  console.log(multiExtensionWorkflow.workflowTitle)
-  console.log('--------------------------------')
-  for await (const event of multiExtensionWorkflow.run()) {
-    if (event.type === 'workflow:update') {
-      console.log('Multi-extension event:', event.completedStep?.title);
-    }
-  }
-  console.log('\n\n')
-})();
-
-const optionsWorkflow = createWorkflow<{ features: string[] }>("options test")
-  .step("Check features", ({ context, options }) => {
+const asyncWorkflow = workflow("Async Example", client)
+  // Synchronous step
+  .step("Initialize", ({ context }) => ({
+    ...context,
+    userId: "123"
+  }))
+  // Asynchronous step
+  .step("Fetch User Data", async ({ context }) => {
+    const response = await fetch(`https://api.example.com/users/${context.userId}`);
+    const userData = await response.json();
     return {
       ...context,
-      hasSpeed: options.features.includes('speed'),
-      hasManeuver: options.features.includes('maneuver')
+      userData
     };
   })
-  .step("Process features", ({ context }) => {
-    return {
-      ...context,
-      processed: context.hasSpeed && context.hasManeuver
-    };
-  });
+  .step("simple step", ({ context }) => (context))
 
-const usesNestedWorkflow = createWorkflow<{ features: string[] }>("uses nested workflow")
-  .step("cool", ({ context }) => ({ ...context, cool: 'ness' }))
-  .workflow("options workflow", optionsWorkflow,
-    ({ context, workflowContext }) => ({
-      ...context,
-      isFast: workflowContext.hasSpeed,
-      isManeuverable: workflowContext.hasManeuver
-    }))
-  .step("uses nested workflow", ({ context }) => ({ ...context, test: 'test' }));
 
-/*
-// Example using the files extension - not yet supported in new DSL
-const fileWorkflow = createWorkflow<{}, FileExtension>("file example", [fileExtension, loggerExtension])
-  .files.read("input.txt")
-  .step("Process file content", (context) => {
-    return {
-      ...context,
-      processedContent: context.content.toUpperCase()
-    };
-  })
-  .files.write("output.txt")
-  .logger.info("File processing complete");
-*/
-
-// Example builder with multiple steps and extensions using WorkflowConfig
-const myBuilder = createWorkflow(
-  {
-    title: "Complex Builder Example",
-    description: "A complex workflow demonstrating multiple extensions and steps"
-  },
-  [simpleExtension, anotherExtension, mathExtension]
-)
-  .simple('message')
-  .math.add(1, 2)
-  .math.multiply(3, 4)
-  .another()
-  .step('Add coolness', async ({ context }) => {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 500);
-    })
-    return {
-      cool: 'ness', ...context
-    }
-  })
-  .step('Identity', ({ context }) => ({ bad: 'news', ...context }))
-  .step('final step', ({ context }) => context)
-  .simple('maybe not')
-  .step('final final step v3', ({ context }) => context);
-
-async function executeWorkflow(
-  workflow: Workflow<any, any, any>,
-  options?: any
-) {
-  console.log(workflow.workflowTitle)
-  console.log('--------------------------------')
-  let lastEvent;
-  for await (const event of workflow.run({ options })) {
-    lastEvent = event;
-    if (event.type === 'workflow:update') {
-      console.log('Event:', event.completedStep?.title);
-    }
-  }
-  console.log('last event:', lastEvent?.newContext);
-  console.log('\n\n')
+// Example with workflow options
+interface FeatureOptions {
+  features: string[];
+  apiKey: string;
 }
 
-await executeWorkflow(myBuilder);
-await executeWorkflow(usesNestedWorkflow, { features: ['speed', 'maneuver'] });
-// Type testing
-type AssertEquals<T, U> =
-  0 extends (1 & T) ? false : // fails if T is any
-  0 extends (1 & U) ? false : // fails if U is any
-  [T] extends [U] ? [U] extends [T] ? true : false : false;
+const optionsWorkflow = workflow<FeatureOptions>("Options Workflow", client)
+  .step("Check features", ({ context, options }) => ({
+    ...context,
+    hasSpeed: options.features.includes('speed'),
+    hasManeuver: options.features.includes('maneuver')
+  }))
+  .fetch("Get Feature Details", {
+    url: ctx => `https://api.example.com/features`,
+    schema: z.object({
+      features: z.array(z.string())
+    })
+  })
+  .step("Process features", ({ context }) => ({
+    ...context,
+    processed: context.hasSpeed && context.hasManeuver
+  }));
 
-// Expected final context type
-type ExpectedFinalContext = {
-  message: string;
-  cool: string;
-  bad: string;
-  another: string;
-  result: number;
-};
+// Example of nested workflows
+const nestedWorkflow = workflow<FeatureOptions>("Nested Workflow Example", client)
+  .step("Initialize", ({ context }) => ({
+    ...context,
+    initialized: true
+  }))
+  .workflow(
+    "Process Options",
+    optionsWorkflow,
+    ({ context, workflowContext }) => ({
+      ...context,
+      featureResults: {
+        hasSpeed: workflowContext.hasSpeed,
+        hasManeuver: workflowContext.hasManeuver,
+        processed: workflowContext.processed
+      }
+    })
+  )
+  .slack.notify("Feature Processing Complete", {
+    users: ['@devteam'],
+    message: ctx => `Feature processing completed with results: ${JSON.stringify(ctx.featureResults)}`
+  });
 
-// Type test - extract the raw context type from the final builder state
-type ExtractContextType<T> = T extends Workflow<infer Context, infer _Options, infer _Extension> ? Context : never;
+// Execute workflows
+async function executeWorkflow(wf: any, options?: any) {
+  console.log(`Executing: ${wf.title}`);
+  console.log('--------------------------------');
+  for await (const event of wf.run({ options })) {
+    if (event.type === 'workflow:update') {
+      console.log('Step completed:', event.completedStep?.title);
+    }
+  }
+  console.log('\n');
+}
 
-type TestFinalContext = ExtractContextType<typeof myBuilder>;
+// Run the workflows
+(async () => {
+  await executeWorkflow(coverageWorkflow);
+  await executeWorkflow(userDataWorkflow);
+  await executeWorkflow(optionsWorkflow, {
+    features: ['speed', 'maneuver'],
+    apiKey: 'test-api-key'
+  });
+  await executeWorkflow(nestedWorkflow, {
+    features: ['speed', 'maneuver'],
+    apiKey: 'test-api-key'
+  });
+})();
 
-// This will show a type error if the types don't match
-type TestResult = AssertEquals<TestFinalContext, ExpectedFinalContext>;
-
-// If you want to be even more explicit, you can add a const assertion
-const _typeTest: TestResult = true;
