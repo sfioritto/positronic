@@ -101,7 +101,7 @@ export class Workflow<
       action
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TOptions, TNewContext>(this.client, this.title, this.description).withBlocks(this.blocks);
+    return this.nextWorkflow<TNewContext>();
   }
 
   workflow<
@@ -126,7 +126,7 @@ export class Workflow<
       reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx})
     };
     this.blocks.push(nestedBlock);
-    return new Workflow<TOptions, TNewContext>(this.client, this.title, this.description).withBlocks(this.blocks);
+    return this.nextWorkflow<TNewContext>();
   }
 
   prompt<
@@ -164,10 +164,13 @@ export class Workflow<
       }
     };
     this.blocks.push(promptBlock);
-    return new Workflow<
-      TOptions,
-      TContext & { [K in TResponseKey]: z.infer<TSchema> }
-    >(this.client, this.title, this.description).withBlocks(this.blocks);
+    return this.nextWorkflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }>();
+  }
+
+  async *run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
+    for await (const event of this._run(clone(params))) {
+      yield clone(event);
+    }
   }
 
   private withBlocks(blocks: Block<any, any, TOptions>[]): this {
@@ -175,10 +178,12 @@ export class Workflow<
     return this;
   }
 
-  async *run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
-    for await (const event of this._run(clone(params))) {
-      yield clone(event);
-    }
+  private nextWorkflow<TNewContext extends Context>(): Workflow<TOptions, TNewContext> {
+    return new Workflow<TOptions, TNewContext>(
+      this.client,
+      this.title,
+      this.description
+    ).withBlocks(this.blocks);
   }
 
   /**
