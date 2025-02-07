@@ -1,5 +1,5 @@
-import { WORKFLOW_EVENTS, STATUS } from './constants';
-import { workflow, type Event } from './workflow';
+import { WORKFLOW_EVENTS, STATUS } from '../dsl/constants';
+import { workflow, type Event } from '../dsl/workflow';
 
 // Add type utility and mock client at the top of the test file
 type AssertEquals<T, U> =

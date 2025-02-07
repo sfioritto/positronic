@@ -1,7 +1,7 @@
 import { Database as DatabaseType } from "better-sqlite3";
-import { Adapter } from "./adapter";
-import { STATUS } from "../dsl/constants";
-import type { Event, Step } from "../dsl/types";
+import { Adapter } from "../../positronic/src/adapters/types";
+import { STATUS } from "../../positronic/src/dsl/constants";
+import type { Event } from "../../positronic/src/dsl/workflow";
 
 interface SQLiteOptions {
   workflowRunId?: number;
@@ -15,7 +15,7 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
     super();
   }
 
-  async restarted(event: Event<any, SQLiteOptions>) {
+  async restarted(event: Event<any, any, SQLiteOptions>) {
     this.workflowRunId = event.options?.workflowRunId;
     const { steps = [] } = event;
 
@@ -46,8 +46,8 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
     }
   }
 
-  async started(event: Event<any, SQLiteOptions>) {
-    const { workflowName, previousState, status, error } = event;
+  async started(event: Event<any, any, SQLiteOptions>) {
+    const { workflowTitle, previousState, status, error } = event;
 
     const result = this.db.prepare(`
       INSERT INTO workflow_runs (
@@ -57,7 +57,7 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
         error
       ) VALUES (?, ?, ?, ?)
     `).run(
-      workflowName,
+      workflowTitle,
       JSON.stringify(previousState),
       status,
       error ? JSON.stringify(error) : null
@@ -153,8 +153,3 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
 }
 
 export { SQLiteAdapter };
-
-// Add type for step parameter
-export function stepToRow(step: Step<any>) {
-  // ... rest of file
-}
