@@ -4,20 +4,33 @@ type ExtensionMethods<
   TExtension extends Record<string, any>,
   TOptions extends object,
   TContext extends Context
-> = {
-  [K in keyof TExtension]: TExtension[K] extends (
-    this: any,
-    title: string,
-    config: infer TConfig
-  ) => Workflow<any, infer TReturnContext>
+> = TExtension extends (<T>(...args: any[]) => any)
+  ? TExtension extends (<T>(
+      this: any,
+      title: string,
+      config: infer TConfig
+    ) => Workflow<any, infer TReturnContext>)
     ? (
         title: string,
         config: TConfig extends ((ctx: any) => any)
           ? { [P in keyof TConfig]: TConfig[P] extends Function ? ((ctx: TContext) => any) : TConfig[P] }
           : TConfig
       ) => Workflow<TOptions, Expand<TContext & TReturnContext>>
-    : never;
-};
+    : never
+  : {
+      [K in keyof TExtension]: TExtension[K] extends (
+        this: any,
+        title: string,
+        config: infer TConfig
+      ) => Workflow<any, infer TReturnContext>
+        ? (
+            title: string,
+            config: TConfig extends ((ctx: any) => any)
+              ? { [P in keyof TConfig]: TConfig[P] extends Function ? ((ctx: TContext) => any) : TConfig[P] }
+              : TConfig
+          ) => Workflow<TOptions, Expand<TContext & TReturnContext>>
+        : never;
+    };
 
 export function createExtension<
   TExtensionKey extends string,

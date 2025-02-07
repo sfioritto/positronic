@@ -3,6 +3,7 @@ import { AnthropicClient } from '../clients/anthropic';
 import { z } from 'zod';
 import '../extensions/slack';
 import '../extensions/fetch';
+import '../extensions/files';
 
 export interface SlackMessage extends Context {
   channel: string;

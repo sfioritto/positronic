@@ -1,18 +1,32 @@
-import type { Extension, Workflow } from "../dsl/new-dsl";
-import { JsonObject } from "../dsl/types";
+import { Workflow } from "../dsl/blocks";
+import { createExtension } from "../dsl/extensions";
 
-export interface FileContext extends JsonObject {
-  files?: Record<string, string>;
-}
+const filesExtension = createExtension('files', {
+  file(
+    this: Workflow<any>,
+    title: string,
+    config: {
+      path: string;
+    }
+  ) {
+    return this.step(title, async ({ context }) => {
+      console.log(`[FILES] Creating file reference for ${config.path}`);
 
-export type FileExtension = {
-  file: (title: string, path: string) => Workflow<FileContext, JsonObject, JsonObject, FileExtension>;
-}
-
-export const fileExtension: Extension<{}, FileExtension> = (builder) => ({
-  file: (title: string, path: string) =>
-    builder.step(
-      title,
-      () => ({ files: { [title]: path } })
-    ) as Workflow<FileContext, JsonObject, JsonObject, FileExtension>
+      return {
+        ...context,
+        files: {
+          ...((context as any).files || {}),
+          [title]: config.path
+        }
+      };
+    });
+  }
 });
+
+declare module "../dsl/blocks" {
+  interface Workflow<TOptions extends object, TContext extends Context> {
+    files: ReturnType<typeof filesExtension.augment<TOptions, TContext>>;
+  }
+}
+
+filesExtension.install();
