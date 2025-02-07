@@ -167,7 +167,7 @@ export class Workflow<
     return this.nextWorkflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }>();
   }
 
-  async *run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
+  async *run(params?: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
     for await (const event of this._run(clone(params))) {
       yield clone(event);
     }
@@ -192,8 +192,8 @@ export class Workflow<
    * by consumers of the workflow is in fact cloned. This guarantees that all input and output
    * data is immutable and safe to use by consumers of the workflow.
    */
-  private async *_run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
-    const { initialContext, options = {} as TOptions, initialCompletedSteps } = params;
+  private async *_run(params?: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
+    const { initialContext, options = {} as TOptions, initialCompletedSteps } = params || {};
     let currentContext = clone(initialContext || {}) as TContext;
     const completedSteps: SerializedStep[] = [...(initialCompletedSteps || [])];
 

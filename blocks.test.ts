@@ -1,6 +1,12 @@
 import { workflow, type Event } from './dsl/blocks';
 import { WORKFLOW_EVENTS, STATUS } from './dsl/constants';
 
+// Add type utility and mock client at the top of the test file
+type AssertEquals<T, U> =
+  0 extends (1 & T) ? false : // fails if T is any
+  0 extends (1 & U) ? false : // fails if U is any
+  [T] extends [U] ? [U] extends [T] ? true : false : false;
+
 // Mock PromptClient for testing
 const mockClient = {
   execute: jest.fn()
@@ -18,7 +24,7 @@ describe('workflow creation', () => {
         ({ context }) => ({ count: context.count, doubled: context.count * 2 })
       );
 
-    const workflowRun = testWorkflow.run({ options: {} });
+    const workflowRun = testWorkflow.run();
 
     // Check start event
     const startResult = await workflowRun.next();
@@ -70,7 +76,7 @@ describe('workflow creation', () => {
       description: 'some description'
     }, mockClient);
 
-    const workflowRun = testWorkflow.run({ options: {} });
+    const workflowRun = testWorkflow.run();
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(expect.objectContaining({
       workflowTitle: 'my named workflow',
@@ -81,7 +87,7 @@ describe('workflow creation', () => {
 
   it('should create a workflow with just a name when passed a string', async () => {
     const testWorkflow = workflow('simple workflow', mockClient);
-    const workflowRun = testWorkflow.run({ options: {} });
+    const workflowRun = testWorkflow.run();
     const startResult = await workflowRun.next();
     const event = startResult.value;
     if (!event) throw new Error('Expected event');
@@ -117,7 +123,7 @@ describe('error handling', () => {
 
     let finalEvent;
     try {
-      for await (const event of errorWorkflow.run({ options: {} })) {
+      for await (const event of errorWorkflow.run()) {
         finalEvent = event;
       }
     } catch (error) {
@@ -148,7 +154,7 @@ describe('step creation', () => {
       }));
 
     let finalEvent;
-    for await (const event of testWorkflow.run({ options: {} })) {
+    for await (const event of testWorkflow.run()) {
       finalEvent = event;
     }
 
@@ -177,7 +183,6 @@ describe('step creation', () => {
     let finalEvent;
     for await (const event of testWorkflow.run({
       initialContext: originalContext,
-      options: {}
     })) {
       finalEvent = event;
     }
@@ -203,7 +208,7 @@ describe('step creation', () => {
       });
 
     let finalEvent;
-    for await (const event of testWorkflow.run({ options: {} })) {
+    for await (const event of testWorkflow.run()) {
       finalEvent = event;
     }
 
@@ -240,7 +245,6 @@ describe('workflow resumption', () => {
     let fullRun;
     for await (const event of threeStepWorkflow.run({
       initialContext,
-      options: {}
     })) {
       fullRun = event;
     }
@@ -253,7 +257,6 @@ describe('workflow resumption', () => {
     let resumedRun;
     for await (const event of threeStepWorkflow.run({
       initialContext,
-      options: {},
       initialCompletedSteps: [fullRun.steps[0]]
     })) {
       resumedRun = event;
@@ -298,7 +301,7 @@ describe('nested workflows', () => {
       );
 
     const events: Event<any, any, any>[] = [];
-    for await (const event of outerWorkflow.run({ options: {} })) {
+    for await (const event of outerWorkflow.run()) {
       events.push(event);
     }
 
@@ -397,7 +400,7 @@ describe('nested workflows', () => {
     const events: Event<any, any>[] = [];
     let error: Error | undefined;
     try {
-      for await (const event of outerWorkflow.run({ options: {} })) {
+      for await (const event of outerWorkflow.run()) {
         events.push(event);
       }
     } catch (e) {
@@ -514,7 +517,6 @@ describe('workflow options', () => {
 
     const workflowRun = testWorkflow.run({
       initialContext: { hasOptions: false },
-      options: {}
     });
 
     // Skip start event
@@ -528,5 +530,203 @@ describe('workflow options', () => {
         hasOptions: true
       }
     }));
+  });
+});
+
+describe('type inference', () => {
+  it('should correctly infer complex workflow context types', async () => {
+    // Create an inner workflow that uses the shared options type
+    const innerWorkflow = workflow<{ features: string[] }>('Inner Type Test', mockClient)
+      .step(
+        "Process features",
+        ({ options }) => ({
+          processedValue: options.features.includes('fast') ? 100 : 42,
+          featureCount: options.features.length
+        })
+      );
+
+    // Create a complex workflow using multiple features
+    const complexWorkflow = workflow<{ features: string[] }>('Complex Type Test', mockClient)
+      .step(
+        "First step",
+        ({ options }) => ({
+          initialFeatures: options.features,
+          value: 42
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ context, workflowContext }) => ({
+          ...context,
+          processedValue: workflowContext.processedValue,
+          totalFeatures: workflowContext.featureCount
+        }),
+        () => ({ // Match the inner workflow's context shape
+          processedValue: 0,
+          featureCount: 0
+        })
+      )
+      .step(
+        "Final step",
+        ({ context }) => ({
+          ...context,
+          completed: true
+        })
+      );
+
+    // Type test setup
+    type ExpectedContext = {
+      initialFeatures: string[];
+      value: number;
+      processedValue: number;
+      totalFeatures: number;
+      completed: true;
+    };
+
+    type ActualContext = Parameters<
+      Parameters<(typeof complexWorkflow)['step']>[1]
+    >[0]['context'];
+
+    type TypeTest = AssertEquals<ActualContext, ExpectedContext>;
+    const _typeAssert: TypeTest = true;
+
+    // Run the workflow to verify runtime behavior matches types
+    let finalEvent;
+    for await (const event of complexWorkflow.run({
+      options: { features: ['fast', 'secure'] }
+    })) {
+      finalEvent = event;
+    }
+
+    // Verify the final context has all expected properties with correct types
+    expect(finalEvent?.newContext).toEqual({
+      initialFeatures: ['fast', 'secure'],
+      value: 42,
+      processedValue: 100,
+      totalFeatures: 2,
+      completed: true
+    });
+  });
+
+  it('should correctly infer workflow reducer context types', async () => {
+    // Create an inner workflow with a specific context shape
+    const innerWorkflow = workflow('Inner Context Test', mockClient)
+      .step(
+        "Inner step",
+        () => ({
+          innerValue: 42,
+          metadata: { processed: true }
+        })
+      );
+
+    // Create outer workflow to test reducer type inference
+    const outerWorkflow = workflow('Outer Context Test', mockClient)
+      .step(
+        "First step",
+        () => ({
+          outerValue: 100,
+          status: 'ready'
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ context, workflowContext }) => {
+          // Type assertion for outer context
+          type ExpectedOuterContext = {
+            outerValue: number;
+            status: string;
+          };
+          type ActualOuterContext = typeof context;
+          type OuterContextTest = AssertEquals<
+            ActualOuterContext,
+            ExpectedOuterContext
+          >;
+          const _outerAssert: OuterContextTest = true;
+
+          // Type assertion for inner workflow context
+          type ExpectedInnerContext = {
+            innerValue: number;
+            metadata: { processed: boolean };
+          };
+          type ActualInnerContext = typeof workflowContext;
+          type InnerContextTest = AssertEquals<
+            ActualInnerContext,
+            ExpectedInnerContext
+          >;
+          const _innerAssert: InnerContextTest = true;
+
+          return {
+            ...context,
+            innerResult: workflowContext.innerValue,
+            processed: workflowContext.metadata.processed
+          };
+        },
+        () => ({} as { innerValue: number; metadata: { processed: boolean } }) // Add initial context
+      );
+
+    // Run the workflow to verify runtime behavior
+    let finalEvent;
+    for await (const event of outerWorkflow.run()) {
+      finalEvent = event;
+    }
+
+    expect(finalEvent?.newContext).toEqual({
+      outerValue: 100,
+      status: 'ready',
+      innerResult: 42,
+      processed: true
+    });
+  });
+
+  it('should correctly infer step action context types', async () => {
+    const testWorkflow = workflow('Action Context Test', mockClient)
+      .step(
+        "First step",
+        () => ({
+          count: 1,
+          metadata: { created: new Date().toISOString() }
+        })
+      )
+      .step(
+        "Second step",
+        ({ context }) => {
+          // Type assertion for action context
+          type ExpectedContext = {
+            count: number;
+            metadata: { created: string };
+          };
+          type ActualContext = typeof context;
+          type ContextTest = AssertEquals<
+            ActualContext,
+            ExpectedContext
+          >;
+          const _contextAssert: ContextTest = true;
+
+          return {
+            ...context,
+            count: context.count + 1,
+            metadata: {
+              ...context.metadata,
+              updated: new Date().toISOString()
+            }
+          };
+        }
+      );
+
+    // Run the workflow to verify runtime behavior
+    let finalEvent;
+    for await (const event of testWorkflow.run()) {
+      finalEvent = event;
+    }
+
+    expect(finalEvent?.newContext).toMatchObject({
+      count: 2,
+      metadata: {
+        created: expect.any(String),
+        updated: expect.any(String)
+      }
+    });
   });
 });
