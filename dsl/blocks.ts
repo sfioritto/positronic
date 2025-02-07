@@ -198,28 +198,28 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
 
     // Process each block
     for (const block of this.blocks) {
-      const previousContext = currentContext;
+      const previousContext = structuredClone(currentContext);
       try {
         if (block.type === 'step') {
           currentContext = await block.execute({
-            context: currentContext,
+            context: structuredClone(currentContext),
             options: params.options
           });
         } else if (block.type === 'workflow') {
           const childInitial = typeof block.initialContext === 'function'
-            ? block.initialContext(currentContext)
+            ? block.initialContext(structuredClone(currentContext))
             : block.initialContext;
           const innerCtx = await block.innerWorkflow.run({
             initialContext: childInitial,
             options: params.options
           });
-          currentContext = block.reducer(currentContext, innerCtx);
+          currentContext = block.reducer(structuredClone(currentContext), innerCtx);
         }
 
         const completedStep = {
           title: block.title,
           status: STATUS.COMPLETE,
-          context: currentContext
+          context: structuredClone(currentContext)
         };
         completedSteps.push(completedStep);
 
