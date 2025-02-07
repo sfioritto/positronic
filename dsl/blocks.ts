@@ -36,7 +36,12 @@ export type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
   action: (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
 };
 
-type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext, TOptions extends object = {}> = {
+type WorkflowBlock<
+  TOuterContext,
+  TInnerContext extends Context,
+  TNewContext,
+  TOptions extends object = {}
+> = {
   type: 'workflow';
   title: string;
   innerWorkflow: Workflow<TOptions, TInnerContext>;
@@ -53,7 +58,7 @@ interface RunParams<
   TContextIn extends Context = Context
 > {
   initialContext?: TContextIn;
-  options: TOptions;
+  options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
 }
 
@@ -130,7 +135,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
     > = {
       type: 'step',
       title,
-      action: async ({ context, options }) => {
+      action: async ({ context }) => {
         const { client: workflowClient } = this;
         const { client: stepClient, template, responseModel } = config;
         const client = stepClient ?? workflowClient;
@@ -168,7 +173,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
    * data is immutable and safe to use by consumers of the workflow.
    */
   private async *_run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
-    const { initialContext, options, initialCompletedSteps } = params;
+    const { initialContext, options = {} as TOptions, initialCompletedSteps } = params;
     let currentContext = clone(initialContext || {}) as TContext;
     const completedSteps: SerializedStep[] = [...(initialCompletedSteps || [])];
 
