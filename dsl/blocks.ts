@@ -235,10 +235,25 @@ export class Workflow<
           const childInitial = typeof block.initialContext === 'function'
             ? block.initialContext(currentContext)
             : block.initialContext;
-          const innerCtx = await block.innerWorkflow.run({
+
+          // Run inner workflow and yield all its events
+          const innerRun = block.innerWorkflow.run({
             initialContext: childInitial,
             options,
           });
+
+          let innerCtx;
+          for await (const event of innerRun) {
+            yield event; // Forward inner workflow events
+            if (event.type === 'workflow:complete') {
+              innerCtx = event.newContext;
+            }
+          }
+
+          if (!innerCtx) {
+            throw new Error('Inner workflow did not complete');
+          }
+
           currentContext = block.reducer(currentContext, innerCtx);
         }
 

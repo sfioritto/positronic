@@ -1,4 +1,4 @@
-import { workflow } from './dsl/blocks';
+import { workflow, type Event } from './dsl/blocks';
 import { WORKFLOW_EVENTS, STATUS } from './dsl/constants';
 
 // Mock PromptClient for testing
@@ -266,5 +266,189 @@ describe('workflow resumption', () => {
     // Verify the resumed run started from step 2 with correct context
     expect(resumedRun?.newContext.value).toBe(42);
     expect(resumedRun?.steps.slice(1).map(s => s.context.value)).toEqual([14, 42]);
+  });
+});
+
+describe('nested workflows', () => {
+  it('should execute nested workflows and yield all inner workflow events', async () => {
+    // Create an inner workflow that will be nested
+    const innerWorkflow = workflow('Inner Workflow', mockClient)
+      .step(
+        "Double value",
+        ({ context }) => ({
+          inner: true,
+          value: (context as any).value * 2
+        })
+      );
+
+    // Create outer workflow that uses the inner workflow
+    const outerWorkflow = workflow('Outer Workflow', mockClient)
+      .step(
+        "Set prefix",
+        () => ({ prefix: "test-" })
+      )
+      .workflow(
+        "Run inner workflow",
+        innerWorkflow,
+        ({ context, workflowContext }) => ({
+          ...context,
+          innerResult: workflowContext.value
+        }),
+        () => ({ value: 5 })
+      );
+
+    const events: Event<any, any, any>[] = [];
+    for await (const event of outerWorkflow.run({ options: {} })) {
+      events.push(event);
+    }
+
+    // Verify all events are yielded in correct order
+    expect(events.map(e => ({
+      type: e.type,
+      workflowTitle: e.workflowTitle,
+      status: e.status,
+      ...(e.completedStep ? { stepTitle: e.completedStep.title } : {})
+    }))).toEqual([
+      // Outer workflow start
+      {
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING
+      },
+      // First step of outer workflow
+      {
+        type: WORKFLOW_EVENTS.UPDATE,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING,
+        stepTitle: 'Set prefix'
+      },
+      // Inner workflow start
+      {
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Inner Workflow',
+        status: STATUS.RUNNING
+      },
+      // Inner workflow step
+      {
+        type: WORKFLOW_EVENTS.UPDATE,
+        workflowTitle: 'Inner Workflow',
+        status: STATUS.RUNNING,
+        stepTitle: 'Double value'
+      },
+      // Inner workflow completion
+      {
+        type: WORKFLOW_EVENTS.COMPLETE,
+        workflowTitle: 'Inner Workflow',
+        status: STATUS.COMPLETE
+      },
+      // Outer workflow nested step completion
+      {
+        type: WORKFLOW_EVENTS.UPDATE,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING,
+        stepTitle: 'Run inner workflow'
+      },
+      // Outer workflow completion
+      {
+        type: WORKFLOW_EVENTS.COMPLETE,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.COMPLETE
+      }
+    ]);
+
+    // Verify contexts are passed correctly
+    expect(events[3].newContext).toEqual({ // Inner workflow step completion
+      inner: true,
+      value: 10
+    });
+    expect(events[5].newContext).toEqual({ // Outer workflow after nested workflow
+      prefix: "test-",
+      innerResult: 10
+    });
+  });
+
+  it('should handle errors in nested workflows and propagate them up', async () => {
+    // Create an inner workflow that will throw an error
+    const innerWorkflow = workflow('Failing Inner Workflow', mockClient)
+      .step(
+        "Throw error",
+        () => {
+          throw new Error('Inner workflow error');
+        }
+      );
+
+    // Create outer workflow that uses the failing inner workflow
+    const outerWorkflow = workflow('Outer Workflow', mockClient)
+      .step(
+        "First step",
+        () => ({ step: "first" })
+      )
+      .workflow(
+        "Run inner workflow",
+        innerWorkflow,
+        ({ context, workflowContext }) => ({
+          ...context,
+          step: "second",
+          innerResult: workflowContext.value
+        }),
+        () => ({ value: 5 })
+      );
+
+    const events: Event<any, any>[] = [];
+    let error: Error | undefined;
+    try {
+      for await (const event of outerWorkflow.run({ options: {} })) {
+        events.push(event);
+      }
+    } catch (e) {
+      error = e as Error;
+    }
+
+    // Verify error was thrown
+    expect(error?.message).toBe('Inner workflow error');
+
+    // Verify event sequence including error
+    expect(events.map(e => ({
+      type: e.type,
+      workflowTitle: e.workflowTitle,
+      status: e.status
+    }))).toEqual([
+      {
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING
+      },
+      {
+        type: WORKFLOW_EVENTS.UPDATE,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING
+      },
+      {
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Failing Inner Workflow',
+        status: STATUS.RUNNING
+      },
+      {
+        type: WORKFLOW_EVENTS.ERROR,
+        workflowTitle: 'Failing Inner Workflow',
+        status: STATUS.ERROR
+      },
+      {
+        type: WORKFLOW_EVENTS.ERROR,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.ERROR
+      }
+    ]);
+
+    // Verify error details in both inner and outer workflow events
+    const innerErrorEvent = events[events.length - 2];
+    const outerErrorEvent = events[events.length - 1];
+
+    expect(innerErrorEvent.error).toEqual(expect.objectContaining({
+      message: 'Inner workflow error'
+    }));
+    expect(outerErrorEvent.error).toEqual(expect.objectContaining({
+      message: 'Inner workflow error'
+    }));
   });
 });
