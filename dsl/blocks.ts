@@ -46,7 +46,7 @@ type WorkflowBlock<
   title: string;
   innerWorkflow: Workflow<TOptions, TInnerContext>;
   initialContext: TInnerContext | ((outerCtx: TOuterContext) => TInnerContext);
-  reducer: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
+  action: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
 };
 
 type Block<TContextIn, TContextOut, TOptions extends object = {}> =
@@ -110,7 +110,7 @@ export class Workflow<
   >(
     title: string,
     innerWorkflow: Workflow<TOptions, TInnerContext>,
-    reducer: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
+    action: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
     initialContext?: TInnerContext | ((context: TContext) => TInnerContext)
   ) {
     const nestedBlock: WorkflowBlock<
@@ -123,7 +123,7 @@ export class Workflow<
       title,
       innerWorkflow,
       initialContext: initialContext || (() => ({} as TInnerContext)),
-      reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx})
+      action: (outerCtx, innerCtx) => action({ context: outerCtx, workflowContext: innerCtx})
     };
     this.blocks.push(nestedBlock);
     return this.nextWorkflow<TNewContext>();
@@ -254,7 +254,7 @@ export class Workflow<
             throw new Error('Inner workflow did not complete');
           }
 
-          currentContext = block.reducer(currentContext, innerCtx);
+          currentContext = block.action(currentContext, innerCtx);
         }
 
         const completedStep = {
