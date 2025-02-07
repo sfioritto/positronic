@@ -1,9 +1,7 @@
 import { z } from "zod";
 import type { PromptClient } from "../types";
-import type { JsonObject, SerializedError } from "./types";
+import type { JsonObject, SerializedError, Context } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
-
-export type Context = JsonObject;
 
 export type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 

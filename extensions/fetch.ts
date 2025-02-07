@@ -1,7 +1,7 @@
-import { Workflow, type Context } from "../dsl/blocks";
+import { Workflow } from "../dsl/blocks";
 import { z } from "zod";
 import { createExtension } from "../dsl/extensions";
-
+import { Context } from "../dsl/types";
 const fetchExtension = createExtension('fetch', function fetch<
   TOptions extends object,
   TContext extends Context,

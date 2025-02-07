@@ -1,6 +1,6 @@
 import { Workflow } from "../dsl/blocks";
 import { createExtension } from "../dsl/extensions";
-
+import type { Context } from "../dsl/types";
 const slackExtension = createExtension('slack', {
   message(
     this: Workflow<any>,

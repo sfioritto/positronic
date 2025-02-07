@@ -1,4 +1,5 @@
-import { Workflow, type Expand, type Context } from "./blocks";
+import { Workflow, type Expand } from "./blocks";
+import type { Context } from "./types";
 
 type ExtensionMethods<
   TExtension extends Record<string, any>,
