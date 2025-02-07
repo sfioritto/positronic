@@ -198,8 +198,10 @@ export class Workflow<
     const completedSteps: SerializedStep[] = [...(initialCompletedSteps || [])];
 
     if (completedSteps.length > 0) {
-      currentContext = completedSteps[completedSteps.length - 1].context as TContext;
+      currentContext = clone(completedSteps[completedSteps.length - 1].context as TContext);
     }
+
+    const remainingBlocks = this.blocks.slice(completedSteps.length);
 
     yield {
       type: completedSteps.length > 0 ? 'workflow:restart' : 'workflow:start',
@@ -216,7 +218,7 @@ export class Workflow<
       options,
     };
 
-    for (const block of this.blocks) {
+    for (const block of remainingBlocks) {
       // Clone the current context here to prevent mutation of the context
       // when the block is executed. The initial clone in the first pass
       // of the loop is not necessary, but it is needed for every other pass
