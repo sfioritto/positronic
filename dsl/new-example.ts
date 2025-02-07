@@ -1,9 +1,20 @@
-import { workflow, type Workflow } from './blocks';
-import type { SlackMessage, SlackNotification } from '../extensions/slack';
+import { workflow, type Workflow, type Context } from './blocks';
 import { AnthropicClient } from '../clients/anthropic';
 import { z } from 'zod';
-import '../extensions/slack';
+// import '../extensions/slack';
 import '../extensions/fetch';
+
+export interface SlackMessage extends Context {
+  channel: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface SlackNotification extends Context {
+  users: string[];
+  message: string;
+  timestamp: string;
+}
 
 const client = new AnthropicClient();
 

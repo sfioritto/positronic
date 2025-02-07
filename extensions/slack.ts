@@ -1,56 +1,5 @@
-import { Workflow, type Expand, type Context } from "../dsl/blocks";
-
-export type ExtensionMethods<
-  TExtension extends Record<string, any>,
-  TOptions extends object,
-  TContext extends Context
-> = {
-  [K in keyof TExtension]: TExtension[K] extends (
-    this: any,
-    title: string,
-    config: infer TConfig
-  ) => Workflow<any, infer TReturnContext>
-    ? (
-        title: string,
-        config: TConfig extends ((ctx: any) => any)
-          ? { [P in keyof TConfig]: TConfig[P] extends Function ? ((ctx: TContext) => any) : TConfig[P] }
-          : TConfig
-      ) => Workflow<TOptions, Expand<TContext & TReturnContext>>
-    : never;
-};
-
-export function createWorkflowExtension<
-  TExtensionKey extends string,
-  TExtension extends Record<string, any>
->(key: TExtensionKey, extension: TExtension) {
-  return {
-    install() {
-      Object.assign(Workflow.prototype, {
-        [key]: Object.fromEntries(
-          Object.entries(extension).map(([methodKey, fn]) => [
-            methodKey,
-            fn.bind(Workflow.prototype)
-          ])
-        )
-      });
-    },
-    augment<TOptions extends object, TContext extends Context>(): ExtensionMethods<TExtension, TOptions, TContext> {
-      return {} as ExtensionMethods<TExtension, TOptions, TContext>;
-    }
-  };
-}
-
-export interface SlackMessage extends Context {
-  channel: string;
-  message: string;
-  timestamp: string;
-}
-
-export interface SlackNotification extends Context {
-  users: string[];
-  message: string;
-  timestamp: string;
-}
+import { Workflow } from "../dsl/blocks";
+import { createWorkflowExtension } from "../dsl/extensions";
 
 const slackExtension = createWorkflowExtension('slack', {
   message(
