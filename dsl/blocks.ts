@@ -1,9 +1,7 @@
 import { z } from "zod";
 import type { PromptClient } from "../types";
-import type { JsonObject, SerializedError, Context } from "./types";
+import type { SerializedError, Context } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
-
-export type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 
 export interface Event<
   TContextIn extends Context,
@@ -28,7 +26,7 @@ interface SerializedStep {
   context: Context;
 }
 
-export type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
+type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
   type: 'step';
   title: string;
   action: (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
@@ -59,8 +57,6 @@ interface RunParams<
   options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
 }
-
-export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
 
 const clone = <T>(value: T): T => structuredClone(value);
 
