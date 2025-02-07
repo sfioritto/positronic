@@ -1,22 +1,22 @@
 import { Workflow } from "../dsl/blocks";
 import { z } from "zod";
 import { createExtension } from "../dsl/extensions";
-import { Context } from "../dsl/types";
+import { State } from "../dsl/types";
 const fetchExtension = createExtension('fetch', function fetch<
   TOptions extends object,
-  TContext extends Context,
+  TState extends State,
   TSchema extends z.ZodObject<any>
 >(
-  this: Workflow<TOptions, TContext>,
+  this: Workflow<TOptions, TState>,
   title: string,
   config: {
-    url: string | ((ctx: TContext) => string);
+    url: string | ((ctx: TState) => string);
     method?: string;
     schema: TSchema;
   }
 ) {
-  return this.step(title, async ({ context }) => {
-    const url = typeof config.url === 'function' ? config.url(context) : config.url;
+  return this.step(title, async ({ state }) => {
+    const url = typeof config.url === 'function' ? config.url(state) : config.url;
 
     // Simulate network delay with setTimeout
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -33,22 +33,22 @@ const fetchExtension = createExtension('fetch', function fetch<
     const data = config.schema.parse(rawData) as z.infer<TSchema>;
 
     return {
-      ...context,
+      ...state,
       ...data
     };
   });
 });
 
 declare module "../dsl/blocks" {
-  interface Workflow<TOptions extends object, TContext extends Context> {
+  interface Workflow<TOptions extends object, TState extends State> {
     fetch: <TSchema extends z.ZodObject<any>>(
       title: string,
       config: {
-        url: string | ((ctx: TContext) => string);
+        url: string | ((ctx: TState) => string);
         method?: string;
         schema: TSchema;
       }
-    ) => Workflow<TOptions, TContext & z.infer<TSchema>>;
+    ) => Workflow<TOptions, TState & z.infer<TSchema>>;
   }
 }
 

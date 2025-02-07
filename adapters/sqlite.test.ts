@@ -23,15 +23,15 @@ describe("SQLiteAdapter", () => {
   });
 
   it("should track workflow execution in database", async () => {
-    interface TestContext {
+    interface TestState {
       count: number;
     }
 
-    const testWorkflow = workflow<TestContext>(
+    const testWorkflow = workflow<TestState>(
       "Test Counter",
       step(
         "Increment",
-        action(async (context) => context.count + 1),
+        action(async (state) => state.count + 1),
         reduce((result) => ({ count: result }))
       )
     );
@@ -46,7 +46,7 @@ describe("SQLiteAdapter", () => {
 
     expect(workflowRun).toBeTruthy();
     expect(workflowRun.workflow_name).toBe("Test Counter");
-    expect(JSON.parse(workflowRun.initial_context)).toEqual({ count: 0 });
+    expect(JSON.parse(workflowRun.initial_state)).toEqual({ count: 0 });
     expect(workflowRun.status).toBe("complete");
     expect(workflowRun.error).toBe(null);
 
@@ -56,35 +56,35 @@ describe("SQLiteAdapter", () => {
     ).all(workflowRun.id) as any[];
 
     expect(steps).toHaveLength(1);
-    expect(JSON.parse(steps[0].previous_context)).toEqual({ count: 0 });
-    expect(JSON.parse(steps[0].new_context)).toEqual({ count: 1 });
+    expect(JSON.parse(steps[0].previous_state)).toEqual({ count: 0 });
+    expect(JSON.parse(steps[0].new_state)).toEqual({ count: 1 });
     expect(steps[0].status).toBe("complete");
     expect(steps[0].error).toBe(null);
   });
 
   it("should track multiple workflow executions correctly", async () => {
-    interface CounterContext {
+    interface CounterState {
       count: number;
     }
 
-    interface NameContext {
+    interface NameState {
       name: string;
     }
 
-    const counterWorkflow = workflow<CounterContext>(
+    const counterWorkflow = workflow<CounterState>(
       "Counter Workflow",
       step(
         "Increment",
-        action(async (context) => context.count + 1),
+        action(async (state) => state.count + 1),
         reduce((result) => ({ count: result }))
       )
     );
 
-    const nameWorkflow = workflow<NameContext>(
+    const nameWorkflow = workflow<NameState>(
       "Name Workflow",
       step(
         "Uppercase",
-        action(async (context) => context.name.toUpperCase()),
+        action(async (state) => state.name.toUpperCase()),
         reduce((result) => ({ name: result }))
       )
     );
@@ -100,13 +100,13 @@ describe("SQLiteAdapter", () => {
 
     // Verify Counter Workflow
     expect(workflowRuns[0].workflow_name).toBe("Counter Workflow");
-    expect(JSON.parse(workflowRuns[0].initial_context)).toEqual({ count: 0 });
+    expect(JSON.parse(workflowRuns[0].initial_state)).toEqual({ count: 0 });
     expect(workflowRuns[0].status).toBe("complete");
     expect(workflowRuns[0].error).toBe(null);
 
     // Verify Name Workflow
     expect(workflowRuns[1].workflow_name).toBe("Name Workflow");
-    expect(JSON.parse(workflowRuns[1].initial_context)).toEqual({ name: "test" });
+    expect(JSON.parse(workflowRuns[1].initial_state)).toEqual({ name: "test" });
     expect(workflowRuns[1].status).toBe("complete");
     expect(workflowRuns[1].error).toBe(null);
 
@@ -121,32 +121,32 @@ describe("SQLiteAdapter", () => {
     expect(allSteps).toHaveLength(2);
 
     // Verify Counter Workflow Step
-    expect(JSON.parse(allSteps[0].previous_context)).toEqual({ count: 0 });
-    expect(JSON.parse(allSteps[0].new_context)).toEqual({ count: 1 });
+    expect(JSON.parse(allSteps[0].previous_state)).toEqual({ count: 0 });
+    expect(JSON.parse(allSteps[0].new_state)).toEqual({ count: 1 });
     expect(allSteps[0].status).toBe("complete");
     expect(allSteps[0].error).toBe(null);
 
     // Verify Name Workflow Step
-    expect(JSON.parse(allSteps[1].previous_context)).toEqual({ name: "test" });
-    expect(JSON.parse(allSteps[1].new_context)).toEqual({ name: "TEST" });
+    expect(JSON.parse(allSteps[1].previous_state)).toEqual({ name: "test" });
+    expect(JSON.parse(allSteps[1].new_state)).toEqual({ name: "TEST" });
     expect(allSteps[1].status).toBe("complete");
     expect(allSteps[1].error).toBe(null);
   });
 
   it("should track workflow step errors correctly", async () => {
-    interface ErrorContext {
+    interface ErrorState {
       shouldError: boolean;
     }
 
-    const errorWorkflow = workflow<ErrorContext>(
+    const errorWorkflow = workflow<ErrorState>(
       "Error Workflow",
       step(
         "Maybe Error",
-        action(async (context) => {
-          if (context.shouldError) {
+        action(async (state) => {
+          if (state.shouldError) {
             throw new Error("Test error");
           }
-          return context;
+          return state;
         })
       )
     );
@@ -171,8 +171,8 @@ describe("SQLiteAdapter", () => {
     ).all(workflowRun.id) as any[];
 
     expect(steps).toHaveLength(1);
-    expect(JSON.parse(steps[0].previous_context)).toEqual({ shouldError: true });
-    expect(JSON.parse(steps[0].new_context)).toEqual({ shouldError: true });
+    expect(JSON.parse(steps[0].previous_state)).toEqual({ shouldError: true });
+    expect(JSON.parse(steps[0].new_state)).toEqual({ shouldError: true });
     expect(steps[0].status).toBe("error");
     expect(JSON.parse(steps[0].error)).toMatchObject({
       name: "Error",
@@ -181,22 +181,22 @@ describe("SQLiteAdapter", () => {
   });
 
   it("should track multi-step workflow execution step by step", async () => {
-    interface MultiStepContext {
+    interface MultiStepState {
       value: string;
       count: number;
     }
 
-    const multiStepWorkflow = workflow<MultiStepContext>(
+    const multiStepWorkflow = workflow<MultiStepState>(
       "Multi Step Workflow",
       step(
         "Uppercase String",
-        action(async (context) => context.value.toUpperCase()),
-        reduce((result, context) => ({ ...context, value: result }))
+        action(async (state) => state.value.toUpperCase()),
+        reduce((result, state) => ({ ...state, value: result }))
       ),
       step(
         "Increment Counter",
-        action(async (context) => context.count + 1),
-        reduce((result, context) => ({ ...context, count: result }))
+        action(async (state) => state.count + 1),
+        reduce((result, state) => ({ ...state, count: result }))
       )
     );
 
@@ -225,7 +225,7 @@ describe("SQLiteAdapter", () => {
       LIMIT 1
     `).get(firstStepRun.id) as any;
 
-    expect(JSON.parse(latestStep.new_context)).toEqual({ value: "TEST", count: 0 });
+    expect(JSON.parse(latestStep.new_state)).toEqual({ value: "TEST", count: 0 });
 
     // Verify first step row
     const firstStepRows = db.prepare(
@@ -233,8 +233,8 @@ describe("SQLiteAdapter", () => {
     ).all(firstStepRun.id) as any[];
 
     expect(firstStepRows).toHaveLength(1);
-    expect(JSON.parse(firstStepRows[0].previous_context)).toEqual({ value: "test", count: 0 });
-    expect(JSON.parse(firstStepRows[0].new_context)).toEqual({ value: "TEST", count: 0 });
+    expect(JSON.parse(firstStepRows[0].previous_state)).toEqual({ value: "test", count: 0 });
+    expect(JSON.parse(firstStepRows[0].new_state)).toEqual({ value: "TEST", count: 0 });
     expect(firstStepRows[0].status).toBe("complete");
 
     // Run second step
@@ -246,8 +246,8 @@ describe("SQLiteAdapter", () => {
     ).all(firstStepRun.id) as any[];
 
     expect(secondStepRows).toHaveLength(2);
-    expect(JSON.parse(secondStepRows[1].previous_context)).toEqual({ value: "TEST", count: 0 });
-    expect(JSON.parse(secondStepRows[1].new_context)).toEqual({ value: "TEST", count: 1 });
+    expect(JSON.parse(secondStepRows[1].previous_state)).toEqual({ value: "TEST", count: 0 });
+    expect(JSON.parse(secondStepRows[1].new_state)).toEqual({ value: "TEST", count: 1 });
     expect(secondStepRows[1].status).toBe("complete");
 
     // Complete workflow
@@ -267,29 +267,29 @@ describe("SQLiteAdapter", () => {
       LIMIT 1
     `).get(finalRun.id) as any;
 
-    expect(JSON.parse(finalStep.new_context)).toEqual({ value: "TEST", count: 1 });
+    expect(JSON.parse(finalStep.new_state)).toEqual({ value: "TEST", count: 1 });
   });
 
   it("should correctly restart workflow with completed steps", async () => {
-    interface MultiStepContext {
+    interface MultiStepState {
       value: number;
     }
 
-    const threeStepWorkflow = workflow<MultiStepContext>(
+    const threeStepWorkflow = workflow<MultiStepState>(
       "Three Step Workflow",
       step(
         "Double",
-        action(async (context) => context.value * 2),
+        action(async (state) => state.value * 2),
         reduce((result) => ({ value: result }))
       ),
       step(
         "Add Ten",
-        action(async (context) => context.value + 10),
+        action(async (state) => state.value + 10),
         reduce((result) => ({ value: result }))
       ),
       step(
         "Multiply By Three",
-        action(async (context) => context.value * 3),
+        action(async (state) => state.value * 3),
         reduce((result) => ({ value: result }))
       )
     );
@@ -315,7 +315,7 @@ describe("SQLiteAdapter", () => {
       [restartAdapter],
       completedSteps.map(step => ({
         title: step.title,
-        context: JSON.parse(step.new_context),
+        state: JSON.parse(step.new_state),
         status: STATUS.COMPLETE,
       })),
       { workflowRunId: initialRun.id }
@@ -330,8 +330,8 @@ describe("SQLiteAdapter", () => {
     ).all(initialRun.id) as any[];
 
     expect(afterRestartSteps).toHaveLength(2);
-    expect(JSON.parse(afterRestartSteps[0].new_context)).toEqual({ value: 4 }); // 2 * 2
-    expect(JSON.parse(afterRestartSteps[1].new_context)).toEqual({ value: 14 }); // 4 + 10
+    expect(JSON.parse(afterRestartSteps[0].new_state)).toEqual({ value: 4 }); // 2 * 2
+    expect(JSON.parse(afterRestartSteps[1].new_state)).toEqual({ value: 14 }); // 4 + 10
 
     // Complete the workflow
     await stepIterator.next(); // Final step
@@ -343,9 +343,9 @@ describe("SQLiteAdapter", () => {
     ).all(initialRun.id) as any[];
 
     expect(finalSteps).toHaveLength(3);
-    expect(JSON.parse(finalSteps[0].new_context)).toEqual({ value: 4 }); // 2 * 2
-    expect(JSON.parse(finalSteps[1].new_context)).toEqual({ value: 14 }); // 4 + 10
-    expect(JSON.parse(finalSteps[2].new_context)).toEqual({ value: 42 }); // 14 * 3
+    expect(JSON.parse(finalSteps[0].new_state)).toEqual({ value: 4 }); // 2 * 2
+    expect(JSON.parse(finalSteps[1].new_state)).toEqual({ value: 14 }); // 4 + 10
+    expect(JSON.parse(finalSteps[2].new_state)).toEqual({ value: 42 }); // 14 * 3
 
     const finalRun = db.prepare(
       "SELECT * FROM workflow_runs WHERE id = ?"

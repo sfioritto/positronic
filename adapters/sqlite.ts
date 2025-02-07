@@ -47,18 +47,18 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   async started(event: Event<any, SQLiteOptions>) {
-    const { workflowName, previousContext, status, error } = event;
+    const { workflowName, previousState, status, error } = event;
 
     const result = this.db.prepare(`
       INSERT INTO workflow_runs (
         workflow_name,
-        initial_context,
+        initial_state,
         status,
         error
       ) VALUES (?, ?, ?, ?)
     `).run(
       workflowName,
-      JSON.stringify(previousContext),
+      JSON.stringify(previousState),
       status,
       error ? JSON.stringify(error) : null
     );
@@ -87,15 +87,15 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
     this.db.prepare(`
       INSERT INTO workflow_steps (
         workflow_run_id,
-        previous_context,
-        new_context,
+        previous_state,
+        new_state,
         status,
         error
       ) VALUES (?, ?, ?, ?, ?)
     `).run(
       this.workflowRunId,
-      JSON.stringify(event.previousContext),
-      JSON.stringify(event.newContext),
+      JSON.stringify(event.previousState),
+      JSON.stringify(event.newState),
       'complete',
       event.error ? JSON.stringify(event.error) : null
     );
@@ -137,15 +137,15 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
     this.db.prepare(`
       INSERT INTO workflow_steps (
         workflow_run_id,
-        previous_context,
-        new_context,
+        previous_state,
+        new_state,
         status,
         error
       ) VALUES (?, ?, ?, ?, ?)
     `).run(
       this.workflowRunId,
-      JSON.stringify(workflow.previousContext),
-      JSON.stringify(workflow.newContext),
+      JSON.stringify(workflow.previousState),
+      JSON.stringify(workflow.newState),
       'error',
       workflow.error ? JSON.stringify(workflow.error) : null
     );

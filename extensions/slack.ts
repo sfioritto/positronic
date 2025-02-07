@@ -1,6 +1,6 @@
 import { Workflow } from "../dsl/blocks";
 import { createExtension } from "../dsl/extensions";
-import type { Context } from "../dsl/types";
+import type { State } from "../dsl/types";
 const slackExtension = createExtension('slack', {
   message(
     this: Workflow<any>,
@@ -10,9 +10,9 @@ const slackExtension = createExtension('slack', {
       message: string | ((ctx: any) => string);
     }
   ) {
-    return this.step(title, async ({ context }) => {
+    return this.step(title, async ({ state }) => {
       const messageText = typeof config.message === 'function'
-        ? config.message(context)
+        ? config.message(state)
         : config.message;
 
       console.log(`[SLACK] Sending message to ${config.channel}: ${messageText}`);
@@ -21,7 +21,7 @@ const slackExtension = createExtension('slack', {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       return {
-        ...context,
+        ...state,
         lastSlackMessage: {
           channel: config.channel,
           message: messageText,
@@ -39,9 +39,9 @@ const slackExtension = createExtension('slack', {
       message: string | ((ctx: any) => string);
     }
   ) {
-    return this.step(title, async ({ context }) => {
+    return this.step(title, async ({ state }) => {
       const messageText = typeof config.message === 'function'
-        ? config.message(context)
+        ? config.message(state)
         : config.message;
 
       console.log(`[SLACK] Notifying users ${config.users.join(', ')}: ${messageText}`);
@@ -50,7 +50,7 @@ const slackExtension = createExtension('slack', {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       return {
-        ...context,
+        ...state,
         lastSlackNotification: {
           users: config.users,
           message: messageText,
@@ -62,8 +62,8 @@ const slackExtension = createExtension('slack', {
 });
 
 declare module "../dsl/blocks" {
-  interface Workflow<TOptions extends object, TContext extends Context> {
-    slack: ReturnType<typeof slackExtension.augment<TOptions, TContext>>;
+  interface Workflow<TOptions extends object, TState extends State> {
+    slack: ReturnType<typeof slackExtension.augment<TOptions, TState>>;
   }
 }
 

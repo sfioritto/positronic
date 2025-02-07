@@ -12,7 +12,7 @@ import type { Step } from '../dsl/types';
 
 interface CliOptions {
   workflowDir?: string;
-  contextFile?: string;
+  stateFile?: string;
   verbose?: boolean;
   restartFrom?: number;
 }
@@ -30,8 +30,8 @@ function parseArgs(): CliOptions & { workflowPath: string } {
         case 'workflow-dir':
           options.workflowDir = arg.split('=')[1];
           break;
-        case 'context':
-          options.contextFile = arg.split('=')[1];
+        case 'state':
+          options.stateFile = arg.split('=')[1];
           break;
         case 'verbose':
           options.verbose = true;
@@ -48,12 +48,12 @@ function parseArgs(): CliOptions & { workflowPath: string } {
   return { ...options, workflowPath: nonOptionArgs[0] };
 }
 
-async function loadContext(contextFile?: string) {
-  if (!contextFile) return {};
+async function loadState(stateFile?: string) {
+  if (!stateFile) return {};
 
-  const fullPath = path.resolve(process.cwd(), contextFile);
+  const fullPath = path.resolve(process.cwd(), stateFile);
   if (!fs.existsSync(fullPath)) {
-    throw new Error(`Context file not found: ${contextFile}`);
+    throw new Error(`State file not found: ${stateFile}`);
   }
 
   const content = fs.readFileSync(fullPath, 'utf-8');
@@ -113,7 +113,7 @@ async function getLastWorkflowRun(db: DatabaseType, workflowName: string) {
     runId: lastRun.id,
     completedSteps: completedSteps.map(step => ({
       title: step.title,
-      context: JSON.parse(step.new_context),
+      state: JSON.parse(step.new_state),
       status: STATUS.COMPLETE
     }))
   };
@@ -121,7 +121,7 @@ async function getLastWorkflowRun(db: DatabaseType, workflowName: string) {
 
 async function main() {
   try {
-    const { workflowPath, workflowDir, contextFile, verbose, restartFrom } = parseArgs();
+    const { workflowPath, workflowDir, stateFile, verbose, restartFrom } = parseArgs();
 
     const fullPath = workflowDir
       ? path.resolve(process.cwd(), workflowDir, workflowPath)
@@ -143,7 +143,7 @@ async function main() {
       workflow.configure({ workflowDir: workflowDirectory });
     }
 
-    const initialContext = await loadContext(contextFile);
+    const initialState = await loadState(stateFile);
     const db = await initializeDatabase('workflows.db');
 
     let completedSteps: Step<any>[] = [];
@@ -172,7 +172,7 @@ async function main() {
       }
     );
 
-    await runner.run(workflow, initialContext, completedSteps, { workflowRunId });
+    await runner.run(workflow, initialState, completedSteps, { workflowRunId });
 
   } catch (error) {
     if (error instanceof Error) {

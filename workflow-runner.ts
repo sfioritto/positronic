@@ -2,7 +2,7 @@ import { WORKFLOW_EVENTS } from './dsl/constants';
 import type { Adapter } from "./adapters/adapter";
 import type { FileStore } from "./file-stores";
 import type { Event } from './dsl/blocks';
-import type { Context, JsonObject } from './dsl/types';
+import type { State, JsonObject } from './dsl/types';
 
 interface Logger {
   log(...args: any[]): void;
@@ -20,31 +20,31 @@ export class WorkflowRunner {
 
   async run<
     TOptions extends JsonObject = {},
-    TContext extends Context = {}
+    TState extends State = {}
   >(
     workflow: {
       run: (params?: {
-        initialContext?: TContext,
+        initialState?: TState,
         initialCompletedSteps?: Array<{
           title: string,
           status: string,
-          context: JsonObject
+          state: JsonObject
         }>,
         options?: TOptions
-      }) => AsyncGenerator<Event<TContext, TContext, TOptions>>
+      }) => AsyncGenerator<Event<TState, TState, TOptions>>
     },
-    initialContext?: TContext,
+    initialState?: TState,
     initialCompletedSteps?: Array<{
       title: string,
       status: string,
-      context: JsonObject
+      state: JsonObject
     }>,
     options?: TOptions
   ) {
     const { adapters, logger: { log }, verbose } = this.options;
 
     for await (const event of workflow.run({
-      initialContext,
+      initialState,
       initialCompletedSteps,
       options
     })) {
@@ -58,13 +58,13 @@ export class WorkflowRunner {
         log(`${event.completedStep.title} ✅`);
       }
 
-      // Log final context on workflow completion/error if verbose
+      // Log final state on workflow completion/error if verbose
       if ((
         event.type === WORKFLOW_EVENTS.COMPLETE ||
         event.type === WORKFLOW_EVENTS.ERROR
       ) && verbose) {
         log(`Workflow completed: \n\n ${JSON.stringify(
-          this.truncateDeep(structuredClone(event.newContext)), null, 2
+          this.truncateDeep(structuredClone(event.newState)), null, 2
         )}`);
       }
     }

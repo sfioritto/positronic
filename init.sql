@@ -2,13 +2,13 @@
 CREATE TABLE workflow_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workflow_name TEXT NOT NULL,
-    initial_context TEXT NOT NULL,  -- JSON
+    initial_state TEXT NOT NULL,  -- JSON
     status TEXT NOT NULL,
     error TEXT,  -- JSON
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
     -- Add JSON validation checks
-    CONSTRAINT valid_initial_context CHECK (json_valid(initial_context)),
+    CONSTRAINT valid_initial_state CHECK (json_valid(initial_state)),
     CONSTRAINT valid_error CHECK (error IS NULL OR json_valid(error))
 );
 
@@ -22,15 +22,15 @@ END;
 CREATE TABLE workflow_steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workflow_run_id INTEGER NOT NULL REFERENCES workflow_runs(id),
-    previous_context TEXT NOT NULL,  -- JSON
-    new_context TEXT NOT NULL,  -- JSON
+    previous_state TEXT NOT NULL,  -- JSON
+    new_state TEXT NOT NULL,  -- JSON
     status TEXT NOT NULL,
     error TEXT,  -- JSON
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
     -- Add JSON validation checks
-    CONSTRAINT valid_previous_context CHECK (json_valid(previous_context)),
-    CONSTRAINT valid_new_context CHECK (json_valid(new_context)),
+    CONSTRAINT valid_previous_state CHECK (json_valid(previous_state)),
+    CONSTRAINT valid_new_state CHECK (json_valid(new_state)),
     CONSTRAINT valid_error CHECK (error IS NULL OR json_valid(error))
 );
 

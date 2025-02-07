@@ -3,5 +3,5 @@ export type JsonArray = JsonValue[];
 export type JsonObject = { [Key in string]?: JsonValue };
 export type JsonValue = JsonPrimitive | JsonArray | JsonObject;
 
-export type Context = JsonObject;
+export type State = JsonObject;
 

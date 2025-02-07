@@ -5,11 +5,11 @@ import type { Adapter } from "./adapter";
 
 export async function runWorkflow(
   workflow: WorkflowBlock<any>,
-  initialContext: any,
+  initialState: any,
   adapters: Adapter[] = []
 ) {
   const events = [];
-  for await (const event of workflow.run({ initialContext })) {
+  for await (const event of workflow.run({ initialState })) {
     events.push(event);
     await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
   }
@@ -37,12 +37,12 @@ export async function finalWorkflowEvent<T>(
 
 export async function* runWorkflowStepByStep(
   workflow: WorkflowBlock<any>,
-  initialContext: any,
+  initialState: any,
   adapters: Adapter[] = [],
   initialCompletedSteps: Step<any>[] = [],
   options: { workflowRunId?: number } = {}
 ): AsyncGenerator<Event<any, any>> {
-  for await (const event of workflow.run({ initialContext, initialCompletedSteps, options })) {
+  for await (const event of workflow.run({ initialState, initialCompletedSteps, options })) {
     await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
     yield event;
   }

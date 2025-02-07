@@ -1,37 +1,37 @@
 import { Workflow } from "./blocks";
-import type { Context } from "../dsl/types";
+import type { State } from "../dsl/types";
 
 type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 
 type ExtensionMethods<
   TExtension extends Record<string, any>,
   TOptions extends object,
-  TContext extends Context
+  TState extends State
 > = TExtension extends (<T>(...args: any[]) => any)
   ? TExtension extends (<T>(
       this: any,
       title: string,
       config: infer TConfig
-    ) => Workflow<any, infer TReturnContext>)
+    ) => Workflow<any, infer TReturnState>)
     ? (
         title: string,
         config: TConfig extends ((ctx: any) => any)
-          ? { [P in keyof TConfig]: TConfig[P] extends Function ? ((ctx: TContext) => any) : TConfig[P] }
+          ? { [P in keyof TConfig]: TConfig[P] extends Function ? ((ctx: TState) => any) : TConfig[P] }
           : TConfig
-      ) => Workflow<TOptions, Expand<TContext & TReturnContext>>
+      ) => Workflow<TOptions, Expand<TState & TReturnState>>
     : never
   : {
       [K in keyof TExtension]: TExtension[K] extends (
         this: any,
         title: string,
         config: infer TConfig
-      ) => Workflow<any, infer TReturnContext>
+      ) => Workflow<any, infer TReturnState>
         ? (
             title: string,
             config: TConfig extends ((ctx: any) => any)
-              ? { [P in keyof TConfig]: TConfig[P] extends Function ? ((ctx: TContext) => any) : TConfig[P] }
+              ? { [P in keyof TConfig]: TConfig[P] extends Function ? ((ctx: TState) => any) : TConfig[P] }
               : TConfig
-          ) => Workflow<TOptions, Expand<TContext & TReturnContext>>
+          ) => Workflow<TOptions, Expand<TState & TReturnState>>
         : never;
     };
 
@@ -50,8 +50,8 @@ export function createExtension<
         )
       });
     },
-    augment<TOptions extends object, TContext extends Context>(): ExtensionMethods<TExtension, TOptions, TContext> {
-      return {} as ExtensionMethods<TExtension, TOptions, TContext>;
+    augment<TOptions extends object, TState extends State>(): ExtensionMethods<TExtension, TOptions, TState> {
+      return {} as ExtensionMethods<TExtension, TOptions, TState>;
     }
   };
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { PromptClient } from "../types";
-import type { Context } from "./types";
+import type { State } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 
 type SerializedError = {
@@ -10,16 +10,16 @@ type SerializedError = {
 }
 
 export interface Event<
-  TContextIn extends Context,
-  TContextOut extends Context,
+  TStateIn extends State,
+  TStateOut extends State,
   TOptions extends object = {}
 > {
   workflowTitle: string;
   workflowDescription?: string;
   type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
   status: typeof STATUS[keyof typeof STATUS];
-  previousContext: TContextIn;
-  newContext: TContextOut;
+  previousState: TStateIn;
+  newState: TStateOut;
   error?: SerializedError;
   completedStep?: SerializedStep;
   steps: SerializedStep[];
@@ -29,37 +29,37 @@ export interface Event<
 interface SerializedStep {
   title: string;
   status: typeof STATUS[keyof typeof STATUS];
-  context: Context;
+  state: State;
 }
 
-type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
+type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
   type: 'step';
   title: string;
-  action: (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
+  action: (params: { state: TStateIn; options: TOptions }) => TStateOut | Promise<TStateOut>;
 };
 
 type WorkflowBlock<
-  TOuterContext,
-  TInnerContext extends Context,
-  TNewContext,
+  TOuterState,
+  TInnerState extends State,
+  TNewState,
   TOptions extends object = {}
 > = {
   type: 'workflow';
   title: string;
-  innerWorkflow: Workflow<TOptions, TInnerContext>;
-  initialContext: TInnerContext | ((outerCtx: TOuterContext) => TInnerContext);
-  action: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
+  innerWorkflow: Workflow<TOptions, TInnerState>;
+  initialState: TInnerState | ((outerCtx: TOuterState) => TInnerState);
+  action: (outerCtx: TOuterState, innerCtx: TInnerState) => TNewState;
 };
 
-type Block<TContextIn, TContextOut, TOptions extends object = {}> =
-  | StepBlock<TContextIn, TContextOut, TOptions>
-  | WorkflowBlock<TContextIn, any, TContextOut, TOptions>;
+type Block<TStateIn, TStateOut, TOptions extends object = {}> =
+  | StepBlock<TStateIn, TStateOut, TOptions>
+  | WorkflowBlock<TStateIn, any, TStateOut, TOptions>;
 
 interface RunParams<
   TOptions extends object = {},
-  TContextIn extends Context = Context
+  TStateIn extends State = State
 > {
-  initialContext?: TContextIn;
+  initialState?: TStateIn;
   options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
 }
@@ -68,19 +68,19 @@ const clone = <T>(value: T): T => structuredClone(value);
 
 export function workflow<
   TOptions extends object = {},
-  TContext extends Context = {}
+  TState extends State = {}
 >(
   workflowConfig: string | { title: string; description?: string },
   client: PromptClient
 ) {
   const title = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
-  return new Workflow<TOptions, TContext>(client, title, description);
+  return new Workflow<TOptions, TState>(client, title, description);
 }
 
 export class Workflow<
   TOptions extends object = {},
-  TContext extends Context = {}
+  TState extends State = {}
 > {
   private blocks: Block<any, any, TOptions>[] = [];
 
@@ -91,42 +91,42 @@ export class Workflow<
   ) {
   }
 
-  step<TNewContext extends Context>(
+  step<TNewState extends State>(
     title: string,
-    action: (params: { context: TContext; options: TOptions }) => TNewContext | Promise<TNewContext>
+    action: (params: { state: TState; options: TOptions }) => TNewState | Promise<TNewState>
   ) {
-    const stepBlock: StepBlock<TContext, TNewContext, TOptions> = {
+    const stepBlock: StepBlock<TState, TNewState, TOptions> = {
       type: 'step',
       title,
       action
     };
     this.blocks.push(stepBlock);
-    return this.nextWorkflow<TNewContext>();
+    return this.nextWorkflow<TNewState>();
   }
 
   workflow<
-    TInnerContext extends Context,
-    TNewContext extends Context
+    TInnerState extends State,
+    TNewState extends State
   >(
     title: string,
-    innerWorkflow: Workflow<TOptions, TInnerContext>,
-    action: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
-    initialContext?: TInnerContext | ((context: TContext) => TInnerContext)
+    innerWorkflow: Workflow<TOptions, TInnerState>,
+    action: (params: { state: TState, workflowState: TInnerState }) => TNewState,
+    initialState?: TInnerState | ((state: TState) => TInnerState)
   ) {
     const nestedBlock: WorkflowBlock<
-      TContext,
-      TInnerContext,
-      TNewContext,
+      TState,
+      TInnerState,
+      TNewState,
       TOptions
     > = {
       type: 'workflow',
       title,
       innerWorkflow,
-      initialContext: initialContext || (() => ({} as TInnerContext)),
-      action: (outerCtx, innerCtx) => action({ context: outerCtx, workflowContext: innerCtx})
+      initialState: initialState || (() => ({} as TInnerState)),
+      action: (outerCtx, innerCtx) => action({ state: outerCtx, workflowState: innerCtx})
     };
     this.blocks.push(nestedBlock);
-    return this.nextWorkflow<TNewContext>();
+    return this.nextWorkflow<TNewState>();
   }
 
   prompt<
@@ -135,7 +135,7 @@ export class Workflow<
   >(
     title: string,
     config: {
-      template: (ctx: TContext) => string;
+      template: (ctx: TState) => string;
       responseModel: {
         schema: TSchema;
         name: TResponseKey;
@@ -144,30 +144,30 @@ export class Workflow<
     }
   ) {
     const promptBlock: StepBlock<
-      TContext,
-      TContext & { [K in TResponseKey]: z.infer<TSchema> },
+      TState,
+      TState & { [K in TResponseKey]: z.infer<TSchema> },
       TOptions
     > = {
       type: 'step',
       title,
-      action: async ({ context }) => {
+      action: async ({ state }) => {
         const { client: workflowClient } = this;
         const { client: stepClient, template, responseModel } = config;
         const client = stepClient ?? workflowClient;
-        const promptString = template(context);
+        const promptString = template(state);
         const response = await client.execute(promptString, responseModel);
 
         return {
-          ...context,
+          ...state,
           [config.responseModel.name]: response
         };
       }
     };
     this.blocks.push(promptBlock);
-    return this.nextWorkflow<TContext & { [K in TResponseKey]: z.infer<TSchema> }>();
+    return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
   }
 
-  async *run(params?: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
+  async *run(params?: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TState, TOptions>> {
     for await (const event of this._run(clone(params))) {
       yield clone(event);
     }
@@ -178,8 +178,8 @@ export class Workflow<
     return this;
   }
 
-  private nextWorkflow<TNewContext extends Context>(): Workflow<TOptions, TNewContext> {
-    return new Workflow<TOptions, TNewContext>(
+  private nextWorkflow<TNewState extends State>(): Workflow<TOptions, TNewState> {
+    return new Workflow<TOptions, TNewState>(
       this.client,
       this.title,
       this.description
@@ -192,13 +192,13 @@ export class Workflow<
    * by consumers of the workflow is in fact cloned. This guarantees that all input and output
    * data is immutable and safe to use by consumers of the workflow.
    */
-  private async *_run(params?: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
-    const { initialContext, options = {} as TOptions, initialCompletedSteps } = params || {};
-    let currentContext = clone(initialContext || {}) as TContext;
+  private async *_run(params?: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TState, TOptions>> {
+    const { initialState, options = {} as TOptions, initialCompletedSteps } = params || {};
+    let currentState = clone(initialState || {}) as TState;
     const completedSteps: SerializedStep[] = [...(initialCompletedSteps || [])];
 
     if (completedSteps.length > 0) {
-      currentContext = clone(completedSteps[completedSteps.length - 1].context as TContext);
+      currentState = clone(completedSteps[completedSteps.length - 1].state as TState);
     }
 
     const remainingBlocks = this.blocks.slice(completedSteps.length);
@@ -208,37 +208,37 @@ export class Workflow<
       status: STATUS.RUNNING,
       workflowTitle: this.title,
       workflowDescription: this.description,
-      previousContext: currentContext,
-      newContext: currentContext,
+      previousState: currentState,
+      newState: currentState,
       steps: this.blocks.map(block => ({
         title: block.title,
         status: STATUS.PENDING,
-        context: currentContext
+        state: currentState
       })),
       options,
     };
 
     for (const block of remainingBlocks) {
-      // Clone the current context here to prevent mutation of the context
+      // Clone the current state here to prevent mutation of the state
       // when the block is executed. The initial clone in the first pass
       // of the loop is not necessary, but it is needed for every other pass
       // and putting it here makes it easier to see.
-      currentContext = clone(currentContext);
-      const previousContext = currentContext;
+      currentState = clone(currentState);
+      const previousState = currentState;
       try {
         if (block.type === 'step') {
-          currentContext = await block.action({
-            context: currentContext,
+          currentState = await block.action({
+            state: currentState,
             options,
           });
         } else if (block.type === 'workflow') {
-          const childInitial = typeof block.initialContext === 'function'
-            ? block.initialContext(currentContext)
-            : block.initialContext;
+          const childInitial = typeof block.initialState === 'function'
+            ? block.initialState(currentState)
+            : block.initialState;
 
           // Run inner workflow and yield all its events
           const innerRun = block.innerWorkflow.run({
-            initialContext: childInitial,
+            initialState: childInitial,
             options,
           });
 
@@ -246,7 +246,7 @@ export class Workflow<
           for await (const event of innerRun) {
             yield event; // Forward inner workflow events
             if (event.type === 'workflow:complete') {
-              innerCtx = event.newContext;
+              innerCtx = event.newState;
             }
           }
 
@@ -254,13 +254,13 @@ export class Workflow<
             throw new Error('Inner workflow did not complete');
           }
 
-          currentContext = block.action(currentContext, innerCtx);
+          currentState = block.action(currentState, innerCtx);
         }
 
         const completedStep = {
           title: block.title,
           status: STATUS.COMPLETE,
-          context: currentContext
+          state: currentState
         };
         completedSteps.push(completedStep);
 
@@ -269,14 +269,14 @@ export class Workflow<
           status: STATUS.RUNNING,
           workflowTitle: this.title,
           workflowDescription: this.description,
-          previousContext,
-          newContext: currentContext,
+          previousState,
+          newState: currentState,
           completedStep,
           steps: this.blocks.map((b, i) =>
             completedSteps[i] || {
               title: b.title,
               status: STATUS.PENDING,
-              context: currentContext
+              state: currentState
             }
           ),
           options,
@@ -285,7 +285,7 @@ export class Workflow<
         const errorStep = {
           title: block.title,
           status: STATUS.ERROR,
-          context: currentContext
+          state: currentState
         };
         completedSteps.push(errorStep);
 
@@ -294,15 +294,15 @@ export class Workflow<
           status: STATUS.ERROR,
           workflowTitle: this.title,
           workflowDescription: this.description,
-          previousContext,
-          newContext: currentContext,
+          previousState,
+          newState: currentState,
           completedStep: errorStep,
           error: error as SerializedError,
           steps: this.blocks.map((b, i) =>
             completedSteps[i] || {
               title: b.title,
               status: STATUS.PENDING,
-              context: currentContext
+              state: currentState
             }
           ),
           options,
@@ -316,12 +316,12 @@ export class Workflow<
       status: STATUS.COMPLETE,
       workflowTitle: this.title,
       workflowDescription: this.description,
-      previousContext: initialContext || {} as TContext,
-      newContext: currentContext,
+      previousState: initialState || {} as TState,
+      newState: currentState,
       steps: completedSteps,
       options,
     };
 
-    return currentContext;
+    return currentState;
   }
 }
