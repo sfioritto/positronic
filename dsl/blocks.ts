@@ -67,15 +67,19 @@ export function workflow<TContext extends Context = {}, TOptions extends object 
 ) {
   const title = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
-  return new Workflow<TContext, TOptions>(client);
+  return new Workflow<TContext, TOptions>(client, title, description);
 }
 
 export class Workflow<TContext extends Context = {}, TOptions extends object = {}> {
   private blocks: Block<any, any, TOptions>[] = [];
   private client: PromptClient;
+  private title: string;
+  private description?: string;
 
-  constructor(client: PromptClient) {
+  constructor(client: PromptClient, title: string, description?: string) {
     this.client = client;
+    this.title = title;
+    this.description = description;
   }
 
   step<TNewContext extends Context>(
@@ -88,7 +92,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       execute: fn
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TNewContext, TOptions>(this.client).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
@@ -105,7 +109,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       reducer: (outerCtx, innerCtx) => reducer({ context: outerCtx, workflowContext: innerCtx})
     };
     this.blocks.push(nestedBlock);
-    return new Workflow<TNewContext, TOptions>(this.client).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
   prompt<TResponseKey extends string, TSchema extends z.ZodObject<any>>(
@@ -143,7 +147,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
     return new Workflow<
       TContext & { [K in TResponseKey]: z.infer<TSchema> },
       TOptions
-    >(this.client).withBlocks(this.blocks);
+    >(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
   private withBlocks(blocks: Block<any, any, TOptions>[]): this {
@@ -182,7 +186,8 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
     yield {
       type: completedSteps.length > 0 ? 'workflow:restart' : 'workflow:start',
       status: STATUS.RUNNING,
-      workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+      workflowTitle: this.title,
+      workflowDescription: this.description,
       previousContext: currentContext,
       newContext: currentContext,
       steps: this.blocks.map(block => ({
@@ -220,7 +225,8 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
         yield {
           type: 'workflow:update',
           status: STATUS.RUNNING,
-          workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+          workflowTitle: this.title,
+          workflowDescription: this.description,
           previousContext,
           newContext: currentContext,
           completedStep,
@@ -244,7 +250,8 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
         yield {
           type: 'workflow:error',
           status: STATUS.ERROR,
-          workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+          workflowTitle: this.title,
+          workflowDescription: this.description,
           previousContext,
           newContext: currentContext,
           completedStep: errorStep,
@@ -265,7 +272,8 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
     yield {
       type: 'workflow:complete',
       status: STATUS.COMPLETE,
-      workflowTitle: this.blocks[0]?.title ?? 'Untitled Workflow',
+      workflowTitle: this.title,
+      workflowDescription: this.description,
       previousContext: params.initialContext || {} as TContext,
       newContext: currentContext,
       steps: completedSteps,
@@ -315,7 +323,7 @@ interface ApiOptions {
   retryCount: number;
 }
 
-const optionsWorkflow = new Workflow<{}, ApiOptions>(client)
+const optionsWorkflow = new Workflow<{}, ApiOptions>(client, 'Options Workflow', 'This workflow demonstrates options handling')
   .step('Initialize Config', ({ context, options }) => ({
     ...context,
     config: {
