@@ -1,6 +1,5 @@
-import { createWorkflow, Event } from './dsl/new-dsl';
+import { createWorkflow } from './dsl/new-dsl';
 import { WORKFLOW_EVENTS, STATUS } from './dsl/constants';
-import { JsonObject } from './dsl/types';
 
 type AssertEquals<T, U> =
   0 extends (1 & T) ? false : // fails if T is any
