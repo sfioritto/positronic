@@ -12,5 +12,3 @@ export interface PromptClient {
     responseModel: ResponseModel<T>,
   ): Promise<z.infer<T>>;
 }
-
-export type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;

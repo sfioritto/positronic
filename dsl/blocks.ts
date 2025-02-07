@@ -1,7 +1,13 @@
 import { z } from "zod";
 import type { PromptClient } from "../types";
-import type { SerializedError, Context } from "./types";
+import type { Context } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
+
+type SerializedError = {
+  name: string;
+  message: string;
+  stack?: string;
+}
 
 export interface Event<
   TContextIn extends Context,

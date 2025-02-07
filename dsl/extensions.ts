@@ -1,6 +1,7 @@
 import { Workflow } from "./blocks";
-import type { Expand } from "../types";
 import type { Context } from "../dsl/types";
+
+type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 
 type ExtensionMethods<
   TExtension extends Record<string, any>,
