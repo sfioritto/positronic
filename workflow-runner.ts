@@ -1,14 +1,14 @@
 import { WORKFLOW_EVENTS } from './dsl/constants';
-import type { WorkflowBlock, Step } from './dsl/types';
-import { Adapter } from "./adapters/adapter";
-import type { Context } from "./dsl/types";
+import type { Adapter } from "./adapters/adapter";
 import type { FileStore } from "./file-stores";
+import type { Event } from './dsl/blocks';
+import type { Context, JsonObject } from './dsl/types';
 
 interface Logger {
   log(...args: any[]): void;
 }
 
-export class WorkflowRunner<T> {
+export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[],
@@ -18,27 +18,51 @@ export class WorkflowRunner<T> {
     }
   ) {}
 
-  async run(
-    workflow: WorkflowBlock<T>,
-    initialContext: Context<T>,
-    initialCompletedSteps: Step<T>[] = [],
-    options: Record<string, any> = {}
+  async run<
+    TOptions extends JsonObject = {},
+    TContext extends Context = {}
+  >(
+    workflow: {
+      run: (params?: {
+        initialContext?: TContext,
+        initialCompletedSteps?: Array<{
+          title: string,
+          status: string,
+          context: JsonObject
+        }>,
+        options?: TOptions
+      }) => AsyncGenerator<Event<TContext, TContext, TOptions>>
+    },
+    initialContext?: TContext,
+    initialCompletedSteps?: Array<{
+      title: string,
+      status: string,
+      context: JsonObject
+    }>,
+    options?: TOptions
   ) {
-    const { logger: { log } } = this.options;
+    const { adapters, logger: { log }, verbose } = this.options;
+
     for await (const event of workflow.run({
       initialContext,
       initialCompletedSteps,
-      options,
+      options
     })) {
-      await Promise.all(this.options.adapters.map((adapter) => adapter.dispatch(event)));
+      // Dispatch event to all adapters
+      await Promise.all(
+        adapters.map(adapter => adapter.dispatch(event))
+      );
+
+      // Log completed steps
       if (event.completedStep) {
         log(`${event.completedStep.title} ✅`);
       }
 
+      // Log final context on workflow completion/error if verbose
       if ((
         event.type === WORKFLOW_EVENTS.COMPLETE ||
         event.type === WORKFLOW_EVENTS.ERROR
-      ) && this.options.verbose) {
+      ) && verbose) {
         log(`Workflow completed: \n\n ${JSON.stringify(
           this.truncateDeep(structuredClone(event.newContext)), null, 2
         )}`);
@@ -68,4 +92,3 @@ export class WorkflowRunner<T> {
     return obj;
   }
 }
-
