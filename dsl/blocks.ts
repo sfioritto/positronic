@@ -66,7 +66,10 @@ export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
 
 const clone = <T>(value: T): T => structuredClone(value);
 
-export function workflow<TOptions extends object = {}, TContext extends Context = {}>(
+export function workflow<
+  TOptions extends object = {},
+  TContext extends Context = {}
+>(
   workflowConfig: string | { title: string; description?: string },
   client: PromptClient
 ) {
@@ -75,38 +78,47 @@ export function workflow<TOptions extends object = {}, TContext extends Context 
   return new Workflow<TOptions, TContext>(client, title, description);
 }
 
-export class Workflow<TOptions extends object = {}, TContext extends Context = {}> {
+export class Workflow<
+  TOptions extends object = {},
+  TContext extends Context = {}
+> {
   private blocks: Block<any, any, TOptions>[] = [];
-  private client: PromptClient;
-  private title: string;
-  private description?: string;
 
-  constructor(client: PromptClient, title: string, description?: string) {
-    this.client = client;
-    this.title = title;
-    this.description = description;
+  constructor(
+    private client: PromptClient,
+    private title: string,
+    private description?: string
+  ) {
   }
 
   step<TNewContext extends Context>(
     title: string,
-    fn: (params: { context: TContext; options: TOptions }) => TNewContext | Promise<TNewContext>
+    action: (params: { context: TContext; options: TOptions }) => TNewContext | Promise<TNewContext>
   ) {
     const stepBlock: StepBlock<TContext, TNewContext, TOptions> = {
       type: 'step',
       title,
-      action: fn
+      action
     };
     this.blocks.push(stepBlock);
     return new Workflow<TOptions, TNewContext>(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
-  workflow<TInnerContext extends Context, TNewContext extends Context>(
+  workflow<
+    TInnerContext extends Context,
+    TNewContext extends Context
+  >(
     title: string,
     innerWorkflow: Workflow<TOptions, TInnerContext>,
     reducer: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
     initialContext?: TInnerContext | ((context: TContext) => TInnerContext)
   ) {
-    const nestedBlock: WorkflowBlock<TContext, TInnerContext, TNewContext, TOptions> = {
+    const nestedBlock: WorkflowBlock<
+      TContext,
+      TInnerContext,
+      TNewContext,
+      TOptions
+    > = {
       type: 'workflow',
       title,
       innerWorkflow,
@@ -117,7 +129,10 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
     return new Workflow<TOptions, TNewContext>(this.client, this.title, this.description).withBlocks(this.blocks);
   }
 
-  prompt<TResponseKey extends string, TSchema extends z.ZodObject<any>>(
+  prompt<
+    TResponseKey extends string,
+    TSchema extends z.ZodObject<any>
+  >(
     title: string,
     config: {
       template: (ctx: TContext) => string;
@@ -127,7 +142,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
       };
       client?: PromptClient;
     }
-  ): Workflow<TOptions, TContext & { [K in TResponseKey]: z.infer<TSchema> }> {
+  ) {
     const promptBlock: StepBlock<
       TContext,
       TContext & { [K in TResponseKey]: z.infer<TSchema> },
