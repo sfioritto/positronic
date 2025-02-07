@@ -33,7 +33,7 @@ interface SerializedStep {
 export type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
   type: 'step';
   title: string;
-  execute: (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
+  action: (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
 };
 
 type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext, TOptions extends object = {}> = {
@@ -89,7 +89,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
     const stepBlock: StepBlock<TContext, TNewContext, TOptions> = {
       type: 'step',
       title,
-      execute: fn
+      action: fn
     };
     this.blocks.push(stepBlock);
     return new Workflow<TOptions, TNewContext>(this.client, this.title, this.description).withBlocks(this.blocks);
@@ -130,7 +130,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
     > = {
       type: 'step',
       title,
-      execute: async ({ context, options }) => {
+      action: async ({ context, options }) => {
         const { client: workflowClient } = this;
         const { client: stepClient, template, responseModel } = config;
         const client = stepClient ?? workflowClient;
@@ -200,7 +200,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
       const previousContext = currentContext;
       try {
         if (block.type === 'step') {
-          currentContext = await block.execute({
+          currentContext = await block.action({
             context: currentContext,
             options,
           });
