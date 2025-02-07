@@ -64,19 +64,9 @@ export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
 export class Workflow<TContext extends Context = {}, TOptions extends object = {}> {
   private blocks: Block<any, any, TOptions>[] = [];
   private defaultClient: PromptClient;
-  private extensions: WorkflowExtension[];
 
-  constructor(
-    defaultClient: PromptClient,
-    extensions: WorkflowExtension[] = []
-  ) {
+  constructor(defaultClient: PromptClient) {
     this.defaultClient = defaultClient;
-    this.extensions = extensions;
-    console.log('Creating workflow with extensions:', extensions.length);
-    extensions.forEach(ext => {
-      console.log('Applying extension...');
-      ext(this);
-    });
   }
 
   step<TNewContext extends Context>(
@@ -89,7 +79,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
       execute: fn
     };
     this.blocks.push(stepBlock);
-    return new Workflow<TNewContext, TOptions>(this.defaultClient, this.extensions).withBlocks(this.blocks);
+    return new Workflow<TNewContext, TOptions>(this.defaultClient).withBlocks(this.blocks);
   }
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
