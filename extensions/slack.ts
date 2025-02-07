@@ -1,5 +1,4 @@
-import { WorkflowExtension, type Context } from "./blocks";
-import { Expand } from "./blocks";
+import { Workflow, type Expand, type Context } from "../dsl/blocks";
 
 interface SlackMessage extends Context {
   channel: string;
@@ -13,8 +12,8 @@ interface SlackNotification extends Context {
   timestamp: string;
 }
 
-// Declare module augmentation with nested namespace
-declare module "./blocks" {
+// Type augmentation - only available when this module is imported
+declare module "../dsl/blocks" {
   interface Workflow<TContext> {
     slack: {
       message(
@@ -36,17 +35,18 @@ declare module "./blocks" {
   }
 }
 
-export const slackExtension: WorkflowExtension = (workflow) => {
-  // Create the slack namespace
-  workflow.slack = {
+// Wrap the prototype modification in an IIFE that runs after module initialization
+(() => {
+  const slackMethods = {
     message(
+      this: Workflow<any>,
       title: string,
       config: {
         channel: string;
         message: string | ((ctx: any) => string);
       }
     ) {
-      return workflow.step(title, async ({ context }) => {
+      return this.step(title, async ({ context }) => {
         const messageText = typeof config.message === 'function'
           ? config.message(context)
           : config.message;
@@ -68,13 +68,14 @@ export const slackExtension: WorkflowExtension = (workflow) => {
     },
 
     notify(
+      this: Workflow<any>,
       title: string,
       config: {
         users: string[];
         message: string | ((ctx: any) => string);
       }
     ) {
-      return workflow.step(title, async ({ context }) => {
+      return this.step(title, async ({ context }) => {
         const messageText = typeof config.message === 'function'
           ? config.message(context)
           : config.message;
@@ -95,4 +96,9 @@ export const slackExtension: WorkflowExtension = (workflow) => {
       });
     }
   };
-};
+
+  Workflow.prototype.slack = {
+    message: slackMethods.message.bind(Workflow.prototype),
+    notify: slackMethods.notify.bind(Workflow.prototype)
+  };
+})();

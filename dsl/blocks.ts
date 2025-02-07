@@ -3,7 +3,7 @@ import { AnthropicClient } from "../clients/anthropic";
 import type { PromptClient } from "../types";
 import type { JsonObject, SerializedError } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
-import { slackExtension } from './slack';
+import '../extensions/slack';
 import '../extensions/fetch';
 export type Context = JsonObject;
 
@@ -277,7 +277,7 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
 
 const client = new AnthropicClient();
 
-const workflow = new Workflow<{}, { apiKey: string }>(client, [slackExtension])
+const workflow = new Workflow<{}, { apiKey: string }>(client)
   .step('Get User name', ({ context, options }) => {
     return {
       ...context,
