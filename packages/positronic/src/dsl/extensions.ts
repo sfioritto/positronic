@@ -1,5 +1,5 @@
-import { Workflow } from "./blocks";
-import type { State } from "../dsl/types";
+import { Workflow } from "./workflow";
+import type { State } from "./types";
 
 type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 

@@ -1,6 +1,6 @@
-import { Workflow } from "../dsl/blocks";
-import { createExtension } from "../dsl/extensions";
-import type { State } from "../dsl/types";
+import { Workflow } from "../positronic/src/dsl/workflow";
+import { createExtension } from "../positronic/src/dsl/extensions";
+import type { State } from "../positronic/src/dsl/types";
 const filesExtension = createExtension('files', {
   file(
     this: Workflow<any>,
@@ -23,7 +23,7 @@ const filesExtension = createExtension('files', {
   }
 });
 
-declare module "../dsl/blocks" {
+declare module "../positronic/src/dsl/workflow" {
   interface Workflow<TOptions extends object, TState extends State> {
     files: ReturnType<typeof filesExtension.augment<TOptions, TState>>;
   }
