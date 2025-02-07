@@ -1,7 +1,7 @@
 import { workflow, type Workflow, type Context } from './blocks';
 import { AnthropicClient } from '../clients/anthropic';
 import { z } from 'zod';
-// import '../extensions/slack';
+import '../extensions/slack';
 import '../extensions/fetch';
 
 export interface SlackMessage extends Context {
