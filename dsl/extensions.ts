@@ -1,6 +1,6 @@
 import { Workflow, type Expand, type Context } from "./blocks";
 
-export type ExtensionMethods<
+type ExtensionMethods<
   TExtension extends Record<string, any>,
   TOptions extends object,
   TContext extends Context
@@ -19,7 +19,7 @@ export type ExtensionMethods<
     : never;
 };
 
-export function createWorkflowExtension<
+export function createExtension<
   TExtensionKey extends string,
   TExtension extends Record<string, any>
 >(key: TExtensionKey, extension: TExtension) {

@@ -1,7 +1,7 @@
 import { Workflow } from "../dsl/blocks";
-import { createWorkflowExtension } from "../dsl/extensions";
+import { createExtension } from "../dsl/extensions";
 
-const slackExtension = createWorkflowExtension('slack', {
+const slackExtension = createExtension('slack', {
   message(
     this: Workflow<any>,
     title: string,
