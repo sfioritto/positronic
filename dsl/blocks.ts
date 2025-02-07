@@ -59,6 +59,8 @@ interface RunParams<
 
 export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
 
+const clone = <T>(value: T): T => structuredClone(value);
+
 export function workflow<TOptions extends object = {}, TContext extends Context = {}>(
   workflowConfig: string | { title: string; description?: string },
   client: PromptClient
@@ -154,16 +156,8 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
   }
 
   async *run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
-    // Clone all input params
-    const clonedParams: RunParams<TOptions, TContext> = {
-      initialContext: params.initialContext ? structuredClone(params.initialContext) : {} as TContext,
-      options: structuredClone(params.options),
-      initialCompletedSteps: params.initialCompletedSteps ? structuredClone(params.initialCompletedSteps) : []
-    };
-
-    // Delegate to private run and clone all yielded events
-    for await (const event of this._run(clonedParams)) {
-      yield structuredClone(event);
+    for await (const event of this._run(clone(params))) {
+      yield clone(event);
     }
   }
 
@@ -174,8 +168,9 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
    * data is immutable and safe to use by consumers of the workflow.
    */
   private async *_run(params: RunParams<TOptions, TContext>): AsyncGenerator<Event<TContext, TContext, TOptions>> {
-    let currentContext = params.initialContext as TContext;
-    const completedSteps: SerializedStep[] = [...(params.initialCompletedSteps || [])];
+    const { initialContext, options, initialCompletedSteps } = params;
+    let currentContext = clone(initialContext || {}) as TContext;
+    const completedSteps: SerializedStep[] = [...(initialCompletedSteps || [])];
 
     if (completedSteps.length > 0) {
       currentContext = completedSteps[completedSteps.length - 1].context as TContext;
@@ -193,33 +188,37 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
         status: STATUS.PENDING,
         context: currentContext
       })),
-      options: params.options
+      options,
     };
 
-    // Process each block
     for (const block of this.blocks) {
-      const previousContext = structuredClone(currentContext);
+      // Clone the current context here to prevent mutation of the context
+      // when the block is executed. The initial clone in the first pass
+      // of the loop is not necessary, but it is needed for every other pass
+      // and putting it here makes it easier to see.
+      currentContext = clone(currentContext);
+      const previousContext = currentContext;
       try {
         if (block.type === 'step') {
           currentContext = await block.execute({
-            context: structuredClone(currentContext),
-            options: params.options
+            context: currentContext,
+            options,
           });
         } else if (block.type === 'workflow') {
           const childInitial = typeof block.initialContext === 'function'
-            ? block.initialContext(structuredClone(currentContext))
+            ? block.initialContext(currentContext)
             : block.initialContext;
           const innerCtx = await block.innerWorkflow.run({
             initialContext: childInitial,
-            options: params.options
+            options,
           });
-          currentContext = block.reducer(structuredClone(currentContext), innerCtx);
+          currentContext = block.reducer(currentContext, innerCtx);
         }
 
         const completedStep = {
           title: block.title,
           status: STATUS.COMPLETE,
-          context: structuredClone(currentContext)
+          context: currentContext
         };
         completedSteps.push(completedStep);
 
@@ -238,7 +237,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
               context: currentContext
             }
           ),
-          options: params.options
+          options,
         };
       } catch (error) {
         const errorStep = {
@@ -264,7 +263,7 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
               context: currentContext
             }
           ),
-          options: params.options
+          options,
         };
         throw error;
       }
@@ -275,10 +274,10 @@ export class Workflow<TOptions extends object = {}, TContext extends Context = {
       status: STATUS.COMPLETE,
       workflowTitle: this.title,
       workflowDescription: this.description,
-      previousContext: params.initialContext || {} as TContext,
+      previousContext: initialContext || {} as TContext,
       newContext: currentContext,
       steps: completedSteps,
-      options: params.options
+      options,
     };
 
     return currentContext;
