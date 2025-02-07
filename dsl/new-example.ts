@@ -1,4 +1,5 @@
-import { workflow } from './blocks';
+import { workflow, type Workflow } from './blocks';
+import type { SlackMessage, SlackNotification } from '../extensions/slack';
 import { AnthropicClient } from '../clients/anthropic';
 import { z } from 'zod';
 import '../extensions/slack';
@@ -142,4 +143,78 @@ async function executeWorkflow(wf: any, options?: any) {
     apiKey: 'test-api-key'
   });
 })();
+
+// Type testing utilities
+type AssertEquals<T, U> =
+  0 extends (1 & T) ? false : // fails if T is any
+  0 extends (1 & U) ? false : // fails if U is any
+  [T] extends [U] ? [U] extends [T] ? true : false : false;
+
+// Extract types from workflows
+type ExtractContextType<T> = T extends Workflow<infer Context> ? Context : never;
+type ExtractOptionsType<T> = T extends Workflow<any, infer Options> ? Options : never;
+
+// Expected types for coverageWorkflow
+type ExpectedCoverageContext = {
+  coverage: { files: string[] };
+  lowestCoverageFile: { path: string };
+  lastSlackMessage: SlackMessage;
+  lastSlackNotification: SlackNotification;
+};
+type TestCoverageContext = ExtractContextType<typeof coverageWorkflow>;
+const _coverageTypeTest: AssertEquals<TestCoverageContext, ExpectedCoverageContext> = true;
+
+// Expected types for userDataWorkflow
+type ExpectedUserDataContext = {
+  userId: string;
+  name: string;
+  email: string;
+  preferences: {
+    theme: string;
+    notifications: boolean;
+  };
+  lastSlackMessage: SlackMessage;
+};
+type TestUserDataContext = ExtractContextType<typeof userDataWorkflow>;
+const _userDataTypeTest: AssertEquals<TestUserDataContext, ExpectedUserDataContext> = true;
+
+// Expected types for asyncWorkflow
+type ExpectedAsyncContext = {
+  userId: string;
+  userData: any;
+};
+type TestAsyncContext = ExtractContextType<typeof asyncWorkflow>;
+const _asyncTypeTest: AssertEquals<TestAsyncContext, ExpectedAsyncContext> = true;
+
+// Expected types for optionsWorkflow
+type ExpectedOptionsContext = {
+  hasSpeed: boolean;
+  hasManeuver: boolean;
+  features: string[];
+  processed: boolean;
+};
+type TestOptionsOptions = ExtractOptionsType<typeof optionsWorkflow>;
+type TestOptionsContext = ExtractContextType<typeof optionsWorkflow>;
+const _optionsContextTypeTest: AssertEquals<TestOptionsContext, ExpectedOptionsContext> = true;
+const _optionsOptionsTypeTest: AssertEquals<TestOptionsOptions, FeatureOptions> = true;
+
+// Expected types for nestedWorkflow
+type ExpectedNestedContext = {
+  initialized: boolean;
+  featureResults: {
+    hasSpeed: boolean;
+    hasManeuver: boolean;
+    processed: boolean;
+  };
+  lastSlackNotification: SlackNotification;
+};
+type TestNestedContext = ExtractContextType<typeof nestedWorkflow>;
+type TestNestedOptions = ExtractOptionsType<typeof nestedWorkflow>;
+const _nestedContextTypeTest: AssertEquals<TestNestedContext, ExpectedNestedContext> = true;
+const _nestedOptionsTypeTest: AssertEquals<TestNestedOptions, FeatureOptions> = true;
+
+// Debug type inference
+type WorkflowType = typeof optionsWorkflow;
+type OptionsType = WorkflowType extends Workflow<any, infer O> ? O : never;
+type TestOptionsOptions = OptionsType;
 

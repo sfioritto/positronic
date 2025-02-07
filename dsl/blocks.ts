@@ -38,17 +38,17 @@ export type StepBlock<TContextIn, TContextOut, TOptions extends object = {}> = {
   execute: (params: { context: TContextIn; options: TOptions }) => TContextOut | Promise<TContextOut>;
 };
 
-type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext> = {
+type WorkflowBlock<TOuterContext, TInnerContext extends Context, TNewContext, TOptions extends object = {}> = {
   type: 'workflow';
   title: string;
-  innerWorkflow: Workflow<TInnerContext>;
+  innerWorkflow: Workflow<TInnerContext, TOptions>;
   initialContext: TInnerContext | ((outerCtx: TOuterContext) => TInnerContext);
   reducer: (outerCtx: TOuterContext, innerCtx: TInnerContext) => TNewContext;
 };
 
 type Block<TContextIn, TContextOut, TOptions extends object = {}> =
   | StepBlock<TContextIn, TContextOut, TOptions>
-  | WorkflowBlock<TContextIn, any, TContextOut>;
+  | WorkflowBlock<TContextIn, any, TContextOut, TOptions>;
 
 interface RunParams<
   TOptions extends object = {},
@@ -97,11 +97,11 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
 
   workflow<TInnerContext extends Context, TNewContext extends Context>(
     title: string,
-    innerWorkflow: Workflow<TInnerContext>,
+    innerWorkflow: Workflow<TInnerContext, TOptions>,
     reducer: (params: { context: TContext, workflowContext: TInnerContext }) => TNewContext,
     initialContext?: TInnerContext | ((context: TContext) => TInnerContext)
   ) {
-    const nestedBlock: WorkflowBlock<TContext, TInnerContext, TNewContext> = {
+    const nestedBlock: WorkflowBlock<TContext, TInnerContext, TNewContext, TOptions> = {
       type: 'workflow',
       title,
       innerWorkflow,
@@ -211,7 +211,10 @@ export class Workflow<TContext extends Context = {}, TOptions extends object = {
           const childInitial = typeof block.initialContext === 'function'
             ? block.initialContext(currentContext)
             : block.initialContext;
-          const innerCtx = await block.innerWorkflow.run(childInitial);
+          const innerCtx = await block.innerWorkflow.run({
+            initialContext: childInitial,
+            options: params.options
+          });
           currentContext = block.reducer(currentContext, innerCtx);
         }
 

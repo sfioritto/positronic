@@ -1,12 +1,12 @@
 import { Workflow, type Expand, type Context } from "../dsl/blocks";
 
-interface SlackMessage extends Context {
+export interface SlackMessage extends Context {
   channel: string;
   message: string;
   timestamp: string;
 }
 
-interface SlackNotification extends Context {
+export interface SlackNotification extends Context {
   users: string[];
   message: string;
   timestamp: string;
