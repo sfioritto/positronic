@@ -61,7 +61,7 @@ interface RunParams<
 
 export type WorkflowExtension = (workflow: Workflow<any, any>) => void;
 
-export function workflow<TContext extends Context = {}, TOptions extends object = {}>(
+export function workflow<TOptions extends object = {}, TContext extends Context = {}>(
   workflowConfig: string | { title: string; description?: string },
   client: PromptClient
 ) {
@@ -323,7 +323,7 @@ interface ApiOptions {
   retryCount: number;
 }
 
-const optionsWorkflow = new Workflow<{}, ApiOptions>(client, 'Options Workflow', 'This workflow demonstrates options handling')
+const optionsWorkflow = workflow<ApiOptions>({ title: 'Options Workflow', description: 'This workflow demonstrates options handling' }, client)
   .step('Initialize Config', ({ context, options }) => ({
     ...context,
     config: {
