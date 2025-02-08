@@ -2,7 +2,9 @@
   "name": "@positronic/cli",
   "version": "0.0.1",
   "description": "A CLI for AI Workflows",
-  "main": "src/positronic.ts",
+  "bin": {
+    "positronic": "./src/positronic.ts"
+  },
   "dependencies": {
     "@positronic/core": "^0.0.1",
     "ts-node": "^10.9.2",
