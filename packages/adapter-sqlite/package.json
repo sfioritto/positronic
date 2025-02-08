@@ -1,0 +1,9 @@
+{
+  "name": "@positronic/core",
+  "version": "0.0.1",
+  "description": "A DSL for AI Workflows",
+  "main": "index.js",
+  "dependencies": {
+    "better-sqlite3": "^11.7.2"
+  }
+}

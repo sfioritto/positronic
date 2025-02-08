@@ -1,0 +1,9 @@
+{
+  "name": "@positronic/extension-files",
+  "version": "0.0.1",
+  "description": "A file extension for Positronic",
+  "main": "index.js",
+  "dependencies": {
+    "@positronic/core": "workspace:*"
+  }
+}

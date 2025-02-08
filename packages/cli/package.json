@@ -1,0 +1,10 @@
+{
+  "name": "@positronic/cli",
+  "version": "0.0.1",
+  "description": "A CLI for AI Workflows",
+  "main": "index.js",
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "better-sqlite3": "^11.7.2"
+  }
+}

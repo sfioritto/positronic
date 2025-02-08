@@ -1,26 +1,13 @@
 {
   "name": "positronic",
-  "type": "module",
-  "main": "index.js",
-  "types": "index.d.ts",
-  "bin": {
-    "positronic": "./bin/positronic.js"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  },
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "tsc --emitDeclarationOnly && swc . --out-dir dist && chmod +x dist/bin/positronic.js && cp package.json init.sql dist",
     "build:watch": "nodemon --watch './**/*' --watch '*.ts' --ignore 'dist/**/*' --ext ts,js,json --exec 'npm run build'",
-    "start": "npm run build && node dist/example.js",
     "test": "jest --silent"
-  },
-  "dependencies": {
-    "@instructor-ai/instructor": "^1.5.0",
-    "better-sqlite3": "^11.7.2",
-    "dotenv": "^16.4.7",
-    "ts-node": "^10.9.2",
-    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@swc/cli": "^0.6.0",
