@@ -3,12 +3,12 @@
 import path from 'path';
 import fs from 'fs';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
-import { SQLiteAdapter } from '../adapters/sqlite';
-import { WorkflowRunner } from '../workflow-runner';
+import { SQLiteAdapter } from '../../adapter-sqlite/src';
+import { WorkflowRunner } from '../../positronic/src/dsl/workflow-runner';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { STATUS } from '../dsl/constants';
-import type { Step } from '../dsl/types';
+import { STATUS } from '../../positronic/src/dsl/constants';
+import type { SerializedStep } from '../../positronic/src/dsl/workflow';
 
 interface CliOptions {
   workflowDir?: string;
@@ -146,7 +146,7 @@ async function main() {
     const initialState = await loadState(stateFile);
     const db = await initializeDatabase('workflows.db');
 
-    let completedSteps: Step<any>[] = [];
+    let completedSteps: SerializedStep[] = [];
     let workflowRunId: number | undefined;
 
     if (restartFrom !== undefined) {
@@ -164,7 +164,7 @@ async function main() {
       }
     }
 
-    const runner = new WorkflowRunner<any>(
+    const runner = new WorkflowRunner(
       {
         adapters: [new SQLiteAdapter(db, workflowRunId)],
         logger: console,

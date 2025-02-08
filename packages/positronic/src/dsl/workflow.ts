@@ -26,7 +26,7 @@ export interface Event<
   options: TOptions;
 }
 
-interface SerializedStep {
+export interface SerializedStep {
   title: string;
   status: typeof STATUS[keyof typeof STATUS];
   state: State;

@@ -1,8 +1,8 @@
-import { WORKFLOW_EVENTS } from './dsl/constants';
-import type { Adapter } from "./adapters/adapter";
-import type { FileStore } from "./file-stores";
-import type { Event } from './dsl/blocks';
-import type { State, JsonObject } from './dsl/types';
+import { WORKFLOW_EVENTS } from './constants';
+import type { Adapter } from "../adapters/types";
+import type { FileStore } from "../file-stores/types";
+import type { Event } from './workflow';
+import type { State, JsonObject } from './types';
 
 interface Logger {
   log(...args: any[]): void;
