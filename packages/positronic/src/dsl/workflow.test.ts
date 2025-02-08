@@ -105,6 +105,9 @@ describe('workflow creation', () => {
       execute: jest.fn().mockResolvedValue({ override: true })
     };
 
+    // Make sure that for the default prompt the default client returns a known value.
+    mockClient.execute.mockResolvedValueOnce({ default: true });
+
     const testWorkflow = workflow('Client Override Test')
       .prompt(
         "Use default client",
@@ -128,10 +131,19 @@ describe('workflow creation', () => {
         }
       );
 
+    // Run the workflow and capture the final event.
+    let finalEvent: any;
     for await (const event of testWorkflow.run({ client: mockClient })) {
-      // Continue...
+      finalEvent = event;
     }
 
+    // Final state should include both responses.
+    expect(finalEvent.newState).toEqual({
+      defaultResponse: { default: true },
+      overrideResponse: { override: true }
+    });
+
+    // Verify that each client was used correctly based on the supplied prompt configuration.
     expect(mockClient.execute).toHaveBeenCalledWith("prompt1", expect.any(Object));
     expect(overrideClient.execute).toHaveBeenCalledWith("prompt2", expect.any(Object));
   });
