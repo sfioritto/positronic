@@ -1,7 +1,6 @@
 import Database, { Database as DatabaseType } from "better-sqlite3";
 import { SQLiteAdapter } from "../src/index";
-import { STATUS } from "../../positronic/src/dsl/constants";
-import { workflow } from "../../positronic/src/dsl/workflow";
+import { STATUS, workflow } from "@positronic/core";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { runWorkflow, runWorkflowStepByStep } from "./test-helpers";

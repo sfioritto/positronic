@@ -1,7 +1,5 @@
 import { Database as DatabaseType } from "better-sqlite3";
-import { Adapter } from "../../positronic/src/adapters/types";
-import { STATUS } from "../../positronic/src/dsl/constants";
-import type { Event } from "../../positronic/src/dsl/workflow";
+import { Adapter, STATUS, type Event } from "@positronic/core";
 
 interface SQLiteOptions {
   workflowRunId?: number;
