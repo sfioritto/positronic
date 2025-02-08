@@ -5,14 +5,5 @@
   "main": "src/index.ts",
   "dependencies": {
     "better-sqlite3": "^11.7.2"
-  },
-  "directories": {
-    "test": "tests",
-    "src": "src"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12"
-  },
-  "author": "",
-  "license": "ISC"
+  }
 }
