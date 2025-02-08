@@ -9,9 +9,6 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@instructor-ai/instructor": "^1.5.0",
-    "llm-polyglot": "^2.4.0",
-    "dotenv": "^16.4.7",
     "zod": "^3.24.1"
   },
   "devDependencies": {},
