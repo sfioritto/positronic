@@ -4,6 +4,7 @@
   "description": "A SQLite adapter for Positronic",
   "main": "src/index.ts",
   "dependencies": {
+    "@positronic/core": "^0.0.1",
     "better-sqlite3": "^11.7.2"
   }
 }
