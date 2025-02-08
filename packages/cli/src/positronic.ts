@@ -3,12 +3,12 @@
 import path from 'path';
 import fs from 'fs';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
-import { SQLiteAdapter } from '../../adapter-sqlite/src';
-import { WorkflowRunner } from '../../positronic/src/dsl/workflow-runner';
+import { SQLiteAdapter } from '@positronic/adapter-sqlite';
+import { WorkflowRunner } from '@positronic/core';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { STATUS } from '../../positronic/src/dsl/constants';
-import type { SerializedStep } from '../../positronic/src/dsl/workflow';
+import { STATUS } from '@positronic/core';
+import type { SerializedStep } from '@positronic/core';
 
 interface CliOptions {
   workflowDir?: string;

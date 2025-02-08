@@ -5,7 +5,7 @@ interface SQLiteOptions {
   workflowRunId?: number;
 }
 
-class SQLiteAdapter extends Adapter<SQLiteOptions> {
+export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   constructor(
     private db: DatabaseType,
     private workflowRunId?: number
@@ -149,5 +149,3 @@ class SQLiteAdapter extends Adapter<SQLiteOptions> {
     );
   }
 }
-
-export { SQLiteAdapter };
