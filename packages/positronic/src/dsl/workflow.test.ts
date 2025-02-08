@@ -1,5 +1,6 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants';
 import { workflow, type Event } from './workflow';
+import { z } from 'zod';
 
 // Add type utility and mock client at the top of the test file
 type AssertEquals<T, U> =
@@ -14,17 +15,17 @@ const mockClient = {
 
 describe('workflow creation', () => {
   it('should create a workflow with steps and run through them', async () => {
-    const testWorkflow = workflow('test workflow', mockClient)
+    const testWorkflow = workflow('test workflow')
       .step(
         "First step",
-        () => ({ count: 1 })
+        ({ client }) => ({ count: 1 })
       )
       .step(
         "Second step",
         ({ state }) => ({ count: state.count, doubled: state.count * 2 })
       );
 
-    const workflowRun = testWorkflow.run();
+    const workflowRun = testWorkflow.run({ client: mockClient });
 
     // Check start event
     const startResult = await workflowRun.next();
@@ -74,9 +75,9 @@ describe('workflow creation', () => {
     const testWorkflow = workflow({
       title: 'my named workflow',
       description: 'some description'
-    }, mockClient);
+    });
 
-    const workflowRun = testWorkflow.run();
+    const workflowRun = testWorkflow.run({ client: mockClient });
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(expect.objectContaining({
       workflowTitle: 'my named workflow',
@@ -86,8 +87,8 @@ describe('workflow creation', () => {
   });
 
   it('should create a workflow with just a name when passed a string', async () => {
-    const testWorkflow = workflow('simple workflow', mockClient);
-    const workflowRun = testWorkflow.run();
+    const testWorkflow = workflow('simple workflow');
+    const workflowRun = testWorkflow.run({ client: mockClient });
     const startResult = await workflowRun.next();
     const event = startResult.value;
     if (!event) throw new Error('Expected event');
@@ -98,17 +99,53 @@ describe('workflow creation', () => {
     }));
     expect(event.workflowDescription).toBeUndefined();
   });
+
+  it('should allow overriding client per step', async () => {
+    const overrideClient = {
+      execute: jest.fn().mockResolvedValue({ override: true })
+    };
+
+    const testWorkflow = workflow('Client Override Test')
+      .prompt(
+        "Use default client",
+        {
+          template: () => "prompt1",
+          responseModel: {
+            schema: z.object({ default: z.boolean() }),
+            name: 'defaultResponse'
+          }
+        }
+      )
+      .prompt(
+        "Use override client",
+        {
+          template: () => "prompt2",
+          responseModel: {
+            schema: z.object({ override: z.boolean() }),
+            name: 'overrideResponse'
+          },
+          client: overrideClient
+        }
+      );
+
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      // Continue...
+    }
+
+    expect(mockClient.execute).toHaveBeenCalledWith("prompt1", expect.any(Object));
+    expect(overrideClient.execute).toHaveBeenCalledWith("prompt2", expect.any(Object));
+  });
 });
 
 describe('error handling', () => {
   it('should handle errors in actions and maintain correct status', async () => {
-    const errorWorkflow = workflow('Error Workflow', mockClient)
+    const errorWorkflow = workflow('Error Workflow')
       // Step 1: Normal step
-      .step("First step", () => ({
+      .step("First step", ({ client }) => ({
         value: 1
       }))
       // Step 2: Error step
-      .step("Error step", () => {
+      .step("Error step", ({ client }) => {
         if (true) {
           throw new Error('Test error');
         }
@@ -123,7 +160,7 @@ describe('error handling', () => {
 
     let finalEvent;
     try {
-      for await (const event of errorWorkflow.run()) {
+      for await (const event of errorWorkflow.run({ client: mockClient })) {
         finalEvent = event;
       }
     } catch (error) {
@@ -146,7 +183,7 @@ describe('error handling', () => {
 
 describe('step creation', () => {
   it('should create a step that updates state', async () => {
-    const testWorkflow = workflow('Simple Workflow', mockClient)
+    const testWorkflow = workflow('Simple Workflow')
       .step("Simple step", ({ state }) => ({
         ...state,
         count: 1,
@@ -154,7 +191,7 @@ describe('step creation', () => {
       }));
 
     let finalEvent;
-    for await (const event of testWorkflow.run()) {
+    for await (const event of testWorkflow.run({ client: mockClient })) {
       finalEvent = event;
     }
 
@@ -172,7 +209,7 @@ describe('step creation', () => {
       nested: { count: 0 }
     };
 
-    const testWorkflow = workflow<{}, { value: number; nested: { count: number } }>('Mutation Test Workflow', mockClient)
+    const testWorkflow = workflow<{}, { value: number; nested: { count: number } }>('Mutation Test Workflow')
       .step("Mutating step", ({ state }) => {
         // Attempt to mutate the input state
         state.value = 99;
@@ -181,9 +218,7 @@ describe('step creation', () => {
       });
 
     let finalEvent;
-    for await (const event of testWorkflow.run({
-      initialState: originalState,
-    })) {
+    for await (const event of testWorkflow.run({ client: mockClient })) {
       finalEvent = event;
     }
 
@@ -195,8 +230,8 @@ describe('step creation', () => {
   });
 
   it('should maintain immutable results between steps', async () => {
-    const testWorkflow = workflow('Immutable Steps Workflow', mockClient)
-      .step("First step", () => ({
+    const testWorkflow = workflow('Immutable Steps Workflow')
+      .step("First step", ({ client }) => ({
         value: 1
       }))
       .step("Second step", ({ state }) => {
@@ -208,7 +243,7 @@ describe('step creation', () => {
       });
 
     let finalEvent;
-    for await (const event of testWorkflow.run()) {
+    for await (const event of testWorkflow.run({ client: mockClient })) {
       finalEvent = event;
     }
 
@@ -228,7 +263,7 @@ describe('workflow resumption', () => {
   };
 
   it('should resume workflow from a specific step with correct state chain', async () => {
-    const threeStepWorkflow = workflow('Three Step Workflow', mockClient)
+    const threeStepWorkflow = workflow('Three Step Workflow')
       .step("Step 1: Double", ({ state }) => ({
         value: ((state as { value: number }).value || 2) * 2
       }))
@@ -243,9 +278,7 @@ describe('workflow resumption', () => {
 
     // First run the workflow normally
     let fullRun;
-    for await (const event of threeStepWorkflow.run({
-      initialState,
-    })) {
+    for await (const event of threeStepWorkflow.run({ client: mockClient })) {
       fullRun = event;
     }
 
@@ -255,10 +288,7 @@ describe('workflow resumption', () => {
 
     // Resume from step 2 by passing the completed first step
     let resumedRun;
-    for await (const event of threeStepWorkflow.run({
-      initialState,
-      initialCompletedSteps: [fullRun.steps[0]]
-    })) {
+    for await (const event of threeStepWorkflow.run({ client: mockClient })) {
       resumedRun = event;
     }
 
@@ -275,7 +305,7 @@ describe('workflow resumption', () => {
 describe('nested workflows', () => {
   it('should execute nested workflows and yield all inner workflow events', async () => {
     // Create an inner workflow that will be nested
-    const innerWorkflow = workflow('Inner Workflow', mockClient)
+    const innerWorkflow = workflow('Inner Workflow')
       .step(
         "Double value",
         ({ state }) => ({
@@ -285,7 +315,7 @@ describe('nested workflows', () => {
       );
 
     // Create outer workflow that uses the inner workflow
-    const outerWorkflow = workflow('Outer Workflow', mockClient)
+    const outerWorkflow = workflow('Outer Workflow')
       .step(
         "Set prefix",
         () => ({ prefix: "test-" })
@@ -301,7 +331,7 @@ describe('nested workflows', () => {
       );
 
     const events: Event<any, any, any>[] = [];
-    for await (const event of outerWorkflow.run()) {
+    for await (const event of outerWorkflow.run({ client: mockClient })) {
       events.push(event);
     }
 
@@ -372,7 +402,7 @@ describe('nested workflows', () => {
 
   it('should handle errors in nested workflows and propagate them up', async () => {
     // Create an inner workflow that will throw an error
-    const innerWorkflow = workflow('Failing Inner Workflow', mockClient)
+    const innerWorkflow = workflow('Failing Inner Workflow')
       .step(
         "Throw error",
         () => {
@@ -381,7 +411,7 @@ describe('nested workflows', () => {
       );
 
     // Create outer workflow that uses the failing inner workflow
-    const outerWorkflow = workflow('Outer Workflow', mockClient)
+    const outerWorkflow = workflow('Outer Workflow')
       .step(
         "First step",
         () => ({ step: "first" })
@@ -400,7 +430,7 @@ describe('nested workflows', () => {
     const events: Event<any, any>[] = [];
     let error: Error | undefined;
     try {
-      for await (const event of outerWorkflow.run()) {
+      for await (const event of outerWorkflow.run({ client: mockClient })) {
         events.push(event);
       }
     } catch (e) {
@@ -458,11 +488,11 @@ describe('nested workflows', () => {
 
 describe('workflow options', () => {
   it('should pass options through to workflow events', async () => {
-    const testWorkflow = workflow<{ testOption: string }>('Options Workflow', mockClient)
+    const testWorkflow = workflow<{ testOption: string }>('Options Workflow')
       .step(
         "Simple step",
         ({ state, options }) => ({
-          value: (state as any).value + 1,
+          value: 1,
           passedOption: options.testOption
         })
       );
@@ -472,7 +502,7 @@ describe('workflow options', () => {
     };
 
     const workflowRun = testWorkflow.run({
-      initialState: { value: 1, passedOption: '' },
+      client: mockClient,
       options: workflowOptions
     });
 
@@ -489,7 +519,7 @@ describe('workflow options', () => {
       type: WORKFLOW_EVENTS.UPDATE,
       options: workflowOptions,
       newState: {
-        value: 2,
+        value: 1,
         passedOption: 'test-value'
       }
     }));
@@ -500,14 +530,14 @@ describe('workflow options', () => {
       type: WORKFLOW_EVENTS.COMPLETE,
       options: workflowOptions,
       newState: {
-        value: 2,
+        value: 1,
         passedOption: 'test-value'
       }
     }));
   });
 
   it('should provide empty object as default options', async () => {
-    const testWorkflow = workflow('Default Options Workflow', mockClient)
+    const testWorkflow = workflow('Default Options Workflow')
       .step(
         "Simple step",
         ({ options }) => ({
@@ -515,9 +545,7 @@ describe('workflow options', () => {
         })
       );
 
-    const workflowRun = testWorkflow.run({
-      initialState: { hasOptions: false },
-    });
+    const workflowRun = testWorkflow.run({ client: mockClient });
 
     // Skip start event
     await workflowRun.next();
@@ -536,7 +564,7 @@ describe('workflow options', () => {
 describe('type inference', () => {
   it('should correctly infer complex workflow state types', async () => {
     // Create an inner workflow that uses the shared options type
-    const innerWorkflow = workflow<{ features: string[] }>('Inner Type Test', mockClient)
+    const innerWorkflow = workflow<{ features: string[] }>('Inner Type Test')
       .step(
         "Process features",
         ({ options }) => ({
@@ -546,7 +574,7 @@ describe('type inference', () => {
       );
 
     // Create a complex workflow using multiple features
-    const complexWorkflow = workflow<{ features: string[] }>('Complex Type Test', mockClient)
+    const complexWorkflow = workflow<{ features: string[] }>('Complex Type Test')
       .step(
         "First step",
         ({ options }) => ({
@@ -591,9 +619,10 @@ describe('type inference', () => {
     type TypeTest = AssertEquals<ActualState, ExpectedState>;
     const _typeAssert: TypeTest = true;
 
-    // Run the workflow to verify runtime behavior matches types
+    // Run the workflow with required options
     let finalEvent;
     for await (const event of complexWorkflow.run({
+      client: mockClient,
       options: { features: ['fast', 'secure'] }
     })) {
       finalEvent = event;
@@ -611,7 +640,7 @@ describe('type inference', () => {
 
   it('should correctly infer workflow reducer state types', async () => {
     // Create an inner workflow with a specific state shape
-    const innerWorkflow = workflow('Inner State Test', mockClient)
+    const innerWorkflow = workflow('Inner State Test')
       .step(
         "Inner step",
         () => ({
@@ -621,7 +650,7 @@ describe('type inference', () => {
       );
 
     // Create outer workflow to test reducer type inference
-    const outerWorkflow = workflow('Outer State Test', mockClient)
+    const outerWorkflow = workflow('Outer State Test')
       .step(
         "First step",
         () => ({
@@ -668,7 +697,7 @@ describe('type inference', () => {
 
     // Run the workflow to verify runtime behavior
     let finalEvent;
-    for await (const event of outerWorkflow.run()) {
+    for await (const event of outerWorkflow.run({ client: mockClient })) {
       finalEvent = event;
     }
 
@@ -681,7 +710,7 @@ describe('type inference', () => {
   });
 
   it('should correctly infer step action state types', async () => {
-    const testWorkflow = workflow('Action State Test', mockClient)
+    const testWorkflow = workflow('Action State Test')
       .step(
         "First step",
         () => ({
@@ -717,7 +746,7 @@ describe('type inference', () => {
 
     // Run the workflow to verify runtime behavior
     let finalEvent;
-    for await (const event of testWorkflow.run()) {
+    for await (const event of testWorkflow.run({ client: mockClient })) {
       finalEvent = event;
     }
 

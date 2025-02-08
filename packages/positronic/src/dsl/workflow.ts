@@ -35,7 +35,11 @@ export interface SerializedStep {
 type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
   type: 'step';
   title: string;
-  action: (params: { state: TStateIn; options: TOptions }) => TStateOut | Promise<TStateOut>;
+  action: (params: {
+    state: TStateIn;
+    options: TOptions;
+    client: PromptClient;
+  }) => TStateOut | Promise<TStateOut>;
 };
 
 type WorkflowBlock<
@@ -59,6 +63,7 @@ interface RunParams<
   TOptions extends object = {},
   TStateIn extends State = State
 > {
+  client: PromptClient;
   initialState?: TStateIn;
   options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
@@ -70,12 +75,11 @@ export function workflow<
   TOptions extends object = {},
   TState extends State = {}
 >(
-  workflowConfig: string | { title: string; description?: string },
-  client: PromptClient
+  workflowConfig: string | { title: string; description?: string }
 ) {
   const title = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
-  return new Workflow<TOptions, TState>(client, title, description);
+  return new Workflow<TOptions, TState>(title, description);
 }
 
 export class Workflow<
@@ -85,15 +89,17 @@ export class Workflow<
   private blocks: Block<any, any, TOptions>[] = [];
 
   constructor(
-    private client: PromptClient,
     private title: string,
     private description?: string
-  ) {
-  }
+  ) {}
 
   step<TNewState extends State>(
     title: string,
-    action: (params: { state: TState; options: TOptions }) => TNewState | Promise<TNewState>
+    action: (params: {
+      state: TState;
+      options: TOptions;
+      client: PromptClient;
+    }) => TNewState | Promise<TNewState>
   ) {
     const stepBlock: StepBlock<TState, TNewState, TOptions> = {
       type: 'step',
@@ -110,7 +116,7 @@ export class Workflow<
   >(
     title: string,
     innerWorkflow: Workflow<TOptions, TInnerState>,
-    action: (params: { state: TState, workflowState: TInnerState }) => TNewState,
+    action: (params: { state: TState; workflowState: TInnerState }) => TNewState,
     initialState?: TInnerState | ((state: TState) => TInnerState)
   ) {
     const nestedBlock: WorkflowBlock<
@@ -150,10 +156,9 @@ export class Workflow<
     > = {
       type: 'step',
       title,
-      action: async ({ state }) => {
-        const { client: workflowClient } = this;
-        const { client: stepClient, template, responseModel } = config;
-        const client = stepClient ?? workflowClient;
+      action: async ({ state, client: actionClient }) => {
+        const { template, responseModel, client: stepClient } = config;
+        const client = stepClient ?? actionClient;
         const promptString = template(state);
         const response = await client.execute(promptString, responseModel);
 
@@ -167,8 +172,12 @@ export class Workflow<
     return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
   }
 
-  async *run(params?: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TState, TOptions>> {
-    for await (const event of this._run(clone(params))) {
+  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TState, TOptions>> {
+    // Extract client and clone only the serializable properties.
+    const { client, ...serializableParams } = params;
+    const clonedParams = { client, ...clone(serializableParams) };
+
+    for await (const event of this._run(clonedParams)) {
       yield clone(event);
     }
   }
@@ -180,7 +189,6 @@ export class Workflow<
 
   private nextWorkflow<TNewState extends State>(): Workflow<TOptions, TNewState> {
     return new Workflow<TOptions, TNewState>(
-      this.client,
       this.title,
       this.description
     ).withBlocks(this.blocks);
@@ -192,8 +200,8 @@ export class Workflow<
    * by consumers of the workflow is in fact cloned. This guarantees that all input and output
    * data is immutable and safe to use by consumers of the workflow.
    */
-  private async *_run(params?: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TState, TOptions>> {
-    const { initialState, options = {} as TOptions, initialCompletedSteps } = params || {};
+  private async *_run(params: RunParams<TOptions, TState>) {
+    const { client, initialState, options = {} as TOptions, initialCompletedSteps } = params;
     let currentState = clone(initialState || {}) as TState;
     const completedSteps: SerializedStep[] = [...(initialCompletedSteps || [])];
 
@@ -204,7 +212,7 @@ export class Workflow<
     const remainingBlocks = this.blocks.slice(completedSteps.length);
 
     yield {
-      type: completedSteps.length > 0 ? 'workflow:restart' : 'workflow:start',
+      type: completedSteps.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
       status: STATUS.RUNNING,
       workflowTitle: this.title,
       workflowDescription: this.description,
@@ -222,7 +230,7 @@ export class Workflow<
       // Clone the current state here to prevent mutation of the state
       // when the block is executed. The initial clone in the first pass
       // of the loop is not necessary, but it is needed for every other pass
-      // and putting it here makes it easier to see.
+      // and putting it here makes it easier to see
       currentState = clone(currentState);
       const previousState = currentState;
       try {
@@ -230,22 +238,24 @@ export class Workflow<
           currentState = await block.action({
             state: currentState,
             options,
+            client,
           });
         } else if (block.type === 'workflow') {
           const childInitial = typeof block.initialState === 'function'
             ? block.initialState(currentState)
             : block.initialState;
 
-          // Run inner workflow and yield all its events
+          // Run inner workflow and yield all of its events
           const innerRun = block.innerWorkflow.run({
+            client,
             initialState: childInitial,
             options,
           });
 
           let innerCtx;
           for await (const event of innerRun) {
-            yield event; // Forward inner workflow events
-            if (event.type === 'workflow:complete') {
+            yield event; // Yield all events from the inner workflow
+            if (event.type === WORKFLOW_EVENTS.COMPLETE) {
               innerCtx = event.newState;
             }
           }
@@ -265,7 +275,7 @@ export class Workflow<
         completedSteps.push(completedStep);
 
         yield {
-          type: 'workflow:update',
+          type: WORKFLOW_EVENTS.UPDATE,
           status: STATUS.RUNNING,
           workflowTitle: this.title,
           workflowDescription: this.description,
@@ -290,7 +300,7 @@ export class Workflow<
         completedSteps.push(errorStep);
 
         yield {
-          type: 'workflow:error',
+          type: WORKFLOW_EVENTS.ERROR,
           status: STATUS.ERROR,
           workflowTitle: this.title,
           workflowDescription: this.description,
@@ -312,7 +322,7 @@ export class Workflow<
     }
 
     yield {
-      type: 'workflow:complete',
+      type: WORKFLOW_EVENTS.COMPLETE,
       status: STATUS.COMPLETE,
       workflowTitle: this.title,
       workflowDescription: this.description,
