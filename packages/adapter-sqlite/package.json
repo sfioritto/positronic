@@ -2,8 +2,17 @@
   "name": "@positronic/adapter-sqlite",
   "version": "0.0.1",
   "description": "A SQLite adapter for Positronic",
-  "main": "index.js",
+  "main": "src/index.ts",
   "dependencies": {
     "better-sqlite3": "^11.7.2"
-  }
+  },
+  "directories": {
+    "test": "tests",
+    "src": "src"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12"
+  },
+  "author": "",
+  "license": "ISC"
 }

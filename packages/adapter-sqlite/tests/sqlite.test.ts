@@ -1,5 +1,5 @@
 import Database, { Database as DatabaseType } from "better-sqlite3";
-import { SQLiteAdapter } from "./index";
+import { SQLiteAdapter } from "../src/index";
 import { STATUS } from "../../positronic/src/dsl/constants";
 import { workflow } from "../../positronic/src/dsl/workflow";
 import { readFileSync } from "fs";
