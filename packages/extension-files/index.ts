@@ -1,4 +1,4 @@
-import { Workflow, createExtension } from "@positronic/core";
+import { type Workflow, createExtension } from "@positronic/core";
 import type { State } from "@positronic/core";
 const filesExtension = createExtension('files', {
   file(

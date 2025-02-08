@@ -7,8 +7,8 @@ type ExtensionMethods<
   TExtension extends Record<string, any>,
   TOptions extends object,
   TState extends State
-> = TExtension extends (<T>(...args: any[]) => any)
-  ? TExtension extends (<T>(
+> = TExtension extends ((...args: any[]) => any)
+  ? TExtension extends ((
       this: any,
       title: string,
       config: infer TConfig

@@ -141,11 +141,11 @@ describe('error handling', () => {
   it('should handle errors in actions and maintain correct status', async () => {
     const errorWorkflow = workflow('Error Workflow')
       // Step 1: Normal step
-      .step("First step", ({ client }) => ({
+      .step("First step", () => ({
         value: 1
       }))
       // Step 2: Error step
-      .step("Error step", ({ client }) => {
+      .step("Error step", () => {
         if (true) {
           throw new Error('Test error');
         }
