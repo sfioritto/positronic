@@ -1,4 +1,4 @@
-import type { PromptClient, ResponseModel } from './types';
+import type { PromptClient, ResponseModel } from '@positronic/core';
 import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from "llm-polyglot"
 import { z } from 'zod';
