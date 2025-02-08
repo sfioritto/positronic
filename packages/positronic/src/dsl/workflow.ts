@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PromptClient } from "../../../../types";
+import type { PromptClient } from "../clients/types";
 import type { State } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 
