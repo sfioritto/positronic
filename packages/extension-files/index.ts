@@ -1,6 +1,5 @@
-import { Workflow } from "../positronic/src/dsl/workflow";
-import { createExtension } from "../positronic/src/dsl/extensions";
-import type { State } from "../positronic/src/dsl/types";
+import { Workflow, createExtension } from "@positronic/core";
+import type { State } from "@positronic/core";
 const filesExtension = createExtension('files', {
   file(
     this: Workflow<any>,
