@@ -2,15 +2,9 @@
   "name": "@positronic/cli",
   "version": "0.0.1",
   "description": "A CLI for AI Workflows",
-  "main": "index.js",
+  "main": "src/positronic.ts",
   "dependencies": {
     "ts-node": "^10.9.2",
     "better-sqlite3": "^11.7.2"
-  },
-  "devDependencies": {},
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC"
+  }
 }
