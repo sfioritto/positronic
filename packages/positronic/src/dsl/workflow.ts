@@ -156,9 +156,9 @@ export class Workflow<
     > = {
       type: 'step',
       title,
-      action: async ({ state, client: actionClient }) => {
+      action: async ({ state, client: runClient }) => {
         const { template, responseModel, client: stepClient } = config;
-        const client = stepClient ?? actionClient;
+        const client = stepClient ?? runClient;
         const promptString = template(state);
         const response = await client.execute(promptString, responseModel);
 

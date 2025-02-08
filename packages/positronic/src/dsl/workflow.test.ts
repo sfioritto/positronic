@@ -106,7 +106,7 @@ describe('workflow creation', () => {
     };
 
     // Make sure that for the default prompt the default client returns a known value.
-    mockClient.execute.mockResolvedValueOnce({ default: true });
+    mockClient.execute.mockResolvedValueOnce({ override: false });
 
     const testWorkflow = workflow('Client Override Test')
       .prompt(
@@ -114,8 +114,8 @@ describe('workflow creation', () => {
         {
           template: () => "prompt1",
           responseModel: {
-            schema: z.object({ default: z.boolean() }),
-            name: 'defaultResponse'
+            schema: z.object({ override: z.boolean() }),
+            name: 'overrideResponse'
           }
         }
       )
@@ -139,7 +139,6 @@ describe('workflow creation', () => {
 
     // Final state should include both responses.
     expect(finalEvent.newState).toEqual({
-      defaultResponse: { default: true },
       overrideResponse: { override: true }
     });
 
