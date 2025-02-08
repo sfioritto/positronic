@@ -1,7 +1,7 @@
 {
-  "name": "@positronic/core",
+  "name": "@positronic/adapter-sqlite",
   "version": "0.0.1",
-  "description": "A DSL for AI Workflows",
+  "description": "A SQLite adapter for Positronic",
   "main": "index.js",
   "dependencies": {
     "better-sqlite3": "^11.7.2"

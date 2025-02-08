@@ -1,9 +1,6 @@
 {
   "name": "positronic",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "build": "tsc --emitDeclarationOnly && swc . --out-dir dist && chmod +x dist/bin/positronic.js && cp package.json init.sql dist",
     "build:watch": "nodemon --watch './**/*' --watch '*.ts' --ignore 'dist/**/*' --ext ts,js,json --exec 'npm run build'",
