@@ -7,8 +7,7 @@
   "types": "dist/types/index.d.ts",
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
-    "build": "npm run tsc && swc src -d dist/src",
-    "clean": "rm -rf dist"
+    "build": "npm run tsc && swc src -d dist/src"
   },
   "dependencies": {
     "zod": "^3.24.1"
