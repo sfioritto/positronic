@@ -22,7 +22,7 @@ const filesExtension = createExtension('files', {
   }
 });
 
-declare module "../positronic/src/dsl/workflow" {
+declare module "@positronic/core" {
   interface Workflow<TOptions extends object, TState extends State> {
     files: ReturnType<typeof filesExtension.augment<TOptions, TState>>;
   }

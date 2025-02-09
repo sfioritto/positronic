@@ -6,7 +6,8 @@
   "types": "dist/types/index.d.ts",
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
-    "build": "npm run tsc && swc src -d dist/src"
+    "build": "npm run tsc && swc src -d dist/src",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
   "dependencies": {
     "@positronic/core": "^0.0.1",

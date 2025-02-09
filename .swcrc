@@ -33,7 +33,6 @@
     "noInterop": false,
     "resolveFully": true
   },
-  "sourceMaps": true,
   "exclude": [
     "node_modules",
     "dist",

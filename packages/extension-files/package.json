@@ -2,7 +2,14 @@
   "name": "@positronic/extension-files",
   "version": "0.0.1",
   "description": "A file extension for Positronic",
-  "main": "index.js",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "tsc": "tsc --project tsconfig.json",
+    "build": "npm run tsc && swc . -d dist --config-file ../../.swcrc",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist"
+  },
   "dependencies": {
     "@positronic/core": "^0.0.1"
   }

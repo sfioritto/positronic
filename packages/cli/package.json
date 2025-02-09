@@ -5,6 +5,9 @@
   "bin": {
     "positronic": "./src/positronic.ts"
   },
+  "scripts": {
+    "clean": "rm -rf tsconfig.tsbuildinfo dist"
+  },
   "dependencies": {
     "@positronic/core": "^0.0.1",
     "@positronic/adapter-sqlite": "^0.0.1",
