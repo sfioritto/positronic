@@ -12,12 +12,7 @@
     "skipLibCheck": true,
     "incremental": true,
     "isolatedModules": true,
-    "outDir": "dist",
     "strictNullChecks": true,
     "types": ["jest", "node"],
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "rootDir": "."
   },
 }

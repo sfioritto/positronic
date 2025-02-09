@@ -3,8 +3,13 @@
   "version": "0.0.1",
   "description": "A DSL for AI Workflows",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/src/index.js",
+  "types": "dist/types/index.d.ts",
+  "scripts": {
+    "tsc": "tsc --project tsconfig.json",
+    "build": "npm run tsc && swc src -d dist/src",
+    "clean": "rm -rf dist"
+  },
   "dependencies": {
     "zod": "^3.24.1"
   }
