@@ -2,8 +2,8 @@
   "name": "positronic",
   "private": true,
   "scripts": {
-    "build": "npm run build --workspace",
-    "build:watch": "nodemon --watch 'packages/**/*' --ignore '**/dist/**' --ignore '**/node_modules/**' --ext ts,js,json --exec 'npm run build'"
+    "build:workspaces": "npm run build --workspaces",
+    "build:watch": "nodemon --watch 'packages/**/*' --ignore '**/dist/**' --ignore '**/node_modules/**' --ext ts,js,json --exec 'npm run build:workspaces'"
   },
   "devDependencies": {
     "@swc/cli": "^0.6.0",
