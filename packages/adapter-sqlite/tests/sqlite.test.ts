@@ -460,36 +460,24 @@ describe("SQLiteAdapter", () => {
     }
 
     const testWorkflow = workflow<{}, TestState>("Concurrent Test")
-      .step("Step 1", async ({ state }) => ({
-        value: state.value + 1
-      }));
+      .step("Step 1", async ({ state }) => {
+        // Add small delay to better simulate concurrent execution
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return {
+          value: state.value + 1
+        };
+      });
 
-    // Run workflows sequentially to ensure predictable state
-    const adapter = new SQLiteAdapter(db);
-
-    // Run first workflow
-    for await (const event of testWorkflow.run({
-      initialState: { value: 1 },
-      client: mockClient
-    })) {
-      await adapter.dispatch(event);
-    }
-
-    // Run second workflow
-    for await (const event of testWorkflow.run({
-      initialState: { value: 2 },
-      client: mockClient
-    })) {
-      await adapter.dispatch(event);
-    }
-
-    // Run third workflow
-    for await (const event of testWorkflow.run({
-      initialState: { value: 3 },
-      client: mockClient
-    })) {
-      await adapter.dispatch(event);
-    }
+    // Run three workflows concurrently, each with its own adapter
+    await Promise.all([1, 2, 3].map(async initialValue => {
+      const adapter = new SQLiteAdapter(db);
+      for await (const event of testWorkflow.run({
+        initialState: { value: initialValue },
+        client: mockClient
+      })) {
+        await adapter.dispatch(event);
+      }
+    }));
 
     // Verify all workflow runs were recorded correctly
     const runs = db.prepare(`
@@ -499,13 +487,15 @@ describe("SQLiteAdapter", () => {
     `).all("Concurrent Test") as any[];
 
     expect(runs).toHaveLength(3);
-    expect(JSON.parse(runs[0].initial_state)).toEqual({ value: 1 });
-    expect(JSON.parse(runs[1].initial_state)).toEqual({ value: 2 });
-    expect(JSON.parse(runs[2].initial_state)).toEqual({ value: 3 });
+
+    // Since workflows run concurrently, we can't guarantee order
+    // Instead, verify that all expected initial states are present
+    const initialStates = runs.map(run => JSON.parse(run.initial_state).value).sort();
+    expect(initialStates).toEqual([1, 2, 3]);
 
     // Verify all steps were recorded correctly
     const steps = db.prepare(`
-      SELECT s.*
+      SELECT s.*, r.initial_state as workflow_initial_state
       FROM workflow_steps s
       JOIN workflow_runs r ON s.workflow_run_id = r.id
       WHERE r.workflow_name = ?
@@ -513,9 +503,13 @@ describe("SQLiteAdapter", () => {
     `).all("Concurrent Test") as any[];
 
     expect(steps).toHaveLength(3);
-    expect(JSON.parse(steps[0].new_state)).toEqual({ value: 2 });
-    expect(JSON.parse(steps[1].new_state)).toEqual({ value: 3 });
-    expect(JSON.parse(steps[2].new_state)).toEqual({ value: 4 });
+
+    // Verify each step incremented its value by 1
+    steps.forEach(step => {
+      const initialState = JSON.parse(step.workflow_initial_state).value;
+      const finalState = JSON.parse(step.new_state).value;
+      expect(finalState).toBe(initialState + 1);
+    });
   });
 
   it("should preserve timestamps of completed steps during restart", async () => {
