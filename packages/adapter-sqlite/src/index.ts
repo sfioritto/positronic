@@ -86,14 +86,6 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   private async handleRestart(event: Event<any, any, SQLiteOptions>) {
-    console.log('Handling RESTART event:', {
-      type: event.type,
-      steps: event.steps.map(s => ({
-        title: s.title,
-        status: s.status
-      }))
-    });
-
     this.workflowRunId = event.options?.workflowRunId;
 
     if (!this.workflowRunId) {
@@ -110,11 +102,9 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
 
     // Find the index of the first non-completed step from the event
     const firstNonCompletedIndex = event.steps.findIndex(step => step.status !== STATUS.COMPLETE);
-    console.log('First non-completed index:', firstNonCompletedIndex);
 
     // Delete steps from this index onwards
     if (firstNonCompletedIndex !== -1) {
-      console.log('Deleting steps from index:', firstNonCompletedIndex);
 
       this.db.prepare(`
         DELETE FROM workflow_steps
@@ -127,10 +117,6 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         : event.previousState;
 
       event.steps.slice(firstNonCompletedIndex).forEach((step, index) => {
-        console.log('Creating new step:', {
-          title: step.title,
-          order: firstNonCompletedIndex + index
-        });
 
         const sql = `
           INSERT INTO workflow_steps (
@@ -159,7 +145,6 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       });
 
       // Start the next pending step
-      console.log('Starting next pending step at index:', firstNonCompletedIndex);
 
       this.db.prepare(`
         UPDATE workflow_steps SET
