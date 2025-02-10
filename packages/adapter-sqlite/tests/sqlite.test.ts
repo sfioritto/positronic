@@ -328,4 +328,114 @@ describe("SQLiteAdapter", () => {
     expect(finalRun.status).toBe(STATUS.COMPLETE);
     expect(finalRun.error).toBe(null);
   });
+
+  it("should handle timestamps correctly", async () => {
+    interface TestState extends State {
+      count: number;
+    }
+
+    const testWorkflow = workflow("Timestamp Test")
+      .step("Step 1", async ({ state }) => ({
+        count: ((state as TestState).count ?? 0) + 1
+      }));
+
+    const adapter = new SQLiteAdapter(db);
+
+    for await (const event of testWorkflow.run({
+      initialState: { count: 0 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+    }
+
+    // Query workflow run
+    const workflowRun = db.prepare(`
+      SELECT id, created_at, completed_at
+      FROM workflow_runs
+      WHERE workflow_name = ?
+    `).get("Timestamp Test") as any;
+
+    // Verify workflow timestamps
+    expect(workflowRun.created_at).toBeTruthy();
+    expect(workflowRun.completed_at).toBeTruthy();
+
+    // Query step
+    const steps = db.prepare(`
+      SELECT *
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+    `).all(workflowRun.id) as any[];
+
+    // Verify steps exist and have timestamps
+    expect(steps.length).toEqual(1);
+    expect(steps[0].created_at).toBeTruthy();
+    expect(steps[0].completed_at).toBeTruthy();
+  });
+
+  it("should enforce JSON validation constraints", async () => {
+    expect(() => {
+      db.prepare(`
+        INSERT INTO workflow_runs (
+          workflow_name,
+          initial_state,
+          status,
+          error
+        ) VALUES (?, ?, ?, ?)
+      `).run("Test", "invalid json", STATUS.COMPLETE, null);
+    }).toThrow();
+  });
+
+  it("should handle concurrent workflow executions correctly", async () => {
+    interface TestState extends State {
+      value: number;
+    }
+
+    const testWorkflow = workflow<{}, TestState>("Concurrent Test")
+      .step("Step 1", async ({ state }) => ({
+        value: state.value + 1
+      }));
+
+    const adapter = new SQLiteAdapter(db);
+
+    // Start multiple workflows concurrently
+    const workflows = [1, 2, 3].map(initialValue =>
+      testWorkflow.run({
+        initialState: { value: initialValue },
+        client: mockClient
+      })
+    );
+
+    // Run all workflows concurrently
+    await Promise.all(workflows.map(async (workflow) => {
+      for await (const event of workflow) {
+        await adapter.dispatch(event);
+      }
+    }));
+
+    // Verify all workflow runs were recorded correctly
+    const runs = db.prepare(`
+      SELECT * FROM workflow_runs
+      WHERE workflow_name = ?
+      ORDER BY id ASC
+    `).all("Concurrent Test") as any[];
+
+    expect(runs).toHaveLength(3);
+    expect(JSON.parse(runs[0].initial_state)).toEqual({ value: 1 });
+    expect(JSON.parse(runs[1].initial_state)).toEqual({ value: 2 });
+    expect(JSON.parse(runs[2].initial_state)).toEqual({ value: 3 });
+
+    // Verify all steps were recorded correctly
+    const steps = db.prepare(`
+      SELECT s.*
+      FROM workflow_steps s
+      JOIN workflow_runs r ON s.workflow_run_id = r.id
+      WHERE r.workflow_name = ?
+      ORDER BY r.id ASC
+    `).all("Concurrent Test") as any[];
+
+    expect(steps).toHaveLength(3);
+    expect(JSON.parse(steps[0].new_state)).toEqual({ value: 2 });
+    expect(JSON.parse(steps[1].new_state)).toEqual({ value: 3 });
+    expect(JSON.parse(steps[2].new_state)).toEqual({ value: 4 });
+  });
 });

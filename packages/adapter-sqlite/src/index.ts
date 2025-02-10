@@ -150,15 +150,18 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           previous_state,
           new_state,
           status,
-          error
-        ) VALUES (?, ?, ?, ?, ?, ?)
+          error,
+          created_at,
+          completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
       `).run(
         this.workflowRunId,
         event.completedStep.title,
         previousState,
         JSON.stringify(event.newState),
         event.completedStep.status,
-        event.error ? JSON.stringify(event.error) : null
+        event.error ? JSON.stringify(event.error) : null,
+        event.completedStep.status === STATUS.COMPLETE ? 'CURRENT_TIMESTAMP' : null
       );
     }
   }
@@ -171,7 +174,8 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     this.db.prepare(`
       UPDATE workflow_runs SET
         status = ?,
-        error = ?
+        error = ?,
+        completed_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       event.status,
