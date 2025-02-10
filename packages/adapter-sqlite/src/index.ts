@@ -82,7 +82,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           step.title,
           JSON.stringify(previousState),
           JSON.stringify(previousState),
-          'pending',
+          STATUS.PENDING,
           null,
           index
         );
@@ -145,7 +145,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
             step.title,
             JSON.stringify(previousState),
             JSON.stringify(previousState),
-            'pending',
+            STATUS.PENDING,
             null,
             firstNonCompletedIndex + index
           );
@@ -154,10 +154,10 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         // Start the next pending step
         this.db.prepare(`
           UPDATE workflow_steps SET
-          status = 'running',
+          status = ?,
           started_at = CURRENT_TIMESTAMP
           WHERE workflow_run_id = ? AND step_order = ?
-        `).run(this.workflowRunId, firstNonCompletedIndex);
+        `).run(STATUS.RUNNING, this.workflowRunId, firstNonCompletedIndex);
       }
     })();
   }
@@ -194,10 +194,10 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         if (!currentStep.started_at) {
           await this.db.prepare(`
             UPDATE workflow_steps SET
-            status = 'running',
+            status = ?,
             started_at = CURRENT_TIMESTAMP
             WHERE workflow_run_id = ? AND step_order = ?
-          `).run(this.workflowRunId, currentStepOrder);
+          `).run(STATUS.RUNNING, this.workflowRunId, currentStepOrder);
         }
 
         // Update completed step with the new state
@@ -224,12 +224,13 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
             UPDATE workflow_steps SET
             previous_state = ?,
             new_state = ?,
-            status = 'running',
+            status = ?,
             started_at = CURRENT_TIMESTAMP
             WHERE workflow_run_id = ? AND step_order = ?
           `).run(
             JSON.stringify(event.completedStep.state),
             JSON.stringify(event.completedStep.state),
+            STATUS.RUNNING,
             this.workflowRunId,
             nextStepOrder
           );
