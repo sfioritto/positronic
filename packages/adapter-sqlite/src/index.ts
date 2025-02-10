@@ -60,32 +60,52 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
 
   private async handleRestart(event: Event<any, any, SQLiteOptions>) {
     this.workflowRunId = event.options?.workflowRunId;
-    const { steps = [] } = event;
 
     if (!this.workflowRunId) {
       await this.handleStart(event);
-    } else {
-      const completedSteps = steps.filter((step) => step.status === STATUS.COMPLETE);
+      return;
+    }
 
-      // Update workflow run status to running
-      this.db.prepare(`
-        UPDATE workflow_runs SET
-          status = ?,
-          error = NULL
-        WHERE id = ?
-      `).run(event.status, this.workflowRunId);
+    // Update workflow run status to running
+    this.db.prepare(`
+      UPDATE workflow_runs SET
+        status = ?,
+        error = NULL
+      WHERE id = ?
+    `).run(event.status, this.workflowRunId);
 
-      // Delete all steps after keeping the first N completed ones
-      this.db.prepare(`
-        DELETE FROM workflow_steps
-        WHERE workflow_run_id = ?
-        AND id NOT IN (
-          SELECT id FROM workflow_steps
-          WHERE workflow_run_id = ?
-          ORDER BY id ASC
-          LIMIT ?
-        )
-      `).run(this.workflowRunId, this.workflowRunId, completedSteps.length);
+    // Delete all existing steps
+    this.db.prepare(`
+      DELETE FROM workflow_steps
+      WHERE workflow_run_id = ?
+    `).run(this.workflowRunId);
+
+    // Re-insert initial completed steps
+    const initialCompletedSteps = event.steps.filter((step) => step.status === STATUS.COMPLETE) || [];
+    if (initialCompletedSteps.length > 0) {
+      const insertStep = this.db.prepare(`
+        INSERT INTO workflow_steps (
+          workflow_run_id,
+          title,
+          previous_state,
+          new_state,
+          status,
+          error
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `);
+
+      let previousState = event.previousState;
+      for (const step of initialCompletedSteps) {
+        insertStep.run(
+          this.workflowRunId,
+          step.title,
+          JSON.stringify(previousState),
+          JSON.stringify(step.state),
+          step.status,
+          null
+        );
+        previousState = step.state;
+      }
     }
   }
 
@@ -108,6 +128,22 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
 
     // Only insert step record if there's a completed step
     if (event.completedStep) {
+      // Get the count of existing steps
+      const stepCount = this.db.prepare(`
+        SELECT COUNT(*) as count FROM workflow_steps
+        WHERE workflow_run_id = ?
+      `).get(this.workflowRunId) as { count: number };
+
+      // Get the last step's state if it exists
+      const lastStep = stepCount.count > 0 ? this.db.prepare(`
+        SELECT new_state FROM workflow_steps
+        WHERE workflow_run_id = ?
+        ORDER BY id DESC LIMIT 1
+      `).get(this.workflowRunId) as { new_state: string } : null;
+
+      // Use the last step's state as previous state if available
+      const previousState = lastStep ? lastStep.new_state : JSON.stringify(event.previousState);
+
       this.db.prepare(`
         INSERT INTO workflow_steps (
           workflow_run_id,
@@ -120,7 +156,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       `).run(
         this.workflowRunId,
         event.completedStep.title,
-        JSON.stringify(event.previousState),
+        previousState,
         JSON.stringify(event.newState),
         event.completedStep.status,
         event.error ? JSON.stringify(event.error) : null
@@ -150,7 +186,13 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
 
-    // Update workflow status
+    // Update workflow status with properly serialized error
+    const serializedError = event.error ? {
+      name: event.error.name,
+      message: event.error.message,
+      stack: event.error.stack
+    } : null;
+
     this.db.prepare(`
       UPDATE workflow_runs SET
         status = ?,
@@ -158,7 +200,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       WHERE id = ?
     `).run(
       event.status,
-      event.error ? JSON.stringify(event.error) : null,
+      serializedError ? JSON.stringify(serializedError) : null,
       this.workflowRunId
     );
 
@@ -179,7 +221,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         JSON.stringify(event.previousState),
         JSON.stringify(event.newState),
         event.completedStep.status,
-        event.error ? JSON.stringify(event.error) : null
+        serializedError ? JSON.stringify(serializedError) : null
       );
     }
   }
