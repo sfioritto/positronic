@@ -1,6 +1,7 @@
 import { Database as DatabaseType } from "better-sqlite3";
 import { Adapter, STATUS, WORKFLOW_EVENTS } from "@positronic/core";
 import type { Event } from "@positronic/core";
+import { initSQL } from './sql';
 
 interface SQLiteOptions {
   workflowRunId?: number;
@@ -12,6 +13,9 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     private workflowRunId?: number
   ) {
     super();
+
+    // Initialize database schema
+    this.db.exec(initSQL);
   }
 
   async dispatch(event: Event<any, any, SQLiteOptions>) {

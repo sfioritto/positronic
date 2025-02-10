@@ -1,5 +1,6 @@
+export const initSQL = `
 -- Workflow Runs
-CREATE TABLE workflow_runs (
+CREATE TABLE IF NOT EXISTS workflow_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workflow_name TEXT NOT NULL,
     initial_state TEXT NOT NULL,  -- JSON
@@ -12,14 +13,14 @@ CREATE TABLE workflow_runs (
     CONSTRAINT valid_error CHECK (error IS NULL OR json_valid(error))
 );
 
-CREATE TRIGGER workflow_runs_status_check
+CREATE TRIGGER IF NOT EXISTS workflow_runs_status_check
 AFTER INSERT ON workflow_runs
 WHEN NEW.status NOT IN ('pending', 'running', 'complete', 'error')
 BEGIN
     SELECT RAISE(ROLLBACK, 'Invalid status value');
 END;
 
-CREATE TABLE workflow_steps (
+CREATE TABLE IF NOT EXISTS workflow_steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workflow_run_id INTEGER NOT NULL REFERENCES workflow_runs(id),
     title TEXT NOT NULL,
@@ -35,12 +36,12 @@ CREATE TABLE workflow_steps (
     CONSTRAINT valid_error CHECK (error IS NULL OR json_valid(error))
 );
 
--- Add check constraint separately for better compatibility
-CREATE TRIGGER workflow_steps_status_check
+CREATE TRIGGER IF NOT EXISTS workflow_steps_status_check
 AFTER INSERT ON workflow_steps
 WHEN NEW.status NOT IN ('pending', 'running', 'complete', 'error')
 BEGIN
     SELECT RAISE(ROLLBACK, 'Invalid status value');
 END;
 
-CREATE INDEX workflow_steps_workflow_run_id_idx ON workflow_steps(workflow_run_id);
+CREATE INDEX IF NOT EXISTS workflow_steps_workflow_run_id_idx ON workflow_steps(workflow_run_id);
+`;

@@ -3,16 +3,8 @@ import { jest } from "@jest/globals";
 import { SQLiteAdapter } from "../src/index";
 import { STATUS, WORKFLOW_EVENTS } from "@positronic/core";
 import { State } from "@positronic/core";
-import { readFileSync } from "fs";
-import { join } from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 import { workflow } from "@positronic/core";
 import type { PromptClient } from "@positronic/core";
-import { z } from "zod";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 describe("SQLiteAdapter", () => {
   let db: DatabaseType;
@@ -26,10 +18,7 @@ describe("SQLiteAdapter", () => {
 
     // Use in-memory SQLite database for testing
     db = new Database(":memory:");
-
-    // Read and execute init.sql file
-    const initSql = readFileSync(join(__dirname, "../init.sql"), "utf8");
-    db.exec(initSql);
+    // Schema will be initialized by the adapter
   });
 
   afterEach(() => {
