@@ -22,6 +22,7 @@ END;
 CREATE TABLE workflow_steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workflow_run_id INTEGER NOT NULL REFERENCES workflow_runs(id),
+    title TEXT NOT NULL,
     previous_state TEXT NOT NULL,  -- JSON
     new_state TEXT NOT NULL,  -- JSON
     status TEXT NOT NULL,
