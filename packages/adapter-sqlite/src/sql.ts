@@ -21,7 +21,7 @@ BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS workflow_steps (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,  -- UUID from workflow
     workflow_run_id INTEGER NOT NULL REFERENCES workflow_runs(id),
     title TEXT NOT NULL,
     previous_state TEXT NOT NULL,  -- JSON

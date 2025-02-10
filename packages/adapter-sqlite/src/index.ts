@@ -62,6 +62,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     steps.forEach((step, index) => {
       const sql = `
         INSERT INTO workflow_steps (
+          id,
           workflow_run_id,
           title,
           previous_state,
@@ -70,10 +71,11 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           error,
           step_order,
           started_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
       `;
 
       this.db.prepare(sql).run(
+        step.id,
         this.workflowRunId,
         step.title,
         JSON.stringify(previousState),
@@ -105,7 +107,6 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
 
     // Delete steps from this index onwards
     if (firstNonCompletedIndex !== -1) {
-
       this.db.prepare(`
         DELETE FROM workflow_steps
         WHERE workflow_run_id = ? AND step_order >= ?
@@ -117,9 +118,9 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         : event.previousState;
 
       event.steps.slice(firstNonCompletedIndex).forEach((step, index) => {
-
         const sql = `
           INSERT INTO workflow_steps (
+            id,
             workflow_run_id,
             title,
             previous_state,
@@ -130,10 +131,11 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
             created_at,
             started_at,
             completed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, NULL)
         `;
 
         this.db.prepare(sql).run(
+          step.id,
           this.workflowRunId,
           step.title,
           JSON.stringify(previousState),
@@ -145,7 +147,6 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       });
 
       // Start the next pending step
-
       this.db.prepare(`
         UPDATE workflow_steps SET
         status = 'running',
