@@ -1,5 +1,5 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants';
-import { workflow, type Event } from './workflow';
+import { workflow, type Event, type SerializedStep } from './workflow';
 import { z } from 'zod';
 
 // Add type utility and mock client at the top of the test file
@@ -305,11 +305,11 @@ describe('workflow resumption', () => {
 
     // Verify the full run executed correctly
     expect(fullRun.newState.value).toBe(42); // ((2 * 2) + 10) * 3 = 42
-    expect(fullRun.steps.map(s => s.state.value)).toEqual([4, 14, 42]);
+    expect(fullRun.steps.map(s => s.state?.value)).toEqual([4, 14, 42]);
 
     // Verify the resumed run started from step 2 with correct state
     expect(resumedRun?.newState.value).toBe(42);
-    expect(resumedRun?.steps.slice(1).map(s => s.state.value)).toEqual([14, 42]);
+    expect(resumedRun?.steps.slice(1).map(s => s.state?.value)).toEqual([14, 42]);
   });
 });
 
@@ -768,5 +768,36 @@ describe('type inference', () => {
         updated: expect.any(String)
       }
     });
+  });
+});
+
+describe('workflow steps', () => {
+  it('should preserve UUIDs from completed steps when restarting', async () => {
+    const testWorkflow = workflow('UUID Test')
+      .step(
+        "First step",
+        () => ({ count: 1 })
+      )
+      .step(
+        "Second step",
+        ({ state }) => ({ count: state.count + 1 })
+      );
+
+    // Run first step and get its UUID
+    const firstRun = testWorkflow.run({ client: mockClient });
+    await firstRun.next(); // Start event
+    const firstStepEvent = await firstRun.next();
+    const completedStep = firstStepEvent.value.completedStep;
+
+    // Restart workflow with completed step
+    const secondRun = testWorkflow.run({
+      client: mockClient,
+      initialCompletedSteps: [completedStep]
+    });
+
+    const restartEvent = await secondRun.next();
+
+    // Only verify that the completed step's UUID was preserved
+    expect(restartEvent.value.steps[0].id).toBe(completedStep.id);
   });
 });

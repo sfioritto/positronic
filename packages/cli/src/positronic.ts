@@ -90,7 +90,10 @@ async function initializeDatabase(dbPath: string) {
   return db;
 }
 
-async function getLastWorkflowRun(db: DatabaseType, workflowName: string) {
+async function getLastWorkflowRun(db: DatabaseType, workflowName: string): Promise<{
+  runId: number;
+  completedSteps: SerializedStep[];
+} | null> {
   const lastRun = db.prepare(`
     SELECT * FROM workflow_runs
     WHERE workflow_name = ?
@@ -111,6 +114,7 @@ async function getLastWorkflowRun(db: DatabaseType, workflowName: string) {
   return {
     runId: lastRun.id,
     completedSteps: completedSteps.map(step => ({
+      id: step.id,
       title: step.title,
       state: JSON.parse(step.new_state),
       status: STATUS.COMPLETE

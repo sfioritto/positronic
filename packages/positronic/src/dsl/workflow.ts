@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { v4 as uuidv4 } from 'uuid';
 import type { PromptClient } from "../clients/types";
 import type { State } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
@@ -30,6 +31,7 @@ export interface SerializedStep {
   title: string;
   status: typeof STATUS[keyof typeof STATUS];
   state?: State;
+  id: string;
 }
 
 type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
@@ -70,6 +72,45 @@ interface RunParams<
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+class WorkflowSteps {
+  public steps: SerializedStep[];
+
+  constructor(blocks: Block<any, any, any>[], initialCompletedSteps: SerializedStep[] = []) {
+    this.steps = blocks.map((block, index) => {
+      const completedStep = initialCompletedSteps[index];
+      if (completedStep) {
+        // Use the existing step exactly as is, including its ID
+        return completedStep;
+      }
+      return {
+        id: uuidv4(),
+        title: block.title,
+        status: STATUS.PENDING
+      };
+    });
+  }
+
+  completeStep(index: number, state: State): SerializedStep {
+    const step = {
+      ...this.steps[index],
+      status: STATUS.COMPLETE,
+      state
+    };
+    this.steps[index] = step;
+    return step;
+  }
+
+  errorStep(index: number, state: State): SerializedStep {
+    const step = {
+      ...this.steps[index],
+      status: STATUS.ERROR,
+      state
+    };
+    this.steps[index] = step;
+    return step;
+  }
+}
 
 export function workflow<
   TOptions extends object = {},
@@ -201,38 +242,29 @@ export class Workflow<
    * data is immutable and safe to use by consumers of the workflow.
    */
   private async *_run(params: RunParams<TOptions, TState>) {
-    const { client, initialState, options = {} as TOptions, initialCompletedSteps } = params;
+    const { client, initialState, options = {} as TOptions, initialCompletedSteps = [] } = params;
     let currentState = clone(initialState || {}) as TState;
-    const completedSteps: SerializedStep[] = [...(initialCompletedSteps || [])];
 
-    if (completedSteps.length > 0) {
-      currentState = clone(completedSteps[completedSteps.length - 1].state as TState);
+    const workflowSteps = new WorkflowSteps(this.blocks, initialCompletedSteps);
+
+    if (initialCompletedSteps?.length > 0) {
+      currentState = clone(initialCompletedSteps[initialCompletedSteps.length - 1].state as TState);
     }
 
-    const remainingBlocks = this.blocks.slice(completedSteps.length);
+    const remainingBlocks = this.blocks.slice(initialCompletedSteps?.length || 0);
 
     yield {
-      type: completedSteps.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
+      type: initialCompletedSteps?.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
       status: STATUS.RUNNING,
       workflowTitle: this.title,
       workflowDescription: this.description,
       previousState: currentState,
       newState: currentState,
-      steps: this.blocks.map((block, index) =>
-        // Map through all blocks in the workflow. For each block:
-        // - If we have a completed step at this index, use that (preserving its status and state)
-        // - Otherwise, create a new pending step with the current state
-        index < completedSteps.length
-          ? completedSteps[index]
-          : {
-              title: block.title,
-              status: STATUS.PENDING,
-            }
-      ),
+      steps: workflowSteps.steps,
       options,
     };
 
-    for (const block of remainingBlocks) {
+    for (const [index, block] of remainingBlocks.entries()) {
       // Clone the current state here to prevent mutation of the state
       // when the block is executed. The initial clone in the first pass
       // of the loop is not necessary, but it is needed for every other pass
@@ -273,12 +305,10 @@ export class Workflow<
           currentState = block.action(currentState, innerCtx);
         }
 
-        const completedStep = {
-          title: block.title,
-          status: STATUS.COMPLETE,
-          state: currentState
-        };
-        completedSteps.push(completedStep);
+        const completedStep = workflowSteps.completeStep(
+          (initialCompletedSteps?.length || 0) + index,
+          currentState
+        );
 
         yield {
           type: WORKFLOW_EVENTS.UPDATE,
@@ -288,21 +318,14 @@ export class Workflow<
           previousState,
           newState: currentState,
           completedStep,
-          steps: this.blocks.map((b, i) =>
-            completedSteps[i] || {
-              title: b.title,
-              status: STATUS.PENDING,
-            }
-          ),
+          steps: workflowSteps.steps,
           options,
         };
       } catch (error) {
-        const errorStep = {
-          title: block.title,
-          status: STATUS.ERROR,
-          state: currentState
-        };
-        completedSteps.push(errorStep);
+        const errorStep = workflowSteps.errorStep(
+          (initialCompletedSteps?.length || 0) + index,
+          currentState
+        );
 
         yield {
           type: WORKFLOW_EVENTS.ERROR,
@@ -313,12 +336,7 @@ export class Workflow<
           newState: currentState,
           completedStep: errorStep,
           error: error as SerializedError,
-          steps: this.blocks.map((b, i) =>
-            completedSteps[i] || {
-              title: b.title,
-              status: STATUS.PENDING,
-            }
-          ),
+          steps: workflowSteps.steps,
           options,
         };
         throw error;
@@ -332,7 +350,7 @@ export class Workflow<
       workflowDescription: this.description,
       previousState: initialState || {} as TState,
       newState: currentState,
-      steps: completedSteps,
+      steps: workflowSteps.steps,
       options,
     };
 
