@@ -173,8 +173,8 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     );
 
     if (event.completedStep) {
-      // Get the current step's order
-      const currentStepOrder = event.steps.findIndex(s => s.title === event.completedStep!.title);
+      // Get the current step's order by finding its index in steps array
+      const currentStepOrder = event.steps.findIndex(s => s.id === event.completedStep!.id);
 
       // If this is the first step and it hasn't been started yet, set its started_at
       const currentStep = await this.db.prepare(`
