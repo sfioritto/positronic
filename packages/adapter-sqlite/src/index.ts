@@ -39,8 +39,9 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   private async handleStart(event: Event<any, any, SQLiteOptions>) {
-    const { workflowTitle, previousState, status } = event;
+    const { workflowTitle, previousState, status, steps } = event;
 
+    // Insert workflow run
     const result = this.db.prepare(`
       INSERT INTO workflow_runs (
         workflow_name,
@@ -56,6 +57,32 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     );
 
     this.workflowRunId = result.lastInsertRowid as number;
+
+    // Create all step records upfront as pending
+    steps.forEach((step, index) => {
+      const sql = `
+        INSERT INTO workflow_steps (
+          workflow_run_id,
+          title,
+          previous_state,
+          new_state,
+          status,
+          error,
+          step_order,
+          started_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+      `;
+
+      this.db.prepare(sql).run(
+        this.workflowRunId,
+        step.title,
+        JSON.stringify(previousState),
+        JSON.stringify(previousState),
+        'pending',
+        null,
+        index
+      );
+    });
   }
 
   private async handleRestart(event: Event<any, any, SQLiteOptions>) {
@@ -73,38 +100,54 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       WHERE id = ?
     `).run(event.status, this.workflowRunId);
 
-    // Delete all existing steps
+    // Delete existing steps
     this.db.prepare(`
       DELETE FROM workflow_steps
       WHERE workflow_run_id = ?
     `).run(this.workflowRunId);
 
-    // Re-insert initial completed steps
-    const initialCompletedSteps = event.steps.filter((step) => step.status === STATUS.COMPLETE) || [];
-    if (initialCompletedSteps.length > 0) {
-      const insertStep = this.db.prepare(`
+    // Re-create all steps
+    let previousState = event.previousState;
+    event.steps.forEach((step, index) => {
+      const isCompleted = step.status === STATUS.COMPLETE;
+      const sql = `
         INSERT INTO workflow_steps (
           workflow_run_id,
           title,
           previous_state,
           new_state,
           status,
-          error
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `);
+          error,
+          step_order,
+          started_at,
+          completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ${isCompleted ? 'CURRENT_TIMESTAMP' : 'NULL'}, ${isCompleted ? 'CURRENT_TIMESTAMP' : 'NULL'})
+      `;
 
-      let previousState = event.previousState;
-      for (const step of initialCompletedSteps) {
-        insertStep.run(
-          this.workflowRunId,
-          step.title,
-          JSON.stringify(previousState),
-          JSON.stringify(step.state),
-          step.status,
-          null
-        );
+      this.db.prepare(sql).run(
+        this.workflowRunId,
+        step.title,
+        JSON.stringify(previousState),
+        JSON.stringify(isCompleted ? step.state : previousState),
+        isCompleted ? STATUS.COMPLETE : 'pending',
+        null,
+        index
+      );
+
+      if (isCompleted) {
         previousState = step.state;
       }
+    });
+
+    // Start the next pending step if there is one
+    const nextPendingStep = event.steps.findIndex(step => step.status !== STATUS.COMPLETE);
+    if (nextPendingStep !== -1) {
+      this.db.prepare(`
+        UPDATE workflow_steps SET
+        status = 'running',
+        started_at = CURRENT_TIMESTAMP
+        WHERE workflow_run_id = ? AND step_order = ?
+      `).run(this.workflowRunId, nextPendingStep);
     }
   }
 
@@ -125,44 +168,59 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       this.workflowRunId
     );
 
-    // Only insert step record if there's a completed step
     if (event.completedStep) {
-      // Get the count of existing steps
-      const stepCount = this.db.prepare(`
-        SELECT COUNT(*) as count FROM workflow_steps
-        WHERE workflow_run_id = ?
-      `).get(this.workflowRunId) as { count: number };
+      // Get the current step's order
+      const currentStepOrder = event.steps.findIndex(s => s.title === event.completedStep!.title);
 
-      // Get the last step's state if it exists
-      const lastStep = stepCount.count > 0 ? this.db.prepare(`
-        SELECT new_state FROM workflow_steps
-        WHERE workflow_run_id = ?
-        ORDER BY id DESC LIMIT 1
-      `).get(this.workflowRunId) as { new_state: string } : null;
+      // If this is the first step and it hasn't been started yet, set its started_at
+      const currentStep = await this.db.prepare(`
+        SELECT started_at FROM workflow_steps
+        WHERE workflow_run_id = ? AND step_order = ?
+      `).get(this.workflowRunId, currentStepOrder) as any;
 
-      // Use the last step's state as previous state if available
-      const previousState = lastStep ? lastStep.new_state : JSON.stringify(event.previousState);
+      if (!currentStep.started_at) {
+        await this.db.prepare(`
+          UPDATE workflow_steps SET
+          status = 'running',
+          started_at = CURRENT_TIMESTAMP
+          WHERE workflow_run_id = ? AND step_order = ?
+        `).run(this.workflowRunId, currentStepOrder);
+      }
 
+      // Update completed step with the new state
       this.db.prepare(`
-        INSERT INTO workflow_steps (
-          workflow_run_id,
-          title,
-          previous_state,
-          new_state,
-          status,
-          error,
-          created_at,
-          completed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+        UPDATE workflow_steps SET
+        new_state = ?,
+        status = ?,
+        error = ?,
+        completed_at = CURRENT_TIMESTAMP
+        WHERE workflow_run_id = ? AND step_order = ?
       `).run(
-        this.workflowRunId,
-        event.completedStep.title,
-        previousState,
-        JSON.stringify(event.newState),
+        JSON.stringify(event.completedStep.state),
         event.completedStep.status,
         event.error ? JSON.stringify(event.error) : null,
-        event.completedStep.status === STATUS.COMPLETE ? 'CURRENT_TIMESTAMP' : null
+        this.workflowRunId,
+        currentStepOrder
       );
+
+      // Start next step if it exists
+      const nextStepOrder = currentStepOrder + 1;
+      if (nextStepOrder < event.steps.length) {
+        // Update next step's previous state and start it
+        this.db.prepare(`
+          UPDATE workflow_steps SET
+          previous_state = ?,
+          new_state = ?,
+          status = 'running',
+          started_at = CURRENT_TIMESTAMP
+          WHERE workflow_run_id = ? AND step_order = ?
+        `).run(
+          JSON.stringify(event.completedStep.state),
+          JSON.stringify(event.completedStep.state),
+          this.workflowRunId,
+          nextStepOrder
+        );
+      }
     }
   }
 
@@ -189,13 +247,13 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
 
-    // Update workflow status with properly serialized error
     const serializedError = event.error ? {
       name: event.error.name,
       message: event.error.message,
       stack: event.error.stack
     } : null;
 
+    // Update workflow status
     this.db.prepare(`
       UPDATE workflow_runs SET
         status = ?,
@@ -207,24 +265,23 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       this.workflowRunId
     );
 
-    // Insert step error record if there's a completed step
+    // Update the errored step
     if (event.completedStep) {
+      const stepOrder = event.steps.findIndex(s => s.title === event.completedStep!.title);
       this.db.prepare(`
-        INSERT INTO workflow_steps (
-          workflow_run_id,
-          title,
-          previous_state,
-          new_state,
-          status,
-          error
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        UPDATE workflow_steps SET
+        new_state = ?,
+        status = ?,
+        error = ?,
+        started_at = CURRENT_TIMESTAMP,
+        completed_at = CURRENT_TIMESTAMP
+        WHERE workflow_run_id = ? AND step_order = ?
       `).run(
-        this.workflowRunId,
-        event.completedStep.title,
-        JSON.stringify(event.previousState),
         JSON.stringify(event.newState),
         event.completedStep.status,
-        serializedError ? JSON.stringify(serializedError) : null
+        serializedError ? JSON.stringify(serializedError) : null,
+        this.workflowRunId,
+        stepOrder
       );
     }
   }

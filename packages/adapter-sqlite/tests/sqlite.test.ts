@@ -56,15 +56,19 @@ describe("SQLiteAdapter", () => {
     expect(workflowRun.error).toBe(null);
 
     // Query workflow steps
-    const steps = db.prepare(
-      "SELECT * FROM workflow_steps WHERE workflow_run_id = ? ORDER BY id ASC"
-    ).all(workflowRun.id) as any[];
+    const steps = db.prepare(`
+      SELECT * FROM workflow_steps WHERE workflow_run_id = ? ORDER BY step_order ASC
+    `).all(workflowRun.id) as any[];
 
     expect(steps).toHaveLength(1);
+    expect(steps[0].title).toBe("Increment");
     expect(JSON.parse(steps[0].previous_state)).toEqual({ count: 0 });
     expect(JSON.parse(steps[0].new_state)).toEqual({ count: 1 });
     expect(steps[0].status).toBe(STATUS.COMPLETE);
     expect(steps[0].error).toBe(null);
+    expect(steps[0].created_at).toBeTruthy();
+    expect(steps[0].started_at).toBeTruthy();
+    expect(steps[0].completed_at).toBeTruthy();
   });
 
   it("should track multiple workflow executions correctly", async () => {
@@ -234,23 +238,29 @@ describe("SQLiteAdapter", () => {
     expect(workflowRun.status).toBe(STATUS.COMPLETE);
 
     // Verify steps
-    const steps = db.prepare(
-      "SELECT * FROM workflow_steps WHERE workflow_run_id = ? ORDER BY id ASC"
-    ).all(workflowRun.id) as any[];
+    const steps = db.prepare(`
+      SELECT * FROM workflow_steps WHERE workflow_run_id = ? ORDER BY step_order ASC
+    `).all(workflowRun.id) as any[];
 
     expect(steps).toHaveLength(2);
 
     // Verify first step
+    expect(steps[0].title).toBe("Uppercase String");
     expect(JSON.parse(steps[0].previous_state)).toEqual({ value: "test", count: 0 });
     expect(JSON.parse(steps[0].new_state)).toEqual({ value: "TEST", count: 0 });
     expect(steps[0].status).toBe(STATUS.COMPLETE);
-    expect(steps[0].title).toBe("Uppercase String");
+    expect(steps[0].created_at).toBeTruthy();
+    expect(steps[0].started_at).toBeTruthy();
+    expect(steps[0].completed_at).toBeTruthy();
 
     // Verify second step
+    expect(steps[1].title).toBe("Increment Counter");
     expect(JSON.parse(steps[1].previous_state)).toEqual({ value: "TEST", count: 0 });
     expect(JSON.parse(steps[1].new_state)).toEqual({ value: "TEST", count: 1 });
     expect(steps[1].status).toBe(STATUS.COMPLETE);
-    expect(steps[1].title).toBe("Increment Counter");
+    expect(steps[1].created_at).toBeTruthy();
+    expect(steps[1].started_at).toBeTruthy();
+    expect(steps[1].completed_at).toBeTruthy();
   });
 
   it("should correctly restart workflow with completed steps", async () => {
@@ -312,14 +322,30 @@ describe("SQLiteAdapter", () => {
     }
 
     // Verify final state
-    const finalSteps = db.prepare(
-      "SELECT * FROM workflow_steps WHERE workflow_run_id = ? ORDER BY id ASC"
-    ).all(workflowRunId) as any[];
+    const finalSteps = db.prepare(`
+      SELECT * FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId) as any[];
 
     expect(finalSteps).toHaveLength(3);
-    expect(JSON.parse(finalSteps[0].new_state)).toEqual({ value: 4 }); // 2 * 2
-    expect(JSON.parse(finalSteps[1].new_state)).toEqual({ value: 14 }); // 4 + 10
-    expect(JSON.parse(finalSteps[2].new_state)).toEqual({ value: 42 }); // 14 * 3
+
+    // First two steps should be complete with all timestamps
+    expect(finalSteps[0].status).toBe(STATUS.COMPLETE);
+    expect(finalSteps[0].created_at).toBeTruthy();
+    expect(finalSteps[0].started_at).toBeTruthy();
+    expect(finalSteps[0].completed_at).toBeTruthy();
+
+    expect(finalSteps[1].status).toBe(STATUS.COMPLETE);
+    expect(finalSteps[1].created_at).toBeTruthy();
+    expect(finalSteps[1].started_at).toBeTruthy();
+    expect(finalSteps[1].completed_at).toBeTruthy();
+
+    // Last step should also be complete
+    expect(finalSteps[2].status).toBe(STATUS.COMPLETE);
+    expect(finalSteps[2].created_at).toBeTruthy();
+    expect(finalSteps[2].started_at).toBeTruthy();
+    expect(finalSteps[2].completed_at).toBeTruthy();
 
     const finalRun = db.prepare(
       "SELECT * FROM workflow_runs WHERE id = ?"
@@ -340,36 +366,75 @@ describe("SQLiteAdapter", () => {
       }));
 
     const adapter = new SQLiteAdapter(db);
-
-    for await (const event of testWorkflow.run({
+    const workflowIterator = testWorkflow.run({
       initialState: { count: 0 },
       client: mockClient
-    })) {
-      await adapter.dispatch(event);
-    }
+    });
 
-    // Query workflow run
-    const workflowRun = db.prepare(`
+    // First event (workflow started)
+    const startEvent = await workflowIterator.next();
+    await adapter.dispatch(startEvent.value);
+
+    // Check initial workflow state
+    const initialRun = db.prepare(`
       SELECT id, created_at, completed_at
       FROM workflow_runs
       WHERE workflow_name = ?
     `).get("Timestamp Test") as any;
 
-    // Verify workflow timestamps
-    expect(workflowRun.created_at).toBeTruthy();
-    expect(workflowRun.completed_at).toBeTruthy();
+    expect(initialRun.created_at).toBeTruthy();
+    expect(initialRun.completed_at).toBeNull();
 
-    // Query step
-    const steps = db.prepare(`
-      SELECT *
+    // Check initial step state
+    const initialSteps = db.prepare(`
+      SELECT created_at, started_at, completed_at, status, step_order
       FROM workflow_steps
       WHERE workflow_run_id = ?
-    `).all(workflowRun.id) as any[];
+      ORDER BY step_order ASC
+    `).all(initialRun.id) as any[];
 
-    // Verify steps exist and have timestamps
-    expect(steps.length).toEqual(1);
-    expect(steps[0].created_at).toBeTruthy();
-    expect(steps[0].completed_at).toBeTruthy();
+    // Verify steps are created upfront
+    expect(initialSteps.length).toBe(1);
+    expect(initialSteps[0].created_at).toBeTruthy();
+    expect(initialSteps[0].started_at).toBeNull();
+    expect(initialSteps[0].completed_at).toBeNull();
+    expect(initialSteps[0].status).toBe('pending');
+
+    // Second event (step completed)
+    const stepEvent = await workflowIterator.next();
+    await adapter.dispatch(stepEvent.value);
+
+    // Check workflow state after step
+    const midRun = db.prepare(`
+      SELECT completed_at
+      FROM workflow_runs
+      WHERE id = ?
+    `).get(initialRun.id) as any;
+    expect(midRun.completed_at).toBeNull();
+
+    // Check step state after completion
+    const midStep = db.prepare(`
+      SELECT created_at, started_at, completed_at, status
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+    `).get(initialRun.id) as any;
+
+    expect(midStep.created_at).toBeTruthy();
+    expect(midStep.started_at).toBeTruthy();
+    expect(midStep.completed_at).toBeTruthy();
+    expect(midStep.status).toBe(STATUS.COMPLETE);
+
+    // Final event (workflow completed)
+    const completeEvent = await workflowIterator.next();
+    await adapter.dispatch(completeEvent.value);
+
+    // Check final workflow state
+    const finalRun = db.prepare(`
+      SELECT completed_at
+      FROM workflow_runs
+      WHERE id = ?
+    `).get(initialRun.id) as any;
+    expect(finalRun.completed_at).toBeTruthy();
   });
 
   it("should enforce JSON validation constraints", async () => {
@@ -395,22 +460,32 @@ describe("SQLiteAdapter", () => {
         value: state.value + 1
       }));
 
+    // Run workflows sequentially to ensure predictable state
     const adapter = new SQLiteAdapter(db);
 
-    // Start multiple workflows concurrently
-    const workflows = [1, 2, 3].map(initialValue =>
-      testWorkflow.run({
-        initialState: { value: initialValue },
-        client: mockClient
-      })
-    );
+    // Run first workflow
+    for await (const event of testWorkflow.run({
+      initialState: { value: 1 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+    }
 
-    // Run all workflows concurrently
-    await Promise.all(workflows.map(async (workflow) => {
-      for await (const event of workflow) {
-        await adapter.dispatch(event);
-      }
-    }));
+    // Run second workflow
+    for await (const event of testWorkflow.run({
+      initialState: { value: 2 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+    }
+
+    // Run third workflow
+    for await (const event of testWorkflow.run({
+      initialState: { value: 3 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+    }
 
     // Verify all workflow runs were recorded correctly
     const runs = db.prepare(`

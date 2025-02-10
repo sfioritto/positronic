@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS workflow_steps (
     status TEXT NOT NULL,
     error TEXT,  -- JSON
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
     completed_at DATETIME,
+    step_order INTEGER NOT NULL,  -- Add this to maintain step order
     -- Add JSON validation checks
     CONSTRAINT valid_previous_state CHECK (json_valid(previous_state)),
     CONSTRAINT valid_new_state CHECK (json_valid(new_state)),
