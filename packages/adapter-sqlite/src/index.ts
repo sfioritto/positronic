@@ -86,6 +86,14 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   private async handleRestart(event: Event<any, any, SQLiteOptions>) {
+    console.log('Handling RESTART event:', {
+      type: event.type,
+      steps: event.steps.map(s => ({
+        title: s.title,
+        status: s.status
+      }))
+    });
+
     this.workflowRunId = event.options?.workflowRunId;
 
     if (!this.workflowRunId) {
@@ -100,54 +108,65 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       WHERE id = ?
     `).run(event.status, this.workflowRunId);
 
-    // Delete existing steps
-    this.db.prepare(`
-      DELETE FROM workflow_steps
-      WHERE workflow_run_id = ?
-    `).run(this.workflowRunId);
+    // Find the index of the first non-completed step from the event
+    const firstNonCompletedIndex = event.steps.findIndex(step => step.status !== STATUS.COMPLETE);
+    console.log('First non-completed index:', firstNonCompletedIndex);
 
-    // Re-create all steps
-    let previousState = event.previousState;
-    event.steps.forEach((step, index) => {
-      const isCompleted = step.status === STATUS.COMPLETE;
-      const sql = `
-        INSERT INTO workflow_steps (
-          workflow_run_id,
-          title,
-          previous_state,
-          new_state,
-          status,
-          error,
-          step_order,
-          started_at,
-          completed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ${isCompleted ? 'CURRENT_TIMESTAMP' : 'NULL'}, ${isCompleted ? 'CURRENT_TIMESTAMP' : 'NULL'})
-      `;
+    // Delete steps from this index onwards
+    if (firstNonCompletedIndex !== -1) {
+      console.log('Deleting steps from index:', firstNonCompletedIndex);
 
-      this.db.prepare(sql).run(
-        this.workflowRunId,
-        step.title,
-        JSON.stringify(previousState),
-        JSON.stringify(isCompleted ? step.state : previousState),
-        isCompleted ? STATUS.COMPLETE : 'pending',
-        null,
-        index
-      );
+      this.db.prepare(`
+        DELETE FROM workflow_steps
+        WHERE workflow_run_id = ? AND step_order >= ?
+      `).run(this.workflowRunId, firstNonCompletedIndex);
 
-      if (isCompleted) {
-        previousState = step.state;
-      }
-    });
+      // Re-create steps from the first non-completed step onwards
+      let previousState = firstNonCompletedIndex > 0
+        ? event.steps[firstNonCompletedIndex - 1].state
+        : event.previousState;
 
-    // Start the next pending step if there is one
-    const nextPendingStep = event.steps.findIndex(step => step.status !== STATUS.COMPLETE);
-    if (nextPendingStep !== -1) {
+      event.steps.slice(firstNonCompletedIndex).forEach((step, index) => {
+        console.log('Creating new step:', {
+          title: step.title,
+          order: firstNonCompletedIndex + index
+        });
+
+        const sql = `
+          INSERT INTO workflow_steps (
+            workflow_run_id,
+            title,
+            previous_state,
+            new_state,
+            status,
+            error,
+            step_order,
+            created_at,
+            started_at,
+            completed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, NULL)
+        `;
+
+        this.db.prepare(sql).run(
+          this.workflowRunId,
+          step.title,
+          JSON.stringify(previousState),
+          JSON.stringify(previousState),
+          'pending',
+          null,
+          firstNonCompletedIndex + index
+        );
+      });
+
+      // Start the next pending step
+      console.log('Starting next pending step at index:', firstNonCompletedIndex);
+
       this.db.prepare(`
         UPDATE workflow_steps SET
         status = 'running',
         started_at = CURRENT_TIMESTAMP
         WHERE workflow_run_id = ? AND step_order = ?
-      `).run(this.workflowRunId, nextPendingStep);
+      `).run(this.workflowRunId, firstNonCompletedIndex);
     }
   }
 

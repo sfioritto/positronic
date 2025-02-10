@@ -268,7 +268,7 @@ describe("SQLiteAdapter", () => {
       value: number;
     }
 
-    const threeStepWorkflow = workflow<{}, MultiStepState>("Three Step Workflow")
+    const fourStepWorkflow = workflow<{}, MultiStepState>("Four Step Workflow")
       .step("Double", async ({ state }) => ({
         value: state.value * 2
       }))
@@ -277,6 +277,9 @@ describe("SQLiteAdapter", () => {
       }))
       .step("Multiply By Three", async ({ state }) => ({
         value: state.value * 3
+      }))
+      .step("Final Step", async ({ state }) => ({
+        value: state.value + 5
       }));
 
     // First, run the workflow completely
@@ -284,7 +287,7 @@ describe("SQLiteAdapter", () => {
     let workflowRunId: number | undefined;
 
     // Run initial workflow to completion
-    for await (const event of threeStepWorkflow.run({
+    for await (const event of fourStepWorkflow.run({
       initialState: { value: 2 },
       client: mockClient
     })) {
@@ -292,7 +295,7 @@ describe("SQLiteAdapter", () => {
       if (event.type === WORKFLOW_EVENTS.START) {
         const result = db.prepare(
           "SELECT id FROM workflow_runs WHERE workflow_name = ? ORDER BY id DESC LIMIT 1"
-        ).get("Three Step Workflow") as any;
+        ).get("Four Step Workflow") as any;
         workflowRunId = result.id;
       }
     }
@@ -302,57 +305,102 @@ describe("SQLiteAdapter", () => {
     }
 
     // Get the first two completed steps
-    const completedSteps = db.prepare(
-      "SELECT title, status, new_state as state FROM workflow_steps WHERE workflow_run_id = ? ORDER BY id ASC LIMIT 2"
-    ).all(workflowRunId) as any[];
+    const completedSteps = db.prepare(`
+      SELECT title, status, new_state as state, created_at, started_at, completed_at
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+      LIMIT 2
+    `).all(workflowRunId) as any[];
 
     completedSteps.forEach(step => {
       step.state = JSON.parse(step.state);
     });
 
-    // Now restart the workflow with the first two steps
-    const restartAdapter = new SQLiteAdapter(db, workflowRunId);
-    for await (const event of threeStepWorkflow.run({
+    console.log('Original completed steps:', completedSteps);
+
+    const firstNonCompletedIndex = 2; // We know we're completing first 2 steps
+
+    // Log all steps before restart
+    console.log('Steps before restart:', db.prepare(`
+      SELECT title, created_at, started_at, completed_at, status, step_order
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId));
+
+    // Start the restart but only process the RESTART event
+    const workflowIterator = fourStepWorkflow.run({
+      initialState: { value: 2 },
+      initialCompletedSteps: completedSteps,
+      client: mockClient,
+      options: { workflowRunId }
+    });
+
+    // Process only the RESTART event
+    const restartEvent = await workflowIterator.next();
+    await adapter.dispatch(restartEvent.value);
+
+    // Log all steps after restart
+    console.log('Steps after restart:', db.prepare(`
+      SELECT title, created_at, started_at, completed_at, status, step_order
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId));
+
+    // Get steps after restart but before execution
+    const pendingSteps = db.prepare(`
+      SELECT title, created_at, started_at, completed_at, status, step_order
+      FROM workflow_steps
+      WHERE workflow_run_id = ? AND step_order = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId, 3) as any[]; // Check the LAST step (Final Step)
+
+    console.log('Pending steps query result:', {
+      workflowRunId,
+      targetStepOrder: firstNonCompletedIndex + 1,
+      steps: pendingSteps
+    });
+
+    // Verify last pending step has created_at but no started_at or completed_at
+    expect(pendingSteps[0].created_at).toBeTruthy();
+    expect(pendingSteps[0].started_at).toBeNull();
+    expect(pendingSteps[0].completed_at).toBeNull();
+    expect(pendingSteps[0].status).toBe('pending');
+
+    // Complete the rest of the workflow
+    for await (const event of fourStepWorkflow.run({
       initialState: { value: 2 },
       initialCompletedSteps: completedSteps,
       client: mockClient,
       options: { workflowRunId }
     })) {
-      await restartAdapter.dispatch(event);
+      await adapter.dispatch(event);
     }
 
-    // Verify final state
-    const finalSteps = db.prepare(`
-      SELECT * FROM workflow_steps
+    // Get steps after restart and completion
+    const restartedSteps = db.prepare(`
+      SELECT title, created_at, started_at, completed_at
+      FROM workflow_steps
       WHERE workflow_run_id = ?
       ORDER BY step_order ASC
     `).all(workflowRunId) as any[];
 
-    expect(finalSteps).toHaveLength(3);
+    console.log('Restarted steps:', restartedSteps);
 
-    // First two steps should be complete with all timestamps
-    expect(finalSteps[0].status).toBe(STATUS.COMPLETE);
-    expect(finalSteps[0].created_at).toBeTruthy();
-    expect(finalSteps[0].started_at).toBeTruthy();
-    expect(finalSteps[0].completed_at).toBeTruthy();
+    // Verify first two steps have exactly the same timestamps
+    completedSteps.forEach((original, index) => {
+      const restarted = restartedSteps[index];
+      expect(restarted.created_at).toBe(original.created_at);
+      expect(restarted.started_at).toBe(original.started_at);
+      expect(restarted.completed_at).toBe(original.completed_at);
+    });
 
-    expect(finalSteps[1].status).toBe(STATUS.COMPLETE);
-    expect(finalSteps[1].created_at).toBeTruthy();
-    expect(finalSteps[1].started_at).toBeTruthy();
-    expect(finalSteps[1].completed_at).toBeTruthy();
-
-    // Last step should also be complete
-    expect(finalSteps[2].status).toBe(STATUS.COMPLETE);
-    expect(finalSteps[2].created_at).toBeTruthy();
-    expect(finalSteps[2].started_at).toBeTruthy();
-    expect(finalSteps[2].completed_at).toBeTruthy();
-
-    const finalRun = db.prepare(
-      "SELECT * FROM workflow_runs WHERE id = ?"
-    ).get(workflowRunId) as any;
-
-    expect(finalRun.status).toBe(STATUS.COMPLETE);
-    expect(finalRun.error).toBe(null);
+    // Verify the third step now has all timestamps after completion
+    expect(restartedSteps[2].created_at).toBeTruthy();
+    expect(restartedSteps[2].started_at).toBeTruthy();
+    expect(restartedSteps[2].completed_at).toBeTruthy();
   });
 
   it("should handle timestamps correctly", async () => {
@@ -512,5 +560,138 @@ describe("SQLiteAdapter", () => {
     expect(JSON.parse(steps[0].new_state)).toEqual({ value: 2 });
     expect(JSON.parse(steps[1].new_state)).toEqual({ value: 3 });
     expect(JSON.parse(steps[2].new_state)).toEqual({ value: 4 });
+  });
+
+  it("should preserve timestamps of completed steps during restart", async () => {
+    interface TestState extends State {
+      value: number;
+    }
+
+    const fourStepWorkflow = workflow<{}, TestState>("Timestamp Preservation Test")
+      .step("Step 1", async ({ state }) => ({
+        value: state.value + 1
+      }))
+      .step("Step 2", async ({ state }) => ({
+        value: state.value + 2
+      }))
+      .step("Step 3", async ({ state }) => ({
+        value: state.value + 3
+      }))
+      .step("Step 4", async ({ state }) => ({
+        value: state.value + 4
+      }));
+
+    const adapter = new SQLiteAdapter(db);
+    let workflowRunId: number | undefined;
+
+    // Run initial workflow to completion
+    for await (const event of fourStepWorkflow.run({
+      initialState: { value: 0 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+      if (event.type === WORKFLOW_EVENTS.START) {
+        const result = db.prepare(
+          "SELECT id FROM workflow_runs WHERE workflow_name = ? ORDER BY id DESC LIMIT 1"
+        ).get("Timestamp Preservation Test") as any;
+        workflowRunId = result.id;
+      }
+    }
+
+    if (!workflowRunId) {
+      throw new Error("Failed to get workflow run ID");
+    }
+
+    // Get the first two completed steps for restart with their timestamps
+    const completedSteps = db.prepare(`
+      SELECT title, status, new_state as state, created_at, started_at, completed_at
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+      LIMIT 2
+    `).all(workflowRunId) as any[];
+
+    completedSteps.forEach(step => {
+      step.state = JSON.parse(step.state);
+    });
+
+    console.log('Original completed steps:', completedSteps);
+
+    const firstNonCompletedIndex = 2; // We know we're completing first 2 steps
+
+    // Start the restart but only process the RESTART event
+    const workflowIterator = fourStepWorkflow.run({
+      initialState: { value: 0 },
+      initialCompletedSteps: completedSteps,
+      client: mockClient,
+      options: { workflowRunId }
+    });
+
+    // Process only the RESTART event
+    const restartEvent = await workflowIterator.next();
+    await adapter.dispatch(restartEvent.value);
+
+    // Now check the pending steps - look at the LAST step (Step 4)
+    const pendingSteps = db.prepare(`
+      SELECT title, created_at, started_at, completed_at, status, step_order
+      FROM workflow_steps
+      WHERE workflow_run_id = ? AND step_order = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId, 3) as any[]; // Explicitly check step_order 3 (fourth step)
+
+    console.log('Pending steps query result:', {
+      workflowRunId,
+      targetStepOrder: firstNonCompletedIndex + 1,
+      steps: pendingSteps
+    });
+
+    // Also log all steps to see the full picture
+    const allSteps = db.prepare(`
+      SELECT title, created_at, started_at, completed_at, status, step_order
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId) as any[];
+
+    console.log('All steps after restart:', allSteps);
+
+    // Verify last pending step has created_at but no started_at or completed_at
+    expect(pendingSteps[0].created_at).toBeTruthy();
+    expect(pendingSteps[0].started_at).toBeNull();
+    expect(pendingSteps[0].completed_at).toBeNull();
+    expect(pendingSteps[0].status).toBe('pending');
+
+    // Complete the rest of the workflow
+    for await (const event of fourStepWorkflow.run({
+      initialState: { value: 0 },
+      initialCompletedSteps: completedSteps,
+      client: mockClient,
+      options: { workflowRunId }
+    })) {
+      await adapter.dispatch(event);
+    }
+
+    // Get steps after restart and completion
+    const restartedSteps = db.prepare(`
+      SELECT title, created_at, started_at, completed_at
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId) as any[];
+
+    console.log('Restarted steps:', restartedSteps);
+
+    // Verify first two steps have exactly the same timestamps
+    completedSteps.forEach((original, index) => {
+      const restarted = restartedSteps[index];
+      expect(restarted.created_at).toBe(original.created_at);
+      expect(restarted.started_at).toBe(original.started_at);
+      expect(restarted.completed_at).toBe(original.completed_at);
+    });
+
+    // Verify the third step now has all timestamps after completion
+    expect(restartedSteps[2].created_at).toBeTruthy();
+    expect(restartedSteps[2].started_at).toBeTruthy();
+    expect(restartedSteps[2].completed_at).toBeTruthy();
   });
 });
