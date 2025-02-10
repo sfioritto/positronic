@@ -29,7 +29,7 @@ export interface Event<
 export interface SerializedStep {
   title: string;
   status: typeof STATUS[keyof typeof STATUS];
-  state: State;
+  state?: State;
 }
 
 type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
@@ -218,11 +218,17 @@ export class Workflow<
       workflowDescription: this.description,
       previousState: currentState,
       newState: currentState,
-      steps: this.blocks.map(block => ({
-        title: block.title,
-        status: STATUS.PENDING,
-        state: currentState
-      })),
+      steps: this.blocks.map((block, index) =>
+        // Map through all blocks in the workflow. For each block:
+        // - If we have a completed step at this index, use that (preserving its status and state)
+        // - Otherwise, create a new pending step with the current state
+        index < completedSteps.length
+          ? completedSteps[index]
+          : {
+              title: block.title,
+              status: STATUS.PENDING,
+            }
+      ),
       options,
     };
 
@@ -286,7 +292,6 @@ export class Workflow<
             completedSteps[i] || {
               title: b.title,
               status: STATUS.PENDING,
-              state: currentState
             }
           ),
           options,
@@ -312,7 +317,6 @@ export class Workflow<
             completedSteps[i] || {
               title: b.title,
               status: STATUS.PENDING,
-              state: currentState
             }
           ),
           options,

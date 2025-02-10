@@ -62,8 +62,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     this.workflowRunId = event.options?.workflowRunId;
 
     if (!this.workflowRunId) {
-      await this.handleStart(event);
-      return;
+      throw new Error('Workflow run ID is required to restart a workflow in the SQLite adapter');
     }
 
     // Update workflow run status to running

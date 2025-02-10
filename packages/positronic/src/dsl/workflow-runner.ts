@@ -1,7 +1,7 @@
 import { WORKFLOW_EVENTS } from './constants';
 import type { Adapter } from "../adapters/types";
 import type { FileStore } from "../file-stores/types";
-import type { Event } from './workflow';
+import type { Event, SerializedStep } from './workflow';
 import type { State, JsonObject } from './types';
 
 interface Logger {
@@ -25,20 +25,12 @@ export class WorkflowRunner {
     workflow: {
       run: (params?: {
         initialState?: TState,
-        initialCompletedSteps?: Array<{
-          title: string,
-          status: string,
-          state: JsonObject
-        }>,
+        initialCompletedSteps?: SerializedStep[],
         options?: TOptions
       }) => AsyncGenerator<Event<TState, TState, TOptions>>
     },
     initialState?: TState,
-    initialCompletedSteps?: Array<{
-      title: string,
-      status: string,
-      state: JsonObject
-    }>,
+    initialCompletedSteps?: SerializedStep[],
     options?: TOptions
   ) {
     const { adapters, logger: { log }, verbose } = this.options;
