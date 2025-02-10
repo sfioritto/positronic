@@ -2,6 +2,7 @@
   "name": "positronic",
   "private": true,
   "scripts": {
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --silent",
     "clean:workspaces": "npm run clean --workspaces",
     "build:workspaces": "npm run build --workspaces",
     "build:watch": "nodemon --watch 'packages/**/*' --ignore '**/dist/**' --ignore '**/node_modules/**' --ext ts,js,json --exec 'npm run build:workspaces || /usr/local/bin/terminal-notifier -title \"Positronic Build\" -message \"Build failed\"'"

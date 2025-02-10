@@ -5,6 +5,8 @@ const config = {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@positronic/core$': '<rootDir>/packages/positronic/src',
+    '^@positronic/(.*)$': '<rootDir>/packages/$1/src'
   },
   transform: {
     '^.+\\.tsx?$': [
