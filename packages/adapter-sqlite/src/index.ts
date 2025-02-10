@@ -26,7 +26,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       case WORKFLOW_EVENTS.RESTART:
         await this.handleRestart(event);
         break;
-      case WORKFLOW_EVENTS.UPDATE:
+      case WORKFLOW_EVENTS.STEP_COMPLETE:
         await this.handleUpdate(event);
         break;
       case WORKFLOW_EVENTS.COMPLETE:

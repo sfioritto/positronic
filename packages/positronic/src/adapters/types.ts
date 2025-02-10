@@ -11,7 +11,7 @@ export abstract class Adapter<Options extends object = any> {
   async dispatch(event: Event<any, any, Options>) {
     if (event.type === WORKFLOW_EVENTS.START && this.started) {
       await this.started(event);
-    } else if (event.type === WORKFLOW_EVENTS.UPDATE && this.updated) {
+    } else if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && this.updated) {
       await this.updated(event);
     } else if (event.type === WORKFLOW_EVENTS.COMPLETE && this.completed) {
       await this.completed(event);

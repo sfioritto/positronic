@@ -40,7 +40,7 @@ describe('workflow creation', () => {
     // Check first step completion
     const firstStepResult = await workflowRun.next();
     expect(firstStepResult.value).toEqual(expect.objectContaining({
-      type: WORKFLOW_EVENTS.UPDATE,
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
       newState: { count: 1 },
       completedStep: expect.objectContaining({
         title: 'First step',
@@ -52,7 +52,7 @@ describe('workflow creation', () => {
     // Check second step completion
     const secondStepResult = await workflowRun.next();
     expect(secondStepResult.value).toEqual(expect.objectContaining({
-      type: WORKFLOW_EVENTS.UPDATE,
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
       newState: { count: 1, doubled: 2 },
       completedStep: expect.objectContaining({
         title: 'Second step',
@@ -361,7 +361,7 @@ describe('nested workflows', () => {
       },
       // First step of outer workflow
       {
-        type: WORKFLOW_EVENTS.UPDATE,
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
         stepTitle: 'Set prefix'
@@ -374,7 +374,7 @@ describe('nested workflows', () => {
       },
       // Inner workflow step
       {
-        type: WORKFLOW_EVENTS.UPDATE,
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
         workflowTitle: 'Inner Workflow',
         status: STATUS.RUNNING,
         stepTitle: 'Double value'
@@ -387,7 +387,7 @@ describe('nested workflows', () => {
       },
       // Outer workflow nested step completion
       {
-        type: WORKFLOW_EVENTS.UPDATE,
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow'
@@ -463,7 +463,7 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING
       },
       {
-        type: WORKFLOW_EVENTS.UPDATE,
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING
       },
@@ -527,7 +527,7 @@ describe('workflow options', () => {
     // Check step completion
     const stepResult = await workflowRun.next();
     expect(stepResult.value).toEqual(expect.objectContaining({
-      type: WORKFLOW_EVENTS.UPDATE,
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
       options: workflowOptions,
       newState: {
         value: 1,

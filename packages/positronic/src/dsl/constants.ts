@@ -1,7 +1,8 @@
 export const WORKFLOW_EVENTS = {
   START: 'workflow:start',
   RESTART: 'workflow:restart',
-  UPDATE: 'workflow:update',
+  STEP_START: 'step:start',
+  STEP_COMPLETE: 'step:complete',
   ERROR: 'workflow:error',
   COMPLETE: 'workflow:complete',
 } as const;

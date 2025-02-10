@@ -271,6 +271,19 @@ export class Workflow<
       // and putting it here makes it easier to see
       currentState = clone(currentState);
       const previousState = currentState;
+
+      // Yield step start event
+      // yield {
+      //   type: WORKFLOW_EVENTS.STEP_START,
+      //   status: STATUS.RUNNING,
+      //   workflowTitle: this.title,
+      //   workflowDescription: this.description,
+      //   previousState,
+      //   newState: currentState,
+      //   steps: workflowSteps.steps,
+      //   options,
+      // };
+
       try {
         if (block.type === 'step') {
           currentState = await block.action({
@@ -311,7 +324,7 @@ export class Workflow<
         );
 
         yield {
-          type: WORKFLOW_EVENTS.UPDATE,
+          type: WORKFLOW_EVENTS.STEP_COMPLETE,
           status: STATUS.RUNNING,
           workflowTitle: this.title,
           workflowDescription: this.description,
