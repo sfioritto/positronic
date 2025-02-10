@@ -4,7 +4,7 @@
   "scripts": {
     "clean:workspaces": "npm run clean --workspaces",
     "build:workspaces": "npm run build --workspaces",
-    "build:watch": "nodemon --watch 'packages/**/*' --ignore '**/dist/**' --ignore '**/node_modules/**' --ext ts,js,json --exec 'npm run build:workspaces'"
+    "build:watch": "nodemon --watch 'packages/**/*' --ignore '**/dist/**' --ignore '**/node_modules/**' --ext ts,js,json --exec 'npm run build:workspaces || /usr/local/bin/terminal-notifier -title \"Positronic Build\" -message \"Build failed\"'"
   },
   "devDependencies": {
     "@swc/cli": "^0.6.0",
@@ -18,10 +18,10 @@
     "typescript": "^5.0.0"
   },
   "workspaces": [
+    "packages/positronic",
     "packages/adapter-sqlite",
     "packages/extension-files",
     "packages/cli",
-    "packages/positronic",
     "packages/client-anthropic"
   ]
 }
