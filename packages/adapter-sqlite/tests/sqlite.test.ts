@@ -317,17 +317,7 @@ describe("SQLiteAdapter", () => {
       step.state = JSON.parse(step.state);
     });
 
-    console.log('Original completed steps:', completedSteps);
-
     const firstNonCompletedIndex = 2; // We know we're completing first 2 steps
-
-    // Log all steps before restart
-    console.log('Steps before restart:', db.prepare(`
-      SELECT title, created_at, started_at, completed_at, status, step_order
-      FROM workflow_steps
-      WHERE workflow_run_id = ?
-      ORDER BY step_order ASC
-    `).all(workflowRunId));
 
     // Start the restart but only process the RESTART event
     const workflowIterator = fourStepWorkflow.run({
@@ -341,14 +331,6 @@ describe("SQLiteAdapter", () => {
     const restartEvent = await workflowIterator.next();
     await adapter.dispatch(restartEvent.value);
 
-    // Log all steps after restart
-    console.log('Steps after restart:', db.prepare(`
-      SELECT title, created_at, started_at, completed_at, status, step_order
-      FROM workflow_steps
-      WHERE workflow_run_id = ?
-      ORDER BY step_order ASC
-    `).all(workflowRunId));
-
     // Get steps after restart but before execution
     const pendingSteps = db.prepare(`
       SELECT title, created_at, started_at, completed_at, status, step_order
@@ -356,12 +338,6 @@ describe("SQLiteAdapter", () => {
       WHERE workflow_run_id = ? AND step_order = ?
       ORDER BY step_order ASC
     `).all(workflowRunId, 3) as any[]; // Check the LAST step (Final Step)
-
-    console.log('Pending steps query result:', {
-      workflowRunId,
-      targetStepOrder: firstNonCompletedIndex + 1,
-      steps: pendingSteps
-    });
 
     // Verify last pending step has created_at but no started_at or completed_at
     expect(pendingSteps[0].created_at).toBeTruthy();
@@ -386,8 +362,6 @@ describe("SQLiteAdapter", () => {
       WHERE workflow_run_id = ?
       ORDER BY step_order ASC
     `).all(workflowRunId) as any[];
-
-    console.log('Restarted steps:', restartedSteps);
 
     // Verify first two steps have exactly the same timestamps
     completedSteps.forEach((original, index) => {
@@ -615,8 +589,6 @@ describe("SQLiteAdapter", () => {
       step.state = JSON.parse(step.state);
     });
 
-    console.log('Original completed steps:', completedSteps);
-
     const firstNonCompletedIndex = 2; // We know we're completing first 2 steps
 
     // Start the restart but only process the RESTART event
@@ -638,22 +610,6 @@ describe("SQLiteAdapter", () => {
       WHERE workflow_run_id = ? AND step_order = ?
       ORDER BY step_order ASC
     `).all(workflowRunId, 3) as any[]; // Explicitly check step_order 3 (fourth step)
-
-    console.log('Pending steps query result:', {
-      workflowRunId,
-      targetStepOrder: firstNonCompletedIndex + 1,
-      steps: pendingSteps
-    });
-
-    // Also log all steps to see the full picture
-    const allSteps = db.prepare(`
-      SELECT title, created_at, started_at, completed_at, status, step_order
-      FROM workflow_steps
-      WHERE workflow_run_id = ?
-      ORDER BY step_order ASC
-    `).all(workflowRunId) as any[];
-
-    console.log('All steps after restart:', allSteps);
 
     // Verify last pending step has created_at but no started_at or completed_at
     expect(pendingSteps[0].created_at).toBeTruthy();
@@ -678,8 +634,6 @@ describe("SQLiteAdapter", () => {
       WHERE workflow_run_id = ?
       ORDER BY step_order ASC
     `).all(workflowRunId) as any[];
-
-    console.log('Restarted steps:', restartedSteps);
 
     // Verify first two steps have exactly the same timestamps
     completedSteps.forEach((original, index) => {
