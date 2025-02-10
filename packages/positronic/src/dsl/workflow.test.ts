@@ -37,6 +37,16 @@ describe('workflow creation', () => {
       newState: {}
     }));
 
+    // Check first step start
+    const firstStepStartResult = await workflowRun.next();
+    expect(firstStepStartResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_START,
+      status: STATUS.RUNNING,
+      workflowTitle: 'test workflow',
+      previousState: {},
+      newState: {}
+    }));
+
     // Check first step completion
     const firstStepResult = await workflowRun.next();
     expect(firstStepResult.value).toEqual(expect.objectContaining({
@@ -47,6 +57,16 @@ describe('workflow creation', () => {
         status: STATUS.COMPLETE,
         state: { count: 1 }
       })
+    }));
+
+    // Check second step start
+    const secondStepStartResult = await workflowRun.next();
+    expect(secondStepStartResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_START,
+      status: STATUS.RUNNING,
+      workflowTitle: 'test workflow',
+      previousState: { count: 1 },
+      newState: { count: 1 }
     }));
 
     // Check second step completion
@@ -359,6 +379,12 @@ describe('nested workflows', () => {
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING
       },
+      // First step start
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING
+      },
       // First step of outer workflow
       {
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
@@ -366,9 +392,21 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING,
         stepTitle: 'Set prefix'
       },
+      // Nested workflow step start
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING
+      },
       // Inner workflow start
       {
         type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Inner Workflow',
+        status: STATUS.RUNNING
+      },
+      // Inner workflow step start
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
         workflowTitle: 'Inner Workflow',
         status: STATUS.RUNNING
       },
@@ -401,11 +439,11 @@ describe('nested workflows', () => {
     ]);
 
     // Verify states are passed correctly
-    expect(events[3].newState).toEqual({ // Inner workflow step completion
+    expect(events[6].newState).toEqual({ // Inner workflow step completion
       inner: true,
       value: 10
     });
-    expect(events[5].newState).toEqual({ // Outer workflow after nested workflow
+    expect(events[8].newState).toEqual({ // Outer workflow after nested workflow
       prefix: "test-",
       innerResult: 10
     });
@@ -463,12 +501,27 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING
       },
       {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING
+      },
+      {
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING
       },
       {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING
+      },
+      {
         type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Failing Inner Workflow',
+        status: STATUS.RUNNING
+      },
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
         workflowTitle: 'Failing Inner Workflow',
         status: STATUS.RUNNING
       },
@@ -527,6 +580,13 @@ describe('workflow options', () => {
     // Check step completion
     const stepResult = await workflowRun.next();
     expect(stepResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_START,
+      options: workflowOptions
+    }));
+
+    // Check step completion
+    const stepCompleteResult = await workflowRun.next();
+    expect(stepCompleteResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
       options: workflowOptions,
       newState: {
@@ -561,10 +621,18 @@ describe('workflow options', () => {
     // Skip start event
     await workflowRun.next();
 
+    // Check step start
+    const stepStartResult = await workflowRun.next();
+    expect(stepStartResult.value).toEqual(expect.objectContaining({
+      options: {},
+      type: WORKFLOW_EVENTS.STEP_START
+    }));
+
     // Check step completion
     const stepResult = await workflowRun.next();
     expect(stepResult.value).toEqual(expect.objectContaining({
       options: {},
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
       newState: {
         hasOptions: true
       }
@@ -786,7 +854,8 @@ describe('workflow steps', () => {
     // Run first step and get its UUID
     const firstRun = testWorkflow.run({ client: mockClient });
     await firstRun.next(); // Start event
-    const firstStepEvent = await firstRun.next();
+    await firstRun.next(); // Step start event
+    const firstStepEvent = await firstRun.next(); // Step complete event
     const completedStep = firstStepEvent.value.completedStep;
 
     // Restart workflow with completed step

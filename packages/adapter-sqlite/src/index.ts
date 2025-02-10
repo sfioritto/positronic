@@ -23,6 +23,9 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       case WORKFLOW_EVENTS.START:
         await this.handleStart(event);
         break;
+      case WORKFLOW_EVENTS.STEP_START:
+        await this.handleStepStart(event);
+        break;
       case WORKFLOW_EVENTS.RESTART:
         await this.handleRestart(event);
         break;
@@ -88,6 +91,20 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         );
       });
     })();  // Note: immediately execute the transaction
+  }
+
+  private async handleStepStart(event: Event<any, any>) {
+    if (!this.workflowRunId) {
+      throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
+    }
+
+    // Update the step to running status and set started_at
+    this.db.prepare(`
+      UPDATE workflow_steps SET
+      status = ?,
+      started_at = CURRENT_TIMESTAMP
+      WHERE workflow_run_id = ? AND id = ?
+    `).run(STATUS.RUNNING, this.workflowRunId, event.steps[event.steps.length - 1].id);
   }
 
   private async handleRestart(event: Event<any, any, SQLiteOptions>) {

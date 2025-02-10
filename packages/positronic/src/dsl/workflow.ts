@@ -273,16 +273,16 @@ export class Workflow<
       const previousState = currentState;
 
       // Yield step start event
-      // yield {
-      //   type: WORKFLOW_EVENTS.STEP_START,
-      //   status: STATUS.RUNNING,
-      //   workflowTitle: this.title,
-      //   workflowDescription: this.description,
-      //   previousState,
-      //   newState: currentState,
-      //   steps: workflowSteps.steps,
-      //   options,
-      // };
+      yield {
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        workflowTitle: this.title,
+        workflowDescription: this.description,
+        previousState,
+        newState: currentState,
+        steps: workflowSteps.steps,
+        options,
+      };
 
       try {
         if (block.type === 'step') {

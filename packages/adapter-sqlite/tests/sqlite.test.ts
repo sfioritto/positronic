@@ -404,7 +404,23 @@ describe("SQLiteAdapter", () => {
     expect(initialSteps[0].completed_at).toBeNull();
     expect(initialSteps[0].status).toBe('pending');
 
-    // Second event (step completed)
+    // Second event (step start)
+    const stepStartEvent = await workflowIterator.next();
+    await adapter.dispatch(stepStartEvent.value);
+
+    // Check step state after start
+    const startedStep = db.prepare(`
+      SELECT created_at, started_at, completed_at, status
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+    `).get(initialRun.id) as any;
+
+    expect(startedStep.created_at).toBeTruthy();
+    expect(startedStep.started_at).toBeTruthy();
+    expect(startedStep.completed_at).toBeNull();
+    expect(startedStep.status).toBe(STATUS.RUNNING);
+
+    // Third event (step completed)
     const stepEvent = await workflowIterator.next();
     await adapter.dispatch(stepEvent.value);
 
