@@ -283,7 +283,7 @@ export class Workflow<
           for await (const event of innerRun) {
             yield event; // Yield all events from the inner workflow
             if (event.type === WORKFLOW_EVENTS.COMPLETE) {
-              innerCtx = event.newState;
+              innerCtx = event.currentStep?.state;
             }
           }
 
