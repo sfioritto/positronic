@@ -25,6 +25,7 @@ export interface Event<
   completedStep?: SerializedStep;
   steps: SerializedStep[];
   options: TOptions;
+  currentStepId?: string;
 }
 
 export interface SerializedStep {
@@ -282,6 +283,7 @@ export class Workflow<
         newState: currentState,
         steps: workflowSteps.steps,
         options,
+        currentStepId: workflowSteps.steps[(initialCompletedSteps?.length || 0) + index].id
       };
 
       try {
@@ -333,6 +335,7 @@ export class Workflow<
           completedStep,
           steps: workflowSteps.steps,
           options,
+          currentStepId: completedStep.id
         };
       } catch (error) {
         const errorStep = workflowSteps.errorStep(
@@ -351,6 +354,7 @@ export class Workflow<
           error: error as SerializedError,
           steps: workflowSteps.steps,
           options,
+          currentStepId: errorStep.id
         };
         throw error;
       }

@@ -853,6 +853,7 @@ describe('workflow steps', () => {
 
     // Run first step and get its UUID
     const firstRun = testWorkflow.run({ client: mockClient });
+
     await firstRun.next(); // Start event
     await firstRun.next(); // Step start event
     const firstStepEvent = await firstRun.next(); // Step complete event
@@ -868,5 +869,69 @@ describe('workflow steps', () => {
 
     // Only verify that the completed step's UUID was preserved
     expect(restartEvent.value.steps[0].id).toBe(completedStep.id);
+  });
+
+  it('should set currentStepId correctly in events and preserve through restarts', async () => {
+    const testWorkflow = workflow('Step ID Test')
+      .step(
+        "First step",
+        () => ({ count: 1 })
+      )
+      .step(
+        "Second step",
+        ({ state }) => ({ count: state.count + 1 })
+      );
+
+    // First run - collect all step IDs and events
+    const firstRunEvents = [];
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      firstRunEvents.push(event);
+    }
+
+    // Get the step IDs from the final event's steps array
+    const stepIds = firstRunEvents[firstRunEvents.length - 1].steps.map(s => s.id);
+
+    // Verify currentStepId is set correctly for each step-related event
+    expect(firstRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // First step start
+    expect(firstRunEvents[1].currentStepId).toBe(stepIds[0]);
+
+    expect(firstRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // First step complete
+    expect(firstRunEvents[2].currentStepId).toBe(stepIds[0]);
+
+    expect(firstRunEvents[3].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
+    expect(firstRunEvents[3].currentStepId).toBe(stepIds[1]);
+
+    expect(firstRunEvents[4].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
+    expect(firstRunEvents[4].currentStepId).toBe(stepIds[1]);
+
+    // Verify workflow events don't have currentStepId
+    expect(firstRunEvents[0].currentStepId).toBeUndefined(); // START event
+    expect(firstRunEvents[5].currentStepId).toBeUndefined(); // COMPLETE event
+
+    // Now restart the workflow after first step
+    const firstStepCompleted = firstRunEvents[2].completedStep;
+    if (!firstStepCompleted) {
+      throw new Error('Expected completed step to be defined');
+    }
+
+    const secondRunEvents = [];
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+      initialCompletedSteps: [firstStepCompleted]
+    })) {
+      secondRunEvents.push(event);
+    }
+
+    // Verify the first step ID was preserved and second step ID matches
+    expect(secondRunEvents[0].steps[0].id).toBe(stepIds[0]); // First step ID preserved
+    expect(secondRunEvents[0].steps[1].id).not.toBe(stepIds[1]); // Second step should have new ID
+    expect(secondRunEvents[0].steps[1].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i); // Should be a valid UUID
+
+    // Verify currentStepId is set correctly in restarted workflow
+    expect(secondRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
+    expect(secondRunEvents[1].currentStepId).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
+
+    expect(secondRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
+    expect(secondRunEvents[2].currentStepId).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
   });
 });
