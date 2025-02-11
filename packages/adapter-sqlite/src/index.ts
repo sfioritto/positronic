@@ -297,7 +297,11 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
 
       // Update the errored step
       if (event.currentStep) {
-        const stepOrder = event.steps.findIndex(s => s.title === event.currentStep!.title);
+        const stepOrder = event.steps.findIndex(s => s.id === event.currentStep!.id);
+        if (stepOrder === -1) {
+          throw new Error(`Could not find step with ID ${event.currentStep.id} in steps array`);
+        }
+
         this.db.prepare(`
           UPDATE workflow_steps SET
           new_state = ?,
@@ -307,7 +311,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           completed_at = CURRENT_TIMESTAMP
           WHERE workflow_run_id = ? AND step_order = ?
         `).run(
-          JSON.stringify(event.newState),
+          JSON.stringify(event.currentStep.state),
           event.currentStep.status,
           serializedError ? JSON.stringify(serializedError) : null,
           this.workflowRunId,
