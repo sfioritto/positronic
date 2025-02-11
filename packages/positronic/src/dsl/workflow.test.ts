@@ -424,7 +424,8 @@ describe('nested workflows', () => {
       {
         type: WORKFLOW_EVENTS.COMPLETE,
         workflowTitle: 'Inner Workflow',
-        status: STATUS.COMPLETE
+        status: STATUS.COMPLETE,
+        stepTitle: 'Double value'
       },
       // Outer workflow nested step completion
       {
@@ -437,7 +438,8 @@ describe('nested workflows', () => {
       {
         type: WORKFLOW_EVENTS.COMPLETE,
         workflowTitle: 'Outer Workflow',
-        status: STATUS.COMPLETE
+        status: STATUS.COMPLETE,
+        stepTitle: 'Run inner workflow'
       }
     ]);
 
@@ -908,8 +910,9 @@ describe('workflow steps', () => {
     expect(firstRunEvents[4].currentStep?.id).toBe(stepIds[1]);
 
     // Verify workflow events don't have currentStep
-    expect(firstRunEvents[0].currentStep).toBeUndefined(); // START event
-    expect(firstRunEvents[5].currentStep).toBeUndefined(); // COMPLETE event
+    expect(firstRunEvents[0].currentStep).toBeUndefined(); // START event should not have currentStep
+    expect(firstRunEvents[5].currentStep).toBeDefined(); // COMPLETE event should have currentStep
+    expect(firstRunEvents[5].currentStep).toEqual(firstRunEvents[4].currentStep); // COMPLETE event should have last completed step
 
     // Now restart the workflow after first step
     const firstStepCompleted = firstRunEvents[2].currentStep;

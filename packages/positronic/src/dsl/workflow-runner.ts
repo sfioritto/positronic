@@ -56,7 +56,7 @@ export class WorkflowRunner {
         event.type === WORKFLOW_EVENTS.ERROR
       ) && verbose) {
         log(`Workflow completed: \n\n ${JSON.stringify(
-          this.truncateDeep(structuredClone(event.newState)), null, 2
+          this.truncateDeep(structuredClone(event.currentStep?.state)), null, 2
         )}`);
       }
     }

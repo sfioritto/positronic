@@ -349,7 +349,7 @@ export class Workflow<
       newState: clone(currentState),
       steps,
       options,
-      currentStep: undefined
+      currentStep: lastCompletedStep
     };
 
     return currentState as TState;
