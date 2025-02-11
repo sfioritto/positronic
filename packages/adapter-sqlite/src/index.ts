@@ -98,13 +98,17 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
 
+    if (!event.currentStepId) {
+      throw new Error('Current step ID is required for step start event');
+    }
+
     // Update the step to running status and set started_at
     this.db.prepare(`
       UPDATE workflow_steps SET
       status = ?,
       started_at = CURRENT_TIMESTAMP
       WHERE workflow_run_id = ? AND id = ?
-    `).run(STATUS.RUNNING, this.workflowRunId, event.steps[event.steps.length - 1].id);
+    `).run(STATUS.RUNNING, this.workflowRunId, event.currentStepId);
   }
 
   private async handleRestart(event: Event<any, any, SQLiteOptions>) {
@@ -167,14 +171,6 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
             firstNonCompletedIndex + index
           );
         });
-
-        // Start the next pending step
-        this.db.prepare(`
-          UPDATE workflow_steps SET
-          status = ?,
-          started_at = CURRENT_TIMESTAMP
-          WHERE workflow_run_id = ? AND step_order = ?
-        `).run(STATUS.RUNNING, this.workflowRunId, firstNonCompletedIndex);
       }
     })();
   }
