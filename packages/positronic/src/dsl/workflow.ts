@@ -22,10 +22,9 @@ export interface Event<
   previousState: TStateIn;
   newState: TStateOut;
   error?: SerializedError;
-  completedStep?: SerializedStep;
+  currentStep?: SerializedStep;
   steps: SerializedStep[];
   options: TOptions;
-  currentStepId?: string;
 }
 
 export interface SerializedStep {
@@ -76,6 +75,7 @@ const clone = <T>(value: T): T => structuredClone(value);
 
 class WorkflowSteps {
   public steps: SerializedStep[];
+  private currentIndex: number;
 
   constructor(blocks: Block<any, any, any>[], initialCompletedSteps: SerializedStep[] = []) {
     this.steps = blocks.map((block, index) => {
@@ -90,25 +90,35 @@ class WorkflowSteps {
         status: STATUS.PENDING
       };
     });
+    this.currentIndex = initialCompletedSteps.length;
   }
 
-  completeStep(index: number, state: State): SerializedStep {
+  get currentStep(): SerializedStep | undefined {
+    return this.steps[this.currentIndex];
+  }
+
+  get lastCompletedStep(): SerializedStep | undefined {
+    return this.steps[this.currentIndex - 1];
+  }
+
+  completeStep(state: State): SerializedStep {
     const step = {
-      ...this.steps[index],
+      ...this.steps[this.currentIndex],
       status: STATUS.COMPLETE,
       state
     };
-    this.steps[index] = step;
+    this.steps[this.currentIndex] = step;
+    this.currentIndex++;
     return step;
   }
 
-  errorStep(index: number, state: State): SerializedStep {
+  errorStep(state: State): SerializedStep {
     const step = {
-      ...this.steps[index],
+      ...this.steps[this.currentIndex],
       status: STATUS.ERROR,
       state
     };
-    this.steps[index] = step;
+    this.steps[this.currentIndex] = step;
     return step;
   }
 }
@@ -249,7 +259,11 @@ export class Workflow<
     const workflowSteps = new WorkflowSteps(this.blocks, initialCompletedSteps);
 
     if (initialCompletedSteps?.length > 0) {
-      currentState = clone(initialCompletedSteps[initialCompletedSteps.length - 1].state as TState);
+      // Get state from the last completed step
+      const lastCompletedStep = workflowSteps.lastCompletedStep;
+      if (lastCompletedStep?.state) {
+        currentState = clone(lastCompletedStep.state as TState);
+      }
     }
 
     const remainingBlocks = this.blocks.slice(initialCompletedSteps?.length || 0);
@@ -265,7 +279,7 @@ export class Workflow<
       options,
     };
 
-    for (const [index, block] of remainingBlocks.entries()) {
+    for (const block of remainingBlocks) {
       // Clone the current state here to prevent mutation of the state
       // when the block is executed. The initial clone in the first pass
       // of the loop is not necessary, but it is needed for every other pass
@@ -283,7 +297,7 @@ export class Workflow<
         newState: currentState,
         steps: workflowSteps.steps,
         options,
-        currentStepId: workflowSteps.steps[(initialCompletedSteps?.length || 0) + index].id
+        currentStep: workflowSteps.currentStep
       };
 
       try {
@@ -320,10 +334,7 @@ export class Workflow<
           currentState = block.action(currentState, innerCtx);
         }
 
-        const completedStep = workflowSteps.completeStep(
-          (initialCompletedSteps?.length || 0) + index,
-          currentState
-        );
+        const completedStep = workflowSteps.completeStep(currentState);
 
         yield {
           type: WORKFLOW_EVENTS.STEP_COMPLETE,
@@ -332,16 +343,12 @@ export class Workflow<
           workflowDescription: this.description,
           previousState,
           newState: currentState,
-          completedStep,
           steps: workflowSteps.steps,
           options,
-          currentStepId: completedStep.id
+          currentStep: completedStep
         };
       } catch (error) {
-        const errorStep = workflowSteps.errorStep(
-          (initialCompletedSteps?.length || 0) + index,
-          currentState
-        );
+        const errorStep = workflowSteps.errorStep(currentState);
 
         yield {
           type: WORKFLOW_EVENTS.ERROR,
@@ -350,11 +357,10 @@ export class Workflow<
           workflowDescription: this.description,
           previousState,
           newState: currentState,
-          completedStep: errorStep,
           error: error as SerializedError,
           steps: workflowSteps.steps,
           options,
-          currentStepId: errorStep.id
+          currentStep: errorStep
         };
         throw error;
       }

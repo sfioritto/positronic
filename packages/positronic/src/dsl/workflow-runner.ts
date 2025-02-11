@@ -46,8 +46,8 @@ export class WorkflowRunner {
       );
 
       // Log completed steps
-      if (event.completedStep) {
-        log(`${event.completedStep.title} ✅`);
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.currentStep) {
+        log(`${event.currentStep.title} ✅`);
       }
 
       // Log final state on workflow completion/error if verbose

@@ -98,8 +98,8 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
 
-    if (!event.currentStepId) {
-      throw new Error('Current step ID is required for step start event');
+    if (!event.currentStep) {
+      throw new Error('Current step is required for step start event');
     }
 
     // Update the step to running status and set started_at
@@ -108,7 +108,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       status = ?,
       started_at = CURRENT_TIMESTAMP
       WHERE workflow_run_id = ? AND id = ?
-    `).run(STATUS.RUNNING, this.workflowRunId, event.currentStepId);
+    `).run(STATUS.RUNNING, this.workflowRunId, event.currentStep.id);
   }
 
   private async handleRestart(event: Event<any, any, SQLiteOptions>) {
@@ -194,9 +194,9 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         this.workflowRunId
       );
 
-      if (event.completedStep) {
+      if (event.currentStep) {
         // Get the current step's order by finding its index in steps array
-        const currentStepOrder = event.steps.findIndex(s => s.id === event.completedStep!.id);
+        const currentStepOrder = event.steps.findIndex(s => s.id === event.currentStep!.id);
 
         // If this is the first step and it hasn't been started yet, set its started_at
         const currentStep = await this.db.prepare(`
@@ -222,8 +222,8 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           completed_at = CURRENT_TIMESTAMP
           WHERE workflow_run_id = ? AND step_order = ?
         `).run(
-          JSON.stringify(event.completedStep.state),
-          event.completedStep.status,
+          JSON.stringify(event.currentStep.state),
+          event.currentStep.status,
           event.error ? JSON.stringify(event.error) : null,
           this.workflowRunId,
           currentStepOrder
@@ -241,8 +241,8 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
             started_at = CURRENT_TIMESTAMP
             WHERE workflow_run_id = ? AND step_order = ?
           `).run(
-            JSON.stringify(event.completedStep.state),
-            JSON.stringify(event.completedStep.state),
+            JSON.stringify(event.currentStep.state),
+            JSON.stringify(event.currentStep.state),
             STATUS.RUNNING,
             this.workflowRunId,
             nextStepOrder
@@ -296,8 +296,8 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       );
 
       // Update the errored step
-      if (event.completedStep) {
-        const stepOrder = event.steps.findIndex(s => s.title === event.completedStep!.title);
+      if (event.currentStep) {
+        const stepOrder = event.steps.findIndex(s => s.title === event.currentStep!.title);
         this.db.prepare(`
           UPDATE workflow_steps SET
           new_state = ?,
@@ -308,7 +308,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           WHERE workflow_run_id = ? AND step_order = ?
         `).run(
           JSON.stringify(event.newState),
-          event.completedStep.status,
+          event.currentStep.status,
           serializedError ? JSON.stringify(serializedError) : null,
           this.workflowRunId,
           stepOrder

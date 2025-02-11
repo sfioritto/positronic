@@ -52,7 +52,7 @@ describe('workflow creation', () => {
     expect(firstStepResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
       newState: { count: 1 },
-      completedStep: expect.objectContaining({
+      currentStep: expect.objectContaining({
         title: 'First step',
         status: STATUS.COMPLETE,
         state: { count: 1 }
@@ -74,7 +74,7 @@ describe('workflow creation', () => {
     expect(secondStepResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
       newState: { count: 1, doubled: 2 },
-      completedStep: expect.objectContaining({
+      currentStep: expect.objectContaining({
         title: 'Second step',
         status: STATUS.COMPLETE,
         state: { count: 1, doubled: 2 }
@@ -371,7 +371,7 @@ describe('nested workflows', () => {
       type: e.type,
       workflowTitle: e.workflowTitle,
       status: e.status,
-      ...(e.completedStep ? { stepTitle: e.completedStep.title } : {})
+      ...(e.currentStep ? { stepTitle: e.currentStep.title } : {})
     }))).toEqual([
       // Outer workflow start
       {
@@ -383,7 +383,8 @@ describe('nested workflows', () => {
       {
         type: WORKFLOW_EVENTS.STEP_START,
         workflowTitle: 'Outer Workflow',
-        status: STATUS.RUNNING
+        status: STATUS.RUNNING,
+        stepTitle: 'Set prefix'
       },
       // First step of outer workflow
       {
@@ -396,7 +397,8 @@ describe('nested workflows', () => {
       {
         type: WORKFLOW_EVENTS.STEP_START,
         workflowTitle: 'Outer Workflow',
-        status: STATUS.RUNNING
+        status: STATUS.RUNNING,
+        stepTitle: 'Run inner workflow'
       },
       // Inner workflow start
       {
@@ -408,7 +410,8 @@ describe('nested workflows', () => {
       {
         type: WORKFLOW_EVENTS.STEP_START,
         workflowTitle: 'Inner Workflow',
-        status: STATUS.RUNNING
+        status: STATUS.RUNNING,
+        stepTitle: 'Double value'
       },
       // Inner workflow step
       {
@@ -857,7 +860,7 @@ describe('workflow steps', () => {
     await firstRun.next(); // Start event
     await firstRun.next(); // Step start event
     const firstStepEvent = await firstRun.next(); // Step complete event
-    const completedStep = firstStepEvent.value.completedStep;
+    const completedStep = firstStepEvent.value.currentStep;
 
     // Restart workflow with completed step
     const secondRun = testWorkflow.run({
@@ -871,7 +874,7 @@ describe('workflow steps', () => {
     expect(restartEvent.value.steps[0].id).toBe(completedStep.id);
   });
 
-  it('should set currentStepId correctly in events and preserve through restarts', async () => {
+  it('should set currentStep correctly in events and preserve through restarts', async () => {
     const testWorkflow = workflow('Step ID Test')
       .step(
         "First step",
@@ -891,27 +894,27 @@ describe('workflow steps', () => {
     // Get the step IDs from the final event's steps array
     const stepIds = firstRunEvents[firstRunEvents.length - 1].steps.map(s => s.id);
 
-    // Verify currentStepId is set correctly for each step-related event
+    // Verify currentStep is set correctly for each step-related event
     expect(firstRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // First step start
-    expect(firstRunEvents[1].currentStepId).toBe(stepIds[0]);
+    expect(firstRunEvents[1].currentStep?.id).toBe(stepIds[0]);
 
     expect(firstRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // First step complete
-    expect(firstRunEvents[2].currentStepId).toBe(stepIds[0]);
+    expect(firstRunEvents[2].currentStep?.id).toBe(stepIds[0]);
 
     expect(firstRunEvents[3].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
-    expect(firstRunEvents[3].currentStepId).toBe(stepIds[1]);
+    expect(firstRunEvents[3].currentStep?.id).toBe(stepIds[1]);
 
     expect(firstRunEvents[4].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
-    expect(firstRunEvents[4].currentStepId).toBe(stepIds[1]);
+    expect(firstRunEvents[4].currentStep?.id).toBe(stepIds[1]);
 
-    // Verify workflow events don't have currentStepId
-    expect(firstRunEvents[0].currentStepId).toBeUndefined(); // START event
-    expect(firstRunEvents[5].currentStepId).toBeUndefined(); // COMPLETE event
+    // Verify workflow events don't have currentStep
+    expect(firstRunEvents[0].currentStep).toBeUndefined(); // START event
+    expect(firstRunEvents[5].currentStep).toBeUndefined(); // COMPLETE event
 
     // Now restart the workflow after first step
-    const firstStepCompleted = firstRunEvents[2].completedStep;
+    const firstStepCompleted = firstRunEvents[2].currentStep;
     if (!firstStepCompleted) {
-      throw new Error('Expected completed step to be defined');
+      throw new Error('Expected current step to be defined');
     }
 
     const secondRunEvents = [];
@@ -927,11 +930,11 @@ describe('workflow steps', () => {
     expect(secondRunEvents[0].steps[1].id).not.toBe(stepIds[1]); // Second step should have new ID
     expect(secondRunEvents[0].steps[1].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i); // Should be a valid UUID
 
-    // Verify currentStepId is set correctly in restarted workflow
+    // Verify currentStep is set correctly in restarted workflow
     expect(secondRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
-    expect(secondRunEvents[1].currentStepId).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
+    expect(secondRunEvents[1].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
 
     expect(secondRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
-    expect(secondRunEvents[2].currentStepId).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
+    expect(secondRunEvents[2].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
   });
 });
