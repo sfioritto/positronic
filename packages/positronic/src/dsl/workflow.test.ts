@@ -291,44 +291,51 @@ describe('workflow resumption', () => {
     execute: jest.fn()
   };
 
-  it('should resume workflow from a specific step with correct state chain', async () => {
+  it('should resume workflow from the correct step when given initialCompletedSteps', async () => {
+    const executedSteps: string[] = [];
+
     const threeStepWorkflow = workflow('Three Step Workflow')
-      .step("Step 1: Double", ({ state }) => ({
-        value: ((state as { value: number }).value || 2) * 2
-      }))
-      .step("Step 2: Add 10", ({ state }) => ({
-        value: state.value + 10
-      }))
-      .step("Step 3: Multiply by 3", ({ state }) => ({
-        value: state.value * 3
-      }));
+      .step("Step 1", ({ state }) => {
+        executedSteps.push("Step 1");
+        return { value: 2 };
+      })
+      .step("Step 2", ({ state }) => {
+        executedSteps.push("Step 2");
+        return { value: state.value + 10 };
+      })
+      .step("Step 3", ({ state }) => {
+        executedSteps.push("Step 3");
+        return { value: state.value * 3 };
+      });
 
-    const initialState = { value: 2 };
-
-    // First run the workflow normally
-    let fullRun;
+    // First run to get the first step completed
+    let firstStepCompleted: SerializedStep | undefined;
     for await (const event of threeStepWorkflow.run({ client: mockClient })) {
-      fullRun = event;
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.currentStep?.title === "Step 1") {
+        firstStepCompleted = event.currentStep;
+        break;  // Stop after first step
+      }
     }
 
-    if (!fullRun?.steps) {
-      throw new Error('Steps not found');
+    if (!firstStepCompleted) {
+      throw new Error('Failed to get first completed step');
     }
 
-    // Resume from step 2 by passing the completed first step
-    let resumedRun;
-    for await (const event of threeStepWorkflow.run({ client: mockClient })) {
-      resumedRun = event;
+    // Clear executed steps array
+    executedSteps.length = 0;
+
+    // Resume workflow with first step completed
+    let finalEvent: any;
+    for await (const event of threeStepWorkflow.run({
+      client: mockClient,
+      initialCompletedSteps: [firstStepCompleted]
+    })) {
+      // do nothing, just run the workflow
     }
 
-    // Verify the full run executed correctly
-    if (!fullRun?.currentStep?.state) throw new Error('Expected currentStep.state to be defined');
-    expect(fullRun.currentStep.state.value).toBe(42); // ((2 * 2) + 10) * 3 = 42
-    expect(fullRun.steps.map(s => s.state?.value)).toEqual([4, 14, 42]);
-
-    // Verify the resumed run started from step 2 with correct state
-    if (!resumedRun?.currentStep?.state) throw new Error('Expected currentStep.state to be defined');
-    expect(resumedRun.currentStep.state.value).toBe(42);
+    // Verify only steps 2 and 3 were executed
+    expect(executedSteps).toEqual(["Step 2", "Step 3"]);
+    expect(executedSteps).not.toContain("Step 1");
   });
 });
 
