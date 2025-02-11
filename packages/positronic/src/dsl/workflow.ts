@@ -220,52 +220,26 @@ export class Workflow<
 
     // Initialize state from completed steps or initial state
     let currentState = initialCompletedSteps?.length > 0
-      ? clone(initialCompletedSteps[initialCompletedSteps.length - 1]?.state ?? initialState)
-      : clone(initialState || {} as TState);
+      ? clone(initialCompletedSteps[initialCompletedSteps.length - 1]?.state ?? initialState ?? {})
+      : clone(initialState ?? {} as TState);
 
     // Track current step for event generation
     let currentStep: SerializedStep | undefined;
     let lastCompletedStep: SerializedStep | undefined;
     const currentIndex = initialCompletedSteps.length;
 
-    // Helper function to create events with consistent structure
-    const createEvent = <TStateIn extends State, TStateOut extends State>(
-      type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS],
-      status: typeof STATUS[keyof typeof STATUS],
-      additionalProps: Partial<Event<TStateIn, TStateOut, TOptions>> = {}
-    ): Event<TStateIn, TStateOut, TOptions> => {
-      const previousState = type === WORKFLOW_EVENTS.COMPLETE ? {} as TStateIn : clone(currentState) as TStateIn;
-      let stepForEvent: SerializedStep | undefined;
-
-      switch (type) {
-        case WORKFLOW_EVENTS.STEP_START:
-          stepForEvent = currentStep;
-          break;
-        case WORKFLOW_EVENTS.STEP_COMPLETE:
-        case WORKFLOW_EVENTS.ERROR:
-          stepForEvent = lastCompletedStep;
-          break;
-      }
-
-      return {
-        type,
-        status,
-        workflowTitle: this.title,
-        workflowDescription: this.description,
-        previousState,
-        newState: clone(currentState) as TStateOut,
-        steps,
-        options,
-        currentStep: stepForEvent,
-        ...additionalProps
-      };
-    };
-
     // Yield start/restart event
-    yield createEvent(
-      initialCompletedSteps?.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
-      STATUS.RUNNING
-    );
+    yield {
+      type: initialCompletedSteps?.length > 0 ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
+      status: STATUS.RUNNING,
+      workflowTitle: this.title,
+      workflowDescription: this.description,
+      previousState: clone(currentState),
+      newState: clone(currentState),
+      steps,
+      options,
+      currentStep: undefined
+    };
 
     // Process remaining blocks
     for (let i = currentIndex; i < this.blocks.length; i++) {
@@ -273,7 +247,17 @@ export class Workflow<
       currentStep = steps[i];
 
       // Yield step start event
-      yield createEvent(WORKFLOW_EVENTS.STEP_START, STATUS.RUNNING);
+      yield {
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        workflowTitle: this.title,
+        workflowDescription: this.description,
+        previousState: clone(currentState),
+        newState: clone(currentState),
+        steps,
+        options,
+        currentStep
+      };
 
       try {
         let newState: TState;
@@ -319,7 +303,17 @@ export class Workflow<
         currentState = clone(newState);
         lastCompletedStep = steps[i];
 
-        yield createEvent(WORKFLOW_EVENTS.STEP_COMPLETE, STATUS.RUNNING);
+        yield {
+          type: WORKFLOW_EVENTS.STEP_COMPLETE,
+          status: STATUS.RUNNING,
+          workflowTitle: this.title,
+          workflowDescription: this.description,
+          previousState: clone(currentState),
+          newState: clone(currentState),
+          steps,
+          options,
+          currentStep: lastCompletedStep
+        };
       } catch (error) {
         // Update step status on error
         steps[i] = {
@@ -329,17 +323,34 @@ export class Workflow<
         };
         lastCompletedStep = steps[i];
 
-        yield createEvent(
-          WORKFLOW_EVENTS.ERROR,
-          STATUS.ERROR,
-          { error: error as SerializedError }
-        );
+        yield {
+          type: WORKFLOW_EVENTS.ERROR,
+          status: STATUS.ERROR,
+          workflowTitle: this.title,
+          workflowDescription: this.description,
+          previousState: clone(currentState),
+          newState: clone(currentState),
+          steps,
+          options,
+          currentStep: lastCompletedStep,
+          error: error as SerializedError
+        };
         throw error;
       }
     }
 
     // Yield completion event
-    yield createEvent(WORKFLOW_EVENTS.COMPLETE, STATUS.COMPLETE);
+    yield {
+      type: WORKFLOW_EVENTS.COMPLETE,
+      status: STATUS.COMPLETE,
+      workflowTitle: this.title,
+      workflowDescription: this.description,
+      previousState: {} as TState,
+      newState: clone(currentState),
+      steps,
+      options,
+      currentStep: undefined
+    };
 
     return currentState as TState;
   }
