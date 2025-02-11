@@ -12,7 +12,6 @@ type SerializedError = {
 
 export interface Event<
   TStateIn extends State,
-  TStateOut extends State,
   TOptions extends object = {}
 > {
   workflowTitle: string;
@@ -20,7 +19,6 @@ export interface Event<
   type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
   status: typeof STATUS[keyof typeof STATUS];
   previousState: TStateIn;
-  newState: TStateOut;
   error?: SerializedError;
   currentStep?: SerializedStep;
   steps: SerializedStep[];
@@ -174,7 +172,7 @@ export class Workflow<
     return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
   }
 
-  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TState, TOptions>> {
+  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TOptions>> {
     // Extract client and clone only the serializable properties.
     const { client, ...serializableParams } = params;
     const clonedParams = { client, ...clone(serializableParams) };
@@ -235,7 +233,6 @@ export class Workflow<
       workflowTitle: this.title,
       workflowDescription: this.description,
       previousState: clone(currentState),
-      newState: clone(currentState),
       steps,
       options,
       currentStep: undefined
@@ -253,21 +250,14 @@ export class Workflow<
         workflowTitle: this.title,
         workflowDescription: this.description,
         previousState: clone(currentState),
-        newState: clone(currentState),
         steps,
         options,
         currentStep
       };
 
       try {
-        let newState: TState;
-        if (block.type === 'step') {
-          newState = await block.action({
-            state: currentState as TState,
-            options,
-            client,
-          });
-        } else {
+        let nextState: TState;
+        if (block.type === 'workflow') {
           const childInitial = typeof block.initialState === 'function'
             ? block.initialState(currentState)
             : block.initialState;
@@ -291,16 +281,22 @@ export class Workflow<
             throw new Error('Inner workflow did not complete');
           }
 
-          newState = block.action(currentState, innerCtx);
+          nextState = block.action(currentState, innerCtx);
+        } else {
+          nextState = await block.action({
+            state: currentState as TState,
+            options,
+            client,
+          });
         }
 
         // Update step and state
         steps[i] = {
           ...steps[i],
           status: STATUS.COMPLETE,
-          state: clone(newState)
+          state: clone(nextState)
         };
-        currentState = clone(newState);
+        currentState = clone(nextState);
         lastCompletedStep = steps[i];
 
         yield {
@@ -309,7 +305,6 @@ export class Workflow<
           workflowTitle: this.title,
           workflowDescription: this.description,
           previousState: clone(currentState),
-          newState: clone(currentState),
           steps,
           options,
           currentStep: lastCompletedStep
@@ -329,7 +324,6 @@ export class Workflow<
           workflowTitle: this.title,
           workflowDescription: this.description,
           previousState: clone(currentState),
-          newState: clone(currentState),
           steps,
           options,
           currentStep: lastCompletedStep,
@@ -346,7 +340,6 @@ export class Workflow<
       workflowTitle: this.title,
       workflowDescription: this.description,
       previousState: {} as TState,
-      newState: clone(currentState),
       steps,
       options,
       currentStep: lastCompletedStep

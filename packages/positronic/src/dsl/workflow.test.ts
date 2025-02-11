@@ -156,7 +156,7 @@ describe('workflow creation', () => {
     }
 
     // Final state should include both responses.
-    expect(finalEvent.newState).toEqual({
+    expect(finalEvent.currentStep?.state).toEqual({
       overrideResponse: { override: true }
     });
 
@@ -360,7 +360,7 @@ describe('nested workflows', () => {
         () => ({ value: 5 })
       );
 
-    const events: Event<any, any, any>[] = [];
+    const events: Event<any, any>[] = [];
     for await (const event of outerWorkflow.run({ client: mockClient })) {
       events.push(event);
     }

@@ -27,7 +27,7 @@ export class WorkflowRunner {
         initialState?: TState,
         initialCompletedSteps?: SerializedStep[],
         options?: TOptions
-      }) => AsyncGenerator<Event<TState, TState, TOptions>>
+      }) => AsyncGenerator<Event<TState, TOptions>>
     },
     initialState?: TState,
     initialCompletedSteps?: SerializedStep[],

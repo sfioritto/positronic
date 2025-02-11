@@ -18,7 +18,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     this.db.exec(initSQL);
   }
 
-  async dispatch(event: Event<any, any, SQLiteOptions>) {
+  async dispatch(event: Event<any, SQLiteOptions>) {
     switch (event.type) {
       case WORKFLOW_EVENTS.START:
         await this.handleStart(event);
@@ -41,7 +41,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     }
   }
 
-  private async handleStart(event: Event<any, any, SQLiteOptions>) {
+  private async handleStart(event: Event<any, SQLiteOptions>) {
     const { workflowTitle, previousState, status, steps } = event;
 
     // Wrap operations in a transaction
@@ -111,7 +111,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     `).run(STATUS.RUNNING, this.workflowRunId, event.currentStep.id);
   }
 
-  private async handleRestart(event: Event<any, any, SQLiteOptions>) {
+  private async handleRestart(event: Event<any, SQLiteOptions>) {
     this.workflowRunId = event.options?.workflowRunId;
 
     if (!this.workflowRunId) {
