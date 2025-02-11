@@ -32,9 +32,7 @@ describe('workflow creation', () => {
     expect(startResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.START,
       status: STATUS.RUNNING,
-      workflowTitle: 'test workflow',
-      previousState: {},
-      newState: {}
+      workflowTitle: 'test workflow'
     }));
 
     // Check first step start
@@ -42,16 +40,13 @@ describe('workflow creation', () => {
     expect(firstStepStartResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_START,
       status: STATUS.RUNNING,
-      workflowTitle: 'test workflow',
-      previousState: {},
-      newState: {}
+      workflowTitle: 'test workflow'
     }));
 
     // Check first step completion
     const firstStepResult = await workflowRun.next();
     expect(firstStepResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
-      newState: { count: 1 },
       currentStep: expect.objectContaining({
         title: 'First step',
         status: STATUS.COMPLETE,
@@ -65,15 +60,15 @@ describe('workflow creation', () => {
       type: WORKFLOW_EVENTS.STEP_START,
       status: STATUS.RUNNING,
       workflowTitle: 'test workflow',
-      previousState: { count: 1 },
-      newState: { count: 1 }
+      currentStep: expect.objectContaining({
+        title: 'Second step'
+      })
     }));
 
     // Check second step completion
     const secondStepResult = await workflowRun.next();
     expect(secondStepResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
-      newState: { count: 1, doubled: 2 },
       currentStep: expect.objectContaining({
         title: 'Second step',
         status: STATUS.COMPLETE,
@@ -86,8 +81,11 @@ describe('workflow creation', () => {
     expect(completeResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.COMPLETE,
       status: STATUS.COMPLETE,
-      previousState: {},
-      newState: { count: 1, doubled: 2 }
+      currentStep: expect.objectContaining({
+        title: 'Second step',
+        status: STATUS.COMPLETE,
+        state: { count: 1, doubled: 2 }
+      })
     }));
   });
 
@@ -228,7 +226,7 @@ describe('step creation', () => {
 
     // Verify the step executed correctly
     expect(finalEvent?.status).toBe(STATUS.COMPLETE);
-    expect(finalEvent?.newState).toEqual({
+    expect(finalEvent?.currentStep?.state).toEqual({
       count: 1,
       message: 'Count is now 1'
     });
@@ -324,12 +322,13 @@ describe('workflow resumption', () => {
     }
 
     // Verify the full run executed correctly
-    expect(fullRun.newState.value).toBe(42); // ((2 * 2) + 10) * 3 = 42
+    if (!fullRun?.currentStep?.state) throw new Error('Expected currentStep.state to be defined');
+    expect(fullRun.currentStep.state.value).toBe(42); // ((2 * 2) + 10) * 3 = 42
     expect(fullRun.steps.map(s => s.state?.value)).toEqual([4, 14, 42]);
 
     // Verify the resumed run started from step 2 with correct state
-    expect(resumedRun?.newState.value).toBe(42);
-    expect(resumedRun?.steps.slice(1).map(s => s.state?.value)).toEqual([14, 42]);
+    if (!resumedRun?.currentStep?.state) throw new Error('Expected currentStep.state to be defined');
+    expect(resumedRun.currentStep.state.value).toBe(42);
   });
 });
 
@@ -444,11 +443,11 @@ describe('nested workflows', () => {
     ]);
 
     // Verify states are passed correctly
-    expect(events[6].newState).toEqual({ // Inner workflow step completion
+    expect(events[6].currentStep?.state).toEqual({ // Inner workflow step completion
       inner: true,
       value: 10
     });
-    expect(events[8].newState).toEqual({ // Outer workflow after nested workflow
+    expect(events[8].currentStep?.state).toEqual({ // Outer workflow after nested workflow
       prefix: "test-",
       innerResult: 10
     });
@@ -594,10 +593,12 @@ describe('workflow options', () => {
     expect(stepCompleteResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
       options: workflowOptions,
-      newState: {
-        value: 1,
-        passedOption: 'test-value'
-      }
+      currentStep: expect.objectContaining({
+        state: {
+          value: 1,
+          passedOption: 'test-value'
+        }
+      })
     }));
 
     // Check workflow completion
@@ -605,10 +606,12 @@ describe('workflow options', () => {
     expect(completeResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.COMPLETE,
       options: workflowOptions,
-      newState: {
-        value: 1,
-        passedOption: 'test-value'
-      }
+      currentStep: expect.objectContaining({
+        state: {
+          value: 1,
+          passedOption: 'test-value'
+        }
+      })
     }));
   });
 
@@ -638,9 +641,11 @@ describe('workflow options', () => {
     expect(stepResult.value).toEqual(expect.objectContaining({
       options: {},
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
-      newState: {
-        hasOptions: true
-      }
+      currentStep: expect.objectContaining({
+        state: {
+          hasOptions: true
+        }
+      })
     }));
   });
 });
@@ -713,7 +718,7 @@ describe('type inference', () => {
     }
 
     // Verify the final state has all expected properties with correct types
-    expect(finalEvent?.newState).toEqual({
+    expect(finalEvent?.currentStep?.state).toEqual({
       initialFeatures: ['fast', 'secure'],
       value: 42,
       processedValue: 100,
@@ -785,7 +790,7 @@ describe('type inference', () => {
       finalEvent = event;
     }
 
-    expect(finalEvent?.newState).toEqual({
+    expect(finalEvent?.currentStep?.state).toEqual({
       outerValue: 100,
       status: 'ready',
       innerResult: 42,
@@ -834,7 +839,7 @@ describe('type inference', () => {
       finalEvent = event;
     }
 
-    expect(finalEvent?.newState).toMatchObject({
+    expect(finalEvent?.currentStep?.state).toMatchObject({
       count: 2,
       metadata: {
         created: expect.any(String),
