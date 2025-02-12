@@ -9,8 +9,6 @@ const filesExtension = createExtension('files', {
     }
   ) {
     return this.step(title, async ({ state }) => {
-      console.log(`[FILES] Creating file reference for ${config.path}`);
-
       return {
         ...state,
         files: {

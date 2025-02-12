@@ -242,13 +242,10 @@ export class Workflow<
       initialCompletedSteps = []
     } = params;
 
-    console.log('Initial workflow state:', initialState);
-
     // Initialize steps array with UUIDs and pending status
     const steps = this.blocks.map((block, index) => {
       const completedStep = initialCompletedSteps[index];
       if (completedStep) {
-        console.log(`Using completed step ${index}:`, completedStep);
         return new Step(block, completedStep.id)
           .withState(completedStep.state as TState)
           .withStatus(completedStep.status);
@@ -320,10 +317,6 @@ export class Workflow<
             .withStatus(STATUS.COMPLETE);
         } else {
           const { block: { action } } = currentStep;
-          console.log('Step execution:', {
-            stepTitle: currentStep.block.title,
-            currentState,
-          });
 
           nextState = await action({
             state: currentState,

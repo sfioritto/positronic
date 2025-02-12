@@ -19,16 +19,13 @@ describe('workflow creation', () => {
       .step(
         "First step",
         ({ client }) => {
-          console.log('Executing first step');
           return { count: 1 };
         }
       )
       .step(
         "Second step",
         ({ state }) => {
-          console.log('Executing second step with state:', state);
           const result = { count: state.count, doubled: state.count * 2 };
-          console.log('Second step result:', result);
           return result;
         }
       );
