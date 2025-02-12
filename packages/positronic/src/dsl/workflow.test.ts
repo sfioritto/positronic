@@ -13,21 +13,25 @@ const mockClient = {
   execute: jest.fn()
 };
 
+// Add this helper function at the top of the file
+const nextStep = async <T>(workflowRun: AsyncIterator<T>): Promise<T> => {
+  const result = await workflowRun.next();
+  if (result.done) throw new Error('Iterator is done');
+  return result.value;
+};
+
 describe('workflow creation', () => {
   it('should create a workflow with steps and run through them', async () => {
     const testWorkflow = workflow('test workflow')
       .step(
         "First step",
-        ({ client }) => {
+        () => {
           return { count: 1 };
         }
       )
       .step(
         "Second step",
-        ({ state }) => {
-          const result = { count: state.count, doubled: state.count * 2 };
-          return result;
-        }
+        ({ state }) => ({ ...state, doubled: state.count * 2 })
       );
 
     const workflowRun = testWorkflow.run({ client: mockClient });
@@ -41,16 +45,16 @@ describe('workflow creation', () => {
     }));
 
     // Check first step start
-    const firstStepStartResult = await workflowRun.next();
-    expect(firstStepStartResult.value).toEqual(expect.objectContaining({
+    const firstStepStartResult = await nextStep(workflowRun);
+    expect(firstStepStartResult).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_START,
       status: STATUS.RUNNING,
       workflowTitle: 'test workflow'
     }));
 
     // Check first step completion
-    const firstStepResult = await workflowRun.next();
-    expect(firstStepResult.value).toEqual(expect.objectContaining({
+    const firstStepResult = await nextStep(workflowRun);
+    expect(firstStepResult).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
       currentStep: expect.objectContaining({
         title: 'First step',
@@ -60,8 +64,8 @@ describe('workflow creation', () => {
     }));
 
     // Check second step start
-    const secondStepStartResult = await workflowRun.next();
-    expect(secondStepStartResult.value).toEqual(expect.objectContaining({
+    const secondStepStartResult = await nextStep(workflowRun);
+    expect(secondStepStartResult).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_START,
       status: STATUS.RUNNING,
       workflowTitle: 'test workflow',
@@ -71,8 +75,8 @@ describe('workflow creation', () => {
     }));
 
     // Check second step completion
-    const secondStepResult = await workflowRun.next();
-    expect(secondStepResult.value).toEqual(expect.objectContaining({
+    const secondStepResult = await nextStep(workflowRun);
+    expect(secondStepResult).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
       currentStep: expect.objectContaining({
         title: 'Second step',
@@ -82,8 +86,8 @@ describe('workflow creation', () => {
     }));
 
     // Check workflow completion
-    const completeResult = await workflowRun.next();
-    expect(completeResult.value).toEqual(expect.objectContaining({
+    const completeResult = await nextStep(workflowRun);
+    expect(completeResult).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.COMPLETE,
       status: STATUS.COMPLETE,
       workflowTitle: 'test workflow',
