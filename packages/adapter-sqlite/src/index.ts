@@ -42,7 +42,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   private async handleStart(event: Event<any, SQLiteOptions>) {
-    const { workflowTitle, previousState, status, steps } = event;
+    const { workflowTitle, status, steps } = event;
 
     // Wrap operations in a transaction
     this.db.transaction(() => {
@@ -50,13 +50,11 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
       const result = this.db.prepare(`
         INSERT INTO workflow_runs (
           workflow_name,
-          initial_state,
           status,
           error
-        ) VALUES (?, ?, ?, ?)
+        ) VALUES (?, ?, ?)
       `).run(
         workflowTitle,
-        JSON.stringify(previousState),
         status,
         null
       );
@@ -70,27 +68,25 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
             id,
             workflow_run_id,
             title,
-            previous_state,
-            new_state,
+            state,
             status,
             error,
             step_order,
             started_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
         `;
 
         this.db.prepare(sql).run(
           step.id,
           this.workflowRunId,
           step.title,
-          JSON.stringify(previousState),
-          JSON.stringify(previousState),
+          JSON.stringify(step.state ?? {}),
           STATUS.PENDING,
           null,
           index
         );
       });
-    })();  // Note: immediately execute the transaction
+    })();
   }
 
   private async handleStepStart(event: Event<any, any>) {
@@ -138,10 +134,11 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           WHERE workflow_run_id = ? AND step_order >= ?
         `).run(this.workflowRunId, firstNonCompletedIndex);
 
+        const previousStep = event.steps.find(step => step.id === event.currentStep?.id);
         // Re-create steps from the first non-completed step onwards
         let previousState = firstNonCompletedIndex > 0
           ? event.steps[firstNonCompletedIndex - 1].state
-          : event.previousState;
+          : previousStep?.state;
 
         event.steps.slice(firstNonCompletedIndex).forEach((step, index) => {
           const sql = `
@@ -149,23 +146,19 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
               id,
               workflow_run_id,
               title,
-              previous_state,
-              new_state,
+              state,
               status,
               error,
               step_order,
-              created_at,
-              started_at,
-              completed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, NULL)
+              started_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
           `;
 
           this.db.prepare(sql).run(
             step.id,
             this.workflowRunId,
             step.title,
-            JSON.stringify(previousState),
-            JSON.stringify(previousState),
+            JSON.stringify(step.state ?? {}),
             STATUS.PENDING,
             null,
             firstNonCompletedIndex + index
@@ -216,7 +209,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         // Update completed step with the new state
         this.db.prepare(`
           UPDATE workflow_steps SET
-          new_state = ?,
+          state = ?,
           status = ?,
           error = ?,
           completed_at = CURRENT_TIMESTAMP
@@ -232,16 +225,14 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         // Start next step if it exists
         const nextStepOrder = currentStepOrder + 1;
         if (nextStepOrder < event.steps.length) {
-          // Update next step's previous state and start it
+          // Update next step's state and start it
           this.db.prepare(`
             UPDATE workflow_steps SET
-            previous_state = ?,
-            new_state = ?,
+            state = ?,
             status = ?,
             started_at = CURRENT_TIMESTAMP
             WHERE workflow_run_id = ? AND step_order = ?
           `).run(
-            JSON.stringify(event.currentStep.state),
             JSON.stringify(event.currentStep.state),
             STATUS.RUNNING,
             this.workflowRunId,
@@ -304,7 +295,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
 
         this.db.prepare(`
           UPDATE workflow_steps SET
-          new_state = ?,
+          state = ?,
           status = ?,
           error = ?,
           started_at = CURRENT_TIMESTAMP,

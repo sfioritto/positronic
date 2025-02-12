@@ -3,13 +3,11 @@ export const initSQL = `
 CREATE TABLE IF NOT EXISTS workflow_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workflow_name TEXT NOT NULL,
-    initial_state TEXT NOT NULL,  -- JSON
     status TEXT NOT NULL,
     error TEXT,  -- JSON
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
     -- Add JSON validation checks
-    CONSTRAINT valid_initial_state CHECK (json_valid(initial_state)),
     CONSTRAINT valid_error CHECK (error IS NULL OR json_valid(error))
 );
 
@@ -24,8 +22,7 @@ CREATE TABLE IF NOT EXISTS workflow_steps (
     id TEXT PRIMARY KEY,  -- UUID from workflow
     workflow_run_id INTEGER NOT NULL REFERENCES workflow_runs(id),
     title TEXT NOT NULL,
-    previous_state TEXT NOT NULL,  -- JSON
-    new_state TEXT NOT NULL,  -- JSON
+    state TEXT NOT NULL,  -- JSON
     status TEXT NOT NULL,
     error TEXT,  -- JSON
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -33,8 +30,7 @@ CREATE TABLE IF NOT EXISTS workflow_steps (
     completed_at DATETIME,
     step_order INTEGER NOT NULL,  -- Add this to maintain step order
     -- Add JSON validation checks
-    CONSTRAINT valid_previous_state CHECK (json_valid(previous_state)),
-    CONSTRAINT valid_new_state CHECK (json_valid(new_state)),
+    CONSTRAINT valid_state CHECK (json_valid(state)),
     CONSTRAINT valid_error CHECK (error IS NULL OR json_valid(error))
 );
 

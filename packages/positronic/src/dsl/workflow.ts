@@ -77,8 +77,9 @@ class Step {
 
   constructor(
     public block: Block<any, any, any>,
+    id?: string
   ) {
-    this.id = uuidv4();
+    this.id = id || uuidv4();
   }
 
   get state(): State {
@@ -248,13 +249,18 @@ export class Workflow<
       const completedStep = initialCompletedSteps[index];
       if (completedStep) {
         console.log(`Using completed step ${index}:`, completedStep);
-        return new Step(block)
+        return new Step(block, completedStep.id)
           .withState(completedStep.state as TState)
           .withStatus(completedStep.status);
       }
 
       return new Step(block);
     });
+
+    // Get the last completed step's state or use initial state
+    let currentState = initialCompletedSteps.length > 0
+      ? initialCompletedSteps[initialCompletedSteps.length - 1].state as TState
+      : initialState || {} as TState;
 
     // Yield start/restart event
     yield {
@@ -265,8 +271,6 @@ export class Workflow<
       steps: steps.map(step => step.serialized),
       options,
     };
-
-    let currentState = initialState || {} as TState;
 
     // Process remaining blocks
     for (const currentStep of steps.slice(initialCompletedSteps.length)) {
@@ -308,7 +312,7 @@ export class Workflow<
             throw new Error('Inner workflow did not complete');
           }
 
-          nextState = action(currentState, innerState);
+          nextState = await action(currentState, innerState);
           currentState = nextState;
 
           currentStep
