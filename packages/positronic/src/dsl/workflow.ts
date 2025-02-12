@@ -11,7 +11,6 @@ type SerializedError = {
 }
 
 export interface Event<
-  TStateIn extends State,
   TOptions extends object = {}
 > {
   workflowTitle: string;
@@ -207,7 +206,7 @@ export class Workflow<
     return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
   }
 
-  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<Event<TState, TOptions>> {
+  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<Event<TOptions>> {
     // Extract client and clone only the serializable properties.
     const { client, ...serializableParams } = params;
     const clonedParams = { client, ...clone(serializableParams) };

@@ -2,13 +2,13 @@ import { WORKFLOW_EVENTS } from '../dsl/constants';
 import type { Event } from '../dsl/workflow';
 
 export abstract class Adapter<Options extends object = any> {
-  async started?(event: Event<any, Options>): Promise<void>;
-  async updated?(event: Event<any, Options>): Promise<void>;
-  async completed?(event: Event<any, Options>): Promise<void>;
-  async error?(event: Event<any, Options>): Promise<void>;
-  async restarted?(event: Event<any, Options>): Promise<void>;
+  async started?(event: Event<Options>): Promise<void>;
+  async updated?(event: Event<Options>): Promise<void>;
+  async completed?(event: Event<Options>): Promise<void>;
+  async error?(event: Event<Options>): Promise<void>;
+  async restarted?(event: Event<Options>): Promise<void>;
 
-  async dispatch(event: Event<any, Options>) {
+  async dispatch(event: Event<Options>) {
     if (event.type === WORKFLOW_EVENTS.START && this.started) {
       await this.started(event);
     } else if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && this.updated) {

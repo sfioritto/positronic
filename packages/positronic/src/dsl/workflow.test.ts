@@ -385,7 +385,7 @@ describe('nested workflows', () => {
         () => ({ value: 5 })
       );
 
-    const events: Event<any, any>[] = [];
+    const events: Event<any>[] = [];
     for await (const event of outerWorkflow.run({ client: mockClient })) {
       events.push(event);
     }
@@ -505,7 +505,7 @@ describe('nested workflows', () => {
         () => ({ value: 5 })
       );
 
-    const events: Event<any, any>[] = [];
+    const events: Event<any>[] = [];
     let error: Error | undefined;
     try {
       for await (const event of outerWorkflow.run({ client: mockClient })) {

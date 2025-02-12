@@ -18,7 +18,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     this.db.exec(initSQL);
   }
 
-  async dispatch(event: Event<any, SQLiteOptions>) {
+  async dispatch(event: Event<SQLiteOptions>) {
     switch (event.type) {
       case WORKFLOW_EVENTS.START:
         await this.handleStart(event);
@@ -41,7 +41,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     }
   }
 
-  private async handleStart(event: Event<any, SQLiteOptions>) {
+  private async handleStart(event: Event<SQLiteOptions>) {
     const { workflowTitle, status, steps } = event;
 
     // Wrap operations in a transaction
@@ -89,7 +89,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     })();
   }
 
-  private async handleStepStart(event: Event<any, any>) {
+  private async handleStepStart(event: Event<SQLiteOptions>) {
     if (!this.workflowRunId) {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
@@ -107,7 +107,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     `).run(STATUS.RUNNING, this.workflowRunId, event.currentStep.id);
   }
 
-  private async handleRestart(event: Event<any, SQLiteOptions>) {
+  private async handleRestart(event: Event<SQLiteOptions>) {
     this.workflowRunId = event.options?.workflowRunId;
 
     if (!this.workflowRunId) {
@@ -168,7 +168,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     })();
   }
 
-  private async handleUpdate(event: Event<any, any>) {
+  private async handleUpdate(event: Event<SQLiteOptions>) {
     if (!this.workflowRunId) {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
@@ -243,7 +243,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     })();
   }
 
-  private async handleComplete(event: Event<any, any>) {
+  private async handleComplete(event: Event<SQLiteOptions>) {
     if (!this.workflowRunId) {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
@@ -261,7 +261,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     );
   }
 
-  private async handleError(event: Event<any, any>) {
+  private async handleError(event: Event<SQLiteOptions>) {
     if (!this.workflowRunId) {
       throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
     }
