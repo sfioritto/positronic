@@ -134,12 +134,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
           WHERE workflow_run_id = ? AND step_order >= ?
         `).run(this.workflowRunId, firstNonCompletedIndex);
 
-        const previousStep = event.steps.find(step => step.id === event.currentStep?.id);
         // Re-create steps from the first non-completed step onwards
-        let previousState = firstNonCompletedIndex > 0
-          ? event.steps[firstNonCompletedIndex - 1].state
-          : previousStep?.state;
-
         event.steps.slice(firstNonCompletedIndex).forEach((step, index) => {
           const sql = `
             INSERT INTO workflow_steps (
