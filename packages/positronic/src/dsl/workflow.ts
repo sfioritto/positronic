@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { v4 as uuidv4 } from 'uuid';
 import type { PromptClient } from "../clients/types";
-import type { State } from "./types";
+import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 
 type SerializedError = {
@@ -9,6 +9,70 @@ type SerializedError = {
   message: string;
   stack?: string;
 }
+
+// New Event Type System
+// Base event interface with only type and options
+interface BaseEvent<TOptions extends object = {}> {
+  type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
+  options: TOptions;
+}
+
+// 1. Workflow Events (all include workflow title/description)
+interface WorkflowBaseEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
+  workflowTitle: string;
+  workflowDescription?: string;
+}
+
+interface WorkflowStartEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
+  type: typeof WORKFLOW_EVENTS.START | typeof WORKFLOW_EVENTS.RESTART;
+  status: typeof STATUS.RUNNING;
+}
+
+interface WorkflowCompleteEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
+  type: typeof WORKFLOW_EVENTS.COMPLETE;
+  status: typeof STATUS.COMPLETE;
+}
+
+interface WorkflowErrorEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
+  type: typeof WORKFLOW_EVENTS.ERROR;
+  status: typeof STATUS.ERROR;
+  error: {
+    name: string;
+    message: string;
+    stack?: string;
+  };
+}
+
+// 2. Step Status Event (just steps array and base event properties)
+interface StepStatusEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
+  type: typeof WORKFLOW_EVENTS.STEP_STATUS;
+  steps: SerializedStep[];
+}
+
+// 3. Step Events (include step-specific properties)
+interface StepStartedEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
+  type: typeof WORKFLOW_EVENTS.STEP_START;
+  status: typeof STATUS.RUNNING;
+  stepTitle: string;
+  stepId: string;
+}
+
+interface StepCompletedEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
+  type: typeof WORKFLOW_EVENTS.STEP_COMPLETE;
+  status: typeof STATUS.RUNNING;
+  stepTitle: string;
+  stepId: string;
+  patch: JsonPatch;
+}
+
+// Union type of all possible events
+export type WorkflowEvent<TOptions extends object = {}> =
+  | WorkflowStartEvent<TOptions>
+  | WorkflowCompleteEvent<TOptions>
+  | WorkflowErrorEvent<TOptions>
+  | StepStatusEvent<TOptions>
+  | StepStartedEvent<TOptions>
+  | StepCompletedEvent<TOptions>;
 
 export interface Event<
   TOptions extends object = {}
@@ -26,8 +90,8 @@ export interface Event<
 export interface SerializedStep {
   title: string;
   status: typeof STATUS[keyof typeof STATUS];
-  state?: State;
   id: string;
+  state?: State;
 }
 
 type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
