@@ -37,11 +37,7 @@ interface WorkflowCompleteEvent<TOptions extends object = {}> extends WorkflowBa
 interface WorkflowErrorEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.ERROR;
   status: typeof STATUS.ERROR;
-  error: {
-    name: string;
-    message: string;
-    stack?: string;
-  };
+  error: SerializedError;
 }
 
 // 2. Step Status Event (just steps array and base event properties)
@@ -217,8 +213,16 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
           options: this.params.options ?? {} as TOptions,
         };
 
-        // Execute step and yield any events it produces
+        // Execute step and yield the STEP_COMPLETE event and
+        // all events from inner workflows if any
         yield* this.executeStep(step);
+
+        // Step Status Event
+        yield {
+          type: WORKFLOW_EVENTS.STEP_STATUS,
+          steps: this.steps.map(step => step.serialized),
+          options: this.params.options ?? {} as TOptions,
+        };
 
         this.currentStepIndex++;
       }
@@ -248,6 +252,14 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
           stack: error.stack
         }
       };
+
+      // Step Status Event
+      yield {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: this.steps.map(step => step.serialized),
+        options: this.params.options ?? {} as TOptions,
+      };
+
       throw error;
     }
   }

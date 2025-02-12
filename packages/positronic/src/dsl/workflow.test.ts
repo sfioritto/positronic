@@ -67,6 +67,9 @@ describe('workflow creation', () => {
       }]
     }));
 
+    // Step Status Event
+    await nextStep(workflowRun);
+
     // Check second step start
     const secondStepStartResult = await nextStep(workflowRun);
     expect(secondStepStartResult).toEqual(expect.objectContaining({
@@ -87,6 +90,24 @@ describe('workflow creation', () => {
         path: '/doubled',
         value: 2
       }]
+    }));
+
+    // Step Status Event
+    const stepStatusResult = await nextStep(workflowRun);
+    expect(stepStatusResult).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_STATUS,
+      steps: [
+        expect.objectContaining({
+          title: 'First step',
+          status: STATUS.COMPLETE,
+          id: expect.any(String)
+        }),
+        expect.objectContaining({
+          title: 'Second step',
+          status: STATUS.COMPLETE,
+          id: expect.any(String)
+        })
+      ]
     }));
 
     // Check workflow completion
@@ -181,49 +202,65 @@ describe('workflow creation', () => {
   });
 });
 
-// describe('error handling', () => {
-//   it('should handle errors in actions and maintain correct status', async () => {
-//     const errorWorkflow = workflow('Error Workflow')
-//       // Step 1: Normal step
-//       .step("First step", () => ({
-//         value: 1
-//       }))
-//       // Step 2: Error step
-//       .step("Error step", () => {
-//         if (true) {
-//           throw new Error('Test error');
-//         }
-//         return {
-//           value: 1
-//         };
-//       })
-//       // Step 3: Should never execute
-//       .step("Never reached", ({ state }) => ({
-//         value: state.value + 1
-//       }));
+describe('error handling', () => {
+  it('should handle errors in actions and maintain correct status', async () => {
+    const errorWorkflow = workflow('Error Workflow')
+      // Step 1: Normal step
+      .step("First step", () => ({
+        value: 1
+      }))
+      // Step 2: Error step
+      .step("Error step", () => {
+        if (true) {
+          throw new Error('Test error');
+        }
+        return {
+          value: 1
+        };
+      })
+      // Step 3: Should never execute
+      .step("Never reached", ({ state }) => ({
+        value: state.value + 1
+      }));
 
-//     let finalEvent;
-//     try {
-//       for await (const event of errorWorkflow.run({ client: mockClient })) {
-//         finalEvent = event;
-//       }
-//     } catch (error) {
-//       // Error is expected to be thrown
-//     }
+    let errorEvent, finalStepStatusEvent;
+    try {
+      for await (const event of errorWorkflow.run({ client: mockClient })) {
+        if (event.type === WORKFLOW_EVENTS.ERROR) {
+          errorEvent = event;
+        }
+        if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+          finalStepStatusEvent = event;
+        }
+      }
+    } catch (error) {
+      // Error is expected to be thrown
+    }
 
-//     // Verify final state
-//     expect(finalEvent?.status).toBe(STATUS.ERROR);
-//     expect(finalEvent?.error?.message).toBe('Test error');
+    // Verify final state
+    expect(errorEvent?.status).toBe(STATUS.ERROR);
+    expect(errorEvent?.error?.message).toBe('Test error');
 
-//     // Verify steps status
-//     if (!finalEvent?.steps) {
-//       throw new Error('Steps not found');
-//     }
-//     expect(finalEvent.steps[0].status).toBe(STATUS.COMPLETE);
-//     expect(finalEvent.steps[1].status).toBe(STATUS.ERROR);
-//     expect(finalEvent.steps[2].status).toBe(STATUS.PENDING);
-//   });
-// });
+    // Verify steps status
+    if (!finalStepStatusEvent?.steps) {
+      throw new Error('Steps not found');
+    }
+    expect(finalStepStatusEvent.steps[0].status).toBe(STATUS.COMPLETE);
+    expect(finalStepStatusEvent.steps[1].status).toBe(STATUS.ERROR);
+    expect(finalStepStatusEvent.steps[2].status).toBe(STATUS.PENDING);
+
+    // Verify error event structure
+    expect(errorEvent).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.ERROR,
+      status: STATUS.ERROR,
+      workflowTitle: 'Error Workflow',
+      error: expect.objectContaining({
+        name: 'Error',
+        message: 'Test error',
+      }),
+    }));
+  });
+});
 
 // describe('step creation', () => {
 //   it('should create a step that updates state', async () => {
