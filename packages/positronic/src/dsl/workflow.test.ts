@@ -579,394 +579,380 @@ describe('nested workflows', () => {
   });
 });
 
-// describe('workflow options', () => {
-//   it('should pass options through to workflow events', async () => {
-//     const testWorkflow = workflow<{ testOption: string }>('Options Workflow')
-//       .step(
-//         "Simple step",
-//         ({ state, options }) => ({
-//           value: 1,
-//           passedOption: options.testOption
-//         })
-//       );
+describe('workflow options', () => {
+  it('should pass options through to workflow events', async () => {
+    const testWorkflow = workflow<{ testOption: string }>('Options Workflow')
+      .step(
+        "Simple step",
+        ({ state, options }) => ({
+          value: 1,
+          passedOption: options.testOption
+        })
+      );
 
-//     const workflowOptions = {
-//       testOption: 'test-value'
-//     };
+    const workflowOptions = {
+      testOption: 'test-value'
+    };
 
-//     const workflowRun = testWorkflow.run({
-//       client: mockClient,
-//       options: workflowOptions
-//     });
+    let finalEvent;
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+      options: workflowOptions
+    })) {
+      finalEvent = event;
+    }
 
-//     // Check start event
-//     const startResult = await workflowRun.next();
-//     expect(startResult.value).toEqual(expect.objectContaining({
-//       type: WORKFLOW_EVENTS.START,
-//       options: workflowOptions
-//     }));
+    if (!finalEvent) throw new Error('Expected final event');
+    expect(finalEvent).toEqual({
+      type: WORKFLOW_EVENTS.COMPLETE,
+      status: STATUS.COMPLETE,
+      workflowTitle: 'Options Workflow',
+      workflowDescription: undefined,
+      steps: [
+        expect.objectContaining({
+          state: {
+            value: 1,
+            passedOption: 'test-value'
+          },
+          status: STATUS.COMPLETE,
+        })
+      ],
+      options: workflowOptions,
+    });
+  });
 
-//     // Check step completion
-//     const stepResult = await workflowRun.next();
-//     expect(stepResult.value).toEqual(expect.objectContaining({
-//       type: WORKFLOW_EVENTS.STEP_START,
-//       options: workflowOptions
-//     }));
+  it('should provide empty object as default options', async () => {
+    const testWorkflow = workflow('Default Options Workflow')
+      .step(
+        "Simple step",
+        ({ options }) => ({
+          hasOptions: Object.keys(options).length === 0
+        })
+      );
 
-//     // Check step completion
-//     const stepCompleteResult = await workflowRun.next();
-//     expect(stepCompleteResult.value).toEqual(expect.objectContaining({
-//       type: WORKFLOW_EVENTS.STEP_COMPLETE,
-//       options: workflowOptions,
-//       currentStep: expect.objectContaining({
-//         state: {
-//           value: 1,
-//           passedOption: 'test-value'
-//         }
-//       })
-//     }));
+    const workflowRun = testWorkflow.run({ client: mockClient });
 
-//     // Check workflow completion
-//     const completeResult = await workflowRun.next();
-//     expect(completeResult.value).toEqual(expect.objectContaining({
-//       type: WORKFLOW_EVENTS.COMPLETE,
-//       options: workflowOptions,
-//       currentStep: expect.objectContaining({
-//         state: {
-//           value: 1,
-//           passedOption: 'test-value'
-//         }
-//       })
-//     }));
-//   });
+    // Skip start event
+    await workflowRun.next();
 
-//   it('should provide empty object as default options', async () => {
-//     const testWorkflow = workflow('Default Options Workflow')
-//       .step(
-//         "Simple step",
-//         ({ options }) => ({
-//           hasOptions: Object.keys(options).length === 0
-//         })
-//       );
+    // Check step start
+    const stepStartResult = await workflowRun.next();
+    expect(stepStartResult.value).toEqual(expect.objectContaining({
+      options: {},
+      type: WORKFLOW_EVENTS.STEP_START
+    }));
 
-//     const workflowRun = testWorkflow.run({ client: mockClient });
+    // Check step completion
+    const stepResult = await workflowRun.next();
+    expect(stepResult.value).toEqual(expect.objectContaining({
+      options: {},
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
+      currentStep: expect.objectContaining({
+        state: {
+          hasOptions: true
+        }
+      })
+    }));
+  });
+});
 
-//     // Skip start event
-//     await workflowRun.next();
+describe('type inference', () => {
+  it('should correctly infer complex workflow state types', async () => {
+    // Create an inner workflow that uses the shared options type
+    const innerWorkflow = workflow<{ features: string[] }>('Inner Type Test')
+      .step(
+        "Process features",
+        ({ options }) => ({
+          processedValue: options.features.includes('fast') ? 100 : 42,
+          featureCount: options.features.length
+        })
+      );
 
-//     // Check step start
-//     const stepStartResult = await workflowRun.next();
-//     expect(stepStartResult.value).toEqual(expect.objectContaining({
-//       options: {},
-//       type: WORKFLOW_EVENTS.STEP_START
-//     }));
+    // Create a complex workflow using multiple features
+    const complexWorkflow = workflow<{ features: string[] }>('Complex Type Test')
+      .step(
+        "First step",
+        ({ options }) => ({
+          initialFeatures: options.features,
+          value: 42
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => ({
+          ...state,
+          processedValue: workflowState.processedValue,
+          totalFeatures: workflowState.featureCount
+        }),
+        () => ({ // Match the inner workflow's state shape
+          processedValue: 0,
+          featureCount: 0
+        })
+      )
+      .step(
+        "Final step",
+        ({ state }) => ({
+          ...state,
+          completed: true
+        })
+      );
 
-//     // Check step completion
-//     const stepResult = await workflowRun.next();
-//     expect(stepResult.value).toEqual(expect.objectContaining({
-//       options: {},
-//       type: WORKFLOW_EVENTS.STEP_COMPLETE,
-//       currentStep: expect.objectContaining({
-//         state: {
-//           hasOptions: true
-//         }
-//       })
-//     }));
-//   });
-// });
+    // Type test setup
+    type ExpectedState = {
+      initialFeatures: string[];
+      value: number;
+      processedValue: number;
+      totalFeatures: number;
+      completed: true;
+    };
 
-// describe('type inference', () => {
-//   it('should correctly infer complex workflow state types', async () => {
-//     // Create an inner workflow that uses the shared options type
-//     const innerWorkflow = workflow<{ features: string[] }>('Inner Type Test')
-//       .step(
-//         "Process features",
-//         ({ options }) => ({
-//           processedValue: options.features.includes('fast') ? 100 : 42,
-//           featureCount: options.features.length
-//         })
-//       );
+    type ActualState = Parameters<
+      Parameters<(typeof complexWorkflow)['step']>[1]
+    >[0]['state'];
 
-//     // Create a complex workflow using multiple features
-//     const complexWorkflow = workflow<{ features: string[] }>('Complex Type Test')
-//       .step(
-//         "First step",
-//         ({ options }) => ({
-//           initialFeatures: options.features,
-//           value: 42
-//         })
-//       )
-//       .workflow(
-//         "Nested workflow",
-//         innerWorkflow,
-//         ({ state, workflowState }) => ({
-//           ...state,
-//           processedValue: workflowState.processedValue,
-//           totalFeatures: workflowState.featureCount
-//         }),
-//         () => ({ // Match the inner workflow's state shape
-//           processedValue: 0,
-//           featureCount: 0
-//         })
-//       )
-//       .step(
-//         "Final step",
-//         ({ state }) => ({
-//           ...state,
-//           completed: true
-//         })
-//       );
+    type TypeTest = AssertEquals<ActualState, ExpectedState>;
+    const _typeAssert: TypeTest = true;
 
-//     // Type test setup
-//     type ExpectedState = {
-//       initialFeatures: string[];
-//       value: number;
-//       processedValue: number;
-//       totalFeatures: number;
-//       completed: true;
-//     };
+    // Run the workflow with required options
+    let finalEvent;
+    for await (const event of complexWorkflow.run({
+      client: mockClient,
+      options: { features: ['fast', 'secure'] }
+    })) {
+      finalEvent = event;
+    }
 
-//     type ActualState = Parameters<
-//       Parameters<(typeof complexWorkflow)['step']>[1]
-//     >[0]['state'];
+    // Verify the final state has all expected properties with correct types
+    if (!finalEvent) throw new Error('Expected final event');
+    const lastStep = finalEvent.steps[finalEvent.steps.length - 1];
+    expect(lastStep.state).toEqual({
+      initialFeatures: ['fast', 'secure'],
+      value: 42,
+      processedValue: 100,
+      totalFeatures: 2,
+      completed: true
+    });
+  });
 
-//     type TypeTest = AssertEquals<ActualState, ExpectedState>;
-//     const _typeAssert: TypeTest = true;
+  it('should correctly infer workflow reducer state types', async () => {
+    // Create an inner workflow with a specific state shape
+    const innerWorkflow = workflow('Inner State Test')
+      .step(
+        "Inner step",
+        () => ({
+          innerValue: 42,
+          metadata: { processed: true }
+        })
+      );
 
-//     // Run the workflow with required options
-//     let finalEvent;
-//     for await (const event of complexWorkflow.run({
-//       client: mockClient,
-//       options: { features: ['fast', 'secure'] }
-//     })) {
-//       finalEvent = event;
-//     }
+    // Create outer workflow to test reducer type inference
+    const outerWorkflow = workflow('Outer State Test')
+      .step(
+        "First step",
+        () => ({
+          outerValue: 100,
+          status: 'ready'
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => {
+          // Type assertion for outer state
+          type ExpectedOuterState = {
+            outerValue: number;
+            status: string;
+          };
+          type ActualOuterState = typeof state;
+          type OuterStateTest = AssertEquals<
+            ActualOuterState,
+            ExpectedOuterState
+          >;
+          const _outerAssert: OuterStateTest = true;
 
-//     // Verify the final state has all expected properties with correct types
-//     expect(finalEvent?.currentStep?.state).toEqual({
-//       initialFeatures: ['fast', 'secure'],
-//       value: 42,
-//       processedValue: 100,
-//       totalFeatures: 2,
-//       completed: true
-//     });
-//   });
+          // Type assertion for inner workflow state
+          type ExpectedInnerState = {
+            innerValue: number;
+            metadata: { processed: boolean };
+          };
+          type ActualInnerState = typeof workflowState;
+          type InnerStateTest = AssertEquals<
+            ActualInnerState,
+            ExpectedInnerState
+          >;
+          const _innerAssert: InnerStateTest = true;
 
-//   it('should correctly infer workflow reducer state types', async () => {
-//     // Create an inner workflow with a specific state shape
-//     const innerWorkflow = workflow('Inner State Test')
-//       .step(
-//         "Inner step",
-//         () => ({
-//           innerValue: 42,
-//           metadata: { processed: true }
-//         })
-//       );
+          return {
+            ...state,
+            innerResult: workflowState.innerValue,
+            processed: workflowState.metadata.processed
+          };
+        },
+        () => ({} as { innerValue: number; metadata: { processed: boolean } }) // Add initial state
+      );
 
-//     // Create outer workflow to test reducer type inference
-//     const outerWorkflow = workflow('Outer State Test')
-//       .step(
-//         "First step",
-//         () => ({
-//           outerValue: 100,
-//           status: 'ready'
-//         })
-//       )
-//       .workflow(
-//         "Nested workflow",
-//         innerWorkflow,
-//         ({ state, workflowState }) => {
-//           // Type assertion for outer state
-//           type ExpectedOuterState = {
-//             outerValue: number;
-//             status: string;
-//           };
-//           type ActualOuterState = typeof state;
-//           type OuterStateTest = AssertEquals<
-//             ActualOuterState,
-//             ExpectedOuterState
-//           >;
-//           const _outerAssert: OuterStateTest = true;
+    // Run the workflow to verify runtime behavior
+    let finalEvent;
+    for await (const event of outerWorkflow.run({ client: mockClient })) {
+      finalEvent = event;
+    }
 
-//           // Type assertion for inner workflow state
-//           type ExpectedInnerState = {
-//             innerValue: number;
-//             metadata: { processed: boolean };
-//           };
-//           type ActualInnerState = typeof workflowState;
-//           type InnerStateTest = AssertEquals<
-//             ActualInnerState,
-//             ExpectedInnerState
-//           >;
-//           const _innerAssert: InnerStateTest = true;
+    if (!finalEvent) throw new Error('Expected final event');
+    const lastStep = finalEvent.steps[finalEvent.steps.length - 1];
+    expect(lastStep.state).toEqual({
+      outerValue: 100,
+      status: 'ready',
+      innerResult: 42,
+      processed: true
+    });
+  });
 
-//           return {
-//             ...state,
-//             innerResult: workflowState.innerValue,
-//             processed: workflowState.metadata.processed
-//           };
-//         },
-//         () => ({} as { innerValue: number; metadata: { processed: boolean } }) // Add initial state
-//       );
+  it('should correctly infer step action state types', async () => {
+    const testWorkflow = workflow('Action State Test')
+      .step(
+        "First step",
+        () => ({
+          count: 1,
+          metadata: { created: new Date().toISOString() }
+        })
+      )
+      .step(
+        "Second step",
+        ({ state }) => {
+          // Type assertion for action state
+          type ExpectedState = {
+            count: number;
+            metadata: { created: string };
+          };
+          type ActualState = typeof state;
+          type StateTest = AssertEquals<
+            ActualState,
+            ExpectedState
+          >;
+          const _stateAssert: StateTest = true;
 
-//     // Run the workflow to verify runtime behavior
-//     let finalEvent;
-//     for await (const event of outerWorkflow.run({ client: mockClient })) {
-//       finalEvent = event;
-//     }
+          return {
+            ...state,
+            count: state.count + 1,
+            metadata: {
+              ...state.metadata,
+              updated: new Date().toISOString()
+            }
+          };
+        }
+      );
 
-//     expect(finalEvent?.currentStep?.state).toEqual({
-//       outerValue: 100,
-//       status: 'ready',
-//       innerResult: 42,
-//       processed: true
-//     });
-//   });
+    // Run the workflow to verify runtime behavior
+    let finalEvent;
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      finalEvent = event;
+    }
 
-//   it('should correctly infer step action state types', async () => {
-//     const testWorkflow = workflow('Action State Test')
-//       .step(
-//         "First step",
-//         () => ({
-//           count: 1,
-//           metadata: { created: new Date().toISOString() }
-//         })
-//       )
-//       .step(
-//         "Second step",
-//         ({ state }) => {
-//           // Type assertion for action state
-//           type ExpectedState = {
-//             count: number;
-//             metadata: { created: string };
-//           };
-//           type ActualState = typeof state;
-//           type StateTest = AssertEquals<
-//             ActualState,
-//             ExpectedState
-//           >;
-//           const _stateAssert: StateTest = true;
+    if (!finalEvent) throw new Error('Expected final event');
+    const lastStep = finalEvent.steps[finalEvent.steps.length - 1];
+    expect(lastStep.state).toMatchObject({
+      count: 2,
+      metadata: {
+        created: expect.any(String),
+      }
+    });
+  });
+});
 
-//           return {
-//             ...state,
-//             count: state.count + 1,
-//             metadata: {
-//               ...state.metadata,
-//               updated: new Date().toISOString()
-//             }
-//           };
-//         }
-//       );
+describe('workflow steps', () => {
+  it('should preserve UUIDs from completed steps when restarting', async () => {
+    const testWorkflow = workflow('UUID Test')
+      .step(
+        "First step",
+        () => ({ count: 1 })
+      )
+      .step(
+        "Second step",
+        ({ state }) => ({ count: state.count + 1 })
+      );
 
-//     // Run the workflow to verify runtime behavior
-//     let finalEvent;
-//     for await (const event of testWorkflow.run({ client: mockClient })) {
-//       finalEvent = event;
-//     }
+    // Run first step and get its UUID
+    const firstRun = testWorkflow.run({ client: mockClient });
 
-//     expect(finalEvent?.currentStep?.state).toMatchObject({
-//       count: 2,
-//       metadata: {
-//         created: expect.any(String),
-//         updated: expect.any(String)
-//       }
-//     });
-//   });
-// });
+    await firstRun.next(); // Start event
+    await firstRun.next(); // Step start event
+    const firstStepEvent = await firstRun.next(); // Step complete event
+    const completedStep = firstStepEvent.value.currentStep;
 
-// describe('workflow steps', () => {
-//   it('should preserve UUIDs from completed steps when restarting', async () => {
-//     const testWorkflow = workflow('UUID Test')
-//       .step(
-//         "First step",
-//         () => ({ count: 1 })
-//       )
-//       .step(
-//         "Second step",
-//         ({ state }) => ({ count: state.count + 1 })
-//       );
+    // Restart workflow with completed step
+    const secondRun = testWorkflow.run({
+      client: mockClient,
+      initialCompletedSteps: [completedStep]
+    });
 
-//     // Run first step and get its UUID
-//     const firstRun = testWorkflow.run({ client: mockClient });
+    const restartEvent = await secondRun.next();
 
-//     await firstRun.next(); // Start event
-//     await firstRun.next(); // Step start event
-//     const firstStepEvent = await firstRun.next(); // Step complete event
-//     const completedStep = firstStepEvent.value.currentStep;
+    // Only verify that the completed step's UUID was preserved
+    expect(restartEvent.value.steps[0].id).toBe(completedStep.id);
+  });
 
-//     // Restart workflow with completed step
-//     const secondRun = testWorkflow.run({
-//       client: mockClient,
-//       initialCompletedSteps: [completedStep]
-//     });
+  it('should set currentStep correctly in events and preserve through restarts', async () => {
+    const testWorkflow = workflow('Step ID Test')
+      .step(
+        "First step",
+        () => ({ count: 1 })
+      )
+      .step(
+        "Second step",
+        ({ state }) => ({ count: state.count + 1 })
+      );
 
-//     const restartEvent = await secondRun.next();
+    // First run - collect all step IDs and events
+    const firstRunEvents = [];
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      firstRunEvents.push(event);
+    }
 
-//     // Only verify that the completed step's UUID was preserved
-//     expect(restartEvent.value.steps[0].id).toBe(completedStep.id);
-//   });
+    // Get the step IDs from the final event's steps array
+    const stepIds = firstRunEvents[firstRunEvents.length - 1].steps.map(s => s.id);
 
-//   it('should set currentStep correctly in events and preserve through restarts', async () => {
-//     const testWorkflow = workflow('Step ID Test')
-//       .step(
-//         "First step",
-//         () => ({ count: 1 })
-//       )
-//       .step(
-//         "Second step",
-//         ({ state }) => ({ count: state.count + 1 })
-//       );
+    // Verify currentStep is set correctly for each step-related event
+    expect(firstRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // First step start
+    expect(firstRunEvents[1].currentStep?.id).toBe(stepIds[0]);
 
-//     // First run - collect all step IDs and events
-//     const firstRunEvents = [];
-//     for await (const event of testWorkflow.run({ client: mockClient })) {
-//       firstRunEvents.push(event);
-//     }
+    expect(firstRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // First step complete
+    expect(firstRunEvents[2].currentStep?.id).toBe(stepIds[0]);
 
-//     // Get the step IDs from the final event's steps array
-//     const stepIds = firstRunEvents[firstRunEvents.length - 1].steps.map(s => s.id);
+    expect(firstRunEvents[3].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
+    expect(firstRunEvents[3].currentStep?.id).toBe(stepIds[1]);
 
-//     // Verify currentStep is set correctly for each step-related event
-//     expect(firstRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // First step start
-//     expect(firstRunEvents[1].currentStep?.id).toBe(stepIds[0]);
+    expect(firstRunEvents[4].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
+    expect(firstRunEvents[4].currentStep?.id).toBe(stepIds[1]);
 
-//     expect(firstRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // First step complete
-//     expect(firstRunEvents[2].currentStep?.id).toBe(stepIds[0]);
+    // Verify workflow events don't have currentStep
+    expect(firstRunEvents[0].currentStep).toBeUndefined(); // START event should not have currentStep
+    expect(firstRunEvents[5].currentStep).toBeUndefined(); // COMPLETE event should not have currentStep
 
-//     expect(firstRunEvents[3].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
-//     expect(firstRunEvents[3].currentStep?.id).toBe(stepIds[1]);
+    // Now restart the workflow after first step
+    const firstStepCompleted = firstRunEvents[2].currentStep;
+    if (!firstStepCompleted) {
+      throw new Error('Expected current step to be defined');
+    }
 
-//     expect(firstRunEvents[4].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
-//     expect(firstRunEvents[4].currentStep?.id).toBe(stepIds[1]);
+    const secondRunEvents = [];
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+      initialCompletedSteps: [firstStepCompleted]
+    })) {
+      secondRunEvents.push(event);
+    }
 
-//     // Verify workflow events don't have currentStep
-//     expect(firstRunEvents[0].currentStep).toBeUndefined(); // START event should not have currentStep
-//     expect(firstRunEvents[5].currentStep).toBeUndefined(); // COMPLETE event should not have currentStep
+    // Verify the first step ID was preserved and second step ID matches
+    expect(secondRunEvents[0].steps[0].id).toBe(stepIds[0]); // First step ID preserved
+    expect(secondRunEvents[0].steps[1].id).not.toBe(stepIds[1]); // Second step should have new ID
+    expect(secondRunEvents[0].steps[1].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i); // Should be a valid UUID
 
-//     // Now restart the workflow after first step
-//     const firstStepCompleted = firstRunEvents[2].currentStep;
-//     if (!firstStepCompleted) {
-//       throw new Error('Expected current step to be defined');
-//     }
+    // Verify currentStep is set correctly in restarted workflow
+    expect(secondRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
+    expect(secondRunEvents[1].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
 
-//     const secondRunEvents = [];
-//     for await (const event of testWorkflow.run({
-//       client: mockClient,
-//       initialCompletedSteps: [firstStepCompleted]
-//     })) {
-//       secondRunEvents.push(event);
-//     }
-
-//     // Verify the first step ID was preserved and second step ID matches
-//     expect(secondRunEvents[0].steps[0].id).toBe(stepIds[0]); // First step ID preserved
-//     expect(secondRunEvents[0].steps[1].id).not.toBe(stepIds[1]); // Second step should have new ID
-//     expect(secondRunEvents[0].steps[1].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i); // Should be a valid UUID
-
-//     // Verify currentStep is set correctly in restarted workflow
-//     expect(secondRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
-//     expect(secondRunEvents[1].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
-
-//     expect(secondRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
-//     expect(secondRunEvents[2].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
-//   });
-// });
+    expect(secondRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
+    expect(secondRunEvents[2].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
+  });
+});
