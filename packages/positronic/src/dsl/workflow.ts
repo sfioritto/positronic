@@ -18,7 +18,6 @@ export interface Event<
   workflowDescription?: string;
   type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
   status: typeof STATUS[keyof typeof STATUS];
-  previousState: TStateIn;
   error?: SerializedError;
   currentStep?: SerializedStep;
   steps: SerializedStep[];
@@ -70,6 +69,41 @@ interface RunParams<
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+class Step {
+  private id: string;
+  private currentState?: State;
+  private status: typeof STATUS[keyof typeof STATUS] = STATUS.PENDING;
+
+  constructor(
+    public block: Block<any, any, any>,
+  ) {
+    this.id = uuidv4();
+  }
+
+  get state(): State {
+    return clone(this.currentState ?? {} as State);
+  }
+
+  withState(state: State | undefined) {
+    this.currentState = state ? clone(state) : undefined;
+    return this;
+  }
+
+  withStatus(status: typeof STATUS[keyof typeof STATUS]) {
+    this.status = status;
+    return this;
+  }
+
+  get serialized(): SerializedStep {
+    return {
+      id: this.id,
+      title: this.block.title,
+      status: this.status,
+      state: this.state
+    };
+  }
+}
 
 export function workflow<
   TOptions extends object = {},
@@ -197,34 +231,30 @@ export class Workflow<
   /**
    * This is separated from the public run() method to centralize all deep cloning
    * operations to ensure that all data that should be cloned to prevent object mutation
-   * by consumers of the workflow is in fact cloned. This guarantees that all input and output data is immutable and safe to use by consumers of the workflow.
+   * by consumers of the workflow is in fact cloned. This guarantees that all input and output data is immutable and safe to use by * consumers of the workflow.
    */
   private async *_run(params: RunParams<TOptions, TState>) {
-    const { client, initialState, options = {} as TOptions, initialCompletedSteps = [] } = params;
+    const {
+      client,
+      initialState,
+      options = {} as TOptions,
+      initialCompletedSteps = []
+    } = params;
+
+    console.log('Initial workflow state:', initialState);
 
     // Initialize steps array with UUIDs and pending status
     const steps = this.blocks.map((block, index) => {
       const completedStep = initialCompletedSteps[index];
       if (completedStep) {
-        // Use the existing step exactly as is, including its ID
-        return completedStep;
+        console.log(`Using completed step ${index}:`, completedStep);
+        return new Step(block)
+          .withState(completedStep.state as TState)
+          .withStatus(completedStep.status);
       }
-      return {
-        id: uuidv4(),
-        title: block.title,
-        status: STATUS.PENDING
-      };
+
+      return new Step(block);
     });
-
-    // Initialize state from completed steps or initial state
-    let currentState = initialCompletedSteps?.length > 0
-      ? clone(initialCompletedSteps[initialCompletedSteps.length - 1]?.state ?? initialState ?? {})
-      : clone(initialState ?? {} as TState);
-
-    // Track current step for event generation
-    let currentStep: SerializedStep | undefined;
-    let lastCompletedStep: SerializedStep | undefined;
-    const currentIndex = initialCompletedSteps.length;
 
     // Yield start/restart event
     yield {
@@ -232,101 +262,100 @@ export class Workflow<
       status: STATUS.RUNNING,
       workflowTitle: this.title,
       workflowDescription: this.description,
-      previousState: clone(currentState),
-      steps,
+      steps: steps.map(step => step.serialized),
       options,
-      currentStep: undefined
     };
 
-    // Process remaining blocks
-    for (let i = currentIndex; i < this.blocks.length; i++) {
-      const block = this.blocks[i];
-      currentStep = steps[i];
+    let currentState = initialState || {} as TState;
 
+    // Process remaining blocks
+    for (const currentStep of steps.slice(initialCompletedSteps.length)) {
       // Yield step start event
       yield {
         type: WORKFLOW_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         workflowTitle: this.title,
         workflowDescription: this.description,
-        previousState: clone(currentState),
-        steps,
+        steps: steps.map(step => step.serialized),
         options,
-        currentStep
+        currentStep: currentStep.serialized
       };
 
       try {
         let nextState: TState;
-        if (block.type === 'workflow') {
-          const childInitial = typeof block.initialState === 'function'
-            ? block.initialState(currentState)
-            : block.initialState;
+        if (currentStep.block.type === 'workflow') {
+          const { block: { initialState, innerWorkflow, action } } = currentStep;
+          const childInitial = typeof initialState === 'function'
+            ? initialState(currentStep.state)
+            : initialState;
 
           // Run inner workflow and yield all of its events
-          const innerRun = block.innerWorkflow.run({
+          const innerRun = innerWorkflow.run({
             client,
             initialState: childInitial,
             options,
           });
 
-          let innerCtx;
+          let innerState;
           for await (const event of innerRun) {
             yield event; // Yield all events from the inner workflow
             if (event.type === WORKFLOW_EVENTS.COMPLETE) {
-              innerCtx = event.currentStep?.state;
+              innerState = event.steps[event.steps.length - 1].state;
             }
           }
 
-          if (!innerCtx) {
+          if (!innerState) {
             throw new Error('Inner workflow did not complete');
           }
 
-          nextState = block.action(currentState, innerCtx);
+          nextState = action(currentState, innerState);
+          currentState = nextState;
+
+          currentStep
+            .withState(nextState)
+            .withStatus(STATUS.COMPLETE);
         } else {
-          nextState = await block.action({
-            state: currentState as TState,
+          const { block: { action } } = currentStep;
+          console.log('Step execution:', {
+            stepTitle: currentStep.block.title,
+            currentState,
+          });
+
+          nextState = await action({
+            state: currentState,
             options,
             client,
           });
-        }
 
-        // Update step and state
-        steps[i] = {
-          ...steps[i],
-          status: STATUS.COMPLETE,
-          state: clone(nextState)
-        };
-        currentState = clone(nextState);
-        lastCompletedStep = steps[i];
+          currentState = nextState;
+
+          currentStep
+            .withState(nextState)
+            .withStatus(STATUS.COMPLETE);
+        }
 
         yield {
           type: WORKFLOW_EVENTS.STEP_COMPLETE,
           status: STATUS.RUNNING,
           workflowTitle: this.title,
           workflowDescription: this.description,
-          previousState: clone(currentState),
-          steps,
+          steps: steps.map(step => step.serialized),
           options,
-          currentStep: lastCompletedStep
+          currentStep: currentStep.serialized
         };
       } catch (error) {
-        // Update step status on error
-        steps[i] = {
-          ...steps[i],
-          status: STATUS.ERROR,
-          state: clone(currentState)
-        };
-        lastCompletedStep = steps[i];
+        currentStep
+          .withStatus(STATUS.ERROR)
+          .withState(currentStep.state);
 
         yield {
           type: WORKFLOW_EVENTS.ERROR,
           status: STATUS.ERROR,
           workflowTitle: this.title,
           workflowDescription: this.description,
-          previousState: clone(currentState),
-          steps,
+          steps: steps.map(step => step.serialized),
           options,
-          currentStep: lastCompletedStep,
+          currentStep: currentStep.serialized,
           error: error as SerializedError
         };
         throw error;
@@ -339,12 +368,10 @@ export class Workflow<
       status: STATUS.COMPLETE,
       workflowTitle: this.title,
       workflowDescription: this.description,
-      previousState: {} as TState,
-      steps,
+      steps: steps.map(step => step.serialized),
       options,
-      currentStep: lastCompletedStep
     };
 
-    return currentState as TState;
+    return steps[steps.length - 1].state as TState;
   }
 }
