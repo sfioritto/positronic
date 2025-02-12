@@ -262,81 +262,102 @@ describe('error handling', () => {
   });
 });
 
-// describe('step creation', () => {
-//   it('should create a step that updates state', async () => {
-//     const testWorkflow = workflow('Simple Workflow')
-//       .step("Simple step", ({ state }) => ({
-//         ...state,
-//         count: 1,
-//         message: 'Count is now 1'
-//       }));
+describe('step creation', () => {
+  it('should create a step that updates state', async () => {
+    const testWorkflow = workflow('Simple Workflow')
+      .step("Simple step", ({ state }) => ({
+        ...state,
+        count: 1,
+        message: 'Count is now 1'
+      }));
 
-//     let finalEvent;
-//     for await (const event of testWorkflow.run({ client: mockClient })) {
-//       finalEvent = event;
-//     }
+    const events = [];
+    let finalState = {};
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      events.push(event);
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, event.patch);
+      }
+    }
 
-//     // Verify the step executed correctly
-//     expect(finalEvent?.status).toBe(STATUS.COMPLETE);
-//     const lastStep = finalEvent?.steps[finalEvent.steps.length - 1];
-//     expect(lastStep?.state).toEqual({
-//       count: 1,
-//       message: 'Count is now 1'
-//     });
-//   });
+    // Verify the step start event
+    expect(events[1]).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_START,
+      status: STATUS.RUNNING,
+      stepTitle: 'Simple step',
+      stepId: expect.any(String),
+      options: {}
+    }));
 
-//   it('should not modify the original state when step mutates state', async () => {
-//     const originalState = {
-//       value: 1,
-//       nested: { count: 0 }
-//     };
+    // Verify the step complete event
+    expect(events[2]).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
+      status: STATUS.RUNNING,
+      stepTitle: 'Simple step',
+      stepId: expect.any(String),
+      patch: [{
+        op: 'add',
+        path: '/count',
+        value: 1
+      }, {
+        op: 'add',
+        path: '/message',
+        value: 'Count is now 1'
+      }],
+      options: {}
+    }));
 
-//     const testWorkflow = workflow<{}, { value: number; nested: { count: number } }>('Mutation Test Workflow')
-//       .step("Mutating step", ({ state }) => {
-//         // Attempt to mutate the input state
-//         state.value = 99;
-//         state.nested = { count: 99 };
-//         return state;
-//       });
+    expect(events[3]).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_STATUS,
+      steps: [
+        expect.objectContaining({ title: 'Simple step', status: STATUS.COMPLETE, id: expect.any(String) })
+      ],
+      options: {}
+    }));
 
-//     let finalEvent;
-//     for await (const event of testWorkflow.run({ client: mockClient })) {
-//       finalEvent = event;
-//     }
+    // Verify the workflow complete event
+    expect(events[4]).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.COMPLETE,
+      status: STATUS.COMPLETE,
+      workflowTitle: 'Simple Workflow',
+      options: {}
+    }));
 
-//     // Verify original state remains unchanged
-//     expect(originalState).toEqual({
-//       value: 1,
-//       nested: { count: 0 }
-//     });
-//   });
+    // Verify the final state
+    expect(finalState).toEqual({
+      count: 1,
+      message: 'Count is now 1'
+    });
+  });
 
-//   it('should maintain immutable results between steps', async () => {
-//     const testWorkflow = workflow('Immutable Steps Workflow')
-//       .step("First step", () => ({
-//         value: 1
-//       }))
-//       .step("Second step", ({ state }) => {
-//         // Attempt to modify previous step's state
-//         state.value = 99;
-//         return {
-//           value: 2
-//         };
-//       });
+  it('should maintain immutable results between steps', async () => {
+    const testWorkflow = workflow('Immutable Steps Workflow')
+      .step("First step", () => ({
+        value: 1
+      }))
+      .step("Second step", ({ state }) => {
+        // Attempt to modify previous step's state
+        state.value = 99;
+        return {
+          value: 2
+        };
+      });
 
-//     let finalEvent;
-//     for await (const event of testWorkflow.run({ client: mockClient })) {
-//       finalEvent = event;
-//     }
+    let finalState = {};
+    const patches = [];
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        patches.push(...event.patch);
+      }
+    }
 
-//     // Verify that modifications didn't persist
-//     if (!finalEvent?.steps) {
-//       throw new Error('Steps not found');
-//     }
-//     expect(finalEvent.steps[0].state).toEqual({ value: 1 });
-//     expect(finalEvent.steps[1].state).toEqual({ value: 2 });
-//   });
-// });
+    // Apply all patches to the initial state
+    finalState = applyPatches(finalState, patches);
+
+    // Verify the final state
+    expect(finalState).toEqual({ value: 2 });
+  });
+});
 
 // describe('workflow resumption', () => {
 //   // Mock client setup
