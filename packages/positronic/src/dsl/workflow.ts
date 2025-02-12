@@ -220,20 +220,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         // Execute step and yield any events it produces
         yield* this.executeStep(step);
 
-        // Step complete event
-        yield {
-          type: WORKFLOW_EVENTS.STEP_COMPLETE,
-          status: STATUS.RUNNING,
-          stepTitle: step.block.title,
-          stepId: step.id,
-          patch: [{
-            op: 'replace',
-            path: '/',
-            value: step.state
-          }],
-          options: this.params.options ?? {} as TOptions,
-        };
-
         this.currentStepIndex++;
       }
 
