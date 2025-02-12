@@ -11,6 +11,7 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
   "dependencies": {
+    "fast-json-patch": "^3.1.1",
     "uuid": "^11.0.5",
     "zod": "^3.24.1"
   },

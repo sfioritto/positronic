@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { PromptClient } from "../clients/types";
 import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
+import { createPatch, applyPatches } from './json-patch';
 
 type SerializedError = {
   name: string;
@@ -274,7 +275,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         : block.initialState;
 
       // Run inner workflow and yield all its events
-      let innerState;
+      let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
         client: this.params.client,
         initialState,
@@ -283,21 +284,36 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
 
       for await (const event of innerRun) {
         yield event;  // Forward all inner workflow events
-        if (event.type === WORKFLOW_EVENTS.COMPLETE) {
-          // TODO: collect and roll up patches
-          innerState = {};
+        if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+          patches.push(event.patch);
         }
       }
 
-      if (!innerState) {
-        throw new Error('Inner workflow did not complete');
-      }
+      // Apply collected patches to get final inner state
+      const innerState = applyPatches(initialState, patches);
+
+      // Get previous state before action
+      const prevState = this.currentState;
 
       // Update state with inner workflow results
       this.currentState = await block.action(this.currentState, innerState);
       step.withState(this.currentState).withStatus(STATUS.COMPLETE);
 
+      // Create patch for the outer state change
+      const patch = createPatch(prevState, this.currentState);
+      yield {
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        status: STATUS.RUNNING,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        patch,
+        options: this.params.options ?? {} as TOptions,
+      };
+
     } else {
+      // Get previous state before action
+      const prevState = this.currentState;
+
       // Execute regular step
       this.currentState = await block.action({
         state: this.currentState,
@@ -305,6 +321,17 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         client: this.params.client,
       });
       step.withState(this.currentState).withStatus(STATUS.COMPLETE);
+
+      // Create patch for the state change
+      const patch = createPatch(prevState, this.currentState);
+      yield {
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        status: STATUS.RUNNING,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        patch,
+        options: this.params.options ?? {} as TOptions,
+      };
     }
   }
 }
