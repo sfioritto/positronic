@@ -1,7 +1,7 @@
 import { WORKFLOW_EVENTS } from './constants';
 import type { Adapter } from "../adapters/types";
 import type { FileStore } from "../file-stores/types";
-import type { Event, SerializedStep } from './workflow';
+import type { WorkflowEvent, SerializedStep } from './workflow';
 import type { State, JsonObject } from './types';
 
 interface Logger {
@@ -27,7 +27,7 @@ export class WorkflowRunner {
         initialState?: TState,
         initialCompletedSteps?: SerializedStep[],
         options?: TOptions
-      }) => AsyncGenerator<Event<TOptions>>
+      }) => AsyncGenerator<WorkflowEvent<TOptions>>
     },
     initialState?: TState,
     initialCompletedSteps?: SerializedStep[],

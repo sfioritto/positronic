@@ -74,19 +74,6 @@ export type WorkflowEvent<TOptions extends object = {}> =
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>;
 
-export interface Event<
-  TOptions extends object = {}
-> {
-  workflowTitle: string;
-  workflowDescription?: string;
-  type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
-  status: typeof STATUS[keyof typeof STATUS];
-  error?: SerializedError;
-  currentStep?: SerializedStep;
-  steps: SerializedStep[];
-  options: TOptions;
-}
-
 export interface SerializedStep {
   title: string;
   status: typeof STATUS[keyof typeof STATUS];
@@ -134,7 +121,7 @@ interface RunParams<
 const clone = <T>(value: T): T => structuredClone(value);
 
 class Step {
-  private id: string;
+  public id: string;
   private currentState?: State;
   private status: typeof STATUS[keyof typeof STATUS] = STATUS.PENDING;
 
@@ -198,7 +185,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     this.currentState = lastCompletedStep?.state as TState ?? clone(params.initialState ?? {} as TState);
   }
 
-  async *next(): AsyncGenerator<Event<TOptions>> {
+  async *next(): AsyncGenerator<WorkflowEvent<TOptions>> {
     try {
       // Start event
       const hasCompletedSteps = this.steps.some(step => step.serialized.status !== STATUS.PENDING);
@@ -207,7 +194,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.RUNNING,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
-        steps: this.steps.map(step => step.serialized),
         options: this.params.options ?? {} as TOptions
       };
 
@@ -225,11 +211,9 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         yield {
           type: WORKFLOW_EVENTS.STEP_START,
           status: STATUS.RUNNING,
-          workflowTitle: this.params.title,
-          workflowDescription: this.params.description,
-          steps: this.steps.map(step => step.serialized),
+          stepTitle: step.block.title,
+          stepId: step.id,
           options: this.params.options ?? {} as TOptions,
-          currentStep: step.serialized
         };
 
         // Execute step and yield any events it produces
@@ -239,11 +223,14 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         yield {
           type: WORKFLOW_EVENTS.STEP_COMPLETE,
           status: STATUS.RUNNING,
-          workflowTitle: this.params.title,
-          workflowDescription: this.params.description,
-          steps: this.steps.map(step => step.serialized),
+          stepTitle: step.block.title,
+          stepId: step.id,
+          patch: [{
+            op: 'replace',
+            path: '/',
+            value: step.state
+          }],
           options: this.params.options ?? {} as TOptions,
-          currentStep: step.serialized
         };
 
         this.currentStepIndex++;
@@ -254,7 +241,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.COMPLETE,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
-        steps: this.steps.map(step => step.serialized),
         options: this.params.options ?? {} as TOptions
       };
 
@@ -268,9 +254,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.ERROR,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
-        steps: this.steps.map(step => step.serialized),
         options: this.params.options ?? {} as TOptions,
-        currentStep: currentStep?.serialized,
         error: {
           name: error.name,
           message: error.message,
@@ -281,7 +265,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     }
   }
 
-  private async *executeStep(step: Step): AsyncGenerator<Event<TOptions>> {
+  private async *executeStep(step: Step): AsyncGenerator<WorkflowEvent<TOptions>> {
     const block = step.block;
 
     if (block.type === 'workflow') {
@@ -300,7 +284,8 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       for await (const event of innerRun) {
         yield event;  // Forward all inner workflow events
         if (event.type === WORKFLOW_EVENTS.COMPLETE) {
-          innerState = event.steps[event.steps.length - 1].state;
+          // TODO: collect and roll up patches
+          innerState = {};
         }
       }
 
@@ -425,7 +410,7 @@ export class Workflow<
     return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
   }
 
-  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<Event<TOptions>> {
+  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<WorkflowEvent<TOptions>> {
     const stream = new WorkflowEventStream({
       title: this.title,
       description: this.description,

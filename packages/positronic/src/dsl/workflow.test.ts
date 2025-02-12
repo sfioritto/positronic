@@ -1,5 +1,5 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants';
-import { workflow, type Event, type SerializedStep } from './workflow';
+import { workflow, type WorkflowEvent, type SerializedStep } from './workflow';
 import { z } from 'zod';
 
 // Add type utility and mock client at the top of the test file
@@ -385,7 +385,7 @@ describe('nested workflows', () => {
         () => ({ value: 5 })
       );
 
-    const events: Event<any>[] = [];
+    const events: WorkflowEvent<any>[] = [];
     for await (const event of outerWorkflow.run({ client: mockClient })) {
       events.push(event);
     }
@@ -505,7 +505,7 @@ describe('nested workflows', () => {
         () => ({ value: 5 })
       );
 
-    const events: Event<any>[] = [];
+    const events: WorkflowEvent<any>[] = [];
     let error: Error | undefined;
     try {
       for await (const event of outerWorkflow.run({ client: mockClient })) {
