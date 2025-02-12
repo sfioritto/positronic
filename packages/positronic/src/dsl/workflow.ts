@@ -118,9 +118,9 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     }
   ) {
     // Initialize steps array with UUIDs and pending status
-    this.steps = params.blocks.map((block) => {
-      // Try to find a matching completed step by title
-      const completedStep = params.initialCompletedSteps?.find(s => s.title === block.title);
+    this.steps = params.blocks.map((block, index) => {
+      // Use completed step at same index if available
+      const completedStep = params.initialCompletedSteps?.[index];
       if (completedStep) {
         return new Step(block, completedStep.id)
           .withState(completedStep.state as TState)
