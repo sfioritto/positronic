@@ -1,4 +1,5 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants';
+import { applyPatches } from './json-patch';
 import { workflow, type WorkflowEvent, type SerializedStep } from './workflow';
 import { z } from 'zod';
 
@@ -98,87 +99,86 @@ describe('workflow creation', () => {
     }));
   });
 
-  // it('should create a workflow with a name and description when passed an object', async () => {
-  //   const testWorkflow = workflow({
-  //     title: 'my named workflow',
-  //     description: 'some description'
-  //   });
+  it('should create a workflow with a name and description when passed an object', async () => {
+    const testWorkflow = workflow({
+      title: 'my named workflow',
+      description: 'some description'
+    });
 
-  //   const workflowRun = testWorkflow.run({ client: mockClient });
-  //   const startResult = await workflowRun.next();
-  //   expect(startResult.value).toEqual(expect.objectContaining({
-  //     workflowTitle: 'my named workflow',
-  //     workflowDescription: 'some description',
-  //     type: WORKFLOW_EVENTS.START
-  //   }));
-  // });
+    const workflowRun = testWorkflow.run({ client: mockClient });
+    const startResult = await workflowRun.next();
+    expect(startResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.START,
+      status: STATUS.RUNNING,
+      workflowTitle: 'my named workflow',
+      workflowDescription: 'some description',
+      options: {}
+    }));
+  });
 
-  // it('should create a workflow with just a name when passed a string', async () => {
-  //   const testWorkflow = workflow('simple workflow');
-  //   const workflowRun = testWorkflow.run({ client: mockClient });
-  //   const startResult = await workflowRun.next();
-  //   const event = startResult.value;
-  //   if (!event) throw new Error('Expected event');
+  it('should create a workflow with just a name when passed a string', async () => {
+    const testWorkflow = workflow('simple workflow');
+    const workflowRun = testWorkflow.run({ client: mockClient });
+    const startResult = await workflowRun.next();
+    expect(startResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.START,
+      status: STATUS.RUNNING,
+      workflowTitle: 'simple workflow',
+      workflowDescription: undefined,
+      options: {}
+    }));
+  });
 
-  //   expect(event).toEqual(expect.objectContaining({
-  //     workflowTitle: 'simple workflow',
-  //     type: WORKFLOW_EVENTS.START
-  //   }));
-  //   expect(event.workflowDescription).toBeUndefined();
-  // });
+  it('should allow overriding client per step', async () => {
+    const overrideClient = {
+      execute: jest.fn().mockResolvedValue({ override: true })
+    };
 
-  // it('should allow overriding client per step', async () => {
-  //   const overrideClient = {
-  //     execute: jest.fn().mockResolvedValue({ override: true })
-  //   };
+    // Make sure that for the default prompt the default client returns a known value.
+    mockClient.execute.mockResolvedValueOnce({ override: false });
 
-  //   // Make sure that for the default prompt the default client returns a known value.
-  //   mockClient.execute.mockResolvedValueOnce({ override: false });
+    const testWorkflow = workflow('Client Override Test')
+      .prompt(
+        "Use default client",
+        {
+          template: () => "prompt1",
+          responseModel: {
+            schema: z.object({ override: z.boolean() }),
+            name: 'overrideResponse'
+          }
+        }
+      )
+      .prompt(
+        "Use override client",
+        {
+          template: () => "prompt2",
+          responseModel: {
+            schema: z.object({ override: z.boolean() }),
+            name: 'overrideResponse'
+          },
+          client: overrideClient
+        }
+      );
 
-  //   const testWorkflow = workflow('Client Override Test')
-  //     .prompt(
-  //       "Use default client",
-  //       {
-  //         template: () => "prompt1",
-  //         responseModel: {
-  //           schema: z.object({ override: z.boolean() }),
-  //           name: 'overrideResponse'
-  //         }
-  //       }
-  //     )
-  //     .prompt(
-  //       "Use override client",
-  //       {
-  //         template: () => "prompt2",
-  //         responseModel: {
-  //           schema: z.object({ override: z.boolean() }),
-  //           name: 'overrideResponse'
-  //         },
-  //         client: overrideClient
-  //       }
-  //     );
+    // Run the workflow and capture all events
+    const events = [];
+    let finalState = {};
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      events.push(event);
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
 
-  //   // Run the workflow and capture all events
-  //   const events = [];
-  //   for await (const event of testWorkflow.run({ client: mockClient })) {
-  //     events.push(event);
-  //   }
+    // Final state should include both responses
+    expect(finalState).toEqual({
+      overrideResponse: { override: true }
+    });
 
-  //   // Get the final event (should be COMPLETE)
-  //   const finalEvent = events[events.length - 1];
-
-  //   // Get the last step's state from the steps array
-  //   const finalState = finalEvent.steps[finalEvent.steps.length - 1].state;
-
-  //   // Final state should include both responses.
-  //   expect(finalState).toEqual({
-  //     overrideResponse: { override: true }
-  //   });
-
-  //   // Verify that each client was used correctly based on the supplied prompt configuration.
-  //   expect(mockClient.execute).toHaveBeenCalledWith("prompt1", expect.any(Object));
-  //   expect(overrideClient.execute).toHaveBeenCalledWith("prompt2", expect.any(Object));
-  // });
+    // Verify that each client was used correctly based on the supplied prompt configuration.
+    expect(mockClient.execute).toHaveBeenCalledWith("prompt1", expect.any(Object));
+    expect(overrideClient.execute).toHaveBeenCalledWith("prompt2", expect.any(Object));
+  });
 });
 
 // describe('error handling', () => {
