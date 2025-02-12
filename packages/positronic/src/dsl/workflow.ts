@@ -50,8 +50,8 @@ type WorkflowBlock<
   type: 'workflow';
   title: string;
   innerWorkflow: Workflow<TOptions, TInnerState>;
-  initialState: TInnerState | ((outerCtx: TOuterState) => TInnerState);
-  action: (outerCtx: TOuterState, innerCtx: TInnerState) => TNewState;
+  initialState: TInnerState | ((outerState: TOuterState) => TInnerState);
+  action: (outerState: TOuterState, innerState: TInnerState) => TNewState;
 };
 
 type Block<TStateIn, TStateOut, TOptions extends object = {}> =
@@ -164,7 +164,7 @@ export class Workflow<
       title,
       innerWorkflow,
       initialState: initialState || (() => ({} as TInnerState)),
-      action: (outerCtx, innerCtx) => action({ state: outerCtx, workflowState: innerCtx})
+      action: (outerState, innerState) => action({ state: outerState, workflowState: innerState})
     };
     this.blocks.push(nestedBlock);
     return this.nextWorkflow<TNewState>();
@@ -176,7 +176,7 @@ export class Workflow<
   >(
     title: string,
     config: {
-      template: (ctx: TState) => string;
+      template: (state: TState) => string;
       responseModel: {
         schema: TSchema;
         name: TResponseKey;

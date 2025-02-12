@@ -279,7 +279,7 @@ describe('step creation', () => {
 
   it('should maintain immutable results between steps', async () => {
     const testWorkflow = workflow('Immutable Steps Workflow')
-      .step("First step", ({ client }) => ({
+      .step("First step", () => ({
         value: 1
       }))
       .step("Second step", ({ state }) => {
