@@ -344,7 +344,6 @@ describe('workflow resumption', () => {
     executedSteps.length = 0;
 
     // Resume workflow with first step completed
-    let finalEvent: any;
     for await (const event of threeStepWorkflow.run({
       client: mockClient,
       initialCompletedSteps: [firstStepCompleted]
