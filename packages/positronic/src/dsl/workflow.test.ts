@@ -1,5 +1,6 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants';
 import { applyPatches } from './json-patch';
+import { State } from './types';
 import { workflow, type WorkflowEvent, type SerializedStep } from './workflow';
 import { z } from 'zod';
 
@@ -359,58 +360,74 @@ describe('step creation', () => {
   });
 });
 
-// describe('workflow resumption', () => {
-//   // Mock client setup
-//   const mockClient = {
-//     execute: jest.fn()
-//   };
+describe('workflow resumption', () => {
+  const mockClient = {
+    execute: jest.fn()
+  };
 
-//   it('should resume workflow from the correct step when given initialCompletedSteps', async () => {
-//     const executedSteps: string[] = [];
+  it('should resume workflow from the correct step when given initialCompletedSteps', async () => {
+    const executedSteps: string[] = [];
+    const threeStepWorkflow = workflow('Three Step Workflow')
+      .step("Step 1", ({ state }) => {
+        executedSteps.push("Step 1");
+        return { ...state, value: 2 };
+      })
+      .step("Step 2", ({ state }) => {
+        executedSteps.push("Step 2");
+        return { ...state, value: state.value + 10 };
+      })
+      .step("Step 3", ({ state }) => {
+        executedSteps.push("Step 3");
+        return { ...state, value: state.value * 3 };
+      });
 
-//     const threeStepWorkflow = workflow('Three Step Workflow')
-//       .step("Step 1", ({ state }) => {
-//         executedSteps.push("Step 1");
-//         return { value: 2 };
-//       })
-//       .step("Step 2", ({ state }) => {
-//         executedSteps.push("Step 2");
-//         return { value: state.value + 10 };
-//       })
-//       .step("Step 3", ({ state }) => {
-//         executedSteps.push("Step 3");
-//         return { value: state.value * 3 };
-//       });
+    // First run to get the first step completed with initial state
+    let initialCompletedSteps;
+    const initialState = { initialValue: true };
+    let firstStepState: State = initialState;
 
-//     // First run to get the first step completed
-//     let firstStepCompleted: SerializedStep | undefined;
-//     for await (const event of threeStepWorkflow.run({ client: mockClient })) {
-//       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.currentStep?.title === "Step 1") {
-//         firstStepCompleted = event.currentStep;
-//         break;  // Stop after first step
-//       }
-//     }
+    // Run workflow until we get the first step completed
+    for await (const event of threeStepWorkflow.run({
+      client: mockClient,
+      initialState
+    })) {
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        firstStepState = applyPatches(firstStepState, [event.patch]);
+      }
+      if (event.type === WORKFLOW_EVENTS.STEP_STATUS && event.steps[0].status === STATUS.COMPLETE) {
+        initialCompletedSteps = event.steps;
+        break;  // Stop after first step
+      }
+    }
 
-//     if (!firstStepCompleted) {
-//       throw new Error('Failed to get first completed step');
-//     }
+    // Clear executed steps array
+    executedSteps.length = 0;
 
-//     // Clear executed steps array
-//     executedSteps.length = 0;
+    // Resume workflow with first step completed
+    let resumedState: State | undefined;
+    for await (const event of threeStepWorkflow.run({
+      client: mockClient,
+      initialState,
+      initialCompletedSteps
+    })) {
+      if (event.type === WORKFLOW_EVENTS.RESTART) {
+        resumedState = event.initialState;
+      } else if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        resumedState = applyPatches(resumedState!, [event.patch]);
+      }
+    }
 
-//     // Resume workflow with first step completed
-//     for await (const event of threeStepWorkflow.run({
-//       client: mockClient,
-//       initialCompletedSteps: [firstStepCompleted]
-//     })) {
-//       // do nothing, just run the workflow
-//     }
+    // Verify only steps 2 and 3 were executed
+    expect(executedSteps).toEqual(["Step 2", "Step 3"]);
+    expect(executedSteps).not.toContain("Step 1");
 
-//     // Verify only steps 2 and 3 were executed
-//     expect(executedSteps).toEqual(["Step 2", "Step 3"]);
-//     expect(executedSteps).not.toContain("Step 1");
-//   });
-// });
+    // Verify the final state after all steps complete
+    expect(resumedState).toEqual({
+      value: 36,
+      initialValue: true
+    });
+  });
+});
 
 // describe('nested workflows', () => {
 //   it('should execute nested workflows and yield all inner workflow events', async () => {

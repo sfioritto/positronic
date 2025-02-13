@@ -26,6 +26,7 @@ interface WorkflowBaseEvent<TOptions extends object = {}> extends BaseEvent<TOpt
 
 interface WorkflowStartEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.START | typeof WORKFLOW_EVENTS.RESTART;
+  initialState: State;
   status: typeof STATUS.RUNNING;
 }
 
@@ -75,7 +76,7 @@ export interface SerializedStep {
   title: string;
   status: typeof STATUS[keyof typeof STATUS];
   id: string;
-  state?: State;
+  patch?: JsonPatch;
 }
 
 type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
@@ -110,7 +111,7 @@ interface RunParams<
   TStateIn extends State = State
 > {
   client: PromptClient;
-  initialState?: TStateIn;
+  initialState?: State;  // Allow any State
   options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
 }
@@ -119,7 +120,7 @@ const clone = <T>(value: T): T => structuredClone(value);
 
 class Step {
   public id: string;
-  private currentState?: State;
+  private patch?: JsonPatch;
   private status: typeof STATUS[keyof typeof STATUS] = STATUS.PENDING;
 
   constructor(
@@ -129,12 +130,8 @@ class Step {
     this.id = id || uuidv4();
   }
 
-  get state(): State {
-    return clone(this.currentState ?? {} as State);
-  }
-
-  withState(state: State | undefined) {
-    this.currentState = state ? clone(state) : undefined;
+  withPatch(patch: JsonPatch | undefined) {
+    this.patch = patch;
     return this;
   }
 
@@ -148,7 +145,7 @@ class Step {
       id: this.id,
       title: this.block.title,
       status: this.status,
-      state: this.state
+      patch: this.patch
     };
   }
 }
@@ -157,7 +154,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private currentState: TState;
   private steps: Step[];
   private currentStepIndex: number = 0;
-
+  private initialState: TState;
   constructor(
     private params: RunParams<TOptions, TState> & {
       title: string;
@@ -165,21 +162,30 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       blocks: Block<any, any, TOptions>[];
     }
   ) {
+    this.initialState = (params.initialState ?? {}) as TState;
+
     // Initialize steps array with UUIDs and pending status
     this.steps = params.blocks.map((block, index) => {
       // Use completed step at same index if available
       const completedStep = params.initialCompletedSteps?.[index];
       if (completedStep) {
         return new Step(block, completedStep.id)
-          .withState(completedStep.state as TState)
-          .withStatus(completedStep.status);
+          .withStatus(completedStep.status)
+          .withPatch(completedStep.patch);
       }
       return new Step(block);
     });
 
-    // Set initial state from the last completed step, or use provided initialState
-    const lastCompletedStep = params.initialCompletedSteps?.[params.initialCompletedSteps.length - 1];
-    this.currentState = lastCompletedStep?.state as TState ?? clone(params.initialState ?? {} as TState);
+    // Set initial state by applying patches from completed steps to the initialState
+    this.currentState = clone(this.initialState);
+
+    if (params.initialCompletedSteps) {
+      for (const step of this.steps) {
+        if (step.serialized.status === STATUS.COMPLETE && step.serialized.patch) {
+          this.currentState = applyPatches(this.currentState, [step.serialized.patch]) as TState;
+        }
+      }
+    }
   }
 
   async *next(): AsyncGenerator<WorkflowEvent<TOptions>> {
@@ -191,7 +197,8 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.RUNNING,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
-        options: this.params.options ?? {} as TOptions
+        initialState: this.currentState, // This now includes patches from completed steps
+        options: this.params.options ?? {} as TOptions,
       };
 
       // Process each step
@@ -295,7 +302,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
 
       // Update state with inner workflow results
       this.currentState = await block.action(this.currentState, innerState);
-      step.withState(this.currentState).withStatus(STATUS.COMPLETE);
+      step.withStatus(STATUS.COMPLETE);
 
       // Create patch for the outer state change
       const patch = createPatch(prevState, this.currentState);
@@ -318,10 +325,13 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         options: this.params.options ?? {} as TOptions,
         client: this.params.client,
       });
-      step.withState(this.currentState).withStatus(STATUS.COMPLETE);
+
+      step.withStatus(STATUS.COMPLETE);
 
       // Create patch for the state change
       const patch = createPatch(prevState, this.currentState);
+      step.withPatch(patch);
+
       yield {
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
