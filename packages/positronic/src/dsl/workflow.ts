@@ -25,13 +25,13 @@ interface WorkflowBaseEvent<TOptions extends object = {}> extends BaseEvent<TOpt
   workflowDescription?: string;
 }
 
-interface WorkflowStartEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
+export interface WorkflowStartEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.START | typeof WORKFLOW_EVENTS.RESTART;
   initialState: State;
   status: typeof STATUS.RUNNING;
 }
 
-interface WorkflowCompleteEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
+export interface WorkflowCompleteEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.COMPLETE;
   status: typeof STATUS.COMPLETE;
 }
@@ -43,20 +43,20 @@ export interface WorkflowErrorEvent<TOptions extends object = {}> extends Workfl
 }
 
 // 2. Step Status Event (just steps array and base event properties)
-interface StepStatusEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
+export interface StepStatusEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.STEP_STATUS;
   steps: SerializedStep[];
 }
 
 // 3. Step Events (include step-specific properties)
-interface StepStartedEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
+export interface StepStartedEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.STEP_START;
   status: typeof STATUS.RUNNING;
   stepTitle: string;
   stepId: string;
 }
 
-interface StepCompletedEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
+export interface StepCompletedEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.STEP_COMPLETE;
   status: typeof STATUS.RUNNING;
   stepTitle: string;
@@ -322,6 +322,14 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
         initialState: this.currentState,
+        options: this.params.options ?? {} as TOptions,
+        workflowRunId: this.workflowRunId
+      };
+
+      // Emit initial step status after workflow starts
+      yield {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: this.steps.map(step => step.serialized),
         options: this.params.options ?? {} as TOptions,
         workflowRunId: this.workflowRunId
       };

@@ -45,6 +45,9 @@ describe('workflow creation', () => {
       workflowDescription: undefined
     }));
 
+    // Skip initial step status event
+    await nextStep(workflowRun);
+
     // Check first step start
     const firstStepStartResult = await nextStep(workflowRun);
     expect(firstStepStartResult).toEqual(expect.objectContaining({
@@ -316,6 +319,10 @@ describe('error handling', () => {
         workflowRunId: mainWorkflowId
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array)
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'First step'
@@ -340,6 +347,10 @@ describe('error handling', () => {
         status: STATUS.RUNNING,
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array)
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Throw error'
@@ -351,7 +362,7 @@ describe('error handling', () => {
         error: expect.objectContaining({
           name: expect.any(String),
           message: expect.any(String)
-        })
+        }),
       }),
       expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_STATUS,
@@ -420,8 +431,11 @@ describe('step creation', () => {
       }
     }
 
+    // Skip checking events[0] (workflow:start)
+    // Skip checking events[1] (step:status)
+
     // Verify the step start event
-    expect(events[1]).toEqual(expect.objectContaining({
+    expect(events[2]).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_START,
       status: STATUS.RUNNING,
       stepTitle: 'Simple step',
@@ -430,7 +444,7 @@ describe('step creation', () => {
     }));
 
     // Verify the step complete event
-    expect(events[2]).toEqual(expect.objectContaining({
+    expect(events[3]).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_COMPLETE,
       status: STATUS.RUNNING,
       stepTitle: 'Simple step',
@@ -447,7 +461,7 @@ describe('step creation', () => {
       options: {}
     }));
 
-    expect(events[3]).toEqual(expect.objectContaining({
+    expect(events[4]).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_STATUS,
       steps: [
         expect.objectContaining({ title: 'Simple step', status: STATUS.COMPLETE, id: expect.any(String) })
@@ -456,7 +470,7 @@ describe('step creation', () => {
     }));
 
     // Verify the workflow complete event
-    expect(events[4]).toEqual(expect.objectContaining({
+    expect(events[5]).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.COMPLETE,
       status: STATUS.COMPLETE,
       workflowTitle: 'Simple Workflow',
@@ -618,28 +632,32 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING,
         stepTitle: undefined
       },
-      // First step start
-      {
-        type: WORKFLOW_EVENTS.STEP_START,
-        workflowTitle: undefined,
-        status: STATUS.RUNNING,
-        stepTitle: 'Set prefix'
-      },
-      // First step of outer workflow
-      {
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
-        workflowTitle: undefined,
-        status: STATUS.RUNNING,
-        stepTitle: 'Set prefix'
-      },
-      // Step status after first step
+      // Initial step status for outer workflow
       {
         type: WORKFLOW_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined
       },
-      // Nested workflow step start
+      // First step of outer workflow
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Set prefix'
+      },
+      {
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Set prefix'
+      },
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined
+      },
       {
         type: WORKFLOW_EVENTS.STEP_START,
         workflowTitle: undefined,
@@ -653,28 +671,32 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING,
         stepTitle: undefined
       },
-      // Inner workflow step start
-      {
-        type: WORKFLOW_EVENTS.STEP_START,
-        workflowTitle: undefined,
-        status: STATUS.RUNNING,
-        stepTitle: 'Double value'
-      },
-      // Inner workflow step complete
-      {
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
-        workflowTitle: undefined,
-        status: STATUS.RUNNING,
-        stepTitle: 'Double value'
-      },
-      // Inner workflow step status
+      // Initial step status for inner workflow
       {
         type: WORKFLOW_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined
       },
-      // Inner workflow completion
+      // Inner workflow step
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Double value'
+      },
+      {
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Double value'
+      },
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined
+      },
       {
         type: WORKFLOW_EVENTS.COMPLETE,
         workflowTitle: 'Inner Workflow',
@@ -688,7 +710,6 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow'
       },
-      // Outer workflow step status after nested workflow
       {
         type: WORKFLOW_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
@@ -784,6 +805,10 @@ describe('nested workflows', () => {
         workflowRunId: mainWorkflowId
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array)
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'First step'
@@ -808,6 +833,10 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING,
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array)
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Throw error'
@@ -819,7 +848,7 @@ describe('nested workflows', () => {
         error: expect.objectContaining({
           name: expect.any(String),
           message: expect.any(String)
-        })
+        }),
       }),
       expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_STATUS,
@@ -929,6 +958,9 @@ describe('workflow options', () => {
     const workflowRun = testWorkflow.run({ client: mockClient });
 
     // Skip start event
+    await workflowRun.next();
+
+    // Skip initial step status event
     await workflowRun.next();
 
     // Check step start
