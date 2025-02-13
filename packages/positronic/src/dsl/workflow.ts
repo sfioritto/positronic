@@ -22,6 +22,7 @@ interface BaseEvent<TOptions extends object = {}> {
 interface WorkflowBaseEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
   workflowTitle: string;
   workflowDescription?: string;
+  workflowRunId: string;
 }
 
 interface WorkflowStartEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
@@ -114,6 +115,7 @@ interface RunParams<
   initialState?: State;  // Allow any State
   options?: TOptions;
   initialCompletedSteps?: SerializedStep[];
+  workflowRunId?: string;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -155,6 +157,8 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private steps: Step[];
   private currentStepIndex: number = 0;
   private initialState: TState;
+  private workflowRunId: string;
+
   constructor(
     private params: RunParams<TOptions, TState> & {
       title: string;
@@ -186,11 +190,13 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         }
       }
     }
+
+    this.workflowRunId = params.workflowRunId ?? uuidv4();
   }
 
   async *next(): AsyncGenerator<WorkflowEvent<TOptions>> {
     try {
-      // Start event
+      // Start event with workflowRunId
       const hasCompletedSteps = this.steps.some(step => step.serialized.status !== STATUS.PENDING);
       yield {
         type: hasCompletedSteps ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
@@ -199,6 +205,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         workflowDescription: this.params.description,
         initialState: this.currentState,
         options: this.params.options ?? {} as TOptions,
+        workflowRunId: this.workflowRunId
       };
 
       // Process each step
@@ -239,6 +246,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.COMPLETE,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
+        workflowRunId: this.workflowRunId,
         options: this.params.options ?? {} as TOptions
       };
 
@@ -252,6 +260,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.ERROR,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
+        workflowRunId: this.workflowRunId,
         error: {
           name: error.name,
           message: error.message,

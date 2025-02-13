@@ -886,14 +886,14 @@ describe('workflow options', () => {
       }
     }
 
-    expect(finalEvent).toEqual({
+    expect(finalEvent).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.COMPLETE,
       status: STATUS.COMPLETE,
       workflowTitle: 'Options Workflow',
       workflowDescription: undefined,
       options: workflowOptions,
-    })
-    expect(finalStepStatus).toEqual({
+    }))
+    expect(finalStepStatus).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.STEP_STATUS,
       steps: [
         expect.objectContaining({
@@ -903,7 +903,7 @@ describe('workflow options', () => {
         })
       ],
       options: workflowOptions,
-    });
+    }));
   });
 
   it('should provide empty object as default options', async () => {
