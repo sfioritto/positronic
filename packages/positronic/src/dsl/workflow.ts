@@ -306,6 +306,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
 
       // Create patch for the outer state change
       const patch = createPatch(prevState, this.currentState);
+
       yield {
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
@@ -325,7 +326,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         options: this.params.options ?? {} as TOptions,
         client: this.params.client,
       });
-
       step.withStatus(STATUS.COMPLETE);
 
       // Create patch for the state change

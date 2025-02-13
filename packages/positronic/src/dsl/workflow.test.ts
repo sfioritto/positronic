@@ -429,126 +429,164 @@ describe('workflow resumption', () => {
   });
 });
 
-// describe('nested workflows', () => {
-//   it('should execute nested workflows and yield all inner workflow events', async () => {
-//     // Create an inner workflow that will be nested
-//     const innerWorkflow = workflow<{}, { value: number }>('Inner Workflow')
-//       .step(
-//         "Double value",
-//         ({ state }) => ({
-//           inner: true,
-//           value: state.value * 2
-//         })
-//       );
+describe('nested workflows', () => {
+  it('should execute nested workflows and yield all inner workflow events', async () => {
+    // Create an inner workflow that will be nested
+    const innerWorkflow = workflow<{}, { value: number }>('Inner Workflow')
+      .step(
+        "Double value",
+        ({ state }) => ({
+          inner: true,
+          value: state.value * 2
+        })
+      );
 
-//     // Create outer workflow that uses the inner workflow
-//     const outerWorkflow = workflow('Outer Workflow')
-//       .step(
-//         "Set prefix",
-//         () => ({ prefix: "test-" })
-//       )
-//       .workflow(
-//         "Run inner workflow",
-//         innerWorkflow,
-//         ({ state, workflowState }) => ({
-//           ...state,
-//           innerResult: workflowState.value
-//         }),
-//         () => ({ value: 5 })
-//       );
+    // Create outer workflow that uses the inner workflow
+    const outerWorkflow = workflow('Outer Workflow')
+      .step(
+        "Set prefix",
+        () => ({ prefix: "test-" })
+      )
+      .workflow(
+        "Run inner workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => ({
+          ...state,
+          innerResult: workflowState.value
+        }),
+        () => ({ value: 5 })
+      );
 
-//     const events: WorkflowEvent<any>[] = [];
-//     for await (const event of outerWorkflow.run({ client: mockClient })) {
-//       events.push(event);
-//     }
+    const events: WorkflowEvent<any>[] = [];
+    for await (const event of outerWorkflow.run({ client: mockClient })) {
+      events.push(event);
+    }
 
-//     // Verify all events are yielded in correct order
-//     expect(events.map(e => ({
-//       type: e.type,
-//       workflowTitle: e.workflowTitle,
-//       status: e.status,
-//       stepTitle: e.currentStep?.title || (e.type === WORKFLOW_EVENTS.COMPLETE ? e.steps[e.steps.length - 1].title : undefined)
-//     }))).toEqual([
-//       // Outer workflow start
-//       {
-//         type: WORKFLOW_EVENTS.START,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       // First step start
-//       {
-//         type: WORKFLOW_EVENTS.STEP_START,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING,
-//         stepTitle: 'Set prefix'
-//       },
-//       // First step of outer workflow
-//       {
-//         type: WORKFLOW_EVENTS.STEP_COMPLETE,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING,
-//         stepTitle: 'Set prefix'
-//       },
-//       // Nested workflow step start
-//       {
-//         type: WORKFLOW_EVENTS.STEP_START,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING,
-//         stepTitle: 'Run inner workflow'
-//       },
-//       // Inner workflow start
-//       {
-//         type: WORKFLOW_EVENTS.START,
-//         workflowTitle: 'Inner Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       // Inner workflow step start
-//       {
-//         type: WORKFLOW_EVENTS.STEP_START,
-//         workflowTitle: 'Inner Workflow',
-//         status: STATUS.RUNNING,
-//         stepTitle: 'Double value'
-//       },
-//       // Inner workflow step
-//       {
-//         type: WORKFLOW_EVENTS.STEP_COMPLETE,
-//         workflowTitle: 'Inner Workflow',
-//         status: STATUS.RUNNING,
-//         stepTitle: 'Double value'
-//       },
-//       // Inner workflow completion
-//       {
-//         type: WORKFLOW_EVENTS.COMPLETE,
-//         workflowTitle: 'Inner Workflow',
-//         status: STATUS.COMPLETE,
-//         stepTitle: 'Double value'
-//       },
-//       // Outer workflow nested step completion
-//       {
-//         type: WORKFLOW_EVENTS.STEP_COMPLETE,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING,
-//         stepTitle: 'Run inner workflow'
-//       },
-//       // Outer workflow completion
-//       {
-//         type: WORKFLOW_EVENTS.COMPLETE,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.COMPLETE,
-//         stepTitle: 'Run inner workflow'
-//       }
-//     ]);
+    // Verify all events are yielded in correct order
+    expect(events.map(e => ({
+      type: e.type,
+      workflowTitle: 'workflowTitle' in e ? e.workflowTitle : undefined,
+      status: 'status' in e ? e.status : undefined,
+      stepTitle: 'stepTitle' in e ? e.stepTitle : undefined
+    }))).toEqual([
+      // Outer workflow start
+      {
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING,
+        stepTitle: undefined
+      },
+      // First step start
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Set prefix'
+      },
+      // First step of outer workflow
+      {
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Set prefix'
+      },
+      // Step status after first step
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined
+      },
+      // Nested workflow step start
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Run inner workflow'
+      },
+      // Inner workflow start
+      {
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Inner Workflow',
+        status: STATUS.RUNNING,
+        stepTitle: undefined
+      },
+      // Inner workflow step start
+      {
+        type: WORKFLOW_EVENTS.STEP_START,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Double value'
+      },
+      // Inner workflow step complete
+      {
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Double value'
+      },
+      // Inner workflow step status
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined
+      },
+      // Inner workflow completion
+      {
+        type: WORKFLOW_EVENTS.COMPLETE,
+        workflowTitle: 'Inner Workflow',
+        status: STATUS.COMPLETE,
+        stepTitle: undefined
+      },
+      // Outer workflow nested step completion
+      {
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        workflowTitle: undefined,
+        status: STATUS.RUNNING,
+        stepTitle: 'Run inner workflow'
+      },
+      // Outer workflow step status after nested workflow
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined
+      },
+      // Outer workflow completion
+      {
+        type: WORKFLOW_EVENTS.COMPLETE,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.COMPLETE,
+        stepTitle: undefined
+      }
+    ]);
 
-//     // Verify states are passed correctly
-//     expect(events[6].currentStep?.state).toEqual({ // Inner workflow step completion
-//       inner: true,
-//       value: 10
-//     });
-//     expect(events[8].currentStep?.state).toEqual({ // Outer workflow after nested workflow
-//       prefix: "test-",
-//       innerResult: 10
-//     });
-//   });
+    // Verify states are passed correctly
+    let innerState: State = { value: 5 };  // Match the initial state from the workflow
+    let outerState = {};
+
+    for (const event of events) {
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        if (event.stepTitle === 'Double value') {
+          innerState = applyPatches(innerState, [event.patch]);
+        } else {
+          outerState = applyPatches(outerState, [event.patch]);
+        }
+      }
+    }
+
+    // Verify final states
+    expect(innerState).toEqual({
+      inner: true,
+      value: 10
+    });
+
+    expect(outerState).toEqual({
+      prefix: "test-",
+      innerResult: 10
+    });
+  });
 
 //   it('should handle errors in nested workflows and propagate them up', async () => {
 //     // Create an inner workflow that will throw an error
@@ -649,7 +687,7 @@ describe('workflow resumption', () => {
 //       message: 'Inner workflow error'
 //     }));
 //   });
-// });
+});
 
 // describe('workflow options', () => {
 //   it('should pass options through to workflow events', async () => {

@@ -1,4 +1,4 @@
-import { JsonPatch, JsonValue, State } from './types';
+import { JsonPatch, State } from './types';
 import { compare } from 'fast-json-patch';
 import { applyPatch } from 'fast-json-patch';
 
