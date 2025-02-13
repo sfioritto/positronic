@@ -1,6 +1,13 @@
 import { Database as DatabaseType } from "better-sqlite3";
-import { Adapter, STATUS, WORKFLOW_EVENTS } from "@positronic/core";
-import type { Event } from "@positronic/core";
+import { Adapter, WORKFLOW_EVENTS } from "@positronic/core";
+import type {
+  WorkflowEvent,
+  WorkflowStartEvent,
+  WorkflowCompleteEvent,
+  WorkflowErrorEvent,
+  StepStatusEvent,
+  StepStartedEvent,
+} from "@positronic/core";
 import { initSQL } from './sql';
 
 interface SQLiteOptions {
@@ -8,32 +15,35 @@ interface SQLiteOptions {
 }
 
 export class SQLiteAdapter extends Adapter<SQLiteOptions> {
-  constructor(
-    private db: DatabaseType,
-    private workflowRunId?: number
-  ) {
+  constructor(private db: DatabaseType) {
     super();
-
     // Initialize database schema
     this.db.exec(initSQL);
   }
 
-  async dispatch(event: Event<SQLiteOptions>) {
+  public async dispatch(event: WorkflowEvent<SQLiteOptions>) {
+    console.log('Dispatching event:', event.type);
+
     switch (event.type) {
       case WORKFLOW_EVENTS.START:
-        await this.handleStart(event);
+        this.handleWorkflowStart(event);
         break;
       case WORKFLOW_EVENTS.STEP_START:
-        await this.handleStepStart(event);
+        console.log('Handling step start:', event.stepId);
+        this.handleStepStart(event);
+        // Verify the update
+        const startedStep = this.db.prepare(
+          "SELECT started_at FROM workflow_steps WHERE id = ?"
+        ).get(event.stepId);
+        console.log('After step start update:', startedStep);
         break;
-      case WORKFLOW_EVENTS.RESTART:
-        await this.handleRestart(event);
-        break;
-      case WORKFLOW_EVENTS.STEP_COMPLETE:
-        await this.handleUpdate(event);
+      case WORKFLOW_EVENTS.STEP_STATUS:
+        console.log('Handling step status:',
+          event.steps.map(s => ({ id: s.id, status: s.status })));
+        this.handleStepStatus(event);
         break;
       case WORKFLOW_EVENTS.COMPLETE:
-        await this.handleComplete(event);
+        this.handleComplete(event);
         break;
       case WORKFLOW_EVENTS.ERROR:
         await this.handleError(event);
@@ -41,269 +51,112 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     }
   }
 
-  private async handleStart(event: Event<SQLiteOptions>) {
-    const { workflowTitle, status, steps } = event;
+  private async handleWorkflowStart(event: WorkflowStartEvent<SQLiteOptions>) {
+    // Insert or update workflow run
+    this.db.prepare(`
+      INSERT INTO workflow_runs (
+        id,
+        workflow_name,
+        status,
+        error
+      ) VALUES (?, ?, ?, ?)
+    `).run(
+      event.workflowRunId,
+      event.workflowTitle,
+      event.status,
+      null
+    );
+  }
 
+  private handleStepStart(event: StepStartedEvent<SQLiteOptions>) {
+    console.log('Running step start SQL update for step:', event.stepId);
+    this.db.prepare(`
+      UPDATE workflow_steps
+      SET
+        status = 'running',
+        started_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(event.stepId);
+  }
+
+  private async handleStepStatus(event: StepStatusEvent<SQLiteOptions>) {
+    console.log('Running step status SQL update for steps:',
+      event.steps.map(s => ({ id: s.id, status: s.status })));
     // Wrap operations in a transaction
     this.db.transaction(() => {
-      // Insert workflow run
-      const result = this.db.prepare(`
-        INSERT INTO workflow_runs (
-          workflow_name,
-          status,
-          error
-        ) VALUES (?, ?, ?)
-      `).run(
-        workflowTitle,
-        status,
-        null
-      );
-
-      this.workflowRunId = result.lastInsertRowid as number;
-
-      // Create all step records upfront as pending
-      steps.forEach((step, index) => {
-        const sql = `
+      // Upsert all steps
+      event.steps.forEach((step, index) => {
+        this.db.prepare(`
           INSERT INTO workflow_steps (
             id,
             workflow_run_id,
             title,
-            state,
             status,
-            error,
+            patch,
             step_order,
-            started_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-        `;
-
-        this.db.prepare(sql).run(
+            started_at,
+            completed_at
+          ) VALUES (?, ?, ?, ?, ?, ?,
+            CASE WHEN ? = 'running' THEN CURRENT_TIMESTAMP ELSE NULL END,
+            CASE WHEN ? IN ('complete', 'error') THEN CURRENT_TIMESTAMP ELSE NULL END
+          )
+          ON CONFLICT(id) DO UPDATE SET
+            status = excluded.status,
+            patch = excluded.patch,
+            step_order = excluded.step_order,
+            started_at = CASE
+              WHEN excluded.status = 'running' AND started_at IS NULL
+              THEN CURRENT_TIMESTAMP
+              ELSE started_at
+            END,
+            completed_at = CASE
+              WHEN excluded.status IN ('complete', 'error') AND completed_at IS NULL
+              THEN CURRENT_TIMESTAMP
+              ELSE completed_at
+            END
+        `).run(
           step.id,
-          this.workflowRunId,
+          event.workflowRunId,
           step.title,
-          JSON.stringify(step.state ?? {}),
-          STATUS.PENDING,
-          null,
-          index
+          step.status,
+          step.patch ? JSON.stringify(step.patch) : null,
+          index,
+          step.status,  // For started_at CASE
+          step.status   // For completed_at CASE
         );
       });
     })();
   }
 
-  private async handleStepStart(event: Event<SQLiteOptions>) {
-    if (!this.workflowRunId) {
-      throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
-    }
-
-    if (!event.currentStep) {
-      throw new Error('Current step is required for step start event');
-    }
-
-    // Update the step to running status and set started_at
+  private async handleComplete(event: WorkflowCompleteEvent<SQLiteOptions>) {
     this.db.prepare(`
-      UPDATE workflow_steps SET
-      status = ?,
-      started_at = CURRENT_TIMESTAMP
-      WHERE workflow_run_id = ? AND id = ?
-    `).run(STATUS.RUNNING, this.workflowRunId, event.currentStep.id);
-  }
-
-  private async handleRestart(event: Event<SQLiteOptions>) {
-    this.workflowRunId = event.options?.workflowRunId;
-
-    if (!this.workflowRunId) {
-      throw new Error('Workflow run ID is required to restart a workflow in the SQLite adapter');
-    }
-
-    // Wrap operations in a transaction
-    this.db.transaction(() => {
-      // Update workflow run status to running
-      this.db.prepare(`
-        UPDATE workflow_runs SET
-          status = ?,
-          error = NULL
-        WHERE id = ?
-      `).run(event.status, this.workflowRunId);
-
-      // Find the index of the first non-completed step from the event
-      const firstNonCompletedIndex = event.steps.findIndex(step => step.status !== STATUS.COMPLETE);
-
-      // Delete steps from this index onwards
-      if (firstNonCompletedIndex !== -1) {
-        this.db.prepare(`
-          DELETE FROM workflow_steps
-          WHERE workflow_run_id = ? AND step_order >= ?
-        `).run(this.workflowRunId, firstNonCompletedIndex);
-
-        // Re-create steps from the first non-completed step onwards
-        event.steps.slice(firstNonCompletedIndex).forEach((step, index) => {
-          const sql = `
-            INSERT INTO workflow_steps (
-              id,
-              workflow_run_id,
-              title,
-              state,
-              status,
-              error,
-              step_order,
-              started_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-          `;
-
-          this.db.prepare(sql).run(
-            step.id,
-            this.workflowRunId,
-            step.title,
-            JSON.stringify(step.state ?? {}),
-            STATUS.PENDING,
-            null,
-            firstNonCompletedIndex + index
-          );
-        });
-      }
-    })();
-  }
-
-  private async handleUpdate(event: Event<SQLiteOptions>) {
-    if (!this.workflowRunId) {
-      throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
-    }
-
-    // Wrap operations in a transaction
-    this.db.transaction(async () => {
-      // Update workflow status
-      this.db.prepare(`
-        UPDATE workflow_runs SET
-          status = ?,
-          error = ?
-        WHERE id = ?
-      `).run(
-        event.status,
-        event.error ? JSON.stringify(event.error) : null,
-        this.workflowRunId
-      );
-
-      if (event.currentStep) {
-        // Get the current step's order by finding its index in steps array
-        const currentStepOrder = event.steps.findIndex(s => s.id === event.currentStep!.id);
-
-        // If this is the first step and it hasn't been started yet, set its started_at
-        const currentStep = await this.db.prepare(`
-          SELECT started_at FROM workflow_steps
-          WHERE workflow_run_id = ? AND step_order = ?
-        `).get(this.workflowRunId, currentStepOrder) as any;
-
-        if (!currentStep.started_at) {
-          await this.db.prepare(`
-            UPDATE workflow_steps SET
-            status = ?,
-            started_at = CURRENT_TIMESTAMP
-            WHERE workflow_run_id = ? AND step_order = ?
-          `).run(STATUS.RUNNING, this.workflowRunId, currentStepOrder);
-        }
-
-        // Update completed step with the new state
-        this.db.prepare(`
-          UPDATE workflow_steps SET
-          state = ?,
-          status = ?,
-          error = ?,
-          completed_at = CURRENT_TIMESTAMP
-          WHERE workflow_run_id = ? AND step_order = ?
-        `).run(
-          JSON.stringify(event.currentStep.state),
-          event.currentStep.status,
-          event.error ? JSON.stringify(event.error) : null,
-          this.workflowRunId,
-          currentStepOrder
-        );
-
-        // Start next step if it exists
-        const nextStepOrder = currentStepOrder + 1;
-        if (nextStepOrder < event.steps.length) {
-          // Update next step's state and start it
-          this.db.prepare(`
-            UPDATE workflow_steps SET
-            state = ?,
-            status = ?,
-            started_at = CURRENT_TIMESTAMP
-            WHERE workflow_run_id = ? AND step_order = ?
-          `).run(
-            JSON.stringify(event.currentStep.state),
-            STATUS.RUNNING,
-            this.workflowRunId,
-            nextStepOrder
-          );
-        }
-      }
-    })();
-  }
-
-  private async handleComplete(event: Event<SQLiteOptions>) {
-    if (!this.workflowRunId) {
-      throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
-    }
-
-    this.db.prepare(`
-      UPDATE workflow_runs SET
+      UPDATE workflow_runs
+      SET
         status = ?,
-        error = ?,
         completed_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       event.status,
-      event.error ? JSON.stringify(event.error) : null,
-      this.workflowRunId
+      event.workflowRunId
     );
   }
 
-  private async handleError(event: Event<SQLiteOptions>) {
-    if (!this.workflowRunId) {
-      throw new Error('Workflow run ID is required for this event handler in the SQLite adapter');
-    }
-
+  private async handleError(event: WorkflowErrorEvent<SQLiteOptions>) {
     const serializedError = event.error ? {
       name: event.error.name,
       message: event.error.message,
       stack: event.error.stack
     } : null;
 
-    // Wrap operations in a transaction
-    this.db.transaction(() => {
-      // Update workflow status
-      this.db.prepare(`
-        UPDATE workflow_runs SET
-          status = ?,
-          error = ?
-        WHERE id = ?
-      `).run(
-        event.status,
-        serializedError ? JSON.stringify(serializedError) : null,
-        this.workflowRunId
-      );
-
-      // Update the errored step
-      if (event.currentStep) {
-        const stepOrder = event.steps.findIndex(s => s.id === event.currentStep!.id);
-        if (stepOrder === -1) {
-          throw new Error(`Could not find step with ID ${event.currentStep.id} in steps array`);
-        }
-
-        this.db.prepare(`
-          UPDATE workflow_steps SET
-          state = ?,
-          status = ?,
-          error = ?,
-          started_at = CURRENT_TIMESTAMP,
-          completed_at = CURRENT_TIMESTAMP
-          WHERE workflow_run_id = ? AND step_order = ?
-        `).run(
-          JSON.stringify(event.currentStep.state),
-          event.currentStep.status,
-          serializedError ? JSON.stringify(serializedError) : null,
-          this.workflowRunId,
-          stepOrder
-        );
-      }
-    })();
+    this.db.prepare(`
+      UPDATE workflow_runs SET
+        status = ?,
+        error = ?
+      WHERE id = ?
+    `).run(
+      event.status,
+      serializedError ? JSON.stringify(serializedError) : null,
+      event.workflowRunId
+    );
   }
 }
