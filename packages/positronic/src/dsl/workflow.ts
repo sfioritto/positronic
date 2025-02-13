@@ -107,18 +107,136 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}> =
   | StepBlock<TStateIn, TStateOut, TOptions>
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions>;
 
-interface RunParams<
-  TOptions extends object = {},
-  TStateIn extends State = State
-> {
-  client: PromptClient;
-  initialState?: State;  // Allow any State
-  options?: TOptions;
-  initialCompletedSteps?: SerializedStep[];
-  workflowRunId?: string;
+interface InitialRunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+  initialState?: State;
+  initialCompletedSteps?: never;
+  workflowRunId?: never;
 }
 
-const clone = <T>(value: T): T => structuredClone(value);
+interface RerunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+  initialState: State;
+  initialCompletedSteps: SerializedStep[];
+  workflowRunId: string;
+}
+
+export class Workflow<
+  TOptions extends object = {},
+  TState extends State = {}
+> {
+  private blocks: Block<any, any, TOptions>[] = [];
+
+  constructor(
+    private title: string,
+    private description?: string
+  ) {}
+
+  step<TNewState extends State>(
+    title: string,
+    action: (params: {
+      state: TState;
+      options: TOptions;
+      client: PromptClient;
+    }) => TNewState | Promise<TNewState>
+  ) {
+    const stepBlock: StepBlock<TState, TNewState, TOptions> = {
+      type: 'step',
+      title,
+      action
+    };
+    this.blocks.push(stepBlock);
+    return this.nextWorkflow<TNewState>();
+  }
+
+  workflow<
+    TInnerState extends State,
+    TNewState extends State
+  >(
+    title: string,
+    innerWorkflow: Workflow<TOptions, TInnerState>,
+    action: (params: { state: TState; workflowState: TInnerState }) => TNewState,
+    initialState?: TInnerState | ((state: TState) => TInnerState)
+  ) {
+    const nestedBlock: WorkflowBlock<
+      TState,
+      TInnerState,
+      TNewState,
+      TOptions
+    > = {
+      type: 'workflow',
+      title,
+      innerWorkflow,
+      initialState: initialState || (() => ({} as TInnerState)),
+      action: (outerState, innerState) => action({ state: outerState, workflowState: innerState})
+    };
+    this.blocks.push(nestedBlock);
+    return this.nextWorkflow<TNewState>();
+  }
+
+  prompt<
+    TResponseKey extends string,
+    TSchema extends z.ZodObject<any>
+  >(
+    title: string,
+    config: {
+      template: (state: TState) => string;
+      responseModel: {
+        schema: TSchema;
+        name: TResponseKey;
+      };
+      client?: PromptClient;
+    }
+  ) {
+    const promptBlock: StepBlock<
+      TState,
+      TState & { [K in TResponseKey]: z.infer<TSchema> },
+      TOptions
+    > = {
+      type: 'step',
+      title,
+      action: async ({ state, client: runClient }) => {
+        const { template, responseModel, client: stepClient } = config;
+        const client = stepClient ?? runClient;
+        const promptString = template(state);
+        const response = await client.execute(promptString, responseModel);
+
+        return {
+          ...state,
+          [config.responseModel.name]: response
+        };
+      }
+    };
+    this.blocks.push(promptBlock);
+    return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
+  }
+
+  // Overload signatures
+  run(params: InitialRunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
+  run(params: RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
+
+  // Implementation signature
+  async *run(params: InitialRunParams<TOptions> | RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>> {
+    const stream = new WorkflowEventStream({
+      title: this.title,
+      description: this.description,
+      blocks: this.blocks,
+      ...params
+    });
+
+    yield* stream.next();
+  }
+
+  private withBlocks(blocks: Block<any, any, TOptions>[]): this {
+    this.blocks = blocks;
+    return this;
+  }
+
+  private nextWorkflow<TNewState extends State>(): Workflow<TOptions, TNewState> {
+    return new Workflow<TOptions, TNewState>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks);
+  }
+}
 
 class Step {
   public id: string;
@@ -160,7 +278,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private workflowRunId: string;
 
   constructor(
-    private params: RunParams<TOptions, TState> & {
+    private params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
       title: string;
       description?: string;
       blocks: Block<any, any, TOptions>[];
@@ -374,133 +492,4 @@ interface BaseRunParams<TOptions extends object = {}> {
   options?: TOptions;
 }
 
-interface InitialRunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
-  initialState?: State;
-  initialCompletedSteps?: never;
-  workflowRunId?: never;
-}
-
-interface RerunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
-  initialState: State;
-  initialCompletedSteps: SerializedStep[];
-  workflowRunId: string;
-}
-
-export class Workflow<
-  TOptions extends object = {},
-  TState extends State = {}
-> {
-  private blocks: Block<any, any, TOptions>[] = [];
-
-  constructor(
-    private title: string,
-    private description?: string
-  ) {}
-
-  step<TNewState extends State>(
-    title: string,
-    action: (params: {
-      state: TState;
-      options: TOptions;
-      client: PromptClient;
-    }) => TNewState | Promise<TNewState>
-  ) {
-    const stepBlock: StepBlock<TState, TNewState, TOptions> = {
-      type: 'step',
-      title,
-      action
-    };
-    this.blocks.push(stepBlock);
-    return this.nextWorkflow<TNewState>();
-  }
-
-  workflow<
-    TInnerState extends State,
-    TNewState extends State
-  >(
-    title: string,
-    innerWorkflow: Workflow<TOptions, TInnerState>,
-    action: (params: { state: TState; workflowState: TInnerState }) => TNewState,
-    initialState?: TInnerState | ((state: TState) => TInnerState)
-  ) {
-    const nestedBlock: WorkflowBlock<
-      TState,
-      TInnerState,
-      TNewState,
-      TOptions
-    > = {
-      type: 'workflow',
-      title,
-      innerWorkflow,
-      initialState: initialState || (() => ({} as TInnerState)),
-      action: (outerState, innerState) => action({ state: outerState, workflowState: innerState})
-    };
-    this.blocks.push(nestedBlock);
-    return this.nextWorkflow<TNewState>();
-  }
-
-  prompt<
-    TResponseKey extends string,
-    TSchema extends z.ZodObject<any>
-  >(
-    title: string,
-    config: {
-      template: (state: TState) => string;
-      responseModel: {
-        schema: TSchema;
-        name: TResponseKey;
-      };
-      client?: PromptClient;
-    }
-  ) {
-    const promptBlock: StepBlock<
-      TState,
-      TState & { [K in TResponseKey]: z.infer<TSchema> },
-      TOptions
-    > = {
-      type: 'step',
-      title,
-      action: async ({ state, client: runClient }) => {
-        const { template, responseModel, client: stepClient } = config;
-        const client = stepClient ?? runClient;
-        const promptString = template(state);
-        const response = await client.execute(promptString, responseModel);
-
-        return {
-          ...state,
-          [config.responseModel.name]: response
-        };
-      }
-    };
-    this.blocks.push(promptBlock);
-    return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
-  }
-
-  // Overload signatures
-  run(params: InitialRunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
-  run(params: RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
-
-  // Implementation signature
-  async *run(params: InitialRunParams<TOptions> | RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>> {
-    const stream = new WorkflowEventStream({
-      title: this.title,
-      description: this.description,
-      blocks: this.blocks,
-      ...params
-    });
-
-    yield* stream.next();
-  }
-
-  private withBlocks(blocks: Block<any, any, TOptions>[]): this {
-    this.blocks = blocks;
-    return this;
-  }
-
-  private nextWorkflow<TNewState extends State>(): Workflow<TOptions, TNewState> {
-    return new Workflow<TOptions, TNewState>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks);
-  }
-}
+const clone = <T>(value: T): T => structuredClone(value);
