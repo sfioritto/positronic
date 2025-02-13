@@ -16,13 +16,13 @@ export type SerializedError = {
 interface BaseEvent<TOptions extends object = {}> {
   type: typeof WORKFLOW_EVENTS[keyof typeof WORKFLOW_EVENTS];
   options: TOptions;
+  workflowRunId: string;
 }
 
 // 1. Workflow Events (all include workflow title/description)
 interface WorkflowBaseEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
   workflowTitle: string;
   workflowDescription?: string;
-  workflowRunId: string;
 }
 
 interface WorkflowStartEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
@@ -225,6 +225,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
           stepTitle: step.block.title,
           stepId: step.id,
           options: this.params.options ?? {} as TOptions,
+          workflowRunId: this.workflowRunId
         };
 
         // Execute step and yield the STEP_COMPLETE event and
@@ -236,6 +237,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
           type: WORKFLOW_EVENTS.STEP_STATUS,
           steps: this.steps.map(step => step.serialized),
           options: this.params.options ?? {} as TOptions,
+          workflowRunId: this.workflowRunId
         };
 
         this.currentStepIndex++;
@@ -274,6 +276,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         type: WORKFLOW_EVENTS.STEP_STATUS,
         steps: this.steps.map(step => step.serialized),
         options: this.params.options ?? {} as TOptions,
+        workflowRunId: this.workflowRunId
       };
 
       throw error;
@@ -323,6 +326,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         stepId: step.id,
         patch,
         options: this.params.options ?? {} as TOptions,
+        workflowRunId: this.workflowRunId
       };
 
     } else {
@@ -348,6 +352,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         stepId: step.id,
         patch,
         options: this.params.options ?? {} as TOptions,
+        workflowRunId: this.workflowRunId
       };
     }
   }

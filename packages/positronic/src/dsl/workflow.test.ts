@@ -291,9 +291,14 @@ describe('error handling', () => {
 
     const events: WorkflowEvent<any>[] = [];
     let error: Error | undefined;
+    let mainWorkflowId: string | undefined;
+
     try {
       for await (const event of outerWorkflow.run({ client: mockClient })) {
         events.push(event);
+        if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+          mainWorkflowId = event.workflowRunId;
+        }
       }
     } catch (e) {
       error = e as Error;
@@ -308,6 +313,7 @@ describe('error handling', () => {
         type: WORKFLOW_EVENTS.START,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
+        workflowRunId: mainWorkflowId
       }),
       expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_START,
@@ -376,17 +382,15 @@ describe('error handling', () => {
       })
     ]);
 
-    // Verify error details in both inner and outer workflow events
+    // Find inner and outer error events by workflowRunId
     const innerErrorEvent = events.find(e =>
       e.type === WORKFLOW_EVENTS.ERROR &&
-      'workflowTitle' in e &&
-      e.workflowTitle === 'Failing Inner Workflow'
+      e.workflowRunId !== mainWorkflowId
     ) as WorkflowErrorEvent<any>;
 
     const outerErrorEvent = events.find(e =>
       e.type === WORKFLOW_EVENTS.ERROR &&
-      'workflowTitle' in e &&
-      e.workflowTitle === 'Outer Workflow'
+      e.workflowRunId === mainWorkflowId
     ) as WorkflowErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(expect.objectContaining({
@@ -752,9 +756,14 @@ describe('nested workflows', () => {
 
     const events: WorkflowEvent<any>[] = [];
     let error: Error | undefined;
+    let mainWorkflowId: string | undefined;
+
     try {
       for await (const event of outerWorkflow.run({ client: mockClient })) {
         events.push(event);
+        if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+          mainWorkflowId = event.workflowRunId;
+        }
       }
     } catch (e) {
       error = e as Error;
@@ -769,6 +778,7 @@ describe('nested workflows', () => {
         type: WORKFLOW_EVENTS.START,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
+        workflowRunId: mainWorkflowId
       }),
       expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_START,
@@ -837,17 +847,15 @@ describe('nested workflows', () => {
       })
     ]);
 
-    // Verify error details in both inner and outer workflow events
+    // Find inner and outer error events by workflowRunId
     const innerErrorEvent = events.find(e =>
       e.type === WORKFLOW_EVENTS.ERROR &&
-      'workflowTitle' in e &&
-      e.workflowTitle === 'Failing Inner Workflow'
+      e.workflowRunId !== mainWorkflowId
     ) as WorkflowErrorEvent<any>;
 
     const outerErrorEvent = events.find(e =>
       e.type === WORKFLOW_EVENTS.ERROR &&
-      'workflowTitle' in e &&
-      e.workflowTitle === 'Outer Workflow'
+      e.workflowRunId === mainWorkflowId
     ) as WorkflowErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(expect.objectContaining({
@@ -966,7 +974,7 @@ describe('type inference', () => {
           processedValue: workflowState.processedValue,
           totalFeatures: workflowState.featureCount
         }),
-        () => ({ // Match the inner workflow's state shape
+        () => ({
           processedValue: 0,
           featureCount: 0
         })
@@ -998,15 +1006,24 @@ describe('type inference', () => {
     // Collect all events
     const events = [];
     let finalStepStatus, finalState = {};
+    let mainWorkflowId: string | undefined;
+
     for await (const event of complexWorkflow.run({
       client: mockClient,
       options: { features: ['fast', 'secure'] }
     })) {
       events.push(event);
+
+      // Capture the main workflow's ID from its start event
+      if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+        mainWorkflowId = event.workflowRunId;
+      }
+
       if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
       } else if (
-        event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.stepTitle !== 'Process features'
+        event.type === WORKFLOW_EVENTS.STEP_COMPLETE &&
+        event.workflowRunId === mainWorkflowId // Only process events from main workflow
       ) {
         finalState = applyPatches(finalState, [event.patch]);
       }
@@ -1018,14 +1035,15 @@ describe('type inference', () => {
       status: STATUS.RUNNING,
       workflowTitle: 'Complex Type Test',
       workflowDescription: undefined,
-      options: { features: ['fast', 'secure'] }
+      options: { features: ['fast', 'secure'] },
+      workflowRunId: mainWorkflowId
     }));
 
     // Verify inner workflow events are included
     const innerStartEvent = events.find(e =>
       e.type === WORKFLOW_EVENTS.START &&
-      'workflowTitle' in e &&
-      e.workflowTitle === 'Inner Type Test'
+      'workflowRunId' in e &&
+      e.workflowRunId !== mainWorkflowId
     );
     expect(innerStartEvent).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.START,
@@ -1049,224 +1067,138 @@ describe('type inference', () => {
     });
   });
 
-//   it('should correctly infer workflow reducer state types', async () => {
-//     // Create an inner workflow with a specific state shape
-//     const innerWorkflow = workflow('Inner State Test')
-//       .step(
-//         "Inner step",
-//         () => ({
-//           innerValue: 42,
-//           metadata: { processed: true }
-//         })
-//       );
+  it('should correctly infer workflow reducer state types', async () => {
+    // Create an inner workflow with a specific state shape
+    const innerWorkflow = workflow('Inner State Test')
+      .step(
+        "Inner step",
+        () => ({
+          innerValue: 42,
+          metadata: { processed: true }
+        })
+      );
 
-//     // Create outer workflow to test reducer type inference
-//     const outerWorkflow = workflow('Outer State Test')
-//       .step(
-//         "First step",
-//         () => ({
-//           outerValue: 100,
-//           status: 'ready'
-//         })
-//       )
-//       .workflow(
-//         "Nested workflow",
-//         innerWorkflow,
-//         ({ state, workflowState }) => {
-//           // Type assertion for outer state
-//           type ExpectedOuterState = {
-//             outerValue: number;
-//             status: string;
-//           };
-//           type ActualOuterState = typeof state;
-//           type OuterStateTest = AssertEquals<
-//             ActualOuterState,
-//             ExpectedOuterState
-//           >;
-//           const _outerAssert: OuterStateTest = true;
+    // Create outer workflow to test reducer type inference
+    const outerWorkflow = workflow('Outer State Test')
+      .step(
+        "First step",
+        () => ({
+          outerValue: 100,
+          status: 'ready'
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => {
+          // Type assertion for outer state
+          type ExpectedOuterState = {
+            outerValue: number;
+            status: string;
+          };
+          type ActualOuterState = typeof state;
+          type OuterStateTest = AssertEquals<
+            ActualOuterState,
+            ExpectedOuterState
+          >;
+          const _outerAssert: OuterStateTest = true;
 
-//           // Type assertion for inner workflow state
-//           type ExpectedInnerState = {
-//             innerValue: number;
-//             metadata: { processed: boolean };
-//           };
-//           type ActualInnerState = typeof workflowState;
-//           type InnerStateTest = AssertEquals<
-//             ActualInnerState,
-//             ExpectedInnerState
-//           >;
-//           const _innerAssert: InnerStateTest = true;
+          // Type assertion for inner workflow state
+          type ExpectedInnerState = {
+            innerValue: number;
+            metadata: { processed: boolean };
+          };
+          type ActualInnerState = typeof workflowState;
+          type InnerStateTest = AssertEquals<
+            ActualInnerState,
+            ExpectedInnerState
+          >;
+          const _innerAssert: InnerStateTest = true;
 
-//           return {
-//             ...state,
-//             innerResult: workflowState.innerValue,
-//             processed: workflowState.metadata.processed
-//           };
-//         },
-//         () => ({} as { innerValue: number; metadata: { processed: boolean } }) // Add initial state
-//       );
+          return {
+            ...state,
+            innerResult: workflowState.innerValue,
+            processed: workflowState.metadata.processed
+          };
+        },
+        () => ({} as { innerValue: number; metadata: { processed: boolean } })
+      );
 
-//     // Run the workflow to verify runtime behavior
-//     let finalEvent;
-//     for await (const event of outerWorkflow.run({ client: mockClient })) {
-//       finalEvent = event;
-//     }
+    // Run the workflow to verify runtime behavior
+    let finalState = {};
+    let mainWorkflowId: string | undefined;
 
-//     if (!finalEvent) throw new Error('Expected final event');
-//     const lastStep = finalEvent.steps[finalEvent.steps.length - 1];
-//     expect(lastStep.state).toEqual({
-//       outerValue: 100,
-//       status: 'ready',
-//       innerResult: 42,
-//       processed: true
-//     });
-//   });
+    for await (const event of outerWorkflow.run({ client: mockClient })) {
+      if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+        mainWorkflowId = event.workflowRunId;
+      }
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.workflowRunId === mainWorkflowId) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
 
-//   it('should correctly infer step action state types', async () => {
-//     const testWorkflow = workflow('Action State Test')
-//       .step(
-//         "First step",
-//         () => ({
-//           count: 1,
-//           metadata: { created: new Date().toISOString() }
-//         })
-//       )
-//       .step(
-//         "Second step",
-//         ({ state }) => {
-//           // Type assertion for action state
-//           type ExpectedState = {
-//             count: number;
-//             metadata: { created: string };
-//           };
-//           type ActualState = typeof state;
-//           type StateTest = AssertEquals<
-//             ActualState,
-//             ExpectedState
-//           >;
-//           const _stateAssert: StateTest = true;
+    expect(finalState).toEqual({
+      outerValue: 100,
+      status: 'ready',
+      innerResult: 42,
+      processed: true
+    });
+  });
 
-//           return {
-//             ...state,
-//             count: state.count + 1,
-//             metadata: {
-//               ...state.metadata,
-//               updated: new Date().toISOString()
-//             }
-//           };
-//         }
-//       );
+  it('should correctly infer step action state types', async () => {
+    const testWorkflow = workflow('Action State Test')
+      .step(
+        "First step",
+        () => ({
+          count: 1,
+          metadata: { created: new Date().toISOString() }
+        })
+      )
+      .step(
+        "Second step",
+        ({ state }) => {
+          // Type assertion for action state
+          type ExpectedState = {
+            count: number;
+            metadata: { created: string };
+          };
+          type ActualState = typeof state;
+          type StateTest = AssertEquals<
+            ActualState,
+            ExpectedState
+          >;
+          const _stateAssert: StateTest = true;
 
-//     // Run the workflow to verify runtime behavior
-//     let finalEvent;
-//     for await (const event of testWorkflow.run({ client: mockClient })) {
-//       finalEvent = event;
-//     }
+          return {
+            ...state,
+            count: state.count + 1,
+            metadata: {
+              ...state.metadata,
+              updated: new Date().toISOString()
+            }
+          };
+        }
+      );
 
-//     if (!finalEvent) throw new Error('Expected final event');
-//     const lastStep = finalEvent.steps[finalEvent.steps.length - 1];
-//     expect(lastStep.state).toMatchObject({
-//       count: 2,
-//       metadata: {
-//         created: expect.any(String),
-//       }
-//     });
-//   });
+    // Run the workflow to verify runtime behavior
+    let finalState = {};
+    let mainWorkflowId: string | undefined;
+
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+        mainWorkflowId = event.workflowRunId;
+      }
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.workflowRunId === mainWorkflowId) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    expect(finalState).toMatchObject({
+      count: 2,
+      metadata: {
+        created: expect.any(String),
+        updated: expect.any(String)
+      }
+    });
+  });
 });
-
-// describe('workflow steps', () => {
-//   it('should preserve UUIDs from completed steps when restarting', async () => {
-//     const testWorkflow = workflow('UUID Test')
-//       .step(
-//         "First step",
-//         () => ({ count: 1 })
-//       )
-//       .step(
-//         "Second step",
-//         ({ state }) => ({ count: state.count + 1 })
-//       );
-
-//     // Run first step and get its UUID
-//     const firstRun = testWorkflow.run({ client: mockClient });
-
-//     await firstRun.next(); // Start event
-//     await firstRun.next(); // Step start event
-//     const firstStepEvent = await firstRun.next(); // Step complete event
-//     const completedStep = firstStepEvent.value.currentStep;
-
-//     // Restart workflow with completed step
-//     const secondRun = testWorkflow.run({
-//       client: mockClient,
-//       initialCompletedSteps: [completedStep]
-//     });
-
-//     const restartEvent = await secondRun.next();
-
-//     // Only verify that the completed step's UUID was preserved
-//     expect(restartEvent.value.steps[0].id).toBe(completedStep.id);
-//   });
-
-//   it('should set currentStep correctly in events and preserve through restarts', async () => {
-//     const testWorkflow = workflow('Step ID Test')
-//       .step(
-//         "First step",
-//         () => ({ count: 1 })
-//       )
-//       .step(
-//         "Second step",
-//         ({ state }) => ({ count: state.count + 1 })
-//       );
-
-//     // First run - collect all step IDs and events
-//     const firstRunEvents = [];
-//     for await (const event of testWorkflow.run({ client: mockClient })) {
-//       firstRunEvents.push(event);
-//     }
-
-//     // Get the step IDs from the final event's steps array
-//     const stepIds = firstRunEvents[firstRunEvents.length - 1].steps.map(s => s.id);
-
-//     // Verify currentStep is set correctly for each step-related event
-//     expect(firstRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // First step start
-//     expect(firstRunEvents[1].currentStep?.id).toBe(stepIds[0]);
-
-//     expect(firstRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // First step complete
-//     expect(firstRunEvents[2].currentStep?.id).toBe(stepIds[0]);
-
-//     expect(firstRunEvents[3].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
-//     expect(firstRunEvents[3].currentStep?.id).toBe(stepIds[1]);
-
-//     expect(firstRunEvents[4].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
-//     expect(firstRunEvents[4].currentStep?.id).toBe(stepIds[1]);
-
-//     // Verify workflow events don't have currentStep
-//     expect(firstRunEvents[0].currentStep).toBeUndefined(); // START event should not have currentStep
-//     expect(firstRunEvents[5].currentStep).toBeUndefined(); // COMPLETE event should not have currentStep
-
-//     // Now restart the workflow after first step
-//     const firstStepCompleted = firstRunEvents[2].currentStep;
-//     if (!firstStepCompleted) {
-//       throw new Error('Expected current step to be defined');
-//     }
-
-//     const secondRunEvents = [];
-//     for await (const event of testWorkflow.run({
-//       client: mockClient,
-//       initialCompletedSteps: [firstStepCompleted]
-//     })) {
-//       secondRunEvents.push(event);
-//     }
-
-//     // Verify the first step ID was preserved and second step ID matches
-//     expect(secondRunEvents[0].steps[0].id).toBe(stepIds[0]); // First step ID preserved
-//     expect(secondRunEvents[0].steps[1].id).not.toBe(stepIds[1]); // Second step should have new ID
-//     expect(secondRunEvents[0].steps[1].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i); // Should be a valid UUID
-
-//     // Verify currentStep is set correctly in restarted workflow
-//     expect(secondRunEvents[1].type).toBe(WORKFLOW_EVENTS.STEP_START); // Second step start
-//     expect(secondRunEvents[1].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
-
-//     expect(secondRunEvents[2].type).toBe(WORKFLOW_EVENTS.STEP_COMPLETE); // Second step complete
-//     expect(secondRunEvents[2].currentStep?.id).toBe(secondRunEvents[0].steps[1].id); // Should match the new ID
-//   });
-// });
