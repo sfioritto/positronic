@@ -76,77 +76,95 @@ describe("SQLiteAdapter", () => {
     expect(steps[0].step_order).toBe(0);
   });
 
-  // it("should track multiple workflow executions correctly", async () => {
-  //   interface CounterState extends State {
-  //     count: number;
-  //   }
+  it("should track multiple workflow executions correctly", async () => {
+    interface CounterState extends State {
+      count: number;
+    }
 
-  //   interface NameState extends State {
-  //     name: string;
-  //   }
+    interface NameState extends State {
+      name: string;
+    }
 
-  //   const counterWorkflow = workflow<{}, CounterState>("Counter Workflow")
-  //     .step("Increment", async ({ state }) => ({
-  //       count: state.count + 1
-  //     }));
+    const counterWorkflow = workflow<{}, CounterState>("Counter Workflow")
+      .step("Increment", async ({ state }) => ({
+        count: state.count + 1
+      }));
 
-  //   const nameWorkflow = workflow<{}, NameState>("Name Workflow")
-  //     .step("Uppercase", async ({ state }) => ({
-  //       name: state.name.toUpperCase()
-  //     }));
+    const nameWorkflow = workflow<{}, NameState>("Name Workflow")
+      .step("Uppercase", async ({ state }) => ({
+        name: state.name.toUpperCase()
+      }));
 
-  //   // Run both workflows
-  //   const adapter = new SQLiteAdapter(db);
+    // Run both workflows
+    const adapter = new SQLiteAdapter(db);
 
-  //   for await (const event of counterWorkflow.run({
-  //     initialState: { count: 0 },
-  //     client: mockClient
-  //   })) {
-  //     await adapter.dispatch(event);
-  //   }
+    for await (const event of counterWorkflow.run({
+      initialState: { count: 0 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+    }
 
-  //   for await (const event of nameWorkflow.run({
-  //     initialState: { name: "test" },
-  //     client: mockClient
-  //   })) {
-  //     await adapter.dispatch(event);
-  //   }
+    for await (const event of nameWorkflow.run({
+      initialState: { name: "test" },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+    }
 
-  //   // Query and verify workflow runs
-  //   const workflowRuns = db.prepare(
-  //     "SELECT * FROM workflow_runs ORDER BY id ASC"
-  //   ).all() as any[];
+    // Query and verify workflow runs
+    const workflowRuns = db.prepare(
+      "SELECT * FROM workflow_runs ORDER BY created_at ASC"
+    ).all() as any[];
 
-  //   // Verify Counter Workflow
-  //   expect(workflowRuns[0].workflow_name).toBe("Counter Workflow");
-  //   expect(workflowRuns[0].status).toBe(STATUS.COMPLETE);
-  //   expect(workflowRuns[0].error).toBe(null);
+    expect(workflowRuns).toHaveLength(2);
 
-  //   // Verify Name Workflow
-  //   expect(workflowRuns[1].workflow_name).toBe("Name Workflow");
-  //   expect(workflowRuns[1].status).toBe(STATUS.COMPLETE);
-  //   expect(workflowRuns[1].error).toBe(null);
+    // Verify Counter Workflow
+    expect(workflowRuns[0].workflow_name).toBe("Counter Workflow");
+    expect(workflowRuns[0].status).toBe(STATUS.COMPLETE);
+    expect(workflowRuns[0].error).toBe(null);
+    expect(workflowRuns[0].created_at).toBeTruthy();
+    expect(workflowRuns[0].completed_at).toBeTruthy();
 
-  //   // Query workflow steps for both workflows
-  //   const allSteps = db.prepare(`
-  //     SELECT s.*
-  //     FROM workflow_steps s
-  //     JOIN workflow_runs r ON s.workflow_run_id = r.id
-  //     ORDER BY r.id, s.id ASC
-  //   `).all() as any[];
+    // Verify Name Workflow
+    expect(workflowRuns[1].workflow_name).toBe("Name Workflow");
+    expect(workflowRuns[1].status).toBe(STATUS.COMPLETE);
+    expect(workflowRuns[1].error).toBe(null);
+    expect(workflowRuns[1].created_at).toBeTruthy();
+    expect(workflowRuns[1].completed_at).toBeTruthy();
 
-  //   expect(allSteps).toHaveLength(2);
+    // Query workflow steps for both workflows
+    const allSteps = db.prepare(`
+      SELECT s.*
+      FROM workflow_steps s
+      JOIN workflow_runs r ON s.workflow_run_id = r.id
+      ORDER BY r.created_at ASC, s.step_order ASC
+    `).all() as any[];
 
-  //   // Verify Counter Workflow Step
-  //   expect(JSON.parse(allSteps[0].state)).toEqual({ count: 1 });
-  //   expect(allSteps[0].status).toBe(STATUS.COMPLETE);
-  //   expect(allSteps[0].error).toBe(null);
+    expect(allSteps).toHaveLength(2);
 
-  //   // Verify Name Workflow Step
-  //   expect(JSON.parse(allSteps[1].state)).toEqual({ name: "TEST" });
-  //   expect(allSteps[1].status).toBe(STATUS.COMPLETE);
-  //   expect(allSteps[1].error).toBe(null);
-  // });
+    // Verify Counter Workflow Step
+    expect(allSteps[0].title).toBe("Increment");
+    expect(JSON.parse(allSteps[0].patch)).toEqual([
+      { op: "replace", path: "/count", value: 1 }
+    ]);
+    expect(allSteps[0].status).toBe(STATUS.COMPLETE);
+    expect(allSteps[0].created_at).toBeTruthy();
+    expect(allSteps[0].started_at).toBeTruthy();
+    expect(allSteps[0].completed_at).toBeTruthy();
+    expect(allSteps[0].step_order).toBe(0);
+
+    // Verify Name Workflow Step
+    expect(allSteps[1].title).toBe("Uppercase");
+    expect(JSON.parse(allSteps[1].patch)).toEqual([
+      { op: "replace", path: "/name", value: "TEST" }
+    ]);
+    expect(allSteps[1].status).toBe(STATUS.COMPLETE);
+    expect(allSteps[1].created_at).toBeTruthy();
+    expect(allSteps[1].started_at).toBeTruthy();
+    expect(allSteps[1].completed_at).toBeTruthy();
+    expect(allSteps[1].step_order).toBe(0);
+  });
 
   // it("should track workflow step errors correctly", async () => {
   //   interface ErrorState extends State {
