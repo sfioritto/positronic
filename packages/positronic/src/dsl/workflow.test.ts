@@ -937,84 +937,117 @@ describe('workflow options', () => {
   });
 });
 
-// describe('type inference', () => {
-//   it('should correctly infer complex workflow state types', async () => {
-//     // Create an inner workflow that uses the shared options type
-//     const innerWorkflow = workflow<{ features: string[] }>('Inner Type Test')
-//       .step(
-//         "Process features",
-//         ({ options }) => ({
-//           processedValue: options.features.includes('fast') ? 100 : 42,
-//           featureCount: options.features.length
-//         })
-//       );
+describe('type inference', () => {
+  it('should correctly infer complex workflow state types', async () => {
+    // Create an inner workflow that uses the shared options type
+    const innerWorkflow = workflow<{ features: string[] }>('Inner Type Test')
+      .step(
+        "Process features",
+        ({ options }) => ({
+          processedValue: options.features.includes('fast') ? 100 : 42,
+          featureCount: options.features.length
+        })
+      );
 
-//     // Create a complex workflow using multiple features
-//     const complexWorkflow = workflow<{ features: string[] }>('Complex Type Test')
-//       .step(
-//         "First step",
-//         ({ options }) => ({
-//           initialFeatures: options.features,
-//           value: 42
-//         })
-//       )
-//       .workflow(
-//         "Nested workflow",
-//         innerWorkflow,
-//         ({ state, workflowState }) => ({
-//           ...state,
-//           processedValue: workflowState.processedValue,
-//           totalFeatures: workflowState.featureCount
-//         }),
-//         () => ({ // Match the inner workflow's state shape
-//           processedValue: 0,
-//           featureCount: 0
-//         })
-//       )
-//       .step(
-//         "Final step",
-//         ({ state }) => ({
-//           ...state,
-//           completed: true
-//         })
-//       );
+    // Create a complex workflow using multiple features
+    const complexWorkflow = workflow<{ features: string[] }>('Complex Type Test')
+      .step(
+        "First step",
+        ({ options }) => ({
+          initialFeatures: options.features,
+          value: 42
+        })
+      )
+      .workflow(
+        "Nested workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => ({
+          ...state,
+          processedValue: workflowState.processedValue,
+          totalFeatures: workflowState.featureCount
+        }),
+        () => ({ // Match the inner workflow's state shape
+          processedValue: 0,
+          featureCount: 0
+        })
+      )
+      .step(
+        "Final step",
+        ({ state }) => ({
+          ...state,
+          completed: true
+        })
+      );
 
-//     // Type test setup
-//     type ExpectedState = {
-//       initialFeatures: string[];
-//       value: number;
-//       processedValue: number;
-//       totalFeatures: number;
-//       completed: true;
-//     };
+    // Type test setup
+    type ExpectedState = {
+      initialFeatures: string[];
+      value: number;
+      processedValue: number;
+      totalFeatures: number;
+      completed: true;
+    };
 
-//     type ActualState = Parameters<
-//       Parameters<(typeof complexWorkflow)['step']>[1]
-//     >[0]['state'];
+    type ActualState = Parameters<
+      Parameters<(typeof complexWorkflow)['step']>[1]
+    >[0]['state'];
 
-//     type TypeTest = AssertEquals<ActualState, ExpectedState>;
-//     const _typeAssert: TypeTest = true;
+    type TypeTest = AssertEquals<ActualState, ExpectedState>;
+    const _typeAssert: TypeTest = true;
 
-//     // Run the workflow with required options
-//     let finalEvent;
-//     for await (const event of complexWorkflow.run({
-//       client: mockClient,
-//       options: { features: ['fast', 'secure'] }
-//     })) {
-//       finalEvent = event;
-//     }
+    // Collect all events
+    const events = [];
+    let finalStepStatus, finalState = {};
+    for await (const event of complexWorkflow.run({
+      client: mockClient,
+      options: { features: ['fast', 'secure'] }
+    })) {
+      events.push(event);
+      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        finalStepStatus = event;
+      } else if (
+        event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.stepTitle !== 'Process features'
+      ) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
 
-//     // Verify the final state has all expected properties with correct types
-//     if (!finalEvent) throw new Error('Expected final event');
-//     const lastStep = finalEvent.steps[finalEvent.steps.length - 1];
-//     expect(lastStep.state).toEqual({
-//       initialFeatures: ['fast', 'secure'],
-//       value: 42,
-//       processedValue: 100,
-//       totalFeatures: 2,
-//       completed: true
-//     });
-//   });
+    // Verify workflow start event
+    expect(events[0]).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.START,
+      status: STATUS.RUNNING,
+      workflowTitle: 'Complex Type Test',
+      workflowDescription: undefined,
+      options: { features: ['fast', 'secure'] }
+    }));
+
+    // Verify inner workflow events are included
+    const innerStartEvent = events.find(e =>
+      e.type === WORKFLOW_EVENTS.START &&
+      'workflowTitle' in e &&
+      e.workflowTitle === 'Inner Type Test'
+    );
+    expect(innerStartEvent).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.START,
+      status: STATUS.RUNNING,
+      workflowTitle: 'Inner Type Test',
+      options: { features: ['fast', 'secure'] }
+    }));
+
+    // Verify the final step status
+    if (!finalStepStatus) throw new Error('Expected final step status event');
+    const lastStep = finalStepStatus.steps[finalStepStatus.steps.length - 1];
+    expect(lastStep.status).toBe(STATUS.COMPLETE);
+    expect(lastStep.title).toBe('Final step');
+
+    expect(finalState).toEqual({
+      initialFeatures: ['fast', 'secure'],
+      value: 42,
+      processedValue: 100,
+      totalFeatures: 2,
+      completed: true
+    });
+  });
 
 //   it('should correctly infer workflow reducer state types', async () => {
 //     // Create an inner workflow with a specific state shape
@@ -1139,7 +1172,7 @@ describe('workflow options', () => {
 //       }
 //     });
 //   });
-// });
+});
 
 // describe('workflow steps', () => {
 //   it('should preserve UUIDs from completed steps when restarting', async () => {
