@@ -1,5 +1,5 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants';
-import { applyPatches } from './json-patch';
+import { applyPatches} from './json-patch';
 import { State } from './types';
 import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
 import { z } from 'zod';
@@ -859,82 +859,83 @@ describe('nested workflows', () => {
   });
 });
 
-// describe('workflow options', () => {
-//   it('should pass options through to workflow events', async () => {
-//     const testWorkflow = workflow<{ testOption: string }>('Options Workflow')
-//       .step(
-//         "Simple step",
-//         ({ state, options }) => ({
-//           value: 1,
-//           passedOption: options.testOption
-//         })
-//       );
+describe('workflow options', () => {
+  it('should pass options through to workflow events', async () => {
+    const testWorkflow = workflow<{ testOption: string }>('Options Workflow')
+      .step(
+        "Simple step",
+        ({ state, options }) => ({
+          value: 1,
+          passedOption: options.testOption
+        })
+      );
 
-//     const workflowOptions = {
-//       testOption: 'test-value'
-//     };
+    const workflowOptions = {
+      testOption: 'test-value'
+    };
 
-//     let finalEvent;
-//     for await (const event of testWorkflow.run({
-//       client: mockClient,
-//       options: workflowOptions
-//     })) {
-//       finalEvent = event;
-//     }
+    let finalEvent, finalStepStatus;
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+      options: workflowOptions
+    })) {
+      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        finalStepStatus = event;
+      } else {
+        finalEvent = event;
+      }
+    }
 
-//     if (!finalEvent) throw new Error('Expected final event');
-//     expect(finalEvent).toEqual({
-//       type: WORKFLOW_EVENTS.COMPLETE,
-//       status: STATUS.COMPLETE,
-//       workflowTitle: 'Options Workflow',
-//       workflowDescription: undefined,
-//       steps: [
-//         expect.objectContaining({
-//           state: {
-//             value: 1,
-//             passedOption: 'test-value'
-//           },
-//           status: STATUS.COMPLETE,
-//         })
-//       ],
-//       options: workflowOptions,
-//     });
-//   });
+    expect(finalEvent).toEqual({
+      type: WORKFLOW_EVENTS.COMPLETE,
+      status: STATUS.COMPLETE,
+      workflowTitle: 'Options Workflow',
+      workflowDescription: undefined,
+      options: workflowOptions,
+    })
+    expect(finalStepStatus).toEqual({
+      type: WORKFLOW_EVENTS.STEP_STATUS,
+      steps: [
+        expect.objectContaining({
+          title: 'Simple step',
+          patch: expect.any(Object),
+          status: STATUS.COMPLETE,
+        })
+      ],
+      options: workflowOptions,
+    });
+  });
 
-//   it('should provide empty object as default options', async () => {
-//     const testWorkflow = workflow('Default Options Workflow')
-//       .step(
-//         "Simple step",
-//         ({ options }) => ({
-//           hasOptions: Object.keys(options).length === 0
-//         })
-//       );
+  it('should provide empty object as default options', async () => {
+    const testWorkflow = workflow('Default Options Workflow')
+      .step(
+        "Simple step",
+        ({ options }) => ({
+          hasOptions: Object.keys(options).length === 0
+        })
+      );
 
-//     const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({ client: mockClient });
 
-//     // Skip start event
-//     await workflowRun.next();
+    // Skip start event
+    await workflowRun.next();
 
-//     // Check step start
-//     const stepStartResult = await workflowRun.next();
-//     expect(stepStartResult.value).toEqual(expect.objectContaining({
-//       options: {},
-//       type: WORKFLOW_EVENTS.STEP_START
-//     }));
+    // Check step start
+    const stepStartResult = await workflowRun.next();
+    expect(stepStartResult.value).toEqual(expect.objectContaining({
+      options: {},
+      type: WORKFLOW_EVENTS.STEP_START
+    }));
 
-//     // Check step completion
-//     const stepResult = await workflowRun.next();
-//     expect(stepResult.value).toEqual(expect.objectContaining({
-//       options: {},
-//       type: WORKFLOW_EVENTS.STEP_COMPLETE,
-//       currentStep: expect.objectContaining({
-//         state: {
-//           hasOptions: true
-//         }
-//       })
-//     }));
-//   });
-// });
+    // Check step completion
+    const stepResult = await workflowRun.next();
+    expect(stepResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
+      stepTitle: 'Simple step',
+      options: {},
+    }));
+  });
+});
 
 // describe('type inference', () => {
 //   it('should correctly infer complex workflow state types', async () => {
