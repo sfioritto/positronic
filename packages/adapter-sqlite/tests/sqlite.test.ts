@@ -5,7 +5,7 @@ import { STATUS, WORKFLOW_EVENTS } from "@positronic/core";
 import { State } from "@positronic/core";
 import { workflow } from "@positronic/core";
 import { nextStep } from "../../../test-utils";
-import type { PromptClient, SerializedStep, StepStatusEvent } from "@positronic/core";
+import type { PromptClient, SerializedStep, StepStatusEvent, WorkflowStartEvent } from "@positronic/core";
 
 describe("SQLiteAdapter", () => {
   let db: DatabaseType;
@@ -390,103 +390,102 @@ describe("SQLiteAdapter", () => {
     });
   });
 
-  // it("should handle timestamps correctly", async () => {
-  //   interface TestState extends State {
-  //     count: number;
-  //   }
+  it("should handle timestamps correctly", async () => {
+    interface TestState extends State {
+      count: number;
+    }
 
-  //   const testWorkflow = workflow("Timestamp Test")
-  //     .step("Step 1", async ({ state }) => ({
-  //       count: ((state as TestState).count ?? 0) + 1
-  //     }));
+    const testWorkflow = workflow("Timestamp Test")
+      .step("Step 1", async ({ state }) => ({
+        count: ((state as TestState).count ?? 0) + 1
+      }));
 
-  //   const adapter = new SQLiteAdapter(db);
-  //   const workflowIterator = testWorkflow.run({
-  //     initialState: { count: 0 },
-  //     client: mockClient
-  //   });
+    const adapter = new SQLiteAdapter(db);
+    const workflowIterator = testWorkflow.run({
+      initialState: { count: 0 },
+      client: mockClient
+    });
 
-  //   // First event (workflow started)
-  //   const startEvent = await workflowIterator.next();
-  //   await adapter.dispatch(startEvent.value);
+    // First event (workflow started)
+    const startEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(startEvent);
+    const { workflowRunId } = startEvent as WorkflowStartEvent;
+    // Check initial workflow state
+    const initialRun = db.prepare(`
+      SELECT id, created_at, completed_at
+      FROM workflow_runs
+      WHERE id = ?
+    `).get(workflowRunId) as any;
 
-  //   // Check initial workflow state
-  //   const initialRun = db.prepare(`
-  //     SELECT id, created_at, completed_at
-  //     FROM workflow_runs
-  //     WHERE workflow_name = ?
-  //   `).get("Timestamp Test") as any;
+    expect(initialRun.created_at).toBeTruthy();
+    expect(initialRun.completed_at).toBeNull();
 
-  //   expect(initialRun.created_at).toBeTruthy();
-  //   expect(initialRun.completed_at).toBeNull();
+    // Check initial step state
+    const [firstStep] = db.prepare(`
+      SELECT created_at, started_at, completed_at, status, step_order
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId) as any[];
 
-  //   // Check initial step state
-  //   const initialSteps = db.prepare(`
-  //     SELECT created_at, started_at, completed_at, status, step_order
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ?
-  //     ORDER BY step_order ASC
-  //   `).all(initialRun.id) as any[];
+    // Verify steps are created upfront
+    expect(firstStep.created_at).toBeTruthy();
+    expect(firstStep.started_at).toBeNull();
+    expect(firstStep.completed_at).toBeNull();
+    expect(firstStep.status).toBe('pending');
 
-  //   // Verify steps are created upfront
-  //   expect(initialSteps.length).toBe(1);
-  //   expect(initialSteps[0].created_at).toBeTruthy();
-  //   expect(initialSteps[0].started_at).toBeNull();
-  //   expect(initialSteps[0].completed_at).toBeNull();
-  //   expect(initialSteps[0].status).toBe('pending');
+    // Second event (step start)
+    const stepStartEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(stepStartEvent);
 
-  //   // Second event (step start)
-  //   const stepStartEvent = await workflowIterator.next();
-  //   await adapter.dispatch(stepStartEvent.value);
+    // Check step state after start
+    const startedStep = db.prepare(`
+      SELECT created_at, started_at, completed_at, status
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+    `).get(workflowRunId) as any;
 
-  //   // Check step state after start
-  //   const startedStep = db.prepare(`
-  //     SELECT created_at, started_at, completed_at, status
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ?
-  //   `).get(initialRun.id) as any;
+    expect(startedStep.created_at).toBeTruthy();
+    expect(startedStep.started_at).toBeTruthy();
+    expect(startedStep.completed_at).toBeNull();
+    expect(startedStep.status).toBe(STATUS.RUNNING);
 
-  //   expect(startedStep.created_at).toBeTruthy();
-  //   expect(startedStep.started_at).toBeTruthy();
-  //   expect(startedStep.completed_at).toBeNull();
-  //   expect(startedStep.status).toBe(STATUS.RUNNING);
+    // Third event (step completed)
+    const stepEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(stepEvent);
 
-  //   // Third event (step completed)
-  //   const stepEvent = await workflowIterator.next();
-  //   await adapter.dispatch(stepEvent.value);
+    // Check workflow state after step
+    const midRun = db.prepare(`
+      SELECT completed_at
+      FROM workflow_runs
+      WHERE id = ?
+    `).get(workflowRunId) as any;
+    expect(midRun.completed_at).toBeNull();
 
-  //   // Check workflow state after step
-  //   const midRun = db.prepare(`
-  //     SELECT completed_at
-  //     FROM workflow_runs
-  //     WHERE id = ?
-  //   `).get(initialRun.id) as any;
-  //   expect(midRun.completed_at).toBeNull();
+    // Check step state after completion
+    const midStep = db.prepare(`
+      SELECT created_at, started_at, completed_at, status
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+    `).get(workflowRunId) as any;
 
-  //   // Check step state after completion
-  //   const midStep = db.prepare(`
-  //     SELECT created_at, started_at, completed_at, status
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ?
-  //   `).get(initialRun.id) as any;
+    expect(midStep.created_at).toBeTruthy();
+    expect(midStep.started_at).toBeTruthy();
+    expect(midStep.completed_at).toBeTruthy();
+    expect(midStep.status).toBe(STATUS.COMPLETE);
 
-  //   expect(midStep.created_at).toBeTruthy();
-  //   expect(midStep.started_at).toBeTruthy();
-  //   expect(midStep.completed_at).toBeTruthy();
-  //   expect(midStep.status).toBe(STATUS.COMPLETE);
+    // Final event (workflow completed)
+    const completeEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(completeEvent);
 
-  //   // Final event (workflow completed)
-  //   const completeEvent = await workflowIterator.next();
-  //   await adapter.dispatch(completeEvent.value);
-
-  //   // Check final workflow state
-  //   const finalRun = db.prepare(`
-  //     SELECT completed_at
-  //     FROM workflow_runs
-  //     WHERE id = ?
-  //   `).get(initialRun.id) as any;
-  //   expect(finalRun.completed_at).toBeTruthy();
-  // });
+    // Check final workflow state
+    const finalRun = db.prepare(`
+      SELECT completed_at
+      FROM workflow_runs
+      WHERE id = ?
+    `).get(workflowRunId) as any;
+    expect(finalRun.completed_at).toBeTruthy();
+  });
 
   // it("should enforce JSON validation constraints", async () => {
   //   expect(() => {
