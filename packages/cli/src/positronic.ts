@@ -169,7 +169,7 @@ async function main() {
 
     const runner = new WorkflowRunner(
       {
-        adapters: [new SQLiteAdapter(db, workflowRunId)],
+        adapters: [new SQLiteAdapter(db)],
         logger: console,
         verbose: !!verbose,
       }
