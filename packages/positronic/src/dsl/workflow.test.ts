@@ -3,6 +3,7 @@ import { applyPatches} from './json-patch';
 import { State } from './types';
 import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
 import { z } from 'zod';
+import { nextStep } from '../../../../test-utils';
 
 type AssertEquals<T, U> =
   0 extends (1 & T) ? false : // fails if T is any
@@ -12,12 +13,6 @@ type AssertEquals<T, U> =
 // Mock PromptClient for testing
 const mockClient = {
   execute: jest.fn()
-};
-
-const nextStep = async <T>(workflowRun: AsyncIterator<T>): Promise<T> => {
-  const result = await workflowRun.next();
-  if (result.done) throw new Error('Iterator is done');
-  return result.value;
 };
 
 describe('workflow creation', () => {
