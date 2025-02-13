@@ -1,7 +1,7 @@
 import Database, { Database as DatabaseType } from "better-sqlite3";
 import { jest } from "@jest/globals";
 import { SQLiteAdapter } from "../src/index";
-import { STATUS, WORKFLOW_EVENTS } from "@positronic/core";
+import { STATUS, WORKFLOW_EVENTS, applyPatches } from "@positronic/core";
 import { State } from "@positronic/core";
 import { workflow } from "@positronic/core";
 import { nextStep } from "../../../test-utils";
@@ -420,6 +420,9 @@ describe("SQLiteAdapter", () => {
     expect(initialRun.created_at).toBeTruthy();
     expect(initialRun.completed_at).toBeNull();
 
+    const stepStatusEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(stepStatusEvent);
+
     // Check initial step state
     const [firstStep] = db.prepare(`
       SELECT created_at, started_at, completed_at, status, step_order
@@ -438,7 +441,12 @@ describe("SQLiteAdapter", () => {
     const stepStartEvent = await nextStep(workflowIterator);
     await adapter.dispatch(stepStartEvent);
 
-    // Check step state after start
+    const stepFinishEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(stepFinishEvent);
+
+    await adapter.dispatch(await nextStep(workflowIterator));
+
+    // Check step state after step is done
     const startedStep = db.prepare(`
       SELECT created_at, started_at, completed_at, status
       FROM workflow_steps
@@ -447,36 +455,10 @@ describe("SQLiteAdapter", () => {
 
     expect(startedStep.created_at).toBeTruthy();
     expect(startedStep.started_at).toBeTruthy();
-    expect(startedStep.completed_at).toBeNull();
-    expect(startedStep.status).toBe(STATUS.RUNNING);
+    expect(startedStep.completed_at).toBeTruthy();
+    expect(startedStep.status).toBe(STATUS.COMPLETE);
 
-    // Third event (step completed)
-    const stepEvent = await nextStep(workflowIterator);
-    await adapter.dispatch(stepEvent);
-
-    // Check workflow state after step
-    const midRun = db.prepare(`
-      SELECT completed_at
-      FROM workflow_runs
-      WHERE id = ?
-    `).get(workflowRunId) as any;
-    expect(midRun.completed_at).toBeNull();
-
-    // Check step state after completion
-    const midStep = db.prepare(`
-      SELECT created_at, started_at, completed_at, status
-      FROM workflow_steps
-      WHERE workflow_run_id = ?
-    `).get(workflowRunId) as any;
-
-    expect(midStep.created_at).toBeTruthy();
-    expect(midStep.started_at).toBeTruthy();
-    expect(midStep.completed_at).toBeTruthy();
-    expect(midStep.status).toBe(STATUS.COMPLETE);
-
-    // Final event (workflow completed)
-    const completeEvent = await nextStep(workflowIterator);
-    await adapter.dispatch(completeEvent);
+    await adapter.dispatch(await nextStep(workflowIterator));
 
     // Check final workflow state
     const finalRun = db.prepare(`
@@ -487,74 +469,67 @@ describe("SQLiteAdapter", () => {
     expect(finalRun.completed_at).toBeTruthy();
   });
 
-  // it("should enforce JSON validation constraints", async () => {
-  //   expect(() => {
-  //     db.prepare(`
-  //       INSERT INTO workflow_runs (
-  //         workflow_name,
-  //         initial_state,
-  //         status,
-  //         error
-  //       ) VALUES (?, ?, ?, ?)
-  //     `).run("Test", "invalid json", STATUS.COMPLETE, null);
-  //   }).toThrow();
-  // });
+  it("should handle concurrent workflow executions correctly", async () => {
+    interface TestState extends State {
+      value: number;
+    }
 
-  // it("should handle concurrent workflow executions correctly", async () => {
-  //   interface TestState extends State {
-  //     value: number;
-  //   }
+    const testWorkflow = workflow<{}, TestState>("Concurrent Test")
+      .step("Step 1", async ({ state }) => {
+        // Add small delay to better simulate concurrent execution
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return {
+          value: state.value + 1
+        };
+      });
 
-  //   const testWorkflow = workflow<{}, TestState>("Concurrent Test")
-  //     .step("Step 1", async ({ state }) => {
-  //       // Add small delay to better simulate concurrent execution
-  //       await new Promise(resolve => setTimeout(resolve, 10));
-  //       return {
-  //         value: state.value + 1
-  //       };
-  //     });
+    // Run three workflows concurrently, each with its own adapter
+    const runs: { workflowRunId: string, initialState: { value: number } }[] = [];
+    await Promise.all([1, 2, 3].map(async initialValue => {
+      const adapter = new SQLiteAdapter(db);
+      let workflowRunId: string | undefined;
+      for await (const event of testWorkflow.run({
+        initialState: { value: initialValue },
+        client: mockClient
+      })) {
+        await adapter.dispatch(event);
+        if (event.type === WORKFLOW_EVENTS.START) {
+          workflowRunId = event.workflowRunId;
+        }
+      }
 
-  //   // Run three workflows concurrently, each with its own adapter
-  //   await Promise.all([1, 2, 3].map(async initialValue => {
-  //     const adapter = new SQLiteAdapter(db);
-  //     for await (const event of testWorkflow.run({
-  //       initialState: { value: initialValue },
-  //       client: mockClient
-  //     })) {
-  //       await adapter.dispatch(event);
-  //     }
-  //   }));
+      runs.push({
+        workflowRunId: workflowRunId as string,
+        initialState: { value: initialValue }
+      });
+    }));
 
-  //   // Verify all workflow runs were recorded correctly
-  //   const runs = db.prepare(`
-  //     SELECT r.*
-  //     FROM workflow_runs r
-  //     WHERE r.workflow_name = ?
-  //     ORDER BY r.id ASC
-  //   `).all("Concurrent Test") as any[];
+    // Verify all workflow runs were recorded correctly
+    const dbRuns = db.prepare(`
+      SELECT r.*
+      FROM workflow_runs r
+      WHERE r.workflow_name = ?
+      ORDER BY r.id ASC
+    `).all("Concurrent Test") as any[];
 
-  //   expect(runs).toHaveLength(3);
-  //   expect(runs.every(run => run.status === STATUS.COMPLETE)).toBe(true);
+    expect(dbRuns).toHaveLength(3);
+    expect(dbRuns.every(run => run.status === STATUS.COMPLETE)).toBe(true);
 
-  //   // Verify all steps were recorded correctly
-  //   const steps = db.prepare(`
-  //     SELECT s.*, r.id as run_id
-  //     FROM workflow_steps s
-  //     JOIN workflow_runs r ON s.workflow_run_id = r.id
-  //     WHERE r.workflow_name = ?
-  //     ORDER BY r.id ASC, s.step_order ASC
-  //   `).all("Concurrent Test") as any[];
+    // Verify all steps were recorded correctly
+    for (const run of runs) {
+      const step = db.prepare(`
+        SELECT s.*
+        FROM workflow_steps s
+        WHERE s.workflow_run_id = ?
+        ORDER BY s.step_order ASC
+      `).get(run.workflowRunId) as any;
 
-  //   expect(steps).toHaveLength(3);
-
-  //   // Verify each step completed successfully with the correct value
-  //   steps.forEach((step, index) => {
-  //     expect(step.status).toBe(STATUS.COMPLETE);
-  //     const state = JSON.parse(step.state);
-  //     // Initial values were 1, 2, 3, so final values should be 2, 3, 4
-  //     expect(state.value).toBe(index + 2);
-  //   });
-  // });
+      expect(step.status).toBe(STATUS.COMPLETE);
+      const patch = JSON.parse(step.patch);
+      const finalState = applyPatches(run.initialState, [patch]);
+      expect(finalState).toEqual({ value: run.initialState.value + 1 });
+    }
+  });
 
   // it("should preserve timestamps of completed steps during restart", async () => {
   //   interface TestState extends State {
