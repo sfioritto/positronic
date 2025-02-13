@@ -166,62 +166,65 @@ describe("SQLiteAdapter", () => {
     expect(allSteps[1].step_order).toBe(0);
   });
 
-  // it("should track workflow step errors correctly", async () => {
-  //   interface ErrorState extends State {
-  //     shouldError: boolean;
-  //   }
+  it("should track workflow step errors correctly", async () => {
+    interface ErrorState extends State {
+      shouldError: boolean;
+    }
 
-  //   const errorWorkflow = workflow<{}, ErrorState>("Error Workflow")
-  //     .step("Maybe Error", async ({ state }) => {
-  //       if (state.shouldError) {
-  //         const error = new Error("Test error");
-  //         error.name = "Error";
-  //         throw error;
-  //       }
-  //       return state;
-  //     });
+    const errorWorkflow = workflow<{}, ErrorState>("Error Workflow")
+      .step("Maybe Error", async ({ state }) => {
+        if (state.shouldError) {
+          const error = new Error("Test error");
+          error.name = "Error";
+          throw error;
+        }
+        return state;
+      });
 
-  //   // Run workflow that will error
-  //   const adapter = new SQLiteAdapter(db);
-  //   let error: Error | undefined;
-  //   try {
-  //     for await (const event of errorWorkflow.run({
-  //       initialState: { shouldError: true },
-  //       client: mockClient
-  //     })) {
-  //       await adapter.dispatch(event);
-  //     }
-  //   } catch (e) {
-  //     error = e as Error;
-  //   }
+    // Run workflow that will error
+    const adapter = new SQLiteAdapter(db);
+    let error: Error | undefined;
+    try {
+      for await (const event of errorWorkflow.run({
+        initialState: { shouldError: true },
+        client: mockClient
+      })) {
+        await adapter.dispatch(event);
+      }
+    } catch (e) {
+      error = e as Error;
+    }
 
-  //   expect(error).toBeDefined();
-  //   expect(error?.message).toBe("Test error");
+    expect(error).toBeDefined();
+    expect(error?.message).toBe("Test error");
 
-  //   // Query workflow run and its steps
-  //   const workflowRun = db.prepare(
-  //     "SELECT * FROM workflow_runs WHERE workflow_name = ?"
-  //   ).get("Error Workflow") as any;
+    // Query workflow run and its steps
+    const workflowRun = db.prepare(
+      "SELECT * FROM workflow_runs WHERE workflow_name = ?"
+    ).get("Error Workflow") as any;
 
-  //   // Add assertions for workflow run
-  //   expect(workflowRun.status).toBe(STATUS.ERROR);
-  //   expect(JSON.parse(workflowRun.error)).toMatchObject({
-  //     name: "Error",
-  //     message: "Test error"
-  //   });
+    // Add assertions for workflow run
+    expect(workflowRun.status).toBe(STATUS.ERROR);
+    expect(JSON.parse(workflowRun.error)).toMatchObject({
+      name: "Error",
+      message: "Test error"
+    });
+    expect(workflowRun.created_at).toBeTruthy();
+    expect(workflowRun.completed_at).toBeTruthy();
 
-  //   const steps = db.prepare(
-  //     "SELECT * FROM workflow_steps WHERE workflow_run_id = ?"
-  //   ).all(workflowRun.id) as any[];
+    const steps = db.prepare(
+      "SELECT * FROM workflow_steps WHERE workflow_run_id = ? ORDER BY step_order ASC"
+    ).all(workflowRun.id) as any[];
 
-  //   expect(steps).toHaveLength(1);
-  //   expect(JSON.parse(steps[0].state)).toEqual({});
-  //   expect(steps[0].status).toBe(STATUS.ERROR);
-  //   expect(JSON.parse(steps[0].error)).toMatchObject({
-  //     name: "Error",
-  //     message: "Test error"
-  //   });
-  // });
+    expect(steps).toHaveLength(1);
+    expect(steps[0].title).toBe("Maybe Error");
+    expect(steps[0].patch).toBeNull(); // No patch since the step errored
+    expect(steps[0].status).toBe(STATUS.ERROR);
+    expect(steps[0].created_at).toBeTruthy();
+    expect(steps[0].started_at).toBeTruthy();
+    expect(steps[0].completed_at).toBeTruthy();
+    expect(steps[0].step_order).toBe(0);
+  });
 
   // it("should track multi-step workflow execution step by step", async () => {
   //   interface MultiStepState extends State {

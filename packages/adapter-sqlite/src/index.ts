@@ -46,7 +46,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
         this.handleComplete(event);
         break;
       case WORKFLOW_EVENTS.ERROR:
-        await this.handleError(event);
+        this.handleWorkflowError(event);
         break;
     }
   }
@@ -141,21 +141,21 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     );
   }
 
-  private async handleError(event: WorkflowErrorEvent<SQLiteOptions>) {
-    const serializedError = event.error ? {
-      name: event.error.name,
-      message: event.error.message,
-      stack: event.error.stack
-    } : null;
-
+  private handleWorkflowError(event: WorkflowErrorEvent<SQLiteOptions>) {
     this.db.prepare(`
-      UPDATE workflow_runs SET
+      UPDATE workflow_runs
+      SET
         status = ?,
-        error = ?
+        error = ?,
+        completed_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       event.status,
-      serializedError ? JSON.stringify(serializedError) : null,
+      JSON.stringify({
+        name: event.error.name,
+        message: event.error.message,
+        stack: event.error.stack
+      }),
       event.workflowRunId
     );
   }
