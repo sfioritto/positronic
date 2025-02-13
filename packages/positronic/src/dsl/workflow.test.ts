@@ -544,10 +544,13 @@ describe('workflow resumption', () => {
 
     // Resume workflow with first step completed
     let resumedState: State | undefined;
+    if (!initialCompletedSteps) throw new Error('Expected initialCompletedSteps');
+
     for await (const event of threeStepWorkflow.run({
       client: mockClient,
       initialState,
-      initialCompletedSteps
+      initialCompletedSteps,
+      workflowRunId: 'test-run-id'
     })) {
       if (event.type === WORKFLOW_EVENTS.RESTART) {
         resumedState = event.initialState;

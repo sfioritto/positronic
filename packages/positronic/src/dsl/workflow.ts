@@ -369,6 +369,23 @@ export function workflow<
   return new Workflow<TOptions, TState>(title, description);
 }
 
+interface BaseRunParams<TOptions extends object = {}> {
+  client: PromptClient;
+  options?: TOptions;
+}
+
+interface InitialRunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+  initialState?: State;
+  initialCompletedSteps?: never;
+  workflowRunId?: never;
+}
+
+interface RerunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+  initialState: State;
+  initialCompletedSteps: SerializedStep[];
+  workflowRunId: string;
+}
+
 export class Workflow<
   TOptions extends object = {},
   TState extends State = {}
@@ -459,7 +476,12 @@ export class Workflow<
     return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
   }
 
-  async *run(params: RunParams<TOptions, TState>): AsyncGenerator<WorkflowEvent<TOptions>> {
+  // Overload signatures
+  run(params: InitialRunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
+  run(params: RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
+
+  // Implementation signature
+  async *run(params: InitialRunParams<TOptions> | RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>> {
     const stream = new WorkflowEventStream({
       title: this.title,
       description: this.description,
