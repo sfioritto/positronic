@@ -240,7 +240,7 @@ export class Workflow<
 
 class Step {
   public id: string;
-  private patch?: JsonPatch;
+  private patch?: JsonPatch | string;
   private status: typeof STATUS[keyof typeof STATUS] = STATUS.PENDING;
 
   constructor(
@@ -265,7 +265,7 @@ class Step {
       id: this.id,
       title: this.block.title,
       status: this.status,
-      patch: this.patch
+      patch: typeof this.patch === 'string' ? JSON.parse(this.patch) : this.patch
     };
   }
 }
@@ -301,11 +301,9 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     // Set initial state by applying patches from completed steps to the initialState
     this.currentState = clone(this.initialState);
 
-    if (params.initialCompletedSteps) {
-      for (const step of this.steps) {
-        if (step.serialized.status === STATUS.COMPLETE && step.serialized.patch) {
-          this.currentState = applyPatches(this.currentState, [step.serialized.patch]) as TState;
-        }
+    for (const step of this.steps) {
+      if (step.serialized.status === STATUS.COMPLETE && step.serialized.patch) {
+        this.currentState = applyPatches(this.currentState, [step.serialized.patch]) as TState;
       }
     }
 

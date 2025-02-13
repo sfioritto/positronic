@@ -531,116 +531,112 @@ describe("SQLiteAdapter", () => {
     }
   });
 
-  // it("should preserve timestamps of completed steps during restart", async () => {
-  //   interface TestState extends State {
-  //     value: number;
-  //   }
+  it("should preserve timestamps of completed steps during restart", async () => {
+    interface TestState extends State {
+      value: number;
+    }
 
-  //   const fourStepWorkflow = workflow<{}, TestState>("Timestamp Preservation Test")
-  //     .step("Step 1", async ({ state }) => ({
-  //       value: state.value + 1
-  //     }))
-  //     .step("Step 2", async ({ state }) => ({
-  //       value: state.value + 2
-  //     }))
-  //     .step("Step 3", async ({ state }) => ({
-  //       value: state.value + 3
-  //     }))
-  //     .step("Step 4", async ({ state }) => ({
-  //       value: state.value + 4
-  //     }));
+    const fourStepWorkflow = workflow<{}, TestState>("Timestamp Preservation Test")
+      .step("Step 1", async ({ state }) => ({
+        value: state.value + 1
+      }))
+      .step("Step 2", async ({ state }) => ({
+        value: state.value + 2
+      }))
+      .step("Step 3", async ({ state }) => ({
+        value: state.value + 3
+      }))
+      .step("Step 4", async ({ state }) => ({
+        value: state.value + 4
+      }));
 
-  //   const adapter = new SQLiteAdapter(db);
-  //   let workflowRunId: number | undefined;
+    const adapter = new SQLiteAdapter(db);
+    let workflowRunId: string | undefined;``
 
-  //   // Run initial workflow to completion
-  //   for await (const event of fourStepWorkflow.run({
-  //     initialState: { value: 0 },
-  //     client: mockClient
-  //   })) {
-  //     await adapter.dispatch(event);
-  //     if (event.type === WORKFLOW_EVENTS.START) {
-  //       const result = db.prepare(
-  //         "SELECT id FROM workflow_runs WHERE workflow_name = ? ORDER BY id DESC LIMIT 1"
-  //       ).get("Timestamp Preservation Test") as any;
-  //       workflowRunId = result.id;
-  //     }
-  //   }
+    // Run initial workflow to completion
+    for await (const event of fourStepWorkflow.run({
+      initialState: { value: 0 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+      if (event.type === WORKFLOW_EVENTS.START) {
+        workflowRunId = event.workflowRunId;
+      }
+    }
 
-  //   if (!workflowRunId) {
-  //     throw new Error("Failed to get workflow run ID");
-  //   }
+    if (!workflowRunId) {
+      throw new Error("Failed to get workflow run ID");
+    }
 
-  //   // Get the first two completed steps for restart with their timestamps
-  //   const completedSteps = db.prepare(`
-  //     SELECT id, title, status, state, created_at, started_at, completed_at
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ?
-  //     ORDER BY step_order ASC
-  //     LIMIT 2
-  //   `).all(workflowRunId) as any[];
+    // Get the first two completed steps for restart with their timestamps
+    const completedSteps = db.prepare(`
+      SELECT *
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+      LIMIT 2
+    `).all(workflowRunId) as any[];
 
-  //   completedSteps.forEach(step => {
-  //     step.state = JSON.parse(step.state);
-  //   });
+    // Start the restart but only process the RESTART event
+    const workflowIterator = fourStepWorkflow.run({
+      initialState: { value: 0 },
+      initialCompletedSteps: completedSteps,
+      client: mockClient,
+      workflowRunId,
+    });
 
-  //   // Start the restart but only process the RESTART event
-  //   const workflowIterator = fourStepWorkflow.run({
-  //     initialState: { value: 0 },
-  //     initialCompletedSteps: completedSteps,
-  //     client: mockClient,
-  //     options: { workflowRunId }
-  //   });
+    // Process the RESTART event
+    const restartEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(restartEvent);
+    // Process the STEP_STATUS event
+    const stepStatusEvent = await nextStep(workflowIterator);
+    await adapter.dispatch(stepStatusEvent);
 
-  //   // Process only the RESTART event
-  //   const restartEvent = await workflowIterator.next();
-  //   await adapter.dispatch(restartEvent.value);
+    // Now check the pending steps - look at the LAST step (Step 4)
+    const pendingSteps = db.prepare(`
+      SELECT title, created_at, started_at, completed_at, status, step_order
+      FROM workflow_steps
+      WHERE workflow_run_id = ? AND step_order = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId, 3) as any[]; // Explicitly check step_order 3 (fourth step)
 
-  //   // Now check the pending steps - look at the LAST step (Step 4)
-  //   const pendingSteps = db.prepare(`
-  //     SELECT title, created_at, started_at, completed_at, status, step_order
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ? AND step_order = ?
-  //     ORDER BY step_order ASC
-  //   `).all(workflowRunId, 3) as any[]; // Explicitly check step_order 3 (fourth step)
+    // Verify last pending step has created_at but no started_at or completed_at
+    expect(pendingSteps[0].created_at).toBeTruthy();
+    expect(pendingSteps[0].started_at).toBeNull();
+    expect(pendingSteps[0].completed_at).toBeNull();
+    expect(pendingSteps[0].status).toBe('pending');
 
-  //   // Verify last pending step has created_at but no started_at or completed_at
-  //   expect(pendingSteps[0].created_at).toBeTruthy();
-  //   expect(pendingSteps[0].started_at).toBeNull();
-  //   expect(pendingSteps[0].completed_at).toBeNull();
-  //   expect(pendingSteps[0].status).toBe('pending');
+    // Complete the rest of the workflow
+    for await (const event of fourStepWorkflow.run({
+      initialState: { value: 0 },
+      initialCompletedSteps: completedSteps,
+      client: mockClient,
+      workflowRunId,
+    })) {
+      await adapter.dispatch(event);
+    }
 
-  //   // Complete the rest of the workflow
-  //   for await (const event of fourStepWorkflow.run({
-  //     initialState: { value: 0 },
-  //     initialCompletedSteps: completedSteps,
-  //     client: mockClient,
-  //     options: { workflowRunId }
-  //   })) {
-  //     await adapter.dispatch(event);
-  //   }
+    // Get steps after restart and completion
+    const restartedSteps = db.prepare(`
+      SELECT title, created_at, started_at, completed_at
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+    `).all(workflowRunId) as any[];
 
-  //   // Get steps after restart and completion
-  //   const restartedSteps = db.prepare(`
-  //     SELECT title, created_at, started_at, completed_at
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ?
-  //     ORDER BY step_order ASC
-  //   `).all(workflowRunId) as any[];
+    // Verify first two steps have exactly the same timestamps
+    completedSteps.forEach((original, index) => {
+      const restarted = restartedSteps[index];
+      expect(restarted.created_at).toBe(original.created_at);
+      expect(restarted.started_at).toBe(original.started_at);
+      expect(restarted.completed_at).toBe(original.completed_at);
+    });
 
-  //   // Verify first two steps have exactly the same timestamps
-  //   completedSteps.forEach((original, index) => {
-  //     const restarted = restartedSteps[index];
-  //     expect(restarted.created_at).toBe(original.created_at);
-  //     expect(restarted.started_at).toBe(original.started_at);
-  //     expect(restarted.completed_at).toBe(original.completed_at);
-  //   });
-
-  //   // Verify the third step now has all timestamps after completion
-  //   expect(restartedSteps[2].created_at).toBeTruthy();
-  //   expect(restartedSteps[2].started_at).toBeTruthy();
-  //   expect(restartedSteps[2].completed_at).toBeTruthy();
-  // });
+    // Verify the third step now has all timestamps after completion
+    expect(restartedSteps[2].created_at).toBeTruthy();
+    expect(restartedSteps[2].started_at).toBeTruthy();
+    expect(restartedSteps[2].completed_at).toBeTruthy();
+  });
 
   // it("should set started_at timestamp when restarting workflow", async () => {
   //   interface TestState extends State {
