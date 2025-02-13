@@ -22,24 +22,14 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   public async dispatch(event: WorkflowEvent<SQLiteOptions>) {
-    console.log('Dispatching event:', event.type);
-
     switch (event.type) {
       case WORKFLOW_EVENTS.START:
         this.handleWorkflowStart(event);
         break;
       case WORKFLOW_EVENTS.STEP_START:
-        console.log('Handling step start:', event.stepId);
         this.handleStepStart(event);
-        // Verify the update
-        const startedStep = this.db.prepare(
-          "SELECT started_at FROM workflow_steps WHERE id = ?"
-        ).get(event.stepId);
-        console.log('After step start update:', startedStep);
         break;
       case WORKFLOW_EVENTS.STEP_STATUS:
-        console.log('Handling step status:',
-          event.steps.map(s => ({ id: s.id, status: s.status })));
         this.handleStepStatus(event);
         break;
       case WORKFLOW_EVENTS.COMPLETE:
@@ -69,7 +59,6 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   private handleStepStart(event: StepStartedEvent<SQLiteOptions>) {
-    console.log('Running step start SQL update for step:', event.stepId);
     this.db.prepare(`
       UPDATE workflow_steps
       SET
@@ -80,11 +69,20 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
   }
 
   private async handleStepStatus(event: StepStatusEvent<SQLiteOptions>) {
-    console.log('Running step status SQL update for steps:',
-      event.steps.map(s => ({ id: s.id, status: s.status })));
-    // Wrap operations in a transaction
+    // Get the IDs of all steps in this update
+    const updatedStepIds = event.steps.map(step => step.id);
+
+    // Wrap in transaction
     this.db.transaction(() => {
-      // Upsert all steps
+      // First, delete any steps for this workflow that aren't in the current update
+      // This handles cleanup during restarts
+      this.db.prepare(`
+        DELETE FROM workflow_steps
+        WHERE workflow_run_id = ?
+        AND id NOT IN (${updatedStepIds.map(() => '?').join(',')})
+      `).run(event.workflowRunId, ...updatedStepIds);
+
+      // Then handle the current steps (create or update)
       event.steps.forEach((step, index) => {
         this.db.prepare(`
           INSERT INTO workflow_steps (

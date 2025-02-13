@@ -4,7 +4,8 @@ import { SQLiteAdapter } from "../src/index";
 import { STATUS, WORKFLOW_EVENTS } from "@positronic/core";
 import { State } from "@positronic/core";
 import { workflow } from "@positronic/core";
-import type { PromptClient } from "@positronic/core";
+import { nextStep } from "../../../test-utils";
+import type { PromptClient, SerializedStep, StepStatusEvent } from "@positronic/core";
 
 describe("SQLiteAdapter", () => {
   let db: DatabaseType;
@@ -291,101 +292,103 @@ describe("SQLiteAdapter", () => {
     expect(steps[1].step_order).toBe(1);
   });
 
-  // it("should correctly restart workflow with completed steps", async () => {
-  //   interface MultiStepState extends State {
-  //     value: number;
-  //   }
+  it("should correctly restart workflow with completed steps", async () => {
+    interface MultiStepState extends State {
+      value: number;
+    }
 
-  //   const fourStepWorkflow = workflow<{}, MultiStepState>("Four Step Workflow")
-  //     .step("Double", async ({ state }) => ({
-  //       value: state.value * 2
-  //     }))
-  //     .step("Add Ten", async ({ state }) => ({
-  //       value: state.value + 10
-  //     }))
-  //     .step("Multiply By Three", async ({ state }) => ({
-  //       value: state.value * 3
-  //     }))
-  //     .step("Final Step", async ({ state }) => ({
-  //       value: state.value + 5
-  //     }));
+    const fourStepWorkflow = workflow<{}, MultiStepState>("Four Step Workflow")
+      .step("Double", async ({ state }) => ({
+        value: state.value * 2
+      }))
+      .step("Add Ten", async ({ state }) => ({
+        value: state.value + 10
+      }))
+      .step("Multiply By Three", async ({ state }) => ({
+        value: state.value * 3
+      }))
+      .step("Final Step", async ({ state }) => ({
+        value: state.value + 5
+      }));
 
-  //   const adapter = new SQLiteAdapter(db);
-  //   let workflowRunId: number | undefined;
-  //   let completedStepIds: string[] = [];
+    const adapter = new SQLiteAdapter(db);
+    let workflowRunId: string | undefined;
+    let completedStepIds: string[] = [];
 
-  //   // Run initial workflow and capture step IDs
-  //   for await (const event of fourStepWorkflow.run({
-  //     initialState: { value: 2 },
-  //     client: mockClient
-  //   })) {
-  //     await adapter.dispatch(event);
-  //     if (event.type === WORKFLOW_EVENTS.START) {
-  //       const result = db.prepare(
-  //         "SELECT id FROM workflow_runs WHERE workflow_name = ? ORDER BY id DESC LIMIT 1"
-  //       ).get("Four Step Workflow") as any;
-  //       workflowRunId = result.id;
-  //       // Store original step IDs
-  //       completedStepIds = event.steps.map(step => step.id);
-  //     }
-  //   }
+    // Run initial workflow and capture step IDs
+    for await (const event of fourStepWorkflow.run({
+      initialState: { value: 2 },
+      client: mockClient
+    })) {
+      await adapter.dispatch(event);
+      if (event.type === WORKFLOW_EVENTS.START) {
+        workflowRunId = event.workflowRunId;
+      } else if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        completedStepIds = event.steps.map(step => step.id);
+      }
+    }
 
-  //   if (!workflowRunId) {
-  //     throw new Error("Failed to get workflow run ID");
-  //   }
+    if (!workflowRunId) {
+      throw new Error("Failed to get workflow run ID");
+    }
 
-  //   // Get the first two completed steps
-  //   const completedSteps = db.prepare(`
-  //     SELECT id, title, status, state, created_at, started_at, completed_at
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ?
-  //     ORDER BY step_order ASC
-  //     LIMIT 2
-  //   `).all(workflowRunId) as any[];
+    // Get the first two completed steps
+    const completedSteps = db.prepare(`
+      SELECT id, title, status, patch, created_at, started_at, completed_at
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC
+      LIMIT 2
+    `).all(workflowRunId) as any[];
 
-  //   completedSteps.forEach(step => {
-  //     step.state = JSON.parse(step.state);
-  //   });
+    completedSteps.forEach(step => {
+      step.patch = JSON.parse(step.patch);
+    });
 
-  //   // Start the restart with completed steps
-  //   const restartIterator = fourStepWorkflow.run({
-  //     initialState: { value: 2 },
-  //     initialCompletedSteps: completedSteps,
-  //     client: mockClient,
-  //     options: { workflowRunId }
-  //   });
+    // Start the restart with completed steps
+    const restartIterator = fourStepWorkflow.run({
+      workflowRunId,
+      initialState: { value: 2 },
+      initialCompletedSteps: completedSteps,
+      client: mockClient,
+    });
 
-  //   // Process only the RESTART event
-  //   const restartEvent = await restartIterator.next();
-  //   await adapter.dispatch(restartEvent.value);
+    // Process only the RESTART event
+    await nextStep(restartIterator); // workflow start
+    const restartEvent = await nextStep(restartIterator); // step status
+    const { steps } = restartEvent as StepStatusEvent;
+    await adapter.dispatch(restartEvent);
 
-  //   // Verify that the first two steps maintain their original IDs
-  //   expect(restartEvent.value.steps[0].id).toBe(completedStepIds[0]);
-  //   expect(restartEvent.value.steps[1].id).toBe(completedStepIds[1]);
-  //   // Verify that new steps get new IDs
-  //   expect(restartEvent.value.steps[2].id).not.toBe(completedStepIds[2]);
-  //   expect(restartEvent.value.steps[3].id).not.toBe(completedStepIds[3]);
+    // Verify that the first two steps maintain their original IDs
+    expect(steps[0].id).toBe(completedStepIds[0]);
+    expect(steps[1].id).toBe(completedStepIds[1]);
+    // Verify that new steps get new IDs
+    expect(steps[2].id).not.toBe(completedStepIds[2]);
+    expect(steps[3].id).not.toBe(completedStepIds[3]);
 
-  //   // Complete the rest of the workflow
-  //   for await (const event of restartIterator) {
-  //     await adapter.dispatch(event);
-  //   }
+    // Complete the rest of the workflow
+    let finalSteps: SerializedStep[] = [];
+    for await (const event of restartIterator) {
+      await adapter.dispatch(event);
+      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        finalSteps = event.steps;
+      }
+    }
+    // Verify final state is correct
+    const dbSteps = db.prepare(`
+      SELECT title, status, patch
+      FROM workflow_steps
+      WHERE workflow_run_id = ?
+      ORDER BY step_order ASC, id DESC
+    `).all(workflowRunId) as any[];
 
-  //   // Verify final state is correct
-  //   const finalSteps = db.prepare(`
-  //     SELECT title, status, state
-  //     FROM workflow_steps
-  //     WHERE workflow_run_id = ?
-  //     ORDER BY step_order ASC
-  //   `).all(workflowRunId) as any[];
-
-  //   expect(finalSteps.map(s => JSON.parse(s.state).value)).toEqual([
-  //     4,    // Double: 2 * 2
-  //     14,   // Add Ten: 4 + 10
-  //     42,   // Multiply By Three: 14 * 3
-  //     47    // Final Step: 42 + 5
-  //   ]);
-  // });
+    // Verify patches match between database and final steps
+    dbSteps.forEach((dbStep, index) => {
+      expect(dbStep.patch).toBe(JSON.stringify(finalSteps[index].patch));
+      expect(dbStep.status).toBe(finalSteps[index].status);
+      expect(dbStep.title).toBe(finalSteps[index].title);
+    });
+  });
 
   // it("should handle timestamps correctly", async () => {
   //   interface TestState extends State {
