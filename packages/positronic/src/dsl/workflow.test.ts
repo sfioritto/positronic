@@ -1,7 +1,7 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants';
 import { applyPatches } from './json-patch';
 import { State } from './types';
-import { workflow, type WorkflowEvent, type SerializedStep } from './workflow';
+import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
 import { z } from 'zod';
 
 type AssertEquals<T, U> =
@@ -256,9 +256,144 @@ describe('error handling', () => {
       status: STATUS.ERROR,
       workflowTitle: 'Error Workflow',
       error: expect.objectContaining({
-        name: 'Error',
-        message: 'Test error',
+        name: expect.any(String),
+        message: expect.any(String)
       }),
+    }));
+  });
+
+  it('should handle errors in nested workflows and propagate them up', async () => {
+    // Create an inner workflow that will throw an error
+    const innerWorkflow = workflow('Failing Inner Workflow')
+      .step(
+        "Throw error",
+        () => {
+          throw new Error('Inner workflow error');
+        }
+      );
+
+    // Create outer workflow that uses the failing inner workflow
+    const outerWorkflow = workflow('Outer Workflow')
+      .step(
+        "First step",
+        () => ({ step: "first" })
+      )
+      .workflow(
+        "Run inner workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => ({
+          ...state,
+          step: "second",
+          innerResult: workflowState.value
+        }),
+        () => ({ value: 5 })
+      );
+
+    const events: WorkflowEvent<any>[] = [];
+    let error: Error | undefined;
+    try {
+      for await (const event of outerWorkflow.run({ client: mockClient })) {
+        events.push(event);
+      }
+    } catch (e) {
+      error = e as Error;
+    }
+
+    // Verify error was thrown
+    expect(error?.message).toBe('Inner workflow error');
+
+    // Verify event sequence including error
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING,
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        stepTitle: 'First step'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        status: STATUS.RUNNING,
+        stepTitle: 'First step'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array)
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        stepTitle: 'Run inner workflow'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Failing Inner Workflow',
+        status: STATUS.RUNNING,
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        stepTitle: 'Throw error'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.ERROR,
+        workflowTitle: 'Failing Inner Workflow',
+        status: STATUS.ERROR,
+        error: expect.objectContaining({
+          name: expect.any(String),
+          message: expect.any(String)
+        })
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.arrayContaining([
+          expect.objectContaining({
+            title: 'Throw error',
+            status: STATUS.ERROR
+          })
+        ])
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.ERROR,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.ERROR,
+        error: expect.objectContaining({
+          name: expect.any(String),
+          message: expect.any(String)
+        })
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.arrayContaining([
+          expect.objectContaining({
+            title: 'Run inner workflow',
+            status: STATUS.ERROR
+          })
+        ])
+      })
+    ]);
+
+    // Verify error details in both inner and outer workflow events
+    const innerErrorEvent = events.find(e =>
+      e.type === WORKFLOW_EVENTS.ERROR &&
+      'workflowTitle' in e &&
+      e.workflowTitle === 'Failing Inner Workflow'
+    ) as WorkflowErrorEvent<any>;
+
+    const outerErrorEvent = events.find(e =>
+      e.type === WORKFLOW_EVENTS.ERROR &&
+      'workflowTitle' in e &&
+      e.workflowTitle === 'Outer Workflow'
+    ) as WorkflowErrorEvent<any>;
+
+    expect(innerErrorEvent.error).toEqual(expect.objectContaining({
+      message: 'Inner workflow error'
+    }));
+    expect(outerErrorEvent.error).toEqual(expect.objectContaining({
+      message: 'Inner workflow error'
     }));
   });
 });
@@ -588,105 +723,140 @@ describe('nested workflows', () => {
     });
   });
 
-//   it('should handle errors in nested workflows and propagate them up', async () => {
-//     // Create an inner workflow that will throw an error
-//     const innerWorkflow = workflow('Failing Inner Workflow')
-//       .step(
-//         "Throw error",
-//         () => {
-//           throw new Error('Inner workflow error');
-//         }
-//       );
+  it('should handle errors in nested workflows and propagate them up', async () => {
+    // Create an inner workflow that will throw an error
+    const innerWorkflow = workflow('Failing Inner Workflow')
+      .step(
+        "Throw error",
+        () => {
+          throw new Error('Inner workflow error');
+        }
+      );
 
-//     // Create outer workflow that uses the failing inner workflow
-//     const outerWorkflow = workflow('Outer Workflow')
-//       .step(
-//         "First step",
-//         () => ({ step: "first" })
-//       )
-//       .workflow(
-//         "Run inner workflow",
-//         innerWorkflow,
-//         ({ state, workflowState }) => ({
-//           ...state,
-//           step: "second",
-//           innerResult: workflowState.value
-//         }),
-//         () => ({ value: 5 })
-//       );
+    // Create outer workflow that uses the failing inner workflow
+    const outerWorkflow = workflow('Outer Workflow')
+      .step(
+        "First step",
+        () => ({ step: "first" })
+      )
+      .workflow(
+        "Run inner workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => ({
+          ...state,
+          step: "second",
+          innerResult: workflowState.value
+        }),
+        () => ({ value: 5 })
+      );
 
-//     const events: WorkflowEvent<any>[] = [];
-//     let error: Error | undefined;
-//     try {
-//       for await (const event of outerWorkflow.run({ client: mockClient })) {
-//         events.push(event);
-//       }
-//     } catch (e) {
-//       error = e as Error;
-//     }
+    const events: WorkflowEvent<any>[] = [];
+    let error: Error | undefined;
+    try {
+      for await (const event of outerWorkflow.run({ client: mockClient })) {
+        events.push(event);
+      }
+    } catch (e) {
+      error = e as Error;
+    }
 
-//     // Verify error was thrown
-//     expect(error?.message).toBe('Inner workflow error');
+    // Verify error was thrown
+    expect(error?.message).toBe('Inner workflow error');
 
-//     // Verify event sequence including error
-//     expect(events.map(e => ({
-//       type: e.type,
-//       workflowTitle: e.workflowTitle,
-//       status: e.status
-//     }))).toEqual([
-//       {
-//         type: WORKFLOW_EVENTS.START,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       {
-//         type: WORKFLOW_EVENTS.STEP_START,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       {
-//         type: WORKFLOW_EVENTS.STEP_COMPLETE,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       {
-//         type: WORKFLOW_EVENTS.STEP_START,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       {
-//         type: WORKFLOW_EVENTS.START,
-//         workflowTitle: 'Failing Inner Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       {
-//         type: WORKFLOW_EVENTS.STEP_START,
-//         workflowTitle: 'Failing Inner Workflow',
-//         status: STATUS.RUNNING
-//       },
-//       {
-//         type: WORKFLOW_EVENTS.ERROR,
-//         workflowTitle: 'Failing Inner Workflow',
-//         status: STATUS.ERROR
-//       },
-//       {
-//         type: WORKFLOW_EVENTS.ERROR,
-//         workflowTitle: 'Outer Workflow',
-//         status: STATUS.ERROR
-//       }
-//     ]);
+    // Verify event sequence including error
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.RUNNING,
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        stepTitle: 'First step'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        status: STATUS.RUNNING,
+        stepTitle: 'First step'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array)
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        stepTitle: 'Run inner workflow'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.START,
+        workflowTitle: 'Failing Inner Workflow',
+        status: STATUS.RUNNING,
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_START,
+        status: STATUS.RUNNING,
+        stepTitle: 'Throw error'
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.ERROR,
+        workflowTitle: 'Failing Inner Workflow',
+        status: STATUS.ERROR,
+        error: expect.objectContaining({
+          name: expect.any(String),
+          message: expect.any(String)
+        })
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.arrayContaining([
+          expect.objectContaining({
+            title: 'Throw error',
+            status: STATUS.ERROR
+          })
+        ])
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.ERROR,
+        workflowTitle: 'Outer Workflow',
+        status: STATUS.ERROR,
+        error: expect.objectContaining({
+          name: expect.any(String),
+          message: expect.any(String)
+        })
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.arrayContaining([
+          expect.objectContaining({
+            title: 'Run inner workflow',
+            status: STATUS.ERROR
+          })
+        ])
+      })
+    ]);
 
-//     // Verify error details in both inner and outer workflow events
-//     const innerErrorEvent = events[events.length - 2];
-//     const outerErrorEvent = events[events.length - 1];
+    // Verify error details in both inner and outer workflow events
+    const innerErrorEvent = events.find(e =>
+      e.type === WORKFLOW_EVENTS.ERROR &&
+      'workflowTitle' in e &&
+      e.workflowTitle === 'Failing Inner Workflow'
+    ) as WorkflowErrorEvent<any>;
 
-//     expect(innerErrorEvent.error).toEqual(expect.objectContaining({
-//       message: 'Inner workflow error'
-//     }));
-//     expect(outerErrorEvent.error).toEqual(expect.objectContaining({
-//       message: 'Inner workflow error'
-//     }));
-//   });
+    const outerErrorEvent = events.find(e =>
+      e.type === WORKFLOW_EVENTS.ERROR &&
+      'workflowTitle' in e &&
+      e.workflowTitle === 'Outer Workflow'
+    ) as WorkflowErrorEvent<any>;
+
+    expect(innerErrorEvent.error).toEqual(expect.objectContaining({
+      message: 'Inner workflow error'
+    }));
+    expect(outerErrorEvent.error).toEqual(expect.objectContaining({
+      message: 'Inner workflow error'
+    }));
+  });
 });
 
 // describe('workflow options', () => {

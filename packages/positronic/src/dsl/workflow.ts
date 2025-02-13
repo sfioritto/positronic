@@ -5,7 +5,7 @@ import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { createPatch, applyPatches } from './json-patch';
 
-type SerializedError = {
+export type SerializedError = {
   name: string;
   message: string;
   stack?: string;
@@ -35,7 +35,7 @@ interface WorkflowCompleteEvent<TOptions extends object = {}> extends WorkflowBa
   status: typeof STATUS.COMPLETE;
 }
 
-interface WorkflowErrorEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
+export interface WorkflowErrorEvent<TOptions extends object = {}> extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.ERROR;
   status: typeof STATUS.ERROR;
   error: SerializedError;
@@ -197,7 +197,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.RUNNING,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
-        initialState: this.currentState, // This now includes patches from completed steps
+        initialState: this.currentState,
         options: this.params.options ?? {} as TOptions,
       };
 
@@ -242,7 +242,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         options: this.params.options ?? {} as TOptions
       };
 
-    } catch (err: unknown) {
+    } catch (err: any) {
       const error = err as Error;
       const currentStep = this.steps[this.currentStepIndex];
       currentStep?.withStatus(STATUS.ERROR);
@@ -252,12 +252,12 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         status: STATUS.ERROR,
         workflowTitle: this.params.title,
         workflowDescription: this.params.description,
-        options: this.params.options ?? {} as TOptions,
         error: {
           name: error.name,
           message: error.message,
           stack: error.stack
-        }
+        },
+        options: this.params.options ?? {} as TOptions,
       };
 
       // Step Status Event
