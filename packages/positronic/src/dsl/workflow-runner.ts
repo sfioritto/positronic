@@ -1,4 +1,5 @@
 import { WORKFLOW_EVENTS } from './constants';
+import { applyPatches } from './json-patch';
 import type { Adapter } from "../adapters/types";
 import type { FileStore } from "../file-stores/types";
 import type { WorkflowEvent, SerializedStep } from './workflow';
@@ -35,6 +36,8 @@ export class WorkflowRunner {
   ) {
     const { adapters, logger: { log }, verbose } = this.options;
 
+    let currentState = initialState ?? ({} as TState);
+
     for await (const event of workflow.run({
       initialState,
       initialCompletedSteps,
@@ -45,9 +48,14 @@ export class WorkflowRunner {
         adapters.map(adapter => adapter.dispatch(event))
       );
 
-      // Log completed steps
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.currentStep) {
-        log(`${event.currentStep.title} ✅`);
+      // Log step completions
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        log(`${event.stepTitle} ✅`);
+      }
+
+      // Update current state when steps complete
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.patch) {
+        currentState = applyPatches(currentState, [event.patch]) as TState;
       }
 
       // Log final state on workflow completion/error if verbose
@@ -56,7 +64,7 @@ export class WorkflowRunner {
         event.type === WORKFLOW_EVENTS.ERROR
       ) && verbose) {
         log(`Workflow completed: \n\n ${JSON.stringify(
-          this.truncateDeep(structuredClone(event.currentStep?.state)), null, 2
+          this.truncateDeep(structuredClone(currentState)), null, 2
         )}`);
       }
     }
