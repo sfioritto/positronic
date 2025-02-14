@@ -1,36 +1,46 @@
 import { type Workflow, createExtension } from "@positronic/core";
 import type { State } from "@positronic/core";
+
 const filesExtension = createExtension('fs', {
-  file(
+  file<TName extends string>(
     this: Workflow<any>,
-    title: string,
-    config: {
-      path: string;
-    }
+    name: TName,
+    path: string
   ) {
-    return this.step(title, async ({ state }) => {
+    return this.step(`Adding ${name}`, async ({ state }) => {
       return {
         ...state,
         files: {
           ...((state as any).files || {}),
-          [title]: config.path
+          [name]: path
         }
       };
     });
   },
-  files(
+  files<TFiles extends Record<string, string>>(
     this: Workflow<any>,
     title: string,
-    files: {
-      [key: string]: string;
-  }) {
-    return this.step('files', ({ state }) => ({ ...state, files }));
+    files: TFiles
+  ) {
+    return this.step(title, ({ state }) => ({
+      ...state,
+      files,
+    }));
   }
 });
 
 declare module "@positronic/core" {
   interface Workflow<TOptions extends object, TState extends State> {
-    fs: ReturnType<typeof filesExtension.augment<TOptions, TState>>;
+    fs: {
+      file<TName extends string>(
+        name: TName,
+        path: string
+      ): Workflow<TOptions, TState & { files: { [K in TName]: string } }>;
+      files<TFiles extends Record<string, string>>(
+        title: string,
+        files: TFiles
+      ): Workflow<TOptions, TState & { files: TFiles }>;
+    };
   }
 }
 

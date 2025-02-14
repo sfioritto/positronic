@@ -11,4 +11,3 @@ export type JsonPatch = {
   value?: JsonValue;
   from?: string;
 }[];
-
