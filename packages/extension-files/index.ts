@@ -1,6 +1,6 @@
 import { type Workflow, createExtension } from "@positronic/core";
 import type { State } from "@positronic/core";
-const filesExtension = createExtension('files', {
+const filesExtension = createExtension('fs', {
   file(
     this: Workflow<any>,
     title: string,
@@ -17,12 +17,20 @@ const filesExtension = createExtension('files', {
         }
       };
     });
+  },
+  files(
+    this: Workflow<any>,
+    title: string,
+    files: {
+      [key: string]: string;
+  }) {
+    return this.step('files', ({ state }) => ({ ...state, files }));
   }
 });
 
 declare module "@positronic/core" {
   interface Workflow<TOptions extends object, TState extends State> {
-    files: ReturnType<typeof filesExtension.augment<TOptions, TState>>;
+    fs: ReturnType<typeof filesExtension.augment<TOptions, TState>>;
   }
 }
 
