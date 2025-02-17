@@ -41,13 +41,14 @@ export function createExtension<
 >(key: TExtensionKey, extension: TExtension) {
   return {
     install() {
-      Object.assign(Workflow.prototype, {
-        [key]: Object.fromEntries(
-          Object.entries(extension).map(([methodKey, fn]) => [
-            methodKey,
-            fn.bind(Workflow.prototype)
-          ])
-        )
+      Object.defineProperty(Workflow.prototype, key, {
+        get() {
+          const boundMethods: Record<string, Function> = {};
+          for (const [methodKey, fn] of Object.entries(extension)) {
+            boundMethods[methodKey] = fn.bind(this);
+          }
+          return boundMethods;
+        }
       });
     },
     augment<TOptions extends object, TState extends State>(): ExtensionMethods<TExtension, TOptions, TState> {

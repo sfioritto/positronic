@@ -1,31 +1,42 @@
 import { type Workflow, createExtension } from "@positronic/core";
 import type { State } from "@positronic/core";
+import { promises as fs } from 'fs';
 
 const filesExtension = createExtension('fs', {
   file<TName extends string>(
-    this: Workflow<any>,
+    this: Workflow,
     name: TName,
     path: string
   ) {
     return this.step(`Adding ${name}`, async ({ state }) => {
+      const content = await fs.readFile(path, 'utf-8');
       return {
         ...state,
         files: {
           ...((state as any).files || {}),
-          [name]: path
+          [name]: content
         }
       };
     });
   },
   files<TFiles extends Record<string, string>>(
-    this: Workflow<any>,
+    this: Workflow,
     title: string,
-    files: TFiles
+    files: Record<string, string>
   ) {
-    return this.step(title, ({ state }) => ({
-      ...state,
-      files,
-    }));
+    return this.step(title, async ({ state }) => {
+      const contents: Record<string, string> = {};
+      for (const [name, path] of Object.entries(files)) {
+        contents[name] = await fs.readFile(path, 'utf-8');
+      }
+      return {
+        ...state,
+        files: {
+          ...((state as any).files || {}),
+          ...contents
+        }
+      };
+    });
   }
 });
 
