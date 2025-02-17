@@ -61,7 +61,10 @@ async function loadState(stateFile?: string) {
 
 async function loadTypeScriptWorkflow(filePath: string) {
   try {
-    const importedModule = await import(path.resolve(filePath));
+    // Add .ts extension if not present
+    const fullPath = filePath.endsWith('.ts') ? filePath : `${filePath}.ts`;
+    const importedModule = await import(path.resolve(fullPath));
+    console.log('Imported module:', importedModule); // Debug log
     return importedModule.default;
   } catch (error) {
     console.error('Failed to load TypeScript workflow:', error);
@@ -135,9 +138,8 @@ async function main() {
     }
 
     const workflow = await loadTypeScriptWorkflow(fullPath);
-
     if (!workflow || workflow.type !== 'workflow') {
-      throw new Error(`File ${workflowPath} does not export a workflow as default export`);
+      throw new Error(`File ${workflowPath} does not export a workflow as default export: ${workflow.type}`);
     }
 
     // Configure workflow in development mode

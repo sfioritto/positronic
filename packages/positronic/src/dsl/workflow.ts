@@ -124,6 +124,7 @@ export class Workflow<
   TState extends State = {}
 > {
   private blocks: Block<any, any, TOptions>[] = [];
+  public type: 'workflow' = 'workflow';
 
   constructor(
     private title: string,
