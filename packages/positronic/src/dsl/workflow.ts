@@ -191,7 +191,8 @@ export class Workflow<
       client?: PromptClient;
     },
     reduce?: (params: {
-      state: TState & { [K in TResponseKey]: z.infer<TSchema> },
+      state: TState,
+      response: z.infer<TSchema>,
       options: TOptions
     }) => TNewState | Promise<TNewState>,
   ) {
@@ -213,7 +214,7 @@ export class Workflow<
         };
 
         return reduce
-          ? reduce({ state: stateWithResponse, options })
+          ? reduce({ state, response, options })
           : stateWithResponse as unknown as TNewState;
       }
     };

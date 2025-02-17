@@ -1300,10 +1300,11 @@ describe('type inference', () => {
             name: "numbersResponse" as const
           }
         },
-        ({ state }) => ({
+        ({ state, response, options }) => ({
           ...state,
-          sum: state.numbersResponse.numbers.reduce((a, b) => a + b, 0),
-          count: state.numbersResponse.numbers.length
+          numbersResponse: response,  // Include the response explicitly
+          sum: response.numbers.reduce((a, b) => a + b, 0),
+          count: response.numbers.length
         })
       );
 
