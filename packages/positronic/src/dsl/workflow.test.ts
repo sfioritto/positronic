@@ -1288,4 +1288,61 @@ describe('type inference', () => {
       greeting: "Hello Test User, you are 30 years old"
     });
   });
+
+  it('should correctly handle prompt reduce function', async () => {
+    const testWorkflow = workflow('Prompt Reduce Test')
+      .prompt(
+        "Get numbers",
+        {
+          template: () => "Give me some numbers",
+          responseModel: {
+            schema: z.object({ numbers: z.array(z.number()) }),
+            name: "numbersResponse" as const
+          }
+        },
+        ({ state }) => ({
+          ...state,
+          sum: state.numbersResponse.numbers.reduce((a, b) => a + b, 0),
+          count: state.numbersResponse.numbers.length
+        })
+      );
+
+    // Mock the client response
+    mockClient.execute.mockResolvedValueOnce({
+      numbers: [1, 2, 3, 4, 5]
+    });
+
+    // Run workflow and collect final state
+    let finalState = {};
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    // Verify the workflow executed correctly with reduced state
+    expect(finalState).toEqual({
+      numbersResponse: {
+        numbers: [1, 2, 3, 4, 5]
+      },
+      sum: 15,
+      count: 5
+    });
+
+    // Verify type inference works correctly
+    type ExpectedState = {
+      numbersResponse: {
+        numbers: number[];
+      };
+      sum: number;
+      count: number;
+    };
+
+    type ActualState = Parameters<
+      Parameters<(typeof testWorkflow)['step']>[1]
+    >[0]['state'];
+
+    type TypeTest = AssertEquals<ActualState, ExpectedState>;
+    const _typeAssert: TypeTest = true;
+  });
 });
