@@ -1,4 +1,4 @@
-#!/usr/bin/env NODE_NO_WARNINGS=1 node --loader ts-node/esm --experimental-specifier-resolution=node
+#!/usr/bin/env node --loader ts-node/esm --experimental-specifier-resolution=node
 
 import path from 'path';
 import fs from 'fs';
