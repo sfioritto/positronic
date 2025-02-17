@@ -172,8 +172,12 @@ export class Workflow<
     return this.nextWorkflow<TNewState>();
   }
 
+  // TResponseKey:
+  // The response key must be a string literal, so if defining a response model
+  // a consumer of this workflow must use "as const" to ensure the key is a string literal
+  // this type makes sure that the will get a ts error if they don't.
   prompt<
-    TResponseKey extends string,
+    TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>
   >(
     title: string,
@@ -181,7 +185,7 @@ export class Workflow<
       template: (state: TState) => string;
       responseModel: {
         schema: TSchema;
-        name: TResponseKey;
+        name: TResponseKey & (string extends TResponseKey ? never : unknown);
       };
       client?: PromptClient;
     }

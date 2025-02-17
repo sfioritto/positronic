@@ -1231,4 +1231,61 @@ describe('type inference', () => {
       }
     });
   });
+
+  it('should correctly infer prompt response types in subsequent steps', async () => {
+    const testWorkflow = workflow('Prompt Type Test')
+      .prompt(
+        "Get user info",
+        {
+          template: () => "What is the user's info?",
+          responseModel: {
+            schema: z.object({ name: z.string(), age: z.number() }),
+            name: "userInfo" as const  // Must be const or type inference breaks
+          }
+        }
+      )
+      .step(
+        "Use response",
+        ({ state }) => {
+          // Type assertion to verify state includes userInfo
+          type ExpectedState = {
+            userInfo: {
+              name: string;
+              age: number;
+            }
+          };
+          type ActualState = typeof state;
+          type StateTest = AssertEquals<ActualState, ExpectedState>;
+          const _stateAssert: StateTest = true;
+
+          return {
+            ...state,
+            greeting: `Hello ${state.userInfo.name}, you are ${state.userInfo.age} years old`
+          };
+        }
+      );
+
+    // Mock the client response
+    mockClient.execute.mockResolvedValueOnce({
+      name: "Test User",
+      age: 30
+    });
+
+    // Run workflow and collect final state
+    let finalState = {};
+    for await (const event of testWorkflow.run({ client: mockClient })) {
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    // Verify the workflow executed correctly
+    expect(finalState).toEqual({
+      userInfo: {
+        name: "Test User",
+        age: 30
+      },
+      greeting: "Hello Test User, you are 30 years old"
+    });
+  });
 });
