@@ -178,7 +178,8 @@ export class Workflow<
   // this type makes sure that the will get a ts error if they don't.
   prompt<
     TResponseKey extends string & { readonly brand?: unique symbol },
-    TSchema extends z.ZodObject<any>
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & { [K in TResponseKey]: z.infer<TSchema> }
   >(
     title: string,
     config: {
@@ -188,29 +189,36 @@ export class Workflow<
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
       };
       client?: PromptClient;
-    }
+    },
+    reduce?: (params: {
+      state: TState & { [K in TResponseKey]: z.infer<TSchema> },
+      options: TOptions
+    }) => TNewState | Promise<TNewState>,
   ) {
     const promptBlock: StepBlock<
       TState,
-      TState & { [K in TResponseKey]: z.infer<TSchema> },
+      TNewState,
       TOptions
     > = {
       type: 'step',
       title,
-      action: async ({ state, client: runClient }) => {
+      action: async ({ state, client: runClient, options }) => {
         const { template, responseModel, client: stepClient } = config;
         const client = stepClient ?? runClient;
         const promptString = template(state);
         const response = await client.execute(promptString, responseModel);
-
-        return {
+        const stateWithResponse = {
           ...state,
           [config.responseModel.name]: response
         };
+
+        return reduce
+          ? reduce({ state: stateWithResponse, options })
+          : stateWithResponse as unknown as TNewState;
       }
     };
     this.blocks.push(promptBlock);
-    return this.nextWorkflow<TState & { [K in TResponseKey]: z.infer<TSchema> }>();
+    return this.nextWorkflow<TNewState>();
   }
 
   // Overload signatures
