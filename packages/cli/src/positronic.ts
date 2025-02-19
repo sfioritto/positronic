@@ -74,27 +74,6 @@ async function loadTypeScriptWorkflow(filePath: string) {
   }
 }
 
-async function initializeDatabase(dbPath: string) {
-  const db = new Database(dbPath);
-
-  // Check if tables exist
-  const tableExists = db.prepare(`
-    SELECT name
-    FROM sqlite_master
-    WHERE type='table' AND name='workflow_runs'
-  `).get();
-
-  if (!tableExists) {
-    // Get the current file's path and construct the path to init.sql
-    const currentFilePath = fileURLToPath(import.meta.url);
-    const currentDir = dirname(currentFilePath);
-    const initSql = fs.readFileSync(path.join(currentDir, '../init.sql'), 'utf8');
-    db.exec(initSql);
-  }
-
-  return db;
-}
-
 async function getLastWorkflowRun(db: DatabaseType, workflowName: string): Promise<{
   runId: number;
   completedSteps: SerializedStep[];
@@ -145,7 +124,7 @@ async function main() {
     }
 
     const initialState = await loadState(stateFile);
-    const db = await initializeDatabase('workflows.db');
+    const db = new Database('workflows.db');
 
     let completedSteps: SerializedStep[] = [];
     let workflowRunId: number | undefined;

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     status TEXT NOT NULL,
     error TEXT,  -- JSON
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
     completed_at DATETIME,
     -- Add JSON validation checks
     CONSTRAINT valid_error CHECK (error IS NULL OR json_valid(error))
