@@ -4,6 +4,25 @@ import { State } from './types';
 import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
 import { z } from 'zod';
 import { nextStep } from '../../../../test-utils';
+import { FileStore } from '../file-stores/types';
+
+class TestFileStore implements FileStore {
+  private files: Map<string, string> = new Map();
+
+  setFile(path: string, content: string) {
+    this.files.set(path, content);
+  }
+
+  async readFile(path: string): Promise<string> {
+    const content = this.files.get(path);
+    if (content === undefined) {
+      throw new Error(`File not found: ${path}`);
+    }
+    return content;
+  }
+}
+
+const testFileStore = new TestFileStore();
 
 type AssertEquals<T, U> =
   0 extends (1 & T) ? false : // fails if T is any
@@ -29,7 +48,7 @@ describe('workflow creation', () => {
         ({ state }) => ({ ...state, doubled: state.count * 2 })
       );
 
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({ client: mockClient, fileStore: testFileStore });
 
     // Check start event
     const startResult = await workflowRun.next();
@@ -125,7 +144,7 @@ describe('workflow creation', () => {
       description: 'some description'
     });
 
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({ client: mockClient, fileStore: testFileStore });
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.START,
@@ -138,7 +157,7 @@ describe('workflow creation', () => {
 
   it('should create a workflow with just a name when passed a string', async () => {
     const testWorkflow = workflow('simple workflow');
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({ client: mockClient, fileStore: testFileStore });
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(expect.objectContaining({
       type: WORKFLOW_EVENTS.START,
@@ -183,7 +202,7 @@ describe('workflow creation', () => {
     // Run the workflow and capture all events
     const events = [];
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       events.push(event);
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -224,7 +243,7 @@ describe('error handling', () => {
 
     let errorEvent, finalStepStatusEvent;
     try {
-      for await (const event of errorWorkflow.run({ client: mockClient })) {
+      for await (const event of errorWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
         if (event.type === WORKFLOW_EVENTS.ERROR) {
           errorEvent = event;
         }
@@ -292,7 +311,7 @@ describe('error handling', () => {
     let mainWorkflowId: string | undefined;
 
     try {
-      for await (const event of outerWorkflow.run({ client: mockClient })) {
+      for await (const event of outerWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
         events.push(event);
         if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
           mainWorkflowId = event.workflowRunId;
@@ -419,7 +438,7 @@ describe('step creation', () => {
 
     const events = [];
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       events.push(event);
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, event.patch);
@@ -494,7 +513,7 @@ describe('step creation', () => {
 
     let finalState = {};
     const patches = [];
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         patches.push(...event.patch);
       }
@@ -537,7 +556,8 @@ describe('workflow resumption', () => {
     // Run workflow until we get the first step completed
     for await (const event of threeStepWorkflow.run({
       client: mockClient,
-      initialState
+      initialState,
+      fileStore: testFileStore
     })) {
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         firstStepState = applyPatches(firstStepState, [event.patch]);
@@ -559,7 +579,8 @@ describe('workflow resumption', () => {
       client: mockClient,
       initialState,
       initialCompletedSteps,
-      workflowRunId: 'test-run-id'
+      workflowRunId: 'test-run-id',
+      fileStore: testFileStore
     })) {
       if (event.type === WORKFLOW_EVENTS.RESTART) {
         resumedState = event.initialState;
@@ -609,7 +630,7 @@ describe('nested workflows', () => {
       );
 
     const events: WorkflowEvent<any>[] = [];
-    for await (const event of outerWorkflow.run({ client: mockClient })) {
+    for await (const event of outerWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       events.push(event);
     }
 
@@ -778,7 +799,7 @@ describe('nested workflows', () => {
     let mainWorkflowId: string | undefined;
 
     try {
-      for await (const event of outerWorkflow.run({ client: mockClient })) {
+      for await (const event of outerWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
         events.push(event);
         if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
           mainWorkflowId = event.workflowRunId;
@@ -912,7 +933,8 @@ describe('workflow options', () => {
     let finalEvent, finalStepStatus;
     for await (const event of testWorkflow.run({
       client: mockClient,
-      options: workflowOptions
+      options: workflowOptions,
+      fileStore: testFileStore
     })) {
       if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
@@ -950,7 +972,7 @@ describe('workflow options', () => {
         })
       );
 
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({ client: mockClient, fileStore: testFileStore });
 
     // Skip start event
     await workflowRun.next();
@@ -1040,7 +1062,8 @@ describe('type inference', () => {
 
     for await (const event of complexWorkflow.run({
       client: mockClient,
-      options: { features: ['fast', 'secure'] }
+      options: { features: ['fast', 'secure'] },
+      fileStore: testFileStore
     })) {
       events.push(event);
 
@@ -1158,7 +1181,7 @@ describe('type inference', () => {
     let finalState = {};
     let mainWorkflowId: string | undefined;
 
-    for await (const event of outerWorkflow.run({ client: mockClient })) {
+    for await (const event of outerWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
         mainWorkflowId = event.workflowRunId;
       }
@@ -1214,7 +1237,7 @@ describe('type inference', () => {
     let finalState = {};
     let mainWorkflowId: string | undefined;
 
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
         mainWorkflowId = event.workflowRunId;
       }
@@ -1273,7 +1296,7 @@ describe('type inference', () => {
 
     // Run workflow and collect final state
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
@@ -1315,7 +1338,7 @@ describe('type inference', () => {
 
     // Run workflow and collect final state
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }

@@ -109,6 +109,7 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}> =
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions>;
 
 interface BaseRunParams<TOptions extends object = {}> {
+  fileStore: FileStore;
   client: PromptClient;
   options?: TOptions;
 }
@@ -452,6 +453,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Run inner workflow and yield all its events
       let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
+        fileStore: this.params.fileStore,
         client: this.params.client,
         initialState,
         options: this.params.options ?? {} as TOptions,
