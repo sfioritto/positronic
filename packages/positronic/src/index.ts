@@ -17,5 +17,6 @@ export type {
 } from "./dsl/workflow";
 export type { PromptClient, ResponseModel } from "./clients/types";
 export type { State } from "./dsl/types";
+export type { FileStore } from "./file-stores/types";
 export { createPatch, applyPatches } from "./dsl/json-patch";
 export { LocalFileStore } from "./file-stores/local-file-store";

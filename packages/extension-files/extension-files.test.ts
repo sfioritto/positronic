@@ -1,6 +1,9 @@
-import { workflow, applyPatches } from "@positronic/core";
-import { promises as fs } from 'fs';
+import { workflow, applyPatches, type FileStore } from "@positronic/core";
 import './index';
+
+class TestFileStore implements FileStore {
+  readFile = jest.fn().mockImplementation(async () => 'content');
+}
 
 // Mock fs.promises.readFile
 jest.mock('fs', () => ({
@@ -19,8 +22,9 @@ describe('files extension', () => {
   });
 
   it('should read files and add them to state', async () => {
+    const fs = new TestFileStore();
     // Mock readFile responses
-    (fs.readFile as jest.Mock)
+    fs.readFile
       .mockResolvedValueOnce('content 1')
       .mockResolvedValueOnce('content 2')
       .mockResolvedValueOnce('content 3');
@@ -33,16 +37,16 @@ describe('files extension', () => {
       });
 
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: fs })) {
       if (event.type === 'step:complete') {
         finalState = applyPatches(finalState, event.patch);
       }
     }
 
     // Verify files were read
-    expect(fs.readFile).toHaveBeenCalledWith('/path/to/single.txt', 'utf-8');
-    expect(fs.readFile).toHaveBeenCalledWith('/path/to/file1.txt', 'utf-8');
-    expect(fs.readFile).toHaveBeenCalledWith('/path/to/file2.txt', 'utf-8');
+    expect(fs.readFile).toHaveBeenCalledWith('/path/to/single.txt');
+    expect(fs.readFile).toHaveBeenCalledWith('/path/to/file1.txt');
+    expect(fs.readFile).toHaveBeenCalledWith('/path/to/file2.txt');
 
     // Verify final state
     expect(finalState).toEqual({
@@ -55,6 +59,7 @@ describe('files extension', () => {
   });
 
   it('should correctly type the state with file contents', async () => {
+    const fs = new TestFileStore();
     const testWorkflow = workflow('Type Test')
       .fs.file('testFile', '/path/to/file.txt')
       .fs.files('Multiple files', {
@@ -78,9 +83,9 @@ describe('files extension', () => {
       });
 
     // Mock file reads for runtime verification
-    (fs.readFile as jest.Mock).mockResolvedValue('test content');
+    fs.readFile.mockResolvedValue('test content');
 
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({ client: mockClient, fileStore: fs })) {
       // Consume events
     }
   });
