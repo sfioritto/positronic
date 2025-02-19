@@ -1,6 +1,5 @@
 import { type Workflow, createExtension } from "@positronic/core";
 import type { State } from "@positronic/core";
-import { promises as fs } from 'fs';
 
 const filesExtension = createExtension('fs', {
   file<TName extends string>(
@@ -8,8 +7,8 @@ const filesExtension = createExtension('fs', {
     name: TName,
     path: string
   ) {
-    return this.step(`Adding ${name}`, async ({ state }) => {
-      const content = await fs.readFile(path, 'utf-8');
+    return this.step(`Adding ${name}`, async ({ state, fileStore }) => {
+      const content = await fileStore.readFile(path);
       return {
         ...state,
         files: {
@@ -19,15 +18,15 @@ const filesExtension = createExtension('fs', {
       };
     });
   },
-  files<TFiles extends Record<string, string>>(
+  files(
     this: Workflow,
     title: string,
     files: Record<string, string>
   ) {
-    return this.step(title, async ({ state }) => {
+    return this.step(title, async ({ state, fileStore }) => {
       const contents: Record<string, string> = {};
       for (const [name, path] of Object.entries(files)) {
-        contents[name] = await fs.readFile(path, 'utf-8');
+        contents[name] = await fileStore.readFile(path);
       }
       return {
         ...state,

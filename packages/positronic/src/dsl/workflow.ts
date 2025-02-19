@@ -88,6 +88,7 @@ type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
     state: TStateIn;
     options: TOptions;
     client: PromptClient;
+    fileStore: FileStore;
   }) => TStateOut | Promise<TStateOut>;
 };
 
@@ -158,6 +159,7 @@ export class Workflow<
       state: TState;
       options: TOptions;
       client: PromptClient;
+      fileStore: FileStore;
     }) => TNewState | Promise<TNewState>
   ) {
     const stepBlock: StepBlock<TState, TNewState, TOptions> = {
@@ -498,6 +500,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         state: this.currentState,
         options: this.params.options ?? {} as TOptions,
         client: this.params.client,
+        fileStore: this.params.fileStore,
       });
       step.withStatus(STATUS.COMPLETE);
 
