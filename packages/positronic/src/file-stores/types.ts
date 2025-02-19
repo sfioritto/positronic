@@ -1,3 +1,3 @@
 export interface FileStore {
-  readFile(path: string, workflowDir?: string): Promise<string>;
+  readFile(path: string): Promise<string>;
 }

@@ -4,6 +4,7 @@ import type { PromptClient } from "../clients/types";
 import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { createPatch, applyPatches } from './json-patch';
+import type { FileStore } from "../file-stores/types";
 
 export type SerializedError = {
   name: string;
@@ -107,13 +108,18 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}> =
   | StepBlock<TStateIn, TStateOut, TOptions>
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions>;
 
-interface InitialRunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+interface BaseRunParams<TOptions extends object = {}> {
+  client: PromptClient;
+  options?: TOptions;
+}
+
+export interface InitialRunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
   initialState?: State;
   initialCompletedSteps?: never;
   workflowRunId?: never;
 }
 
-interface RerunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+export interface RerunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
   workflowRunId: string;
@@ -124,12 +130,26 @@ export class Workflow<
   TState extends State = {}
 > {
   private blocks: Block<any, any, TOptions>[] = [];
+  private logger?: (...args: any[]) => void;
+  private verbose?: boolean;
+  private fileStore?: FileStore;
   public type: 'workflow' = 'workflow';
 
   constructor(
     private title: string,
     private description?: string
   ) {}
+
+  withLogger(logger: (...args: any[]) => void, verbose: boolean): this {
+    this.logger = logger;
+    this.verbose = verbose;
+    return this;
+  }
+
+  withFileStore(fileStore?: FileStore): this {
+    this.fileStore = fileStore;
+    return this;
+  }
 
   step<TNewState extends State>(
     title: string,
@@ -505,11 +525,6 @@ export function workflow<
   const title = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
   return new Workflow<TOptions, TState>(title, description);
-}
-
-interface BaseRunParams<TOptions extends object = {}> {
-  client: PromptClient;
-  options?: TOptions;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);

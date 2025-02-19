@@ -4,10 +4,12 @@ import path from 'path';
 import fs from 'fs';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { SQLiteAdapter } from '@positronic/adapter-sqlite';
-import { WorkflowRunner, STATUS } from '@positronic/core';
+import { WorkflowRunner, STATUS, LocalFileStore } from '@positronic/core';
+import { AnthropicClient } from '@positronic/client-anthropic';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import type { SerializedStep } from '@positronic/core';
+
 
 interface CliOptions {
   workflowDir?: string;
@@ -142,12 +144,6 @@ async function main() {
       throw new Error(`File ${workflowPath} does not export a workflow as default export: ${workflow.type}`);
     }
 
-    // Configure workflow in development mode
-    if (process.env.NODE_ENV === 'development') {
-      const workflowDirectory = path.dirname(fullPath);
-      workflow.configure({ workflowDir: workflowDirectory });
-    }
-
     const initialState = await loadState(stateFile);
     const db = await initializeDatabase('workflows.db');
 
@@ -169,15 +165,17 @@ async function main() {
       }
     }
 
-    const runner = new WorkflowRunner(
-      {
-        adapters: [new SQLiteAdapter(db)],
-        logger: console,
-        verbose: !!verbose,
-      }
-    );
+    const currentWorkflowDir = path.dirname(fullPath);
 
-    await runner.run(workflow, initialState, completedSteps, { workflowRunId });
+    const runner = new WorkflowRunner({
+      adapters: [new SQLiteAdapter(db)],
+      logger: console,
+      verbose: !!verbose,
+      client: new AnthropicClient(),
+      fileStore: new LocalFileStore(currentWorkflowDir)
+    });
+
+    await runner.run(workflow, initialState, { workflowRunId, initialCompletedSteps: completedSteps });
 
   } catch (error) {
     if (error instanceof Error) {

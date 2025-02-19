@@ -25,7 +25,7 @@
     "packages/positronic",
     "packages/adapter-sqlite",
     "packages/extension-files",
-    "packages/cli",
-    "packages/client-anthropic"
+    "packages/client-anthropic",
+    "packages/cli"
   ]
 }

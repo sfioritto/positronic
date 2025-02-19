@@ -2,8 +2,9 @@ import { WORKFLOW_EVENTS } from './constants';
 import { applyPatches } from './json-patch';
 import type { Adapter } from "../adapters/types";
 import type { FileStore } from "../file-stores/types";
-import type { WorkflowEvent, SerializedStep } from './workflow';
-import type { State, JsonObject } from './types';
+import type { SerializedStep, Workflow } from './workflow';
+import type { State } from './types';
+import type { PromptClient } from '../clients/types';
 
 interface Logger {
   log(...args: any[]): void;
@@ -13,36 +14,42 @@ export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[],
-      fileStore?: FileStore,
+      fileStore: FileStore,
       logger: Logger,
-      verbose: boolean
+      verbose: boolean,
+      client: PromptClient
     }
   ) {}
 
   async run<
-    TOptions extends JsonObject = {},
+    TOptions extends object = {},
     TState extends State = {}
   >(
-    workflow: {
-      run: (params?: {
-        initialState?: TState,
-        initialCompletedSteps?: SerializedStep[],
-        options?: TOptions
-      }) => AsyncGenerator<WorkflowEvent<TOptions>>
-    },
-    initialState?: TState,
-    initialCompletedSteps?: SerializedStep[],
-    options?: TOptions
+    workflow: Workflow<TOptions, TState>,
+    initialState: TState = {} as TState,
+    options?: TOptions,
+    initialCompletedSteps?: SerializedStep[] | never,
+    workflowRunId?: string | never
   ) {
-    const { adapters, logger: { log }, verbose } = this.options;
+    const {
+      adapters,
+      logger: { log },
+      verbose,
+      fileStore,
+      client,
+    } = this.options;
 
     let currentState = initialState ?? ({} as TState);
 
-    for await (const event of workflow.run({
-      initialState,
-      initialCompletedSteps,
-      options
-    })) {
+    const configuredWorkflow = workflow
+      .withLogger(log, verbose)
+      .withFileStore(fileStore)
+
+    const workflowRun = workflowRunId && initialCompletedSteps
+    ? configuredWorkflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client })
+    : configuredWorkflow.run({ initialState, options, client });
+
+    for await (const event of workflowRun) {
       // Dispatch event to all adapters
       await Promise.all(
         adapters.map(adapter => adapter.dispatch(event))

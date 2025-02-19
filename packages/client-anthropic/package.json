@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Anthropic client for Positronic",
   "type": "module",
-  "main": "dist/src/index.ts",
+  "main": "dist/src/index.js",
   "types": "dist/types/index.ts",
   "scripts": {
     "tsc": "tsc --project tsconfig.json",

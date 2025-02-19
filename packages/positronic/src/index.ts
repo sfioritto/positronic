@@ -6,6 +6,8 @@ export { Adapter } from "./adapters/types";
 export type {
   WorkflowEvent,
   SerializedStep,
+  InitialRunParams,
+  RerunParams,
   WorkflowStartEvent,
   WorkflowCompleteEvent,
   WorkflowErrorEvent,
@@ -16,3 +18,4 @@ export type {
 export type { PromptClient, ResponseModel } from "./clients/types";
 export type { State } from "./dsl/types";
 export { createPatch, applyPatches } from "./dsl/json-patch";
+export { LocalFileStore } from "./file-stores/local-file-store";

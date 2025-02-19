@@ -1,11 +1,11 @@
 import { join } from 'path';
 import * as fs from 'fs/promises';
 import type { FileStore } from './types';
+
 export class LocalFileStore implements FileStore {
-  async readFile(path: string, workflowDir?: string): Promise<string> {
-    if (workflowDir) {
-      path = join(workflowDir, path);
-    }
-    return fs.readFile(path, 'utf-8');
+  constructor(private baseDir: string) {}
+  async readFile(path: string): Promise<string> {
+    const filePath = join(this.baseDir, path);
+    return fs.readFile(filePath, 'utf-8');
   }
 }

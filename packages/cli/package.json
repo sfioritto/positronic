@@ -16,6 +16,7 @@
   "dependencies": {
     "@positronic/core": "^0.0.1",
     "@positronic/adapter-sqlite": "^0.0.1",
+    "@positronic/client-anthropic": "^0.0.1",
     "ts-node": "^10.9.2",
     "better-sqlite3": "^11.7.2"
   }
