@@ -281,10 +281,10 @@ describe('error handling', () => {
 
   it('should handle errors in nested workflows and propagate them up', async () => {
     // Create an inner workflow that will throw an error
-    const innerWorkflow = workflow('Failing Inner Workflow')
+    const innerWorkflow = workflow<{}, { inner?: boolean, value?: number }>('Failing Inner Workflow')
       .step(
         "Throw error",
-        () => {
+        (): { value: number } => {
           throw new Error('Inner workflow error');
         }
       );
@@ -769,10 +769,10 @@ describe('nested workflows', () => {
 
   it('should handle errors in nested workflows and propagate them up', async () => {
     // Create an inner workflow that will throw an error
-    const innerWorkflow = workflow('Failing Inner Workflow')
+    const innerWorkflow = workflow<{}, { inner: boolean, value: number }>('Failing Inner Workflow')
       .step(
         "Throw error",
-        () => {
+        (): { value: number } => {
           throw new Error('Inner workflow error');
         }
       );
@@ -1159,7 +1159,7 @@ describe('type inference', () => {
           // Type assertion for inner workflow state
           type ExpectedInnerState = {
             innerValue: number;
-            metadata: { processed: boolean };
+            metadata: { processed: true };
           };
           type ActualInnerState = typeof workflowState;
           type InnerStateTest = AssertEquals<

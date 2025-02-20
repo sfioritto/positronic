@@ -101,7 +101,7 @@ type WorkflowBlock<
   type: 'workflow';
   title: string;
   innerWorkflow: Workflow<TOptions, TInnerState>;
-  initialState: TInnerState | ((outerState: TOuterState) => TInnerState);
+  initialState: State | ((outerState: TOuterState) => State);
   action: (outerState: TOuterState, innerState: TInnerState) => TNewState;
 };
 
@@ -178,7 +178,7 @@ export class Workflow<
     title: string,
     innerWorkflow: Workflow<TOptions, TInnerState>,
     action: (params: { state: TState; workflowState: TInnerState }) => TNewState,
-    initialState?: TInnerState | ((state: TState) => TInnerState)
+    initialState?: State | ((state: TState) => State)
   ) {
     const nestedBlock: WorkflowBlock<
       TState,
@@ -189,7 +189,7 @@ export class Workflow<
       type: 'workflow',
       title,
       innerWorkflow,
-      initialState: initialState || (() => ({} as TInnerState)),
+      initialState: initialState || (() => ({} as State)),
       action: (outerState, innerState) => action({ state: outerState, workflowState: innerState})
     };
     this.blocks.push(nestedBlock);

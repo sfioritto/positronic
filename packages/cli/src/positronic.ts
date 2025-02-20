@@ -1,4 +1,4 @@
-#!/usr/bin/env node --loader ts-node/esm --experimental-specifier-resolution=node
+#!/usr/bin/env node --disable-warning=ExperimentalWarning --loader ts-node/esm --experimental-specifier-resolution=node
 
 import path from 'path';
 import fs from 'fs';
@@ -6,10 +6,7 @@ import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { SQLiteAdapter } from '@positronic/adapter-sqlite';
 import { WorkflowRunner, STATUS, LocalFileStore } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import type { SerializedStep } from '@positronic/core';
-
 
 interface CliOptions {
   workflowDir?: string;
