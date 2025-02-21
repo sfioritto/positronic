@@ -56,7 +56,7 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
         case 'verbose':
           options.verbose = true;
           break;
-        case 'restartFrom':
+        case 'restart-from':
           options.restartFrom = parseInt(arg.split('=')[1], 10);
           break;
         case 'run-id':
