@@ -237,7 +237,7 @@ async function main() {
     const runner = new WorkflowRunner({
       adapters: [
         new SQLiteAdapter(db),
-        new ConsoleAdapter()
+        new ConsoleAdapter(restartFrom || 1)
       ],
       logger: console,
       verbose: !!verbose,

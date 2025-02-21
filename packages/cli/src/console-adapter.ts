@@ -1,12 +1,17 @@
 import { Adapter, WORKFLOW_EVENTS, WorkflowEvent } from '@positronic/core';
 
 export class ConsoleAdapter extends Adapter {
-  private stepNumber = 1;
+  private stepNumber: number;
   private currentStepTitle: string | null = null;
 
   // Track workflow hierarchy using run IDs
   private workflowHierarchy: Map<string, string> = new Map(); // child -> parent
   private topLevelWorkflowId: string | null = null;
+
+  constructor(startingStep: number = 1) {
+    super();
+    this.stepNumber = startingStep;
+  }
 
   private getWorkflowDepth(runId: string): number {
     let depth = 0;
