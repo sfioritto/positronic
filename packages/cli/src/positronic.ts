@@ -13,9 +13,34 @@ interface CliOptions {
   stateFile?: string;
   verbose?: boolean;
   restartFrom?: number;
+  runId?: string;
+  listRuns?: boolean;
 }
 
-function parseArgs(): CliOptions & { workflowPath: string } {
+async function getRecentRuns(db: DatabaseType): Promise<Array<{
+  id: string;
+  workflowName: string;
+  status: string;
+  createdAt: string;
+}>> {
+  return db.prepare(`
+    SELECT
+      id,
+      workflow_name as workflowName,
+      status,
+      created_at as createdAt
+    FROM workflow_runs
+    ORDER BY created_at DESC
+    LIMIT 5
+  `).all() as Array<{
+    id: string;
+    workflowName: string;
+    status: string;
+    createdAt: string;
+  }>;
+}
+
+function parseArgs(): CliOptions & { workflowPath?: string } {
   const args = process.argv.slice(2);
   const options: CliOptions = {};
   const nonOptionArgs: string[] = [];
@@ -36,6 +61,12 @@ function parseArgs(): CliOptions & { workflowPath: string } {
           break;
         case 'restartFrom':
           options.restartFrom = parseInt(arg.split('=')[1], 10);
+          break;
+        case 'run-id':
+          options.runId = arg.split('=')[1];
+          break;
+        case 'list-runs':
+          options.listRuns = true;
           break;
       }
     } else {
@@ -63,7 +94,6 @@ async function loadTypeScriptWorkflow(filePath: string) {
     // Add .ts extension if not present
     const fullPath = filePath.endsWith('.ts') ? filePath : `${filePath}.ts`;
     const importedModule = await import(path.resolve(fullPath));
-    console.log('Imported module:', importedModule); // Debug log
     return importedModule.default;
   } catch (error) {
     console.error('Failed to load TypeScript workflow:', error);
@@ -71,41 +101,64 @@ async function loadTypeScriptWorkflow(filePath: string) {
   }
 }
 
-async function getLastWorkflowRun(db: DatabaseType, workflowName: string): Promise<{
-  runId: number;
+async function getLastWorkflowRun(db: DatabaseType, runId: string): Promise<{
+  runId: string;
   completedSteps: SerializedStep[];
 } | null> {
-  const lastRun = db.prepare(`
+  const run = db.prepare(`
     SELECT * FROM workflow_runs
-    WHERE workflow_name = ?
-    ORDER BY created_at DESC
-    LIMIT 1
-  `).get(workflowName) as any;
+    WHERE id = ?
+  `).get(runId) as any;
 
-  if (!lastRun) {
+  if (!run) {
     return null;
   }
 
   const completedSteps = db.prepare(`
-    SELECT * FROM workflow_steps
-    WHERE workflow_run_id = ?
-    ORDER BY id ASC
-  `).all(lastRun.id) as any[];
+    SELECT
+      id,
+      title,
+      patch,
+      status
+    FROM workflow_steps
+    WHERE workflow_run_id = ? AND status = 'complete'
+    ORDER BY step_order ASC
+  `).all(run.id) as any[];
 
   return {
-    runId: lastRun.id,
+    runId: run.id,
     completedSteps: completedSteps.map(step => ({
       id: step.id,
       title: step.title,
-      state: JSON.parse(step.new_state),
-      status: STATUS.COMPLETE
+      status: STATUS.COMPLETE,
+      patch: step.patch ? JSON.parse(step.patch) : undefined
     }))
   };
 }
 
 async function main() {
   try {
-    const { workflowPath, workflowDir, stateFile, verbose, restartFrom } = parseArgs();
+    const { workflowPath, workflowDir, stateFile, verbose, restartFrom, runId, listRuns } = parseArgs();
+    const db = new Database('workflows.db');
+
+    // Handle list-runs command
+    if (listRuns) {
+      const recentRuns = await getRecentRuns(db);
+      console.log('-------------------');
+      recentRuns.forEach(run => {
+        console.log(`ID: ${run.id}`);
+        console.log(`Workflow: ${run.workflowName}`);
+        console.log(`Status: ${run.status}`);
+        console.log(`Created: ${run.createdAt}`);
+        console.log('-------------------');
+      });
+      process.exit(0);
+    }
+
+    // Require workflow path for other operations
+    if (!workflowPath) {
+      throw new Error('Workflow path is required unless using --list-runs');
+    }
 
     const fullPath = workflowDir
       ? path.resolve(process.cwd(), workflowDir, workflowPath)
@@ -121,15 +174,18 @@ async function main() {
     }
 
     const initialState = await loadState(stateFile);
-    const db = new Database('workflows.db');
 
     let completedSteps: SerializedStep[] = [];
-    let workflowRunId: number | undefined;
+    let workflowRunId: string | undefined;
 
     if (restartFrom !== undefined) {
-      const lastRun = await getLastWorkflowRun(db, workflow.name);
+      if (!runId) {
+        throw new Error('--run-id is required when using --restartFrom');
+      }
+
+      const lastRun = await getLastWorkflowRun(db, runId);
       if (!lastRun) {
-        throw new Error(`No previous runs found for workflow: ${workflow.name}`);
+        throw new Error(`No run found with ID: ${runId}`);
       }
 
       const stepsToKeep = restartFrom - 1;
@@ -151,7 +207,7 @@ async function main() {
       fileStore: new LocalFileStore(currentWorkflowDir)
     });
 
-    await runner.run(workflow, initialState, { workflowRunId, initialCompletedSteps: completedSteps });
+    await runner.run(workflow, initialState, {}, completedSteps, workflowRunId);
 
   } catch (error) {
     if (error instanceof Error) {

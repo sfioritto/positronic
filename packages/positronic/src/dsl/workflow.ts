@@ -378,7 +378,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
           this.currentStepIndex++;
           continue;
         }
-
         // Step start event
         yield {
           type: WORKFLOW_EVENTS.STEP_START,
