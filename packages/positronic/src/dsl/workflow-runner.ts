@@ -48,6 +48,16 @@ export class WorkflowRunner {
 
     let currentState = initialState ?? ({} as TState);
 
+    // Apply any patches from completed steps
+    // to the initial state so that the workflow
+    // starts with a state that reflects all of the completed steps.
+    // Need to do this when a workflow is restarted with completed steps.
+    initialCompletedSteps?.forEach(step => {
+      if (step.patch) {
+        currentState = applyPatches(currentState, [step.patch]) as TState;
+      }
+    });
+
     const workflowRun = workflowRunId && initialCompletedSteps
       ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, fileStore })
       : workflow.run({ initialState, options, client, fileStore });
