@@ -10,18 +10,14 @@ import type {
 } from "@positronic/core";
 import { initSQL } from './sql';
 
-interface SQLiteOptions {
-  workflowRunId?: number;
-}
-
-export class SQLiteAdapter extends Adapter<SQLiteOptions> {
+export class SQLiteAdapter extends Adapter {
   constructor(private db: DatabaseType) {
     super();
     // Initialize database schema
     this.db.exec(initSQL);
   }
 
-  public async dispatch(event: WorkflowEvent<SQLiteOptions>) {
+  public async dispatch(event: WorkflowEvent) {
     switch (event.type) {
       case WORKFLOW_EVENTS.START:
         this.handleWorkflowStart(event);
@@ -41,7 +37,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     }
   }
 
-  private async handleWorkflowStart(event: WorkflowStartEvent<SQLiteOptions>) {
+  private async handleWorkflowStart(event: WorkflowStartEvent) {
     // Insert or update workflow run
     this.db.prepare(`
       INSERT INTO workflow_runs (
@@ -58,7 +54,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     );
   }
 
-  private handleStepStart(event: StepStartedEvent<SQLiteOptions>) {
+  private handleStepStart(event: StepStartedEvent) {
     this.db.prepare(`
       UPDATE workflow_steps
       SET
@@ -68,7 +64,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     `).run(event.stepId);
   }
 
-  private async handleStepStatus(event: StepStatusEvent<SQLiteOptions>) {
+  private async handleStepStatus(event: StepStatusEvent) {
     // Get the IDs of all steps in this update
     const updatedStepIds = event.steps.map(step => step.id);
 
@@ -126,7 +122,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     })();
   }
 
-  private async handleComplete(event: WorkflowCompleteEvent<SQLiteOptions>) {
+  private async handleComplete(event: WorkflowCompleteEvent) {
     this.db.prepare(`
       UPDATE workflow_runs
       SET
@@ -139,7 +135,7 @@ export class SQLiteAdapter extends Adapter<SQLiteOptions> {
     );
   }
 
-  private handleWorkflowError(event: WorkflowErrorEvent<SQLiteOptions>) {
+  private handleWorkflowError(event: WorkflowErrorEvent) {
     this.db.prepare(`
       UPDATE workflow_runs
       SET
