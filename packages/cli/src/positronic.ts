@@ -207,7 +207,11 @@ async function main() {
       fileStore: new LocalFileStore(currentWorkflowDir)
     });
 
-    await runner.run(workflow, initialState, {}, completedSteps, workflowRunId);
+    await runner.run(workflow, {
+      initialState,
+      initialCompletedSteps: completedSteps,
+      workflowRunId
+    });
 
   } catch (error) {
     if (error instanceof Error) {

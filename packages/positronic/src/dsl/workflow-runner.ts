@@ -26,10 +26,17 @@ export class WorkflowRunner {
     TState extends State = {}
   >(
     workflow: Workflow<TOptions, TState>,
-    initialState: TState = {} as TState,
-    options?: TOptions,
-    initialCompletedSteps?: SerializedStep[] | never,
-    workflowRunId?: string | never
+    {
+      initialState = {} as TState,
+      options,
+      initialCompletedSteps,
+      workflowRunId
+    }: {
+      initialState?: TState,
+      options?: TOptions,
+      initialCompletedSteps?: SerializedStep[] | never,
+      workflowRunId?: string | never
+    } = {}
   ) {
     const {
       adapters,
