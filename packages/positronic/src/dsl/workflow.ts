@@ -238,10 +238,11 @@ export class Workflow<
 
   // Implementation signature
   async *run(params: InitialRunParams<TOptions> | RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>> {
+    const { title, description, blocks } = this;
     const stream = new WorkflowEventStream({
-      title: this.title,
-      description: this.description,
-      blocks: this.blocks,
+      title,
+      description,
+      blocks,
       ...params
     });
 
@@ -299,20 +300,39 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private currentStepIndex: number = 0;
   private initialState: TState;
   private workflowRunId: string;
+  private title: string;
+  private description?: string;
+  private fileStore: FileStore;
+  private client: PromptClient;
+  private options: TOptions;
 
-  constructor(
-    private params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
-      title: string;
-      description?: string;
-      blocks: Block<any, any, TOptions>[];
-    }
-  ) {
-    this.initialState = (params.initialState ?? {}) as TState;
+  constructor(params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
+    title: string;
+    description?: string;
+    blocks: Block<any, any, TOptions>[];
+  }) {
+    const {
+      initialState = {} as TState,
+      initialCompletedSteps,
+      blocks,
+      title,
+      description,
+      workflowRunId: providedWorkflowRunId,
+      options = {} as TOptions,
+      fileStore,
+      client
+    } = params;
+
+    this.initialState = initialState as TState;
+    this.title = title;
+    this.description = description;
+    this.fileStore = fileStore;
+    this.client = client;
+    this.options = options;
 
     // Initialize steps array with UUIDs and pending status
-    this.steps = params.blocks.map((block, index) => {
-      // Use completed step at same index if available
-      const completedStep = params.initialCompletedSteps?.[index];
+    this.steps = blocks.map((block, index) => {
+      const completedStep = initialCompletedSteps?.[index];
       if (completedStep) {
         return new Step(block, completedStep.id)
           .withStatus(completedStep.status)
@@ -321,7 +341,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       return new Step(block);
     });
 
-    // Set initial state by applying patches from completed steps to the initialState
     this.currentState = clone(this.initialState);
 
     for (const step of this.steps) {
@@ -330,34 +349,42 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       }
     }
 
-    this.workflowRunId = params.workflowRunId ?? uuidv4();
+    this.workflowRunId = providedWorkflowRunId ?? uuidv4();
   }
 
   async *next(): AsyncGenerator<WorkflowEvent<TOptions>> {
+    const {
+      steps,
+      title: workflowTitle,
+      description: workflowDescription,
+      currentState,
+      options,
+      workflowRunId
+    } = this;
+
     try {
-      // Start event with workflowRunId
-      const hasCompletedSteps = this.steps.some(step => step.serialized.status !== STATUS.PENDING);
+      const hasCompletedSteps = steps.some(step => step.serialized.status !== STATUS.PENDING);
       yield {
         type: hasCompletedSteps ? WORKFLOW_EVENTS.RESTART : WORKFLOW_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle: this.params.title,
-        workflowDescription: this.params.description,
-        initialState: this.currentState,
-        options: this.params.options ?? {} as TOptions,
-        workflowRunId: this.workflowRunId
+        workflowTitle,
+        workflowDescription,
+        initialState: currentState,
+        options,
+        workflowRunId
       };
 
       // Emit initial step status after workflow starts
       yield {
         type: WORKFLOW_EVENTS.STEP_STATUS,
-        steps: this.steps.map(step => step.serialized),
-        options: this.params.options ?? {} as TOptions,
-        workflowRunId: this.workflowRunId
+        steps: steps.map(step => step.serialized),
+        options,
+        workflowRunId
       };
 
       // Process each step
-      while (this.currentStepIndex < this.steps.length) {
-        const step = this.steps[this.currentStepIndex];
+      while (this.currentStepIndex < steps.length) {
+        const step = steps[this.currentStepIndex];
 
         // Skip completed steps
         if (step.serialized.status === STATUS.COMPLETE) {
@@ -370,8 +397,8 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
           status: STATUS.RUNNING,
           stepTitle: step.block.title,
           stepId: step.id,
-          options: this.params.options ?? {} as TOptions,
-          workflowRunId: this.workflowRunId
+          options,
+          workflowRunId
         };
 
         // Execute step and yield the STEP_COMPLETE event and
@@ -381,9 +408,9 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         // Step Status Event
         yield {
           type: WORKFLOW_EVENTS.STEP_STATUS,
-          steps: this.steps.map(step => step.serialized),
-          options: this.params.options ?? {} as TOptions,
-          workflowRunId: this.workflowRunId
+          steps: steps.map(step => step.serialized),
+          options,
+          workflowRunId
         };
 
         this.currentStepIndex++;
@@ -392,37 +419,37 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       yield {
         type: WORKFLOW_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
-        workflowTitle: this.params.title,
-        workflowDescription: this.params.description,
-        workflowRunId: this.workflowRunId,
-        options: this.params.options ?? {} as TOptions
+        workflowTitle,
+        workflowDescription,
+        workflowRunId,
+        options
       };
 
     } catch (err: any) {
       const error = err as Error;
-      const currentStep = this.steps[this.currentStepIndex];
+      const currentStep = steps[this.currentStepIndex];
       currentStep?.withStatus(STATUS.ERROR);
 
       yield {
         type: WORKFLOW_EVENTS.ERROR,
         status: STATUS.ERROR,
-        workflowTitle: this.params.title,
-        workflowDescription: this.params.description,
-        workflowRunId: this.workflowRunId,
+        workflowTitle,
+        workflowDescription,
+        workflowRunId,
         error: {
           name: error.name,
           message: error.message,
           stack: error.stack
         },
-        options: this.params.options ?? {} as TOptions,
+        options,
       };
 
       // Step Status Event
       yield {
         type: WORKFLOW_EVENTS.STEP_STATUS,
-        steps: this.steps.map(step => step.serialized),
-        options: this.params.options ?? {} as TOptions,
-        workflowRunId: this.workflowRunId
+        steps: steps.map(step => step.serialized),
+        options,
+        workflowRunId
       };
 
       throw error;
@@ -440,10 +467,10 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Run inner workflow and yield all its events
       let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
-        fileStore: this.params.fileStore,
-        client: this.params.client,
+        fileStore: this.fileStore,
+        client: this.client,
         initialState,
-        options: this.params.options ?? {} as TOptions,
+        options: this.options ?? {} as TOptions,
       });
 
       for await (const event of innerRun) {
@@ -472,7 +499,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         stepTitle: step.block.title,
         stepId: step.id,
         patch,
-        options: this.params.options ?? {} as TOptions,
+        options: this.options ?? {} as TOptions,
         workflowRunId: this.workflowRunId
       };
 
@@ -483,9 +510,9 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Execute regular step
       this.currentState = await block.action({
         state: this.currentState,
-        options: this.params.options ?? {} as TOptions,
-        client: this.params.client,
-        fileStore: this.params.fileStore,
+        options: this.options ?? {} as TOptions,
+        client: this.client,
+        fileStore: this.fileStore,
       });
       step.withStatus(STATUS.COMPLETE);
 
@@ -499,7 +526,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         stepTitle: step.block.title,
         stepId: step.id,
         patch,
-        options: this.params.options ?? {} as TOptions,
+        options: this.options ?? {} as TOptions,
         workflowRunId: this.workflowRunId
       };
     }
