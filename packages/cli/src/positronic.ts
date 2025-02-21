@@ -50,6 +50,9 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
     if (arg.startsWith('--')) {
       const [key] = arg.slice(2).split('=');
       switch (key) {
+        case 'help':
+          printHelp();
+          process.exit(0);
         case 'state':
           options.stateFile = arg.split('=')[1];
           break;
@@ -72,6 +75,33 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
   }
 
   return { ...options, workflowPath: nonOptionArgs[0] };
+}
+
+function printHelp() {
+  console.log(`
+Usage: positronic [options] <workflow-path>
+
+Options:
+  --help                Show this help message
+  --state=<file>       Path to initial state file (JSON)
+  --verbose            Enable verbose logging
+  --restart-from=<n>   Restart workflow from step n (requires --run-id)
+  --run-id=<id>        Specify workflow run ID
+  --list-runs          List recent workflow runs
+
+Examples:
+  # Run a workflow
+  positronic ./workflows/my-workflow.ts
+
+  # Run with initial state
+  positronic --state=initial-state.json ./workflows/my-workflow.ts
+
+  # List recent workflow runs
+  positronic --list-runs
+
+  # Restart a workflow from step 3
+  positronic --run-id=abc123 --restart-from=3 ./workflows/my-workflow.ts
+`);
 }
 
 async function fileExists(path: string): Promise<boolean> {
