@@ -47,8 +47,6 @@ export class WorkflowRunner {
     } = this.options;
 
     let currentState = initialState ?? ({} as TState);
-    let stepNumber = 1;
-    let currentStepTitle: string | null = null;
 
     const workflowRun = workflowRunId && initialCompletedSteps
       ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, fileStore })
@@ -59,20 +57,6 @@ export class WorkflowRunner {
       await Promise.all(
         adapters.map(adapter => adapter.dispatch(event))
       );
-
-      // Log step starts
-      if (event.type === WORKFLOW_EVENTS.STEP_START) {
-        currentStepTitle = event.stepTitle;
-        process.stdout.write(`\r${stepNumber}. ${currentStepTitle} ...`);
-      }
-
-      // Log step completions and increment counter
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
-        if (currentStepTitle === event.stepTitle) {
-          process.stdout.write(`\r${stepNumber}. ${event.stepTitle} ✅\n`);
-          stepNumber++;
-        }
-      }
 
       // Update current state when steps complete
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.patch) {

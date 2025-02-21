@@ -8,6 +8,7 @@ import { SQLiteAdapter } from '@positronic/adapter-sqlite';
 import { WorkflowRunner, STATUS, LocalFileStore } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
 import type { SerializedStep } from '@positronic/core';
+import { ConsoleAdapter } from './console-adapter';
 
 interface CliOptions {
   stateFile?: string;
@@ -234,7 +235,10 @@ async function main() {
     const currentWorkflowDir = path.dirname(fullPath);
 
     const runner = new WorkflowRunner({
-      adapters: [new SQLiteAdapter(db)],
+      adapters: [
+        new SQLiteAdapter(db),
+        new ConsoleAdapter()
+      ],
       logger: console,
       verbose: !!verbose,
       client: new AnthropicClient(),
