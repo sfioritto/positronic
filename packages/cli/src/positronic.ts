@@ -10,7 +10,6 @@ import { AnthropicClient } from '@positronic/client-anthropic';
 import type { SerializedStep } from '@positronic/core';
 
 interface CliOptions {
-  workflowDir?: string;
   stateFile?: string;
   verbose?: boolean;
   restartFrom?: number;
@@ -51,9 +50,6 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
     if (arg.startsWith('--')) {
       const [key] = arg.slice(2).split('=');
       switch (key) {
-        case 'workflow-dir':
-          options.workflowDir = arg.split('=')[1];
-          break;
         case 'state':
           options.stateFile = arg.split('=')[1];
           break;
@@ -148,7 +144,7 @@ async function getLastWorkflowRun(db: DatabaseType, runId: string): Promise<{
 
 async function main() {
   try {
-    const { workflowPath, workflowDir, stateFile, verbose, restartFrom, runId, listRuns } = parseArgs();
+    const { workflowPath, stateFile, verbose, restartFrom, runId, listRuns } = parseArgs();
     const db = new Database('workflows.db');
 
     // Handle list-runs command
@@ -170,9 +166,7 @@ async function main() {
       throw new Error('Workflow path is required unless using --list-runs');
     }
 
-    const fullPath = workflowDir
-      ? path.resolve(process.cwd(), workflowDir, workflowPath)
-      : path.resolve(process.cwd(), workflowPath);
+    const fullPath = path.resolve(process.cwd(), workflowPath);
 
     if (!await fileExists(fullPath)) {
       throw new Error(`Workflow file not found: ${fullPath}. CWD: ${process.cwd()}`);
