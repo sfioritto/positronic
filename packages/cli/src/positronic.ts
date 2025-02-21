@@ -1,7 +1,8 @@
-#!/usr/bin/env node --disable-warning=ExperimentalWarning --loader ts-node/esm --experimental-specifier-resolution=node
+#!/usr/bin/env node --no-warnings=DEP0180 --disable-warning=ExperimentalWarning --loader ts-node/esm --experimental-specifier-resolution=node
 
 import path from 'path';
 import fs from 'fs';
+import { access } from 'fs/promises';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { SQLiteAdapter } from '@positronic/adapter-sqlite';
 import { WorkflowRunner, STATUS, LocalFileStore } from '@positronic/core';
@@ -77,15 +78,24 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
   return { ...options, workflowPath: nonOptionArgs[0] };
 }
 
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function loadState(stateFile?: string) {
   if (!stateFile) return {};
 
   const fullPath = path.resolve(process.cwd(), stateFile);
-  if (!fs.existsSync(fullPath)) {
+  if (!await fileExists(fullPath)) {
     throw new Error(`State file not found: ${stateFile}`);
   }
 
-  const content = fs.readFileSync(fullPath, 'utf-8');
+  const content = await fs.promises.readFile(fullPath, 'utf-8');
   return JSON.parse(content);
 }
 
@@ -164,7 +174,7 @@ async function main() {
       ? path.resolve(process.cwd(), workflowDir, workflowPath)
       : path.resolve(process.cwd(), workflowPath);
 
-    if (!fs.existsSync(fullPath)) {
+    if (!await fileExists(fullPath)) {
       throw new Error(`Workflow file not found: ${fullPath}. CWD: ${process.cwd()}`);
     }
 
