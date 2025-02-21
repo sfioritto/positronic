@@ -132,26 +132,12 @@ export class Workflow<
   TState extends State = {}
 > {
   private blocks: Block<any, any, TOptions>[] = [];
-  private logger?: (...args: any[]) => void;
-  private verbose?: boolean;
-  private fileStore?: FileStore;
   public type: 'workflow' = 'workflow';
 
   constructor(
     private title: string,
     private description?: string
   ) {}
-
-  withLogger(logger: (...args: any[]) => void, verbose: boolean): this {
-    this.logger = logger;
-    this.verbose = verbose;
-    return this;
-  }
-
-  withFileStore(fileStore?: FileStore): this {
-    this.fileStore = fileStore;
-    return this;
-  }
 
   step<TNewState extends State>(
     title: string,

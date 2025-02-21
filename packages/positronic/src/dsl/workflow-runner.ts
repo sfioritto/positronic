@@ -41,13 +41,9 @@ export class WorkflowRunner {
 
     let currentState = initialState ?? ({} as TState);
 
-    const configuredWorkflow = workflow
-      .withLogger(log, verbose)
-      .withFileStore(fileStore)
-
     const workflowRun = workflowRunId && initialCompletedSteps
-    ? configuredWorkflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, fileStore })
-    : configuredWorkflow.run({ initialState, options, client, fileStore });
+    ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, fileStore })
+    : workflow.run({ initialState, options, client, fileStore });
 
     for await (const event of workflowRun) {
       // Dispatch event to all adapters
