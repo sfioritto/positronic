@@ -108,13 +108,33 @@ describe('WorkflowRunner', () => {
     });
 
     const testWorkflow = workflow('Test Workflow')
-      .step('First Step', () => ({ first: true }))
-      .step('Second Step', () => ({ second: true }));
+      .step('First Step', () => ({ value: 1 }))
+      .step('Second Step', () => ({ value: 2 }));
 
-    await runner.run(testWorkflow);
+    // Store the original stdout.write
+    const originalStdoutWrite = process.stdout.write;
+    const writes: string[] = [];
 
-    expect(mockLogger.log).toHaveBeenCalledWith('First Step ✅');
-    expect(mockLogger.log).toHaveBeenCalledWith('Second Step ✅');
+    // Mock stdout.write
+    process.stdout.write = jest.fn((str: string | Uint8Array) => {
+      writes.push(str.toString());
+      return true;
+    });
+
+    try {
+      await runner.run(testWorkflow);
+    } finally {
+      // Restore original stdout.write
+      process.stdout.write = originalStdoutWrite;
+    }
+
+    // Verify the sequence of writes
+    expect(writes).toEqual([
+      '\r1. First Step ...',
+      '\r1. First Step ✅\n',
+      '\r2. Second Step ...',
+      '\r2. Second Step ✅\n'
+    ]);
   });
 
   it('should log final state when verbose is true', async () => {

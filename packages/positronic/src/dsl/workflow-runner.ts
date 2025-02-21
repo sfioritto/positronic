@@ -47,10 +47,12 @@ export class WorkflowRunner {
     } = this.options;
 
     let currentState = initialState ?? ({} as TState);
+    let stepNumber = 1;
+    let currentStepTitle: string | null = null;
 
     const workflowRun = workflowRunId && initialCompletedSteps
-    ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, fileStore })
-    : workflow.run({ initialState, options, client, fileStore });
+      ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, fileStore })
+      : workflow.run({ initialState, options, client, fileStore });
 
     for await (const event of workflowRun) {
       // Dispatch event to all adapters
@@ -58,9 +60,18 @@ export class WorkflowRunner {
         adapters.map(adapter => adapter.dispatch(event))
       );
 
-      // Log step completions
+      // Log step starts
+      if (event.type === WORKFLOW_EVENTS.STEP_START) {
+        currentStepTitle = event.stepTitle;
+        process.stdout.write(`\r${stepNumber}. ${currentStepTitle} ...`);
+      }
+
+      // Log step completions and increment counter
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
-        log(`${event.stepTitle} ✅`);
+        if (currentStepTitle === event.stepTitle) {
+          process.stdout.write(`\r${stepNumber}. ${event.stepTitle} ✅\n`);
+          stepNumber++;
+        }
       }
 
       // Update current state when steps complete
@@ -73,7 +84,7 @@ export class WorkflowRunner {
         event.type === WORKFLOW_EVENTS.COMPLETE ||
         event.type === WORKFLOW_EVENTS.ERROR
       ) && verbose) {
-        log(`Workflow completed: \n\n ${JSON.stringify(
+        log(`\nWorkflow completed: \n\n ${JSON.stringify(
           this.truncateDeep(structuredClone(currentState)), null, 2
         )}`);
       }
