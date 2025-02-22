@@ -488,22 +488,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
 
       // Update state with inner workflow results
       this.currentState = await block.action(this.currentState, innerState);
-      step.withStatus(STATUS.COMPLETE);
-
-      // Create patch for the outer state change
-      const patch = createPatch(prevState, this.currentState);
-      step.withPatch(patch);
-
-      yield {
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
-        status: STATUS.RUNNING,
-        stepTitle: step.block.title,
-        stepId: step.id,
-        patch,
-        options: this.options ?? {} as TOptions,
-        workflowRunId: this.workflowRunId
-      };
-
+      yield* this.completeStep(step, prevState);
     } else {
       // Get previous state before action
       const prevState = this.currentState;
@@ -515,22 +500,26 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         client: this.client,
         fileStore: this.fileStore,
       });
-      step.withStatus(STATUS.COMPLETE);
-
-      // Create patch for the state change
-      const patch = createPatch(prevState, this.currentState);
-      step.withPatch(patch);
-
-      yield {
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
-        status: STATUS.RUNNING,
-        stepTitle: step.block.title,
-        stepId: step.id,
-        patch,
-        options: this.options ?? {} as TOptions,
-        workflowRunId: this.workflowRunId
-      };
+      yield* this.completeStep(step, prevState);
     }
+  }
+
+  private *completeStep(step: Step, prevState: TState): Generator<WorkflowEvent<TOptions>> {
+    step.withStatus(STATUS.COMPLETE);
+
+    // Create patch for the state change
+    const patch = createPatch(prevState, this.currentState);
+    step.withPatch(patch);
+
+    yield {
+      type: WORKFLOW_EVENTS.STEP_COMPLETE,
+      status: STATUS.RUNNING,
+      stepTitle: step.block.title,
+      stepId: step.id,
+      patch,
+      options: this.options ?? {} as TOptions,
+      workflowRunId: this.workflowRunId
+    };
   }
 }
 
