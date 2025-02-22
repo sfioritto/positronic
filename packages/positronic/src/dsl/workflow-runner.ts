@@ -30,12 +30,14 @@ export class WorkflowRunner {
       initialState = {} as TState,
       options,
       initialCompletedSteps,
-      workflowRunId
+      workflowRunId,
+      endAfter
     }: {
       initialState?: TState,
       options?: TOptions,
       initialCompletedSteps?: SerializedStep[] | never,
-      workflowRunId?: string | never
+      workflowRunId?: string | never,
+      endAfter?: number
     } = {}
   ) {
     const {
@@ -47,6 +49,7 @@ export class WorkflowRunner {
     } = this.options;
 
     let currentState = initialState ?? ({} as TState);
+    let stepNumber = 1;
 
     // Apply any patches from completed steps
     // to the initial state so that the workflow
@@ -55,6 +58,7 @@ export class WorkflowRunner {
     initialCompletedSteps?.forEach(step => {
       if (step.patch) {
         currentState = applyPatches(currentState, [step.patch]) as TState;
+        stepNumber++;
       }
     });
 
@@ -69,8 +73,23 @@ export class WorkflowRunner {
       );
 
       // Update current state when steps complete
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.patch) {
-        currentState = applyPatches(currentState, [event.patch]) as TState;
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        if (event.patch) {
+          currentState = applyPatches(currentState, [event.patch]) as TState;
+        }
+
+        // Check if we should stop after this step
+        if (endAfter && stepNumber >= endAfter) {
+          // Log final state if verbose
+          if (verbose) {
+            log(`\nWorkflow stopped after step ${endAfter} as requested: \n\n ${JSON.stringify(
+              this.truncateDeep(structuredClone(currentState)), null, 2
+            )}`);
+          }
+          return;
+        }
+
+        stepNumber++;
       }
 
       // Log final state on workflow completion/error if verbose

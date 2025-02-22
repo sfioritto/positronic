@@ -14,6 +14,7 @@ interface CliOptions {
   stateFile?: string;
   verbose?: boolean;
   restartFrom?: number;
+  endAfter?: number;
   runId?: string;
   listRuns?: boolean;
 }
@@ -63,6 +64,9 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
         case 'restart-from':
           options.restartFrom = parseInt(arg.split('=')[1], 10);
           break;
+        case 'end-after':
+          options.endAfter = parseInt(arg.split('=')[1], 10);
+          break;
         case 'run-id':
           options.runId = arg.split('=')[1];
           break;
@@ -87,6 +91,7 @@ Options:
   --state=<file>       Path to initial state file (JSON)
   --verbose            Enable verbose logging
   --restart-from=<n>   Restart workflow from step n
+  --end-after=<n>      Stop workflow after completing step n
   --run-id=<id>        Specify workflow run ID (optional with --restart-from)
   --list-runs          List recent workflow runs
 
@@ -102,6 +107,12 @@ Examples:
 
   # Restart a workflow from step 3 (uses most recent run)
   positronic --restart-from=3 ./workflows/my-workflow.ts
+
+  # Run workflow and stop after step 5
+  positronic --end-after=5 ./workflows/my-workflow.ts
+
+  # Restart from step 3 and run through step 5
+  positronic --restart-from=3 --end-after=5 ./workflows/my-workflow.ts
 
   # Restart a specific run from step 3
   positronic --run-id=abc123 --restart-from=3 ./workflows/my-workflow.ts
@@ -191,7 +202,7 @@ async function getMostRecentRunId(db: DatabaseType, workflowName: string): Promi
 
 async function main() {
   try {
-    const { workflowPath, stateFile, verbose, restartFrom, runId, listRuns } = parseArgs();
+    const { workflowPath, stateFile, verbose, restartFrom, endAfter, runId, listRuns } = parseArgs();
     const db = new Database('workflows.db');
 
     // Handle list-runs command
@@ -271,7 +282,8 @@ async function main() {
     await runner.run(workflow, {
       initialState,
       initialCompletedSteps: completedSteps,
-      workflowRunId
+      workflowRunId,
+      endAfter
     });
 
   } catch (error) {
