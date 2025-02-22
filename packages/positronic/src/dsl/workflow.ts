@@ -533,6 +533,16 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   }
 }
 
+let workflowNamesAreUnique = true;
+export function disableWorkflowNameUniqueness() {
+  workflowNamesAreUnique = false;
+}
+
+export function enableWorkflowNameUniqueness() {
+  workflowNamesAreUnique = true;
+}
+
+const workflowNames = new Set<string>();
 export function workflow<
   TOptions extends object = {},
   TState extends State = {}
@@ -541,6 +551,12 @@ export function workflow<
 ) {
   const title = typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
   const description = typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
+  if (workflowNamesAreUnique && workflowNames.has(title)) {
+    throw new Error(`Workflow with name "${title}" already exists. Workflow names must be unique.`);
+  }
+  if (workflowNamesAreUnique) {
+    workflowNames.add(title);
+  }
   return new Workflow<TOptions, TState>(title, description);
 }
 
