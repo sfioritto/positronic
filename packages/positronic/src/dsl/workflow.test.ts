@@ -913,6 +913,69 @@ describe('nested workflows', () => {
       message: 'Inner workflow error'
     }));
   });
+
+  it('should include patches in step status events for inner workflow steps', async () => {
+    interface InnerState extends State {
+      value: number;
+    }
+
+    interface OuterState extends State {
+      value: number;
+      result?: number;
+    }
+
+    // Create an inner workflow that modifies state
+    const innerWorkflow = workflow<{}, InnerState>('Inner Workflow')
+      .step("Double value", ({ state }) => ({
+        ...state,
+        value: state.value * 2
+      }));
+
+    // Create outer workflow that uses the inner workflow
+    const outerWorkflow = workflow<{}, OuterState>('Outer Workflow')
+      .step("Set initial", () => ({
+        value: 5
+      }))
+      .workflow(
+        "Run inner workflow",
+        innerWorkflow,
+        ({ state, workflowState }) => ({
+          ...state,
+          result: workflowState.value
+        }),
+        (state) => ({ value: state.value })
+      );
+
+    // Run workflow and collect step status events
+    let finalStepStatus;
+    for await (const event of outerWorkflow.run({ client: mockClient, fileStore: testFileStore })) {
+      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        finalStepStatus = event;
+      }
+    }
+
+    // Verify step status contains patches for all steps including the inner workflow step
+    expect(finalStepStatus?.steps).toEqual([
+      expect.objectContaining({
+        title: 'Set initial',
+        status: STATUS.COMPLETE,
+        patch: [{
+          op: 'add',
+          path: '/value',
+          value: 5
+        }]
+      }),
+      expect.objectContaining({
+        title: 'Run inner workflow',
+        status: STATUS.COMPLETE,
+        patch: [{
+          op: 'add',
+          path: '/result',
+          value: 10
+        }]
+      })
+    ]);
+  });
 });
 
 describe('workflow options', () => {
