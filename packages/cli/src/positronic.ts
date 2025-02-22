@@ -86,8 +86,8 @@ Options:
   --help                Show this help message
   --state=<file>       Path to initial state file (JSON)
   --verbose            Enable verbose logging
-  --restart-from=<n>   Restart workflow from step n (requires --run-id)
-  --run-id=<id>        Specify workflow run ID
+  --restart-from=<n>   Restart workflow from step n
+  --run-id=<id>        Specify workflow run ID (optional with --restart-from)
   --list-runs          List recent workflow runs
 
 Examples:
@@ -100,7 +100,10 @@ Examples:
   # List recent workflow runs
   positronic --list-runs
 
-  # Restart a workflow from step 3
+  # Restart a workflow from step 3 (uses most recent run)
+  positronic --restart-from=3 ./workflows/my-workflow.ts
+
+  # Restart a specific run from step 3
   positronic --run-id=abc123 --restart-from=3 ./workflows/my-workflow.ts
 `);
 }
@@ -174,6 +177,18 @@ async function getLastWorkflowRun(db: DatabaseType, runId: string): Promise<{
   };
 }
 
+async function getMostRecentRunId(db: DatabaseType, workflowName: string): Promise<string | undefined> {
+  const run = db.prepare(`
+    SELECT id
+    FROM workflow_runs
+    WHERE workflow_name = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(workflowName) as { id: string } | undefined;
+
+  return run?.id;
+}
+
 async function main() {
   try {
     const { workflowPath, stateFile, verbose, restartFrom, runId, listRuns } = parseArgs();
@@ -216,13 +231,19 @@ async function main() {
     let workflowRunId: string | undefined;
 
     if (restartFrom !== undefined) {
-      if (!runId) {
-        throw new Error('--run-id is required when using --restartFrom');
+      let targetRunId = runId;
+
+      // If no run ID provided, get the most recent run for this workflow
+      if (!targetRunId) {
+        targetRunId = await getMostRecentRunId(db, workflow.title);
+        if (!targetRunId) {
+          throw new Error(`No previous runs found for workflow: ${workflow.title}`);
+        }
       }
 
-      const lastRun = await getLastWorkflowRun(db, runId);
+      const lastRun = await getLastWorkflowRun(db, targetRunId);
       if (!lastRun) {
-        throw new Error(`No run found with ID: ${runId}`);
+        throw new Error(`No run found with ID: ${targetRunId}`);
       }
 
       const stepsToKeep = restartFrom - 1;

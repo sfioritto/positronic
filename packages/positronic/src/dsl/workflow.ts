@@ -135,7 +135,7 @@ export class Workflow<
   public type: 'workflow' = 'workflow';
 
   constructor(
-    private title: string,
+    public readonly title: string,
     private description?: string
   ) {}
 
@@ -492,6 +492,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
 
       // Create patch for the outer state change
       const patch = createPatch(prevState, this.currentState);
+      step.withPatch(patch);
 
       yield {
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
