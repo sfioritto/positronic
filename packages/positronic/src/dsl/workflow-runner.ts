@@ -93,7 +93,25 @@ export class WorkflowRunner {
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => this.truncateDeep(item, maxLength));
+      if (obj.length === 0) return obj;
+
+      let truncatedArray = [];
+      let currentLength = 2; // Account for [] brackets
+
+      for (let i = 0; i < obj.length; i++) {
+        const processedItem = this.truncateDeep(obj[i], maxLength);
+        const itemStr = JSON.stringify(processedItem);
+
+        if (currentLength + itemStr.length + (i > 0 ? 1 : 0) > maxLength) {
+          truncatedArray.push(`... (${obj.length})`);
+          break;
+        }
+
+        truncatedArray.push(processedItem);
+        currentLength += itemStr.length + (i > 0 ? 1 : 0); // Add 1 for comma
+      }
+
+      return truncatedArray;
     }
 
     if (typeof obj === 'object') {
