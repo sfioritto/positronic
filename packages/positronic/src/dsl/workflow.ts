@@ -203,7 +203,8 @@ export class Workflow<
     reduce?: (params: {
       state: TState,
       response: z.infer<TSchema>,
-      options: TOptions
+      options: TOptions,
+      prompt: string
     }) => TNewState | Promise<TNewState>,
   ) {
     const promptBlock: StepBlock<
@@ -224,7 +225,7 @@ export class Workflow<
         };
 
         return reduce
-          ? reduce({ state, response, options })
+          ? reduce({ state, response, options, prompt: promptString })
           : stateWithResponse as unknown as TNewState;
       }
     };
