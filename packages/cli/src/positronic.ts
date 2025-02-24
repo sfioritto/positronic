@@ -17,6 +17,7 @@ interface CliOptions {
   endAfter?: number;
   runId?: string;
   listRuns?: boolean;
+  listSteps?: boolean;
 }
 
 async function getRecentRuns(db: DatabaseType): Promise<Array<{
@@ -73,6 +74,9 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
         case 'list-runs':
           options.listRuns = true;
           break;
+        case 'list-steps':
+          options.listSteps = true;
+          break;
       }
     } else {
       nonOptionArgs.push(arg);
@@ -94,6 +98,7 @@ Options:
   --end-after=<n>      Stop workflow after completing step n
   --run-id=<id>        Specify workflow run ID (optional with --restart-from)
   --list-runs          List recent workflow runs
+  --list-steps         List all steps in the workflow
 
 Examples:
   # Run a workflow
@@ -202,7 +207,7 @@ async function getMostRecentRunId(db: DatabaseType, workflowName: string): Promi
 
 async function main() {
   try {
-    const { workflowPath, stateFile, verbose, restartFrom, endAfter, runId, listRuns } = parseArgs();
+    const { workflowPath, stateFile, verbose, restartFrom, endAfter, runId, listRuns, listSteps } = parseArgs();
     const db = new Database('workflows.db');
 
     // Handle list-runs command
@@ -234,6 +239,20 @@ async function main() {
 
     if (!workflow || workflow.type !== 'workflow') {
       throw new Error(`File ${workflowPath} does not export a workflow as default export\n\n`);
+    }
+
+    // Handle list-steps command
+    if (listSteps) {
+      console.log('Steps in workflow:', workflow.title);
+      console.log('-------------------');
+      if (!workflow.blocks || !Array.isArray(workflow.blocks)) {
+        console.log('No steps found in workflow');
+        process.exit(1);
+      }
+      workflow.blocks.forEach((step: { title: string }, index: number) => {
+        console.log(`${index + 1}. ${step.title}`);
+      });
+      process.exit(0);
     }
 
     const initialState = await loadState(stateFile);
