@@ -34,7 +34,7 @@ export async function writePromptAndResponse(
   prompt: string,
   response: unknown,
   prefix: string = 'debug'
-): Promise<{promptPath: string, responsePath: string}> {
+): Promise<{ promptPath: string, responsePath: string }> {
   const promptPath = await writeAndOpenTemp(prompt, `${prefix}-prompt`, 'md');
   const responsePath = await writeAndOpenTemp(
     typeof response === 'string' ? response : JSON.stringify(response, null, 2),
