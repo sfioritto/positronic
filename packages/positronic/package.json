@@ -1,0 +1,22 @@
+{
+  "name": "@positronic/core",
+  "version": "0.0.1",
+  "description": "A DSL for AI Workflows",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/types/index.d.ts",
+  "scripts": {
+    "tsc": "tsc --project tsconfig.json",
+    "build": "npm run tsc && swc src -d dist",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist"
+  },
+  "dependencies": {
+    "fast-json-patch": "^3.1.1",
+    "ssh2": "^1.16.0",
+    "uuid": "^11.0.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM", "WebWorker", "DOM.Iterable"],
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "strictNullChecks": true,
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["jest", "node"],
+  },
+  "references": [
+    { "path": "./packages/positronic" },
+    { "path": "./packages/adapter-sqlite" },
+    { "path": "./packages/extension-files" },
+    { "path": "./packages/cli" },
+    { "path": "./packages/client-anthropic" }
+  ]
+}

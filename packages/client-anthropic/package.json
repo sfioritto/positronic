@@ -1,0 +1,21 @@
+{
+  "name": "@positronic/client-anthropic",
+  "version": "0.0.1",
+  "description": "Anthropic client for Positronic",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/types/index.ts",
+  "scripts": {
+    "tsc": "tsc --project tsconfig.json",
+    "swc": "swc src -d dist",
+    "build": "npm run tsc && npm run swc",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist"
+  },
+  "dependencies": {
+    "@positronic/core": "^0.0.1",
+    "@instructor-ai/instructor": "^1.5.0",
+    "llm-polyglot": "^2.4.0",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.1"
+  }
+}
