@@ -51,8 +51,5 @@ export function createExtension<
         }
       });
     },
-    augment<TOptions extends object, TState extends State>(): ExtensionMethods<TExtension, TOptions, TState> {
-      return {} as ExtensionMethods<TExtension, TOptions, TState>;
-    }
   };
 }
