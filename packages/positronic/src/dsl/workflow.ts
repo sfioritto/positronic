@@ -135,11 +135,18 @@ export class Workflow<
 > {
   private blocks: Block<any, any, TOptions>[] = [];
   public type: 'workflow' = 'workflow';
+  private defaultOptions: Partial<TOptions> = {};
 
   constructor(
     public readonly title: string,
     private description?: string
   ) {}
+
+  // New method to specify default options
+  withOptions(options: Partial<TOptions>): this {
+    this.defaultOptions = { ...this.defaultOptions, ...options };
+    return this;
+  }
 
   step<TNewState extends State>(
     title: string,
@@ -243,11 +250,19 @@ export class Workflow<
   // Implementation signature
   async *run(params: InitialRunParams<TOptions> | RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>> {
     const { title, description, blocks } = this;
+
+    // Merge default options with provided options
+    const mergedOptions = {
+      ...this.defaultOptions,
+      ...(params.options || {})
+    } as TOptions;
+
     const stream = new WorkflowEventStream({
       title,
       description,
       blocks,
-      ...params
+      ...params,
+      options: mergedOptions  // Use merged options
     });
 
     yield* stream.next();
@@ -259,10 +274,16 @@ export class Workflow<
   }
 
   private nextWorkflow<TNewState extends State>(): Workflow<TOptions, TNewState> {
-    return new Workflow<TOptions, TNewState>(
+    // Pass default options to the next workflow
+    const nextWorkflow = new Workflow<TOptions, TNewState>(
       this.title,
       this.description
     ).withBlocks(this.blocks);
+
+    // Copy default options to the next workflow
+    nextWorkflow.withOptions(this.defaultOptions);
+
+    return nextWorkflow;
   }
 }
 
