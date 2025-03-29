@@ -1,9 +1,7 @@
 import Database, { Database as DatabaseType } from "better-sqlite3";
 import { jest } from "@jest/globals";
 import { SQLiteAdapter } from "../src/index";
-import { STATUS, WORKFLOW_EVENTS, applyPatches } from "@positronic/core";
-import { State } from "@positronic/core";
-import { workflow } from "@positronic/core";
+import { STATUS, WORKFLOW_EVENTS, applyPatches, workflow, State, LocalShell } from "@positronic/core";
 import { nextStep } from "../../../test-utils";
 import type {
   PromptClient, SerializedStep, StepStatusEvent, WorkflowStartEvent, FileSystem
@@ -18,6 +16,9 @@ describe("SQLiteAdapter", () => {
   const mockClient = {
     execute: jest.fn(async () => ({}))
   } satisfies PromptClient;
+
+  // Initialize once to use in all tests
+  const mockShell = new LocalShell();
 
   beforeEach(() => {
     // Reset mock
@@ -47,7 +48,8 @@ describe("SQLiteAdapter", () => {
     for await (const event of testWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      fs: new TestFileSystem()
+      fs: new TestFileSystem(),
+      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -109,7 +111,8 @@ describe("SQLiteAdapter", () => {
     for await (const event of counterWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      fs: new TestFileSystem()
+      fs: new TestFileSystem(),
+      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -117,7 +120,8 @@ describe("SQLiteAdapter", () => {
     for await (const event of nameWorkflow.run({
       initialState: { name: "test" },
       client: mockClient,
-      fs: new TestFileSystem()
+      fs: new TestFileSystem(),
+      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -198,7 +202,8 @@ describe("SQLiteAdapter", () => {
       for await (const event of errorWorkflow.run({
         initialState: { shouldError: true },
         client: mockClient,
-        fs: new TestFileSystem()
+        fs: new TestFileSystem(),
+        shell: mockShell
       })) {
         await adapter.dispatch(event);
       }
@@ -258,7 +263,8 @@ describe("SQLiteAdapter", () => {
     for await (const event of multiStepWorkflow.run({
       initialState: { value: "test", count: 0 },
       client: mockClient,
-      fs: new TestFileSystem()
+      fs: new TestFileSystem(),
+      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -330,7 +336,8 @@ describe("SQLiteAdapter", () => {
     for await (const event of fourStepWorkflow.run({
       initialState: { value: 2 },
       client: mockClient,
-      fs: new TestFileSystem()
+      fs: new TestFileSystem(),
+      shell: mockShell
     })) {
       await adapter.dispatch(event);
       if (event.type === WORKFLOW_EVENTS.START) {
@@ -363,7 +370,8 @@ describe("SQLiteAdapter", () => {
       initialState: { value: 2 },
       initialCompletedSteps: completedSteps,
       client: mockClient,
-      fs: new TestFileSystem()
+      fs: new TestFileSystem(),
+      shell: mockShell
     });
 
     // Process only the RESTART event
@@ -417,7 +425,8 @@ describe("SQLiteAdapter", () => {
     const workflowIterator = testWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      fs: new TestFileSystem()
+      fs: new TestFileSystem(),
+      shell: mockShell
     });
 
     // First event (workflow started)
@@ -505,7 +514,8 @@ describe("SQLiteAdapter", () => {
       for await (const event of testWorkflow.run({
         initialState: { value: initialValue },
         client: mockClient,
-        fs: new TestFileSystem()
+        fs: new TestFileSystem(),
+        shell: mockShell
       })) {
         await adapter.dispatch(event);
         if (event.type === WORKFLOW_EVENTS.START) {

@@ -1,4 +1,4 @@
-import { workflow, applyPatches, type FileSystem } from "@positronic/core";
+import { workflow, applyPatches, type FileSystem, LocalShell } from "@positronic/core";
 import './index';
 
 class TestFileSystem implements FileSystem {
@@ -15,6 +15,9 @@ jest.mock('fs', () => ({
 const mockClient = {
   execute: jest.fn()
 };
+
+// Initialize shell for tests
+const mockShell = new LocalShell();
 
 describe('files extension', () => {
   beforeEach(() => {
@@ -37,7 +40,11 @@ describe('files extension', () => {
       });
 
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient, fs })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+      fs,
+      shell: mockShell
+    })) {
       if (event.type === 'step:complete') {
         finalState = applyPatches(finalState, event.patch);
       }
@@ -85,7 +92,11 @@ describe('files extension', () => {
     // Mock file reads for runtime verification
     fs.readFile.mockResolvedValue('test content');
 
-    for await (const event of testWorkflow.run({ client: mockClient, fs })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+      fs,
+      shell: mockShell
+    })) {
       // Consume events
     }
   });
