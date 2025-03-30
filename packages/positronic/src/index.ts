@@ -17,9 +17,9 @@ export type {
 } from "./dsl/workflow";
 export type { PromptClient, ResponseModel } from "./clients/types";
 export type { State } from "./dsl/types";
-export type { ResourceLoader as FileSystem } from "./file-stores/types";
+export type { ResourceLoader } from "./file-stores/types";
 export type { Shell } from "./shells/types";
 export { createPatch, applyPatches } from "./dsl/json-patch";
-export { LocalFileSystem } from "./file-stores/local-file-store";
+export { LocalResourceLoader } from "./file-stores/local-file-store";
 export { SSHShell } from "./shells/ssh-shell";
 export { LocalShell } from "./shells/local-shell";
