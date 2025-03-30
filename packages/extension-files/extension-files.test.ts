@@ -1,7 +1,7 @@
-import { workflow, applyPatches, type FileSystem, LocalShell } from "@positronic/core";
+import { workflow, applyPatches, type ResourceLoader, LocalShell } from "@positronic/core";
 import './index';
 
-class TestFileSystem implements FileSystem {
+class TestResourceLoader implements ResourceLoader {
   load = jest.fn().mockImplementation(async () => 'content');
 }
 
@@ -25,7 +25,7 @@ describe('files extension', () => {
   });
 
   it('should read files and add them to state', async () => {
-    const fs = new TestFileSystem();
+    const fs = new TestResourceLoader();
     // Mock readFile responses
     fs.load
       .mockResolvedValueOnce('content 1')
@@ -66,7 +66,7 @@ describe('files extension', () => {
   });
 
   it('should correctly type the state with file contents', async () => {
-    const fs = new TestFileSystem();
+    const fs = new TestResourceLoader();
     const testWorkflow = workflow('Type Test')
       .fs.file('testFile', '/path/to/file.txt')
       .fs.files('Multiple files', {
