@@ -111,7 +111,7 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}> =
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions>;
 
 interface BaseRunParams<TOptions extends object = {}> {
-  fs: ResourceLoader;
+  resources: ResourceLoader;
   shell: Shell;
   client: PromptClient;
   options?: TOptions;
@@ -327,7 +327,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private workflowRunId: string;
   private title: string;
   private description?: string;
-  private fs: ResourceLoader;
+  private resources: ResourceLoader;
   private client: PromptClient;
   private options: TOptions;
   private shell: Shell;
@@ -345,7 +345,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       description,
       workflowRunId: providedWorkflowRunId,
       options = {} as TOptions,
-      fs,
+      resources,
       client,
       shell
     } = params;
@@ -353,7 +353,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     this.initialState = initialState as TState;
     this.title = title;
     this.description = description;
-    this.fs = fs;
+    this.resources = resources;
     this.client = client;
     this.options = options;
     this.shell = shell;
@@ -494,7 +494,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Run inner workflow and yield all its events
       let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
-        fs: this.fs,
+        resources: this.resources,
         shell: this.shell,
         client: this.client,
         initialState,
@@ -526,7 +526,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         state: this.currentState,
         options: this.options ?? {} as TOptions,
         client: this.client,
-        resources: this.fs,
+        resources: this.resources,
         shell: this.shell,
       });
       yield* this.completeStep(step, prevState);

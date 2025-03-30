@@ -423,7 +423,7 @@ async function main() {
       logger: console,
       verbose: !!verbose,
       client: new AnthropicClient(),
-      fs: new LocalResourceLoader(currentWorkflowDir),
+      resources: new LocalResourceLoader(currentWorkflowDir),
       shell
     });
 

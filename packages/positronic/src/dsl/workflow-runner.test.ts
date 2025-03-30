@@ -28,7 +28,7 @@ describe('WorkflowRunner', () => {
     dispatch: jest.fn()
   };
 
-  const fs = new TestResourceLoader();
+  const resources = new TestResourceLoader();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -37,7 +37,7 @@ describe('WorkflowRunner', () => {
   it('should run a workflow and dispatch events to adapters', async () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
-      fs,
+      resources,
       logger: mockLogger,
       verbose: false,
       client: mockClient,
@@ -108,7 +108,7 @@ describe('WorkflowRunner', () => {
   it('should log final state when verbose is true', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
-      fs,
+      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,
@@ -131,7 +131,7 @@ describe('WorkflowRunner', () => {
   it('should handle workflow errors', async () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
-      fs,
+      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,
@@ -163,7 +163,7 @@ describe('WorkflowRunner', () => {
   it('should truncate long values in verbose output', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
-      fs,
+      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,
@@ -190,7 +190,7 @@ describe('WorkflowRunner', () => {
   it('should maintain state between steps', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
-      fs,
+      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,

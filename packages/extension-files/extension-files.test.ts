@@ -25,9 +25,9 @@ describe('files extension', () => {
   });
 
   it('should read files and add them to state', async () => {
-    const fs = new TestResourceLoader();
+    const resources = new TestResourceLoader();
     // Mock readFile responses
-    fs.load
+    resources.load
       .mockResolvedValueOnce('content 1')
       .mockResolvedValueOnce('content 2')
       .mockResolvedValueOnce('content 3');
@@ -42,7 +42,7 @@ describe('files extension', () => {
     let finalState = {};
     for await (const event of testWorkflow.run({
       client: mockClient,
-      fs,
+      resources,
       shell: mockShell
     })) {
       if (event.type === 'step:complete') {
@@ -51,9 +51,9 @@ describe('files extension', () => {
     }
 
     // Verify files were read
-    expect(fs.load).toHaveBeenCalledWith('/path/to/single.txt');
-    expect(fs.load).toHaveBeenCalledWith('/path/to/file1.txt');
-    expect(fs.load).toHaveBeenCalledWith('/path/to/file2.txt');
+    expect(resources.load).toHaveBeenCalledWith('/path/to/single.txt');
+    expect(resources.load).toHaveBeenCalledWith('/path/to/file1.txt');
+    expect(resources.load).toHaveBeenCalledWith('/path/to/file2.txt');
 
     // Verify final state
     expect(finalState).toEqual({
@@ -66,7 +66,7 @@ describe('files extension', () => {
   });
 
   it('should correctly type the state with file contents', async () => {
-    const fs = new TestResourceLoader();
+    const resources = new TestResourceLoader();
     const testWorkflow = workflow('Type Test')
       .fs.file('testFile', '/path/to/file.txt')
       .fs.files('Multiple files', {
@@ -90,11 +90,11 @@ describe('files extension', () => {
       });
 
     // Mock file reads for runtime verification
-    fs.load.mockResolvedValue('test content');
+    resources.load.mockResolvedValue('test content');
 
     for await (const event of testWorkflow.run({
       client: mockClient,
-      fs,
+      resources,
       shell: mockShell
     })) {
       // Consume events
