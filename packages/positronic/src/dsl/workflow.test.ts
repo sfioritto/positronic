@@ -1068,6 +1068,44 @@ describe('workflow options', () => {
   });
 });
 
+describe('services support', () => {
+  it('should allow adding custom services to workflows', async () => {
+
+    // Create a mock implementation
+    const testLogger = {
+      log: jest.fn()
+    };
+
+    // Create a workflow with services
+    const testWorkflow = workflow('Services Test')
+      .withServices({
+        logger: testLogger
+      })
+      .step('Use service', ({ state, services }) => {
+        services.logger.log('Test service called');
+        return { serviceUsed: true };
+      });
+
+    // Run the workflow and collect events
+    let finalState = {};
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+      resources: testResourceLoader,
+      shell: mockShell
+    })) {
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    // Verify the service was called
+    expect(testLogger.log).toHaveBeenCalledWith('Test service called');
+
+    // Verify the state was updated
+    expect(finalState).toEqual({ serviceUsed: true });
+  });
+});
+
 describe('type inference', () => {
   it('should correctly infer complex workflow state types', async () => {
     // Create an inner workflow that uses the shared options type
