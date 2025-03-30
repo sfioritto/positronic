@@ -7,8 +7,8 @@ const filesExtension = createExtension('fs', {
     name: TName,
     path: string
   ) {
-    return this.step(`Adding ${name}`, async ({ state, fs }) => {
-      const resource = await fs.load(path);
+    return this.step(`Adding ${name}`, async ({ state, resources }) => {
+      const resource = await resources.load(path);
       if (typeof resource === 'string') {
         return {
           ...state,
@@ -27,10 +27,10 @@ const filesExtension = createExtension('fs', {
     title: string,
     files: Record<string, string>
   ) {
-    return this.step(title, async ({ state, fs }) => {
+    return this.step(title, async ({ state, resources }) => {
       const contents: Record<string, string> = {};
       for (const [name, path] of Object.entries(files)) {
-        const resource = await fs.load(path);
+        const resource = await resources.load(path);
         if (typeof resource === 'string') {
           contents[name] = resource;
         } else {

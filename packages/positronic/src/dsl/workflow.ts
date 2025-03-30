@@ -88,7 +88,7 @@ type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
     state: TStateIn;
     options: TOptions;
     client: PromptClient;
-    fs: ResourceLoader;
+    resources: ResourceLoader;
     shell: Shell;
   }) => TStateOut | Promise<TStateOut>;
 };
@@ -154,7 +154,7 @@ export class Workflow<
       state: TState;
       options: TOptions;
       client: PromptClient;
-      fs: ResourceLoader;
+      resources: ResourceLoader;
       shell: Shell;
     }) => TNewState | Promise<TNewState>
   ) {
@@ -526,7 +526,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         state: this.currentState,
         options: this.options ?? {} as TOptions,
         client: this.client,
-        fs: this.fs,
+        resources: this.fs,
         shell: this.shell,
       });
       yield* this.completeStep(step, prevState);
