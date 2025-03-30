@@ -5,3 +5,4 @@ coverage/
 .vscode/
 .swc/
 .env
+.DS_Store
