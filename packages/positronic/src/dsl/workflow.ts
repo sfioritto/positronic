@@ -4,7 +4,7 @@ import type { PromptClient } from "../clients/types";
 import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { createPatch, applyPatches } from './json-patch';
-import type { ResourceLoader } from "../file-stores/types";
+import type { ResourceLoader } from "../resource-loaders/types";
 import type { Shell } from "../shells/types";
 export type SerializedError = {
   name: string;

@@ -1,7 +1,6 @@
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
-import { ResourceLoader } from '../file-stores/types';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 

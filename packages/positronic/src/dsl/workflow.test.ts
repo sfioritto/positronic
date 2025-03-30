@@ -4,7 +4,7 @@ import { State } from './types';
 import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
 import { z } from 'zod';
 import { nextStep } from '../../../../test-utils';
-import { ResourceLoader } from '../file-stores/types';
+import { ResourceLoader } from '../resource-loaders/types';
 
 class TestResourceLoader implements ResourceLoader {
   private files: Map<string, string> = new Map();

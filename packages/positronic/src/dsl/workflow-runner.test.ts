@@ -1,7 +1,7 @@
 import { WorkflowRunner } from './workflow-runner';
 import { workflow } from './workflow';
 import { WORKFLOW_EVENTS, STATUS } from './constants';
-import type { ResourceLoader } from '../file-stores/types';
+import type { ResourceLoader } from '../resource-loaders/types';
 
 class TestResourceLoader implements ResourceLoader {
   async load(path: string) {
