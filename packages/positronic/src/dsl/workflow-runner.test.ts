@@ -3,7 +3,7 @@ import { workflow } from './workflow';
 import { WORKFLOW_EVENTS, STATUS } from './constants';
 import type { ResourceLoader } from '../file-stores/types';
 
-class TestFileSystem implements ResourceLoader {
+class TestResourceLoader implements ResourceLoader {
   async load(path: string) {
     return Promise.resolve('');
   }
@@ -28,7 +28,7 @@ describe('WorkflowRunner', () => {
     dispatch: jest.fn()
   };
 
-  const fs = new TestFileSystem();
+  const fs = new TestResourceLoader();
 
   beforeEach(() => {
     jest.clearAllMocks();
