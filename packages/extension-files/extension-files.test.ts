@@ -1,8 +1,8 @@
-import { workflow, applyPatches, type FileSystem, LocalShell } from "@positronic/core";
+import { workflow, applyPatches, type ResourceLoader, LocalShell } from "@positronic/core";
 import './index';
 
-class TestFileSystem implements FileSystem {
-  readFile = jest.fn().mockImplementation(async () => 'content');
+class TestResourceLoader implements ResourceLoader {
+  load = jest.fn().mockImplementation(async () => 'content');
 }
 
 // Mock fs.promises.readFile
@@ -25,9 +25,9 @@ describe('files extension', () => {
   });
 
   it('should read files and add them to state', async () => {
-    const fs = new TestFileSystem();
+    const fs = new TestResourceLoader();
     // Mock readFile responses
-    fs.readFile
+    fs.load
       .mockResolvedValueOnce('content 1')
       .mockResolvedValueOnce('content 2')
       .mockResolvedValueOnce('content 3');
@@ -51,9 +51,9 @@ describe('files extension', () => {
     }
 
     // Verify files were read
-    expect(fs.readFile).toHaveBeenCalledWith('/path/to/single.txt');
-    expect(fs.readFile).toHaveBeenCalledWith('/path/to/file1.txt');
-    expect(fs.readFile).toHaveBeenCalledWith('/path/to/file2.txt');
+    expect(fs.load).toHaveBeenCalledWith('/path/to/single.txt');
+    expect(fs.load).toHaveBeenCalledWith('/path/to/file1.txt');
+    expect(fs.load).toHaveBeenCalledWith('/path/to/file2.txt');
 
     // Verify final state
     expect(finalState).toEqual({
@@ -66,7 +66,7 @@ describe('files extension', () => {
   });
 
   it('should correctly type the state with file contents', async () => {
-    const fs = new TestFileSystem();
+    const fs = new TestResourceLoader();
     const testWorkflow = workflow('Type Test')
       .fs.file('testFile', '/path/to/file.txt')
       .fs.files('Multiple files', {
@@ -90,7 +90,7 @@ describe('files extension', () => {
       });
 
     // Mock file reads for runtime verification
-    fs.readFile.mockResolvedValue('test content');
+    fs.load.mockResolvedValue('test content');
 
     for await (const event of testWorkflow.run({
       client: mockClient,

@@ -8,14 +8,18 @@ const filesExtension = createExtension('fs', {
     path: string
   ) {
     return this.step(`Adding ${name}`, async ({ state, fs }) => {
-      const content = await fs.readFile(path);
-      return {
-        ...state,
-        files: {
-          ...((state as any).files || {}),
-          [name]: content
-        }
-      };
+      const resource = await fs.load(path);
+      if (typeof resource === 'string') {
+        return {
+          ...state,
+          files: {
+            ...((state as any).files || {}),
+            [name]: resource
+          }
+        };
+      } else {
+        throw new Error('Expected a string resource');
+      }
     });
   },
   files(
@@ -26,7 +30,12 @@ const filesExtension = createExtension('fs', {
     return this.step(title, async ({ state, fs }) => {
       const contents: Record<string, string> = {};
       for (const [name, path] of Object.entries(files)) {
-        contents[name] = await fs.readFile(path);
+        const resource = await fs.load(path);
+        if (typeof resource === 'string') {
+          contents[name] = resource;
+        } else {
+          throw new Error('Expected a string resource');
+        }
       }
       return {
         ...state,

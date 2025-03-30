@@ -4,7 +4,7 @@ import path from 'path';
 import { access, readdir } from 'fs/promises';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { SQLiteAdapter } from '@positronic/adapter-sqlite';
-import { WorkflowRunner, STATUS, LocalFileSystem, LocalShell, SSHShell } from '@positronic/core';
+import { WorkflowRunner, STATUS, LocalResourceLoader, LocalShell, SSHShell } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
 import { ConsoleAdapter } from './console-adapter';
 import type { SerializedStep } from '@positronic/core';
@@ -423,7 +423,7 @@ async function main() {
       logger: console,
       verbose: !!verbose,
       client: new AnthropicClient(),
-      fs: new LocalFileSystem(currentWorkflowDir),
+      fs: new LocalResourceLoader(currentWorkflowDir),
       shell
     });
 
