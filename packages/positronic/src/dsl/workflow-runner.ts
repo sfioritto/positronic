@@ -1,7 +1,7 @@
 import { WORKFLOW_EVENTS } from './constants';
 import { applyPatches } from './json-patch';
 import type { Adapter } from "../adapters/types";
-import type { FileSystem } from "../file-stores/types";
+import type { ResourceLoader } from "../file-stores/types";
 import type { SerializedStep, Workflow } from './workflow';
 import type { State } from './types';
 import type { PromptClient } from '../clients/types';
@@ -15,7 +15,7 @@ export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[],
-      fs: FileSystem,
+      fs: ResourceLoader,
       shell: Shell,
       logger: Logger,
       verbose: boolean,

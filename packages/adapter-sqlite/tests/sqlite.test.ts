@@ -8,7 +8,7 @@ import type {
 } from "@positronic/core";
 
 class TestFileSystem implements FileSystem {
-  readFile: FileSystem['readFile'] = jest.fn().mockImplementation(async () => 'content') as FileSystem['readFile'];
+  load: FileSystem['load'] = jest.fn().mockImplementation(async () => 'content') as FileSystem['load'];
 }
 
 describe("SQLiteAdapter", () => {

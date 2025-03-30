@@ -1,3 +1,5 @@
-export interface FileSystem {
-  readFile(path: string): Promise<string>;
+export interface ResourceLoader {
+  load(
+    resourceName: string,
+    type?: 'text' | 'image' | 'binary'): Promise<string | Buffer>;
 }

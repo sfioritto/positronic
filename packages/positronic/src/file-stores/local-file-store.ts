@@ -1,11 +1,18 @@
 import { join } from 'path';
 import * as fs from 'fs/promises';
-import type { FileSystem } from './types';
+import type { ResourceLoader } from './types';
 
-export class LocalFileSystem implements FileSystem {
+export class LocalFileSystem implements ResourceLoader {
   constructor(private baseDir: string) {}
-  async readFile(path: string): Promise<string> {
-    const filePath = join(this.baseDir, path);
-    return fs.readFile(filePath, 'utf-8');
+
+  async load(resourceName: string, type: 'text' | 'image' | 'binary' = 'text'): Promise<string | Buffer> {
+    const filePath = join(this.baseDir, resourceName);
+
+    if (type === 'text') {
+      return fs.readFile(filePath, 'utf-8');
+    }
+
+    // For image and binary types, return as Buffer
+    return fs.readFile(filePath);
   }
 }

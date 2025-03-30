@@ -1,10 +1,10 @@
 import { WorkflowRunner } from './workflow-runner';
 import { workflow } from './workflow';
 import { WORKFLOW_EVENTS, STATUS } from './constants';
-import type { FileSystem } from '../file-stores/types';
+import type { ResourceLoader } from '../file-stores/types';
 
-class TestFileSystem implements FileSystem {
-  async readFile(path: string) {
+class TestFileSystem implements ResourceLoader {
+  async load(path: string) {
     return Promise.resolve('');
   }
 }

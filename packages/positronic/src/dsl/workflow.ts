@@ -4,7 +4,7 @@ import type { PromptClient } from "../clients/types";
 import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { createPatch, applyPatches } from './json-patch';
-import type { FileSystem } from "../file-stores/types";
+import type { ResourceLoader } from "../file-stores/types";
 import type { Shell } from "../shells/types";
 export type SerializedError = {
   name: string;
@@ -88,7 +88,7 @@ type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
     state: TStateIn;
     options: TOptions;
     client: PromptClient;
-    fs: FileSystem;
+    fs: ResourceLoader;
     shell: Shell;
   }) => TStateOut | Promise<TStateOut>;
 };
@@ -111,7 +111,7 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}> =
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions>;
 
 interface BaseRunParams<TOptions extends object = {}> {
-  fs: FileSystem;
+  fs: ResourceLoader;
   shell: Shell;
   client: PromptClient;
   options?: TOptions;
@@ -154,7 +154,7 @@ export class Workflow<
       state: TState;
       options: TOptions;
       client: PromptClient;
-      fs: FileSystem;
+      fs: ResourceLoader;
       shell: Shell;
     }) => TNewState | Promise<TNewState>
   ) {
@@ -327,7 +327,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private workflowRunId: string;
   private title: string;
   private description?: string;
-  private fs: FileSystem;
+  private fs: ResourceLoader;
   private client: PromptClient;
   private options: TOptions;
   private shell: Shell;

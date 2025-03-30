@@ -4,16 +4,16 @@ import { State } from './types';
 import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
 import { z } from 'zod';
 import { nextStep } from '../../../../test-utils';
-import { FileSystem } from '../file-stores/types';
+import { ResourceLoader } from '../file-stores/types';
 
-class TestFileSystem implements FileSystem {
+class TestFileSystem implements ResourceLoader {
   private files: Map<string, string> = new Map();
 
   setFile(path: string, content: string) {
     this.files.set(path, content);
   }
 
-  async readFile(path: string): Promise<string> {
+  async load(path: string): Promise<string> {
     const content = this.files.get(path);
     if (content === undefined) {
       throw new Error(`File not found: ${path}`);
