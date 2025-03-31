@@ -1,7 +1,6 @@
 import { WORKFLOW_EVENTS } from './constants';
 import { applyPatches } from './json-patch';
 import type { Adapter } from "../adapters/types";
-import type { ResourceLoader } from "../resource-loaders/types";
 import type { SerializedStep, Workflow } from './workflow';
 import type { State } from './types';
 import type { PromptClient } from '../clients/types';
@@ -15,7 +14,6 @@ export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[],
-      resources: ResourceLoader,
       shell: Shell,
       logger: Logger,
       verbose: boolean,
@@ -46,7 +44,6 @@ export class WorkflowRunner {
       adapters,
       logger: { log },
       verbose,
-      resources,
       client,
       shell,
     } = this.options;
@@ -66,8 +63,8 @@ export class WorkflowRunner {
     });
 
     const workflowRun = workflowRunId && initialCompletedSteps
-      ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, resources, shell })
-      : workflow.run({ initialState, options, client, resources, shell });
+      ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, shell })
+      : workflow.run({ initialState, options, client, shell });
 
     for await (const event of workflowRun) {
       // Dispatch event to all adapters

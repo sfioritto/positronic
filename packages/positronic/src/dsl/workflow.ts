@@ -4,7 +4,6 @@ import type { PromptClient } from "../clients/types";
 import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { createPatch, applyPatches } from './json-patch';
-import type { ResourceLoader } from "../resource-loaders/types";
 import type { Shell } from "../shells/types";
 export type SerializedError = {
   name: string;
@@ -88,7 +87,6 @@ type StepBlock<TStateIn, TStateOut, TOptions extends object = {}, TServices exte
     state: TStateIn;
     options: TOptions;
     client: PromptClient;
-    resources: ResourceLoader;
     shell: Shell;
   } & TServices) => TStateOut | Promise<TStateOut>;
 };
@@ -112,9 +110,8 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}, TServices extends 
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
 interface BaseRunParams<TOptions extends object = {}, TServices extends object = {}> {
-  resources: ResourceLoader;
-  shell: Shell;
   client: PromptClient;
+  shell: Shell;
   options?: TOptions;
   services?: TServices;
 }
@@ -174,7 +171,6 @@ export class Workflow<
       state: TState;
       options: TOptions;
       client: PromptClient;
-      resources: ResourceLoader;
       shell: Shell;
     } & TServices) => TNewState | Promise<TNewState>
   ) {
@@ -353,7 +349,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private workflowRunId: string;
   private title: string;
   private description?: string;
-  private resources: ResourceLoader;
   private client: PromptClient;
   private options: TOptions;
   private shell: Shell;
@@ -373,7 +368,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       description,
       workflowRunId: providedWorkflowRunId,
       options = {} as TOptions,
-      resources,
       client,
       shell,
       services
@@ -382,7 +376,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     this.initialState = initialState as TState;
     this.title = title;
     this.description = description;
-    this.resources = resources;
     this.client = client;
     this.options = options;
     this.shell = shell;
@@ -524,7 +517,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Run inner workflow and yield all its events
       let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
-        resources: this.resources,
         shell: this.shell,
         client: this.client,
         initialState,
@@ -557,7 +549,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         state: this.currentState,
         options: this.options ?? {} as TOptions,
         client: this.client,
-        resources: this.resources,
         shell: this.shell,
         ...this.services
       });

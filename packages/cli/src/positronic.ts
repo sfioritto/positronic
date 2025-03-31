@@ -4,10 +4,11 @@ import path from 'path';
 import { access, readdir } from 'fs/promises';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { SQLiteAdapter } from '@positronic/adapter-sqlite';
-import { WorkflowRunner, STATUS, LocalResourceLoader, LocalShell, SSHShell } from '@positronic/core';
+import { WorkflowRunner, STATUS, LocalShell, SSHShell } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
 import { ConsoleAdapter } from './console-adapter';
 import type { SerializedStep } from '@positronic/core';
+import { LocalResourceLoader } from '@positronic/dev';
 
 
 interface CliOptions {
@@ -423,7 +424,6 @@ async function main() {
       logger: console,
       verbose: !!verbose,
       client: new AnthropicClient(),
-      resources: new LocalResourceLoader(currentWorkflowDir),
       shell
     });
 
