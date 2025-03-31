@@ -584,14 +584,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   }
 }
 
-let workflowNamesAreUnique = true;
-export function disableWorkflowNameUniqueness() {
-  workflowNamesAreUnique = false;
-}
-
-export function enableWorkflowNameUniqueness() {
-  workflowNamesAreUnique = true;
-}
+const workflowNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const workflowNames = new Set<string>();
 export function workflow<
