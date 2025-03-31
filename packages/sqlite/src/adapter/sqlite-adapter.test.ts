@@ -2,7 +2,6 @@ import Database, { Database as DatabaseType } from "better-sqlite3";
 import { jest } from "@jest/globals";
 import { SQLiteAdapter } from ".";
 import { STATUS, WORKFLOW_EVENTS, applyPatches, workflow, State } from "@positronic/core";
-import { LocalShell } from "../local-shell";
 import { nextStep } from "../../../../test-utils";
 import type {
   PromptClient, SerializedStep, StepStatusEvent, WorkflowStartEvent
@@ -19,10 +18,7 @@ describe("SQLiteAdapter", () => {
     execute: jest.fn(async () => ({}))
   } satisfies PromptClient;
 
-  // Initialize once to use in all tests
-  const mockShell = new LocalShell();
-
-  // Create test services
+    // Create test services
   const testServices = {
     resources: new TestResourceLoader()
   };
