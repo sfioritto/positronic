@@ -27,6 +27,7 @@
     "packages/adapter-sqlite",
     "packages/extension-files",
     "packages/client-anthropic",
+    "packages/resources-local",
     "packages/cli"
   ]
 }
