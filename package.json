@@ -25,7 +25,6 @@
   "workspaces": [
     "packages/positronic",
     "packages/client-anthropic",
-    "packages/interfaces",
     "packages/cli",
     "packages/shell",
     "packages/resources",

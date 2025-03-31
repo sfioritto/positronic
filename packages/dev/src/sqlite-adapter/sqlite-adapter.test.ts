@@ -7,7 +7,7 @@ import { nextStep } from "../../../../test-utils";
 import type {
   PromptClient, SerializedStep, StepStatusEvent, WorkflowStartEvent
 } from "@positronic/core";
-import { ResourceLoader } from "@positronic/interfaces";
+import { ResourceLoader } from "@positronic/resources/src/types";
 
 class TestResourceLoader implements ResourceLoader {
   load: ResourceLoader['load'] = jest.fn().mockImplementation(async () => 'content') as ResourceLoader['load'];

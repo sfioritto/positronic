@@ -1,5 +1,5 @@
 import { Client, ClientChannel } from 'ssh2';
-import { Shell, ExecCommandOptions, ExecCommandResponse } from '@positronic/interfaces';
+import type { Shell, ExecCommandOptions, ExecCommandResponse } from './types';
 import type { ConnectConfig } from 'ssh2';
 
 interface SSH2ShellOptions extends ConnectConfig {

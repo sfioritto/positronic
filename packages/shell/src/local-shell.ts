@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { Shell, ExecCommandOptions, ExecCommandResponse } from '@positronic/interfaces';
+import { Shell, ExecCommandOptions, ExecCommandResponse } from './types';
 import { Readable } from 'stream';
 
 interface LocalShellOptions {
