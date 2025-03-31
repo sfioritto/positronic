@@ -1,9 +1,9 @@
 import Database, { Database as DatabaseType } from "better-sqlite3";
 import { jest } from "@jest/globals";
-import { SQLiteAdapter } from "../src/sqlite-adapter";
+import { SQLiteAdapter } from ".";
 import { STATUS, WORKFLOW_EVENTS, applyPatches, workflow, State } from "@positronic/core";
-import { LocalShell } from "../src/local-shell";
-import { nextStep } from "../../../test-utils";
+import { LocalShell } from "../local-shell";
+import { nextStep } from "../../../../test-utils";
 import type {
   PromptClient, SerializedStep, StepStatusEvent, WorkflowStartEvent
 } from "@positronic/core";
