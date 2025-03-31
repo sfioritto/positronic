@@ -4,7 +4,7 @@ import type { PromptClient } from "../clients/types";
 import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { createPatch, applyPatches } from './json-patch';
-import type { Shell } from "../shells/types";
+import type { Shell } from "@positronic/interfaces";
 export type SerializedError = {
   name: string;
   message: string;

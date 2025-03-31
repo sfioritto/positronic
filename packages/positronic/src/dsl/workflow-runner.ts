@@ -4,7 +4,7 @@ import type { Adapter } from "../adapters/types";
 import type { SerializedStep, Workflow } from './workflow';
 import type { State } from './types';
 import type { PromptClient } from '../clients/types';
-import type { Shell } from '../shells/types';
+import type { Shell } from '@positronic/interfaces';
 
 interface Logger {
   log(...args: any[]): void;

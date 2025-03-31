@@ -17,7 +17,4 @@ export type {
 } from "./dsl/workflow";
 export type { PromptClient, ResponseModel } from "./clients/types";
 export type { State } from "./dsl/types";
-export type { Shell } from "./shells/types";
 export { createPatch, applyPatches } from "./dsl/json-patch";
-export { SSHShell } from "./shells/ssh-shell";
-export { LocalShell } from "./shells/local-shell";
