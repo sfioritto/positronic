@@ -3,12 +3,11 @@
 import path from 'path';
 import { access, readdir } from 'fs/promises';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
-import { SQLiteAdapter } from '@positronic/adapter-sqlite';
 import { WorkflowRunner, STATUS } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
 import { ConsoleAdapter } from './console-adapter';
 import type { SerializedStep } from '@positronic/core';
-import { LocalShell, SSHShell } from '@positronic/dev';
+import { LocalShell, SSHShell, SQLiteAdapter } from '@positronic/dev';
 
 
 interface CliOptions {

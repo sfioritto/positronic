@@ -24,7 +24,6 @@
   },
   "workspaces": [
     "packages/positronic",
-    "packages/adapter-sqlite",
     "packages/client-anthropic",
     "packages/interfaces",
     "packages/dev",
