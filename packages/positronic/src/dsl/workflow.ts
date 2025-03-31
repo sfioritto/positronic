@@ -111,7 +111,6 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}, TServices extends 
 interface BaseRunParams<TOptions extends object = {}, TServices extends object = {}> {
   client: PromptClient;
   options?: TOptions;
-  services?: TServices;
 }
 
 export interface InitialRunParams<TOptions extends object = {}, TServices extends object = {}> extends BaseRunParams<TOptions, TServices> {
@@ -514,7 +513,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         client: this.client,
         initialState,
         options: this.options ?? {} as TOptions,
-        services: this.services
       });
 
       for await (const event of innerRun) {
