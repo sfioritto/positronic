@@ -87,11 +87,10 @@ type StepBlock<TStateIn, TStateOut, TOptions extends object = {}, TServices exte
   action: (params: {
     state: TStateIn;
     options: TOptions;
-    services: TServices;
     client: PromptClient;
     resources: ResourceLoader;
     shell: Shell;
-  }) => TStateOut | Promise<TStateOut>;
+  } & TServices) => TStateOut | Promise<TStateOut>;
 };
 
 type WorkflowBlock<
@@ -174,11 +173,10 @@ export class Workflow<
     action: (params: {
       state: TState;
       options: TOptions;
-      services: TServices;
       client: PromptClient;
       resources: ResourceLoader;
       shell: Shell;
-    }) => TNewState | Promise<TNewState>
+    } & TServices) => TNewState | Promise<TNewState>
   ) {
     const stepBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
       type: 'step',
@@ -237,9 +235,8 @@ export class Workflow<
       state: TState,
       response: z.infer<TSchema>,
       options: TOptions,
-      services: TServices,
       prompt: string
-    }) => TNewState | Promise<TNewState>,
+    } & TServices) => TNewState | Promise<TNewState>,
   ) {
     const promptBlock: StepBlock<
       TState,
@@ -249,7 +246,7 @@ export class Workflow<
     > = {
       type: 'step',
       title,
-      action: async ({ state, client: runClient, options, services }) => {
+      action: async ({ state, client: runClient, options, ...services }) => {
         const { template, responseModel, client: stepClient } = config;
         const client = stepClient ?? runClient;
         const promptString = template(state);
@@ -260,7 +257,7 @@ export class Workflow<
         };
 
         return reduce
-          ? reduce({ state, response, options, services, prompt: promptString })
+          ? reduce({ state, response, options, prompt: promptString, ...(services as TServices) })
           : stateWithResponse as unknown as TNewState;
       }
     };
@@ -559,10 +556,10 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       this.currentState = await block.action({
         state: this.currentState,
         options: this.options ?? {} as TOptions,
-        services: this.services,
         client: this.client,
         resources: this.resources,
         shell: this.shell,
+        ...this.services
       });
       yield* this.completeStep(step, prevState);
     }

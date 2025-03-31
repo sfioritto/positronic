@@ -1081,8 +1081,8 @@ describe('services support', () => {
       .withServices({
         logger: testLogger
       })
-      .step('Use service', ({ state, services }) => {
-        services.logger.log('Test service called');
+      .step('Use service', ({ state, logger }) => {
+        logger.log('Test service called');
         return { serviceUsed: true };
       });
 
