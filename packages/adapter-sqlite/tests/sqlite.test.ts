@@ -48,7 +48,7 @@ describe("SQLiteAdapter", () => {
     for await (const event of testWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      fs: new TestResourceLoader(),
+      resources: new TestResourceLoader(),
       shell: mockShell
     })) {
       await adapter.dispatch(event);
@@ -111,7 +111,7 @@ describe("SQLiteAdapter", () => {
     for await (const event of counterWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      fs: new TestResourceLoader(),
+      resources: new TestResourceLoader(),
       shell: mockShell
     })) {
       await adapter.dispatch(event);
@@ -120,7 +120,7 @@ describe("SQLiteAdapter", () => {
     for await (const event of nameWorkflow.run({
       initialState: { name: "test" },
       client: mockClient,
-      fs: new TestResourceLoader(),
+      resources: new TestResourceLoader(),
       shell: mockShell
     })) {
       await adapter.dispatch(event);
@@ -202,7 +202,7 @@ describe("SQLiteAdapter", () => {
       for await (const event of errorWorkflow.run({
         initialState: { shouldError: true },
         client: mockClient,
-        fs: new TestResourceLoader(),
+        resources: new TestResourceLoader(),
         shell: mockShell
       })) {
         await adapter.dispatch(event);
@@ -263,7 +263,7 @@ describe("SQLiteAdapter", () => {
     for await (const event of multiStepWorkflow.run({
       initialState: { value: "test", count: 0 },
       client: mockClient,
-      fs: new TestResourceLoader(),
+      resources: new TestResourceLoader(),
       shell: mockShell
     })) {
       await adapter.dispatch(event);
@@ -336,7 +336,7 @@ describe("SQLiteAdapter", () => {
     for await (const event of fourStepWorkflow.run({
       initialState: { value: 2 },
       client: mockClient,
-      fs: new TestResourceLoader(),
+      resources: new TestResourceLoader(),
       shell: mockShell
     })) {
       await adapter.dispatch(event);
@@ -370,7 +370,7 @@ describe("SQLiteAdapter", () => {
       initialState: { value: 2 },
       initialCompletedSteps: completedSteps,
       client: mockClient,
-      fs: new TestResourceLoader(),
+      resources: new TestResourceLoader(),
       shell: mockShell
     });
 
@@ -425,7 +425,7 @@ describe("SQLiteAdapter", () => {
     const workflowIterator = testWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      fs: new TestResourceLoader(),
+      resources: new TestResourceLoader(),
       shell: mockShell
     });
 
@@ -514,7 +514,7 @@ describe("SQLiteAdapter", () => {
       for await (const event of testWorkflow.run({
         initialState: { value: initialValue },
         client: mockClient,
-        fs: new TestResourceLoader(),
+        resources: new TestResourceLoader(),
         shell: mockShell
       })) {
         await adapter.dispatch(event);
