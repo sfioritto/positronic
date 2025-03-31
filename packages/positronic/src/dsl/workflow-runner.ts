@@ -14,7 +14,6 @@ export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[],
-      shell: Shell,
       logger: Logger,
       verbose: boolean,
       client: PromptClient,
@@ -45,7 +44,6 @@ export class WorkflowRunner {
       logger: { log },
       verbose,
       client,
-      shell,
     } = this.options;
 
     let currentState = initialState ?? ({} as TState);
@@ -63,8 +61,8 @@ export class WorkflowRunner {
     });
 
     const workflowRun = workflowRunId && initialCompletedSteps
-      ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, shell })
-      : workflow.run({ initialState, options, client, shell });
+      ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client })
+      : workflow.run({ initialState, options, client });
 
     for await (const event of workflowRun) {
       // Dispatch event to all adapters

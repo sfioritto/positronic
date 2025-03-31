@@ -87,7 +87,6 @@ type StepBlock<TStateIn, TStateOut, TOptions extends object = {}, TServices exte
     state: TStateIn;
     options: TOptions;
     client: PromptClient;
-    shell: Shell;
   } & TServices) => TStateOut | Promise<TStateOut>;
 };
 
@@ -111,7 +110,6 @@ type Block<TStateIn, TStateOut, TOptions extends object = {}, TServices extends 
 
 interface BaseRunParams<TOptions extends object = {}, TServices extends object = {}> {
   client: PromptClient;
-  shell: Shell;
   options?: TOptions;
   services?: TServices;
 }
@@ -171,7 +169,6 @@ export class Workflow<
       state: TState;
       options: TOptions;
       client: PromptClient;
-      shell: Shell;
     } & TServices) => TNewState | Promise<TNewState>
   ) {
     const stepBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
@@ -351,7 +348,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private description?: string;
   private client: PromptClient;
   private options: TOptions;
-  private shell: Shell;
   private services: TServices;
 
   constructor(params: (InitialRunParams<TOptions, TServices> | RerunParams<TOptions, TServices>) & {
@@ -369,7 +365,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       workflowRunId: providedWorkflowRunId,
       options = {} as TOptions,
       client,
-      shell,
       services
     } = params;
 
@@ -378,7 +373,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     this.description = description;
     this.client = client;
     this.options = options;
-    this.shell = shell;
     this.services = services;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
@@ -517,7 +511,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Run inner workflow and yield all its events
       let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
-        shell: this.shell,
         client: this.client,
         initialState,
         options: this.options ?? {} as TOptions,
@@ -549,7 +542,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         state: this.currentState,
         options: this.options ?? {} as TOptions,
         client: this.client,
-        shell: this.shell,
         ...this.services
       });
       yield* this.completeStep(step, prevState);

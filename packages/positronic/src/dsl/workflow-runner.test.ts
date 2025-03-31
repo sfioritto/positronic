@@ -39,7 +39,6 @@ describe('WorkflowRunner', () => {
       logger: mockLogger,
       verbose: false,
       client: mockClient,
-      shell: mockShell
     });
 
     const testWorkflow = workflow('Test Workflow')
@@ -109,7 +108,6 @@ describe('WorkflowRunner', () => {
       logger: mockLogger,
       verbose: true,
       client: mockClient,
-      shell: mockShell
     });
 
     const testWorkflow = workflow('Test Workflow')
@@ -131,7 +129,6 @@ describe('WorkflowRunner', () => {
       logger: mockLogger,
       verbose: true,
       client: mockClient,
-      shell: mockShell
     });
 
     const errorWorkflow = workflow('Error Workflow')
@@ -162,7 +159,6 @@ describe('WorkflowRunner', () => {
       logger: mockLogger,
       verbose: true,
       client: mockClient,
-      shell: mockShell
     });
 
     const longString = 'a'.repeat(1000); // Make string much longer
@@ -188,7 +184,6 @@ describe('WorkflowRunner', () => {
       logger: mockLogger,
       verbose: true,
       client: mockClient,
-      shell: mockShell
     });
 
     const testWorkflow = workflow('Test Workflow')

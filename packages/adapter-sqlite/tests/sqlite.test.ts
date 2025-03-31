@@ -46,7 +46,6 @@ describe("SQLiteAdapter", () => {
     }
 
     const testWorkflow = workflow<{}, TestState>("Test Counter")
-      .withServices(testServices)
       .step("Increment", async ({ state }) => ({
         count: state.count + 1
       }));
@@ -56,7 +55,6 @@ describe("SQLiteAdapter", () => {
     for await (const event of testWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -103,13 +101,11 @@ describe("SQLiteAdapter", () => {
     }
 
     const counterWorkflow = workflow<{}, CounterState>("Counter Workflow")
-      .withServices(testServices)
       .step("Increment", async ({ state }) => ({
         count: state.count + 1
       }));
 
     const nameWorkflow = workflow<{}, NameState>("Name Workflow")
-      .withServices(testServices)
       .step("Uppercase", async ({ state }) => ({
         name: state.name.toUpperCase()
       }));
@@ -120,7 +116,6 @@ describe("SQLiteAdapter", () => {
     for await (const event of counterWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -128,7 +123,6 @@ describe("SQLiteAdapter", () => {
     for await (const event of nameWorkflow.run({
       initialState: { name: "test" },
       client: mockClient,
-      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -193,7 +187,6 @@ describe("SQLiteAdapter", () => {
     }
 
     const errorWorkflow = workflow<{}, ErrorState>("Error Workflow")
-      .withServices(testServices)
       .step("Maybe Error", async ({ state }) => {
         if (state.shouldError) {
           const error = new Error("Test error");
@@ -210,7 +203,6 @@ describe("SQLiteAdapter", () => {
       for await (const event of errorWorkflow.run({
         initialState: { shouldError: true },
         client: mockClient,
-        shell: mockShell
       })) {
         await adapter.dispatch(event);
       }
@@ -256,7 +248,6 @@ describe("SQLiteAdapter", () => {
     }
 
     const multiStepWorkflow = workflow<{}, MultiStepState>("Multi Step Workflow")
-      .withServices(testServices)
       .step("Uppercase String", async ({ state }) => ({
         ...state,
         value: state.value.toUpperCase()
@@ -271,7 +262,6 @@ describe("SQLiteAdapter", () => {
     for await (const event of multiStepWorkflow.run({
       initialState: { value: "test", count: 0 },
       client: mockClient,
-      shell: mockShell
     })) {
       await adapter.dispatch(event);
     }
@@ -343,7 +333,6 @@ describe("SQLiteAdapter", () => {
     for await (const event of fourStepWorkflow.run({
       initialState: { value: 2 },
       client: mockClient,
-      shell: mockShell
     })) {
       await adapter.dispatch(event);
       if (event.type === WORKFLOW_EVENTS.START) {
@@ -376,7 +365,6 @@ describe("SQLiteAdapter", () => {
       initialState: { value: 2 },
       initialCompletedSteps: completedSteps,
       client: mockClient,
-      shell: mockShell
     });
 
     // Process only the RESTART event
@@ -430,7 +418,6 @@ describe("SQLiteAdapter", () => {
     const workflowIterator = testWorkflow.run({
       initialState: { count: 0 },
       client: mockClient,
-      shell: mockShell
     });
 
     // First event (workflow started)
@@ -518,7 +505,6 @@ describe("SQLiteAdapter", () => {
       for await (const event of testWorkflow.run({
         initialState: { value: initialValue },
         client: mockClient,
-        shell: mockShell
       })) {
         await adapter.dispatch(event);
         if (event.type === WORKFLOW_EVENTS.START) {

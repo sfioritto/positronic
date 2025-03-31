@@ -424,7 +424,6 @@ async function main() {
       logger: console,
       verbose: !!verbose,
       client: new AnthropicClient(),
-      shell
     });
 
     try {
