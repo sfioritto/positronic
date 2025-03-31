@@ -4,8 +4,7 @@ import type { PromptClient } from "../clients/types";
 import type { State, JsonPatch } from "./types";
 import { STATUS, WORKFLOW_EVENTS } from './constants';
 import { createPatch, applyPatches } from './json-patch';
-import type { ResourceLoader } from "../resource-loaders/types";
-import type { Shell } from "../shells/types";
+import type { Shell } from "@positronic/interfaces";
 export type SerializedError = {
   name: string;
   message: string;
@@ -81,49 +80,46 @@ export interface SerializedStep {
   patch?: JsonPatch;
 }
 
-type StepBlock<TStateIn, TStateOut, TOptions extends object = {}> = {
+type StepBlock<TStateIn, TStateOut, TOptions extends object = {}, TServices extends object = {}> = {
   type: 'step';
   title: string;
   action: (params: {
     state: TStateIn;
     options: TOptions;
     client: PromptClient;
-    resources: ResourceLoader;
-    shell: Shell;
-  }) => TStateOut | Promise<TStateOut>;
+  } & TServices) => TStateOut | Promise<TStateOut>;
 };
 
 type WorkflowBlock<
   TOuterState,
   TInnerState extends State,
   TNewState,
-  TOptions extends object = {}
+  TOptions extends object = {},
+  TServices extends object = {}
 > = {
   type: 'workflow';
   title: string;
-  innerWorkflow: Workflow<TOptions, TInnerState>;
+  innerWorkflow: Workflow<TOptions, TInnerState, TServices>;
   initialState: State | ((outerState: TOuterState) => State);
-  action: (outerState: TOuterState, innerState: TInnerState) => TNewState;
+  action: (outerState: TOuterState, innerState: TInnerState, services: TServices) => TNewState;
 };
 
-type Block<TStateIn, TStateOut, TOptions extends object = {}> =
-  | StepBlock<TStateIn, TStateOut, TOptions>
-  | WorkflowBlock<TStateIn, any, TStateOut, TOptions>;
+type Block<TStateIn, TStateOut, TOptions extends object = {}, TServices extends object = {}> =
+  | StepBlock<TStateIn, TStateOut, TOptions, TServices>
+  | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
-interface BaseRunParams<TOptions extends object = {}> {
-  resources: ResourceLoader;
-  shell: Shell;
+interface BaseRunParams<TOptions extends object = {}, TServices extends object = {}> {
   client: PromptClient;
   options?: TOptions;
 }
 
-export interface InitialRunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+export interface InitialRunParams<TOptions extends object = {}, TServices extends object = {}> extends BaseRunParams<TOptions, TServices> {
   initialState?: State;
   initialCompletedSteps?: never;
   workflowRunId?: never;
 }
 
-export interface RerunParams<TOptions extends object = {}> extends BaseRunParams<TOptions> {
+export interface RerunParams<TOptions extends object = {}, TServices extends object = {}> extends BaseRunParams<TOptions, TServices> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
   workflowRunId: string;
@@ -131,11 +127,13 @@ export interface RerunParams<TOptions extends object = {}> extends BaseRunParams
 
 export class Workflow<
   TOptions extends object = {},
-  TState extends State = {}
+  TState extends State = {},
+  TServices extends object = {}
 > {
-  private blocks: Block<any, any, TOptions>[] = [];
+  private blocks: Block<any, any, TOptions, TServices>[] = [];
   public type: 'workflow' = 'workflow';
   private defaultOptions: Partial<TOptions> = {};
+  private services: TServices = {} as TServices;
 
   constructor(
     public readonly title: string,
@@ -148,17 +146,31 @@ export class Workflow<
     return this;
   }
 
+  // New method to add services
+  withServices<TNewServices extends object>(services: TNewServices): Workflow<TOptions, TState, TNewServices> {
+    const nextWorkflow = new Workflow<TOptions, TState, TNewServices>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+
+    // Copy default options
+    nextWorkflow.withOptions(this.defaultOptions);
+
+    // Set services
+    nextWorkflow.services = services;
+
+    return nextWorkflow;
+  }
+
   step<TNewState extends State>(
     title: string,
     action: (params: {
       state: TState;
       options: TOptions;
       client: PromptClient;
-      resources: ResourceLoader;
-      shell: Shell;
-    }) => TNewState | Promise<TNewState>
+    } & TServices) => TNewState | Promise<TNewState>
   ) {
-    const stepBlock: StepBlock<TState, TNewState, TOptions> = {
+    const stepBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
       type: 'step',
       title,
       action
@@ -172,21 +184,22 @@ export class Workflow<
     TNewState extends State
   >(
     title: string,
-    innerWorkflow: Workflow<TOptions, TInnerState>,
-    action: (params: { state: TState; workflowState: TInnerState }) => TNewState,
+    innerWorkflow: Workflow<TOptions, TInnerState, TServices>,
+    action: (params: { state: TState; workflowState: TInnerState; services: TServices }) => TNewState,
     initialState?: State | ((state: TState) => State)
   ) {
     const nestedBlock: WorkflowBlock<
       TState,
       TInnerState,
       TNewState,
-      TOptions
+      TOptions,
+      TServices
     > = {
       type: 'workflow',
       title,
       innerWorkflow,
       initialState: initialState || (() => ({} as State)),
-      action: (outerState, innerState) => action({ state: outerState, workflowState: innerState})
+      action: (outerState, innerState, services) => action({ state: outerState, workflowState: innerState, services })
     };
     this.blocks.push(nestedBlock);
     return this.nextWorkflow<TNewState>();
@@ -215,16 +228,17 @@ export class Workflow<
       response: z.infer<TSchema>,
       options: TOptions,
       prompt: string
-    }) => TNewState | Promise<TNewState>,
+    } & TServices) => TNewState | Promise<TNewState>,
   ) {
     const promptBlock: StepBlock<
       TState,
       TNewState,
-      TOptions
+      TOptions,
+      TServices
     > = {
       type: 'step',
       title,
-      action: async ({ state, client: runClient, options }) => {
+      action: async ({ state, client: runClient, options, ...services }) => {
         const { template, responseModel, client: stepClient } = config;
         const client = stepClient ?? runClient;
         const promptString = template(state);
@@ -235,7 +249,7 @@ export class Workflow<
         };
 
         return reduce
-          ? reduce({ state, response, options, prompt: promptString })
+          ? reduce({ state, response, options, prompt: promptString, ...(services as TServices) })
           : stateWithResponse as unknown as TNewState;
       }
     };
@@ -244,11 +258,11 @@ export class Workflow<
   }
 
   // Overload signatures
-  run(params: InitialRunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
-  run(params: RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
+  run(params: InitialRunParams<TOptions, TServices>): AsyncGenerator<WorkflowEvent<TOptions>>;
+  run(params: RerunParams<TOptions, TServices>): AsyncGenerator<WorkflowEvent<TOptions>>;
 
   // Implementation signature
-  async *run(params: InitialRunParams<TOptions> | RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>> {
+  async *run(params: InitialRunParams<TOptions, TServices> | RerunParams<TOptions, TServices>): AsyncGenerator<WorkflowEvent<TOptions>> {
     const { title, description, blocks } = this;
 
     // Merge default options with provided options
@@ -262,26 +276,30 @@ export class Workflow<
       description,
       blocks,
       ...params,
-      options: mergedOptions  // Use merged options
+      options: mergedOptions,  // Use merged options
+      services: this.services  // Use services from the workflow
     });
 
     yield* stream.next();
   }
 
-  private withBlocks(blocks: Block<any, any, TOptions>[]): this {
+  private withBlocks(blocks: Block<any, any, TOptions, TServices>[]): this {
     this.blocks = blocks;
     return this;
   }
 
-  private nextWorkflow<TNewState extends State>(): Workflow<TOptions, TNewState> {
+  private nextWorkflow<TNewState extends State>(): Workflow<TOptions, TNewState, TServices> {
     // Pass default options to the next workflow
-    const nextWorkflow = new Workflow<TOptions, TNewState>(
+    const nextWorkflow = new Workflow<TOptions, TNewState, TServices>(
       this.title,
       this.description
-    ).withBlocks(this.blocks);
+    ).withBlocks(this.blocks as any);
 
     // Copy default options to the next workflow
     nextWorkflow.withOptions(this.defaultOptions);
+
+    // Copy services to the next workflow
+    nextWorkflow.services = this.services;
 
     return nextWorkflow;
   }
@@ -293,7 +311,7 @@ class Step {
   private status: typeof STATUS[keyof typeof STATUS] = STATUS.PENDING;
 
   constructor(
-    public block: Block<any, any, any>,
+    public block: Block<any, any, any, any>,
     id?: string
   ) {
     this.id = id || uuidv4();
@@ -319,7 +337,7 @@ class Step {
   }
 }
 
-class WorkflowEventStream<TOptions extends object = {}, TState extends State = {}> {
+class WorkflowEventStream<TOptions extends object = {}, TState extends State = {}, TServices extends object = {}> {
   private currentState: TState;
   private steps: Step[];
   private currentStepIndex: number = 0;
@@ -327,15 +345,15 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   private workflowRunId: string;
   private title: string;
   private description?: string;
-  private resources: ResourceLoader;
   private client: PromptClient;
   private options: TOptions;
-  private shell: Shell;
+  private services: TServices;
 
-  constructor(params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
+  constructor(params: (InitialRunParams<TOptions, TServices> | RerunParams<TOptions, TServices>) & {
     title: string;
     description?: string;
-    blocks: Block<any, any, TOptions>[];
+    blocks: Block<any, any, TOptions, TServices>[];
+    services: TServices;
   }) {
     const {
       initialState = {} as TState,
@@ -345,18 +363,16 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       description,
       workflowRunId: providedWorkflowRunId,
       options = {} as TOptions,
-      resources,
       client,
-      shell
+      services
     } = params;
 
     this.initialState = initialState as TState;
     this.title = title;
     this.description = description;
-    this.resources = resources;
     this.client = client;
     this.options = options;
-    this.shell = shell;
+    this.services = services;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -468,7 +484,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
           message: error.message,
           stack: error.stack
         },
-        options,
+        options
       };
 
       // Step Status Event
@@ -494,8 +510,6 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Run inner workflow and yield all its events
       let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
-        resources: this.resources,
-        shell: this.shell,
         client: this.client,
         initialState,
         options: this.options ?? {} as TOptions,
@@ -515,7 +529,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       const prevState = this.currentState;
 
       // Update state with inner workflow results
-      this.currentState = await block.action(this.currentState, innerState);
+      this.currentState = await block.action(this.currentState, innerState, this.services);
       yield* this.completeStep(step, prevState);
     } else {
       // Get previous state before action
@@ -526,8 +540,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         state: this.currentState,
         options: this.options ?? {} as TOptions,
         client: this.client,
-        resources: this.resources,
-        shell: this.shell,
+        ...this.services
       });
       yield* this.completeStep(step, prevState);
     }
@@ -552,19 +565,13 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
   }
 }
 
-let workflowNamesAreUnique = true;
-export function disableWorkflowNameUniqueness() {
-  workflowNamesAreUnique = false;
-}
-
-export function enableWorkflowNameUniqueness() {
-  workflowNamesAreUnique = true;
-}
+const workflowNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const workflowNames = new Set<string>();
 export function workflow<
   TOptions extends object = {},
-  TState extends State = {}
+  TState extends State = {},
+  TServices extends object = {}
 >(
   workflowConfig: string | { title: string; description?: string }
 ) {
@@ -576,7 +583,7 @@ export function workflow<
   if (workflowNamesAreUnique) {
     workflowNames.add(title);
   }
-  return new Workflow<TOptions, TState>(title, description);
+  return new Workflow<TOptions, TState, TServices>(title, description);
 }
 
 const clone = <T>(value: T): T => structuredClone(value);

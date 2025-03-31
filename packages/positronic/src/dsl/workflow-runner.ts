@@ -1,11 +1,10 @@
 import { WORKFLOW_EVENTS } from './constants';
 import { applyPatches } from './json-patch';
 import type { Adapter } from "../adapters/types";
-import type { ResourceLoader } from "../resource-loaders/types";
 import type { SerializedStep, Workflow } from './workflow';
 import type { State } from './types';
 import type { PromptClient } from '../clients/types';
-import type { Shell } from '../shells/types';
+import type { Shell } from '@positronic/interfaces';
 
 interface Logger {
   log(...args: any[]): void;
@@ -15,8 +14,6 @@ export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[],
-      resources: ResourceLoader,
-      shell: Shell,
       logger: Logger,
       verbose: boolean,
       client: PromptClient,
@@ -27,7 +24,7 @@ export class WorkflowRunner {
     TOptions extends object = {},
     TState extends State = {}
   >(
-    workflow: Workflow<TOptions, TState>,
+    workflow: Workflow<TOptions, TState, any>,
     {
       initialState = {} as TState,
       options,
@@ -46,9 +43,7 @@ export class WorkflowRunner {
       adapters,
       logger: { log },
       verbose,
-      resources,
       client,
-      shell,
     } = this.options;
 
     let currentState = initialState ?? ({} as TState);
@@ -66,8 +61,8 @@ export class WorkflowRunner {
     });
 
     const workflowRun = workflowRunId && initialCompletedSteps
-      ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client, resources, shell })
-      : workflow.run({ initialState, options, client, resources, shell });
+      ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client })
+      : workflow.run({ initialState, options, client });
 
     for await (const event of workflowRun) {
       // Dispatch event to all adapters

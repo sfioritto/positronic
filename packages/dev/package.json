@@ -1,10 +1,10 @@
 {
-  "name": "@positronic/adapter-sqlite",
+  "name": "@positronic/dev",
   "version": "0.0.1",
+  "description": "Development implementations of Positronic service interfaces",
   "type": "module",
-  "description": "A SQLite adapter for Positronic",
   "main": "dist/src/index.js",
-  "types": "dist/types/index.d.ts",
+  "types": "dist/types/index.ts",
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
@@ -13,7 +13,10 @@
   },
   "dependencies": {
     "@positronic/core": "^0.0.1",
-    "better-sqlite3": "^11.7.2"
+    "@positronic/interfaces": "^0.0.1",
+    "better-sqlite3": "^11.7.2",
+    "ssh2": "^1.14.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12"

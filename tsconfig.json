@@ -20,8 +20,6 @@
   },
   "references": [
     { "path": "./packages/positronic" },
-    { "path": "./packages/adapter-sqlite" },
-    { "path": "./packages/extension-files" },
     { "path": "./packages/cli" },
     { "path": "./packages/client-anthropic" }
   ]

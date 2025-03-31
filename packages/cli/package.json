@@ -14,9 +14,9 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
   "dependencies": {
-    "@positronic/adapter-sqlite": "^0.0.1",
     "@positronic/client-anthropic": "^0.0.1",
     "@positronic/core": "^0.0.1",
+    "@positronic/dev": "^0.0.1",
     "better-sqlite3": "^11.7.2",
     "ts-node": "^10.9.2"
   }
