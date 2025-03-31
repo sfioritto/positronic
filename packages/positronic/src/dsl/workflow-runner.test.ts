@@ -1,10 +1,10 @@
 import { WorkflowRunner } from './workflow-runner';
 import { workflow } from './workflow';
 import { WORKFLOW_EVENTS, STATUS } from './constants';
-import type { ResourceLoader } from '../resource-loaders/types';
+import { ResourceLoader } from '@positronic/interfaces';
 
 class TestResourceLoader implements ResourceLoader {
-  async load(path: string) {
+  async load(path: string, type?: 'text' | 'image' | 'binary'): Promise<string | Buffer> {
     return Promise.resolve('');
   }
 }
@@ -28,7 +28,6 @@ describe('WorkflowRunner', () => {
     dispatch: jest.fn()
   };
 
-  const resources = new TestResourceLoader();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -37,7 +36,6 @@ describe('WorkflowRunner', () => {
   it('should run a workflow and dispatch events to adapters', async () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
-      resources,
       logger: mockLogger,
       verbose: false,
       client: mockClient,
@@ -108,7 +106,6 @@ describe('WorkflowRunner', () => {
   it('should log final state when verbose is true', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
-      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,
@@ -131,7 +128,6 @@ describe('WorkflowRunner', () => {
   it('should handle workflow errors', async () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
-      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,
@@ -163,7 +159,6 @@ describe('WorkflowRunner', () => {
   it('should truncate long values in verbose output', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
-      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,
@@ -190,7 +185,6 @@ describe('WorkflowRunner', () => {
   it('should maintain state between steps', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
-      resources,
       logger: mockLogger,
       verbose: true,
       client: mockClient,

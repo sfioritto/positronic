@@ -25,7 +25,7 @@ export class WorkflowRunner {
     TOptions extends object = {},
     TState extends State = {}
   >(
-    workflow: Workflow<TOptions, TState>,
+    workflow: Workflow<TOptions, TState, any>,
     {
       initialState = {} as TState,
       options,
