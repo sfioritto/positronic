@@ -1,7 +1,7 @@
 {
-  "name": "@positronic/dev",
+  "name": "@positronic/shell",
   "version": "0.0.1",
-  "description": "Development implementations of Positronic service interfaces",
+  "description": "Shell implementations for Positronic",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/types/index.ts",
@@ -12,13 +12,9 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
   "dependencies": {
-    "@positronic/core": "^0.0.1",
-    "@positronic/interfaces": "^0.0.1",
-    "better-sqlite3": "^11.7.2",
-    "ssh2": "^1.14.0",
-    "zod": "^3.24.1"
+    "ssh2": "^1.14.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12"
+    "@types/ssh2": "^1.15.4"
   }
 }

@@ -1,8 +1,8 @@
 import { Client, ClientChannel } from 'ssh2';
-import { Shell, ExecCommandOptions, ExecCommandResponse } from './types';
+import type { Shell, ExecCommandOptions, ExecCommandResponse } from './types';
 import type { ConnectConfig } from 'ssh2';
 
-interface SSHShellOptions extends ConnectConfig {
+interface SSH2ShellOptions extends ConnectConfig {
   env?: NodeJS.ProcessEnv;
   timeout?: number;
   shell?: 'bash' | 'sh' | 'zsh';
@@ -10,11 +10,11 @@ interface SSHShellOptions extends ConnectConfig {
   cwd?: string;
 }
 
-export class SSHShell implements Shell {
+export class SSH2Shell implements Shell {
   private client: Client;
   private defaultCwd?: string;
 
-  constructor(private config: SSHShellOptions) {
+  constructor(private config: SSH2ShellOptions) {
     this.client = new Client();
     this.defaultCwd = config.cwd;
   }

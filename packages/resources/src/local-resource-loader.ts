@@ -1,6 +1,6 @@
 import { join } from 'path';
 import * as fs from 'fs/promises';
-import type { ResourceLoader } from '@positronic/interfaces';
+import type { ResourceLoader } from './types';
 
 export class LocalResourceLoader implements ResourceLoader {
   constructor(private baseDir: string) {}

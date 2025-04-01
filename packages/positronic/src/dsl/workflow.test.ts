@@ -4,7 +4,7 @@ import { State } from './types';
 import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
 import { z } from 'zod';
 import { nextStep } from '../../../../test-utils';
-import { ResourceLoader } from '@positronic/interfaces';
+import { ResourceLoader } from '@positronic/resources/src/types';
 
 // Define a Logger interface for testing
 interface Logger {

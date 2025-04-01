@@ -7,7 +7,8 @@ import { WorkflowRunner, STATUS } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
 import { ConsoleAdapter } from './console-adapter';
 import type { SerializedStep } from '@positronic/core';
-import { LocalShell, SSHShell, SQLiteAdapter } from '@positronic/dev';
+import { LocalShell, SSH2Shell } from '@positronic/shell';
+import { SQLiteAdapter } from '@positronic/sqlite';
 
 
 interface CliOptions {
@@ -398,7 +399,7 @@ async function main() {
 
     let shell;
     if (process.env.NODE_ENV === 'production') {
-      shell = new SSHShell({
+      shell = new SSH2Shell({
         host: '37.16.27.38',
         username: 'root',
         port: 2222,
@@ -433,7 +434,7 @@ async function main() {
         endAfter
       });
     } finally {
-      if (shell instanceof SSHShell) {
+      if (shell instanceof SSH2Shell) {
         await shell.disconnect();
       }
     }

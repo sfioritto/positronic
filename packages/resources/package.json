@@ -1,7 +1,7 @@
 {
-  "name": "@positronic/interfaces",
+  "name": "@positronic/resources",
   "version": "0.0.1",
-  "description": "Service interfaces for Positronic",
+  "description": "Resource loaders for Positronic",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/types/index.ts",
@@ -12,6 +12,7 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
   "dependencies": {
+    "@positronic/core": "^0.0.1",
     "zod": "^3.24.1"
   }
 }
