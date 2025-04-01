@@ -2,6 +2,7 @@
 
 import path from 'path';
 import { access, readdir } from 'fs/promises';
+import fs from 'fs';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { WorkflowRunner, STATUS } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
@@ -9,7 +10,14 @@ import { ConsoleAdapter } from './console-adapter';
 import type { SerializedStep } from '@positronic/core';
 import { LocalShell, SSH2Shell } from '@positronic/shell';
 import { SQLiteAdapter } from '@positronic/sqlite';
-
+// Import templates for the new command
+import {
+  developmentTemplate,
+  productionTemplate,
+  packageJsonTemplate,
+  tsConfigTemplate,
+  gitignoreTemplate
+} from './templates/project';
 
 interface CliOptions {
   verbose?: boolean;
@@ -18,9 +26,10 @@ interface CliOptions {
   runId?: string;
   listRuns?: boolean;
   listSteps?: boolean;
+  new?: boolean;
 }
 
-function parseArgs(): CliOptions & { workflowPath?: string } {
+function parseArgs(): CliOptions & { workflowPath?: string; projectName?: string } {
   const args = process.argv.slice(2);
   const options: CliOptions = {};
   const nonOptionArgs: string[] = [];
@@ -74,15 +83,36 @@ function parseArgs(): CliOptions & { workflowPath?: string } {
           break;
       }
     } else {
-      nonOptionArgs.push(arg);
+      // Handle subcommands
+      if (arg === 'new' && nonOptionArgs.length === 0) {
+        options.new = true;
+      } else {
+        nonOptionArgs.push(arg);
+      }
     }
   }
-  return { ...options, workflowPath: nonOptionArgs[0] };
+
+  // Extract projectName only for 'new' command
+  let projectName: string | undefined;
+  if (options.new && nonOptionArgs.length > 0) {
+    projectName = nonOptionArgs[0];
+    nonOptionArgs.shift(); // Remove the project name
+  }
+
+  return {
+    ...options,
+    workflowPath: options.new ? undefined : nonOptionArgs[0],
+    projectName
+  };
 }
 
 function printHelp() {
   console.log(`
-Usage: positronic [options] <workflow>
+Usage: positronic [command] [options] [args]
+
+Commands:
+  positronic <workflow>       Run a workflow
+  positronic new <name>       Create a new Positronic project
 
 The <workflow> argument can be either:
   - A path to a workflow file (e.g. ./workflows/my-workflow.ts)
@@ -100,6 +130,9 @@ Options:
   --list-steps         List all steps in the workflow
 
 Examples:
+  # Create a new Positronic project
+  positronic new my-workflows
+
   # Run a workflow by path
   positronic ./workflows/my-workflow.ts
 
@@ -317,9 +350,81 @@ async function resolveWorkflowPath(workflowPath: string): Promise<string> {
   }
 }
 
+// New function to handle the 'new' command
+async function createNewProject(projectName: string, verbose: boolean): Promise<void> {
+  // Create the project directory
+  const targetDir = path.resolve(process.cwd(), projectName);
+
+  if (fs.existsSync(targetDir)) {
+    console.error(`Error: Directory ${projectName} already exists`);
+    process.exit(1);
+  }
+
+  if (verbose) {
+    console.log(`Creating new Positronic project: ${projectName}`);
+    console.log(`Target directory: ${targetDir}`);
+  }
+
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  // Generate templates with project name
+  const templateProps = { projectName };
+
+  // Write the files
+  const filesToGenerate = [
+    {
+      filename: 'development.ts',
+      content: developmentTemplate(templateProps)
+    },
+    {
+      filename: 'production.ts',
+      content: productionTemplate(templateProps)
+    },
+    {
+      filename: 'package.json',
+      content: packageJsonTemplate(templateProps)
+    },
+    {
+      filename: 'tsconfig.json',
+      content: tsConfigTemplate(templateProps)
+    },
+    {
+      filename: '.gitignore',
+      content: gitignoreTemplate()
+    },
+  ];
+
+  for (const file of filesToGenerate) {
+    const filePath = path.join(targetDir, file.filename);
+    fs.writeFileSync(filePath, file.content);
+
+    if (verbose) {
+      console.log(`Created ${file.filename}`);
+    }
+  }
+
+  console.log(`Project ${projectName} created successfully!`);
+  console.log(`To get started:`);
+  console.log(`  cd ${projectName}`);
+  console.log(`  npm install`);
+}
+
 async function main() {
   try {
-    const { workflowPath, verbose, restartFrom, endAfter, runId, listRuns, listSteps } = parseArgs();
+    const { workflowPath, projectName, verbose, restartFrom, endAfter, runId, listRuns, listSteps, new: isNew } = parseArgs();
+
+    // Handle new command
+    if (isNew) {
+      if (!projectName) {
+        console.error('Error: Project name is required for the "new" command');
+        console.log('Usage: positronic new <project-name>');
+        process.exit(1);
+      }
+
+      await createNewProject(projectName, !!verbose);
+      process.exit(0);
+    }
+
     const db = new Database('workflows.db');
 
     // Handle list-runs command
@@ -338,7 +443,7 @@ async function main() {
 
     // Require workflow path for other operations
     if (!workflowPath) {
-      throw new Error('Workflow path is required unless using --list-runs');
+      throw new Error('Workflow path is required unless using --list-runs or the "new" command');
     }
 
     const resolvedPath = await resolveWorkflowPath(workflowPath);
