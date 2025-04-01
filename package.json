@@ -1,6 +1,7 @@
 {
   "name": "positronic",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "test": "jest --silent",
     "test:watch": "jest --silent --watch",

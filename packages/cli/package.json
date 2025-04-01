@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "A CLI for AI Workflows",
   "type": "module",
+  "license": "MIT",
   "bin": {
     "positronic": "./dist/src/positronic.js"
   },
