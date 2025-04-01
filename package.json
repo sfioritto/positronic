@@ -24,10 +24,10 @@
   },
   "workspaces": [
     "packages/positronic",
+    "packages/shell",
+    "packages/sqlite",
     "packages/client-anthropic",
     "packages/cli",
-    "packages/shell",
-    "packages/resources",
-    "packages/sqlite"
+    "packages/resources"
   ]
 }
