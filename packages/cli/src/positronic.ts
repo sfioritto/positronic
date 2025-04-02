@@ -17,7 +17,7 @@ import {
   packageJsonTemplate,
   tsConfigTemplate,
   gitignoreTemplate
-} from './templates/project';
+} from './templates';
 
 interface CliOptions {
   verbose?: boolean;
