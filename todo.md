@@ -67,6 +67,31 @@ positronic agent show <agent-name>
 positronic agent history <agent-name>
 ```
 
+### Prompt Management
+
+```bash
+# List all prompts in the active project
+positronic prompt list
+
+# Show prompt details including usage statistics
+# (frequency of calls, token usage, total cost)
+positronic prompt show <prompt-name>
+```
+
+### Resource Management
+
+```bash
+# List all resources in the active project
+positronic resource list
+```
+
+### Service Management
+
+```bash
+# List all services in the active project
+positronic service list
+```
+
 ### Execution Commands
 
 ```bash
@@ -112,13 +137,30 @@ positronic new <project-name>
    - Define agent structure and interface
    - Implement agent list/run/show/history commands
 
-5. **Improve project creation**
+5. **Implement prompt commands**
+
+   - Define prompt interface and metadata structure
+   - Implement prompt list/show commands
+   - Create usage tracking and cost calculation features
+   - Display statistics about call frequency, token usage, and costs
+
+6. **Implement resource commands**
+
+   - Define resource interface and metadata
+   - Implement resource list command
+
+7. **Implement service commands**
+
+   - Define service interface and metadata
+   - Implement service list command
+
+8. **Improve project creation**
 
    - Update project template generation
    - Add scaffolding for development.ts and production.ts
    - Create standard directory structure
 
-6. **Polish user experience**
+9. **Polish user experience**
    - Add colorful, interactive components with Ink
    - Implement loading indicators for long-running operations
    - Create helpful error messages and suggestions

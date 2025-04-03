@@ -1,556 +1,472 @@
-#!/usr/bin/env node --no-warnings=DEP0180 --disable-warning=ExperimentalWarning --loader ts-node/esm --experimental-specifier-resolution=node
+#!/usr/bin/env node
 
-import path from 'path';
-import { access, readdir } from 'fs/promises';
-import fs from 'fs';
-import Database, { Database as DatabaseType } from 'better-sqlite3';
-import { WorkflowRunner, STATUS } from '@positronic/core';
-import { AnthropicClient } from '@positronic/client-anthropic';
-import { ConsoleAdapter } from './console-adapter';
-import type { SerializedStep } from '@positronic/core';
-import { LocalShell, SSH2Shell } from '@positronic/shell';
-import { SQLiteAdapter } from '@positronic/sqlite';
-// Import templates for the new command
-import {
-  developmentTemplate,
-  productionTemplate,
-  packageJsonTemplate,
-  tsConfigTemplate,
-  gitignoreTemplate
-} from './templates';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
-interface CliOptions {
-  verbose?: boolean;
-  restartFrom?: number;
-  endAfter?: number;
-  runId?: string;
-  listRuns?: boolean;
-  listSteps?: boolean;
-  new?: boolean;
+// Environment Variable for Mode Detection:
+// POSITRONIC_PROJECT_PATH: If this environment variable is set, the CLI operates in
+// "Local Development Mode", targeting the project specified by the path.
+// All operations assume the context of this local project, and commands interact
+// with a local development server (e.g., http://localhost:8080). Project selection is disabled.
+// If this variable is NOT set, the CLI operates in "Global Mode", interacting
+// with remote projects configured via `project add`.
+
+const isLocalDevMode = !!process.env.POSITRONIC_PROJECT_PATH;
+const localProjectPath = process.env.POSITRONIC_PROJECT_PATH;
+
+// Main CLI definition
+let cli = yargs(hideBin(process.argv))
+  .scriptName('positronic')
+  .usage('Usage: $0 <command> [options]')
+  .version()
+  .alias('v', 'version')
+  .help('h')
+  .alias('h', 'help')
+  .wrap(null)
+  .strictCommands()
+  .demandCommand(1, 'You need to specify a command');
+
+// --- Project Management Commands (Global Mode Only) ---
+if (!isLocalDevMode) {
+  cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject) => {
+    yargsProject
+      .command('add <name>', 'Add a project to your list of projects', (yargsAdd) => {
+        return yargsAdd
+          .positional('name', {
+            describe: 'Name for the project',
+            type: 'string',
+            demandOption: true,
+          })
+          .option('url', {
+            describe: 'Project API URL',
+            type: 'string',
+            demandOption: true,
+          })
+          .example('$0 project add my-project --url https://api.my-project.positronic.sh', 'Add a project configuration');
+      }, handleProjectAdd)
+      .command('select [name]', 'Switch the active project', (yargsSelect) => {
+        return yargsSelect
+          .positional('name', {
+            describe: 'Project name to select',
+            type: 'string'
+          })
+          .example('$0 project select my-project', 'Switch the active project')
+          .example('$0 project select', 'Interactive project selection');
+      }, handleProjectSelect)
+      .command('list', 'List all of your Positronic projects', () => {}, handleProjectList)
+      .command('show', 'Display your currently selected project', () => {}, handleProjectShow)
+      .demandCommand(1, 'You need to specify a project command');
+
+    return yargsProject;
+  });
 }
 
-function parseArgs(): CliOptions & { workflowPath?: string; projectName?: string } {
-  const args = process.argv.slice(2);
-  const options: CliOptions = {};
-  const nonOptionArgs: string[] = [];
+// --- Workflow Management Commands ---
+cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeScript code created by you Workflows can use agents, prompts, resources, and services.\n', (yargs) => {
+  yargs
+    .command('list', 'List all workflows in the active project\n', () => {})
+    .command('history <workflow-name>', 'List recent runs of a specific workflow\n', (yargs) => {
+      return yargs
+        .positional('workflow-name', {
+          describe: 'Name of the workflow',
+          type: 'string',
+          demandOption: true
+        })
+        .option('limit', {
+          describe: 'Maximum number of runs to show',
+          type: 'number',
+          default: 10
+        })
+        .example('$0 workflow history my-workflow', 'List recent runs for my-workflow')
+        .example('$0 workflow history my-workflow --limit=20', 'List more recent runs');
+    }, handleWorkflowHistory)
+    .command('show <workflow-name>', 'List all steps and other details for the workflow\n', (yargs) => {
+      return yargs
+        .positional('workflow-name', {
+          describe: 'Name of the workflow',
+          type: 'string',
+          demandOption: true
+        });
+    })
+    .command('rerun <workflow-name> [workflow-run-id]', 'Rerun an existing workflow run\n', (yargs) => {
+      return yargs
+        .positional('workflow-name', {
+          describe: 'Name of the workflow',
+          type: 'string',
+          demandOption: true
+        })
+        .positional('workflow-run-id', {
+          describe: 'ID of the workflow run to rerun (defaults to the most recent run)',
+          type: 'string'
+        })
+        .option('starts-at', {
+          describe: 'Step number to start execution from',
+          type: 'number'
+        })
+        .alias('starts-at', 's')
+        .option('stops-after', {
+          describe: 'Step number to stop execution after',
+          type: 'number'
+        })
+        .alias('stops-after', 'e')
+        .option('verbose', {
+          describe: 'Show verbose output',
+          type: 'boolean',
+        })
+        .example('$0 workflow rerun my-workflow', 'Rerun the most recent execution of my-workflow')
+        .example('$0 workflow rerun my-workflow abc123', 'Rerun a specific workflow run')
+        .example('$0 workflow rerun my-workflow --starts-at=3', 'Rerun from step 3')
+        .example('$0 workflow rerun my-workflow --stops-after=5', 'Rerun and stop after step 5')
+        .example('$0 workflow rerun my-workflow --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
+        .example('$0 workflow rerun my-workflow --verbose', 'Rerun with verbose output');
+    }, handleWorkflowRerun)
+    .command('run <workflow-name>', 'Run a workflow\n', (yargs) => {
+      return yargs
+        .positional('workflow-name', {
+          describe: 'Name of the workflow',
+          type: 'string',
+          demandOption: true
+        })
+        .option('verbose', {
+          describe: 'Show verbose output',
+          type: 'boolean',
+        })
+        .example('$0 workflow run my-workflow', 'Run a workflow by name')
+        .example('$0 workflow run my-workflow --verbose', 'Run a workflow with verbose output');
+    }, handleWorkflowRun)
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--')) {
-      const [key] = arg.slice(2).split('=');
-      switch (key) {
-        case 'help':
-          printHelp();
-          process.exit(0);
-        case 'verbose':
-          options.verbose = true;
-          break;
-        case 'restart-from':
-          options.restartFrom = parseInt(arg.split('=')[1], 10);
-          break;
-        case 'end-after':
-          options.endAfter = parseInt(arg.split('=')[1], 10);
-          break;
-        case 'run-id':
-          options.runId = arg.split('=')[1];
-          break;
-        case 'list-runs':
-          options.listRuns = true;
-          break;
-        case 'list-steps':
-          options.listSteps = true;
-          break;
-      }
-    } else if (arg.startsWith('-')) {
-      const flag = arg.slice(1);
-      switch (flag) {
-        case 'h':
-          printHelp();
-          process.exit(0);
-        case 'v':
-          options.verbose = true;
-          break;
-        case 'r':
-          // For short options, the value is the next argument
-          if (i + 1 <= args.length) {
-            options.restartFrom = parseInt(args[++i], 10);
-          }
-          break;
-        case 'e':
-          if (i + 1 <= args.length) {
-            options.endAfter = parseInt(args[++i], 10);
-          }
-          break;
-      }
-    } else {
-      // Handle subcommands
-      if (arg === 'new' && nonOptionArgs.length === 0) {
-        options.new = true;
-      } else {
-        nonOptionArgs.push(arg);
-      }
-    }
+  if (isLocalDevMode) {
+    yargs.command('new <workflow-name>', 'Create a new workflow in the current project', (yargsNew) => {
+      return yargsNew
+        .positional('workflow-name', {
+          describe: 'Name of the new workflow'
+        })
+        .option('prompt', {
+          describe: 'Prompt to use for generating the workflow',
+          type: 'string',
+          alias: 'p'
+        })
+        .example('$0 workflow new my-workflow', 'Create a new workflow in the current project directory')
+        .example('$0 workflow new my-workflow -p "Generate a workflow for data processing"', 'Create a workflow using a prompt');
+    }, handleWorkflowNew);
   }
 
-  // Extract projectName only for 'new' command
-  let projectName: string | undefined;
-  if (options.new && nonOptionArgs.length > 0) {
-    projectName = nonOptionArgs[0];
-    nonOptionArgs.shift(); // Remove the project name
+  return yargs.demandCommand(1, 'You need to specify a workflow command');
+})
+
+// --- Agent Management Commands ---
+cli = cli.command('agent', 'Agents have tools, resources and an objective. They can have a human in the loop.\n', (yargs) => {
+  yargs
+    .command('list', 'List all agents in the active project\n', () => { })
+    .command('show <agent-name>', 'Show details and usage statistics for a specific agent\n', (yargs) => {
+      return yargs
+        .positional('agent-name', {
+          describe: 'Name of the agent',
+          type: 'string',
+          demandOption: true
+        });
+    })
+    .command('history <agent-name>', 'List recent history of a specific agent\n', (yargs) => {
+      return yargs
+        .positional('agent-name', {
+          describe: 'Name of the agent',
+          type: 'string',
+          demandOption: true
+        });
+    })
+
+
+  if (isLocalDevMode) {
+    yargs.command('new <agent-name>', 'Create a new agent in the current project', (yargsNew) => {
+      return yargsNew
+        .positional('agent-name', {
+          describe: 'Name of the new agent'
+        })
+        .option('prompt', {
+          describe: 'Prompt to use for generating the agent',
+          type: 'string',
+          alias: 'p'
+        })
+        .example('$0 agent new my-agent', 'Create a new agent in the current project directory')
+        .example('$0 agent new my-agent -p "Generate a customer service agent"', 'Create an agent using a prompt');
+    }, handleAgentNew); // Handler only runs in local mode now
   }
 
-  return {
-    ...options,
-    workflowPath: options.new ? undefined : nonOptionArgs[0],
-    projectName
-  };
-}
+  return yargs.demandCommand(1, 'You need to specify an agent command');
+})
 
-function printHelp() {
-  console.log(`
-Usage: positronic [command] [options] [args]
+// --- Prompt Management Commands ---
+cli = cli.command('prompt', 'Prompts are a one-shot call to an LLM with a typed return with no human in the loop (see agents for that) that you can use in your workflows.\n', (yargs) => {
+  yargs
+    .command('list', 'List all prompts in the active project\n', () => {}, handlePromptList)
+    .command('show <prompt-name>', 'Show prompt details including usage statistics\n', (yargs) => {
+      return yargs
+        .positional('prompt-name', {
+          describe: 'Name of the prompt',
+          type: 'string',
+          demandOption: true
+        })
+        .example('$0 prompt show my-prompt', 'Show usage statistics for my-prompt');
+    }, handlePromptShow)
 
-Commands:
-  positronic <workflow>       Run a workflow
-  positronic new <name>       Create a new Positronic project
-
-The <workflow> argument can be either:
-  - A path to a workflow file (e.g. ./workflows/my-workflow.ts)
-  - A workflow name (e.g. test-coverage) which will be searched for recursively
-
-Options:
-  --help, -h           Show this help message
-  --verbose, -v        Enable verbose logging
-  --restart-from=<n>   Restart workflow from step n
-  -r <n>               Shorthand for --restart-from
-  --end-after=<n>      Stop workflow after completing step n
-  -e <n>               Shorthand for --end-after
-  --run-id=<id>        Specify workflow run ID (optional with --restart-from)
-  --list-runs          List recent workflow runs
-  --list-steps         List all steps in the workflow
-
-Examples:
-  # Create a new Positronic project
-  positronic new my-workflows
-
-  # Run a workflow by path
-  positronic ./workflows/my-workflow.ts
-
-  # Run a workflow by name (searches recursively)
-  positronic test-coverage
-
-  # List recent workflow runs
-  positronic --list-runs
-
-  # Restart a workflow from step 3 (uses most recent run)
-  positronic --restart-from=3 test-coverage
-  # Or using shorthand:
-  positronic -r 3 test-coverage
-
-  # Run workflow and stop after step 5
-  positronic --end-after=5 test-coverage
-  # Or using shorthand:
-  positronic -e 5 test-coverage
-
-  # Restart from step 3 and run through step 5
-  positronic --restart-from=3 --end-after=5 test-coverage
-  # Or using shorthand:
-  positronic -r 3 -e 5 test-coverage
-
-  # Run workflow with verbose output
-  positronic -v test-coverage
-
-  # Restart a specific run from step 3
-  positronic --run-id=abc123 --restart-from=3 test-coverage
-`);
-}
-
-async function getRecentRuns(db: DatabaseType): Promise<Array<{
-  id: string;
-  workflowName: string;
-  status: string;
-  createdAt: string;
-}>> {
-  return db.prepare(`
-    SELECT
-      id,
-      workflow_name as workflowName,
-      status,
-      created_at as createdAt
-    FROM workflow_runs
-    ORDER BY created_at DESC
-    LIMIT 5
-  `).all() as Array<{
-    id: string;
-    workflowName: string;
-    status: string;
-    createdAt: string;
-  }>;
-}
-
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function loadTypeScriptWorkflow(filePath: string) {
-  try {
-    // Add .ts extension if not present
-    const fullPath = filePath.endsWith('.ts') ? filePath : `${filePath}.ts`;
-    const importedModule = await import(path.resolve(fullPath));
-    return importedModule.default;
-
-  } catch (error) {
-    console.error('Failed to load TypeScript workflow:', error);
-    throw error;
-  }
-}
-
-async function getLastWorkflowRun(db: DatabaseType, runId: string): Promise<{
-  runId: string;
-  completedSteps: SerializedStep[];
-} | null> {
-  const run = db.prepare(`
-    SELECT * FROM workflow_runs
-    WHERE id = ?
-  `).get(runId) as any;
-
-  if (!run) {
-    return null;
+  // Command available ONLY in Local Dev Mode
+  if (isLocalDevMode) {
+    yargs.command('new <prompt-name>', 'Create a new prompt in the current project', (yargsNew) => {
+      return yargsNew
+        .positional('prompt-name', {
+          describe: 'Name of the new prompt'
+        })
+        .example('$0 prompt new my-prompt', 'Create a new prompt file in the current project directory');
+    }, handlePromptNew); // Handler only runs in local mode now
   }
 
-  const completedSteps = db.prepare(`
-    SELECT
-      id,
-      title,
-      patch,
-      status
-    FROM workflow_steps
-    WHERE workflow_run_id = ? AND status = 'complete'
-    ORDER BY step_order ASC
-  `).all(run.id) as any[];
+  return yargs.demandCommand(1, 'You need to specify a prompt command');
+})
 
-  return {
-    runId: run.id,
-    completedSteps: completedSteps.map(step => ({
-      id: step.id,
-      title: step.title,
-      status: STATUS.COMPLETE,
-      patch: step.patch ? JSON.parse(step.patch) : undefined
-    }))
-  };
+// --- Resource Management Commands ---
+cli = cli.command('resource', 'Resources are any data that can be used in your workflows, agents, and prompts. They can be text or binaries.\n', (yargs) => {
+  return yargs
+    .command('list', 'List all resources in the active project\n', () => {}, handleResourceList)
+    .demandCommand(1, 'You need to specify a resource command');
+})
+
+// --- Service Management Commands ---
+cli = cli.command('service', 'Services are code that can be injected into your workflows and available in every Step.\n', (yargs) => {
+  return yargs
+    .command('list', 'List all services in the active project\n', () => {}, handleServiceList)
+    .demandCommand(1, 'You need to specify a service command');
+})
+
+// --- Execution Commands ---
+cli = cli.command('run <name-or-path>', 'Run a workflow or agent', (yargsRun) => {
+  return yargsRun
+    .positional('name-or-path', {
+      describe: 'Name of the workflow/agent to run',
+      type: 'string',
+      demandOption: true
+    })
+    // Options like --workflow, --agent might be fine
+    .option('workflow', {
+      describe: 'Explicitly specify workflow name',
+      type: 'string',
+    })
+    .option('agent', {
+      describe: 'Explicitly specify agent name',
+      type: 'string',
+    })
+    .option('starts-at', {
+      describe: 'Start workflow from specific step (requires --workflow)',
+      type: 'number',
+    })
+    .alias('starts-at', 's')
+    .option('stops-after', {
+      describe: 'Stop workflow after specific step (requires --workflow)',
+      type: 'number',
+    })
+    .alias('stops-after', 'e')
+    .option('verbose', {
+      describe: 'Show verbose output',
+      type: 'boolean',
+    })
+    // Rules: starts-at and stops-after require workflow to be specified
+    .implies('starts-at', 'workflow')
+    .implies('stops-after', 'workflow')
+    .example('$0 run my-workflow', 'Run a workflow by name')
+    .example('$0 run --workflow my-workflow', 'Explicitly run a workflow')
+    .example('$0 run --agent my-agent', 'Explicitly run an agent')
+    .example('$0 run --workflow my-workflow --starts-at=3 --verbose', 'Run workflow starting at step 3')
+    .example('$0 run --workflow my-workflow -s 3 -e 5', 'Run workflow steps 3 through 5');
+}, handleRun);
+
+// --- Global Project Creation (Available ONLY in Global Mode) ---
+if (!isLocalDevMode) {
+  cli = cli.command('new <project-name>', 'Create a new Positronic project directory', (yargs) => {
+    // This command creates the project structure locally, including `bin/positronic`
+    return yargs
+      .positional('project-name', {
+        describe: 'Name of the new project directory to create',
+        type: 'string',
+        demandOption: true
+      });
+  }, handleGlobalNewProject);
 }
 
-async function getMostRecentRunId(db: DatabaseType, workflowName: string): Promise<string | undefined> {
-  const run = db.prepare(`
-    SELECT id
-    FROM workflow_runs
-    WHERE workflow_name = ?
-    ORDER BY created_at DESC
-    LIMIT 1
-  `).get(workflowName) as { id: string } | undefined;
+// --- Global List Command ---
+cli = cli.command(
+  'list',
+  'List entities (workflows, agents, etc.) in the current project',
+  (yargsList) => {
+    return yargsList
+      .option('type', {
+        describe: 'Filter by entity type (can be specified multiple times)',
+        choices: ['workflow', 'agent', 'resource', 'prompt', 'service', 'all'],
+        default: 'all',
+        array: true
+      })
+      .example('$0 list', 'List all workflows, agents, resources, prompts and services in the current project')
+      .example('$0 list --type workflow', 'List workflows')
+      .example('$0 list --type agent', 'List agents')
+      .example('$0 list --type workflow --type agent', 'List both workflows and agents')
+      .example('$0 list --type resource', 'List resources')
+      .example('$0 list --type prompt', 'List prompts')
+      .example('$0 list --type service', 'List services');
+  }, handleGlobalList);
 
-  return run?.id;
+cli = cli.epilogue('For more information, visit https://positronic.sh');
+
+// Parse the arguments
+cli.parse();
+
+function handleGlobalNewProject(argv: any) {
+  console.log(`Creating new project: ${argv['project-name']}`);
 }
 
-function looksLikePath(input: string): boolean {
-  // Check if input contains path separators or starts with ./ or ../
-  return input.includes(path.sep) ||
-         input.startsWith('./') ||
-         input.startsWith('../') ||
-         path.isAbsolute(input);
+function handleRun(argv: any) {
+  console.log(`Running: ${argv['name-or-path']}`);
 }
 
-async function findFilesRecursively(dir: string, name: string, ignoreDirs: Set<string>): Promise<string[]> {
-  const results: string[] = [];
+// Placeholder handlers to be implemented
+function handleProjectAdd(argv: any) {
+  // Project directory structure (when created via `project new`):
+  // <project-name>/
+  //   ├── bin/
+  //   │   └── positronic       # Script that sets POSITRONIC_PROJECT_PATH and runs the global CLI
+  //   ├── workflows/
+  //   ├── agents/
+  //   ├── prompts/
+  //   ├── services/
+  //   └── resources/
+  //   └── (config files, etc.)
 
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        // Skip ignored directories
-        if (ignoreDirs.has(entry.name) || entry.name.startsWith('.')) {
-          continue;
-        }
-        results.push(...await findFilesRecursively(fullPath, name, ignoreDirs));
-      } else if (entry.isFile() && entry.name === `${name}.ts`) {
-        results.push(fullPath);
-      }
-    }
-  } catch (error) {
-    // Silently skip directories we can't access
+  // Implementation Notes:
+  // - This handler should only execute in Global Mode (isLocalDevMode === false).
+  // - It needs to store the project name and its mandatory URL in the CLI's global configuration.
+  // - The previous check for argv.path is removed as the option is gone.
+  console.log(`Adding project ${argv.name} with URL: ${argv.url}`);
+  if (isLocalDevMode) {
+     // This check might be redundant due to the yargs check, but good for clarity
+     console.error("Error: Project add command is not available in Local Development Mode.");
+     process.exit(1);
   }
-
-  return results;
+  // TODO: Implement storage of project name and URL in global config
 }
 
-async function findWorkflowByName(name: string): Promise<string | null> {
-  try {
-    const ignoreDirs = new Set([
-      'node_modules',
-      'dist',
-      'build',
-      'coverage',
-      '.git',
-      'tmp',
-      'temp'
-    ]);
-
-    const files = await findFilesRecursively(process.cwd(), name, ignoreDirs);
-
-    if (files.length === 0) {
-      return null;
-    }
-
-    if (files.length > 1) {
-      console.warn('Multiple workflow files found:');
-      files.forEach((file: string) => console.warn(`  ${file}`));
-      console.warn(`Using first match: ${files[0]}`);
-    }
-
-    return files[0];
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error occurred';
-    throw new Error(`Failed to search for workflow "${name}": ${message}`);
-  }
-}
-
-async function resolveWorkflowPath(workflowPath: string): Promise<string> {
-  if (looksLikePath(workflowPath)) {
-    // If it looks like a path, resolve it normally
-    const fullPath = path.resolve(process.cwd(), workflowPath);
-
-    // Add .ts extension if not present
-    if (!fullPath.endsWith('.ts')) {
-      const withExtension = `${fullPath}.ts`;
-      if (await fileExists(withExtension)) {
-        return withExtension;
-      }
-    }
-
-    if (await fileExists(fullPath)) {
-      return fullPath;
-    }
-
-    throw new Error(`Workflow file not found: ${fullPath}`);
+function handleProjectList() {
+  if (isLocalDevMode) {
+    console.log(`Showing details for local project at: ${localProjectPath}`);
+    // TODO: Implement listing logic for local project context
   } else {
-    // If it's just a name, search for it
-    const foundPath = await findWorkflowByName(workflowPath);
-    if (!foundPath) {
-      throw new Error(`No workflow file found matching name: ${workflowPath}`);
-    }
-    return foundPath;
+    console.log('Listing all configured projects');
+    // TODO: Implement listing logic for remote projects from global config
   }
 }
 
-// New function to handle the 'new' command
-async function createNewProject(projectName: string, verbose: boolean): Promise<void> {
-  // Create the project directory
-  const targetDir = path.resolve(process.cwd(), projectName);
+function handleProjectSelect(argv: any) {
+  // This handler only runs in Global Mode now
+  if (argv.name) {
+    console.log(`Selecting project: ${argv.name}`);
+    // TODO: Implement setting the active remote project (and its URL) in global config
+  } else {
+    console.log('Interactive project selection');
+    // TODO: Implement interactive selection from configured remote projects
+  }
+}
 
-  if (fs.existsSync(targetDir)) {
-    console.error(`Error: Directory ${projectName} already exists`);
+function handleProjectShow() {
+  if (isLocalDevMode) {
+    console.log(`Showing details for local project at: ${localProjectPath}`);
+    // TODO: Implement logic to show details of the project in the CWD
+  } else {
+    console.log('Showing active project');
+    // TODO: Implement logic to show the currently selected remote project from global config
+  }
+}
+
+function handleGlobalList(argv: any) {
+  const context = isLocalDevMode ? `local project at ${localProjectPath}` : 'selected remote project';
+  if (argv.type.includes('all')) {
+    console.log(`Listing all entity types in ${context}`);
+  } else {
+    console.log(`Listing entities of types: ${argv.type.join(', ')} in ${context}`);
+  }
+  // TODO: Implement actual listing logic, querying either local file system or remote API
+}
+
+// Add handler for workflow new command
+function handleWorkflowNew(argv: any) {
+  if (!isLocalDevMode) {
+    console.error("Error: Cannot create new workflows in Global Mode. Use `bin/positronic workflow new ...` within your project directory.");
     process.exit(1);
   }
-
-  if (verbose) {
-    console.log(`Creating new Positronic project: ${projectName}`);
-    console.log(`Target directory: ${targetDir}`);
-  }
-
-  fs.mkdirSync(targetDir, { recursive: true });
-
-  // Generate templates with project name
-  const templateProps = { projectName };
-
-  // Write the files
-  const filesToGenerate = [
-    {
-      filename: 'development.ts',
-      content: developmentTemplate(templateProps)
-    },
-    {
-      filename: 'production.ts',
-      content: productionTemplate(templateProps)
-    },
-    {
-      filename: 'package.json',
-      content: packageJsonTemplate(templateProps)
-    },
-    {
-      filename: 'tsconfig.json',
-      content: tsConfigTemplate(templateProps)
-    },
-    {
-      filename: '.gitignore',
-      content: gitignoreTemplate()
-    },
-  ];
-
-  for (const file of filesToGenerate) {
-    const filePath = path.join(targetDir, file.filename);
-    fs.writeFileSync(filePath, file.content);
-
-    if (verbose) {
-      console.log(`Created ${file.filename}`);
-    }
-  }
-
-  console.log(`Project ${projectName} created successfully!`);
-  console.log(`To get started:`);
-  console.log(`  cd ${projectName}`);
-  console.log(`  npm install`);
+  // Now we know we are in Local Dev Mode
+  console.log(`Creating new workflow in project ${localProjectPath}: ${argv['workflow-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
+  // TODO: Implement workflow creation logic within localProjectPath
 }
 
-async function main() {
-  try {
-    const { workflowPath, projectName, verbose, restartFrom, endAfter, runId, listRuns, listSteps, new: isNew } = parseArgs();
-
-    // Handle new command
-    if (isNew) {
-      if (!projectName) {
-        console.error('Error: Project name is required for the "new" command');
-        console.log('Usage: positronic new <project-name>');
-        process.exit(1);
-      }
-
-      await createNewProject(projectName, !!verbose);
-      process.exit(0);
-    }
-
-    const db = new Database('workflows.db');
-
-    // Handle list-runs command
-    if (listRuns) {
-      const recentRuns = await getRecentRuns(db);
-      console.log('-------------------');
-      recentRuns.forEach(run => {
-        console.log(`ID: ${run.id}`);
-        console.log(`Workflow: ${run.workflowName}`);
-        console.log(`Status: ${run.status}`);
-        console.log(`Created: ${run.createdAt}`);
-        console.log('-------------------');
-      });
-      process.exit(0);
-    }
-
-    // Require workflow path for other operations
-    if (!workflowPath) {
-      throw new Error('Workflow path is required unless using --list-runs or the "new" command');
-    }
-
-    const resolvedPath = await resolveWorkflowPath(workflowPath);
-    const workflow = await loadTypeScriptWorkflow(resolvedPath);
-    if (!workflow || workflow.type !== 'workflow') {
-      throw new Error(`File ${resolvedPath} does not export a workflow as default export\n\n`);
-    }
-
-    // Handle list-steps command
-    if (listSteps) {
-      console.log('Steps in workflow:', workflow.title);
-      console.log('-------------------');
-      if (!workflow.blocks || !Array.isArray(workflow.blocks)) {
-        console.log('No steps found in workflow');
-        process.exit(1);
-      }
-      workflow.blocks.forEach((step: { title: string }, index: number) => {
-        console.log(`${index + 1}. ${step.title}`);
-      });
-      process.exit(0);
-    }
-
-    let completedSteps: SerializedStep[] = [];
-    let workflowRunId: string | undefined;
-
-    if (restartFrom !== undefined) {
-      let targetRunId = runId;
-
-      // If no run ID provided, get the most recent run for this workflow
-      if (!targetRunId) {
-        targetRunId = await getMostRecentRunId(db, workflow.title);
-        if (!targetRunId) {
-          throw new Error(`No previous runs found for workflow: ${workflow.title}`);
-        }
-      }
-
-      const lastRun = await getLastWorkflowRun(db, targetRunId);
-      if (!lastRun) {
-        throw new Error(`No run found with ID: ${targetRunId}`);
-      }
-
-      const stepsToKeep = restartFrom - 1;
-      completedSteps = lastRun.completedSteps.slice(0, stepsToKeep);
-      workflowRunId = lastRun.runId;
-
-      if (completedSteps.length < stepsToKeep) {
-        throw new Error(`Workflow only has ${completedSteps.length} steps, cannot restart from step ${restartFrom}`);
-      }
-    }
-
-    const currentWorkflowDir = path.dirname(resolvedPath);
-
-    // Set up environment variables for the workflow
-    const env: Record<string, string> = {};
-    if (process.env.GITHUB_TOKEN) {
-      env.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-    }
-
-    let shell;
-    if (process.env.NODE_ENV === 'production') {
-      shell = new SSH2Shell({
-        host: '37.16.27.38',
-        username: 'root',
-        port: 2222,
-        agent: process.env.SSH_AUTH_SOCK,
-        env,
-        cwd: process.env.POSITRONIC_CWD
-      });
-
-      // Connect to SSH shell before running workflow
-      await shell.connect();
-    } else {
-      shell = new LocalShell({
-        cwd: process.env.POSITRONIC_CWD
-      });
-    }
-
-    const runner = new WorkflowRunner({
-      adapters: [
-        new SQLiteAdapter(db),
-        new ConsoleAdapter(restartFrom || 1)
-      ],
-      logger: console,
-      verbose: !!verbose,
-      client: new AnthropicClient(),
-    });
-
-    try {
-      await runner.run(workflow, {
-        initialState: {},
-        initialCompletedSteps: completedSteps,
-        workflowRunId,
-        endAfter
-      });
-    } finally {
-      if (shell instanceof SSH2Shell) {
-        await shell.disconnect();
-      }
-    }
-
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Failed to run workflow:', error.message);
-      if (error.stack) console.error(error.stack);
-    }
-    process.exit(1);
-  }
+// Add handler for agent new command
+function handleAgentNew(argv: any) {
+  // TODO: Implement this handler
+  // IMPORTANT: This handler should check if the currently selected project is local
+  // and throw an error if it's not, as creating entities requires a local project
+  // IMPORTANT: Agents are created as directories in the global agents directory
+  // IMPORTANT: Each agent directory includes an agent.ts file and a resources/ subdirectory
+  console.log(`Creating new agent: ${argv['agent-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
 }
 
-main();
+// Add handlers for the prompt commands
+function handlePromptNew(argv: any) {
+  // TODO: Implement this handler
+  // IMPORTANT: This handler should check if the currently selected project is local
+  // and throw an error if it's not, as creating entities requires a local project
+  // IMPORTANT: Prompts are created as single files in the global prompts directory
+  console.log(`Creating new prompt: ${argv['prompt-name']}`);
+}
+
+function handlePromptList() {
+  console.log('Listing all prompts');
+}
+
+function handlePromptShow(argv: any) {
+  console.log(`Showing prompt details for: ${argv['prompt-name']} including usage statistics`);
+}
+
+// Add handlers for the resource commands
+function handleResourceList() {
+  console.log('Listing all resources');
+}
+
+// Add handlers for the service commands
+function handleServiceList() {
+  console.log('Listing all services');
+}
+
+// Add handler for workflow rerun command
+function handleWorkflowRerun(argv: any) {
+  const workflowName = argv['workflow-name'];
+  const workflowRunId = argv['workflow-run-id'] || 'most recent run';
+  const startsAt = argv['starts-at'] ? ` starting at step ${argv['starts-at']}` : '';
+  const stopsAfter = argv['stops-after'] ? ` stopping after step ${argv['stops-after']}` : '';
+  const verbose = argv.verbose ? ' with verbose output' : '';
+
+  console.log(`Rerunning workflow: ${workflowName} (run: ${workflowRunId})${startsAt}${stopsAfter}${verbose}`);
+}
+
+// Add handler for workflow run command
+function handleWorkflowRun(argv: any) {
+  const workflowName = argv['workflow-name'];
+  const verbose = argv.verbose ? ' with verbose output' : '';
+
+  console.log(`Running workflow: ${workflowName}${verbose}`);
+}
+
+// Add handler for workflow history command
+function handleWorkflowHistory(argv: any) {
+  const workflowName = argv['workflow-name'];
+  const limit = argv.limit;
+
+  console.log(`Listing ${limit} recent runs for workflow: ${workflowName} (including output and state information)`);
+  // Here we would implement:
+  // 1. Query for recent workflow runs for the specified workflow
+  // 2. Display in a table format: Run ID, Start Time, Duration, Status
+  // 3. Include truncated output and state information for each run
+}
