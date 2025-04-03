@@ -174,7 +174,20 @@ cli = cli.command('agent', 'Agents have tools, resources and an objective. They 
           demandOption: true
         });
     })
-
+    .command('run <agent-name>', 'Run an agent\n', (yargs) => {
+      return yargs
+        .positional('agent-name', {
+          describe: 'Name of the agent',
+          type: 'string',
+          demandOption: true
+        })
+        .option('verbose', {
+          describe: 'Show verbose output',
+          type: 'boolean',
+        })
+        .example('$0 agent run my-agent', 'Run an agent by name')
+        .example('$0 agent run my-agent --verbose', 'Run an agent with verbose output');
+    }, handleAgentRun)
 
   if (isLocalDevMode) {
     yargs.command('new <agent-name>', 'Create a new agent in the current project', (yargsNew) => {
@@ -411,6 +424,15 @@ function handleAgentNew(argv: any) {
   // IMPORTANT: Agents are created as directories in the global agents directory
   // IMPORTANT: Each agent directory includes an agent.ts file and a resources/ subdirectory
   console.log(`Creating new agent: ${argv['agent-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
+}
+
+// Add handler for agent run command
+function handleAgentRun(argv: any) {
+  const agentName = argv['agent-name'];
+  const verbose = argv.verbose ? ' with verbose output' : '';
+
+  console.log(`Running agent: ${agentName}${verbose}`);
+  // TODO: Implement agent run logic (API call to local/remote server)
 }
 
 // Add handlers for the prompt commands
