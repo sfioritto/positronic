@@ -51,7 +51,7 @@ positronic workflow list
 positronic workflow history <workflow-name>
 
 # List all steps in a specific workflow
-positronic workflow steps <workflow-name>
+positronic workflow show <workflow-name>
 ```
 
 ### Agent Management
