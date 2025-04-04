@@ -2,6 +2,7 @@
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import { ProjectCommand } from './commands/project';
 
 // Environment Variable for Mode Detection:
 // POSITRONIC_PROJECT_PATH: If this environment variable is set, the CLI operates in
@@ -13,6 +14,9 @@ import { hideBin } from 'yargs/helpers';
 
 const isLocalDevMode = !!process.env.POSITRONIC_PROJECT_PATH;
 const localProjectPath = process.env.POSITRONIC_PROJECT_PATH;
+
+// Instantiate command classes
+const projectCommand = new ProjectCommand();
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -30,35 +34,71 @@ let cli = yargs(hideBin(process.argv))
 if (!isLocalDevMode) {
   cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject) => {
     yargsProject
-      .command('add <name>', 'Add a project to your list of projects', (yargsAdd) => {
-        return yargsAdd
-          .positional('name', {
-            describe: 'Name for the project',
-            type: 'string',
-            demandOption: true,
-          })
-          .option('url', {
-            describe: 'Project API URL',
-            type: 'string',
-            demandOption: true,
-          })
-          .example('$0 project add my-project --url https://api.my-project.positronic.sh', 'Add a project configuration');
-      }, handleProjectAdd)
-      .command('select [name]', 'Switch the active project', (yargsSelect) => {
-        return yargsSelect
-          .positional('name', {
-            describe: 'Project name to select',
-            type: 'string'
-          })
-          .example('$0 project select my-project', 'Switch the active project')
-          .example('$0 project select', 'Interactive project selection');
-      }, handleProjectSelect)
-      .command('list', 'List all of your Positronic projects', () => {}, handleProjectList)
-      .command('show', 'Display your currently selected project', () => {}, handleProjectShow)
+      .command(
+        'add <name>',
+        'Add a project to your list of projects',
+        (yargsAdd) => {
+          return yargsAdd
+            .positional('name', {
+              describe: 'Name for the project',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('url', {
+              describe: 'Project API URL',
+              type: 'string',
+              demandOption: true,
+            })
+            .example('$0 project add my-project --url https://api.my-project.positronic.sh', 'Add a project configuration');
+        },
+        (argv) => projectCommand.add(argv)
+      )
+      .command(
+        'select [name]',
+        'Switch the active project',
+        (yargsSelect) => {
+          return yargsSelect
+            .positional('name', {
+              describe: 'Project name to select',
+              type: 'string'
+            })
+            .example('$0 project select my-project', 'Switch the active project')
+            .example('$0 project select', 'Interactive project selection');
+        },
+        (argv) => projectCommand.select(argv)
+      )
+      .command(
+        'list',
+        'List all of your Positronic projects',
+        () => {},
+        () => projectCommand.list()
+      )
+      .command(
+        'show',
+        'Display your currently selected project',
+        () => {},
+        () => projectCommand.show()
+      )
       .demandCommand(1, 'You need to specify a project command');
 
     return yargsProject;
   });
+
+  // --- Global Project Creation (Available ONLY in Global Mode) ---
+  cli = cli.command(
+    'new <project-name>',
+    'Create a new Positronic project directory',
+    (yargsNew) => {
+        // This command creates the project structure locally, including `bin/positronic`
+        return yargsNew
+            .positional('project-name', {
+                describe: 'Name of the new project directory to create',
+                type: 'string',
+                demandOption: true
+            });
+    },
+    (argv) => projectCommand.create(argv)
+   );
 }
 
 // --- Workflow Management Commands ---
@@ -202,7 +242,7 @@ cli = cli.command('agent', 'Agents have tools, resources and an objective. They 
         })
         .example('$0 agent new my-agent', 'Create a new agent in the current project directory')
         .example('$0 agent new my-agent -p "Generate a customer service agent"', 'Create an agent using a prompt');
-    }, handleAgentNew); // Handler only runs in local mode now
+    }, handleAgentNew);
   }
 
   return yargs.demandCommand(1, 'You need to specify an agent command');
@@ -230,7 +270,7 @@ cli = cli.command('prompt', 'Prompts are a one-shot call to an LLM with a typed 
           describe: 'Name of the new prompt'
         })
         .example('$0 prompt new my-prompt', 'Create a new prompt file in the current project directory');
-    }, handlePromptNew); // Handler only runs in local mode now
+    }, handlePromptNew);
   }
 
   return yargs.demandCommand(1, 'You need to specify a prompt command');
@@ -291,19 +331,6 @@ cli = cli.command('run <name-or-path>', 'Run a workflow or agent', (yargsRun) =>
     .example('$0 run --workflow my-workflow -s 3 -e 5', 'Run workflow steps 3 through 5');
 }, handleRun);
 
-// --- Global Project Creation (Available ONLY in Global Mode) ---
-if (!isLocalDevMode) {
-  cli = cli.command('new <project-name>', 'Create a new Positronic project directory', (yargs) => {
-    // This command creates the project structure locally, including `bin/positronic`
-    return yargs
-      .positional('project-name', {
-        describe: 'Name of the new project directory to create',
-        type: 'string',
-        demandOption: true
-      });
-  }, handleGlobalNewProject);
-}
-
 // --- Global List Command ---
 cli = cli.command(
   'list',
@@ -330,69 +357,8 @@ cli = cli.epilogue('For more information, visit https://positronic.sh');
 // Parse the arguments
 cli.parse();
 
-function handleGlobalNewProject(argv: any) {
-  console.log(`Creating new project: ${argv['project-name']}`);
-}
-
 function handleRun(argv: any) {
   console.log(`Running: ${argv['name-or-path']}`);
-}
-
-// Placeholder handlers to be implemented
-function handleProjectAdd(argv: any) {
-  // Project directory structure (when created via `project new`):
-  // <project-name>/
-  //   ├── bin/
-  //   │   └── positronic       # Script that sets POSITRONIC_PROJECT_PATH and runs the global CLI
-  //   ├── workflows/
-  //   ├── agents/
-  //   ├── prompts/
-  //   ├── services/
-  //   └── resources/
-  //   └── (config files, etc.)
-
-  // Implementation Notes:
-  // - This handler should only execute in Global Mode (isLocalDevMode === false).
-  // - It needs to store the project name and its mandatory URL in the CLI's global configuration.
-  // - The previous check for argv.path is removed as the option is gone.
-  console.log(`Adding project ${argv.name} with URL: ${argv.url}`);
-  if (isLocalDevMode) {
-     // This check might be redundant due to the yargs check, but good for clarity
-     console.error("Error: Project add command is not available in Local Development Mode.");
-     process.exit(1);
-  }
-  // TODO: Implement storage of project name and URL in global config
-}
-
-function handleProjectList() {
-  if (isLocalDevMode) {
-    console.log(`Showing details for local project at: ${localProjectPath}`);
-    // TODO: Implement listing logic for local project context
-  } else {
-    console.log('Listing all configured projects');
-    // TODO: Implement listing logic for remote projects from global config
-  }
-}
-
-function handleProjectSelect(argv: any) {
-  // This handler only runs in Global Mode now
-  if (argv.name) {
-    console.log(`Selecting project: ${argv.name}`);
-    // TODO: Implement setting the active remote project (and its URL) in global config
-  } else {
-    console.log('Interactive project selection');
-    // TODO: Implement interactive selection from configured remote projects
-  }
-}
-
-function handleProjectShow() {
-  if (isLocalDevMode) {
-    console.log(`Showing details for local project at: ${localProjectPath}`);
-    // TODO: Implement logic to show details of the project in the CWD
-  } else {
-    console.log('Showing active project');
-    // TODO: Implement logic to show the currently selected remote project from global config
-  }
 }
 
 function handleGlobalList(argv: any) {
