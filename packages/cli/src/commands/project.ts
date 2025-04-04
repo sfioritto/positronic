@@ -1,5 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
+// Import templates
+import {
+    developmentTemplate,
+    productionTemplate,
+    packageJsonTemplate,
+    tsConfigTemplate,
+    gitignoreTemplate
+} from '../templates/index.js';
+
 // TODO: Consider passing config/mode info via constructor instead of relying on process.env here
 const isLocalDevMode = !!process.env.POSITRONIC_PROJECT_PATH;
 const localProjectPath = process.env.POSITRONIC_PROJECT_PATH;
@@ -81,7 +90,7 @@ export class ProjectCommand {
 
     /**
      * Handles the 'positronic new <project-name>' command.
-     * Creates a new project directory structure.
+     * Creates a new project directory structure and populates it with template files.
      * Only available in Global Mode.
      */
     create(argv: any): void {
@@ -100,27 +109,65 @@ export class ProjectCommand {
         try {
             // Create project root directory
             fs.mkdirSync(projectPath);
+            console.log(`  Created ./${path.relative(process.cwd(), projectPath)}/`);
+
 
             // Create standard subdirectories
-            const subdirs = ['bin', 'workflows', 'agents', 'prompts', 'services', 'resources'];
+            const subdirs = ['bin', 'workflows', 'agents', 'prompts', 'services', 'resources', 'config']; // Added config dir
             subdirs.forEach(subdir => {
                 const dirPath = path.join(projectPath, subdir);
                 fs.mkdirSync(dirPath);
                 // Create a .gitkeep file to ensure directories are added to git even if empty
                 fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
-                 console.log(`  Created ./${path.relative(process.cwd(), dirPath)}/`);
+                console.log(`  Created ./${path.relative(process.cwd(), dirPath)}/`);
             });
 
-            // TODO: Add template file generation (e.g., bin/positronic script, config files like package.json, tsconfig.json)
-            console.log(`Project '${projectName}' created successfully at ${projectPath}`);
-            console.log(`
-Next steps:`);
+            // --- Generate template files ---
+            const templateProps = { projectName };
+
+            const filesToGenerate = [
+                 {
+                    filename: path.join('config', 'development.ts'),
+                    content: developmentTemplate(templateProps)
+                },
+                {
+                    filename: path.join('config', 'production.ts'),
+                    content: productionTemplate(templateProps)
+                },
+                 {
+                    filename: 'package.json',
+                    content: packageJsonTemplate(templateProps)
+                },
+                {
+                    filename: 'tsconfig.json',
+                    content: tsConfigTemplate(templateProps)
+                },
+                {
+                    filename: '.gitignore',
+                    content: gitignoreTemplate() // gitignore doesn't need projectName
+                },
+            ];
+
+            filesToGenerate.forEach(file => {
+                const filePath = path.join(projectPath, file.filename);
+                 // Ensure subdirectories exist (e.g., for config/)
+                 const fileDir = path.dirname(filePath);
+                 // No need to check if exists, mkdirSync handles it if recursive: true (default in newer Node)
+                 // but we created 'config' explicitly above anyway.
+                fs.writeFileSync(filePath, file.content.trim() + '\n'); // Trim whitespace and add trailing newline
+                console.log(`  Created ./${path.relative(process.cwd(), filePath)}`);
+            });
+            // --- End template generation ---
+
+            console.log(`\nProject '${projectName}' created successfully at ${projectPath}`);
+            console.log(`\nNext steps:`);
             console.log(`  cd ${projectName}`);
+            console.log(`  npm install`); // Add npm install step
             console.log(`  # Start developing your project!`);
 
 
         } catch (error) {
-            console.error(`Error creating project directory structure:`, error);
+            console.error(`Error creating project directory structure or files:`, error);
             // Attempt cleanup if creation failed partway
             if (fs.existsSync(projectPath)) {
                 try {
