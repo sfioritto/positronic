@@ -294,7 +294,7 @@ cli = cli.command('service', 'Services are code that can be injected into your w
 })
 
 // --- Execution Commands ---
-cli = cli.command('run <name-or-path>', 'Run a workflow or agent', (yargsRun) => {
+cli = cli.command('run <name-or-path>', 'Run a workflow or agent\n', (yargsRun) => {
   return yargsRun
     .positional('name-or-path', {
       describe: 'Name of the workflow/agent to run',
