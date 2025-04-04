@@ -2,7 +2,7 @@
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { ProjectCommand } from './commands/project';
+import { ProjectCommand } from './commands/project.js';
 
 // Environment Variable for Mode Detection:
 // POSITRONIC_PROJECT_PATH: If this environment variable is set, the CLI operates in
@@ -31,8 +31,27 @@ let cli = yargs(hideBin(process.argv))
   .demandCommand(1, 'You need to specify a command');
 
 // --- Project Management Commands (Global Mode Only) ---
-if (!isLocalDevMode) {
-  cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject) => {
+cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject) => {
+  if (!isLocalDevMode) {
+    // Only 'new' is available in Global Mode
+    yargsProject
+      .command(
+        'new <project-name>',
+        'Create a new Positronic project directory',
+        (yargsNew) => {
+            // This command creates the project structure locally, including `bin/positronic`
+            return yargsNew
+                .positional('project-name', {
+                    describe: 'Name of the new project directory to create',
+                    type: 'string',
+                    demandOption: true
+                });
+        },
+        (argv) => projectCommand.create(argv)
+      )
+      .demandCommand(1, 'In Global Mode, only the \'new\' project command is available.');
+  } else {
+    // add, select, list, show are available in Local Dev Mode
     yargsProject
       .command(
         'add <name>',
@@ -79,27 +98,11 @@ if (!isLocalDevMode) {
         () => {},
         () => projectCommand.show()
       )
-      .demandCommand(1, 'You need to specify a project command');
+      .demandCommand(1, 'You need to specify a project command (add, select, list, show) in Local Dev Mode.');
+  }
 
-    return yargsProject;
-  });
-
-  // --- Global Project Creation (Available ONLY in Global Mode) ---
-  cli = cli.command(
-    'new <project-name>',
-    'Create a new Positronic project directory',
-    (yargsNew) => {
-        // This command creates the project structure locally, including `bin/positronic`
-        return yargsNew
-            .positional('project-name', {
-                describe: 'Name of the new project directory to create',
-                type: 'string',
-                demandOption: true
-            });
-    },
-    (argv) => projectCommand.create(argv)
-   );
-}
+  return yargsProject;
+});
 
 // --- Workflow Management Commands ---
 cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeScript code created by you Workflows can use agents, prompts, resources, and services.\n', (yargs) => {
