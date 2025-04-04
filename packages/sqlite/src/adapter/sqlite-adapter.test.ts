@@ -1,12 +1,12 @@
 import Database, { Database as DatabaseType } from "better-sqlite3";
 import { jest } from "@jest/globals";
-import { SQLiteAdapter } from ".";
+import { SQLiteAdapter } from "./index.js";
 import { STATUS, WORKFLOW_EVENTS, applyPatches, workflow, State } from "@positronic/core";
-import { nextStep } from "../../../../test-utils";
+import { nextStep } from "../../../../test-utils.js";
 import type {
   PromptClient, SerializedStep, StepStatusEvent, WorkflowStartEvent
 } from "@positronic/core";
-import { ResourceLoader } from "@positronic/resources/src/types";
+import { ResourceLoader } from "@positronic/resources/src/types.js";
 
 class TestResourceLoader implements ResourceLoader {
   load: ResourceLoader['load'] = jest.fn().mockImplementation(async () => 'content') as ResourceLoader['load'];

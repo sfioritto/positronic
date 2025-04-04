@@ -1,5 +1,5 @@
-import { WORKFLOW_EVENTS } from '../dsl/constants';
-import type { WorkflowEvent } from '../dsl/workflow';
+import { WORKFLOW_EVENTS } from '../dsl/constants.js';
+import type { WorkflowEvent } from '../dsl/workflow.js';
 
 export abstract class Adapter<Options extends object = any> {
   async started?(event: WorkflowEvent<Options>): Promise<void>;

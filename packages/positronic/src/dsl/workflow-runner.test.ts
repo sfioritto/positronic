@@ -1,7 +1,7 @@
-import { WorkflowRunner } from './workflow-runner';
-import { workflow } from './workflow';
-import { WORKFLOW_EVENTS, STATUS } from './constants';
-import { ResourceLoader } from '@positronic/resources/src/types';
+import { WorkflowRunner } from './workflow-runner.js';
+import { workflow } from './workflow.js';
+import { WORKFLOW_EVENTS, STATUS } from './constants.js';
+import { ResourceLoader } from '@positronic/resources/src/types.js';
 
 class TestResourceLoader implements ResourceLoader {
   async load(path: string, type?: 'text' | 'image' | 'binary'): Promise<string | Buffer> {

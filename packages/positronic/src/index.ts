@@ -1,8 +1,8 @@
-export { Workflow, workflow } from "./dsl/workflow";
-export { WorkflowRunner } from "./dsl/workflow-runner";
-export { createExtension } from "./dsl/extensions";
-export { STATUS, WORKFLOW_EVENTS } from "./dsl/constants";
-export { Adapter } from "./adapters/types";
+export { Workflow, workflow } from "./dsl/workflow.js";
+export { WorkflowRunner } from "./dsl/workflow-runner.js";
+export { createExtension } from "./dsl/extensions.js";
+export { STATUS, WORKFLOW_EVENTS } from "./dsl/constants.js";
+export { Adapter } from "./adapters/types.js";
 export type {
   WorkflowEvent,
   SerializedStep,
@@ -14,7 +14,7 @@ export type {
   StepStatusEvent,
   StepStartedEvent,
   StepCompletedEvent
-} from "./dsl/workflow";
-export type { PromptClient, ResponseModel } from "./clients/types";
-export type { State } from "./dsl/types";
-export { createPatch, applyPatches } from "./dsl/json-patch";
+} from "./dsl/workflow.js";
+export type { PromptClient, ResponseModel } from "./clients/types.js";
+export type { State } from "./dsl/types.js";
+export { createPatch, applyPatches } from "./dsl/json-patch.js";

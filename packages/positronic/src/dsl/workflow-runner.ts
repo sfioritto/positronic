@@ -1,10 +1,10 @@
-import { WORKFLOW_EVENTS } from './constants';
-import { applyPatches } from './json-patch';
-import type { Adapter } from "../adapters/types";
-import type { SerializedStep, Workflow } from './workflow';
-import type { State } from './types';
-import type { PromptClient } from '../clients/types';
-import type { Shell } from '@positronic/shell/src/types';
+import { WORKFLOW_EVENTS } from './constants.js';
+import { applyPatches } from './json-patch.js';
+import type { Adapter } from "../adapters/types.js";
+import type { SerializedStep, Workflow } from './workflow.js';
+import type { State } from './types.js';
+import type { PromptClient } from '../clients/types.js';
+import type { Shell } from '@positronic/shell/src/types.js';
 
 interface Logger {
   log(...args: any[]): void;

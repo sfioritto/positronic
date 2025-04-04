@@ -1,6 +1,6 @@
 import pkg from 'fast-json-patch';
 const { compare, applyPatch } = pkg;
-import { JsonPatch, State } from './types';
+import { JsonPatch, State } from './types.js';
 
 /**
  * Creates a JSON Patch that describes the changes needed to transform prevState into nextState.

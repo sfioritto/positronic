@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { Readable } from 'stream';
 
-import type { Shell, ExecCommandOptions, ExecCommandResponse } from './types';
+import type { Shell, ExecCommandOptions, ExecCommandResponse } from './types.js';
 
 interface LocalShellOptions {
   cwd?: string;

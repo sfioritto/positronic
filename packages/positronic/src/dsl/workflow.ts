@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { v4 as uuidv4 } from 'uuid';
-import type { PromptClient } from "../clients/types";
-import type { State, JsonPatch } from "./types";
-import { STATUS, WORKFLOW_EVENTS } from './constants';
-import { createPatch, applyPatches } from './json-patch';
-import type { Shell } from "@positronic/shell/src/types";
+import type { PromptClient } from "../clients/types.js";
+import type { State, JsonPatch } from "./types.js";
+import { STATUS, WORKFLOW_EVENTS } from './constants.js';
+import { createPatch, applyPatches } from './json-patch.js';
+import type { Shell } from "@positronic/shell/src/types.js";
 export type SerializedError = {
   name: string;
   message: string;

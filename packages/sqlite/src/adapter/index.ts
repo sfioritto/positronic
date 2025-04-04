@@ -8,7 +8,7 @@ import type {
   StepStatusEvent,
   StepStartedEvent,
 } from "@positronic/core";
-import { initSQL } from './sql';
+import { initSQL } from './sql.js';
 
 export class SQLiteAdapter extends Adapter {
   constructor(private db: DatabaseType) {

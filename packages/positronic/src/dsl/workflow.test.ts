@@ -1,10 +1,10 @@
-import { WORKFLOW_EVENTS, STATUS } from './constants';
-import { applyPatches} from './json-patch';
-import { State } from './types';
-import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow';
+import { WORKFLOW_EVENTS, STATUS } from './constants.js';
+import { applyPatches} from './json-patch.js';
+import { State } from './types.js';
+import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow.js';
 import { z } from 'zod';
-import { nextStep } from '../../../../test-utils';
-import { ResourceLoader } from '@positronic/resources/src/types';
+import { nextStep } from '../../../../test-utils.js';
+import { ResourceLoader } from '@positronic/resources/src/types.js';
 
 // Define a Logger interface for testing
 interface Logger {

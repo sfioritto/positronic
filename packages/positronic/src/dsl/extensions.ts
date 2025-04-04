@@ -1,4 +1,4 @@
-import { Workflow } from "./workflow";
+import { Workflow } from "./workflow.js";
 
 export function createExtension<
   TExtensionKey extends string,

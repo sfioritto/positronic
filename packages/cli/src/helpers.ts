@@ -6,7 +6,7 @@ import fs from 'fs';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { WorkflowRunner, STATUS } from '@positronic/core';
 import { AnthropicClient } from '@positronic/client-anthropic';
-import { ConsoleAdapter } from './console-adapter';
+import { ConsoleAdapter } from './console-adapter.js';
 import type { SerializedStep } from '@positronic/core';
 import { LocalShell, SSH2Shell } from '@positronic/shell';
 import { SQLiteAdapter } from '@positronic/sqlite';
@@ -17,7 +17,7 @@ import {
   packageJsonTemplate,
   tsConfigTemplate,
   gitignoreTemplate
-} from './templates';
+} from './templates/index.js';
 
 
 async function getRecentRuns(db: DatabaseType): Promise<Array<{

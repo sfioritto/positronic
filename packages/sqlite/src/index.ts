@@ -1,3 +1,3 @@
-import { SQLiteAdapter } from './adapter';
+import { SQLiteAdapter } from './adapter/index.js';
 
 export { SQLiteAdapter };

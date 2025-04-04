@@ -1,5 +1,5 @@
 import { Client, ClientChannel } from 'ssh2';
-import type { Shell, ExecCommandOptions, ExecCommandResponse } from './types';
+import type { Shell, ExecCommandOptions, ExecCommandResponse } from './types.js';
 import type { ConnectConfig } from 'ssh2';
 
 interface SSH2ShellOptions extends ConnectConfig {
