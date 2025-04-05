@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
+// Import Node.js built-in for running commands
+import { execSync } from 'child_process';
 // Import templates
 import {
     developmentTemplate,
@@ -158,6 +160,23 @@ export class ProjectCommand {
                 console.log(`  Created ./${path.relative(process.cwd(), filePath)}`);
             });
             // --- End template generation ---
+
+            // --- Initialize Git repository ---
+            try {
+                // stdio: 'ignore' prevents git init output from cluttering the console
+                execSync('git init', { cwd: projectPath, stdio: 'ignore' });
+                console.log('  Initialized Git repository.');
+            } catch (gitError: any) {
+                // Handle cases where git might not be installed or other errors
+                console.warn(`\nWarning: Could not initialize Git repository in ${projectPath}`);
+                if (gitError.message?.includes('command not found') || gitError.code === 'ENOENT') {
+                    console.warn('  Reason: Git command not found. Is Git installed and in your PATH?');
+                } else {
+                    console.warn(`  Reason: ${gitError.message}`);
+                }
+                console.warn('  Please initialize the repository manually if desired: cd <project_dir> && git init');
+            }
+            // --- End Git initialization ---
 
             console.log(`\nProject '${projectName}' created successfully at ${projectPath}`);
             console.log(`\nNext steps:`);

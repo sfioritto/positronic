@@ -6,7 +6,7 @@ export default ({ projectName }: { projectName: string }) => (`{
   "type": "module",
   "scripts": {
     "start": "positronic development",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \\"Error: no test specified\\" && exit 1"
   },
   "dependencies": {
     "@positronic/core": "latest",
