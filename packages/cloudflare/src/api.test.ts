@@ -1,5 +1,5 @@
 import { Miniflare } from 'miniflare';
-import type { CreateRunResponse } from '../types.js'; // Assuming types are exported from types.ts
+import type { CreateRunResponse } from './types.js'; // Assuming types are exported from types.ts
 
 // Simple bindings can remain here if needed in the future
 const mockBindings = {};
@@ -10,7 +10,7 @@ describe('Hono API (/runs)', () => {
 	beforeEach(() => {
 		mf = new Miniflare({
 			// Point scriptPath to the Hono API entry point
-			scriptPath: 'dist/api.js',
+			scriptPath: 'packages/cloudflare/dist/src/api.js',
 			modules: true,
 			bindings: mockBindings, // Basic JSON-serializable bindings
 
