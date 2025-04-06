@@ -97,9 +97,9 @@ This document outlines the intended end-to-end flow for running Positronic workf
   - **[X]** Define `WorkflowDO` class extending `DurableObject`.
   - **[X]** Implement `constructor` to initialize `state`, `env`.
   - **[X]** Implement `fetch` handler.
-- **[ ] Initialization & Workflow Loading:**
-  - **[ ]** Implement `/init` endpoint logic within `fetch` (or separate method called by fetch).
-  - **[ ]** Store `workflowRunId` passed from Hono.
+- **[X] Initialization & Workflow Loading:**
+  - **[X]** Implement `/init` endpoint logic within `fetch` (or separate method called by fetch).
+  - **[X]** Store `workflowRunId` passed from Hono.
   - **[ ]** Implement workflow manifest/registry lookup (based on bundled code).
   - **[ ]** Load the correct `Workflow` definition object.
   - **[ ]** Instantiate `WorkflowRunner`.
