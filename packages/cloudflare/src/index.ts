@@ -1,4 +1,5 @@
-import { DurableObject } from "cloudflare:workers";
+import type { DurableObjectNamespace, DurableObjectState, D1Database, DurableObject } from "@cloudflare/workers-types";
+import type { Env } from "./types.js";
 // Assuming core types are exported from the core package
 import { Workflow, WorkflowRunner, Adapter, PromptClient, WorkflowEvent } from "@positronic/core";
 
@@ -29,28 +30,30 @@ class DummyPromptClient implements PromptClient {
 }
 
 // Define the expected structure for the registry passed in initData
-// In reality, this might be simplified (e.g., just names, and DO fetches code)
-// or more complex, but for now, assume the Workflow objects are passed.
 type WorkflowRegistry = { [key: string]: Workflow<any, any, any> };
 
 // --- Durable Object ---
 
-export class WorkflowDO extends DurableObject<Env> {
+// Note: We don't 'extend' the interface, we implement the expected shape.
+export class WorkflowDO {
+	private state: DurableObjectState;
+	private env: Env;
 	private workflowRunId?: string;
 	private runner?: WorkflowRunner;
 	private adapters: Adapter[] = [];
 	private promptClient: PromptClient;
 	private workflows?: WorkflowRegistry; // To hold the registry passed during init
 
-	constructor(ctx: DurableObjectState, env: Env) {
-		super(ctx, env);
+	constructor(state: DurableObjectState, env: Env) {
+		this.state = state; // Store state
+		this.env = env;     // Store env
 		// Instantiate adapters and clients that rely on env bindings here
 		// TODO: Pass actual env bindings (like env.DB) to adapters
 		this.adapters = [
-			new D1Adapter(),
-			new WebSocketAdapter()
+			new D1Adapter(), // TODO: Pass this.env.DB
+			new WebSocketAdapter() // TODO: Pass this.state.getWebSockets() etc.
 		];
-		this.promptClient = new DummyPromptClient(); // TODO: Use actual client
+		this.promptClient = new DummyPromptClient(); // TODO: Use actual client, potentially configured via this.env
 		this.runner = new WorkflowRunner({
 			adapters: this.adapters,
 			logger: console, // Use console for logging for now
@@ -61,12 +64,13 @@ export class WorkflowDO extends DurableObject<Env> {
 
 	async fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
-		console.log(`[WorkflowDO ${this.ctx.id}] Received fetch request: ${request.method} ${url.pathname}`);
+		console.log(`[WorkflowDO ${this.state.id}] Received fetch request: ${request.method} ${url.pathname}`);
 
 		if (url.pathname === "/init" && request.method === "POST") {
 			try {
 				// Expect workflowRegistry along with other data
-				const initData = await request.json<{ workflowRunId: string; workflowName: string; workflowRegistry: WorkflowRegistry; }>();
+				// Remove type argument from json() and assert type after await
+				const initData = await request.json() as { workflowRunId: string; workflowName: string; workflowRegistry: WorkflowRegistry; };
 
 				if (!initData.workflowRunId || !initData.workflowName || !initData.workflowRegistry) {
 					return new Response("Missing workflowRunId, workflowName, or workflowRegistry in request body", { status: 400 });
@@ -74,25 +78,34 @@ export class WorkflowDO extends DurableObject<Env> {
 
 				this.workflowRunId = initData.workflowRunId;
 				this.workflows = initData.workflowRegistry; // Store the registry for this instance
-				console.log(`[WorkflowDO ${this.ctx.id}] Initialized with run ID: ${this.workflowRunId}`);
+				console.log(`[WorkflowDO ${this.state.id}] Initialized with run ID: ${this.workflowRunId}`);
+
+				// Add check for this.workflows before accessing
+				if (!this.workflows) {
+					console.error(`[WorkflowDO ${this.state.id}] Workflow registry not loaded.`);
+					return new Response("Internal Server Error: Workflow registry missing", { status: 500 });
+				}
 
 				// Load workflow definition from the passed registry
 				const workflowToRun = this.workflows[initData.workflowName];
 				if (!workflowToRun) {
-					console.error(`[WorkflowDO ${this.ctx.id}] Workflow not found in provided registry: ${initData.workflowName}`);
+					console.error(`[WorkflowDO ${this.state.id}] Workflow not found in provided registry: ${initData.workflowName}`);
 					return new Response(`Workflow '${initData.workflowName}' not found in provided registry`, { status: 404 });
 				}
 
 				// Start workflow run (don't await completion, let it run in background)
 				if (this.runner) {
-					this.runner.run(workflowToRun, {
+					// Use void to explicitly ignore the promise returned by the async run
+					void this.runner.run(workflowToRun, {
 						workflowRunId: this.workflowRunId
 						// TODO: Pass options if needed from initData
 					}).catch(err => {
-						console.error(`[WorkflowDO ${this.ctx.id}] Error during background workflow run ${this.workflowRunId}: ${err.message}`);
+						// Handle potential errors from the async run itself
+						console.error(`[WorkflowDO ${this.state.id}] Error during background workflow run ${this.workflowRunId}: ${err instanceof Error ? err.message : String(err)}`);
+						// TODO: Potentially update D1 status to ERROR here
 					});
 				} else {
-					console.error(`[WorkflowDO ${this.ctx.id}] WorkflowRunner not initialized!`);
+					console.error(`[WorkflowDO ${this.state.id}] WorkflowRunner not initialized!`);
 					return new Response("Internal Server Error: Runner not available", { status: 500 });
 				}
 
@@ -100,7 +113,7 @@ export class WorkflowDO extends DurableObject<Env> {
 
 				return new Response("WorkflowDO initialized successfully, run started.", { status: 200 });
 			} catch (error: any) {
-				console.error(`[WorkflowDO ${this.ctx.id}] Error during /init: ${error.message}`)
+				console.error(`[WorkflowDO ${this.state.id}] Error during /init: ${error.message}`)
 				return new Response("Failed to initialize WorkflowDO", { status: 500 });
 			}
 		}
