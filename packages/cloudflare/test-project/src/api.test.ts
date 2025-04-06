@@ -1,5 +1,5 @@
 import { Miniflare } from 'miniflare';
-import type { CreateRunResponse } from './types.js'; // Assuming types are exported from types.ts
+import type { CreateRunResponse } from '../../src/types.js'; // Assuming types are exported from types.ts
 
 // Simple bindings can remain here if needed in the future
 const mockBindings = {};
