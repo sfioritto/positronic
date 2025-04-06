@@ -18,6 +18,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/uuid": "^9.0.8"
+    "@types/uuid": "^9.0.8",
+    "miniflare": "^4.20250404.0"
   }
 }
