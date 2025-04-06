@@ -93,10 +93,10 @@ This document outlines the intended end-to-end flow for running Positronic workf
 
 ### 1. Core Durable Object (`WorkflowDO`)
 
-- **[ ] Basic Structure:**
-  - **[ ]** Define `WorkflowDO` class extending `DurableObject`.
-  - **[ ]** Implement `constructor` to initialize `state`, `env`.
-  - **[ ]** Implement `fetch` handler.
+- **[X] Basic Structure:**
+  - **[X]** Define `WorkflowDO` class extending `DurableObject`.
+  - **[X]** Implement `constructor` to initialize `state`, `env`.
+  - **[X]** Implement `fetch` handler.
 - **[ ] Initialization & Workflow Loading:**
   - **[ ]** Implement `/init` endpoint logic within `fetch` (or separate method called by fetch).
   - **[ ]** Store `workflowRunId` passed from Hono.

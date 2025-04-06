@@ -9,8 +9,8 @@
 	"compatibility_date": "2025-04-06",
 	"migrations": [
 		{
-			"new_sqlite_classes": [
-				"MyDurableObject"
+			"new_classes": [
+				"WorkflowDO"
 			],
 			"tag": "v1"
 		}
@@ -18,8 +18,8 @@
 	"durable_objects": {
 		"bindings": [
 			{
-				"class_name": "MyDurableObject",
-				"name": "MY_DURABLE_OBJECT"
+				"class_name": "WorkflowDO",
+				"name": "WORKFLOW_DO"
 			}
 		]
 	},
