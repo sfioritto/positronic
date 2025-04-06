@@ -2,6 +2,14 @@
 
 This document outlines the intended end-to-end flow for running Positronic workflows on Cloudflare, incorporating D1 for primary state and delayed hibernation for Durable Objects. It also includes a checklist for implementation.
 
+**Deployment Model Clarification:**
+
+- The `@positronic/cloudflare` package (this code) will be published as an npm library.
+- User projects are generated via the CLI and include `@positronic/cloudflare` as a dependency.
+- The **user's project** is the Cloudflare deployment unit. Users run `wrangler deploy` from their project.
+- The user project's build process is responsible for bundling their specific workflows/agents alongside the `@positronic/cloudflare` library code.
+- The `WorkflowDO` and Hono API (defined in this library) need to be designed to accept user-defined code/configuration (like a workflow registry) dynamically at runtime, likely passed during initialization.
+
 ## Updated End-to-End Flow Simulation (D1 State & Delayed Hibernation)
 
 1.  **User (CLI):** Initiates a run: `positronic run my-workflow --verbose`.
@@ -91,7 +99,7 @@ This document outlines the intended end-to-end flow for running Positronic workf
 
 ## Implementation To-Do List
 
-### 1. Core Durable Object (`WorkflowDO`)
+### 1. Core Durable Object (`WorkflowDO`) (Library Component)
 
 - **[X] Basic Structure:**
   - **[X]** Define `WorkflowDO` class extending `DurableObject`.
@@ -100,12 +108,12 @@ This document outlines the intended end-to-end flow for running Positronic workf
 - **[X] Initialization & Workflow Loading:**
   - **[X]** Implement `/init` endpoint logic within `fetch` (or separate method called by fetch).
   - **[X]** Store `workflowRunId` passed from Hono.
-  - **[ ]** Implement workflow manifest/registry lookup (based on bundled code).
-  - **[ ]** Load the correct `Workflow` definition object.
-  - **[ ]** Instantiate `WorkflowRunner`.
-  - **[ ]** Instantiate and configure `D1Adapter`.
-  - **[ ]** Instantiate and configure `WebSocketAdapter`.
-  - **[ ]** Instantiate/Inject `PromptClient` and other `Services` (using `env` bindings).
+  - **[X]** Accept workflow manifest/registry during `/init`.
+  - **[X]** Load the correct `Workflow` definition object from the provided manifest/registry.
+  - **[X]** Instantiate `WorkflowRunner`.
+  - **[X]** Instantiate and configure `D1Adapter`.
+  - **[X]** Instantiate and configure `WebSocketAdapter`.
+  - **[X]** Instantiate/Inject `PromptClient` and other `Services` (using `env` bindings).
 - **[ ] State Management (Hybrid Approach):**
   - **[ ]** Add `currentState: State | null` property.
   - **[ ]** Implement `ensureWorkflowLoaded()` method:
@@ -193,22 +201,50 @@ This document outlines the intended end-to-end flow for running Positronic workf
 - **[ ] WebSocket Streaming (Optional/Verbose):**
   - **[ ]** Add optional flag (`--stream`?) to connect to the returned `webSocketUrl` and display events in real-time.
 
-### 6. Deployment & Configuration (`wrangler.toml`)
+### 6. User Project Deployment & Configuration (`wrangler.jsonc` in User Project)
 
-- **[ ] Hono Worker:**
-  - **[ ]** Configure worker entry point.
-  - **[ ]** Bind D1 database.
-  - **[ ]** Bind DO namespace.
-  - **[ ]** Configure routes.
-  - **[ ]** Add necessary secrets (API keys, etc.).
-- **[ ] Durable Object Worker:**
-  - **[ ]** Define DO class name and script name.
+- **[ ] Hono API Setup (in User's Worker):**
+  - **[ ]** User's worker entry point (`src/index.ts`) imports Hono setup from `@positronic/cloudflare` library.
+  - **[ ]** User's worker binds D1 database in their `wrangler.jsonc`.
+  - **[ ]** User's worker binds DO namespace in their `wrangler.jsonc`.
+  - **[ ]** User's worker configures Hono routes (if extending base API).
+  - **[ ]** User's worker adds necessary secrets (API keys, etc.) in their `wrangler.jsonc`.
+- **[ ] Durable Object Configuration (in User's `wrangler.jsonc`):**
+  - **[ ]** Define DO binding pointing to the `WorkflowDO` class imported from `@positronic/cloudflare` library.
   - **[ ]** Configure DO migrations (if needed).
-  - **[ ]** Bind D1 database.
-  - **[ ]** Bind any necessary services or secrets (e.g., LLM API keys).
-  - **[ ]** Enable `websockets_hibernation` compatibility flag.
-- **[ ] Build Process:**
-  - **[ ]** Ensure the build process bundles the Positronic framework, workflow/agent manifest, and all definitions into the DO worker script.
+  - **[ ]** Ensure necessary bindings (D1, services, secrets) are available to the DO via user's `wrangler.jsonc`.
+  - **[ ]** Enable `websockets_hibernation` compatibility flag in user's `wrangler.jsonc`.
+
+#### Workflow/Agent Manifest & Registry Explained
+
+How does the `WorkflowDO` (running code from the `@positronic/cloudflare` library) access and execute the user's specific workflow/agent code?
+
+1.  **Bundling is Key:** When the user runs `wrangler deploy`, the bundler (esbuild) traces all `import` statements starting from the user's entry point (`src/index.ts`). It bundles the user's Hono setup, their workflow/agent definitions, the `@positronic/cloudflare` library (including `WorkflowDO`), and all other dependencies into **one single JavaScript file**. There's no dynamic file loading in Cloudflare Workers/DOs at runtime.
+2.  **User Manifest File:** The user's project build process should generate (or the user maintains) a manifest file (e.g., `src/positronic-manifest.ts`). This file uses standard JavaScript `import` statements to bring in all the user-defined workflow/agent objects.
+
+    ```typescript
+    // Example: src/positronic-manifest.ts
+    import myWorkflow from "./workflows/my-workflow";
+    import anotherWorkflow from "./workflows/another-workflow";
+    import myAgent from "./agents/my-agent";
+
+    export const workflowRegistry = {
+      "my-workflow": myWorkflow,
+      "another-workflow": anotherWorkflow,
+    };
+
+    export const agentRegistry = {
+      "my-agent": myAgent,
+    };
+    ```
+
+3.  **Registry is Live Objects:** The `workflowRegistry` (and `agentRegistry`) exported by the manifest are JavaScript objects mapping string names to the **actual, live object references** (e.g., `myWorkflow` object instance) that were imported and bundled.
+4.  **Passing the Registry:** The user's main worker entry point (Hono API) imports this manifest (`import { workflowRegistry } from './positronic-manifest';`). When it calls the `WorkflowDO`'s `/init` endpoint, it includes this `workflowRegistry` object in the JSON payload.
+5.  **DO Lookup:** The `WorkflowDO` receives this live object map in its `/init` handler. When it needs to run a workflow by name (e.g., "my-workflow"), it performs a simple property lookup on the received registry object (`this.workflows['my-workflow']`). This lookup returns the direct reference to the bundled `myWorkflow` object, which is then passed to the `WorkflowRunner`.
+
+- **[ ] User Project Build Process:**
+  - **[X]** Ensure the user's build process generates a workflow/agent manifest (e.g., `src/positronic-manifest.ts`) that imports and exports runnable objects. _(Mechanism clarified above)_
+  - **[ ]** Ensure the user's build process bundles their definitions and the `@positronic/cloudflare` library correctly.
 
 ### 7. Authentication & Authorization
 

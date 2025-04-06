@@ -28,12 +28,10 @@ class DummyPromptClient implements PromptClient {
 	}
 }
 
-// TODO: Replace with actual workflow definitions/loading mechanism
-const workflowRegistry: { [key: string]: Workflow<any, any, any> } = {
-	// Example: assumes a workflow named 'hello' is defined somewhere
-	// import helloWorkflow from './workflows/hello';
-	// hello: helloWorkflow
-};
+// Define the expected structure for the registry passed in initData
+// In reality, this might be simplified (e.g., just names, and DO fetches code)
+// or more complex, but for now, assume the Workflow objects are passed.
+type WorkflowRegistry = { [key: string]: Workflow<any, any, any> };
 
 // --- Durable Object ---
 
@@ -42,6 +40,7 @@ export class WorkflowDO extends DurableObject<Env> {
 	private runner?: WorkflowRunner;
 	private adapters: Adapter[] = [];
 	private promptClient: PromptClient;
+	private workflows?: WorkflowRegistry; // To hold the registry passed during init
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
@@ -66,29 +65,30 @@ export class WorkflowDO extends DurableObject<Env> {
 
 		if (url.pathname === "/init" && request.method === "POST") {
 			try {
-				const initData = await request.json<{ workflowRunId: string; workflowName: string; }>();
+				// Expect workflowRegistry along with other data
+				const initData = await request.json<{ workflowRunId: string; workflowName: string; workflowRegistry: WorkflowRegistry; }>();
 
-				if (!initData.workflowRunId || !initData.workflowName) {
-					return new Response("Missing workflowRunId or workflowName in request body", { status: 400 });
+				if (!initData.workflowRunId || !initData.workflowName || !initData.workflowRegistry) {
+					return new Response("Missing workflowRunId, workflowName, or workflowRegistry in request body", { status: 400 });
 				}
 
 				this.workflowRunId = initData.workflowRunId;
+				this.workflows = initData.workflowRegistry; // Store the registry for this instance
 				console.log(`[WorkflowDO ${this.ctx.id}] Initialized with run ID: ${this.workflowRunId}`);
 
-				// Load workflow definition
-				const workflowToRun = workflowRegistry[initData.workflowName];
+				// Load workflow definition from the passed registry
+				const workflowToRun = this.workflows[initData.workflowName];
 				if (!workflowToRun) {
-					console.error(`[WorkflowDO ${this.ctx.id}] Workflow not found: ${initData.workflowName}`);
-					return new Response(`Workflow '${initData.workflowName}' not found`, { status: 404 });
+					console.error(`[WorkflowDO ${this.ctx.id}] Workflow not found in provided registry: ${initData.workflowName}`);
+					return new Response(`Workflow '${initData.workflowName}' not found in provided registry`, { status: 404 });
 				}
 
 				// Start workflow run (don't await completion, let it run in background)
 				if (this.runner) {
 					this.runner.run(workflowToRun, {
 						workflowRunId: this.workflowRunId
-						// TODO: Pass options if needed
+						// TODO: Pass options if needed from initData
 					}).catch(err => {
-						// Log errors from the background run
 						console.error(`[WorkflowDO ${this.ctx.id}] Error during background workflow run ${this.workflowRunId}: ${err.message}`);
 					});
 				} else {
@@ -116,10 +116,4 @@ export class WorkflowDO extends DurableObject<Env> {
 	// TODO: Add helper methods (resetHibernationTimer, ensureWorkflowLoaded, etc.)
 }
 
-export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		const id: DurableObjectId = env.WORKFLOW_DO.idFromName("example-workflow-run");
-		const stub = env.WORKFLOW_DO.get(id);
-		return stub.fetch(request);
-	},
-} satisfies ExportedHandler<Env>;
+// No default export, this file now acts as a library exporting WorkflowDO
