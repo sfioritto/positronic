@@ -1,50 +1,22 @@
-import { Miniflare } from 'miniflare';
-import type { CreateRunResponse } from '../../src/types.js'; // Assuming types are exported from types.ts
+import { describe, it, expect } from 'vitest';
+// SELF is often globally available when using the pool, remove explicit import
+// import { SELF } from '@cloudflare/vitest-pool-workers';
+// Import types from the built library output
+import type { CreateRunResponse } from '../../dist/types/types.js';
 
-// Simple bindings can remain here if needed in the future
-const mockBindings = {};
+// Remove mockBindings, bindings come from wrangler.toml
 
 describe('Hono API (/runs)', () => {
-	let mf: Miniflare;
+	// No need for mf: Miniflare variable
 
-	beforeEach(() => {
-		mf = new Miniflare({
-			// Point scriptPath to the Hono API entry point
-			scriptPath: 'packages/cloudflare/dist/src/api.js',
-			modules: true,
-			bindings: mockBindings, // Basic JSON-serializable bindings
-
-			// Configure D1 Databases
-			d1Databases: {
-				DB: 'test-d1-db' // Miniflare will create an in-memory DB with this ID
-			},
-
-			// Configure Durable Objects
-			durableObjects: {
-				// The binding name used in the worker code (e.g., env.DO_NAMESPACE)
-				DO_NAMESPACE: {
-					// The *exported* class name from the script
-					className: 'WorkflowDO',
-					// The path to the script that exports the DO class.
-					// This might need adjustment based on your build output.
-					// If your Hono API and DO are bundled together, scriptPath might suffice.
-					// If they are separate, provide the path to the DO script.
-					// For now, let's assume it's bundled or accessible via the main scriptPath.
-					// scriptName: 'dist/index.js' // Example if separate
-				}
-			},
-
-			// We will need to mock the DO's fetch method more realistically later
-			// or let Miniflare instantiate the actual DO and test its behavior.
-		});
-	});
+	// No need for beforeEach/afterEach in this simple case
 
 	it('should return 201 Created with workflowRunId and webSocketUrl on valid POST /runs', async () => {
 		const testWorkflowName = 'test-workflow';
 		const requestBody = JSON.stringify({ workflowName: testWorkflowName });
 
-		// Use dispatchFetch to send a request to the Miniflare instance
-		const res = await mf.dispatchFetch('http://localhost/runs', {
+		// Use self.fetch (standard worker global scope)
+		const res = await self.fetch('http://localhost/runs', { // Hostname doesn't usually matter here
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: requestBody,
@@ -62,10 +34,8 @@ describe('Hono API (/runs)', () => {
 		expect(body).toHaveProperty('webSocketUrl');
 		expect(typeof body.webSocketUrl).toBe('string');
 		// Basic check for the URL format, might need refinement
+		// The hostname might be different in the test environment
 		expect(body.webSocketUrl).toMatch(/^wss?:\/\/.+\/ws\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
-
-		// Clean up the Miniflare instance after the test
-		await mf.dispose();
 	});
 
 	// Add more tests later (e.g., for missing workflowName, DO errors, etc.)
