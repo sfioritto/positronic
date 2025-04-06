@@ -1,0 +1,9 @@
+{
+  "watch": ["packages/**/*"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/worker-configuration.d.ts"
+  ],
+  "ext": "ts,js,json"
+}

@@ -1,0 +1,21 @@
+{
+  "name": "cloudflare",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "cf-typegen": "wrangler types",
+    "tsc": "tsc --project tsconfig.json",
+    "swc": "swc src -d dist",
+    "build": "npm run cf-typegen && npm run tsc && npm run swc",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist"
+  },
+  "dependencies": {
+    "@positronic/core": "^0.0.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250406.0",
+    "wrangler": "^4.7.2"
+  }
+}
