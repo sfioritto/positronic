@@ -22,6 +22,13 @@ describe('Hono API (/runs)', () => {
 			body: requestBody,
 		});
 
+		// Log the response body if the status is not 201
+		if (res.status !== 201) {
+			console.error('Test received non-201 status:', res.status);
+			const errorBody = await res.text(); // Get raw text in case JSON parsing fails
+			console.error('Response Body:', errorBody);
+		}
+
 		// Expectations
 		expect(res.status).toBe(201);
 
