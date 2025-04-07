@@ -9,8 +9,8 @@
 	"compatibility_date": "2025-04-06",
 	"migrations": [
 		{
-			"new_sqlite_classes": [
-				"MyDurableObject"
+			"new_classes": [
+				"WorkflowRunOrchestratorDO"
 			],
 			"tag": "v1"
 		}
@@ -18,11 +18,19 @@
 	"durable_objects": {
 		"bindings": [
 			{
-				"class_name": "MyDurableObject",
-				"name": "MY_DURABLE_OBJECT"
+				"class_name": "WorkflowRunOrchestratorDO",
+				"name": "DO_NAMESPACE"
 			}
 		]
 	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "test-db",
+			"database_id": "__test-db-id__",
+			"preview_database_id": "__test-db-id__"
+		}
+	],
 	"observability": {
 		"enabled": true
 	}

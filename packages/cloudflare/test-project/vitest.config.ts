@@ -7,8 +7,9 @@ export default defineWorkersConfig({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           durableObjects: {
-            MY_DURABLE_OBJECT: "MyDurableObject",
+            DO_NAMESPACE: "WorkflowRunOrchestratorDO",
           },
+          d1Databases: ["DB"],
         },
       },
     },

@@ -4,31 +4,34 @@ import {
   waitOnExecutionContext,
 } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
-// Could import any other source file/function here
-import worker from "../src";
+// Import the worker (which now points to the Hono app)
+import worker from "../src/index";
 
-// For now, you'll need to do something like this to get a correctly-typed
-// `Request` to pass to `worker.fetch()`.
-const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
+// Define the expected Env shape based on wrangler.jsonc for type safety in tests
+interface TestEnv {
+  DO_NAMESPACE: DurableObjectNamespace;
+  DB: D1Database;
+}
 
-describe("Hello World worker", () => {
-  it("responds with Hello World!", async () => {
-    const request = new IncomingRequest("http://example.com");
-    // Create an empty context to pass to `worker.fetch()`
+describe("Hono API Tests", () => {
+  it("POST /runs without workflowName should return 400", async () => {
+    // Cast the test env to the expected shape for type checking
+    const testEnv = env as unknown as TestEnv;
+
+    const request = new Request("http://example.com/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}), // Empty body, no workflowName
+    });
     const ctx = createExecutionContext();
-    const response = await worker.fetch(request, env, ctx);
-    // Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
+    const response = await worker.fetch(request, testEnv, ctx);
     await waitOnExecutionContext(ctx);
-    expect(await response.text()).toBe("Hello, world!");
+
+    expect(response.status).toBe(400);
+    // Optionally, check the error message in the response body
+    const responseBody = await response.json();
+    expect(responseBody).toEqual({ error: 'Missing workflowName in request body' });
   });
-  it("responds with not found and proper status for /404", async () => {
-    const request = new IncomingRequest("http://example.com/404");
-    // Create an empty context to pass to `worker.fetch()`
-    const ctx = createExecutionContext();
-    const response = await worker.fetch(request, env, ctx);
-    // Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
-    await waitOnExecutionContext(ctx);
-    expect(await response.status).toBe(404);
-    expect(await response.text()).toBe("Not found");
-  });
+
+  // Add more tests here later...
 });
