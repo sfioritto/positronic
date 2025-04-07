@@ -5,11 +5,11 @@ import type { Env, CreateRunRequest, CreateRunResponse } from './types.js';
 // Define the Hono app with Cloudflare Worker environment types
 const app = new Hono<{ Bindings: Env }>();
 
-app.post('/runs', async (c: Context<{ Bindings: Env }>) => {
-  const { workflowName } = await c.req.json<CreateRunRequest>();
+app.post('/runs', async (context: Context<{ Bindings: Env }>) => {
+  const { workflowName } = await context.req.json<CreateRunRequest>();
 
   if (!workflowName) {
-    return c.json({ error: 'Missing workflowName in request body' }, 400);
+    return context.json({ error: 'Missing workflowName in request body' }, 400);
   }
 
   // --- TODO: Implement Workflow Validation --- //
@@ -23,10 +23,10 @@ app.post('/runs', async (c: Context<{ Bindings: Env }>) => {
   // await db.prepare(...).bind(...).run();
 
   // --- DO Interaction ---
-  const doNamespace = c.env.DO_NAMESPACE;
+  const doNamespace = context.env.DO_NAMESPACE;
   if (!doNamespace) {
     console.error('[api.ts] DO_NAMESPACE binding not found!');
-    return c.json({ error: 'Internal Server Configuration Error: DO binding missing' }, 500);
+    return context.json({ error: 'Internal Server Configuration Error: DO binding missing' }, 500);
   }
   // Use a deterministic ID for testing/simplicity for now, based on workflowRunId
   const doId = doNamespace.idFromString(workflowRunId);
@@ -36,7 +36,7 @@ app.post('/runs', async (c: Context<{ Bindings: Env }>) => {
     // IMPORTANT: Use a realistic URL for the DO fetch, even in tests.
     // Using a relative path or placeholder might not work correctly.
     // Constructing a URL based on the incoming request host is safer.
-    const initUrl = new URL(c.req.url);
+    const initUrl = new URL(context.req.url);
     initUrl.pathname = '/init'; // Target the /init path on the DO
 
     const doResponse = await stub.fetch(initUrl.toString(), {
@@ -53,24 +53,24 @@ app.post('/runs', async (c: Context<{ Bindings: Env }>) => {
     if (!doResponse.ok) {
       const errorText = await doResponse.text();
       console.error(`[api.ts] DO stub.fetch(/init) failed: ${doResponse.status} ${errorText}`);
-      return c.json({ error: `Failed to initialize workflow run: ${errorText}` }, 502); // 502 Bad Gateway
+      return context.json({ error: `Failed to initialize workflow run: ${errorText}` }, 502); // 502 Bad Gateway
     }
 
   } catch (err: any) {
     console.error(`[api.ts] Error calling DO stub.fetch(/init): ${err.message || err}`);
-    return c.json({ error: 'Internal Server Error communicating with workflow service' }, 500);
+    return context.json({ error: 'Internal Server Error communicating with workflow service' }, 500);
   }
 
   // --- Construct Actual WebSocket URL ---
   // This will depend on how the DO is exposed (e.g., via a service binding or specific route)
-  const webSocketUrl = `wss://${c.req.header('host')}/ws/${workflowRunId}`; // Placeholder
+  const webSocketUrl = `wss://${context.req.header('host')}/ws/${workflowRunId}`; // Placeholder
 
   const response: CreateRunResponse = {
     workflowRunId,
     webSocketUrl,
   };
 
-  return c.json(response, 201); // 201 Created
+  return context.json(response, 201); // 201 Created
 });
 
 export default app;
