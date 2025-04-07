@@ -48,6 +48,10 @@ export default {
 	 * @returns The response to be sent back to the client
 	 */
 	async fetch(request, env, ctx): Promise<Response> {
+		const { pathname } = new URL(request.url);
+		if (pathname === "/404") {
+      return new Response("Not found", { status: 404 });
+    }
 		// Create a `DurableObjectId` for an instance of the `MyDurableObject`
 		// class named "foo". Requests from all Workers to the instance named
 		// "foo" will go to a single globally unique Durable Object instance.

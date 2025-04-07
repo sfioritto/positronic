@@ -19,6 +19,16 @@ describe("Hello World worker", () => {
     const response = await worker.fetch(request, env, ctx);
     // Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
     await waitOnExecutionContext(ctx);
-    expect(await response.text()).toBe("Hello World!");
+    expect(await response.text()).toBe("Hello, world!");
+  });
+  it("responds with not found and proper status for /404", async () => {
+    const request = new IncomingRequest("http://example.com/404");
+    // Create an empty context to pass to `worker.fetch()`
+    const ctx = createExecutionContext();
+    const response = await worker.fetch(request, env, ctx);
+    // Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
+    await waitOnExecutionContext(ctx);
+    expect(await response.status).toBe(404);
+    expect(await response.text()).toBe("Not found");
   });
 });
