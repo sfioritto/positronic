@@ -14,30 +14,23 @@ app.post('/runs', async (c: Context<{ Bindings: Env }>) => {
 
   // --- TODO: Implement Workflow Validation --- //
   // Check if workflowName exists in bundled manifest or D1 registry
-  console.log(`Received request to run workflow: ${workflowName}`);
 
   const workflowRunId = uuidv4();
-  console.log(`Generated workflowRunId: ${workflowRunId}`);
 
   // --- TODO: Implement D1 Interaction --- //
   // Create initial record in `workflow_runs` table (status='INITIALIZING')
   // const db = c.env.DB;
   // await db.prepare(...).bind(...).run();
-  console.log('TODO: Write initial run record to D1');
 
   // --- DO Interaction ---
-  console.log('[api.ts] Attempting to get DO Namespace binding...');
   const doNamespace = c.env.DO_NAMESPACE;
   if (!doNamespace) {
     console.error('[api.ts] DO_NAMESPACE binding not found!');
     return c.json({ error: 'Internal Server Configuration Error: DO binding missing' }, 500);
   }
-  console.log('[api.ts] DO Namespace binding found. Creating ID...');
   // Use a deterministic ID for testing/simplicity for now, based on workflowRunId
   const doId = doNamespace.idFromString(workflowRunId);
-  console.log(`[api.ts] DO ID created: ${doId}. Getting DO stub...`);
   const stub = doNamespace.get(doId);
-  console.log('[api.ts] DO stub retrieved. Calling stub.fetch(/init)...');
 
   try {
     // IMPORTANT: Use a realistic URL for the DO fetch, even in tests.
@@ -57,8 +50,6 @@ app.post('/runs', async (c: Context<{ Bindings: Env }>) => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    console.log(`[api.ts] DO stub.fetch(/init) response status: ${doResponse.status}`);
-
     if (!doResponse.ok) {
       const errorText = await doResponse.text();
       console.error(`[api.ts] DO stub.fetch(/init) failed: ${doResponse.status} ${errorText}`);
@@ -70,12 +61,9 @@ app.post('/runs', async (c: Context<{ Bindings: Env }>) => {
     return c.json({ error: 'Internal Server Error communicating with workflow service' }, 500);
   }
 
-  console.log('[api.ts] DO stub.fetch(/init) call successful.');
-
   // --- Construct Actual WebSocket URL ---
   // This will depend on how the DO is exposed (e.g., via a service binding or specific route)
   const webSocketUrl = `wss://${c.req.header('host')}/ws/${workflowRunId}`; // Placeholder
-  console.log(`Constructed placeholder WebSocket URL: ${webSocketUrl}`);
 
   const response: CreateRunResponse = {
     workflowRunId,
