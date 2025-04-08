@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
-import { WorkflowRunnerDO } from './workflow-runner.js';
+import { WorkflowRunnerDO } from './workflow-runner-do.js';
 
 type Bindings = {
   WORKFLOW_RUNNER_DO: WorkflowRunnerDO
