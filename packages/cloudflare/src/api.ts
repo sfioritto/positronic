@@ -1,11 +1,24 @@
 import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
-import type { Env, CreateRunRequest, CreateRunResponse } from './types.js';
+import { WorkflowRunnerDO } from './workflow-runner.js';
+
+type Bindings = {
+  WORKFLOW_RUNNER_DO: WorkflowRunnerDO
+}
+
+type CreateRunRequest = {
+  workflowName: string
+}
+
+type CreateRunResponse = {
+  workflowRunId: string
+  webSocketUrl: string
+}
 
 // Define the Hono app with Cloudflare Worker environment types
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Bindings }>();
 
-app.post('/runs', async (context: Context<{ Bindings: Env }>) => {
+app.post('/runs', async (context: Context) => {
   const { workflowName } = await context.req.json<CreateRunRequest>();
 
   if (!workflowName) {
@@ -17,15 +30,10 @@ app.post('/runs', async (context: Context<{ Bindings: Env }>) => {
 
   const workflowRunId = uuidv4();
 
-  // --- TODO: Implement D1 Interaction --- //
-  // Create initial record in `workflow_runs` table (status='INITIALIZING')
-  // const db = c.env.DB;
-  // await db.prepare(...).bind(...).run();
-
   // --- DO Interaction ---
-  const doNamespace = context.env.DO_NAMESPACE;
+  const doNamespace = context.env.WORKFLOW_RUNNER_DO;
   if (!doNamespace) {
-    console.error('[api.ts] DO_NAMESPACE binding not found!');
+    console.error('[api.ts] WORKFLOW_RUNNER_DO binding not found!');
     return context.json({ error: 'Internal Server Configuration Error: DO binding missing' }, 500);
   }
   // Use a deterministic ID for testing/simplicity for now, based on workflowRunId

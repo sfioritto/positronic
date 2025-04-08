@@ -4,6 +4,9 @@
     "rootDir": "./src",
     "emitDeclarationOnly": true,
     "declarationDir": "./dist/types",
+    "types": [
+      "@cloudflare/workers-types/experimental",
+    ],
   },
   "include": ["**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts", "test-project"]
