@@ -61,8 +61,11 @@ describe("Hono API Tests", () => {
     // Fetch the /isStarted endpoint from the DO stub
     const doResponse = await stub.fetch("http://do/isStarted");
     expect(doResponse.status).toBe(200);
-    const doResponseBody = await doResponse.json<{ started: boolean }>();
+    // Check the response body for started status and the result
+    const doResponseBody = await doResponse.json<{ started: boolean; result?: string }>();
     expect(doResponseBody.started).toBe(true);
+    // Assert that the result matches the output of helloWorld()
+    expect(doResponseBody.result).toBe("Hello, World! from test project function.");
   });
 
   // Add more tests here later...
