@@ -37,7 +37,7 @@ describe("Hono API Tests", () => {
 
   it("POST /workflows/runs with workflowName should return 201 and create a DO instance", async () => {
     const testEnv = env as TestEnv;
-    const workflowName = "my-test-workflow";
+    const workflowName = "basic-workflow";
 
     const request = new Request("http://example.com/workflows/runs", {
       method: "POST",
@@ -65,7 +65,7 @@ describe("Hono API Tests", () => {
     const doResponseBody = await doResponse.json<{ started: boolean; result?: string }>();
     expect(doResponseBody.started).toBe(true);
     // Assert that the result matches the output of helloWorld()
-    expect(doResponseBody.result).toBe("Hello, World! from test project function.");
+    expect(doResponseBody.result).toBe("Hello, World!");
   });
 
   // Add more tests here later...

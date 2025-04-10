@@ -12,12 +12,6 @@ class TestResourceLoader implements ResourceLoader {
 describe('WorkflowRunner', () => {
   const mockClient = {
     execute: jest.fn(),
-
-  };
-
-  const mockShell = {
-    execCommand: jest.fn(),
-    exec: jest.fn()
   };
 
   const mockLogger = {

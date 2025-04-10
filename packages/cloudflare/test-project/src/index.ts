@@ -1,16 +1,27 @@
+import { workflow } from '@positronic/core';
 import app from '../../src/api';
-import { setRuntimeManifest, WorkflowRunnerDO } from '../../src/workflow-runner-do';
+import { setManifest, WorkflowRunnerDO } from '../../src/workflow-runner-do';
 
-function helloWorld(name: string = "World"): string {
-	console.log("[test-project] helloWorld function executed!");
-	return `Hello, ${name}! from test project function.`;
-}
+const basicWorkflow = workflow('basic-workflow')
+.step('First step', ({ state }) => ({
+	...state,
+	hello: 'Hello',
+}))
+.step('Second step', ({ state }) => ({
+	...state,
+	world: 'World!',
+}))
+.step('Third step', ({ state }) => ({
+	...state,
+	message: `${state.hello}, ${state.world}`,
+}));
+
 
 const inlineManifest = {
-	'my-test-workflow': helloWorld,
+	'basic-workflow': basicWorkflow,
 };
 
-setRuntimeManifest(inlineManifest);
+setManifest(inlineManifest);
 
 export default {
 	fetch: app.fetch,

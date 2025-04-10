@@ -37,7 +37,7 @@ export class WorkflowRunner {
       workflowRunId?: string | never,
       endAfter?: number
     } = {}
-  ) {
+  ): Promise<TState> {
     const {
       adapters,
       logger: { log },
@@ -83,7 +83,7 @@ export class WorkflowRunner {
               this.truncateDeep(structuredClone(currentState)), null, 2
             )}`);
           }
-          return;
+          return currentState;
         }
 
         stepNumber++;
@@ -99,6 +99,8 @@ export class WorkflowRunner {
         )}`);
       }
     }
+
+    return currentState;
   }
 
   private truncateDeep(obj: any, maxLength: number = 100): any {

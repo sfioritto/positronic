@@ -6,7 +6,15 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "test-project",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-04-06",
+	"compatibility_date": "2025-04-04",
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_classes": [
+				"WorkflowRunnerDO"
+			]
+		}
+	],
 	"durable_objects": {
 		"bindings": [
 			{

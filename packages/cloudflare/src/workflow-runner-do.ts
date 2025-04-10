@@ -1,11 +1,20 @@
+import { WorkflowRunner } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
+import type { Workflow, PromptClient, ResponseModel } from '@positronic/core';
+import { z, TypeOf } from 'zod';
 
-export type SimpleManifestFunction = (...args: any[]) => any;
-export type PositronicManifest = Record<string, SimpleManifestFunction>;
+export type PositronicManifest = Record<string, Workflow | undefined>;
 
-let runtimeManifest: PositronicManifest | null = null;
+const baseClient: PromptClient = {
+  execute: async <T extends z.AnyZodObject>(prompt: string, responseModel: ResponseModel<T>): Promise<TypeOf<T>> => {
+    // Fake implementation returning a string, using type assertion to satisfy the generic type
+    return "stuff" as any;
+  },
+};
 
-export function setRuntimeManifest(manifest: PositronicManifest) {
+let runtimeManifest: PositronicManifest = {};
+
+export function setManifest(manifest: PositronicManifest) {
   runtimeManifest = manifest;
 }
 
@@ -22,10 +31,21 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
   }
 
   async start(workflowName: string) {
-    const functionToRun = runtimeManifest![workflowName];
-    const result = functionToRun();
+    const workflowToRun = runtimeManifest[workflowName];
+    if (!workflowToRun) {
+      throw new Error(`Workflow ${workflowName} not found`);
+    }
+    const runner = new WorkflowRunner({
+      adapters: [],
+      logger: {
+        log: console.log,
+      },
+      verbose: false,
+      client: baseClient,
+    });
+    const result = await runner.run(workflowToRun) as { message: string };
     await this.state.storage.put('started', true);
-    await this.state.storage.put('startResult', result);
+    await this.state.storage.put('startResult', result.message);
   }
 
   async fetch(request: Request): Promise<Response> {
