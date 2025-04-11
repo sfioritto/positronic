@@ -177,6 +177,21 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
         .example('$0 workflow run my-workflow', 'Run a workflow by name')
         .example('$0 workflow run my-workflow --verbose', 'Run a workflow with verbose output');
     }, handleWorkflowRun)
+    .command('watch <workflow-name>', 'Watch a specific workflow run for live updates\n', (yargs) => {
+      return yargs
+        .positional('workflow-name', {
+          describe: 'Name of the workflow',
+          type: 'string',
+          demandOption: true
+        })
+        .option('run-id', {
+          describe: 'ID of the workflow run to watch',
+          type: 'string',
+          demandOption: true,
+          alias: 'id'
+        })
+        .example('$0 workflow watch my-workflow --run-id abc123', 'Watch the workflow run with ID abc123');
+    }, handleWorkflowWatch)
 
   if (isLocalDevMode) {
     yargs.command('new <workflow-name>', 'Create a new workflow in the current project', (yargsNew) => {
@@ -247,6 +262,22 @@ cli = cli.command('agent', 'Agents have tools, resources and an objective. They 
         .example('$0 agent new my-agent -p "Generate a customer service agent"', 'Create an agent using a prompt');
     }, handleAgentNew);
   }
+
+  yargs.command('watch <agent-name>', 'Watch a specific agent run for live updates\n', (yargs) => {
+    return yargs
+      .positional('agent-name', {
+        describe: 'Name of the agent',
+        type: 'string',
+        demandOption: true
+      })
+      .option('run-id', {
+        describe: 'ID of the agent run to watch',
+        type: 'string',
+        demandOption: true,
+        alias: 'id'
+      })
+      .example('$0 agent watch my-agent --run-id def456', 'Watch the agent run with ID def456');
+  }, handleAgentWatch);
 
   return yargs.demandCommand(1, 'You need to specify an agent command');
 })
@@ -460,4 +491,20 @@ function handleWorkflowHistory(argv: any) {
   // 1. Query for recent workflow runs for the specified workflow
   // 2. Display in a table format: Run ID, Start Time, Duration, Status
   // 3. Include truncated output and state information for each run
+}
+
+// Add handler for workflow watch command
+function handleWorkflowWatch(argv: any) {
+  const workflowName = argv['workflow-name'];
+  const runId = argv['run-id'];
+  console.log(`Watching workflow: ${workflowName}, Run ID: ${runId}`);
+  // TODO: Implement SSE connection logic
+}
+
+// Add handler for agent watch command
+function handleAgentWatch(argv: any) {
+  const agentName = argv['agent-name'];
+  const runId = argv['run-id'];
+  console.log(`Watching agent: ${agentName}, Run ID: ${runId}`);
+  // TODO: Implement SSE connection logic
 }

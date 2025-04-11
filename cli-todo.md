@@ -50,8 +50,11 @@ positronic workflow list
 # List recent history of a specific workflow
 positronic workflow history <workflow-name>
 
-# List all steps in a specific workflow
+# List all steps in a specific workflow and other details
 positronic workflow show <workflow-name>
+
+# Watch a specific workflow run for updates
+positronic workflow watch <workflow-name> --run-id <run-id>
 ```
 
 ### Agent Management
@@ -65,6 +68,9 @@ positronic agent show <agent-name>
 
 # List recent history of a specific agent
 positronic agent history <agent-name>
+
+# Watch a specific agent run for updates
+positronic agent watch <agent-name> --run-id <run-id>
 ```
 
 ### Prompt Management
@@ -131,11 +137,15 @@ positronic new <project-name>
    - Refactor workflow discovery/loading logic
    - Implement workflow list/history/steps/run commands
    - Create workflow runner that works with both local and cloud workflows
+   - Implement workflow watch command with SSE connection
+   - Implement workflow watch command to show live updates for a run
 
 4. **Implement agent commands**
 
    - Define agent structure and interface
    - Implement agent list/run/show/history commands
+   - Implement agent watch command with SSE connection
+   - Implement agent watch command to show live updates for a run
 
 5. **Implement prompt commands**
 
@@ -164,9 +174,3 @@ positronic new <project-name>
    - Add colorful, interactive components with Ink
    - Implement loading indicators for long-running operations
    - Create helpful error messages and suggestions
-
-## Migration Strategy
-
-- Initially support both old and new command formats
-- Deprecate old format with warnings
-- Move fully to new command structure after sufficient transition period
