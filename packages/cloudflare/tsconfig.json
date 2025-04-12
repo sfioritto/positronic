@@ -5,7 +5,7 @@
     "emitDeclarationOnly": true,
     "declarationDir": "./dist/types",
     "types": [
-      "@cloudflare/workers-types/experimental",
+      "@cloudflare/workers-types"
     ],
   },
   "include": ["**/*"],

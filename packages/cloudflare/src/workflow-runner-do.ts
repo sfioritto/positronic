@@ -8,7 +8,6 @@ export type PositronicManifest = Record<string, Workflow | undefined>;
 
 const baseClient: PromptClient = {
   execute: async <T extends z.AnyZodObject>(prompt: string, responseModel: ResponseModel<T>): Promise<TypeOf<T>> => {
-    // Fake implementation returning a string, using type assertion to satisfy the generic type
     return "stuff" as any;
   },
 };
@@ -24,23 +23,27 @@ export interface Env {
 }
 
 export class WorkflowRunnerDO extends DurableObject<Env> {
-  private state: any;
-  private adapter: WorkflowRunSQLiteAdapter;
+  private sql: SqlStorage;
+  private workflowRunId: string;
 
-  constructor(state: any, env: Env) {
+  constructor(state: DurableObjectState, env: Env) {
     super(state, env);
-    this.state = state;
-    this.adapter = new WorkflowRunSQLiteAdapter(state.storage.sql);
+    this.sql = state.storage.sql;
+    this.workflowRunId = state.id.toString();
   }
 
-  async startWorkflow(workflowName: string, initialData?: Record<string, any>) {
+  async start(workflowName: string, initialData?: Record<string, any>) {
+    const { sql, workflowRunId } = this;
+
     const workflowToRun = runtimeManifest[workflowName];
     if (!workflowToRun) {
       throw new Error(`Workflow ${workflowName} not found`);
     }
 
+    const sqliteAdapter = new WorkflowRunSQLiteAdapter(sql);
+
     const runner = new WorkflowRunner({
-      adapters: [this.adapter],
+      adapters: [sqliteAdapter],
       logger: {
         log: console.log,
       },
@@ -48,55 +51,34 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
       client: baseClient,
     });
 
-    try {
-      const result = await runner.run(workflowToRun, { initialState: initialData || {} });
-      console.log(`Workflow ${workflowName} (DO ID: ${this.state.id}) completed with result:`, result);
-      return result;
-    } catch (error: any) {
-      console.error(`Workflow ${workflowName} (DO ID: ${this.state.id}) failed:`, error.message, error.stack);
-      throw error;
-    }
+    await runner.run(workflowToRun, {
+        initialState: initialData || {},
+        workflowRunId,
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
+    const { sql, workflowRunId } = this;
     const url = new URL(request.url);
 
-    if (url.pathname === '/start' && request.method === 'POST') {
-      try {
-        const body = await request.json<{ workflowName: string; initialData?: Record<string, any> }>();
-        if (!body || !body.workflowName) {
-          return new Response('Bad Request: Missing workflowName in JSON body', { status: 400 });
-        }
-        this.startWorkflow(body.workflowName, body.initialData).catch(e => console.error(`Background workflow failed: ${e.message}`));
-        return new Response(JSON.stringify({ message: 'Workflow started', durableObjectId: this.state.id.toString() }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 202
-        });
-      } catch (e: any) {
-        console.error("Error starting workflow:", e);
-        return new Response(`Internal Server Error: ${e.message}`, { status: 500 });
-      }
-    }
-
     if (url.pathname === '/status') {
-      try {
-        const sql = `SELECT status, error, started_at, completed_at FROM workflow_runs WHERE id = ?`;
-        // Use .first() to fetch the first row or null if no rows are found
-        const result = await this.state.storage.sql.prepare(sql).bind(this.state.id.toString()).first();
+      const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_runs WHERE id = ? ORDER BY started_at DESC LIMIT 1`;
+      const result = sql.exec<{
+        status: string;
+        error: string | null;
+        started_at: number;
+        completed_at: number | null;
+      }>(statusSql, workflowRunId).one();
 
-        if (result == null) {
-          return new Response(JSON.stringify({ status: 'not_found' }), {
-            headers: { 'Content-Type': 'application/json' },
-            status: 404
-          });
-        }
-        return new Response(JSON.stringify(result), {
+      if (result == null) {
+        return new Response(JSON.stringify({ status: 'not_found' }), {
           headers: { 'Content-Type': 'application/json' },
+          status: 404
         });
-      } catch (e: any) {
-        console.error("Error fetching status:", e);
-        return new Response(`Internal Server Error fetching status: ${e.message}`, { status: 500 });
       }
+      return new Response(JSON.stringify(result), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response('Not found', { status: 404 });

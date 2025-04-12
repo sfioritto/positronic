@@ -17,7 +17,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250407.0",
+    "@cloudflare/workers-types": "^4.20250412.0",
     "@types/uuid": "^9.0.8"
   }
 }
