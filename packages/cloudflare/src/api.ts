@@ -34,12 +34,12 @@ app.post('/workflows/runs', async (context: Context) => {
     return context.json(response, 201);
 });
 
-app.get('/workflows/runs/:runId/status', async (context: Context) => {
+app.get('/workflows/runs/:runId/watch', async (context: Context) => {
     const runId = context.req.param('runId');
     const namespace = context.env.WORKFLOW_RUNNER_DO;
     const doId = namespace.idFromName(runId);
     const stub = namespace.get(doId);
-    const response = await stub.fetch(new Request(`http://do/status`));
+    const response = await stub.fetch(new Request(`http://do/watch`));
     const statusData = await response.json();
     return context.json(statusData, response.status);
 });

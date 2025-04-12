@@ -62,7 +62,7 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     const url = new URL(request.url);
 
     try {
-      if (url.pathname === '/status') {
+      if (url.pathname === '/watch') {
         const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_runs ORDER BY started_at ASC LIMIT 1`;
         const result = sql.exec<{
           status: string;

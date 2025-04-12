@@ -58,7 +58,7 @@ describe("Hono API Tests", () => {
     const stub = testEnv.WORKFLOW_RUNNER_DO.get(doId);
     // Wait for promises in the main worker context
     await waitOnExecutionContext(context);
-    const doResponse = await stub.fetch(`http://do/status`);
+    const doResponse = await stub.fetch(`http://do/watch`);
     expect(doResponse.status).toBe(200);
 
     const doResponseBody = await doResponse.json<{
