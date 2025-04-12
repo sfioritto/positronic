@@ -57,11 +57,9 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     });
   }
 
-  async fetch(request: Request): Promise<Response> {
-    console.log('FETCH');
-    const { sql, workflowRunId } = this;
+  async fetch(request: Request) {
+    const { sql } = this;
     const url = new URL(request.url);
-    console.log('WORKFLOW RUN ID', workflowRunId);
 
     try {
       if (url.pathname === '/status') {
@@ -80,7 +78,6 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
 
       return new Response('Not found', { status: 404 });
     } catch (error) {
-      console.error('WORKFLOW RUN ID', workflowRunId);
       console.error('Error fetching status', error);
       return new Response('Internal server error', { status: 500 });
     }

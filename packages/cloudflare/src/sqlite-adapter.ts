@@ -27,7 +27,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
         this.sql = sql;
     }
 
-    private async initializeSchema(): Promise<void> {
+    private async initializeSchema() {
         try {
             await this.sql.exec(initSQL);
         } catch (e: any) {
@@ -36,7 +36,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
         }
     }
 
-    public async dispatch(event: WorkflowEvent): Promise<void> {
+    public async dispatch(event: WorkflowEvent) {
         if (event.type === WORKFLOW_EVENTS.START || event.type === WORKFLOW_EVENTS.RESTART) {
             await this.handleWorkflowStart(event);
         } else if (event.type === WORKFLOW_EVENTS.COMPLETE) {
@@ -46,8 +46,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
         }
     }
 
-    private async handleWorkflowStart(event: WorkflowStartEvent): Promise<void> {
-        console.log(JSON.stringify(event, null, 2));
+    private async handleWorkflowStart(event: WorkflowStartEvent) {
         await this.initializeSchema();
 
         const sql = `
@@ -69,8 +68,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
         }
     }
 
-    private async handleComplete(event: WorkflowCompleteEvent): Promise<void> {
-        console.log('Handle the complete event', event.status);
+    private async handleComplete(event: WorkflowCompleteEvent) {
         const sql = `
             UPDATE workflow_runs
             SET
@@ -87,7 +85,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
         }
     }
 
-    private async handleWorkflowError(event: WorkflowErrorEvent): Promise<void> {
+    private async handleWorkflowError(event: WorkflowErrorEvent) {
         const sql = `
             UPDATE workflow_runs
             SET
