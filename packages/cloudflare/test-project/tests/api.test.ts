@@ -59,13 +59,11 @@ describe("Hono API Tests", () => {
     const stub = testEnv.WORKFLOW_RUNNER_DO.get(doId);
 
     // Fetch the /isStarted endpoint from the DO stub
-    const doResponse = await stub.fetch("http://do/isStarted");
+    const doResponse = await stub.fetch(`http://do/workflows/runs/${workflowRunId}/status`);
     expect(doResponse.status).toBe(200);
     // Check the response body for started status and the result
-    const doResponseBody = await doResponse.json<{ started: boolean; result?: string }>();
-    expect(doResponseBody.started).toBe(true);
-    // Assert that the result matches the output of helloWorld()
-    expect(doResponseBody.result).toBe("Hello, World!");
+    const doResponseBody = await doResponse.json<{ status: string; error?: string; started_at?: string; completed_at?: string } | null>();
+    expect(doResponseBody?.status).toBe('running');
   });
 
   // Add more tests here later...

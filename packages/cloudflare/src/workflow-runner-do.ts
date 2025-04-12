@@ -51,7 +51,7 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
       client: baseClient,
     });
 
-    await runner.run(workflowToRun, {
+    runner.run(workflowToRun, {
         initialState: initialData || {},
         workflowRunId,
     });

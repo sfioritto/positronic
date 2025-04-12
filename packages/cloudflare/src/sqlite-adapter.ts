@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     workflow_name TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'complete', 'error')),
     error TEXT CHECK (error IS NULL OR json_valid(error)),
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    started_at DATETIME,
+    started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME
 );
 `;
@@ -56,23 +55,16 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
                 id,
                 workflow_name,
                 status,
-                error,
-                started_at
-            ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(id) DO UPDATE SET
-                status = excluded.status,
-                error = excluded.error,
-                started_at = CURRENT_TIMESTAMP,
-                completed_at = NULL
-        `;
+                error
+            ) VALUES (?, ?, ?, ?);`;
 
         try {
-            await this.sql.exec(sql, [
+            await this.sql.exec(sql,
                 event.workflowRunId,
                 event.workflowTitle,
                 event.status,
-                null // Clear error on start/restart
-            ]);
+                null,
+            );
         } catch (e: any) {
              console.error(`Error handling workflow start/restart for ${event.workflowRunId}:`, e.message, e.stack);
              throw e;
@@ -88,10 +80,10 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
            WHERE id = ?
        `;
        try {
-            await this.sql.exec(sql, [
+            await this.sql.exec(sql,
                 event.status,
                 event.workflowRunId
-            ]);
+            );
        } catch (e: any) {
             console.error(`Error handling workflow complete for ${event.workflowRunId}:`, e.message, e.stack);
             throw e;
