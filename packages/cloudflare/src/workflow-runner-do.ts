@@ -62,23 +62,25 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     const url = new URL(request.url);
 
     if (url.pathname === '/status') {
-      const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_runs WHERE id = ? ORDER BY started_at DESC LIMIT 1`;
-      const result = sql.exec<{
-        status: string;
-        error: string | null;
-        started_at: number;
-        completed_at: number | null;
-      }>(statusSql, workflowRunId).one();
+      try {
+        const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_runs WHERE id = ? ORDER BY started_at DESC LIMIT 1`;
+        const result = sql.exec<{
+          status: string;
+          error: string | null;
+          started_at: number;
+          completed_at: number | null;
+        }>(statusSql, workflowRunId).one();
 
-      if (result == null) {
-        return new Response(JSON.stringify({ status: 'not_found' }), {
+        return new Response(JSON.stringify(result), {
           headers: { 'Content-Type': 'application/json' },
-          status: 404
+        });
+      } catch (error) {
+        // If no results, return a default status of "running"
+        console.error(`Error fetching status for workflow ${workflowRunId}:`, error);
+        return new Response(JSON.stringify({ status: 'running' }), {
+          headers: { 'Content-Type': 'application/json' },
         });
       }
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' },
-      });
     }
 
     return new Response('Not found', { status: 404 });

@@ -36,34 +36,47 @@ describe("Hono API Tests", () => {
   });
 
   it("POST /workflows/runs with workflowName should return 201 and create a DO instance", async () => {
-    const testEnv = env as TestEnv;
-    const workflowName = "basic-workflow";
+    try {
+      const testEnv = env as TestEnv;
+      const workflowName = "basic-workflow";
 
-    const request = new Request("http://example.com/workflows/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workflowName }),
-    });
-    const context = createExecutionContext();
-    const response = await worker.fetch(request, testEnv, context);
-    await waitOnExecutionContext(context);
+      const request = new Request("http://example.com/workflows/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowName }),
+      });
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
 
-    expect(response.status).toBe(201);
-    const responseBody = await response.json<{ workflowRunId: string }>();
-    expect(responseBody.workflowRunId).toBeDefined();
-    expect(typeof responseBody.workflowRunId).toBe('string');
+      expect(response.status).toBe(201);
+      const responseBody = await response.json<{ workflowRunId: string }>();
+      expect(responseBody.workflowRunId).toBeDefined();
+      expect(typeof responseBody.workflowRunId).toBe('string');
 
-    // --- Verify the DO was created and started ---
-    const workflowRunId = responseBody.workflowRunId;
-    const doId = testEnv.WORKFLOW_RUNNER_DO.idFromName(workflowRunId);
-    const stub = testEnv.WORKFLOW_RUNNER_DO.get(doId);
+      // --- Verify the DO was created and started ---
+      const workflowRunId = responseBody.workflowRunId;
+      const doId = testEnv.WORKFLOW_RUNNER_DO.idFromName(workflowRunId);
+      const stub = testEnv.WORKFLOW_RUNNER_DO.get(doId);
 
-    // Fetch the /isStarted endpoint from the DO stub
-    const doResponse = await stub.fetch(`http://do/workflows/runs/${workflowRunId}/status`);
-    expect(doResponse.status).toBe(200);
-    // Check the response body for started status and the result
-    const doResponseBody = await doResponse.json<{ status: string; error?: string; started_at?: string; completed_at?: string } | null>();
-    expect(doResponseBody?.status).toBe('running');
+      // Fetch the status endpoint from the DO stub
+      const doResponse = await stub.fetch(`http://do/status`);
+      expect(doResponse.status).toBe(200);
+
+      // Check the response body for started status
+      const doResponseBody = await doResponse.json<{ status: string; error?: string; started_at?: string; completed_at?: string } | null>();
+      expect(doResponseBody?.status).toBe('running');
+
+      // Wait for all promises to complete
+      await waitOnExecutionContext(context);
+
+      const statusResponse = await stub.fetch(`http://do/status`);
+      expect(statusResponse.status).toBe(200);
+      const statusResponseBody = await statusResponse.json<{ status: string; error?: string; started_at?: string; completed_at?: string } | null>();
+      expect(statusResponseBody?.status).toBe('complete');
+    } catch (error) {
+      console.error("Test failed:", error);
+      throw error;
+    }
   });
 
   // Add more tests here later...

@@ -100,7 +100,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
             WHERE id = ?
         `;
         try {
-            await this.sql.exec(sql, [
+            await this.sql.exec(sql,
                 event.status,
                 JSON.stringify({ // Store error details as JSON
                     name: event.error.name,
@@ -108,7 +108,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
                     stack: event.error.stack
                 }),
                 event.workflowRunId
-            ]);
+            );
         } catch (e: any) {
              console.error(`Error handling workflow error for ${event.workflowRunId}:`, e.message, e.stack);
              throw e;

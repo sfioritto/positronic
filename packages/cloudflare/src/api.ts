@@ -39,7 +39,7 @@ app.get('/workflows/runs/:runId/status', async (context: Context) => {
     const namespace = context.env.WORKFLOW_RUNNER_DO;
     const doId = namespace.idFromName(runId);
     const stub = namespace.get(doId);
-    const response = await stub.fetch(new Request(`http://do/${doId}/status`));
+    const response = await stub.fetch(new Request(`http://do/status`));
     const statusData = await response.json();
     return context.json(statusData, response.status);
 });
