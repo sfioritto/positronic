@@ -16,9 +16,22 @@ const basicWorkflow = workflow('basic-workflow')
 	message: `${state.hello}, ${state.world}`,
 }));
 
+// Define the new delayed workflow
+const delayedWorkflow = workflow('delayed-workflow')
+.step('Start Delay', async ({ state }) => {
+	// Simulate a 1.5 second delay using standard setTimeout
+	await new Promise(resolve => setTimeout(resolve, 1500));
+	return { ...state, status_after_sleep: 'awake' };
+})
+.step('Finish', ({ state }) => ({
+	...state,
+	final_message: 'Done after delay',
+}));
+
 
 const inlineManifest = {
 	'basic-workflow': basicWorkflow,
+	'delayed-workflow': delayedWorkflow, // Add the delayed workflow to the manifest
 };
 
 setManifest(inlineManifest);
