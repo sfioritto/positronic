@@ -35,7 +35,7 @@ describe("Hono API Tests", () => {
     expect(responseBody).toEqual({ error: 'Missing workflowName in request body' });
   });
 
-  it("POST /workflows/runs with workflowName should return 201 and create a DO instance", async () => {
+  it("Create and watch a workflow run", async () => {
     const testEnv = env as TestEnv;
     const workflowName = "basic-workflow";
 
@@ -52,23 +52,37 @@ describe("Hono API Tests", () => {
     expect(responseBody.workflowRunId).toBeDefined();
     expect(typeof responseBody.workflowRunId).toBe('string');
 
-    // --- Verify the DO was created and started ---
     const workflowRunId = responseBody.workflowRunId;
-    const doId = testEnv.WORKFLOW_RUNNER_DO.idFromName(workflowRunId);
-    const stub = testEnv.WORKFLOW_RUNNER_DO.get(doId);
-    // Wait for promises in the main worker context
     await waitOnExecutionContext(context);
-    const doResponse = await stub.fetch(`http://do/watch`);
-    expect(doResponse.status).toBe(200);
 
-    const doResponseBody = await doResponse.json<{
-      status: string;
-      error?: string;
-      started_at?: string;
-      completed_at?: string;
-    } | null>();
-    expect(doResponseBody?.status).toBe('complete');
+    // --- Verify the SSE stream from the API endpoint ---
+    const watchUrl = `http://example.com/workflows/runs/${workflowRunId}/watch`;
+    const watchRequest = new Request(watchUrl);
+    const watchContext = createExecutionContext();
+    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+
+    expect(watchResponse.status).toBe(200);
+    expect(watchResponse.headers.get('Content-Type')).toContain('text/event-stream');
+    if (!watchResponse.body) {
+      throw new Error("Watch response body is null");
+    }
+    // Read the first event from the stream
+    const reader = watchResponse.body.getReader();
+    const { value, done } = await reader.read();
+    expect(done).toBe(false);
+
+    // Cancel the reader to close the stream and stop the DO interval
+    await reader.cancel();
+
+    const decoder = new TextDecoder();
+    const eventText = decoder.decode(value);
+    const eventData = JSON.parse(eventText) as {
+        status: string;
+        error?: string | null;
+        started_at?: number;
+        completed_at?: number | null;
+    };
+
+    expect(eventData.status).toBe('complete');
   });
-
-  // Add more tests here later...
 });

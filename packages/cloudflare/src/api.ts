@@ -40,8 +40,7 @@ app.get('/workflows/runs/:runId/watch', async (context: Context) => {
     const doId = namespace.idFromName(runId);
     const stub = namespace.get(doId);
     const response = await stub.fetch(new Request(`http://do/watch`));
-    const statusData = await response.json();
-    return context.json(statusData, response.status);
+    return response;
 });
 
 export default app;

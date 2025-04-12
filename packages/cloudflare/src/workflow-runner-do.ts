@@ -63,18 +63,36 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
 
     try {
       if (url.pathname === '/watch') {
-        const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_runs ORDER BY started_at ASC LIMIT 1`;
-        const result = sql.exec<{
-          status: string;
-          error: string | null;
-          started_at: number;
-          completed_at: number | null;
-        }>(statusSql).one();
+        let timerId: number | undefined;
+        const stream = new ReadableStream({
+          start(controller) {
+            timerId = setInterval(async () => {
+              const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_runs ORDER BY started_at ASC LIMIT 1`;
+              const result = await sql.exec<{
+                status: string;
+                error: string | null;
+                started_at: number;
+                completed_at: number | null;
+              }>(statusSql).one();
+              const encoder = new TextEncoder();
+              controller.enqueue(encoder.encode(`${JSON.stringify(result)}\n\n`));
+            }, 1000);
+          },
+          cancel() {
+            if (timerId !== undefined) {
+              clearInterval(timerId);
+            }
+          },
+        });
 
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+        return new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        });
+      }
 
       return new Response('Not found', { status: 404 });
     } catch (error) {
