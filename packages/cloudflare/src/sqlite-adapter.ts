@@ -12,7 +12,6 @@ import type { SqlStorage } from '@cloudflare/workers-types';
 // Simplified schema creation, only the workflow_runs table
 const initSQL = `
 CREATE TABLE IF NOT EXISTS workflow_runs (
-    id TEXT PRIMARY KEY,
     workflow_name TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'complete', 'error')),
     error TEXT CHECK (error IS NULL OR json_valid(error)),
@@ -48,19 +47,18 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
     }
 
     private async handleWorkflowStart(event: WorkflowStartEvent): Promise<void> {
+        console.log(JSON.stringify(event, null, 2));
         await this.initializeSchema();
 
         const sql = `
             INSERT INTO workflow_runs (
-                id,
                 workflow_name,
                 status,
                 error
-            ) VALUES (?, ?, ?, ?);`;
+            ) VALUES (?, ?, ?);`;
 
         try {
             await this.sql.exec(sql,
-                event.workflowRunId,
                 event.workflowTitle,
                 event.status,
                 null,
@@ -72,22 +70,21 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
     }
 
     private async handleComplete(event: WorkflowCompleteEvent): Promise<void> {
-       const sql = `
-           UPDATE workflow_runs
-           SET
-               status = ?,
-               completed_at = CURRENT_TIMESTAMP
-           WHERE id = ?
-       `;
-       try {
+        console.log('Handle the complete event', event.status);
+        const sql = `
+            UPDATE workflow_runs
+            SET
+                status = ?,
+                completed_at = CURRENT_TIMESTAMP
+        `;
+        try {
             await this.sql.exec(sql,
                 event.status,
-                event.workflowRunId
             );
-       } catch (e: any) {
+        } catch (e: any) {
             console.error(`Error handling workflow complete for ${event.workflowRunId}:`, e.message, e.stack);
             throw e;
-       }
+        }
     }
 
     private async handleWorkflowError(event: WorkflowErrorEvent): Promise<void> {
