@@ -170,7 +170,6 @@ describe("Hono API Tests", () => {
     await waitOnExecutionContext(watchContext);
   });
 
-  // Increase timeout for this longer-running test
   it("Create and watch a delayed workflow run", async () => {
     const testEnv = env as TestEnv;
     const workflowName = "delayed-workflow";
@@ -228,5 +227,46 @@ describe("Hono API Tests", () => {
     expect(lastStepStatusEvent.steps.every((step: any) => step.status === STATUS.COMPLETE)).toBe(true);
 
     await waitOnExecutionContext(watchContext);
-  }, 30000);
+  });
+
+  it("Asserts workflowRunId is present in SSE events", async () => {
+    const testEnv = env as TestEnv;
+    const workflowName = "basic-workflow";
+
+    // Create workflow run
+    const createRequest = new Request("http://example.com/workflows/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workflowName }),
+    });
+    const createContext = createExecutionContext();
+    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+    const createResponseBody = await createResponse.json<{ workflowRunId: string }>();
+    const expectedWorkflowRunId = createResponseBody.workflowRunId;
+    await waitOnExecutionContext(createContext);
+
+    // Watch workflow run
+    const watchUrl = `http://example.com/workflows/runs/${expectedWorkflowRunId}/watch`;
+    const watchRequest = new Request(watchUrl);
+    const watchContext = createExecutionContext();
+    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+
+    // Get first event from stream
+    const reader = watchResponse.body?.getReader();
+    if (!reader) throw new Error("Watch response body is null");
+
+    const { value } = await reader.read();
+    const chunk = new TextDecoder().decode(value);
+    const event = parseSseEvent(chunk);
+
+    // Cleanup
+    reader.cancel();
+    await waitOnExecutionContext(watchContext);
+
+    // Assert
+    expect(event?.workflowRunId).toBeDefined();
+    const expectedDoId = testEnv.WORKFLOW_RUNNER_DO.idFromName(expectedWorkflowRunId).toString();
+    expect(event?.workflowRunId).toBe(expectedDoId);
+  });
+
 });
