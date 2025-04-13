@@ -84,42 +84,35 @@ describe("Hono API Tests", () => {
     }
     // Read the first event from the stream
     const reader = watchResponse.body.getReader();
-    const { value, done } = await reader.read();
-    expect(done).toBe(false);
-
     const decoder = new TextDecoder();
-    const eventText = decoder.decode(value);
 
-    // --- Read first event (overall status) ---
-    const firstEventData = parseSseEvent(eventText);
-    expect(firstEventData).toHaveProperty('status');
-    // Basic workflow is fast, might be running or complete already
-    expect(['running', 'complete']).toContain(firstEventData.status);
+    try {
+      const { value, done } = await reader.read();
+      expect(done).toBe(false);
 
-    // --- Read second event (initial steps) ---
-    const { value: secondValue, done: secondDone } = await reader.read();
-    expect(secondDone).toBe(false);
-    const secondEventText = decoder.decode(secondValue);
-    const secondEventData = parseSseEvent(secondEventText);
-    expect(secondEventData).toHaveProperty('type', 'step:status');
-    expect(secondEventData).toHaveProperty('steps');
-    expect(Array.isArray(secondEventData.steps)).toBe(true);
+      const eventText = decoder.decode(value);
 
-    // --- Read subsequent events until complete (if not already) ---
-    let lastStepsEvent = secondEventData;
-    while (lastStepsEvent.steps.some((step: any) => step.status !== 'complete')) {
-        const { value: nextValue, done: nextDone } = await reader.read();
-        expect(nextDone).toBe(false);
-        const nextEventText = decoder.decode(nextValue);
-        const nextEventData = parseSseEvent(nextEventText);
-        expect(nextEventData).toHaveProperty('type', 'step:status');
-        lastStepsEvent = nextEventData;
+      // --- Read first event (overall status) ---
+      const firstEventData = parseSseEvent(eventText);
+      expect(firstEventData).toHaveProperty('status');
+      // Basic workflow is fast, is complete already
+      expect(firstEventData.status).toBe('complete');
+
+      // --- Read second event (initial steps) ---
+      const { value: secondValue, done: secondDone } = await reader.read();
+      expect(secondDone).toBe(false);
+      const secondEventText = decoder.decode(secondValue);
+      const secondEventData = parseSseEvent(secondEventText);
+      expect(secondEventData).toHaveProperty('type', 'step:status');
+      expect(secondEventData).toHaveProperty('steps');
+      expect(Array.isArray(secondEventData.steps)).toBe(true);
+
+      // Verify the final step status event shows completion
+      expect(secondEventData.steps.every((step: any) => step.status === 'complete')).toBe(true);
+    } finally {
+      await reader.cancel();
     }
 
-    // Verify the final step status event shows completion
-    expect(lastStepsEvent.steps.every((step: any) => step.status === 'complete')).toBe(true);
-
-    await reader.cancel();
     await waitOnExecutionContext(watchContext);
   });
 
@@ -156,45 +149,48 @@ describe("Hono API Tests", () => {
     const reader = watchResponse.body.getReader();
     const decoder = new TextDecoder();
 
-    // --- Read first event (overall status) ---
-    const { value: firstValue, done: firstDone } = await reader.read();
-    expect(firstDone).toBe(false);
-    const firstEventText = decoder.decode(firstValue);
+    try {
+      // --- Read first event (overall status) ---
+      const { value: firstValue, done: firstDone } = await reader.read();
+      expect(firstDone).toBe(false);
+      const firstEventText = decoder.decode(firstValue);
 
-    const firstEventData = parseSseEvent(firstEventText);
-    expect(firstEventData).toHaveProperty('status', 'running');
+      const firstEventData = parseSseEvent(firstEventText);
+      expect(firstEventData).toHaveProperty('status', 'running');
 
-    // --- Read second event (initial steps - should be pending) ---
-    const { value: secondValue, done: secondDone } = await reader.read();
-    expect(secondDone).toBe(false);
-    const secondEventText = decoder.decode(secondValue);
+      // --- Read second event (initial steps - should be pending) ---
+      const { value: secondValue, done: secondDone } = await reader.read();
+      expect(secondDone).toBe(false);
+      const secondEventText = decoder.decode(secondValue);
 
-    const secondEventData = parseSseEvent(secondEventText);
-    expect(secondEventData).toHaveProperty('type', 'step:status');
-    expect(secondEventData).toHaveProperty('steps');
-    expect(Array.isArray(secondEventData.steps)).toBe(true);
-    // Initially, steps might be pending
-    // expect(secondEventData.steps.every((step: any) => step.status === 'pending')).toBe(true);
+      const secondEventData = parseSseEvent(secondEventText);
+      expect(secondEventData).toHaveProperty('type', 'step:status');
+      expect(secondEventData).toHaveProperty('steps');
+      expect(Array.isArray(secondEventData.steps)).toBe(true);
+      // Initially, steps might be pending
+      // expect(secondEventData.steps.every((step: any) => step.status === 'pending')).toBe(true);
 
-    // --- Read subsequent STEP_STATUS events until all steps are complete ---
-    let lastStepsEvent = secondEventData;
-    while (lastStepsEvent.steps.some((step: any) => step.status !== 'complete')) {
-        console.log('Waiting for completion, current steps:', JSON.stringify(lastStepsEvent.steps)); // Add logging
-        const { value: nextValue, done: nextDone } = await reader.read();
-        // If done is true here, the stream closed before completion, which is an error
-        expect(nextDone).toBe(false);
-        const nextEventText = decoder.decode(nextValue);
-        const nextEventData = parseSseEvent(nextEventText);
-        // Ensure we are getting step status updates
-        expect(nextEventData).toHaveProperty('type', 'step:status');
-        lastStepsEvent = nextEventData;
+      // --- Read subsequent STEP_STATUS events until all steps are complete ---
+      let lastStepsEvent = secondEventData;
+      while (lastStepsEvent.steps.some((step: any) => step.status !== 'complete')) {
+          console.log('Waiting for completion, current steps:', JSON.stringify(lastStepsEvent.steps)); // Add logging
+          const { value: nextValue, done: nextDone } = await reader.read();
+          // If done is true here, the stream closed before completion, which is an error
+          expect(nextDone).toBe(false);
+          const nextEventText = decoder.decode(nextValue);
+          const nextEventData = parseSseEvent(nextEventText);
+          // Ensure we are getting step status updates
+          expect(nextEventData).toHaveProperty('type', 'step:status');
+          lastStepsEvent = nextEventData;
+      }
+
+      // Verify the final step status event shows completion
+      expect(lastStepsEvent.steps.every((step: any) => step.status === 'complete')).toBe(true);
+    } finally {
+      // Cancel the stream
+      await reader.cancel();
     }
 
-    // Verify the final step status event shows completion
-    expect(lastStepsEvent.steps.every((step: any) => step.status === 'complete')).toBe(true);
-
-    // Cancel the stream
-    await reader.cancel();
     await waitOnExecutionContext(watchContext);
     // Add a small delay to allow async operations to potentially settle
     await new Promise(resolve => setTimeout(resolve, 100));
