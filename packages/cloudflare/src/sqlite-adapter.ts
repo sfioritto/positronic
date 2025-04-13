@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     workflow_name TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'complete', 'error')),
     error TEXT CHECK (error IS NULL OR json_valid(error)),
-    event TEXT CHECK (json_valid(event)),
     started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME
 );
@@ -47,15 +46,13 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
             INSERT INTO workflow_runs (
                 workflow_name,
                 status,
-                error,
-                event
-            ) VALUES (?, ?, ?, ?);`;
+                error
+            ) VALUES (?, ?, ?);`;
 
         await this.sql.exec(sql,
             event.workflowTitle,
             event.status,
-            null,
-            JSON.stringify(event)
+            null
         );
     }
 
@@ -64,13 +61,11 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
             UPDATE workflow_runs
             SET
                 status = ?,
-                event = ?,
                 completed_at = CURRENT_TIMESTAMP
             WHERE workflow_name = ? AND completed_at IS NULL
         `;
         await this.sql.exec(sql,
             event.status,
-            JSON.stringify(event),
             event.workflowTitle
         );
     }
@@ -81,7 +76,6 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
             SET
                 status = ?,
                 error = ?,
-                event = ?,
                 completed_at = CURRENT_TIMESTAMP
             WHERE workflow_name = ? AND completed_at IS NULL
         `;
@@ -92,7 +86,6 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
                 message: event.error.message,
                 stack: event.error.stack
             }),
-            JSON.stringify(event),
             event.workflowTitle
         );
     }
