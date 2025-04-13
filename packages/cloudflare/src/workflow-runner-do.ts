@@ -55,18 +55,23 @@ class WatchAdapter implements Adapter {
   }
 
   async dispatch(event: WorkflowEvent<any>): Promise<void> {
-    if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
-      // Remove patch data before broadcasting steps
-      const stepsWithoutPatch: StepWithoutPatch[] = event.steps.map(step => ({
-        id: step.id,
-        title: step.title,
-        status: step.status,
-      }));
-      const broadcastData = {
-        type: event.type,
-        steps: stepsWithoutPatch,
-      };
-      this.broadcast(broadcastData);
+    try {
+      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        // Remove patch data before broadcasting steps
+        const stepsWithoutPatch: StepWithoutPatch[] = event.steps.map(step => ({
+          id: step.id,
+          title: step.title,
+          status: step.status,
+        }));
+        const broadcastData = {
+          type: event.type,
+          steps: stepsWithoutPatch,
+        };
+        this.broadcast(broadcastData);
+      }
+    } catch (e) {
+      console.error("Error dispatching event:", e);
+      throw e;
     }
   }
 }
@@ -91,9 +96,10 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     }
 
     const sqliteAdapter = new WorkflowRunSQLiteAdapter(sql);
+    const { watchAdapter } = this;
 
     const runner = new WorkflowRunner({
-      adapters: [sqliteAdapter],
+      adapters: [sqliteAdapter, watchAdapter],
       logger: {
         log: console.log,
       },
@@ -146,7 +152,7 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
                 status: string,
               }>(stepsSql).toArray();
 
-              if (initialStepsResult && initialStepsResult.length > 0) {
+              if (initialStepsResult.length > 0) {
                 const stepsEvent = {
                   type: WORKFLOW_EVENTS.STEP_STATUS,
                   steps: initialStepsResult
