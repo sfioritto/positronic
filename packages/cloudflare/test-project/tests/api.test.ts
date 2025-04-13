@@ -12,7 +12,8 @@ import type {
   WorkflowStartEvent,
   WorkflowCompleteEvent,
   StepStatusEvent,
-  StepCompletedEvent
+  StepCompletedEvent,
+  StepStartedEvent
 } from "@positronic/core";
 import type { WorkflowRunnerDO } from "../../src/workflow-runner-do.js"; // Import the DO class
 
@@ -170,64 +171,62 @@ describe("Hono API Tests", () => {
   });
 
   // Increase timeout for this longer-running test
-  // it("Create and watch a delayed workflow run", async () => {
-  //   const testEnv = env as TestEnv;
-  //   const workflowName = "delayed-workflow";
+  it("Create and watch a delayed workflow run", async () => {
+    const testEnv = env as TestEnv;
+    const workflowName = "delayed-workflow";
 
-  //   // Create the workflow run
-  //   const createRequest = new Request("http://example.com/workflows/runs", {
-  //     method: "POST",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify({ workflowName }),
-  //   });
-  //   const createContext = createExecutionContext();
-  //   const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-  //   expect(createResponse.status).toBe(201);
-  //   const createResponseBody = await createResponse.json<{ workflowRunId: string }>();
-  //   const workflowRunId = createResponseBody.workflowRunId;
-  //   await waitOnExecutionContext(createContext);
+    // Create the workflow run
+    const createRequest = new Request("http://example.com/workflows/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workflowName }),
+    });
+    const createContext = createExecutionContext();
+    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+    expect(createResponse.status).toBe(201);
+    const createResponseBody = await createResponse.json<{ workflowRunId: string }>();
+    const workflowRunId = createResponseBody.workflowRunId;
+    await waitOnExecutionContext(createContext);
 
-  //   // Watch the workflow run via SSE
-  //   const watchUrl = `http://example.com/workflows/runs/${workflowRunId}/watch`;
-  //   const watchRequest = new Request(watchUrl);
-  //   const watchContext = createExecutionContext();
-  //   const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    // Watch the workflow run via SSE
+    const watchUrl = `http://example.com/workflows/runs/${workflowRunId}/watch`;
+    const watchRequest = new Request(watchUrl);
+    const watchContext = createExecutionContext();
+    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
 
-  //   expect(watchResponse.status).toBe(200);
-  //   expect(watchResponse.headers.get('Content-Type')).toContain('text/event-stream');
-  //   if (!watchResponse.body) {
-  //     throw new Error("Watch response body is null");
-  //   }
+    expect(watchResponse.status).toBe(200);
+    expect(watchResponse.headers.get('Content-Type')).toContain('text/event-stream');
+    if (!watchResponse.body) {
+      throw new Error("Watch response body is null");
+    }
 
-  //   // --- Read all events from the SSE stream ---
-  //   const allEvents = await readSseStream(watchResponse.body);
+    // --- Read all events from the SSE stream ---
+    const allEvents = await readSseStream(watchResponse.body);
 
-  //   // --- Assertions on the collected events ---
-  //   // Check for start event
-  //   const startEvent = allEvents.find((e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START);
-  //   expect(startEvent).toBeDefined();
-  //   expect(startEvent?.workflowTitle).toBe(workflowName);
-  //   expect(startEvent?.status).toBe(STATUS.RUNNING);
+    // --- Assertions on the collected events ---
+    // Check for start event
+    const startEvent = allEvents.find((e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START);
+    expect(startEvent).toBeDefined();
+    expect(startEvent?.workflowTitle).toBe(workflowName);
+    expect(startEvent?.status).toBe(STATUS.RUNNING);
 
-  //   // Check for step start/complete events for the delayed step
-  //   const delayStepStart = allEvents.find((e): e is StepStartedEvent => e.type === WORKFLOW_EVENTS.STEP_START && e.stepTitle === 'Delay Step');
-  //   expect(delayStepStart).toBeDefined();
-  //   const delayStepComplete = allEvents.find((e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE && e.stepTitle === 'Delay Step');
-  //   expect(delayStepComplete).toBeDefined();
+    // Check for step start/complete events for the delayed step
+    const delayStepStart = allEvents.find((e): e is StepStartedEvent => e.type === WORKFLOW_EVENTS.STEP_START && e.stepTitle === 'Start Delay');
+    expect(delayStepStart).toBeDefined();
+    const delayStepComplete = allEvents.find((e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE && e.stepTitle === 'Start Delay');
+    expect(delayStepComplete).toBeDefined();
 
-  //   // Check for the final complete event
-  //   const completeEvent = allEvents.find((e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE);
-  //   expect(completeEvent).toBeDefined();
-  //   expect(completeEvent?.status).toBe(STATUS.COMPLETE);
+    // Check for the final complete event
+    const completeEvent = allEvents.find((e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE);
+    expect(completeEvent).toBeDefined();
+    expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
-  //   // Check the final step status event shows completion
-  //   const stepStatusEvents = allEvents.filter((e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS);
-  //   expect(stepStatusEvents.length).toBeGreaterThan(0);
-  //   const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
-  //   expect(lastStepStatusEvent.steps.every((step: any) => step.status === STATUS.COMPLETE)).toBe(true);
+    // Check the final step status event shows completion
+    const stepStatusEvents = allEvents.filter((e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS);
+    expect(stepStatusEvents.length).toBeGreaterThan(0);
+    const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
+    expect(lastStepStatusEvent.steps.every((step: any) => step.status === STATUS.COMPLETE)).toBe(true);
 
-  //   await waitOnExecutionContext(watchContext);
-  //   // Add a small delay to allow async operations to potentially settle
-  //   await new Promise(resolve => setTimeout(resolve, 100));
-  // }, 30000);
+    await waitOnExecutionContext(watchContext);
+  }, 30000);
 });
