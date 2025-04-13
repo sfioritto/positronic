@@ -61,7 +61,7 @@ export class WorkflowRunner {
 
     const workflowRun = workflowRunId && initialCompletedSteps
       ? workflow.run({ initialState, initialCompletedSteps, workflowRunId, options, client })
-      : workflow.run({ initialState, options, client });
+      : workflow.run({ initialState, options, client, workflowRunId });
 
     for await (const event of workflowRun) {
       // Dispatch event to all adapters
