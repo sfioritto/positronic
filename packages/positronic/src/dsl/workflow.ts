@@ -4,7 +4,6 @@ import type { PromptClient } from "../clients/types.js";
 import type { State, JsonPatch } from "./types.js";
 import { STATUS, WORKFLOW_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
-import type { Shell } from "@positronic/shell/src/types.js";
 export type SerializedError = {
   name: string;
   message: string;
@@ -45,7 +44,7 @@ export interface WorkflowErrorEvent<TOptions extends object = {}> extends Workfl
 // 2. Step Status Event (just steps array and base event properties)
 export interface StepStatusEvent<TOptions extends object = {}> extends BaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.STEP_STATUS;
-  steps: SerializedStep[];
+  steps: SerializedStepStatus[];
 }
 
 // 3. Step Events (include step-specific properties)
@@ -79,6 +78,9 @@ export interface SerializedStep {
   id: string;
   patch?: JsonPatch;
 }
+
+// New type for Step Status Event, omitting the patch
+export type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
 
 type StepBlock<TStateIn, TStateOut, TOptions extends object = {}, TServices extends object = {}> = {
   type: 'step';
@@ -420,7 +422,10 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Emit initial step status after workflow starts
       yield {
         type: WORKFLOW_EVENTS.STEP_STATUS,
-        steps: steps.map(step => step.serialized),
+        steps: steps.map(step => {
+          const { patch, ...rest } = step.serialized;
+          return rest;
+        }),
         options,
         workflowRunId
       };
@@ -451,7 +456,10 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
         // Step Status Event
         yield {
           type: WORKFLOW_EVENTS.STEP_STATUS,
-          steps: steps.map(step => step.serialized),
+          steps: steps.map(step => {
+            const { patch, ...rest } = step.serialized;
+            return rest;
+          }),
           options,
           workflowRunId
         };
@@ -490,7 +498,10 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       // Step Status Event
       yield {
         type: WORKFLOW_EVENTS.STEP_STATUS,
-        steps: steps.map(step => step.serialized),
+        steps: steps.map(step => {
+          const { patch, ...rest } = step.serialized;
+          return rest;
+        }),
         options,
         workflowRunId
       };

@@ -965,20 +965,10 @@ describe('nested workflows', () => {
       expect.objectContaining({
         title: 'Set initial',
         status: STATUS.COMPLETE,
-        patch: [{
-          op: 'add',
-          path: '/value',
-          value: 5
-        }]
       }),
       expect.objectContaining({
         title: 'Run inner workflow',
         status: STATUS.COMPLETE,
-        patch: [{
-          op: 'add',
-          path: '/result',
-          value: 10
-        }]
       })
     ]);
   });
@@ -1023,7 +1013,6 @@ describe('workflow options', () => {
       steps: [
         expect.objectContaining({
           title: 'Simple step',
-          patch: expect.any(Object),
           status: STATUS.COMPLETE,
         })
       ],
