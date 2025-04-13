@@ -41,7 +41,7 @@ class EventStreamAdapter implements Adapter {
       try {
         controller.enqueue(encodedMessage);
       } catch (e) {
-        console.error("Failed to send message to subscriber, removing.", e);
+        console.error("[DO_SSE_ADAPTER] Failed to send message to subscriber, removing.", e);
         this.unsubscribe(controller);
       }
     });
@@ -51,7 +51,7 @@ class EventStreamAdapter implements Adapter {
     try {
       this.broadcast(event);
     } catch (e) {
-      console.error("Error dispatching event:", e);
+      console.error("[DO_SSE_ADAPTER] Error dispatching event:", e);
       throw e;
     }
   }
@@ -73,6 +73,7 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
 
     const workflowToRun = runtimeManifest[workflowName];
     if (!workflowToRun) {
+      console.error(`[DO ${workflowRunId}] Workflow ${workflowName} not found in manifest.`);
       throw new Error(`Workflow ${workflowName} not found`);
     }
 
@@ -82,7 +83,7 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     const runner = new WorkflowRunner({
       adapters: [sqliteAdapter, eventStreamAdapter],
       logger: {
-        log: console.log,
+        log: (...args) => console.log(`[DO ${workflowRunId} RUNNER]`, ...args),
       },
       verbose: true,
       client: baseClient,
@@ -91,11 +92,13 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     runner.run(workflowToRun, {
         initialState: initialData || {},
         workflowRunId,
+    }).catch(err => {
+      console.error(`[DO ${workflowRunId}] WorkflowRunner run failed:`, err);
     });
   }
 
   async fetch(request: Request) {
-    const { sql, eventStreamAdapter } = this;
+    const { sql, eventStreamAdapter, workflowRunId } = this;
     const url = new URL(request.url);
     const encoder = new TextEncoder();
 
@@ -103,41 +106,40 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
     };
 
-    let streamController: ReadableStreamDefaultController;
+    let streamController: ReadableStreamDefaultController | null = null;
     try {
       if (url.pathname === '/watch') {
         const stream = new ReadableStream({
           async start(controller) {
+            streamController = controller;
             try {
-              // Keep a reference to the controller so we can unsubscribe from it later in cancel()
               streamController = controller;
-              // 1. Query and send historical events from the database
               const existingEventsSql = `
                 SELECT serialized_event
                 FROM workflow_events
                 ORDER BY event_id ASC;
               `;
-              const existingEventsResult = await sql.exec<{
-                serialized_event: string
-              }>(existingEventsSql).toArray();
+              const existingEventsResult = await sql.exec<{ serialized_event: string }>(existingEventsSql).toArray();
 
               for (const row of existingEventsResult) {
-                const event = JSON.parse(row.serialized_event);
-                sendEvent(controller, event);
+                try {
+                  const event = JSON.parse(row.serialized_event);
+                  sendEvent(controller, event);
+                } catch (parseError) {
+                  console.error(`[DO ${workflowRunId} WATCH] Failed to parse historical event JSON: ${row.serialized_event}`, parseError);
+                }
               }
 
-              // Subscribe and send any new events as they come in
               eventStreamAdapter.subscribe(controller);
             } catch (err) {
-              console.error("Error processing /watch request:", err);
+              console.error(`[DO ${workflowRunId} WATCH] Error during stream start:`, err);
               controller.close();
               eventStreamAdapter.unsubscribe(streamController);
               throw err;
             }
           },
           cancel(reason) {
-            console.log('Client disconnected from /watch', reason);
-            eventStreamAdapter.unsubscribe(streamController);
+            if (streamController) eventStreamAdapter.unsubscribe(streamController);
           },
         });
 
@@ -150,9 +152,10 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
         });
       }
 
+      console.warn(`[DO ${workflowRunId}] fetch() called with unhandled path: ${url.pathname}`);
       return new Response('Not found', { status: 404 });
     } catch (error) {
-      console.error('Error fetching status', error);
+      console.error(`[DO ${workflowRunId}] Error in fetch():`, error);
       return new Response('Internal server error', { status: 500 });
     }
   }

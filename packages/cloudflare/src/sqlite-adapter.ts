@@ -42,7 +42,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
             );
 
         } catch (e) {
-            console.error("Error handling workflow event:", e);
+            console.error("[SQL_ADAPTER] Error handling workflow event:", e, "Event data:", JSON.stringify(event));
             throw e;
         }
     }
