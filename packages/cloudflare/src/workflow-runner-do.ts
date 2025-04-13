@@ -119,7 +119,7 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
                 FROM workflow_events
                 ORDER BY event_id ASC;
               `;
-              const existingEventsResult = await sql.exec<{ serialized_event: string }>(existingEventsSql).toArray();
+              const existingEventsResult = sql.exec<{ serialized_event: string }>(existingEventsSql).toArray();
 
               for (const row of existingEventsResult) {
                 try {

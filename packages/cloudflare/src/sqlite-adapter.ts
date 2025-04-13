@@ -19,16 +19,16 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
         this.sql = sql;
     }
 
-    private async initializeSchema() {
+    private initializeSchema() {
         if (!this.schemaInitialized) {
-            await this.sql.exec(initSQL);
+            this.sql.exec(initSQL);
             this.schemaInitialized = true;
         }
     }
 
-    public async dispatch(event: WorkflowEvent) {
+    public dispatch(event: WorkflowEvent) {
         try {
-            await this.initializeSchema();
+            this.initializeSchema();
 
             const insertSql = `
                 INSERT INTO workflow_events (
@@ -36,7 +36,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
                     serialized_event
                 ) VALUES (?, ?);`;
 
-            await this.sql.exec(insertSql,
+            this.sql.exec(insertSql,
                 event.type,
                 JSON.stringify(event)
             );

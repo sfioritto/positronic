@@ -2,7 +2,7 @@ export { Workflow, workflow } from "./dsl/workflow.js";
 export { WorkflowRunner } from "./dsl/workflow-runner.js";
 export { createExtension } from "./dsl/extensions.js";
 export { STATUS, WORKFLOW_EVENTS } from "./dsl/constants.js";
-export { Adapter } from "./adapters/types.js";
+export type { Adapter } from "./adapters/types.js";
 export type {
   WorkflowEvent,
   SerializedStep,
