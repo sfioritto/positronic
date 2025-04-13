@@ -1,9 +1,8 @@
 import { WorkflowRunner } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
-import type { Workflow, PromptClient, ResponseModel, Adapter, WorkflowEvent, SerializedStep } from '@positronic/core';
+import type { Workflow, PromptClient, ResponseModel, Adapter, WorkflowEvent } from '@positronic/core';
 import { z, TypeOf } from 'zod';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
-import { WORKFLOW_EVENTS } from '@positronic/core';
 
 export type PositronicManifest = Record<string, Workflow | undefined>;
 
@@ -23,9 +22,7 @@ export interface Env {
   WORKFLOW_RUNNER_DO: DurableObjectNamespace;
 }
 
-type StepWithoutPatch = Omit<SerializedStep, 'patch'>;
-
-class WatchAdapter implements Adapter {
+class EventStreamAdapter implements Adapter {
   private subscribers: Set<ReadableStreamDefaultController> = new Set();
   private encoder = new TextEncoder();
 
@@ -37,17 +34,13 @@ class WatchAdapter implements Adapter {
     this.subscribers.delete(controller);
   }
 
-  private broadcast(data: {
-    type: typeof WORKFLOW_EVENTS['STEP_STATUS'],
-    steps: StepWithoutPatch[],
-  }) {
-    const message = `data: ${JSON.stringify(data)}\n\n`;
+  private broadcast(event: WorkflowEvent<any>) {
+    const message = `data: ${JSON.stringify(event)}\n\n`;
     const encodedMessage = this.encoder.encode(message);
     this.subscribers.forEach(controller => {
       try {
         controller.enqueue(encodedMessage);
       } catch (e) {
-        // Could happen if the client disconnected abruptly
         console.error("Failed to send message to subscriber, removing.", e);
         this.unsubscribe(controller);
       }
@@ -56,19 +49,7 @@ class WatchAdapter implements Adapter {
 
   async dispatch(event: WorkflowEvent<any>): Promise<void> {
     try {
-      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
-        // Remove patch data before broadcasting steps
-        const stepsWithoutPatch: StepWithoutPatch[] = event.steps.map(step => ({
-          id: step.id,
-          title: step.title,
-          status: step.status,
-        }));
-        const broadcastData = {
-          type: event.type,
-          steps: stepsWithoutPatch,
-        };
-        this.broadcast(broadcastData);
-      }
+      this.broadcast(event);
     } catch (e) {
       console.error("Error dispatching event:", e);
       throw e;
@@ -79,7 +60,7 @@ class WatchAdapter implements Adapter {
 export class WorkflowRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private workflowRunId: string;
-  private watchAdapter = new WatchAdapter();
+  private eventStreamAdapter = new EventStreamAdapter();
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -96,10 +77,10 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     }
 
     const sqliteAdapter = new WorkflowRunSQLiteAdapter(sql);
-    const { watchAdapter } = this;
+    const { eventStreamAdapter } = this;
 
     const runner = new WorkflowRunner({
-      adapters: [sqliteAdapter, watchAdapter],
+      adapters: [sqliteAdapter, eventStreamAdapter],
       logger: {
         log: console.log,
       },
@@ -114,66 +95,49 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request) {
-    const { sql, watchAdapter } = this;
+    const { sql, eventStreamAdapter } = this;
     const url = new URL(request.url);
     const encoder = new TextEncoder();
 
-    let streamController: ReadableStreamDefaultController;
-
-    // Helper to send SSE formatted messages
     const sendEvent = (controller: ReadableStreamDefaultController, data: any) => {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
     };
 
+    let streamController: ReadableStreamDefaultController;
     try {
       if (url.pathname === '/watch') {
         const stream = new ReadableStream({
           async start(controller) {
-            streamController = controller;
             try {
-              // 1. Send initial workflow run status
-              const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_run`;
-              const initialStatusResult = await sql.exec<{
-                status: string;
-                error: string | null;
-                started_at: number;
-                completed_at: number | null;
-              }>(statusSql).one();
+              // Keep a reference to the controller so we can unsubscribe from it later in cancel()
+              streamController = controller;
+              // 1. Query and send historical events from the database
+              const existingEventsSql = `
+                SELECT serialized_event
+                FROM workflow_events
+                ORDER BY event_id ASC;
+              `;
+              const existingEventsResult = await sql.exec<{
+                serialized_event: string
+              }>(existingEventsSql).toArray();
 
-              if (initialStatusResult) {
-                 sendEvent(controller, initialStatusResult);
+              for (const row of existingEventsResult) {
+                const event = JSON.parse(row.serialized_event);
+                sendEvent(controller, event);
               }
 
-              // 2. Send initial steps status
-              const stepsSql = `SELECT step_id as id, step_title as title, status FROM workflow_run_steps`;
-              const initialStepsResult = await sql.exec<{
-                id: string,
-                title: string,
-                status: string,
-              }>(stepsSql).toArray();
-
-              if (initialStepsResult.length > 0) {
-                const stepsEvent = {
-                  type: WORKFLOW_EVENTS.STEP_STATUS,
-                  steps: initialStepsResult
-                };
-                sendEvent(controller, stepsEvent);
-              }
-
-              // 3. Subscribe to live updates
-              watchAdapter.subscribe(streamController);
-
+              // Subscribe and send any new events as they come in
+              eventStreamAdapter.subscribe(controller);
             } catch (err) {
-              console.error("Error fetching initial state for /watch:", err);
-              sendEvent(streamController, { type: 'error', message: 'Failed to fetch initial state' });
-              streamController.close();
+              console.error("Error processing /watch request:", err);
+              controller.close();
+              eventStreamAdapter.unsubscribe(streamController);
+              throw err;
             }
           },
           cancel(reason) {
             console.log('Client disconnected from /watch', reason);
-            if (streamController) {
-                 watchAdapter.unsubscribe(streamController);
-            }
+            eventStreamAdapter.unsubscribe(streamController);
           },
         });
 

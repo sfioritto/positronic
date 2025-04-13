@@ -1,127 +1,49 @@
-import type {
-    Adapter,
-    WorkflowEvent,
-    WorkflowStartEvent,
-    WorkflowCompleteEvent,
-    WorkflowErrorEvent,
-    StepStatusEvent,
-} from '@positronic/core';
-import { WORKFLOW_EVENTS } from '@positronic/core';
+import type { Adapter, WorkflowEvent } from '@positronic/core';
 import type { SqlStorage } from '@cloudflare/workers-types';
 
-// Simplified schema creation, only the workflow_runs table
+// Define the new schema with a single events table
 const initSQL = `
-CREATE TABLE IF NOT EXISTS workflow_run (
-    workflow_name TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'complete', 'error')),
-    error TEXT CHECK (error IS NULL OR json_valid(error)),
-    started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME
-);
-
-CREATE TABLE IF NOT EXISTS workflow_run_steps (
-    step_id TEXT PRIMARY KEY,
-    step_title TEXT NOT NULL,
-    status TEXT NOT NULL,
-    patch TEXT CHECK (patch IS NULL OR json_valid(patch))
+CREATE TABLE IF NOT EXISTS workflow_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    serialized_event TEXT NOT NULL CHECK(json_valid(serialized_event)),
+    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 `;
 
 export class WorkflowRunSQLiteAdapter implements Adapter {
     private sql: SqlStorage;
+    private schemaInitialized = false; // Track schema initialization
 
     constructor(sql: SqlStorage) {
         this.sql = sql;
     }
 
     private async initializeSchema() {
-        await this.sql.exec(initSQL);
+        if (!this.schemaInitialized) {
+            await this.sql.exec(initSQL);
+            this.schemaInitialized = true;
+        }
     }
 
     public async dispatch(event: WorkflowEvent) {
         try {
-            if (event.type === WORKFLOW_EVENTS.START || event.type === WORKFLOW_EVENTS.RESTART) {
-                await this.handleWorkflowStart(event);
-            } else if (event.type === WORKFLOW_EVENTS.COMPLETE) {
-                await this.handleComplete(event);
-            } else if (event.type === WORKFLOW_EVENTS.ERROR) {
-                await this.handleWorkflowError(event);
-            } else if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
-                await this.handleStepStatus(event);
-            }
-            // NOTE: Intentionally not adding the call to handleStepStatus yet
+            await this.initializeSchema();
+
+            const insertSql = `
+                INSERT INTO workflow_events (
+                    event_type,
+                    serialized_event
+                ) VALUES (?, ?);`;
+
+            await this.sql.exec(insertSql,
+                event.type,
+                JSON.stringify(event)
+            );
+
         } catch (e) {
             console.error("Error handling workflow event:", e);
-            // Optionally re-throw or handle the error appropriately
-            // For now, let's re-throw to ensure test failures are visible
             throw e;
-        }
-    }
-
-    private async handleWorkflowStart(event: WorkflowStartEvent) {
-        await this.initializeSchema();
-        const sql = `
-            INSERT INTO workflow_run (
-                workflow_name,
-                status,
-                error
-            ) VALUES (?, ?, ?);`;
-
-        await this.sql.exec(sql,
-            event.workflowTitle,
-            event.status,
-            null
-        );
-    }
-
-    private async handleComplete(event: WorkflowCompleteEvent) {
-        const sql = `
-            UPDATE workflow_run
-            SET
-                status = ?,
-                completed_at = CURRENT_TIMESTAMP
-        `;
-        await this.sql.exec(sql,
-            event.status
-        );
-    }
-
-    private async handleWorkflowError(event: WorkflowErrorEvent) {
-        const sql = `
-            UPDATE workflow_run
-            SET
-                status = ?,
-                error = ?,
-                completed_at = CURRENT_TIMESTAMP
-        `;
-        await this.sql.exec(sql,
-            event.status,
-            JSON.stringify(event.error),
-        );
-    }
-
-    // Add the new method definition
-    private async handleStepStatus(event: StepStatusEvent) {
-        const upsertSQL = `
-            INSERT INTO workflow_run_steps (
-                step_id,
-                step_title,
-                status,
-                patch
-            ) VALUES (?, ?, ?, ?)
-            ON CONFLICT(step_id) DO UPDATE SET
-                step_title = excluded.step_title,
-                status = excluded.status,
-                patch = excluded.patch;
-        `;
-
-        for (const step of event.steps) {
-            await this.sql.exec(upsertSQL,
-                step.id,
-                step.title,
-                step.status,
-                step.patch ? JSON.stringify(step.patch) : null
-            );
         }
     }
 }

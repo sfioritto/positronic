@@ -7,6 +7,16 @@ import {
 import { describe, it, expect } from "vitest";
 // Import the worker (which now points to the Hono app)
 import worker from "../src/index";
+// Import core types for better assertion
+import { WORKFLOW_EVENTS, STATUS } from "@positronic/core";
+import type {
+  WorkflowEvent,
+  WorkflowStartEvent,
+  WorkflowCompleteEvent,
+  StepStatusEvent,
+  StepStartedEvent,
+  StepCompletedEvent
+} from "@positronic/core";
 import type { WorkflowRunnerDO } from "../../src/workflow-runner-do.js"; // Import the DO class
 
 // Define the expected Env shape based on wrangler.jsonc for type safety in tests
@@ -32,6 +42,56 @@ describe("Hono API Tests", () => {
     return null;
   }
 
+  // Helper function to read the entire SSE stream and collect events
+  async function readSseStream(stream: ReadableStream<Uint8Array>): Promise<WorkflowEvent[]> {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const events: WorkflowEvent[] = [];
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          // Process any remaining buffer content
+          if (buffer.trim().length > 0) {
+            const event = parseSseEvent(buffer);
+            if (event) events.push(event);
+          }
+          break; // Exit loop when stream is done
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        // Process buffer line by line, looking for complete messages (ending in \n\n)
+        let eventEndIndex;
+        while ((eventEndIndex = buffer.indexOf("\n\n")) !== -1) {
+          const message = buffer.substring(0, eventEndIndex);
+          buffer = buffer.substring(eventEndIndex + 2); // Consume message + \n\n
+          if (message.startsWith("data:")) {
+            const event = parseSseEvent(message);
+            if (event) {
+              events.push(event);
+              // Check for terminal events to potentially stop early (though reading until done is safer)
+              // if (event.type === WORKFLOW_EVENTS.COMPLETE || event.type === WORKFLOW_EVENTS.ERROR) {
+              //   reader.cancel(); // Optionally cancel if we know it's the end
+              //   return events; // Return early
+              // }
+            }
+          }
+        }
+      }
+    } catch (e) {
+        console.error("Error reading SSE stream:", e);
+        throw e; // Re-throw error after logging
+    } finally {
+        // Ensure the reader is released even if an error occurs mid-stream
+        // reader.releaseLock(); // releaseLock() might not be needed if using reader.cancel() or natural stream end
+        // reader.cancel() might be called by the test explicitly, so avoid redundant cancellation.
+        console.log(`Finished reading SSE stream, received ${events.length} events.`);
+    }
+    return events;
+  }
+
   it("POST /runs without workflowName should return 400", async () => {
     // Cast the test env to the expected shape for type checking
     const testEnv = env as TestEnv;
@@ -55,6 +115,7 @@ describe("Hono API Tests", () => {
     const testEnv = env as TestEnv;
     const workflowName = "basic-workflow";
 
+    // --- Create the workflow run ---
     const request = new Request("http://example.com/workflows/runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -62,16 +123,12 @@ describe("Hono API Tests", () => {
     });
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
-
     expect(response.status).toBe(201);
     const responseBody = await response.json<{ workflowRunId: string }>();
-    expect(responseBody.workflowRunId).toBeDefined();
-    expect(typeof responseBody.workflowRunId).toBe('string');
-
     const workflowRunId = responseBody.workflowRunId;
     await waitOnExecutionContext(context);
 
-    // --- Verify the SSE stream from the API endpoint ---
+    // --- Watch the workflow run via SSE ---
     const watchUrl = `http://example.com/workflows/runs/${workflowRunId}/watch`;
     const watchRequest = new Request(watchUrl);
     const watchContext = createExecutionContext();
@@ -82,36 +139,31 @@ describe("Hono API Tests", () => {
     if (!watchResponse.body) {
       throw new Error("Watch response body is null");
     }
-    // Read the first event from the stream
-    const reader = watchResponse.body.getReader();
-    const decoder = new TextDecoder();
 
-    try {
-      const { value, done } = await reader.read();
-      expect(done).toBe(false);
+    // --- Read all events from the SSE stream ---
+    const allEvents = await readSseStream(watchResponse.body);
 
-      const eventText = decoder.decode(value);
+    // --- Assertions on the collected events ---
+    // Check for start event
+    const startEvent = allEvents.find((e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START);
+    expect(startEvent).toBeDefined();
+    expect(startEvent?.workflowTitle).toBe(workflowName);
+    expect(startEvent?.status).toBe(STATUS.RUNNING);
 
-      // --- Read first event (overall status) ---
-      const firstEventData = parseSseEvent(eventText);
-      expect(firstEventData).toHaveProperty('status');
-      // Basic workflow is fast, is complete already
-      expect(firstEventData.status).toBe('complete');
+    // Check for complete event
+    const completeEvent = allEvents.find((e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE);
+    expect(completeEvent).toBeDefined();
+    expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
-      // --- Read second event (initial steps) ---
-      const { value: secondValue, done: secondDone } = await reader.read();
-      expect(secondDone).toBe(false);
-      const secondEventText = decoder.decode(secondValue);
-      const secondEventData = parseSseEvent(secondEventText);
-      expect(secondEventData).toHaveProperty('type', 'step:status');
-      expect(secondEventData).toHaveProperty('steps');
-      expect(Array.isArray(secondEventData.steps)).toBe(true);
+    // Check the final step status event
+    const stepStatusEvents = allEvents.filter((e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS);
+    expect(stepStatusEvents.length).toBeGreaterThan(0);
+    const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
+    expect(lastStepStatusEvent.steps.every((step: any) => step.status === STATUS.COMPLETE)).toBe(true);
 
-      // Verify the final step status event shows completion
-      expect(secondEventData.steps.every((step: any) => step.status === 'complete')).toBe(true);
-    } finally {
-      await reader.cancel();
-    }
+    // Check for specific step completion if needed (depends on basic-workflow structure)
+    const stepCompleteEvents = allEvents.filter((e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE);
+    expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1); // Assuming basic-workflow has at least one step
 
     await waitOnExecutionContext(watchContext);
   });
@@ -146,50 +198,32 @@ describe("Hono API Tests", () => {
       throw new Error("Watch response body is null");
     }
 
-    const reader = watchResponse.body.getReader();
-    const decoder = new TextDecoder();
+    // --- Read all events from the SSE stream ---
+    const allEvents = await readSseStream(watchResponse.body);
 
-    try {
-      // --- Read first event (overall status) ---
-      const { value: firstValue, done: firstDone } = await reader.read();
-      expect(firstDone).toBe(false);
-      const firstEventText = decoder.decode(firstValue);
+    // --- Assertions on the collected events ---
+    // Check for start event
+    const startEvent = allEvents.find((e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START);
+    expect(startEvent).toBeDefined();
+    expect(startEvent?.workflowTitle).toBe(workflowName);
+    expect(startEvent?.status).toBe(STATUS.RUNNING);
 
-      const firstEventData = parseSseEvent(firstEventText);
-      expect(firstEventData).toHaveProperty('status', 'running');
+    // Check for step start/complete events for the delayed step
+    const delayStepStart = allEvents.find((e): e is StepStartedEvent => e.type === WORKFLOW_EVENTS.STEP_START && e.stepTitle === 'Delay Step');
+    expect(delayStepStart).toBeDefined();
+    const delayStepComplete = allEvents.find((e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE && e.stepTitle === 'Delay Step');
+    expect(delayStepComplete).toBeDefined();
 
-      // --- Read second event (initial steps - should be pending) ---
-      const { value: secondValue, done: secondDone } = await reader.read();
-      expect(secondDone).toBe(false);
-      const secondEventText = decoder.decode(secondValue);
+    // Check for the final complete event
+    const completeEvent = allEvents.find((e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE);
+    expect(completeEvent).toBeDefined();
+    expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
-      const secondEventData = parseSseEvent(secondEventText);
-      expect(secondEventData).toHaveProperty('type', 'step:status');
-      expect(secondEventData).toHaveProperty('steps');
-      expect(Array.isArray(secondEventData.steps)).toBe(true);
-      // Initially, steps might be pending
-      // expect(secondEventData.steps.every((step: any) => step.status === 'pending')).toBe(true);
-
-      // --- Read subsequent STEP_STATUS events until all steps are complete ---
-      let lastStepsEvent = secondEventData;
-      while (lastStepsEvent.steps.some((step: any) => step.status !== 'complete')) {
-          console.log('Waiting for completion, current steps:', JSON.stringify(lastStepsEvent.steps)); // Add logging
-          const { value: nextValue, done: nextDone } = await reader.read();
-          // If done is true here, the stream closed before completion, which is an error
-          expect(nextDone).toBe(false);
-          const nextEventText = decoder.decode(nextValue);
-          const nextEventData = parseSseEvent(nextEventText);
-          // Ensure we are getting step status updates
-          expect(nextEventData).toHaveProperty('type', 'step:status');
-          lastStepsEvent = nextEventData;
-      }
-
-      // Verify the final step status event shows completion
-      expect(lastStepsEvent.steps.every((step: any) => step.status === 'complete')).toBe(true);
-    } finally {
-      // Cancel the stream
-      await reader.cancel();
-    }
+    // Check the final step status event shows completion
+    const stepStatusEvents = allEvents.filter((e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS);
+    expect(stepStatusEvents.length).toBeGreaterThan(0);
+    const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
+    expect(lastStepStatusEvent.steps.every((step: any) => step.status === STATUS.COMPLETE)).toBe(true);
 
     await waitOnExecutionContext(watchContext);
     // Add a small delay to allow async operations to potentially settle
