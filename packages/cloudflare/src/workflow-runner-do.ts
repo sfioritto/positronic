@@ -1,8 +1,9 @@
 import { WorkflowRunner } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
-import type { Workflow, PromptClient, ResponseModel } from '@positronic/core';
+import type { Workflow, PromptClient, ResponseModel, Adapter, WorkflowEvent, SerializedStep } from '@positronic/core';
 import { z, TypeOf } from 'zod';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
+import { WORKFLOW_EVENTS } from '@positronic/core';
 
 export type PositronicManifest = Record<string, Workflow | undefined>;
 
@@ -22,9 +23,54 @@ export interface Env {
   WORKFLOW_RUNNER_DO: DurableObjectNamespace;
 }
 
+class WatchAdapter implements Adapter {
+  private subscribers: Set<ReadableStreamDefaultController> = new Set();
+  private encoder = new TextEncoder();
+
+  subscribe(controller: ReadableStreamDefaultController) {
+    this.subscribers.add(controller);
+  }
+
+  unsubscribe(controller: ReadableStreamDefaultController) {
+    this.subscribers.delete(controller);
+  }
+
+  private broadcast(data: any) {
+    const message = `data: ${JSON.stringify(data)}\n\n`;
+    const encodedMessage = this.encoder.encode(message);
+    this.subscribers.forEach(controller => {
+      try {
+        controller.enqueue(encodedMessage);
+      } catch (e) {
+        // Could happen if the client disconnected abruptly
+        console.error("Failed to send message to subscriber, removing.", e);
+        this.unsubscribe(controller);
+      }
+    });
+  }
+
+  async dispatch(event: WorkflowEvent<any>): Promise<void> {
+    if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      // Remove patch data before broadcasting steps
+      const stepsWithoutPatch: Omit<SerializedStep, 'patch'>[] = event.steps.map(step => ({
+        id: step.id,
+        title: step.title,
+        status: step.status,
+      }));
+      const broadcastData = {
+        type: event.type,
+        steps: stepsWithoutPatch,
+        workflowRunId: event.workflowRunId,
+      };
+      this.broadcast(broadcastData);
+    }
+  }
+}
+
 export class WorkflowRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private workflowRunId: string;
+  private watchAdapter = new WatchAdapter();
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
