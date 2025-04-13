@@ -23,6 +23,8 @@ export interface Env {
   WORKFLOW_RUNNER_DO: DurableObjectNamespace;
 }
 
+type StepWithoutPatch = Omit<SerializedStep, 'patch'>;
+
 class WatchAdapter implements Adapter {
   private subscribers: Set<ReadableStreamDefaultController> = new Set();
   private encoder = new TextEncoder();
@@ -35,7 +37,10 @@ class WatchAdapter implements Adapter {
     this.subscribers.delete(controller);
   }
 
-  private broadcast(data: any) {
+  private broadcast(data: {
+    type: typeof WORKFLOW_EVENTS['STEP_STATUS'],
+    steps: StepWithoutPatch[],
+  }) {
     const message = `data: ${JSON.stringify(data)}\n\n`;
     const encodedMessage = this.encoder.encode(message);
     this.subscribers.forEach(controller => {
@@ -52,7 +57,7 @@ class WatchAdapter implements Adapter {
   async dispatch(event: WorkflowEvent<any>): Promise<void> {
     if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
       // Remove patch data before broadcasting steps
-      const stepsWithoutPatch: Omit<SerializedStep, 'patch'>[] = event.steps.map(step => ({
+      const stepsWithoutPatch: StepWithoutPatch[] = event.steps.map(step => ({
         id: step.id,
         title: step.title,
         status: step.status,
@@ -60,7 +65,6 @@ class WatchAdapter implements Adapter {
       const broadcastData = {
         type: event.type,
         steps: stepsWithoutPatch,
-        workflowRunId: event.workflowRunId,
       };
       this.broadcast(broadcastData);
     }
