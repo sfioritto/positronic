@@ -108,29 +108,65 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request) {
-    const { sql } = this;
+    const { sql, watchAdapter } = this;
     const url = new URL(request.url);
+    const encoder = new TextEncoder();
+
+    let streamController: ReadableStreamDefaultController;
+
+    // Helper to send SSE formatted messages
+    const sendEvent = (controller: ReadableStreamDefaultController, data: any) => {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+    };
 
     try {
       if (url.pathname === '/watch') {
-        let timerId: number | undefined;
         const stream = new ReadableStream({
-          start(controller) {
-            timerId = setInterval(async () => {
+          async start(controller) {
+            streamController = controller;
+            try {
+              // 1. Send initial workflow run status
               const statusSql = `SELECT status, error, started_at, completed_at FROM workflow_run`;
-              const result = await sql.exec<{
+              const initialStatusResult = await sql.exec<{
                 status: string;
                 error: string | null;
                 started_at: number;
                 completed_at: number | null;
               }>(statusSql).one();
-              const encoder = new TextEncoder();
-              controller.enqueue(encoder.encode(`${JSON.stringify(result)}\n\n`));
-            }, 1000);
+
+              if (initialStatusResult) {
+                 sendEvent(controller, initialStatusResult);
+              }
+
+              // 2. Send initial steps status
+              const stepsSql = `SELECT step_id as id, step_title as title, status FROM workflow_run_steps`;
+              const initialStepsResult = await sql.exec<{
+                id: string,
+                title: string,
+                status: string,
+              }>(stepsSql).toArray();
+
+              if (initialStepsResult && initialStepsResult.length > 0) {
+                const stepsEvent = {
+                  type: WORKFLOW_EVENTS.STEP_STATUS,
+                  steps: initialStepsResult
+                };
+                sendEvent(controller, stepsEvent);
+              }
+
+              // 3. Subscribe to live updates
+              watchAdapter.subscribe(streamController);
+
+            } catch (err) {
+              console.error("Error fetching initial state for /watch:", err);
+              sendEvent(streamController, { type: 'error', message: 'Failed to fetch initial state' });
+              streamController.close();
+            }
           },
-          cancel() {
-            if (timerId !== undefined) {
-              clearInterval(timerId);
+          cancel(reason) {
+            console.log('Client disconnected from /watch', reason);
+            if (streamController) {
+                 watchAdapter.unsubscribe(streamController);
             }
           },
         });
