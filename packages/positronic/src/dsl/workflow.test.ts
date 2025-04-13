@@ -1,7 +1,7 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants.js';
 import { applyPatches} from './json-patch.js';
 import { State } from './types.js';
-import { workflow, type WorkflowEvent, type WorkflowErrorEvent} from './workflow.js';
+import { workflow, type WorkflowEvent, type WorkflowErrorEvent, type SerializedStep, type SerializedStepStatus } from './workflow.js';
 import { z } from 'zod';
 import { nextStep } from '../../../../test-utils.js';
 import { ResourceLoader } from '@positronic/resources/src/types.js';
@@ -557,20 +557,31 @@ describe('workflow resumption', () => {
       });
 
     // First run to get the first step completed with initial state
-    let initialCompletedSteps;
+    let initialCompletedSteps: SerializedStep[] = []; // Use the correct type
     const initialState = { initialValue: true };
     let firstStepState: State = initialState;
+    let allStepsInfo: SerializedStepStatus[] = []; // Explicit type annotation needed
 
     // Run workflow until we get the first step completed
     for await (const event of threeStepWorkflow.run({
       client: mockClient,
       initialState,
     })) {
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
-        firstStepState = applyPatches(firstStepState, [event.patch]);
+      // Capture the full step list from the first status event
+      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        allStepsInfo = event.steps; // Direct assignment, type is SerializedStepStatus[]
       }
-      if (event.type === WORKFLOW_EVENTS.STEP_STATUS && event.steps[0].status === STATUS.COMPLETE) {
-        initialCompletedSteps = event.steps;
+
+      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.stepTitle === "Step 1") {
+        firstStepState = applyPatches(firstStepState, [event.patch]);
+        // Construct initialCompletedSteps with the full data for completed steps
+        initialCompletedSteps = allStepsInfo.map((stepInfo, index) => {
+          if (index === 0) { // If it's Step 1
+            return { ...stepInfo, status: STATUS.COMPLETE, patch: event.patch };
+          } else {
+            return { ...stepInfo, status: STATUS.PENDING, patch: undefined };
+          }
+        });
         break;  // Stop after first step
       }
     }
