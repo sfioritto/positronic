@@ -118,7 +118,7 @@ interface BaseRunParams<TOptions extends object = {}, TServices extends object =
 export interface InitialRunParams<TOptions extends object = {}, TServices extends object = {}> extends BaseRunParams<TOptions, TServices> {
   initialState?: State;
   initialCompletedSteps?: never;
-  workflowRunId?: never;
+  workflowRunId?: string;
 }
 
 export interface RerunParams<TOptions extends object = {}, TServices extends object = {}> extends BaseRunParams<TOptions, TServices> {
@@ -375,6 +375,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
     this.client = client;
     this.options = options;
     this.services = services;
+
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -394,6 +395,7 @@ class WorkflowEventStream<TOptions extends object = {}, TState extends State = {
       }
     }
 
+    // Use provided ID if available, otherwise generate one
     this.workflowRunId = providedWorkflowRunId ?? uuidv4();
   }
 

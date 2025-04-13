@@ -226,6 +226,22 @@ describe('workflow creation', () => {
     expect(mockClient.execute).toHaveBeenCalledWith("prompt1", expect.any(Object));
     expect(overrideClient.execute).toHaveBeenCalledWith("prompt2", expect.any(Object));
   });
+
+  it('should use the provided workflowRunId for the initial run if supplied', async () => {
+    const testWorkflow = workflow('Workflow with Provided ID');
+    const providedId = 'my-custom-run-id-123';
+
+    const workflowRun = testWorkflow.run({ client: mockClient, workflowRunId: providedId });
+
+    // Check start event
+    const startResult = await workflowRun.next();
+    expect(startResult.value).toEqual(expect.objectContaining({
+      type: WORKFLOW_EVENTS.START,
+      status: STATUS.RUNNING,
+      workflowTitle: 'Workflow with Provided ID',
+      workflowRunId: providedId // Expect the provided ID here
+    }));
+  });
 });
 
 describe('error handling', () => {
