@@ -45,6 +45,13 @@ app.get('/workflows/runs/:runId/watch', async (context: Context) => {
     return response;
 });
 
+app.get('/workflows/watch', async (context: Context) => {
+    const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+    const monitorStub = context.env.MONITOR_DO.get(monitorId);
+    const response = await monitorStub.fetch(new Request(`http://do/watch`));
+    return response;
+});
+
 app.get('/workflows/:workflowName/history', async (context: Context) => {
   const workflowName = context.req.param('workflowName');
   const limit = Number(context.req.query('limit') || '10');
