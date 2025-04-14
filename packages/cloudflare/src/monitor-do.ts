@@ -78,4 +78,24 @@ export class MonitorDO extends DurableObject<Env> {
       SELECT * FROM workflow_runs WHERE run_id = ?
     `, workflowRunId).one();
   }
+
+  getWorkflowHistory(workflowTitle: string, limit: number = 10) {
+    return this.storage.exec(`
+      SELECT
+        run_id as workflowRunId,
+        workflow_title as workflowTitle,
+        workflow_description as workflowDescription,
+        type,
+        status,
+        options,
+        error,
+        created_at as createdAt,
+        started_at as startedAt,
+        completed_at as completedAt
+      FROM workflow_runs
+      WHERE workflow_title = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `, workflowTitle, limit).toArray();
+  }
 }

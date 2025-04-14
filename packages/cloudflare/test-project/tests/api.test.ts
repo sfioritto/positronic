@@ -302,4 +302,74 @@ describe("Hono API Tests", () => {
     expect(lastEvent.status).toBe(STATUS.COMPLETE);
   });
 
+  it("Returns workflow history", async () => {
+    const testEnv = env as TestEnv;
+    const workflowName = "basic-workflow";
+
+    // Run the workflow twice
+    for (let i = 0; i < 2; i++) {
+      // Start the workflow
+      const createRequest = new Request("http://example.com/workflows/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowName }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+      const { workflowRunId } = await createResponse.json<{ workflowRunId: string }>();
+
+      // Watch the workflow run via SSE until completion
+      const watchUrl = `http://example.com/workflows/runs/${workflowRunId}/watch`;
+      const watchRequest = new Request(watchUrl);
+      const watchContext = createExecutionContext();
+      const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+      await readSseStream(watchResponse.body!);
+      await waitOnExecutionContext(watchContext);
+      await waitOnExecutionContext(createContext);
+    }
+
+    // Get workflow history
+    const historyRequest = new Request(`http://example.com/workflows/${workflowName}/history?limit=5`);
+    const historyContext = createExecutionContext();
+    const historyResponse = await worker.fetch(historyRequest, testEnv, historyContext);
+    await waitOnExecutionContext(historyContext);
+
+    expect(historyResponse.status).toBe(200);
+    const history = await historyResponse.json<{
+      runs: Array<{
+        workflowRunId: string;
+        workflowTitle: string;
+        workflowDescription: string | null;
+        type: string;
+        status: string;
+        options: string;
+        error: string | null;
+        createdAt: number;
+        startedAt: number | null;
+        completedAt: number | null;
+      }>;
+    }>();
+    expect(history.runs.length).toBe(2);
+
+    // Verify each run has the expected properties
+    for (const run of history.runs) {
+      expect(run).toHaveProperty('workflowRunId');
+      expect(run).toHaveProperty('workflowTitle');
+      expect(run).toHaveProperty('workflowDescription');
+      expect(run).toHaveProperty('type');
+      expect(run).toHaveProperty('status');
+      expect(run).toHaveProperty('options');
+      expect(run).toHaveProperty('error');
+      expect(run).toHaveProperty('createdAt');
+      expect(run).toHaveProperty('startedAt');
+      expect(run).toHaveProperty('completedAt');
+      expect(run.status).toBe(STATUS.COMPLETE);
+      expect(run.workflowTitle).toBe(workflowName);
+    }
+
+    // Verify runs are ordered by createdAt descending
+    const timestamps = history.runs.map((run: { createdAt: number }) => run.createdAt);
+    expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a));
+  });
+
 });
