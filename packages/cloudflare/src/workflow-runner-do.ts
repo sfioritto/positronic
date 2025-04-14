@@ -3,6 +3,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Workflow, PromptClient, ResponseModel, Adapter, WorkflowEvent } from '@positronic/core';
 import { z, TypeOf } from 'zod';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
+import type { MonitorDO } from './monitor-do.js';
 
 export type PositronicManifest = Record<string, Workflow | undefined>;
 
@@ -20,6 +21,7 @@ export function setManifest(manifest: PositronicManifest) {
 
 export interface Env {
   WORKFLOW_RUNNER_DO: DurableObjectNamespace;
+  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
 }
 
 class EventStreamAdapter implements Adapter {
@@ -57,6 +59,14 @@ class EventStreamAdapter implements Adapter {
   }
 }
 
+class MonitorAdapter implements Adapter {
+  constructor(private monitorStub: DurableObjectStub<MonitorDO>) {}
+
+  async dispatch(event: WorkflowEvent<any>): Promise<void> {
+    await this.monitorStub.handleWorkflowEvent(event);
+  }
+}
+
 export class WorkflowRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private workflowRunId: string;
@@ -79,9 +89,12 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
 
     const sqliteAdapter = new WorkflowRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
+    const monitorAdapter = new MonitorAdapter(
+      this.env.MONITOR_DO.get(this.env.MONITOR_DO.idFromName('singleton'))
+    );
 
     const runner = new WorkflowRunner({
-      adapters: [sqliteAdapter, eventStreamAdapter],
+      adapters: [sqliteAdapter, eventStreamAdapter, monitorAdapter],
       logger: {
         log: (...args) => console.log(`[DO ${workflowRunId} RUNNER]`, ...args),
       },

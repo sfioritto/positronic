@@ -1,7 +1,7 @@
 import { workflow } from '@positronic/core';
 import app from '../../src/api';
 import { setManifest, WorkflowRunnerDO } from '../../src/workflow-runner-do';
-
+import { MonitorDO } from '../../src/monitor-do';
 const basicWorkflow = workflow('basic-workflow')
 .step('First step', ({ state }) => ({
 	...state,
@@ -40,4 +40,4 @@ export default {
 	fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { WorkflowRunnerDO };
+export { WorkflowRunnerDO, MonitorDO };
