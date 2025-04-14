@@ -16,9 +16,11 @@ import type {
   StepStartedEvent
 } from "@positronic/core";
 import type { WorkflowRunnerDO } from "../../src/workflow-runner-do.js"; // Import the DO class
+import type { MonitorDO } from "../../src/monitor-do.js";
 
 interface TestEnv {
   WORKFLOW_RUNNER_DO: DurableObjectNamespace<WorkflowRunnerDO>;
+  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   DB: D1Database;
 }
 
@@ -267,6 +269,40 @@ describe("Hono API Tests", () => {
     expect(event?.workflowRunId).toBeDefined();
     const expectedDoId = testEnv.WORKFLOW_RUNNER_DO.idFromName(expectedWorkflowRunId).toString();
     expect(event?.workflowRunId).toBe(expectedDoId);
+  });
+
+  it("Monitor receives workflow events", async () => {
+    const testEnv = env as TestEnv;
+    const workflowName = "basic-workflow";
+
+    // Start the workflow
+    const createRequest = new Request("http://example.com/workflows/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workflowName }),
+    });
+    const createContext = createExecutionContext();
+    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+    const { workflowRunId } = await createResponse.json<{ workflowRunId: string }>();
+    await waitOnExecutionContext(createContext);
+
+    // Watch the workflow run via SSE until completion
+    const watchUrl = `http://example.com/workflows/runs/${workflowRunId}/watch`;
+    const watchRequest = new Request(watchUrl);
+    const watchContext = createExecutionContext();
+    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    await readSseStream(watchResponse.body!);
+    await waitOnExecutionContext(watchContext);
+
+    // Get the monitor singleton instance
+    const monitorId = testEnv.MONITOR_DO.idFromName('singleton');
+    const monitorStub = testEnv.MONITOR_DO.get(monitorId);
+    const lastEvent = await monitorStub.getLastEvent();
+
+    // The last event should be a workflow complete event
+    expect(lastEvent).toBeDefined();
+    expect(lastEvent.type).toBe(WORKFLOW_EVENTS.COMPLETE);
+    expect(lastEvent.status).toBe(STATUS.COMPLETE);
   });
 
 });
