@@ -27,7 +27,7 @@ app.post('/workflows/runs', async (context: Context) => {
     const namespace = context.env.WORKFLOW_RUNNER_DO;
     const doId = namespace.idFromName(workflowRunId);
     const stub = namespace.get(doId);
-    await stub.start(workflowName);
+    await stub.start(workflowName, workflowRunId);
     const response: CreateRunResponse = {
         workflowRunId,
     };

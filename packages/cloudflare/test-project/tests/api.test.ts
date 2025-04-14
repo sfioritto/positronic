@@ -90,8 +90,6 @@ describe("Hono API Tests", () => {
     } catch (e) {
         console.error("[TEST_SSE_READ] Error reading SSE stream:", e);
         throw e; // Re-throw error after logging
-    } finally {
-        console.log(`[TEST_SSE_READ] Finished reading SSE stream, received ${events.length} events.`);
     }
     return events;
   }
@@ -266,9 +264,8 @@ describe("Hono API Tests", () => {
     await waitOnExecutionContext(watchContext);
 
     // Assert
-    expect(event?.workflowRunId).toBeDefined();
-    const expectedDoId = testEnv.WORKFLOW_RUNNER_DO.idFromName(expectedWorkflowRunId).toString();
-    expect(event?.workflowRunId).toBe(expectedDoId);
+    expect(event.workflowRunId).toBeDefined();
+    expect(event.workflowRunId).toBe(expectedWorkflowRunId);
   });
 
   it("Monitor receives workflow events", async () => {
@@ -297,7 +294,7 @@ describe("Hono API Tests", () => {
     // Get the monitor singleton instance
     const monitorId = testEnv.MONITOR_DO.idFromName('singleton');
     const monitorStub = testEnv.MONITOR_DO.get(monitorId);
-    const lastEvent = await monitorStub.getLastEvent();
+    const lastEvent = await monitorStub.getLastEvent(workflowRunId);
 
     // The last event should be a workflow complete event
     expect(lastEvent).toBeDefined();

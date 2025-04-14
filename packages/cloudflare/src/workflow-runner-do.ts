@@ -78,8 +78,12 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
     this.workflowRunId = state.id.toString();
   }
 
-  async start(workflowName: string, initialData?: Record<string, any>) {
-    const { sql, workflowRunId } = this;
+  async start(
+    workflowName: string,
+    workflowRunId: string,
+    initialData?: Record<string, any>
+  ) {
+    const { sql } = this;
 
     const workflowToRun = runtimeManifest[workflowName];
     if (!workflowToRun) {

@@ -12,7 +12,8 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": [
-				"WorkflowRunnerDO"
+				"WorkflowRunnerDO",
+				"MonitorDO"
 			]
 		}
 	],
