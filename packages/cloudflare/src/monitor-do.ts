@@ -79,7 +79,7 @@ export class MonitorDO extends DurableObject<Env> {
     `, workflowRunId).one();
   }
 
-  getWorkflowHistory(workflowTitle: string, limit: number = 10) {
+  history(workflowTitle: string, limit: number = 10) {
     return this.storage.exec(`
       SELECT
         run_id as workflowRunId,

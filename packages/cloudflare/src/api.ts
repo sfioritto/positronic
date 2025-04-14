@@ -53,7 +53,7 @@ app.get('/workflows/:workflowName/history', async (context: Context) => {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId) as MonitorDO;
 
-  const runs = await monitorStub.getWorkflowHistory(workflowName, limit);
+  const runs = await monitorStub.history(workflowName, limit);
   return context.json({ runs });
 });
 
