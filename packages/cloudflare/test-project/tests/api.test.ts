@@ -372,4 +372,96 @@ describe("Hono API Tests", () => {
     expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a));
   });
 
+  it("Watch endpoint streams running workflows", async () => {
+    const testEnv = env as TestEnv;
+    const workflowName = "delayed-workflow";
+    const workflowRuns: string[] = [];
+
+    // Start 3 delayed workflows
+    for (let i = 0; i < 3; i++) {
+      const createRequest = new Request("http://example.com/workflows/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowName }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+      const { workflowRunId } = await createResponse.json<{ workflowRunId: string }>();
+      workflowRuns.push(workflowRunId);
+      await waitOnExecutionContext(createContext);
+    }
+
+    // Connect to watch endpoint
+    const watchRequest = new Request("http://example.com/workflows/watch");
+    const watchContext = createExecutionContext();
+    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    expect(watchResponse.status).toBe(200);
+    expect(watchResponse.headers.get('Content-Type')).toContain('text/event-stream');
+
+    if (!watchResponse.body) {
+      throw new Error("Watch response body is null");
+    }
+
+    // Read the SSE stream
+    const events: any[] = [];
+    const reader = watchResponse.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    // Helper to process SSE messages
+    const processBuffer = () => {
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop() || ""; // Keep the incomplete message in the buffer
+
+      for (const message of messages) {
+        if (message.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(message.slice(6));
+            events.push(data);
+          } catch (e) {
+            console.error('Failed to parse SSE message:', message, e);
+          }
+        }
+      }
+    };
+
+    // Read for a while to capture workflow completions
+    const startTime = Date.now();
+    const TIMEOUT = 5000; // 5 seconds should be enough for our test workflows
+
+    try {
+      while (Date.now() - startTime < TIMEOUT) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        processBuffer();
+
+        // If we've seen all workflows complete, we can stop early
+        const lastEvent = events[events.length - 1];
+        if (lastEvent?.runningWorkflows?.length === 0) {
+          break;
+        }
+      }
+    } finally {
+      reader.cancel();
+    }
+
+    // Verify the events
+    expect(events.length).toBeGreaterThan(0);
+
+    // First event should show all workflows running
+    const initialState = events[0];
+    expect(initialState.runningWorkflows).toBeDefined();
+    expect(initialState.runningWorkflows.length).toBe(3);
+    expect(initialState.runningWorkflows.every((w: any) => w.status === STATUS.RUNNING)).toBe(true);
+
+    // Last event should show no running workflows
+    const finalState = events[events.length - 1];
+    expect(finalState.runningWorkflows).toBeDefined();
+    expect(finalState.runningWorkflows.length).toBe(0);
+
+    await waitOnExecutionContext(watchContext);
+  });
+
 });
