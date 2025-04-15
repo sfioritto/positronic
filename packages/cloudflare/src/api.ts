@@ -57,4 +57,11 @@ app.get('/workflows/:workflowName/history', async (context: Context) => {
   return context.json({ runs });
 });
 
+app.get('/workflows/watch', async (context: Context) => {
+    const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+    const monitorStub = context.env.MONITOR_DO.get(monitorId);
+    const response = await monitorStub.fetch(new Request(`http://do/watch`));
+    return response;
+});
+
 export default app;
