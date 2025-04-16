@@ -10,9 +10,8 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@positronic/core": "^0.0.1",
     "@cloudflare/vitest-pool-workers": "^0.8.11",
-    "@cloudflare/workers-types": "^4.20250406.0",
+    "@positronic/core": "file:../../packages/positronic",
     "typescript": "^5.5.2",
     "vitest": "3.0.9",
     "wrangler": "^4.7.2"

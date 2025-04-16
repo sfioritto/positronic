@@ -2,6 +2,8 @@ import { workflow } from '@positronic/core';
 import app from '../../src/api';
 import { setManifest, WorkflowRunnerDO } from '../../src/workflow-runner-do';
 import { MonitorDO } from '../../src/monitor-do';
+import { PositronicManifest } from '../../src/manifest.js';
+
 const basicWorkflow = workflow('basic-workflow')
 .step('First step', ({ state }) => ({
 	...state,
@@ -28,13 +30,14 @@ const delayedWorkflow = workflow('delayed-workflow')
 	final_message: 'Done after delay',
 }));
 
+const manifest = new PositronicManifest({
+	staticManifest: {
+		'basic-workflow': basicWorkflow,
+		'delayed-workflow': delayedWorkflow
+	}
+});
 
-const inlineManifest = {
-	'basic-workflow': basicWorkflow,
-	'delayed-workflow': delayedWorkflow, // Add the delayed workflow to the manifest
-};
-
-setManifest(inlineManifest);
+setManifest(manifest);
 
 export default {
 	fetch: app.fetch,

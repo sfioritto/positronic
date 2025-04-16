@@ -5,7 +5,9 @@ import { z, TypeOf } from 'zod';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 
-export type PositronicManifest = Record<string, Workflow | undefined>;
+export type PositronicManifest = {
+  import: (name: string) => Promise<Workflow | undefined>;
+};
 
 const baseClient: PromptClient = {
   execute: async <T extends z.AnyZodObject>(prompt: string, responseModel: ResponseModel<T>): Promise<TypeOf<T>> => {
@@ -13,7 +15,7 @@ const baseClient: PromptClient = {
   },
 };
 
-let runtimeManifest: PositronicManifest = {};
+let runtimeManifest: PositronicManifest | null = null;
 
 export function setManifest(manifest: PositronicManifest) {
   runtimeManifest = manifest;
@@ -85,7 +87,11 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
   ) {
     const { sql } = this;
 
-    const workflowToRun = runtimeManifest[workflowName];
+    if (!runtimeManifest) {
+      throw new Error('Runtime manifest not initialized');
+    }
+
+    const workflowToRun = await runtimeManifest.import(workflowName);
     if (!workflowToRun) {
       console.error(`[DO ${workflowRunId}] Workflow ${workflowName} not found in manifest.`);
       throw new Error(`Workflow ${workflowName} not found`);

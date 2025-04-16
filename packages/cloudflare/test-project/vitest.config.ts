@@ -9,7 +9,6 @@ export default defineWorkersConfig({
           durableObjects: {
             DO_NAMESPACE: "WorkflowRunOrchestratorDO",
           },
-          d1Databases: ["DB"],
         },
       },
     },
