@@ -5,7 +5,8 @@
   "scripts": {
     "test": "jest --silent",
     "test:watch": "jest --silent --watch",
-    "dev": "npm run build:workspaces && npm run test || /usr/local/bin/terminal-notifier -title \"Positronic\" -message \"Build/Test failed\"",
+    "test:all": "npm run test && cd packages/cloudflare/test-project && npm run test -- --run",
+    "dev": "npm run build:workspaces && npm run test:all || /usr/local/bin/terminal-notifier -title \"Positronic\" -message \"Build/Test failed\"",
     "dev:watch": "nodemon --exec 'npm run dev'",
     "clean:workspaces": "npm run clean --workspaces",
     "build:workspaces": "npm run build --workspaces",
