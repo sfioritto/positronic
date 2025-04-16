@@ -23,7 +23,7 @@
     "typescript": "^5.0.0"
   },
   "workspaces": [
-    "packages/positronic",
+    "packages/core",
     "packages/shell",
     "packages/client-anthropic",
     "packages/cli",

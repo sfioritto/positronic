@@ -19,7 +19,7 @@
     "types": ["jest", "node"],
   },
   "references": [
-    { "path": "./packages/positronic" },
+    { "path": "./packages/core" },
     { "path": "./packages/cli" },
     { "path": "./packages/client-anthropic" }
   ]
