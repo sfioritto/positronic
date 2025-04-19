@@ -3,13 +3,6 @@ import * as path from 'path';
 // Import Node.js built-in for running commands
 import { execSync } from 'child_process';
 // Import templates
-import {
-    developmentTemplate,
-    productionTemplate,
-    packageJsonTemplate,
-    tsConfigTemplate,
-    gitignoreTemplate
-} from '../templates/index.js';
 
 // TODO: Consider passing config/mode info via constructor instead of relying on process.env here
 const isLocalDevMode = !!process.env.POSITRONIC_PROJECT_PATH;
@@ -96,110 +89,6 @@ export class ProjectCommand {
      * Only available in Global Mode.
      */
     create(argv: any): void {
-        const projectName = argv['project-name'];
-        // Use process.cwd() to create the project relative to where the command is run
-        const projectPath = path.resolve(process.cwd(), projectName);
-
-        console.log(`Creating new project: ${projectName} at ${projectPath}`);
-
-        // Check if directory already exists
-        if (fs.existsSync(projectPath)) {
-            console.error(`Error: Directory already exists: ${projectPath}`);
-            process.exit(1);
-        }
-
-        try {
-            // Create project root directory
-            fs.mkdirSync(projectPath);
-            console.log(`  Created ./${path.relative(process.cwd(), projectPath)}/`);
-
-
-            // Create standard subdirectories
-            const subdirs = ['bin', 'workflows', 'agents', 'prompts', 'services', 'resources', 'config']; // Added config dir
-            subdirs.forEach(subdir => {
-                const dirPath = path.join(projectPath, subdir);
-                fs.mkdirSync(dirPath);
-                // Create a .gitkeep file to ensure directories are added to git even if empty
-                fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
-                console.log(`  Created ./${path.relative(process.cwd(), dirPath)}/`);
-            });
-
-            // --- Generate template files ---
-            const templateProps = { projectName };
-
-            const filesToGenerate = [
-                 {
-                    filename: path.join('config', 'development.ts'),
-                    content: developmentTemplate(templateProps)
-                },
-                {
-                    filename: path.join('config', 'production.ts'),
-                    content: productionTemplate(templateProps)
-                },
-                 {
-                    filename: 'package.json',
-                    content: packageJsonTemplate(templateProps)
-                },
-                {
-                    filename: 'tsconfig.json',
-                    content: tsConfigTemplate(templateProps)
-                },
-                {
-                    filename: '.gitignore',
-                    content: gitignoreTemplate() // gitignore doesn't need projectName
-                },
-            ];
-
-            filesToGenerate.forEach(file => {
-                const filePath = path.join(projectPath, file.filename);
-                 // Ensure subdirectories exist (e.g., for config/)
-                 const fileDir = path.dirname(filePath);
-                 // No need to check if exists, mkdirSync handles it if recursive: true (default in newer Node)
-                 // but we created 'config' explicitly above anyway.
-                fs.writeFileSync(filePath, file.content.trim() + '\n'); // Trim whitespace and add trailing newline
-                console.log(`  Created ./${path.relative(process.cwd(), filePath)}`);
-            });
-            // --- End template generation ---
-
-            // --- Initialize Git repository ---
-            try {
-                // stdio: 'ignore' prevents git init output from cluttering the console
-                execSync('git init', { cwd: projectPath, stdio: 'ignore' });
-                console.log('  Initialized Git repository.');
-            } catch (gitError: any) {
-                // Handle cases where git might not be installed or other errors
-                console.warn(`\nWarning: Could not initialize Git repository in ${projectPath}`);
-                if (gitError.message?.includes('command not found') || gitError.code === 'ENOENT') {
-                    console.warn('  Reason: Git command not found. Is Git installed and in your PATH?');
-                } else {
-                    console.warn(`  Reason: ${gitError.message}`);
-                }
-                console.warn('  Please initialize the repository manually if desired: cd <project_dir> && git init');
-            }
-            // --- End Git initialization ---
-
-            console.log(`\nProject '${projectName}' created successfully at ${projectPath}`);
-            console.log(`\nNext steps:`);
-            console.log(`  cd ${projectName}`);
-            console.log(`  npm install`); // Add npm install step
-            console.log(`  # Start developing your project!`);
-
-
-        } catch (error) {
-            console.error(`Error creating project directory structure or files:`, error);
-            // Attempt cleanup if creation failed partway
-            if (fs.existsSync(projectPath)) {
-                try {
-                    // Use fs.rm for potentially safer removal than rmSync with force
-                    console.warn(`Attempting to clean up partially created directory: ${projectPath}`);
-                    fs.rmSync(projectPath, { recursive: true, force: true }); // Keep rmSync for simplicity here, but fs.rm is newer
-                    console.log(`Cleaned up successfully.`);
-                } catch (cleanupError) {
-                    console.error(`Error during cleanup:`, cleanupError);
-                    console.error(`Please remove the directory manually: ${projectPath}`);
-                }
-            }
-            process.exit(1);
-        }
+        console.log('(Placeholder: Create function not implemented yet)');
     }
 }
