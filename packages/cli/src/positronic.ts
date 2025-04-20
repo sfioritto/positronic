@@ -3,6 +3,10 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { ProjectCommand } from './commands/project.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
 
 // Environment Variable for Mode Detection:
 // POSITRONIC_PROJECT_PATH: If this environment variable is set, the CLI operates in
@@ -14,6 +18,15 @@ import { ProjectCommand } from './commands/project.js';
 
 const isLocalDevMode = !!process.env.POSITRONIC_PROJECT_PATH;
 const localProjectPath = process.env.POSITRONIC_PROJECT_PATH;
+
+// Helper to resolve template paths relative to the current file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// Assuming templates are inside the cli package at packages/cli/templates
+// Compiled file likely at packages/cli/dist/positronic.js
+// Need to go up 1 level to packages/cli/, then into templates/
+const templatesBaseDir = path.resolve(__dirname, '../templates');
+const cloudflareDevServerTemplateDir = path.join(templatesBaseDir, 'cloudflare-dev-server');
 
 // Instantiate command classes
 const projectCommand = new ProjectCommand();
@@ -103,6 +116,36 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
 
   return yargsProject;
 });
+
+// --- Add the Server Command (Only in Local Dev Mode) ---
+if (isLocalDevMode) {
+  cli = cli.command(
+    'server',
+    'Start the local development server for the current project',
+    (yargsServer) => {
+      // Add options later? e.g., --port, --force
+      return yargsServer
+        .option('force', {
+            describe: 'Force regeneration of the .positronic server directory',
+            type: 'boolean',
+            default: false,
+        });
+    },
+    handleServer // Implement this handler function
+  );
+} else {
+  // Optionally, define the server command in global mode to show an error
+  cli = cli.command(
+    'server',
+    'Start the local development server (requires being inside a project)',
+    () => {},
+    () => {
+        console.error("Error: The 'server' command can only be run inside a Positronic project directory.");
+        console.error("Use 'positronic project new <name>' to create a project first, then 'cd <name>' into it.");
+        process.exit(1);
+    }
+  );
+}
 
 // --- Workflow Management Commands ---
 cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeScript code created by you Workflows can use agents, prompts, resources, and services.\n', (yargs) => {
@@ -507,4 +550,189 @@ function handleAgentWatch(argv: any) {
   const runId = argv['run-id'];
   console.log(`Watching agent: ${agentName}, Run ID: ${runId}`);
   // TODO: Implement SSE connection logic
+}
+
+// ------------------- Handler Implementations -------------------
+
+// Helper to find project root
+async function findProjectRoot(startDir: string): Promise<string | null> {
+    let currentDir = path.resolve(startDir);
+    while (true) {
+        const configPath = path.join(currentDir, 'positronic.config.json');
+        try {
+            await fs.access(configPath);
+            return currentDir; // Found it
+        } catch (e) {
+            // Not found, go up
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir) {
+                // Reached root
+                return null;
+            }
+            currentDir = parentDir;
+        }
+    }
+}
+
+// Helper function to copy and process a template file for the server
+async function copyServerTemplate(
+    templateFileName: string,
+    destinationDir: string,
+    destinationFileName: string, // Allow different destination name
+    projectName: string
+): Promise<void> {
+    const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
+    const destinationPath = path.join(destinationDir, destinationFileName);
+    try {
+        const content = await fs.readFile(templatePath, 'utf-8');
+        const processedContent = content.replace(/{{projectName}}/g, projectName);
+        await fs.writeFile(destinationPath, processedContent);
+        console.log(`   Created ${destinationFileName}`);
+    } catch (error: any) {
+        console.error(`   Error processing server template ${templateFileName}: ${error.message}`);
+        throw error; // Re-throw to stop the process
+    }
+}
+
+// Helper to run npm install
+function runNpmInstall(targetDir: string): Promise<void> {
+     console.log(` -> Running npm install in ${targetDir}...`);
+    const npmInstall = spawn('npm', ['install'], {
+        cwd: targetDir,
+        stdio: 'inherit',
+        shell: true
+    });
+
+    return new Promise((resolve, reject) => {
+        npmInstall.on('close', (code) => {
+            if (code === 0) {
+                console.log(` -> npm install completed successfully.`);
+                resolve();
+            } else {
+                console.error(` -> npm install failed with code ${code}.`);
+                reject(new Error(`npm install failed in ${targetDir}`));
+            }
+        });
+        npmInstall.on('error', (err) => {
+            console.error(` -> Failed to start npm install in ${targetDir}:`, err);
+            reject(err);
+        });
+    });
+}
+
+// --- Server Command Handler ---
+async function handleServer(argv: any): Promise<void> {
+    console.log('Starting Positronic development server...');
+
+    // 1. Find Project Root
+    const projectRoot = await findProjectRoot(process.cwd());
+    if (!projectRoot) {
+        console.error("Error: Not inside a Positronic project. Could not find 'positronic.config.json'.");
+        console.error("Run 'positronic project new <name>' first.");
+        process.exit(1);
+    }
+    console.log(`Found project root: ${projectRoot}`);
+
+    // 2. Read Config
+    const configPath = path.join(projectRoot, 'positronic.config.json');
+    let config: any;
+    try {
+        const configContent = await fs.readFile(configPath, 'utf-8');
+        config = JSON.parse(configContent);
+    } catch (error: any) {
+        console.error(`Error reading or parsing ${configPath}: ${error.message}`);
+        process.exit(1);
+    }
+
+    const projectName = config?.projectName || 'positronic-project'; // Fallback name
+
+    // 3. Check Backend Type
+    if (config?.backend?.type !== 'cloudflare') {
+        console.error(`Error: Unsupported backend type '${config?.backend?.type}'. Currently, only 'cloudflare' is supported for the local server.`);
+        process.exit(1);
+    }
+
+    // 4. Define .positronic Path
+    const dotPositronicPath = path.join(projectRoot, '.positronic');
+    const dotPositronicSrcPath = path.join(dotPositronicPath, 'src');
+
+    // 5. Check if .positronic needs generation
+    let needsGeneration = false;
+    try {
+        await fs.access(dotPositronicPath);
+        if (argv.force) {
+             console.log('Force flag detected, regenerating .positronic directory...');
+             needsGeneration = true;
+             // Clean up old dir first if forcing regeneration
+             try {
+                 await fs.rm(dotPositronicPath, { recursive: true, force: true });
+             } catch (rmError: any) {
+                 console.warn(`Warning: Could not completely remove old .positronic directory: ${rmError.message}`);
+             }
+        } else {
+            console.log(`Found existing .positronic directory. Use --force to regenerate.`);
+            // Optional: Add more checks here, e.g., check if package.json exists, or node_modules
+        }
+    } catch (e) {
+        // Doesn't exist, needs generation
+        needsGeneration = true;
+    }
+
+    // 6. Generate .positronic if needed
+    if (needsGeneration) {
+        console.log('Setting up local Cloudflare dev server in .positronic...');
+        try {
+            await fs.mkdir(dotPositronicPath, { recursive: true });
+            await fs.mkdir(dotPositronicSrcPath, { recursive: true });
+            console.log(' -> Created .positronic directories.');
+
+            console.log(' -> Copying server template files...');
+            await copyServerTemplate('package.json.tpl', dotPositronicPath, 'package.json', projectName);
+            await copyServerTemplate('wrangler.jsonc.tpl', dotPositronicPath, 'wrangler.jsonc', projectName);
+            await copyServerTemplate('tsconfig.json.tpl', dotPositronicPath, 'tsconfig.json', projectName);
+            await copyServerTemplate('src/index.ts.tpl', dotPositronicSrcPath, 'index.ts', projectName);
+
+            // Run npm install within .positronic
+            await runNpmInstall(dotPositronicPath);
+
+        } catch (error: any) {
+            console.error(`Error setting up .positronic directory: ${error.message}`);
+            // Attempt cleanup on failure
+            try { await fs.rm(dotPositronicPath, { recursive: true, force: true }); } catch {}
+            process.exit(1);
+        }
+        console.log('.positronic setup complete.');
+    }
+
+    // 7. Run Wrangler Dev
+    console.log('Starting Cloudflare development server via Wrangler...');
+    console.log(`(Running 'npx wrangler dev' in ${dotPositronicPath})`);
+
+    const wranglerDev = spawn('npx', ['wrangler', 'dev'], {
+        cwd: dotPositronicPath,
+        stdio: 'inherit', // Pipe stdin, stdout, stderr to user
+        shell: true // Helps find npx/wrangler
+    });
+
+    wranglerDev.on('close', (code) => {
+        // If wrangler exits cleanly (e.g., user presses Ctrl+C), code might be null or 0
+        // If it crashes, it might be non-zero.
+        if (code !== null && code !== 0) {
+             console.log(`Wrangler dev server exited unexpectedly with code ${code}.`);
+        } else {
+             console.log('Wrangler dev server stopped.');
+        }
+         // Exit the CLI process itself once wrangler is done
+         process.exit(code ?? 0);
+    });
+
+    wranglerDev.on('error', (err) => {
+        console.error('Failed to start Wrangler dev server process:', err);
+        console.error('Ensure Wrangler is installed correctly (`npm install -D wrangler` in .positronic or globally) and accessible in your PATH.');
+        process.exit(1);
+    });
+
+    // Keep the process alive while wrangler is running. The exit logic is handled in the 'close' event.
+    // We might need to handle SIGINT/SIGTERM explicitly to gracefully shut down wrangler if needed,
+    // but stdio: 'inherit' often handles Ctrl+C correctly.
 }

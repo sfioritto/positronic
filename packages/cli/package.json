@@ -10,7 +10,7 @@
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
-    "build": "npm run tsc && npm run swc",
+    "build": "npm run tsc && npm run swc && mkdir -p dist/templates && cp -R templates/. dist/templates",
     "postbuild": "chmod +x ./dist/src/positronic.js",
     "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
