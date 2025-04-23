@@ -117,35 +117,22 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
   return yargsProject;
 });
 
-// --- Add the Server Command (Only in Local Dev Mode) ---
-if (isLocalDevMode) {
-  cli = cli.command(
-    'server',
-    'Start the local development server for the current project',
-    (yargsServer) => {
-      // Add options later? e.g., --port, --force
-      return yargsServer
-        .option('force', {
-            describe: 'Force regeneration of the .positronic server directory',
-            type: 'boolean',
-            default: false,
-        });
-    },
-    handleServer // Implement this handler function
-  );
-} else {
-  // Optionally, define the server command in global mode to show an error
-  cli = cli.command(
-    'server',
-    'Start the local development server (requires being inside a project)',
-    () => {},
-    () => {
-        console.error("Error: The 'server' command can only be run inside a Positronic project directory.");
-        console.error("Use 'positronic project new <name>' to create a project first, then 'cd <name>' into it.");
-        process.exit(1);
-    }
-  );
-}
+// --- Add the Server Command ---
+// The server command should always be available;
+// its handler will check if we are inside a project.
+cli = cli.command(
+  'server',
+  'Start the local development server for the current project',
+  (yargsServer) => {
+    return yargsServer
+      .option('force', {
+          describe: 'Force regeneration of the .positronic server directory',
+          type: 'boolean',
+          default: false,
+      });
+  },
+  handleServer // Handler already checks for project root
+);
 
 // --- Workflow Management Commands ---
 cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeScript code created by you Workflows can use agents, prompts, resources, and services.\n', (yargs) => {
@@ -584,10 +571,50 @@ async function copyServerTemplate(
     const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
     const destinationPath = path.join(destinationDir, destinationFileName);
     try {
-        const content = await fs.readFile(templatePath, 'utf-8');
-        const processedContent = content.replace(/{{projectName}}/g, projectName);
-        await fs.writeFile(destinationPath, processedContent);
+        let content = await fs.readFile(templatePath, 'utf-8');
+
+        // Process {{projectName}} placeholder first
+        content = content.replace(/{{projectName}}/g, projectName);
+
+        // Special handling for package.json to inject local paths if env vars are set
+        if (templateFileName === 'package.json.tpl') {
+            const packagesDevPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+
+            if (packagesDevPath) {
+                console.log(` -> Injecting local development paths from ${packagesDevPath} into package.json...`);
+                try {
+                    const packageJson = JSON.parse(content);
+                    const coreDevPath = path.join(packagesDevPath, 'core');
+                    const cloudflareDevPath = path.join(packagesDevPath, 'cloudflare');
+
+                    // Inject core path if the dependency exists
+                    if (packageJson.dependencies && packageJson.dependencies['@positronic/core']) {
+                        packageJson.dependencies['@positronic/core'] = `file:${coreDevPath}`;
+                        console.log(`    - Using local @positronic/core: file:${coreDevPath}`);
+                    }
+
+                    // Inject cloudflare path if the dependency exists
+                    if (packageJson.dependencies && packageJson.dependencies['@positronic/cloudflare']) {
+                        packageJson.dependencies['@positronic/cloudflare'] = `file:${cloudflareDevPath}`;
+                        console.log(`    - Using local @positronic/cloudflare: file:${cloudflareDevPath}`);
+                    }
+
+                    // Note: Add similar checks here if other @positronic/* packages are needed
+
+                    // Convert back to string with standard indentation
+                    content = JSON.stringify(packageJson, null, 2);
+                } catch (parseError: any) {
+                     console.error(`   Error parsing server template ${templateFileName} for local path injection: ${parseError.message}`);
+                     // Throw error to prevent writing corrupted file
+                     throw parseError;
+                }
+            }
+        }
+
+        // Write the final content (potentially modified)
+        await fs.writeFile(destinationPath, content);
         console.log(`   Created ${destinationFileName}`);
+
     } catch (error: any) {
         console.error(`   Error processing server template ${templateFileName}: ${error.message}`);
         throw error; // Re-throw to stop the process

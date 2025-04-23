@@ -1,0 +1,19 @@
+{
+  "name": "positronic-dev-server-{{projectName}}",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {},
+  "dependencies": {
+    "@positronic/core": "^0.0.1",
+    "@positronic/cloudflare": "^0.0.1",
+    "hono": "^4.0.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240405.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^3.47.0"
+  }
+}
