@@ -3,10 +3,11 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { ProjectCommand } from './commands/project.js';
-import * as fs from 'fs/promises';
+import * as fs from 'fs'; // Use synchronous fs methods
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
+import * as fsPromises from 'fs/promises'; // Keep for async operations where needed
 
 // Environment Variable for Mode Detection:
 // POSITRONIC_PROJECT_PATH: If this environment variable is set, the CLI operates in
@@ -16,8 +17,29 @@ import { fileURLToPath } from 'url';
 // If this variable is NOT set, the CLI operates in "Global Mode", interacting
 // with remote projects configured via `project add`.
 
-const isLocalDevMode = !!process.env.POSITRONIC_PROJECT_PATH;
-const localProjectPath = process.env.POSITRONIC_PROJECT_PATH;
+// Synchronous function to find project root
+function findProjectRootSync(startDir: string): string | null {
+    let currentDir = path.resolve(startDir);
+    while (true) {
+        const configPath = path.join(currentDir, 'positronic.config.json');
+        try {
+            fs.accessSync(configPath); // Use synchronous access check
+            return currentDir; // Found it
+        } catch (e) {
+            // Not found, go up
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir) {
+                // Reached root
+                return null;
+            }
+            currentDir = parentDir;
+        }
+    }
+}
+
+// Determine mode and project path once at the start
+const projectRootPath = findProjectRootSync(process.cwd());
+const isLocalDevMode = !!projectRootPath;
 
 // Helper to resolve template paths relative to the current file
 const __filename = fileURLToPath(import.meta.url);
@@ -28,8 +50,8 @@ const __dirname = path.dirname(__filename);
 const templatesBaseDir = path.resolve(__dirname, '../templates');
 const cloudflareDevServerTemplateDir = path.join(templatesBaseDir, 'cloudflare-dev-server');
 
-// Instantiate command classes
-const projectCommand = new ProjectCommand();
+// Instantiate command classes, passing the determined mode and path
+const projectCommand = new ProjectCommand(isLocalDevMode, projectRootPath);
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -118,21 +140,23 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
 });
 
 // --- Add the Server Command ---
-// The server command should always be available;
-// its handler will check if we are inside a project.
-cli = cli.command(
-  'server',
-  'Start the local development server for the current project',
-  (yargsServer) => {
-    return yargsServer
-      .option('force', {
-          describe: 'Force regeneration of the .positronic server directory',
-          type: 'boolean',
-          default: false,
-      });
-  },
-  handleServer // Handler already checks for project root
-);
+// The server command should only be available in local dev mode;
+// Wrap its registration in the check
+if (isLocalDevMode) {
+  cli = cli.command(
+    'server',
+    'Start the local development server for the current project',
+    (yargsServer) => {
+      return yargsServer
+        .option('force', {
+            describe: 'Force regeneration of the .positronic server directory',
+            type: 'boolean',
+            default: false,
+        });
+    },
+    handleServer // Handler already checks for project root
+  );
+}
 
 // --- Workflow Management Commands ---
 cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeScript code created by you Workflows can use agents, prompts, resources, and services.\n', (yargs) => {
@@ -426,7 +450,7 @@ function handleRun(argv: any) {
 }
 
 function handleGlobalList(argv: any) {
-  const context = isLocalDevMode ? `local project at ${localProjectPath}` : 'selected remote project';
+  const context = isLocalDevMode ? `local project at ${projectRootPath}` : 'selected remote project';
   if (argv.type.includes('all')) {
     console.log(`Listing all entity types in ${context}`);
   } else {
@@ -438,22 +462,23 @@ function handleGlobalList(argv: any) {
 // Add handler for workflow new command
 function handleWorkflowNew(argv: any) {
   if (!isLocalDevMode) {
-    console.error("Error: Cannot create new workflows in Global Mode. Use `bin/positronic workflow new ...` within your project directory.");
+    console.error("Error: Cannot create new workflows in Global Mode. Use `positronic workflow new ...` within your project directory.");
     process.exit(1);
   }
   // Now we know we are in Local Dev Mode
-  console.log(`Creating new workflow in project ${localProjectPath}: ${argv['workflow-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
-  // TODO: Implement workflow creation logic within localProjectPath
+  console.log(`Creating new workflow in project ${projectRootPath}: ${argv['workflow-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
+  // TODO: Implement workflow creation logic within projectRootPath
 }
 
 // Add handler for agent new command
 function handleAgentNew(argv: any) {
-  // TODO: Implement this handler
-  // IMPORTANT: This handler should check if the currently selected project is local
-  // and throw an error if it's not, as creating entities requires a local project
-  // IMPORTANT: Agents are created as directories in the global agents directory
-  // IMPORTANT: Each agent directory includes an agent.ts file and a resources/ subdirectory
-  console.log(`Creating new agent: ${argv['agent-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
+  // This check is now implicitly handled by the command only being available in local mode
+  if (!isLocalDevMode) { // Keep check for clarity or future changes
+      console.error("Internal Error: Agent new command executed in non-local mode.");
+      process.exit(1);
+  }
+  console.log(`Creating new agent in project ${projectRootPath}: ${argv['agent-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
+  // TODO: Implement agent creation logic within projectRootPath
 }
 
 // Add handler for agent run command
@@ -467,11 +492,13 @@ function handleAgentRun(argv: any) {
 
 // Add handlers for the prompt commands
 function handlePromptNew(argv: any) {
-  // TODO: Implement this handler
-  // IMPORTANT: This handler should check if the currently selected project is local
-  // and throw an error if it's not, as creating entities requires a local project
-  // IMPORTANT: Prompts are created as single files in the global prompts directory
-  console.log(`Creating new prompt: ${argv['prompt-name']}`);
+  // This check is now implicitly handled by the command only being available in local mode
+  if (!isLocalDevMode) { // Keep check for clarity or future changes
+      console.error("Internal Error: Prompt new command executed in non-local mode.");
+      process.exit(1);
+  }
+  console.log(`Creating new prompt in project ${projectRootPath}: ${argv['prompt-name']}`);
+  // TODO: Implement prompt creation logic within projectRootPath
 }
 
 function handlePromptList() {
@@ -541,13 +568,14 @@ function handleAgentWatch(argv: any) {
 
 // ------------------- Handler Implementations -------------------
 
-// Helper to find project root
+// Helper to find project root (Keep async version for server command)
 async function findProjectRoot(startDir: string): Promise<string | null> {
     let currentDir = path.resolve(startDir);
     while (true) {
         const configPath = path.join(currentDir, 'positronic.config.json');
         try {
-            await fs.access(configPath);
+            // Use fsPromises for the async version
+            await fsPromises.access(configPath);
             return currentDir; // Found it
         } catch (e) {
             // Not found, go up
@@ -572,7 +600,7 @@ async function copyServerTemplate(
     const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
     const destinationPath = path.join(destinationDir, destinationFileName);
     try {
-        let content = await fs.readFile(templatePath, 'utf-8');
+        let content = await fsPromises.readFile(templatePath, 'utf-8');
 
         // Process {{projectName}} placeholder first
         content = content.replace(/{{projectName}}/g, projectName);
@@ -637,7 +665,7 @@ async function copyServerTemplate(
         }
 
         // Write the final content (potentially modified)
-        await fs.writeFile(destinationPath, content);
+        await fsPromises.writeFile(destinationPath, content);
         console.log(`   Created ${destinationFileName}`);
 
     } catch (error: any) {
@@ -676,24 +704,31 @@ function runNpmInstall(targetDir: string): Promise<void> {
 async function handleServer(argv: any): Promise<void> {
     console.log('Starting Positronic development server...');
 
-    // 1. Find Project Root
-    const projectRoot = await findProjectRoot(process.cwd());
-    if (!projectRoot) {
+    // 1. Find Project Root (Can keep using the async version here)
+    // Or use the already found projectRootPath if available?
+    // Using the async check here ensures it runs correctly even if CWD changes,
+    // and matches the previous logic exactly for this command.
+    const currentProjectRoot = await findProjectRoot(process.cwd());
+    if (!currentProjectRoot) {
         console.error("Error: Not inside a Positronic project. Could not find 'positronic.config.json'.");
-        console.error("Run 'positronic project new <name>' first.");
+        console.error("Run 'positronic project new <name>' first or ensure you are in the project directory.");
         process.exit(1);
     }
-    console.log(`Found project root: ${projectRoot}`);
+    // Can optionally compare currentProjectRoot with the initially found projectRootPath
+    // if (currentProjectRoot !== projectRootPath) {
+    //     console.warn("Warning: Current directory seems outside the initial project root detected.");
+    // }
+    console.log(`Found project root: ${currentProjectRoot}`);
 
-    // 2. Read Config & User Package
-    const configPath = path.join(projectRoot, 'positronic.config.json');
-    const userPackagePath = path.join(projectRoot, 'package.json');
+    // 2. Read Config & User Package (Use currentProjectRoot found by this handler)
+    const configPath = path.join(currentProjectRoot, 'positronic.config.json');
+    const userPackagePath = path.join(currentProjectRoot, 'package.json');
     let config: any;
     let userPackageJson: any;
     let userCoreVersion: string | null = null;
 
     try {
-        const configContent = await fs.readFile(configPath, 'utf-8');
+        const configContent = await fsPromises.readFile(configPath, 'utf-8');
         config = JSON.parse(configContent);
     } catch (error: any) {
         console.error(`Error reading or parsing ${configPath}: ${error.message}`);
@@ -701,7 +736,7 @@ async function handleServer(argv: any): Promise<void> {
     }
 
     try {
-        const userPackageContent = await fs.readFile(userPackagePath, 'utf-8');
+        const userPackageContent = await fsPromises.readFile(userPackagePath, 'utf-8');
         userPackageJson = JSON.parse(userPackageContent);
         userCoreVersion = userPackageJson?.dependencies?.['@positronic/core'] || null;
         if (userCoreVersion) {
@@ -722,20 +757,20 @@ async function handleServer(argv: any): Promise<void> {
         process.exit(1);
     }
 
-    // 4. Define .positronic Path
-    const dotPositronicPath = path.join(projectRoot, '.positronic');
+    // 4. Define .positronic Path (Use currentProjectRoot found by this handler)
+    const dotPositronicPath = path.join(currentProjectRoot, '.positronic');
     const dotPositronicSrcPath = path.join(dotPositronicPath, 'src');
 
     // 5. Check if .positronic needs generation
     let needsGeneration = false;
     try {
-        await fs.access(dotPositronicPath);
+        await fsPromises.access(dotPositronicPath);
         if (argv.force) {
              console.log('Force flag detected, regenerating .positronic directory...');
              needsGeneration = true;
              // Clean up old dir first if forcing regeneration
              try {
-                 await fs.rm(dotPositronicPath, { recursive: true, force: true });
+                 await fsPromises.rm(dotPositronicPath, { recursive: true, force: true });
              } catch (rmError: any) {
                  console.warn(`Warning: Could not completely remove old .positronic directory: ${rmError.message}`);
              }
@@ -752,8 +787,8 @@ async function handleServer(argv: any): Promise<void> {
     if (needsGeneration) {
         console.log('Setting up local Cloudflare dev server in .positronic...');
         try {
-            await fs.mkdir(dotPositronicPath, { recursive: true });
-            await fs.mkdir(dotPositronicSrcPath, { recursive: true });
+            await fsPromises.mkdir(dotPositronicPath, { recursive: true });
+            await fsPromises.mkdir(dotPositronicSrcPath, { recursive: true });
             console.log(' -> Created .positronic directories.');
 
             console.log(' -> Copying server template files...');
@@ -769,7 +804,7 @@ async function handleServer(argv: any): Promise<void> {
         } catch (error: any) {
             console.error(`Error setting up .positronic directory: ${error.message}`);
             // Attempt cleanup on failure
-            try { await fs.rm(dotPositronicPath, { recursive: true, force: true }); } catch {}
+            try { await fsPromises.rm(dotPositronicPath, { recursive: true, force: true }); } catch {}
             process.exit(1);
         }
         console.log('.positronic setup complete.');

@@ -7,10 +7,6 @@ import * as fsPromises from 'fs/promises'; // Use promises version
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url'; // To resolve __dirname in ES modules
 
-// TODO: Consider passing config/mode info via constructor instead of relying on process.env here
-const isLocalDevMode = !!process.env.POSITRONIC_PROJECT_PATH;
-const localProjectPath = process.env.POSITRONIC_PROJECT_PATH;
-
 // Helper to resolve template paths relative to the current file
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,8 +35,16 @@ async function copyTemplate(
 }
 
 export class ProjectCommand {
-    // Constructor could accept shared config, API clients, etc. later
-    constructor() {}
+    // Add instance variables for mode and path
+    private isLocalDevMode: boolean;
+    private projectRootPath: string | null;
+
+    // Constructor accepts shared config, API clients, etc. later
+    // Update constructor to accept mode and path
+    constructor(isLocalDevMode: boolean, projectRootPath: string | null) {
+        this.isLocalDevMode = isLocalDevMode;
+        this.projectRootPath = projectRootPath;
+    }
 
     /**
      * Handles the 'positronic project add <name> --url <url>' command.
@@ -49,8 +53,10 @@ export class ProjectCommand {
      */
     add(argv: any): void {
         console.log(`Adding project ${argv.name} with URL: ${argv.url}`);
-        if (isLocalDevMode) {
-            // This check is technically redundant due to yargs structure, but good defense
+        // Use instance variable for check
+        if (this.isLocalDevMode) {
+            // This check is technically redundant due to yargs structure in positronic.ts,
+            // but good defensive programming.
             console.error("Error: Project add command is not available in Local Development Mode.");
             process.exit(1);
         }
@@ -64,9 +70,11 @@ export class ProjectCommand {
      * Lists configured remote projects (Global Mode) or shows current local project path (Local Dev Mode).
      */
     list(): void {
-        if (isLocalDevMode) {
+        // Use instance variable
+        if (this.isLocalDevMode) {
             console.log(`Operating in Local Development Mode.`);
-            console.log(`Current project path: ${localProjectPath}`);
+            // Use instance variable
+            console.log(`Current project path: ${this.projectRootPath}`);
             // TODO: Implement detailed listing logic for local project context if needed
         } else {
             console.log('Listing all configured remote projects:');
@@ -82,7 +90,11 @@ export class ProjectCommand {
      * Only available in Global Mode.
      */
     select(argv: any): void {
-         // This handler only runs in Global Mode (enforced by yargs structure)
+         // Use instance variable (though this method is only called in Global Mode)
+         if (this.isLocalDevMode) {
+             console.error("Internal Error: Select command called in Local Development Mode.");
+             process.exit(1);
+         }
         if (argv.name) {
             console.log(`Selecting project: ${argv.name}`);
             // TODO: Implement setting the active remote project (and its URL) in global config
@@ -101,9 +113,11 @@ export class ProjectCommand {
      * Shows details of the active project (remote in Global Mode, local in Local Dev Mode).
      */
     show(): void {
-        if (isLocalDevMode) {
+        // Use instance variable
+        if (this.isLocalDevMode) {
             console.log(`Operating in Local Development Mode.`);
-            console.log(`Current project path: ${localProjectPath}`);
+            // Use instance variable
+            console.log(`Current project path: ${this.projectRootPath}`);
             // TODO: Implement logic to show more details of the project in the CWD if needed
         } else {
             console.log('Showing active remote project:');
@@ -119,7 +133,8 @@ export class ProjectCommand {
      * Only available in Global Mode.
      */
     async create(argv: any): Promise<void> { // Make method async
-        if (isLocalDevMode) {
+        // Use instance variable
+        if (this.isLocalDevMode) {
             console.error("Error: 'positronic project new' is not available when already inside a project (Local Development Mode).");
             process.exit(1);
         }
