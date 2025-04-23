@@ -139,12 +139,29 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
   return yargsProject;
 });
 
+// --- Add the 'new' command alias (Global Mode Only) ---
+if (!isLocalDevMode) {
+  cli = cli.command(
+    'new <project-name>',
+    'Alias for `project new`. Create a new Positronic project directory.',
+    (yargsNewAlias) => {
+        return yargsNewAlias
+            .positional('project-name', {
+                describe: 'Name of the new project directory to create',
+                type: 'string',
+                demandOption: true
+            });
+    },
+    (argv) => projectCommand.create(argv) // Reuse the same handler
+  );
+}
+
 // --- Add the Server Command ---
 // The server command should only be available in local dev mode;
 // Wrap its registration in the check
 if (isLocalDevMode) {
   cli = cli.command(
-    'server',
+    ['server', 's'],
     'Start the local development server for the current project',
     (yargsServer) => {
       return yargsServer
