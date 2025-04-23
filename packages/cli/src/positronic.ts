@@ -462,8 +462,82 @@ cli = cli.epilogue('For more information, visit https://positronic.sh');
 // Parse the arguments
 cli.parse();
 
-function handleRun(argv: any) {
-  console.log(`Running: ${argv['name-or-path']}`);
+// Refactored handleRun function
+async function handleRun(argv: any) {
+  if (!isLocalDevMode) {
+    console.error("Error: The 'run' command currently only supports Local Development Mode.");
+    console.error("Please ensure you are inside a Positronic project directory and the dev server is running ('positronic server' or 'px s').");
+    process.exit(1);
+  }
+
+  let targetType: 'workflow' | 'agent' | null = null;
+  let targetName: string | null = null;
+
+  if (argv.agent) {
+    targetType = 'agent';
+    targetName = argv.agent;
+    console.error("Error: Running agents via the 'run' command is not yet supported by the local development server.");
+    process.exit(1);
+    // Future implementation for agents would go here
+  } else if (argv.workflow) {
+    targetType = 'workflow';
+    targetName = argv.workflow;
+  } else if (argv['name-or-path']) {
+    // If no explicit type flag, assume it's a workflow
+    targetType = 'workflow';
+    targetName = argv['name-or-path'];
+  } else {
+    console.error("Error: You must specify the name of the workflow or agent to run.");
+    console.error("Example: positronic run my-workflow");
+    console.error("Example: positronic run --workflow my-workflow");
+    process.exit(1);
+  }
+
+  // Warn about ignored options for workflows
+  if (targetType === 'workflow' && (argv['starts-at'] || argv['stops-after'])) {
+    console.warn("Warning: --starts-at and --stops-after options are ignored by the 'run' command.");
+    console.warn("         Use 'positronic workflow rerun' to run specific step ranges.");
+  }
+
+  if (targetType === 'workflow' && targetName) {
+    const apiUrl = 'http://localhost:8788/workflows/runs'; // Correct API endpoint
+    const workflowName = targetName;
+    const verbose = argv.verbose;
+
+    console.log(`Attempting to run workflow: ${workflowName}...`);
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ workflowName }),
+      });
+
+      if (response.status === 201) {
+        const result = await response.json() as { workflowRunId: string };
+        console.log(`Workflow run started successfully.`);
+        console.log(`Run ID: ${result.workflowRunId}`);
+        if (verbose) {
+          console.log("Verbose flag detected. You can watch the run with:");
+          console.log(`  positronic workflow watch ${workflowName} --run-id ${result.workflowRunId}`);
+          // TODO: Potentially trigger watch directly?
+        }
+      } else {
+        const errorText = await response.text();
+        console.error(`Error starting workflow run: ${response.status} ${response.statusText}`);
+        console.error(`Server response: ${errorText}`);
+        process.exit(1);
+      }
+    } catch (error: any) {
+      console.error(`Error connecting to the local development server at ${apiUrl}.`);
+      console.error("Please ensure the server is running ('positronic server' or 'px s').");
+      console.error(`Fetch error: ${error.message}`);
+      process.exit(1);
+    }
+  }
+  // No else block needed as agent case exits earlier
 }
 
 function handleGlobalList(argv: any) {
