@@ -566,7 +566,8 @@ async function copyServerTemplate(
     templateFileName: string,
     destinationDir: string,
     destinationFileName: string, // Allow different destination name
-    projectName: string
+    projectName: string,
+    userCoreVersion: string | null // Added parameter
 ): Promise<void> {
     const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
     const destinationPath = path.join(destinationDir, destinationFileName);
@@ -576,39 +577,63 @@ async function copyServerTemplate(
         // Process {{projectName}} placeholder first
         content = content.replace(/{{projectName}}/g, projectName);
 
-        // Special handling for package.json to inject local paths if env vars are set
+        // Special handling for package.json
         if (templateFileName === 'package.json.tpl') {
-            const packagesDevPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+            const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH; // Renamed internally, expecting root path now
 
-            if (packagesDevPath) {
-                console.log(` -> Injecting local development paths from ${packagesDevPath} into package.json...`);
+            // Priority 1: Inject local development paths if env var is set
+            if (devRootPath) {
+                console.log(` -> Injecting local development paths relative to ${devRootPath} into package.json...`);
                 try {
                     const packageJson = JSON.parse(content);
-                    const coreDevPath = path.join(packagesDevPath, 'core');
-                    const cloudflareDevPath = path.join(packagesDevPath, 'cloudflare');
+                    // Construct paths relative to the provided root path
+                    const coreDevPath = path.join(devRootPath, 'packages', 'core');
+                    const cloudflareDevPath = path.join(devRootPath, 'packages', 'cloudflare');
 
-                    // Inject core path if the dependency exists
                     if (packageJson.dependencies && packageJson.dependencies['@positronic/core']) {
                         packageJson.dependencies['@positronic/core'] = `file:${coreDevPath}`;
                         console.log(`    - Using local @positronic/core: file:${coreDevPath}`);
                     }
-
-                    // Inject cloudflare path if the dependency exists
                     if (packageJson.dependencies && packageJson.dependencies['@positronic/cloudflare']) {
                         packageJson.dependencies['@positronic/cloudflare'] = `file:${cloudflareDevPath}`;
                         console.log(`    - Using local @positronic/cloudflare: file:${cloudflareDevPath}`);
                     }
-
-                    // Note: Add similar checks here if other @positronic/* packages are needed
-
-                    // Convert back to string with standard indentation
                     content = JSON.stringify(packageJson, null, 2);
                 } catch (parseError: any) {
                      console.error(`   Error parsing server template ${templateFileName} for local path injection: ${parseError.message}`);
-                     // Throw error to prevent writing corrupted file
                      throw parseError;
                 }
             }
+            // Priority 2: Sync versions from user project if dev path is NOT set
+            else if (userCoreVersion) {
+                console.log(` -> Syncing @positronic/* versions to user project version: ${userCoreVersion}...`);
+                 try {
+                    const packageJson = JSON.parse(content);
+                    let updated = false;
+
+                    if (packageJson.dependencies && packageJson.dependencies['@positronic/core']) {
+                        packageJson.dependencies['@positronic/core'] = userCoreVersion;
+                        console.log(`    - Set @positronic/core to ${userCoreVersion}`);
+                        updated = true;
+                    }
+                    if (packageJson.dependencies && packageJson.dependencies['@positronic/cloudflare']) {
+                        packageJson.dependencies['@positronic/cloudflare'] = userCoreVersion;
+                        console.log(`    - Set @positronic/cloudflare to ${userCoreVersion}`);
+                         updated = true;
+                    }
+
+                    if (updated) {
+                         content = JSON.stringify(packageJson, null, 2);
+                    } else {
+                         console.log(`    - No matching @positronic/* dependencies found in template to update.`);
+                    }
+                } catch (parseError: any) {
+                     console.error(`   Error parsing server template ${templateFileName} for version syncing: ${parseError.message}`);
+                     throw parseError;
+                }
+            }
+             // Priority 3: Use default template versions if no dev path and no user version found
+             // (No code needed here, just falls through)
         }
 
         // Write the final content (potentially modified)
@@ -660,15 +685,33 @@ async function handleServer(argv: any): Promise<void> {
     }
     console.log(`Found project root: ${projectRoot}`);
 
-    // 2. Read Config
+    // 2. Read Config & User Package
     const configPath = path.join(projectRoot, 'positronic.config.json');
+    const userPackagePath = path.join(projectRoot, 'package.json');
     let config: any;
+    let userPackageJson: any;
+    let userCoreVersion: string | null = null;
+
     try {
         const configContent = await fs.readFile(configPath, 'utf-8');
         config = JSON.parse(configContent);
     } catch (error: any) {
         console.error(`Error reading or parsing ${configPath}: ${error.message}`);
         process.exit(1);
+    }
+
+    try {
+        const userPackageContent = await fs.readFile(userPackagePath, 'utf-8');
+        userPackageJson = JSON.parse(userPackageContent);
+        userCoreVersion = userPackageJson?.dependencies?.['@positronic/core'] || null;
+        if (userCoreVersion) {
+             console.log(`Detected user project @positronic/core version: ${userCoreVersion}`);
+        } else {
+             console.warn(`Warning: Could not find @positronic/core in user project dependencies (${userPackagePath}). Default versions will be used in .positronic.`);
+        }
+    } catch (error: any) {
+        console.warn(`Warning: Could not read user project package.json at ${userPackagePath}: ${error.message}`);
+        console.warn(' -> Default versions will be used in .positronic.');
     }
 
     const projectName = config?.projectName || 'positronic-project'; // Fallback name
@@ -714,10 +757,11 @@ async function handleServer(argv: any): Promise<void> {
             console.log(' -> Created .positronic directories.');
 
             console.log(' -> Copying server template files...');
-            await copyServerTemplate('package.json.tpl', dotPositronicPath, 'package.json', projectName);
-            await copyServerTemplate('wrangler.jsonc.tpl', dotPositronicPath, 'wrangler.jsonc', projectName);
-            await copyServerTemplate('tsconfig.json.tpl', dotPositronicPath, 'tsconfig.json', projectName);
-            await copyServerTemplate('src/index.ts.tpl', dotPositronicSrcPath, 'index.ts', projectName);
+            // Pass userCoreVersion only to package.json template processing
+            await copyServerTemplate('package.json.tpl', dotPositronicPath, 'package.json', projectName, userCoreVersion);
+            await copyServerTemplate('wrangler.jsonc.tpl', dotPositronicPath, 'wrangler.jsonc', projectName, null);
+            await copyServerTemplate('tsconfig.json.tpl', dotPositronicPath, 'tsconfig.json', projectName, null);
+            await copyServerTemplate('src/index.ts.tpl', dotPositronicSrcPath, 'index.ts', projectName, null);
 
             // Run npm install within .positronic
             await runNpmInstall(dotPositronicPath);
