@@ -5,9 +5,10 @@ import { hideBin } from 'yargs/helpers';
 import { ProjectCommand } from './commands/project.js';
 import * as fs from 'fs'; // Use synchronous fs methods
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
 import * as fsPromises from 'fs/promises'; // Keep for async operations where needed
+import chokidar, { type FSWatcher } from 'chokidar'; // For watching workflows
 
 // Environment Variable for Mode Detection:
 // POSITRONIC_PROJECT_PATH: If this environment variable is set, the CLI operates in
@@ -49,6 +50,7 @@ const __dirname = path.dirname(__filename);
 // Need to go up 1 level to packages/cli/, then into templates/
 const templatesBaseDir = path.resolve(__dirname, '../templates');
 const cloudflareDevServerTemplateDir = path.join(templatesBaseDir, 'cloudflare-dev-server');
+const workflowTemplateDir = path.join(templatesBaseDir, 'workflow'); // Added for workflow new
 
 // Instantiate command classes, passing the determined mode and path
 const projectCommand = new ProjectCommand(isLocalDevMode, projectRootPath);
@@ -552,13 +554,28 @@ function handleGlobalList(argv: any) {
 
 // Add handler for workflow new command
 function handleWorkflowNew(argv: any) {
-  if (!isLocalDevMode) {
-    console.error("Error: Cannot create new workflows in Global Mode. Use `positronic workflow new ...` within your project directory.");
+  if (!projectRootPath) {
+    console.error("Error: Cannot create workflow outside of a project directory.");
     process.exit(1);
   }
-  // Now we know we are in Local Dev Mode
-  console.log(`Creating new workflow in project ${projectRootPath}: ${argv['workflow-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
-  // TODO: Implement workflow creation logic within projectRootPath
+  const workflowName = argv.workflowName;
+  const workflowFileName = `${workflowName}.ts`;
+  const workflowsDir = path.join(projectRootPath, 'workflows');
+  const destinationPath = path.join(workflowsDir, workflowFileName);
+  const templatePath = path.join(workflowTemplateDir, 'new.ts.tpl');
+
+  console.log(`Creating new workflow '${workflowName}' in ${workflowsDir}...`);
+
+  fsPromises.mkdir(workflowsDir, { recursive: true })
+    .then(() => fsPromises.copyFile(templatePath, destinationPath))
+    .then(() => {
+      console.log(`Workflow file created: ${destinationPath}`);
+      // Optionally open the file in an editor or provide further instructions
+    })
+    .catch((err) => {
+      console.error(`Error creating workflow file:`, err);
+      process.exit(1);
+    });
 }
 
 // Add handler for agent new command
@@ -791,146 +808,223 @@ function runNpmInstall(targetDir: string): Promise<void> {
     });
 }
 
-// --- Server Command Handler ---
-async function handleServer(argv: any): Promise<void> {
-    console.log('Starting Positronic development server...');
+// Function to generate the static manifest file
+async function generateStaticManifest(projectRootPath: string, serverSrcDir: string): Promise<void> {
+    const workflowsDir = path.join(projectRootPath, 'workflows');
+    const manifestPath = path.join(serverSrcDir, '_manifest.ts');
+    console.log(`Generating static manifest for workflows in ${workflowsDir}...`);
 
-    // 1. Find Project Root (Can keep using the async version here)
-    // Or use the already found projectRootPath if available?
-    // Using the async check here ensures it runs correctly even if CWD changes,
-    // and matches the previous logic exactly for this command.
-    const currentProjectRoot = await findProjectRoot(process.cwd());
-    if (!currentProjectRoot) {
-        console.error("Error: Not inside a Positronic project. Could not find 'positronic.config.json'.");
-        console.error("Run 'positronic project new <name>' first or ensure you are in the project directory.");
+    let importStatements = `import type { Workflow } from '@positronic/core';\n`;
+    let manifestEntries = '';
+
+    try {
+        // Ensure workflows directory exists, create if not (might be first run)
+        await fsPromises.mkdir(workflowsDir, { recursive: true });
+
+        const files = await fsPromises.readdir(workflowsDir);
+        const workflowFiles = files.filter(file => file.endsWith('.ts') && !file.startsWith('_')); // Ignore files starting with _
+
+        for (const file of workflowFiles) {
+            const workflowName = path.basename(file, '.ts');
+            // IMPORTANT: Relative path from .positronic/src/_manifest.ts to ../../workflows/workflowName.js
+            const importPath = `../../workflows/${workflowName}.js`;
+            const importAlias = `wf_${workflowName.replace(/[^a-zA-Z0-9_]/g, '_')}`; // Sanitize name for import alias
+
+            importStatements += `import * as ${importAlias} from '${importPath}';\n`;
+            manifestEntries += `  ${JSON.stringify(workflowName)}: ${importAlias}.default,\n`; // Use JSON.stringify for keys
+        }
+
+        const manifestContent = `// This file is generated automatically by the Positronic CLI server command. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};\n`;
+
+        await fsPromises.writeFile(manifestPath, manifestContent, 'utf-8');
+        console.log(`Static manifest written to ${manifestPath}`);
+
+    } catch (error: any) {
+        if (error.code === 'ENOENT') {
+            console.warn(`Workflows directory not found at ${workflowsDir}. Creating an empty manifest.`);
+            // Write an empty manifest if the directory doesn't exist
+             const manifestContent = `// This file is generated automatically by the Positronic CLI server command. Do not edit directly.\nimport type { Workflow } from '@positronic/core';\n\nexport const staticManifest: Record<string, Workflow> = {};\n`;
+             await fsPromises.writeFile(manifestPath, manifestContent, 'utf-8');
+        } else {
+            console.error(`Error generating static manifest:`, error);
+            // Decide if we should exit or continue with a potentially broken server
+            // For now, log the error and potentially continue, Wrangler might fail later
+        }
+    }
+}
+
+// Handler for the 'server' command
+async function handleServer(argv: any): Promise<void> {
+    if (!projectRootPath) {
+        console.error("Error: Not inside a Positronic project. Cannot start server.");
+        console.error("Navigate to your project directory or use 'positronic project new <name>' to create one.");
         process.exit(1);
     }
-    // Can optionally compare currentProjectRoot with the initially found projectRootPath
-    // if (currentProjectRoot !== projectRootPath) {
-    //     console.warn("Warning: Current directory seems outside the initial project root detected.");
-    // }
-    console.log(`Found project root: ${currentProjectRoot}`);
 
-    // 2. Read Config & User Package (Use currentProjectRoot found by this handler)
-    const configPath = path.join(currentProjectRoot, 'positronic.config.json');
-    const userPackagePath = path.join(currentProjectRoot, 'package.json');
-    let config: any;
-    let userPackageJson: any;
+    console.log(`Operating in Local Development Mode for project: ${projectRootPath}`);
+    const serverDir = path.join(projectRootPath, '.positronic');
+    const srcDir = path.join(serverDir, 'src');
+    const workflowsDir = path.join(projectRootPath, 'workflows'); // Define workflows dir path
+    const projectName = path.basename(projectRootPath);
+    const userPackageJsonPath = path.join(projectRootPath, 'package.json');
     let userCoreVersion: string | null = null;
 
-    try {
-        const configContent = await fsPromises.readFile(configPath, 'utf-8');
-        config = JSON.parse(configContent);
-    } catch (error: any) {
-        console.error(`Error reading or parsing ${configPath}: ${error.message}`);
-        process.exit(1);
-    }
+    // Declare wrangler process and watcher variables here to manage scope for cleanup
+    let wranglerProcess: ChildProcess | null = null;
+    let watcher: FSWatcher | null = null;
 
-    try {
-        const userPackageContent = await fsPromises.readFile(userPackagePath, 'utf-8');
-        userPackageJson = JSON.parse(userPackageContent);
-        userCoreVersion = userPackageJson?.dependencies?.['@positronic/core'] || null;
-        if (userCoreVersion) {
-             console.log(`Detected user project @positronic/core version: ${userCoreVersion}`);
-        } else {
-             console.warn(`Warning: Could not find @positronic/core in user project dependencies (${userPackagePath}). Default versions will be used in .positronic.`);
+    // Graceful shutdown handler
+    const cleanup = async () => {
+        console.log('\\nShutting down...');
+        if (watcher) {
+            console.log('Closing workflow watcher...');
+            await watcher.close();
+            watcher = null; // Prevent double closing
         }
-    } catch (error: any) {
-        console.warn(`Warning: Could not read user project package.json at ${userPackagePath}: ${error.message}`);
-        console.warn(' -> Default versions will be used in .positronic.');
-    }
+        if (wranglerProcess && !wranglerProcess.killed) {
+            console.log('Stopping Wrangler dev server...');
+            // Sending SIGTERM, consider SIGKILL if it doesn't stop
+            const killed = wranglerProcess.kill('SIGTERM');
+             if (!killed) {
+                console.warn("Failed to kill Wrangler process with SIGTERM, attempting SIGKILL.");
+                wranglerProcess.kill('SIGKILL');
+            }
+            wranglerProcess = null; // Prevent double closing
+        }
+        console.log("Cleanup complete.");
+        process.exit(0); // Exit cleanly
+    };
 
-    const projectName = config?.projectName || 'positronic-project'; // Fallback name
+    // Register signal handlers
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
 
-    // 3. Check Backend Type
-    if (config?.backend?.type !== 'cloudflare') {
-        console.error(`Error: Unsupported backend type '${config?.backend?.type}'. Currently, only 'cloudflare' is supported for the local server.`);
-        process.exit(1);
-    }
 
-    // 4. Define .positronic Path (Use currentProjectRoot found by this handler)
-    const dotPositronicPath = path.join(currentProjectRoot, '.positronic');
-    const dotPositronicSrcPath = path.join(dotPositronicPath, 'src');
-
-    // 5. Check if .positronic needs generation
-    let needsGeneration = false;
     try {
-        await fsPromises.access(dotPositronicPath);
+        const userPackageJson = JSON.parse(await fsPromises.readFile(userPackageJsonPath, 'utf-8'));
+        userCoreVersion = userPackageJson.dependencies?.['@positronic/core'] || userPackageJson.devDependencies?.['@positronic/core'] || null;
+        if(userCoreVersion) {
+            console.log(`Found user-specified @positronic/core version: ${userCoreVersion}`);
+        }
+    } catch (error) {
+        console.warn("Warning: Could not read project's package.json. Using default @positronic/core version.");
+    }
+
+    // Check if server dir exists and if --force is used
+    let setupNeeded = true;
+    try {
+        await fsPromises.access(serverDir);
         if (argv.force) {
-             console.log('Force flag detected, regenerating .positronic directory...');
-             needsGeneration = true;
-             // Clean up old dir first if forcing regeneration
-             try {
-                 await fsPromises.rm(dotPositronicPath, { recursive: true, force: true });
-             } catch (rmError: any) {
-                 console.warn(`Warning: Could not completely remove old .positronic directory: ${rmError.message}`);
-             }
+            console.log("--force flag detected. Regenerating server directory...");
+            await fsPromises.rm(serverDir, { recursive: true, force: true });
         } else {
-            console.log(`Found existing .positronic directory. Use --force to regenerate.`);
-            // Optional: Add more checks here, e.g., check if package.json exists, or node_modules
+            console.log(".positronic server directory already exists. Skipping full setup.");
+            console.log("Use --force to regenerate it (this will run npm install again).");
+            setupNeeded = false;
         }
     } catch (e) {
-        // Doesn't exist, needs generation
-        needsGeneration = true;
+        // Directory doesn't exist, proceed with setup
+        console.log(".positronic server directory not found. Setting it up...");
     }
 
-    // 6. Generate .positronic if needed
-    if (needsGeneration) {
-        console.log('Setting up local Cloudflare dev server in .positronic...');
+    if (setupNeeded) {
         try {
-            await fsPromises.mkdir(dotPositronicPath, { recursive: true });
-            await fsPromises.mkdir(dotPositronicSrcPath, { recursive: true });
-            console.log(' -> Created .positronic directories.');
+            console.log("Creating server directory structure...");
+            await fsPromises.mkdir(srcDir, { recursive: true });
 
-            console.log(' -> Copying server template files...');
-            // Pass userCoreVersion only to package.json template processing
-            await copyServerTemplate('package.json.tpl', dotPositronicPath, 'package.json', projectName, userCoreVersion);
-            await copyServerTemplate('wrangler.jsonc.tpl', dotPositronicPath, 'wrangler.jsonc', projectName, null);
-            await copyServerTemplate('tsconfig.json.tpl', dotPositronicPath, 'tsconfig.json', projectName, null);
-            await copyServerTemplate('src/index.ts.tpl', dotPositronicSrcPath, 'index.ts', projectName, null);
+            console.log("Copying server templates...");
+            // Ensure the manifest file doesn't exist from a previous failed run before copying templates
+             try { await fsPromises.rm(path.join(srcDir, '_manifest.ts'), { force: true }); } catch {}
 
-            // Run npm install within .positronic
-            await runNpmInstall(dotPositronicPath);
+            await copyServerTemplate('package.json.tpl', serverDir, 'package.json', projectName, userCoreVersion);
+            await copyServerTemplate('tsconfig.json.tpl', serverDir, 'tsconfig.json', projectName, userCoreVersion);
+            await copyServerTemplate('wrangler.jsonc.tpl', serverDir, 'wrangler.jsonc', projectName, userCoreVersion);
+            await copyServerTemplate('src/index.ts.tpl', srcDir, 'index.ts', projectName, userCoreVersion);
 
-        } catch (error: any) {
-            console.error(`Error setting up .positronic directory: ${error.message}`);
-            // Attempt cleanup on failure
-            try { await fsPromises.rm(dotPositronicPath, { recursive: true, force: true }); } catch {}
-            process.exit(1);
+            // Initial manifest generation AFTER templates are copied
+            await generateStaticManifest(projectRootPath, srcDir);
+
+            // Run npm install in the .positronic directory
+            await runNpmInstall(serverDir);
+
+            console.log("Server setup complete.");
+        } catch (error) {
+            console.error("Failed to set up the server directory:", error);
+            // Attempt to clean up partially created directory
+            try {
+                await fsPromises.rm(serverDir, { recursive: true, force: true });
+            } catch (cleanupError) {
+                console.error("Failed to clean up server directory after setup error:", cleanupError);
+            }
+            process.exit(1); // Exit if setup fails
         }
-        console.log('.positronic setup complete.');
+    } else {
+         // If setup is skipped, still generate the manifest to ensure it's up-to-date
+        console.log("Ensuring static manifest is up-to-date...");
+        await generateStaticManifest(projectRootPath, srcDir);
     }
 
-    // 7. Run Wrangler Dev
-    console.log('Starting Cloudflare development server via Wrangler...');
-    // Reverted: Use npx to run wrangler dev from the .positronic directory
-    console.log(`(Running 'npx wrangler dev' in ${dotPositronicPath})`);
-
-    const wranglerDev = spawn('npx', ['wrangler', 'dev'], {
-        cwd: dotPositronicPath,
-        stdio: 'inherit',
-        shell: true
-    });
-
-    wranglerDev.on('close', (code) => {
-        // If wrangler exits cleanly (e.g., user presses Ctrl+C), code might be null or 0
-        // If it crashes, it might be non-zero.
-        if (code !== null && code !== 0) {
-             console.log(`Wrangler dev server exited unexpectedly with code ${code}.`);
-        } else {
-             console.log('Wrangler dev server stopped.');
+    // --- Watch for changes in the user's workflows directory ---
+    console.log(`Watching for workflow changes in ${workflowsDir}...`);
+    watcher = chokidar.watch(path.join(workflowsDir, '*.ts'), {
+        ignored: /(^|[\/\\])\../, // ignore dotfiles
+        persistent: true,
+        ignoreInitial: true, // Don't trigger for existing files on startup
+        awaitWriteFinish: { // Try to handle atomic saves
+            stabilityThreshold: 200,
+            pollInterval: 100
         }
-         // Exit the CLI process itself once wrangler is done
-         process.exit(code ?? 0);
     });
 
-    wranglerDev.on('error', (err) => {
-        console.error('Failed to start Wrangler dev server process:', err);
-        console.error('Ensure Wrangler is installed correctly (`npm install -D wrangler` in .positronic or globally) and accessible in your PATH.');
+    const regenerate = async (filePath?: string) => {
+        console.log(`Detected change${filePath ? ` in ${path.basename(filePath)}` : ''}. Regenerating static manifest...`);
+        try {
+            await generateStaticManifest(projectRootPath, srcDir);
+            console.log("Manifest regeneration complete. Wrangler should detect the change and reload.");
+        } catch (error) {
+            console.error("Error regenerating manifest on change:", error);
+        }
+    };
+
+    watcher
+        .on('add', path => regenerate(path))
+        .on('change', path => regenerate(path))
+        .on('unlink', path => regenerate(path)) // Regenerate even on delete
+        .on('error', error => console.error(`Watcher error: ${error}`));
+
+
+    // --- Start wrangler dev ---
+    console.log("Starting Wrangler dev server...");
+    wranglerProcess = spawn('npx', ['wrangler', 'dev', '--local'], { // Removed --persist
+        cwd: serverDir,
+        stdio: 'inherit', // Pass through stdin, stdout, stderr
+        shell: true, // Needed for npx on some systems
+    });
+
+    wranglerProcess.on('close', (code) => {
+        console.log(`Wrangler dev server exited with code ${code}`);
+        // If wrangler stops unexpectedly, clean up the watcher too
+        if (watcher) {
+             console.log("Closing workflow watcher as Wrangler stopped.");
+             watcher.close();
+             watcher = null;
+        }
+        process.exit(code ?? 1); // Exit with wrangler's code or 1 if null
+    });
+
+    wranglerProcess.on('error', (err) => {
+        console.error('Failed to start Wrangler dev server:', err);
+        // Clean up watcher if wrangler fails to start
+         if (watcher) {
+             console.log("Closing workflow watcher due to Wrangler start error.");
+             watcher.close();
+             watcher = null;
+        }
         process.exit(1);
     });
 
-    // Keep the process alive while wrangler is running. The exit logic is handled in the 'close' event.
-    // We might need to handle SIGINT/SIGTERM explicitly to gracefully shut down wrangler if needed,
-    // but stdio: 'inherit' often handles Ctrl+C correctly.
-}
+    // Keep the main CLI process alive while watcher and wrangler are running.
+    // The signal handlers will manage the exit.
+    // No need for process.stdin.resume() as the child process and watcher keep it alive.
+
+} // End of handleServer

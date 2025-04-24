@@ -1,13 +1,11 @@
 import { api as app, setManifest, WorkflowRunnerDO, MonitorDO } from '@positronic/cloudflare';
 import { PositronicManifest } from '@positronic/cloudflare/dist/src/manifest.js';
+// Import the generated manifest - NOTE the .js extension for runtime compatibility
+import { staticManifest } from './_manifest.js';
 
-// Determine the path to the user's workflows directory
-// The worker's CWD is expected to be the .positronic directory.
-const userWorkflowsPath = '../workflows';
-
-// Configure the manifest to dynamically load workflows
+// Configure the manifest to use the statically generated list
 const manifest = new PositronicManifest({
-  workflowsDir: userWorkflowsPath
+  staticManifest
 });
 
 setManifest(manifest);

@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/cloudflare/wrangler/main/config-schema.json",
   "name": "positronic-dev-{{projectName}}",
   "main": "src/index.ts",
-  "compatibility_date": "2024-04-05",
+  "compatibility_date": "2024-09-23",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "migrations": [
