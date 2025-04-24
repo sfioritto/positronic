@@ -1,13 +1,9 @@
 import { api as app, setManifest, WorkflowRunnerDO, MonitorDO } from '@positronic/cloudflare';
 import { PositronicManifest } from '@positronic/cloudflare/dist/src/manifest.js';
-import path from 'node:path';
-// import { fileURLToPath } from 'node:url'; // Not needed
 
 // Determine the path to the user's workflows directory
-// The worker's CWD is the .positronic directory.
-const userWorkflowsPath = path.resolve('../workflows');
-
-console.log(`[Positronic Dev Server] Loading workflows from: ${userWorkflowsPath}`);
+// The worker's CWD is expected to be the .positronic directory.
+const userWorkflowsPath = '../workflows';
 
 // Configure the manifest to dynamically load workflows
 const manifest = new PositronicManifest({

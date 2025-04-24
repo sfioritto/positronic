@@ -8,7 +8,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": [
+      "new_sqlite_classes": [
         "WorkflowRunnerDO",
         "MonitorDO"
       ]
@@ -21,9 +21,5 @@
     ]
   },
   "vars": {
-  },
-  "dev": {
-    "ip": "127.0.0.1",
-    "port": 8788
   }
 }
