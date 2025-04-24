@@ -500,7 +500,7 @@ async function handleRun(argv: any) {
   }
 
   if (targetType === 'workflow' && targetName) {
-    const apiUrl = 'http://localhost:8788/workflows/runs'; // Correct API endpoint
+    const apiUrl = 'http://localhost:8787/workflows/runs'; // Changed port to 8787
     const workflowName = targetName;
     const verbose = argv.verbose;
 
@@ -686,7 +686,7 @@ async function copyServerTemplate(
     destinationDir: string,
     destinationFileName: string, // Allow different destination name
     projectName: string,
-    userCoreVersion: string | null // Added parameter
+    userCoreVersion: string | null // Reverted: Removed replacements map
 ): Promise<void> {
     const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
     const destinationPath = path.join(destinationDir, destinationFileName);
@@ -903,12 +903,13 @@ async function handleServer(argv: any): Promise<void> {
 
     // 7. Run Wrangler Dev
     console.log('Starting Cloudflare development server via Wrangler...');
+    // Reverted: Use npx to run wrangler dev from the .positronic directory
     console.log(`(Running 'npx wrangler dev' in ${dotPositronicPath})`);
 
     const wranglerDev = spawn('npx', ['wrangler', 'dev'], {
         cwd: dotPositronicPath,
-        stdio: 'inherit', // Pipe stdin, stdout, stderr to user
-        shell: true // Helps find npx/wrangler
+        stdio: 'inherit',
+        shell: true
     });
 
     wranglerDev.on('close', (code) => {
