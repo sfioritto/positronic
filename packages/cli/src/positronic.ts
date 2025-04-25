@@ -12,6 +12,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { RunCommand } from './commands/run.js';
 import { ServerCommand } from './commands/server.js';
 import { WorkflowCommand } from './commands/workflow.js';
+import { AgentCommand } from './commands/agent.js';
 
 function findProjectRootSync(startDir: string): string | null {
     let currentDir = path.resolve(startDir);
@@ -48,7 +49,8 @@ const workflowTemplateDir = path.join(templatesBaseDir, 'workflow'); // Added fo
 const projectCommand = new ProjectCommand(isLocalDevMode);
 const runCommand = new RunCommand(isLocalDevMode);
 const serverCommand = new ServerCommand(cloudflareDevServerTemplateDir);
-const workflowCommand = new WorkflowCommand(isLocalDevMode, projectRootPath, workflowTemplateDir);
+const workflowCommand = new WorkflowCommand(projectRootPath, workflowTemplateDir);
+const agentCommand = new AgentCommand(isLocalDevMode, projectRootPath);
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -281,24 +283,24 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
 cli = cli.command('agent', 'Agents have tools, resources and an objective. They can have a human in the loop.\n', (yargs) => {
   yargs
     .command('list', 'List all agents in the active project\n', () => { })
-    .command('show <agent-name>', 'Show details and usage statistics for a specific agent\n', (yargs) => {
-      return yargs
+    .command('show <agent-name>', 'Show details and usage statistics for a specific agent\n', (yargsShow) => {
+      return yargsShow
         .positional('agent-name', {
           describe: 'Name of the agent',
           type: 'string',
           demandOption: true
         });
-    })
-    .command('history <agent-name>', 'List recent history of a specific agent\n', (yargs) => {
-      return yargs
+    }, (argv) => agentCommand.show(argv))
+    .command('history <agent-name>', 'List recent history of a specific agent\n', (yargsHistory) => {
+      return yargsHistory
         .positional('agent-name', {
           describe: 'Name of the agent',
           type: 'string',
           demandOption: true
         });
-    })
-    .command('run <agent-name>', 'Run an agent\n', (yargs) => {
-      return yargs
+    }, (argv) => agentCommand.history(argv))
+    .command('run <agent-name>', 'Run an agent\n', (yargsRun) => {
+      return yargsRun
         .positional('agent-name', {
           describe: 'Name of the agent',
           type: 'string',
@@ -310,13 +312,15 @@ cli = cli.command('agent', 'Agents have tools, resources and an objective. They 
         })
         .example('$0 agent run my-agent', 'Run an agent by name')
         .example('$0 agent run my-agent --verbose', 'Run an agent with verbose output');
-    }, handleAgentRun)
+    }, (argv) => agentCommand.run(argv))
 
   if (isLocalDevMode) {
     yargs.command('new <agent-name>', 'Create a new agent in the current project', (yargsNew) => {
       return yargsNew
         .positional('agent-name', {
-          describe: 'Name of the new agent'
+          describe: 'Name of the new agent',
+          type: 'string',
+          demandOption: true
         })
         .option('prompt', {
           describe: 'Prompt to use for generating the agent',
@@ -325,11 +329,11 @@ cli = cli.command('agent', 'Agents have tools, resources and an objective. They 
         })
         .example('$0 agent new my-agent', 'Create a new agent in the current project directory')
         .example('$0 agent new my-agent -p "Generate a customer service agent"', 'Create an agent using a prompt');
-    }, handleAgentNew);
+    }, (argv) => agentCommand.new(argv));
   }
 
-  yargs.command('watch <agent-name>', 'Watch a specific agent run for live updates\n', (yargs) => {
-    return yargs
+  yargs.command('watch <agent-name>', 'Watch a specific agent run for live updates\n', (yargsWatch) => {
+    return yargsWatch
       .positional('agent-name', {
         describe: 'Name of the agent',
         type: 'string',
@@ -342,7 +346,7 @@ cli = cli.command('agent', 'Agents have tools, resources and an objective. They 
         alias: 'id'
       })
       .example('$0 agent watch my-agent --run-id def456', 'Watch the agent run with ID def456');
-  }, handleAgentWatch);
+  }, (argv) => agentCommand.watch(argv));
 
   return yargs.demandCommand(1, 'You need to specify an agent command');
 })
@@ -493,24 +497,24 @@ function handleGlobalList(argv: any) {
 // }
 
 // Add handler for agent new command
-function handleAgentNew(argv: any) {
-  // This check is now implicitly handled by the command only being available in local mode
-  if (!isLocalDevMode) { // Keep check for clarity or future changes
-      console.error("Internal Error: Agent new command executed in non-local mode.");
-      process.exit(1);
-  }
-  console.log(`Creating new agent in project ${projectRootPath}: ${argv['agent-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
-  // TODO: Implement agent creation logic within projectRootPath
-}
+// function handleAgentNew(argv: any) {
+//   // This check is now implicitly handled by the command only being available in local mode
+//   if (!isLocalDevMode) { // Keep check for clarity or future changes
+//       console.error("Internal Error: Agent new command executed in non-local mode.");
+//       process.exit(1);
+//   }
+//   console.log(`Creating new agent in project ${projectRootPath}: ${argv['agent-name']}${argv.prompt ? ` using prompt: ${argv.prompt}` : ''}`);
+//   // TODO: Implement agent creation logic within projectRootPath
+// }
 
 // Add handler for agent run command
-function handleAgentRun(argv: any) {
-  const agentName = argv['agent-name'];
-  const verbose = argv.verbose ? ' with verbose output' : '';
+// function handleAgentRun(argv: any) {
+//   const agentName = argv['agent-name'];
+//   const verbose = argv.verbose ? ' with verbose output' : '';
 
-  console.log(`Running agent: ${agentName}${verbose}`);
-  // TODO: Implement agent run logic (API call to local/remote server)
-}
+//   console.log(`Running agent: ${agentName}${verbose}`);
+//   // TODO: Implement agent run logic (API call to local/remote server)
+// }
 
 // Add handlers for the prompt commands
 function handlePromptNew(argv: any) {
@@ -539,12 +543,4 @@ function handleResourceList() {
 // Add handlers for the service commands
 function handleServiceList() {
   console.log('Listing all services');
-}
-
-// Add handler for agent watch command
-function handleAgentWatch(argv: any) {
-  const agentName = argv['agent-name'];
-  const runId = argv['run-id'];
-  console.log(`Watching agent: ${agentName}, Run ID: ${runId}`);
-  // TODO: Implement SSE connection logic
 }

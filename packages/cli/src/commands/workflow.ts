@@ -3,12 +3,10 @@ import * as path from 'path';
 import * as fsPromises from 'fs/promises';
 
 export class WorkflowCommand {
-    private isLocalDevMode: boolean;
     private projectRootPath: string | null;
     private workflowTemplateDir: string;
 
-    constructor(isLocalDevMode: boolean, projectRootPath: string | null, workflowTemplateDir: string) {
-        this.isLocalDevMode = isLocalDevMode;
+    constructor(projectRootPath: string | null, workflowTemplateDir: string) {
         this.projectRootPath = projectRootPath;
         this.workflowTemplateDir = workflowTemplateDir;
     }
