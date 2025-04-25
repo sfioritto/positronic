@@ -120,7 +120,7 @@ export class ProjectCommand {
         }
 
         const projectPath = path.resolve(process.cwd(), projectName);
-        const workflowsPath = path.join(projectPath, 'workflows');
+        const brainsPath = path.join(projectPath, 'brains');
 
         // 1. Check if directory already exists
         try {
@@ -139,7 +139,7 @@ export class ProjectCommand {
         // 2. Create project directories
         try {
             await fsPromises.mkdir(projectPath, { recursive: true });
-            await fsPromises.mkdir(workflowsPath, { recursive: true });
+            await fsPromises.mkdir(brainsPath, { recursive: true });
         } catch (error: any) {
             console.error(`Error creating project directories: ${error.message}`);
             process.exit(1);
@@ -151,7 +151,7 @@ export class ProjectCommand {
             await copyTemplate('tsconfig.json.tpl', path.join(projectPath, 'tsconfig.json'), projectName);
             await copyTemplate('positronic.config.json.tpl', path.join(projectPath, 'positronic.config.json'), projectName);
             await copyTemplate('.gitignore.tpl', path.join(projectPath, '.gitignore'), projectName);
-            await copyTemplate('workflows/example.ts.tpl', path.join(workflowsPath, 'example.ts'), projectName);
+            await copyTemplate('brains/example.ts.tpl', path.join(brainsPath, 'example.ts'), projectName);
         } catch (error) {
             // Error already logged in copyTemplate, just exit
             console.error('Failed to copy template files. Aborting.');

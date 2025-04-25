@@ -233,7 +233,7 @@ describe('CLI Integration: positronic new', () => {
         const serverUrl = 'http://localhost:8787';
         await checkServerReady(serverUrl);
 
-        // 5. Run `positronic run example` - No try/catch, let Jest handle errors
+        // 5. Run `positronic run example` - assuming 'example' is now a brain
         const runOutput = execSync(`${nodeExecutable} ${cliExecutable} run example`, {
              cwd: projectPath,
              encoding: 'utf8',
@@ -241,9 +241,9 @@ describe('CLI Integration: positronic new', () => {
              env: { ...process.env }
          });
 
-        // 5. Validate workflow run output
-        expect(runOutput).toContain('Attempting to run workflow: example...');
-        expect(runOutput).toContain('Workflow run started successfully.');
+        // 5. Validate brain run output
+        expect(runOutput).toContain('Attempting to run brain: example...'); // Changed from workflow
+        expect(runOutput).toContain('Brain run started successfully.'); // Changed from workflow
         expect(runOutput).toMatch(/Run ID: [\w-]+/);
     });
 });

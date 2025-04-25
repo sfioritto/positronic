@@ -9,14 +9,14 @@
     {
       "tag": "v1",
       "new_sqlite_classes": [
-        "WorkflowRunnerDO",
+        "BrainRunnerDO",
         "MonitorDO"
       ]
     }
   ],
   "durable_objects": {
     "bindings": [
-      { "name": "WORKFLOW_RUNNER_DO", "class_name": "WorkflowRunnerDO" },
+      { "name": "BRAIN_RUNNER_DO", "class_name": "BrainRunnerDO" },
       { "name": "MONITOR_DO", "class_name": "MonitorDO" }
     ]
   },

@@ -108,26 +108,26 @@ function runNpmInstall(targetDir: string): Promise<void> {
 
 // Function to generate the static manifest file
 async function generateStaticManifest(projectRootPath: string, serverSrcDir: string): Promise<void> {
-    const workflowsDir = path.join(projectRootPath, 'workflows');
+    const brainsDir = path.join(projectRootPath, 'brains');
     const manifestPath = path.join(serverSrcDir, '_manifest.ts');
-    console.log(`Generating static manifest for workflows in ${workflowsDir}...`);
+    console.log(`Generating static manifest for brains in ${brainsDir}...`);
 
     let importStatements = `import type { Workflow } from '@positronic/core';\n`;
     let manifestEntries = '';
 
     try {
-        await fsPromises.mkdir(workflowsDir, { recursive: true });
+        await fsPromises.mkdir(brainsDir, { recursive: true });
 
-        const files = await fsPromises.readdir(workflowsDir);
-        const workflowFiles = files.filter(file => file.endsWith('.ts') && !file.startsWith('_'));
+        const files = await fsPromises.readdir(brainsDir);
+        const brainFiles = files.filter(file => file.endsWith('.ts') && !file.startsWith('_'));
 
-        for (const file of workflowFiles) {
-            const workflowName = path.basename(file, '.ts');
-            const importPath = `../../workflows/${workflowName}.js`;
-            const importAlias = `wf_${workflowName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+        for (const file of brainFiles) {
+            const brainName = path.basename(file, '.ts');
+            const importPath = `../../brains/${brainName}.js`;
+            const importAlias = `brain_${brainName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 
             importStatements += `import * as ${importAlias} from '${importPath}';\n`;
-            manifestEntries += `  ${JSON.stringify(workflowName)}: ${importAlias}.default,\n`;
+            manifestEntries += `  ${JSON.stringify(brainName)}: ${importAlias}.default as Workflow,\n`;
         }
 
         const manifestContent = `// This file is generated automatically by the Positronic CLI server command. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};\n`;
@@ -137,7 +137,7 @@ async function generateStaticManifest(projectRootPath: string, serverSrcDir: str
 
     } catch (error: any) {
         if (error.code === 'ENOENT') {
-            console.warn(`Workflows directory not found at ${workflowsDir}. Creating an empty manifest.`);
+            console.warn(`Brains directory not found at ${brainsDir}. Creating an empty manifest.`);
              const manifestContent = `// This file is generated automatically by the Positronic CLI server command. Do not edit directly.\nimport type { Workflow } from '@positronic/core';\n\nexport const staticManifest: Record<string, Workflow> = {};\n`;
              await fsPromises.writeFile(manifestPath, manifestContent, 'utf-8');
         } else {
@@ -167,7 +167,7 @@ export class ServerCommand {
         console.log(`Operating in Local Development Mode for project: ${projectRootPath}`);
         const serverDir = path.join(projectRootPath, '.positronic');
         const srcDir = path.join(serverDir, 'src');
-        const workflowsDir = path.join(projectRootPath, 'workflows');
+        const brainsDir = path.join(projectRootPath, 'brains');
         const projectName = path.basename(projectRootPath);
         const userPackageJsonPath = path.join(projectRootPath, 'package.json');
         let userCoreVersion: string | null = null;
@@ -178,7 +178,7 @@ export class ServerCommand {
         const cleanup = async () => {
             console.log('\nShutting down...');
             if (watcher) {
-                console.log('Closing workflow watcher...');
+                console.log('Closing brain watcher...');
                 await watcher.close();
                 watcher = null;
             }
@@ -263,8 +263,8 @@ export class ServerCommand {
             }
         }
 
-        console.log(`Watching for workflow changes in ${workflowsDir}...`);
-        watcher = chokidar.watch(path.join(workflowsDir, '*.ts'), {
+        console.log(`Watching for brain changes in ${brainsDir}...`);
+        watcher = chokidar.watch(path.join(brainsDir, '*.ts'), {
             ignored: /(^|[\/\\])\../,
             persistent: true,
             ignoreInitial: true,
@@ -300,7 +300,7 @@ export class ServerCommand {
         wranglerProcess.on('close', (code) => {
             console.log(`Wrangler dev server exited with code ${code}`);
             if (watcher) {
-                 console.log("Closing workflow watcher as Wrangler stopped.");
+                 console.log("Closing brain watcher as Wrangler stopped.");
                  watcher.close();
                  watcher = null;
             }
@@ -310,7 +310,7 @@ export class ServerCommand {
         wranglerProcess.on('error', (err) => {
             console.error('Failed to start Wrangler dev server:', err);
              if (watcher) {
-                 console.log("Closing workflow watcher due to Wrangler start error.");
+                 console.log("Closing brain watcher due to Wrangler start error.");
                  watcher.close();
                  watcher = null;
             }

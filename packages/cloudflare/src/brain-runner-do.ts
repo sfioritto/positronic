@@ -69,7 +69,7 @@ class MonitorAdapter implements Adapter {
   }
 }
 
-export class WorkflowRunnerDO extends DurableObject<Env> {
+export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private workflowRunId: string;
   private eventStreamAdapter = new EventStreamAdapter();
@@ -81,7 +81,7 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
   }
 
   async start(
-    workflowName: string,
+    brainName: string,
     workflowRunId: string,
     initialData?: Record<string, any>
   ) {
@@ -91,10 +91,11 @@ export class WorkflowRunnerDO extends DurableObject<Env> {
       throw new Error('Runtime manifest not initialized');
     }
 
-    const workflowToRun = await runtimeManifest.import(workflowName);
+    const workflowToRun = await runtimeManifest.import(brainName);
     if (!workflowToRun) {
-      console.error(`[DO ${workflowRunId}] Workflow ${workflowName} not found in manifest.`);
-      throw new Error(`Workflow ${workflowName} not found`);
+      console.error(`[DO ${workflowRunId}] Workflow ${brainName} not found in manifest.`);
+      console.error(JSON.stringify(runtimeManifest, null, 2));
+      throw new Error(`Workflow ${brainName} not found`);
     }
 
     const sqliteAdapter = new WorkflowRunSQLiteAdapter(sql);

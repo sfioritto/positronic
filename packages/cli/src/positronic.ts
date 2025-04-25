@@ -8,9 +8,8 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { RunCommand } from './commands/run.js';
 import { ServerCommand } from './commands/server.js';
-import { WorkflowCommand } from './commands/workflow.js';
-import { AgentCommand } from './commands/agent.js';
 import { PromptCommand } from './commands/prompt.js';
+import { BrainCommand } from './commands/brain.js';
 
 function findProjectRootSync(startDir: string): string | null {
     let currentDir = path.resolve(startDir);
@@ -41,14 +40,13 @@ const __dirname = path.dirname(__filename);
 // Need to go up 1 level to packages/cli/, then into templates/
 const templatesBaseDir = path.resolve(__dirname, '../templates');
 const cloudflareDevServerTemplateDir = path.join(templatesBaseDir, 'cloudflare-dev-server');
-const workflowTemplateDir = path.join(templatesBaseDir, 'workflow'); // Added for workflow new
+const brainTemplateDir = path.join(templatesBaseDir, 'brain');
 
 // Instantiate command classes, passing the determined mode and path
 const projectCommand = new ProjectCommand(isLocalDevMode);
 const runCommand = new RunCommand(isLocalDevMode);
 const serverCommand = new ServerCommand(cloudflareDevServerTemplateDir);
-const workflowCommand = new WorkflowCommand(projectRootPath, workflowTemplateDir);
-const agentCommand = new AgentCommand(isLocalDevMode, projectRootPath);
+const brainCommand = new BrainCommand(isLocalDevMode, projectRootPath, brainTemplateDir);
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);
 
 // Main CLI definition
@@ -168,14 +166,14 @@ if (isLocalDevMode) {
   );
 }
 
-// --- Workflow Management Commands ---
-cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeScript code created by you Workflows can use agents, prompts, resources, and services.\n', (yargs) => {
+// --- Brain Management Commands ---
+cli = cli.command('brain', '🧠 Manage Brains: the core executable units you define to build your Positronic project.\n', (yargs) => {
   yargs
-    .command('list', 'List all workflows in the active project\n', () => {})
-    .command('history <workflow-name>', 'List recent runs of a specific workflow\n', (yargs) => {
-      return yargs
-        .positional('workflow-name', {
-          describe: 'Name of the workflow',
+    .command('list', 'List all brains in the active project\n', () => {}, (argv) => brainCommand.list(argv))
+    .command('history <brain-name>', 'List recent runs of a specific brain\n', (yargsHistory) => {
+      return yargsHistory
+        .positional('brain-name', {
+          describe: 'Name of the brain',
           type: 'string',
           demandOption: true
         })
@@ -184,26 +182,26 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
           type: 'number',
           default: 10
         })
-        .example('$0 workflow history my-workflow', 'List recent runs for my-workflow')
-        .example('$0 workflow history my-workflow --limit=20', 'List more recent runs');
-    }, (argv) => workflowCommand.history(argv))
-    .command('show <workflow-name>', 'List all steps and other details for the workflow\n', (yargsShow) => {
+        .example('$0 brain history my-brain', 'List recent runs for my-brain')
+        .example('$0 brain history my-brain --limit=20', 'List more recent runs');
+    }, (argv) => brainCommand.history(argv))
+    .command('show <brain-name>', 'List all steps and other details for the brain\n', (yargsShow) => {
       return yargsShow
-        .positional('workflow-name', {
-          describe: 'Name of the workflow',
+        .positional('brain-name', {
+          describe: 'Name of the brain',
           type: 'string',
           demandOption: true
         });
-    }, (argv) => workflowCommand.show(argv))
-    .command('rerun <workflow-name> [workflow-run-id]', 'Rerun an existing workflow run\n', (yargsRerun) => {
+    }, (argv) => brainCommand.show(argv))
+    .command('rerun <brain-name> [brain-run-id]', 'Rerun an existing brain run\n', (yargsRerun) => {
       return yargsRerun
-        .positional('workflow-name', {
-          describe: 'Name of the workflow',
+        .positional('brain-name', {
+          describe: 'Name of the brain',
           type: 'string',
           demandOption: true
         })
-        .positional('workflow-run-id', {
-          describe: 'ID of the workflow run to rerun (defaults to the most recent run)',
+        .positional('brain-run-id', {
+          describe: 'ID of the brain run to rerun (defaults to the most recent run)',
           type: 'string'
         })
         .option('starts-at', {
@@ -220,17 +218,17 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
           describe: 'Show verbose output',
           type: 'boolean',
         })
-        .example('$0 workflow rerun my-workflow', 'Rerun the most recent execution of my-workflow')
-        .example('$0 workflow rerun my-workflow abc123', 'Rerun a specific workflow run')
-        .example('$0 workflow rerun my-workflow --starts-at=3', 'Rerun from step 3')
-        .example('$0 workflow rerun my-workflow --stops-after=5', 'Rerun and stop after step 5')
-        .example('$0 workflow rerun my-workflow --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
-        .example('$0 workflow rerun my-workflow --verbose', 'Rerun with verbose output');
-    }, (argv) => workflowCommand.rerun(argv))
-    .command('run <workflow-name>', 'Run a workflow\n', (yargsRun) => {
+        .example('$0 brain rerun my-brain', 'Rerun the most recent execution of my-brain')
+        .example('$0 brain rerun my-brain abc123', 'Rerun a specific brain run')
+        .example('$0 brain rerun my-brain --starts-at=3', 'Rerun from step 3')
+        .example('$0 brain rerun my-brain --stops-after=5', 'Rerun and stop after step 5')
+        .example('$0 brain rerun my-brain --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
+        .example('$0 brain rerun my-brain --verbose', 'Rerun with verbose output');
+    }, (argv) => brainCommand.rerun(argv))
+    .command('run <brain-name>', 'Run a brain\n', (yargsRun) => {
       return yargsRun
-        .positional('workflow-name', {
-          describe: 'Name of the workflow',
+        .positional('brain-name', {
+          describe: 'Name of the brain',
           type: 'string',
           demandOption: true
         })
@@ -238,116 +236,44 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
           describe: 'Show verbose output',
           type: 'boolean',
         })
-        .example('$0 workflow run my-workflow', 'Run a workflow by name')
-        .example('$0 workflow run my-workflow --verbose', 'Run a workflow with verbose output');
-    }, (argv) => workflowCommand.run(argv))
-    .command('watch <workflow-name>', 'Watch a specific workflow run for live updates\n', (yargsWatch) => {
+        .example('$0 brain run my-brain', 'Run a brain by name')
+        .example('$0 brain run my-brain --verbose', 'Run a brain with verbose output');
+    }, (argv) => brainCommand.run(argv))
+    .command('watch <brain-name>', 'Watch a specific brain run for live updates\n', (yargsWatch) => {
       return yargsWatch
-        .positional('workflow-name', {
-          describe: 'Name of the workflow',
+        .positional('brain-name', {
+          describe: 'Name of the brain',
           type: 'string',
           demandOption: true
         })
         .option('run-id', {
-          describe: 'ID of the workflow run to watch',
+          describe: 'ID of the brain run to watch',
           type: 'string',
           demandOption: true,
           alias: 'id'
         })
-        .example('$0 workflow watch my-workflow --run-id abc123', 'Watch the workflow run with ID abc123');
-    }, (argv) => workflowCommand.watch(argv))
+        .example('$0 brain watch my-brain --run-id abc123', 'Watch the brain run with ID abc123');
+    }, (argv) => brainCommand.watch(argv))
 
   if (isLocalDevMode) {
-    yargs.command('new <workflow-name>', 'Create a new workflow in the current project', (yargsNew) => {
+    yargs.command('new <brain-name>', 'Create a new brain in the current project', (yargsNew) => {
       return yargsNew
-        .positional('workflow-name', {
-          describe: 'Name of the new workflow',
+        .positional('brain-name', {
+          describe: 'Name of the new brain',
           type: 'string',
           demandOption: true
         })
         .option('prompt', {
-          describe: 'Prompt to use for generating the workflow',
+          describe: 'Prompt to use for generating the brain',
           type: 'string',
           alias: 'p'
         })
-        .example('$0 workflow new my-workflow', 'Create a new workflow in the current project directory')
-        .example('$0 workflow new my-workflow -p "Generate a workflow for data processing"', 'Create a workflow using a prompt');
-    }, (argv) => workflowCommand.new(argv));
+        .example('$0 brain new my-brain', 'Create a new brain in the current project directory')
+        .example('$0 brain new my-brain -p "Create a brain for data processing"', 'Create a brain using a prompt');
+    }, (argv) => brainCommand.new(argv));
   }
 
-  return yargs.demandCommand(1, 'You need to specify a workflow command');
-})
-
-// --- Agent Management Commands ---
-cli = cli.command('agent', 'Agents have tools, resources and an objective. They can have a human in the loop.\n', (yargs) => {
-  yargs
-    .command('list', 'List all agents in the active project\n', () => { })
-    .command('show <agent-name>', 'Show details and usage statistics for a specific agent\n', (yargsShow) => {
-      return yargsShow
-        .positional('agent-name', {
-          describe: 'Name of the agent',
-          type: 'string',
-          demandOption: true
-        });
-    }, (argv) => agentCommand.show(argv))
-    .command('history <agent-name>', 'List recent history of a specific agent\n', (yargsHistory) => {
-      return yargsHistory
-        .positional('agent-name', {
-          describe: 'Name of the agent',
-          type: 'string',
-          demandOption: true
-        });
-    }, (argv) => agentCommand.history(argv))
-    .command('run <agent-name>', 'Run an agent\n', (yargsRun) => {
-      return yargsRun
-        .positional('agent-name', {
-          describe: 'Name of the agent',
-          type: 'string',
-          demandOption: true
-        })
-        .option('verbose', {
-          describe: 'Show verbose output',
-          type: 'boolean',
-        })
-        .example('$0 agent run my-agent', 'Run an agent by name')
-        .example('$0 agent run my-agent --verbose', 'Run an agent with verbose output');
-    }, (argv) => agentCommand.run(argv))
-
-  if (isLocalDevMode) {
-    yargs.command('new <agent-name>', 'Create a new agent in the current project', (yargsNew) => {
-      return yargsNew
-        .positional('agent-name', {
-          describe: 'Name of the new agent',
-          type: 'string',
-          demandOption: true
-        })
-        .option('prompt', {
-          describe: 'Prompt to use for generating the agent',
-          type: 'string',
-          alias: 'p'
-        })
-        .example('$0 agent new my-agent', 'Create a new agent in the current project directory')
-        .example('$0 agent new my-agent -p "Generate a customer service agent"', 'Create an agent using a prompt');
-    }, (argv) => agentCommand.new(argv));
-  }
-
-  yargs.command('watch <agent-name>', 'Watch a specific agent run for live updates\n', (yargsWatch) => {
-    return yargsWatch
-      .positional('agent-name', {
-        describe: 'Name of the agent',
-        type: 'string',
-        demandOption: true
-      })
-      .option('run-id', {
-        describe: 'ID of the agent run to watch',
-        type: 'string',
-        demandOption: true,
-        alias: 'id'
-      })
-      .example('$0 agent watch my-agent --run-id def456', 'Watch the agent run with ID def456');
-  }, (argv) => agentCommand.watch(argv));
-
-  return yargs.demandCommand(1, 'You need to specify an agent command');
+  return yargs.demandCommand(1, 'You need to specify a brain command (new, list, history, show, rerun, run, watch).');
 })
 
 // --- Prompt Management Commands ---
@@ -389,29 +315,20 @@ cli = cli.command('resource', 'Resources are any data that can be used in your w
 })
 
 // --- Execution Commands ---
-cli = cli.command('run <name-or-path>', 'Run a workflow or agent\n', (yargsRun) => {
+cli = cli.command('run <name-or-path>', 'Run a brain\n', (yargsRun) => {
   return yargsRun
     .positional('name-or-path', {
-      describe: 'Name of the workflow/agent to run',
+      describe: 'Name of the brain to run',
       type: 'string',
       demandOption: true
     })
-    // Options like --workflow, --agent might be fine
-    .option('workflow', {
-      describe: 'Explicitly specify workflow name',
-      type: 'string',
-    })
-    .option('agent', {
-      describe: 'Explicitly specify agent name',
-      type: 'string',
-    })
     .option('starts-at', {
-      describe: 'Start workflow from specific step (requires --workflow)',
+      describe: 'Start brain from specific step',
       type: 'number',
     })
     .alias('starts-at', 's')
     .option('stops-after', {
-      describe: 'Stop workflow after specific step (requires --workflow)',
+      describe: 'Stop brain after specific step',
       type: 'number',
     })
     .alias('stops-after', 'e')
@@ -419,32 +336,25 @@ cli = cli.command('run <name-or-path>', 'Run a workflow or agent\n', (yargsRun) 
       describe: 'Show verbose output',
       type: 'boolean',
     })
-    // Rules: starts-at and stops-after require workflow to be specified
-    .implies('starts-at', 'workflow')
-    .implies('stops-after', 'workflow')
-    .example('$0 run my-workflow', 'Run a workflow by name')
-    .example('$0 run --workflow my-workflow', 'Explicitly run a workflow')
-    .example('$0 run --agent my-agent', 'Explicitly run an agent')
-    .example('$0 run --workflow my-workflow --starts-at=3 --verbose', 'Run workflow starting at step 3')
-    .example('$0 run --workflow my-workflow -s 3 -e 5', 'Run workflow steps 3 through 5');
+    .example('$0 run my-brain', 'Run a brain by name')
+    .example('$0 run my-brain --starts-at=3 --verbose', 'Run brain starting at step 3')
+    .example('$0 run my-brain -s 3 -e 5', 'Run brain steps 3 through 5');
 }, (argv) => runCommand.handle(argv));
 
 // --- Global List Command ---
 cli = cli.command(
   'list',
-  'List entities (workflows, agents, etc.) in the current project',
+  'List entities (brains, resources, etc.) in the current project',
   (yargsList) => {
     return yargsList
       .option('type', {
         describe: 'Filter by entity type (can be specified multiple times)',
-        choices: ['workflow', 'agent', 'resource', 'prompt', 'all'],
+        choices: ['brain', 'resource', 'prompt', 'all'],
         default: 'all',
         array: true
       })
-      .example('$0 list', 'List all workflows, agents, resources, and prompts in the current project')
-      .example('$0 list --type workflow', 'List workflows')
-      .example('$0 list --type agent', 'List agents')
-      .example('$0 list --type workflow --type agent', 'List both workflows and agents')
+      .example('$0 list', 'List all brains, resources, and prompts in the current project')
+      .example('$0 list --type brain', 'List brains')
       .example('$0 list --type resource', 'List resources')
       .example('$0 list --type prompt', 'List prompts');
   }, handleGlobalList);
@@ -456,12 +366,12 @@ cli.parse();
 
 function handleGlobalList(argv: any) {
   const context = isLocalDevMode ? `local project at ${projectRootPath}` : 'selected remote project';
-  if (argv.type.includes('all')) {
-    console.log(`Listing all entity types in ${context}`);
-  } else {
-    console.log(`Listing entities of types: ${argv.type.join(', ')} in ${context}`);
-  }
-  // TODO: Implement actual listing logic, querying either local file system or remote API
+  const typesToList = argv.type.includes('all')
+    ? ['brain', 'resource', 'prompt']
+    : argv.type;
+
+  console.log(`Listing entities of types: ${typesToList.join(', ')} in ${context}`);
+  // TODO: Implement actual listing logic, querying either local file system or remote API based on typesToList
 }
 
 // Add handlers for the resource commands

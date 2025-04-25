@@ -5,11 +5,7 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: {
-          durableObjects: {
-            DO_NAMESPACE: "WorkflowRunOrchestratorDO",
-          },
-        },
+        // Reverted: Removed explicit miniflare block
       },
     },
   },

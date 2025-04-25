@@ -14,12 +14,12 @@ export class MonitorDO extends DurableObject<Env> {
     super(state, env);
     this.storage = state.storage.sql;
 
-    // Create the workflow_runs table if it doesn't exist
+    // Update table schema and indexes
     this.storage.exec(`
       CREATE TABLE IF NOT EXISTS workflow_runs (
         run_id TEXT PRIMARY KEY,
-        workflow_title TEXT NOT NULL,
-        workflow_description TEXT,
+        brain_title TEXT NOT NULL, -- Renamed column
+        brain_description TEXT, -- Renamed column
         type TEXT NOT NULL,
         status TEXT NOT NULL,
         options TEXT,
@@ -29,16 +29,15 @@ export class MonitorDO extends DurableObject<Env> {
         completed_at INTEGER
       );
 
-      CREATE INDEX IF NOT EXISTS idx_workflow_status
-      ON workflow_runs(workflow_title, status);
+      CREATE INDEX IF NOT EXISTS idx_brain_status -- Renamed index
+      ON workflow_runs(brain_title, status);
 
-      CREATE INDEX IF NOT EXISTS idx_workflow_time
+      CREATE INDEX IF NOT EXISTS idx_brain_time -- Renamed index
       ON workflow_runs(created_at DESC);
     `);
   }
 
   handleWorkflowEvent(event: WorkflowEvent) {
-    // Only store workflow-level events
     if (event.type === WORKFLOW_EVENTS.START ||
         event.type === WORKFLOW_EVENTS.RESTART ||
         event.type === WORKFLOW_EVENTS.COMPLETE ||
@@ -49,9 +48,10 @@ export class MonitorDO extends DurableObject<Env> {
       const completeTime = (event.type === WORKFLOW_EVENTS.COMPLETE || event.type === WORKFLOW_EVENTS.ERROR) ? currentTime : null;
       const error = event.type === WORKFLOW_EVENTS.ERROR ? JSON.stringify(event.error) : null;
 
+      // Update SQL insert/update with new column names, read from existing event fields
       this.storage.exec(`
         INSERT INTO workflow_runs (
-          run_id, workflow_title, workflow_description, type, status,
+          run_id, brain_title, brain_description, type, status,
           options, error, created_at, started_at, completed_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(run_id) DO UPDATE SET
@@ -60,9 +60,9 @@ export class MonitorDO extends DurableObject<Env> {
           error = excluded.error,
           completed_at = excluded.completed_at
       `,
-      event.workflowRunId,
-      event.workflowTitle,
-      event.workflowDescription || null,
+      event.workflowRunId, // Use workflowRunId for run_id
+      event.workflowTitle, // Read from event field, store in brain_title
+      event.workflowDescription || null, // Read from event field, store in brain_description
       event.type,
       event.status,
       JSON.stringify(event.options || {}),
@@ -72,17 +72,17 @@ export class MonitorDO extends DurableObject<Env> {
       completeTime
       );
 
-      // After updating the database, broadcast running workflows to all subscribers
       this.broadcastRunningWorkflows();
     }
   }
 
   private async broadcastRunningWorkflows() {
+    // Update select query with aliases to maintain external structure for now
     const runningWorkflows = await this.storage.exec(`
       SELECT
         run_id as workflowRunId,
-        workflow_title as workflowTitle,
-        workflow_description as workflowDescription,
+        brain_title as workflowTitle,
+        brain_description as workflowDescription,
         type,
         status,
         options,
@@ -95,6 +95,7 @@ export class MonitorDO extends DurableObject<Env> {
       ORDER BY created_at DESC
     `, STATUS.RUNNING).toArray();
 
+    // Broadcast structure remains { runningWorkflows: [...] }
     this.eventStreamAdapter.broadcast({ runningWorkflows });
   }
 
@@ -106,12 +107,12 @@ export class MonitorDO extends DurableObject<Env> {
       const stream = new ReadableStream({
         start: async (controller) => {
           try {
-            // Send initial state
+            // Update select query with aliases
             const runningWorkflows = await this.storage.exec(`
               SELECT
                 run_id as workflowRunId,
-                workflow_title as workflowTitle,
-                workflow_description as workflowDescription,
+                brain_title as workflowTitle,
+                brain_description as workflowDescription,
                 type,
                 status,
                 options,
@@ -124,9 +125,9 @@ export class MonitorDO extends DurableObject<Env> {
               ORDER BY created_at DESC
             `, STATUS.RUNNING).toArray();
 
+            // Send initial state, structure remains { runningWorkflows: [...] }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ runningWorkflows })}\n\n`));
 
-            // Subscribe to future updates
             this.eventStreamAdapter.subscribe(controller);
           } catch (err) {
             console.error('[MONITOR_DO] Error during stream start:', err);
@@ -151,18 +152,21 @@ export class MonitorDO extends DurableObject<Env> {
     return new Response('Not found', { status: 404 });
   }
 
+  // No changes needed for getLastEvent, uses run_id
   getLastEvent(workflowRunId: string) {
     return this.storage.exec(`
       SELECT * FROM workflow_runs WHERE run_id = ?
     `, workflowRunId).one();
   }
 
-  history(workflowTitle: string, limit: number = 10) {
+  // Update history method parameter and query
+  history(brainTitle: string, limit: number = 10) { // Renamed parameter
+    // Update select query with aliases and filter by brain_title
     return this.storage.exec(`
       SELECT
         run_id as workflowRunId,
-        workflow_title as workflowTitle,
-        workflow_description as workflowDescription,
+        brain_title as workflowTitle,
+        brain_description as workflowDescription,
         type,
         status,
         options,
@@ -171,10 +175,10 @@ export class MonitorDO extends DurableObject<Env> {
         started_at as startedAt,
         completed_at as completedAt
       FROM workflow_runs
-      WHERE workflow_title = ?
+      WHERE brain_title = ? -- Filter by new column name
       ORDER BY created_at DESC
       LIMIT ?
-    `, workflowTitle, limit).toArray();
+    `, brainTitle, limit).toArray(); // Use renamed parameter
   }
 }
 

@@ -1,6 +1,6 @@
 import { workflow } from '@positronic/core';
 import app from '../../src/api';
-import { setManifest, WorkflowRunnerDO } from '../../src/workflow-runner-do';
+import { setManifest, BrainRunnerDO } from '../../src/brain-runner-do';
 import { MonitorDO } from '../../src/monitor-do';
 import { PositronicManifest } from '../../src/manifest.js';
 
@@ -43,4 +43,4 @@ export default {
 	fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { WorkflowRunnerDO, MonitorDO };
+export { BrainRunnerDO, MonitorDO };

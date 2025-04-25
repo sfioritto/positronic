@@ -1,4 +1,4 @@
-import { api as app, setManifest, WorkflowRunnerDO, MonitorDO } from '@positronic/cloudflare';
+import { api as app, setManifest, BrainRunnerDO, MonitorDO } from '@positronic/cloudflare';
 import { PositronicManifest } from '@positronic/cloudflare/dist/src/manifest.js';
 // Import the generated manifest - NOTE the .js extension for runtime compatibility
 import { staticManifest } from './_manifest.js';
@@ -12,7 +12,7 @@ setManifest(manifest);
 
 // Define Env type based on wrangler.jsonc bindings
 interface Env {
-  WORKFLOW_RUNNER_DO: DurableObjectNamespace<WorkflowRunnerDO>;
+  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
 }
 
@@ -21,4 +21,4 @@ export default {
   fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { WorkflowRunnerDO, MonitorDO };
+export { BrainRunnerDO, MonitorDO };
