@@ -388,13 +388,6 @@ cli = cli.command('resource', 'Resources are any data that can be used in your w
     .demandCommand(1, 'You need to specify a resource command');
 })
 
-// --- Service Management Commands ---
-cli = cli.command('service', 'Services are code that can be injected into your workflows and available in every Step.\n', (yargs) => {
-  return yargs
-    .command('list', 'List all services in the active project\n', () => {}, handleServiceList)
-    .demandCommand(1, 'You need to specify a service command');
-})
-
 // --- Execution Commands ---
 cli = cli.command('run <name-or-path>', 'Run a workflow or agent\n', (yargsRun) => {
   return yargsRun
@@ -444,17 +437,16 @@ cli = cli.command(
     return yargsList
       .option('type', {
         describe: 'Filter by entity type (can be specified multiple times)',
-        choices: ['workflow', 'agent', 'resource', 'prompt', 'service', 'all'],
+        choices: ['workflow', 'agent', 'resource', 'prompt', 'all'],
         default: 'all',
         array: true
       })
-      .example('$0 list', 'List all workflows, agents, resources, prompts and services in the current project')
+      .example('$0 list', 'List all workflows, agents, resources, and prompts in the current project')
       .example('$0 list --type workflow', 'List workflows')
       .example('$0 list --type agent', 'List agents')
       .example('$0 list --type workflow --type agent', 'List both workflows and agents')
       .example('$0 list --type resource', 'List resources')
-      .example('$0 list --type prompt', 'List prompts')
-      .example('$0 list --type service', 'List services');
+      .example('$0 list --type prompt', 'List prompts');
   }, handleGlobalList);
 
 cli = cli.epilogue('For more information, visit https://positronic.sh');
@@ -475,9 +467,4 @@ function handleGlobalList(argv: any) {
 // Add handlers for the resource commands
 function handleResourceList() {
   console.log('Listing all resources');
-}
-
-// Add handlers for the service commands
-function handleServiceList() {
-  console.log('Listing all services');
 }
