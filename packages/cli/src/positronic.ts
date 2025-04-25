@@ -944,8 +944,12 @@ async function handleServer(argv: any): Promise<void> {
             // Initial manifest generation AFTER templates are copied
             await generateStaticManifest(projectRootPath, srcDir);
 
-            // Run npm install in the .positronic directory
-            await runNpmInstall(serverDir);
+            // Run npm install in the .positronic directory ONLY if test skip flag is not set
+            if (!process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL) {
+                await runNpmInstall(serverDir);
+            } else {
+                console.log(" -> Skipping npm install due to POSITRONIC_TEST_SKIP_SERVER_INSTALL flag.");
+            }
 
             console.log("Server setup complete.");
         } catch (error) {
@@ -962,6 +966,11 @@ async function handleServer(argv: any): Promise<void> {
          // If setup is skipped, still generate the manifest to ensure it's up-to-date
         console.log("Ensuring static manifest is up-to-date...");
         await generateStaticManifest(projectRootPath, srcDir);
+        // Also skip install here if the flag is set and setup was skipped previously
+        if (process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL) {
+             console.log(" -> Skipping potential npm install check due to POSITRONIC_TEST_SKIP_SERVER_INSTALL flag.");
+        }
+        // Note: Original code didn't explicitly run install here, but adding skip log for clarity
     }
 
     // --- Watch for changes in the user's workflows directory ---

@@ -17,6 +17,7 @@ const config = {
     ],
   },
   testPathIgnorePatterns: [
+    '.test-cache/',
     '/node_modules/',
     '/dist/',
     '<rootDir>/packages/cloudflare/test-project/',
