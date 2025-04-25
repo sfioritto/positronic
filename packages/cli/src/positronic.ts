@@ -3,34 +3,23 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { ProjectCommand } from './commands/project.js';
-import * as fs from 'fs'; // Use synchronous fs methods
+import * as fs from 'fs';
 import * as path from 'path';
 import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
-import * as fsPromises from 'fs/promises'; // Keep for async operations where needed
-import chokidar, { type FSWatcher } from 'chokidar'; // For watching workflows
+import * as fsPromises from 'fs/promises';
+import chokidar, { type FSWatcher } from 'chokidar';
 
-// Environment Variable for Mode Detection:
-// POSITRONIC_PROJECT_PATH: If this environment variable is set, the CLI operates in
-// "Local Development Mode", targeting the project specified by the path.
-// All operations assume the context of this local project, and commands interact
-// with a local development server (e.g., http://localhost:8080). Project selection is disabled.
-// If this variable is NOT set, the CLI operates in "Global Mode", interacting
-// with remote projects configured via `project add`.
-
-// Synchronous function to find project root
 function findProjectRootSync(startDir: string): string | null {
     let currentDir = path.resolve(startDir);
     while (true) {
         const configPath = path.join(currentDir, 'positronic.config.json');
         try {
-            fs.accessSync(configPath); // Use synchronous access check
-            return currentDir; // Found it
+            fs.accessSync(configPath);
+            return currentDir;
         } catch (e) {
-            // Not found, go up
             const parentDir = path.dirname(currentDir);
             if (parentDir === currentDir) {
-                // Reached root
                 return null;
             }
             currentDir = parentDir;
@@ -53,7 +42,7 @@ const cloudflareDevServerTemplateDir = path.join(templatesBaseDir, 'cloudflare-d
 const workflowTemplateDir = path.join(templatesBaseDir, 'workflow'); // Added for workflow new
 
 // Instantiate command classes, passing the determined mode and path
-const projectCommand = new ProjectCommand(isLocalDevMode, projectRootPath);
+const projectCommand = new ProjectCommand(isLocalDevMode);
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -65,18 +54,15 @@ let cli = yargs(hideBin(process.argv))
   .alias('h', 'help')
   .wrap(null)
   .strictCommands()
-  .demandCommand(1, 'You need to specify a command');
 
 // --- Project Management Commands (Global Mode Only) ---
 cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject) => {
   if (!isLocalDevMode) {
-    // Only 'new' is available in Global Mode
     yargsProject
       .command(
         'new <project-name>',
         'Create a new Positronic project directory',
         (yargsNew) => {
-            // This command creates the project structure locally, including `bin/positronic`
             return yargsNew
                 .positional('project-name', {
                     describe: 'Name of the new project directory to create',
@@ -86,57 +72,55 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
         },
         (argv) => projectCommand.create(argv)
       )
-      .demandCommand(1, 'In Global Mode, only the \'new\' project command is available.');
-  } else {
-    // add, select, list, show are available in Local Dev Mode
-    yargsProject
-      .command(
-        'add <name>',
-        'Add a project to your list of projects',
-        (yargsAdd) => {
-          return yargsAdd
-            .positional('name', {
-              describe: 'Name for the project',
-              type: 'string',
-              demandOption: true,
-            })
-            .option('url', {
-              describe: 'Project API URL',
-              type: 'string',
-              demandOption: true,
-            })
-            .example('$0 project add my-project --url https://api.my-project.positronic.sh', 'Add a project configuration');
-        },
-        (argv) => projectCommand.add(argv)
-      )
-      .command(
-        'select [name]',
-        'Switch the active project',
-        (yargsSelect) => {
-          return yargsSelect
-            .positional('name', {
-              describe: 'Project name to select',
-              type: 'string'
-            })
-            .example('$0 project select my-project', 'Switch the active project')
-            .example('$0 project select', 'Interactive project selection');
-        },
-        (argv) => projectCommand.select(argv)
-      )
-      .command(
-        'list',
-        'List all of your Positronic projects',
-        () => {},
-        () => projectCommand.list()
-      )
-      .command(
-        'show',
-        'Display your currently selected project',
-        () => {},
-        () => projectCommand.show()
-      )
-      .demandCommand(1, 'You need to specify a project command (add, select, list, show) in Local Dev Mode.');
   }
+
+  yargsProject
+    .command(
+      'add <name>',
+      'Add a project to your list of projects',
+      (yargsAdd) => {
+        return yargsAdd
+          .positional('name', {
+            describe: 'Name for the project',
+            type: 'string',
+            demandOption: true,
+          })
+          .option('url', {
+            describe: 'Project API URL',
+            type: 'string',
+            demandOption: true,
+          })
+          .example('$0 project add my-project --url https://api.my-project.positronic.sh', 'Add a project configuration');
+      },
+      (argv) => projectCommand.add(argv)
+    )
+    .command(
+      'select [name]',
+      'Switch the active project',
+      (yargsSelect) => {
+        return yargsSelect
+          .positional('name', {
+            describe: 'Project name to select',
+            type: 'string'
+          })
+          .example('$0 project select my-project', 'Switch the active project')
+          .example('$0 project select', 'Interactive project selection');
+      },
+      (argv) => projectCommand.select(argv)
+    )
+    .command(
+      'list',
+      'List all of your Positronic projects',
+      () => {},
+      () => projectCommand.list()
+    )
+    .command(
+      'show',
+      'Display your currently selected project',
+      () => {},
+      () => projectCommand.show()
+    )
+    .demandCommand(1, 'You need to specify a project command (add, select, list, show) in Local Dev Mode.');
 
   return yargsProject;
 });
@@ -145,7 +129,7 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
 if (!isLocalDevMode) {
   cli = cli.command(
     'new <project-name>',
-    'Alias for `project new`. Create a new Positronic project directory.',
+    'Alias for `project new`. Create a new Positronic project directory.\n',
     (yargsNewAlias) => {
         return yargsNewAlias
             .positional('project-name', {

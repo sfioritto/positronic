@@ -1,33 +1,23 @@
-import * as fs from 'fs';
 import * as path from 'path';
-// Import Node.js built-in for running commands
-import { execSync } from 'child_process';
-// Import templates
-import * as fsPromises from 'fs/promises'; // Use promises version
+import * as fsPromises from 'fs/promises';
 import { spawn } from 'child_process';
-import { fileURLToPath } from 'url'; // To resolve __dirname in ES modules
+import { fileURLToPath } from 'url';
 
-// Helper to resolve template paths relative to the current file
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Assuming templates are inside the cli package at packages/cli/templates
-// Compiled file likely at packages/cli/dist/commands/project.js
-// Need to go up 2 levels to packages/cli/, then into templates/
 const templatesBaseDir = path.resolve(__dirname, '../../templates');
 const newProjectTemplateDir = path.join(templatesBaseDir, 'new-project');
 
-// Helper function to copy and process a template file
 async function copyTemplate(
     templateFileName: string,
     destinationPath: string,
     projectName: string
-): Promise<void> {
+) {
     const templatePath = path.join(newProjectTemplateDir, templateFileName);
     try {
         const content = await fsPromises.readFile(templatePath, 'utf-8');
         const processedContent = content.replace(/{{projectName}}/g, projectName);
         await fsPromises.writeFile(destinationPath, processedContent);
-        console.log(`Created ${path.basename(destinationPath)}`);
     } catch (error: any) {
         console.error(`Error processing template ${templateFileName}: ${error.message}`);
         throw error; // Re-throw to stop the process
@@ -37,13 +27,11 @@ async function copyTemplate(
 export class ProjectCommand {
     // Add instance variables for mode and path
     private isLocalDevMode: boolean;
-    private projectRootPath: string | null;
 
     // Constructor accepts shared config, API clients, etc. later
     // Update constructor to accept mode and path
-    constructor(isLocalDevMode: boolean, projectRootPath: string | null) {
+    constructor(isLocalDevMode: boolean) {
         this.isLocalDevMode = isLocalDevMode;
-        this.projectRootPath = projectRootPath;
     }
 
     /**
@@ -52,7 +40,6 @@ export class ProjectCommand {
      * Only available in Global Mode.
      */
     add(argv: any): void {
-        console.log(`Adding project ${argv.name} with URL: ${argv.url}`);
         // Use instance variable for check
         if (this.isLocalDevMode) {
             // This check is technically redundant due to yargs structure in positronic.ts,
@@ -62,7 +49,6 @@ export class ProjectCommand {
         }
         // TODO: Implement storage of project name and URL in global config
         // Example: Config.addProject(argv.name, argv.url);
-        console.log(`(Placeholder: Project ${argv.name} configuration would be saved here)`);
     }
 
     /**
@@ -72,15 +58,11 @@ export class ProjectCommand {
     list(): void {
         // Use instance variable
         if (this.isLocalDevMode) {
-            console.log(`Operating in Local Development Mode.`);
             // Use instance variable
-            console.log(`Current project path: ${this.projectRootPath}`);
             // TODO: Implement detailed listing logic for local project context if needed
         } else {
-            console.log('Listing all configured remote projects:');
             // TODO: Implement listing logic for remote projects from global config
             // Example: const projects = Config.listProjects(); display projects;
-            console.log('(Placeholder: Configured projects would be listed here)');
         }
     }
 
@@ -96,15 +78,11 @@ export class ProjectCommand {
              process.exit(1);
          }
         if (argv.name) {
-            console.log(`Selecting project: ${argv.name}`);
             // TODO: Implement setting the active remote project (and its URL) in global config
             // Example: Config.setActiveProject(argv.name);
-            console.log(`(Placeholder: Project ${argv.name} would be set as active here)`);
         } else {
-            console.log('Interactive project selection (not implemented):');
             // TODO: Implement interactive selection from configured remote projects
             // Example: const selected = await promptUserToSelect(Config.listProjects()); Config.setActiveProject(selected);
-            console.log('(Placeholder: Interactive selection UI would be shown here)');
         }
     }
 
@@ -115,15 +93,11 @@ export class ProjectCommand {
     show(): void {
         // Use instance variable
         if (this.isLocalDevMode) {
-            console.log(`Operating in Local Development Mode.`);
             // Use instance variable
-            console.log(`Current project path: ${this.projectRootPath}`);
             // TODO: Implement logic to show more details of the project in the CWD if needed
         } else {
-            console.log('Showing active remote project:');
             // TODO: Implement logic to show the currently selected remote project from global config
             // Example: const activeProject = Config.getActiveProject(); display activeProject details;
-             console.log('(Placeholder: Details of the active remote project would be shown here)');
         }
     }
 
@@ -148,8 +122,6 @@ export class ProjectCommand {
         const projectPath = path.resolve(process.cwd(), projectName);
         const workflowsPath = path.join(projectPath, 'workflows');
 
-        console.log(`Creating new Positronic project '${projectName}' at ${projectPath}...`);
-
         // 1. Check if directory already exists
         try {
             await fsPromises.access(projectPath);
@@ -168,14 +140,12 @@ export class ProjectCommand {
         try {
             await fsPromises.mkdir(projectPath, { recursive: true });
             await fsPromises.mkdir(workflowsPath, { recursive: true });
-            console.log('Created project directories.');
         } catch (error: any) {
             console.error(`Error creating project directories: ${error.message}`);
             process.exit(1);
         }
 
         // 3. Copy and process template files
-        console.log('Copying template files...');
         try {
             await copyTemplate('package.json.tpl', path.join(projectPath, 'package.json'), projectName);
             await copyTemplate('tsconfig.json.tpl', path.join(projectPath, 'tsconfig.json'), projectName);
@@ -190,7 +160,6 @@ export class ProjectCommand {
         }
 
         // 4. Run npm install
-        console.log('Installing dependencies using npm...');
         const npmInstall = spawn('npm', ['install'], {
             cwd: projectPath,
             stdio: 'inherit', // Show output to the user
@@ -200,13 +169,6 @@ export class ProjectCommand {
         return new Promise<void>((resolve, reject) => {
              npmInstall.on('close', (code) => {
                 if (code === 0) {
-                    console.log('Dependencies installed successfully.');
-                    console.log(`
-Project '${projectName}' created successfully at: ${projectPath}
-
-To get started:
-  cd ${projectName}
-  positronic server`); // Suggest next step
                     resolve();
                 } else {
                     console.error(`
