@@ -11,6 +11,7 @@ import * as fsPromises from 'fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { RunCommand } from './commands/run.js';
 import { ServerCommand } from './commands/server.js';
+import { WorkflowCommand } from './commands/workflow.js';
 
 function findProjectRootSync(startDir: string): string | null {
     let currentDir = path.resolve(startDir);
@@ -47,6 +48,7 @@ const workflowTemplateDir = path.join(templatesBaseDir, 'workflow'); // Added fo
 const projectCommand = new ProjectCommand(isLocalDevMode);
 const runCommand = new RunCommand(isLocalDevMode);
 const serverCommand = new ServerCommand(cloudflareDevServerTemplateDir);
+const workflowCommand = new WorkflowCommand(isLocalDevMode, projectRootPath, workflowTemplateDir);
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -183,17 +185,17 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
         })
         .example('$0 workflow history my-workflow', 'List recent runs for my-workflow')
         .example('$0 workflow history my-workflow --limit=20', 'List more recent runs');
-    }, handleWorkflowHistory)
-    .command('show <workflow-name>', 'List all steps and other details for the workflow\n', (yargs) => {
-      return yargs
+    }, (argv) => workflowCommand.history(argv))
+    .command('show <workflow-name>', 'List all steps and other details for the workflow\n', (yargsShow) => {
+      return yargsShow
         .positional('workflow-name', {
           describe: 'Name of the workflow',
           type: 'string',
           demandOption: true
         });
-    })
-    .command('rerun <workflow-name> [workflow-run-id]', 'Rerun an existing workflow run\n', (yargs) => {
-      return yargs
+    }, (argv) => workflowCommand.show(argv))
+    .command('rerun <workflow-name> [workflow-run-id]', 'Rerun an existing workflow run\n', (yargsRerun) => {
+      return yargsRerun
         .positional('workflow-name', {
           describe: 'Name of the workflow',
           type: 'string',
@@ -223,9 +225,9 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
         .example('$0 workflow rerun my-workflow --stops-after=5', 'Rerun and stop after step 5')
         .example('$0 workflow rerun my-workflow --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
         .example('$0 workflow rerun my-workflow --verbose', 'Rerun with verbose output');
-    }, handleWorkflowRerun)
-    .command('run <workflow-name>', 'Run a workflow\n', (yargs) => {
-      return yargs
+    }, (argv) => workflowCommand.rerun(argv))
+    .command('run <workflow-name>', 'Run a workflow\n', (yargsRun) => {
+      return yargsRun
         .positional('workflow-name', {
           describe: 'Name of the workflow',
           type: 'string',
@@ -237,9 +239,9 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
         })
         .example('$0 workflow run my-workflow', 'Run a workflow by name')
         .example('$0 workflow run my-workflow --verbose', 'Run a workflow with verbose output');
-    }, handleWorkflowRun)
-    .command('watch <workflow-name>', 'Watch a specific workflow run for live updates\n', (yargs) => {
-      return yargs
+    }, (argv) => workflowCommand.run(argv))
+    .command('watch <workflow-name>', 'Watch a specific workflow run for live updates\n', (yargsWatch) => {
+      return yargsWatch
         .positional('workflow-name', {
           describe: 'Name of the workflow',
           type: 'string',
@@ -252,13 +254,15 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
           alias: 'id'
         })
         .example('$0 workflow watch my-workflow --run-id abc123', 'Watch the workflow run with ID abc123');
-    }, handleWorkflowWatch)
+    }, (argv) => workflowCommand.watch(argv))
 
   if (isLocalDevMode) {
     yargs.command('new <workflow-name>', 'Create a new workflow in the current project', (yargsNew) => {
       return yargsNew
         .positional('workflow-name', {
-          describe: 'Name of the new workflow'
+          describe: 'Name of the new workflow',
+          type: 'string',
+          demandOption: true
         })
         .option('prompt', {
           describe: 'Prompt to use for generating the workflow',
@@ -267,7 +271,7 @@ cli = cli.command('workflow', 'Workflows are step-by-step scripts that run TypeS
         })
         .example('$0 workflow new my-workflow', 'Create a new workflow in the current project directory')
         .example('$0 workflow new my-workflow -p "Generate a workflow for data processing"', 'Create a workflow using a prompt');
-    }, handleWorkflowNew);
+    }, (argv) => workflowCommand.new(argv));
   }
 
   return yargs.demandCommand(1, 'You need to specify a workflow command');
@@ -463,30 +467,30 @@ function handleGlobalList(argv: any) {
 }
 
 // Add handler for workflow new command
-function handleWorkflowNew(argv: any) {
-  if (!projectRootPath) {
-    console.error("Error: Cannot create workflow outside of a project directory.");
-    process.exit(1);
-  }
-  const workflowName = argv.workflowName;
-  const workflowFileName = `${workflowName}.ts`;
-  const workflowsDir = path.join(projectRootPath, 'workflows');
-  const destinationPath = path.join(workflowsDir, workflowFileName);
-  const templatePath = path.join(workflowTemplateDir, 'new.ts.tpl');
+// function handleWorkflowNew(argv: any) {
+//   if (!projectRootPath) {
+//     console.error("Error: Cannot create workflow outside of a project directory.");
+//     process.exit(1);
+//   }
+//   const workflowName = argv.workflowName;
+//   const workflowFileName = `${workflowName}.ts`;
+//   const workflowsDir = path.join(projectRootPath, 'workflows');
+//   const destinationPath = path.join(workflowsDir, workflowFileName);
+//   const templatePath = path.join(workflowTemplateDir, 'new.ts.tpl');
 
-  console.log(`Creating new workflow '${workflowName}' in ${workflowsDir}...`);
+//   console.log(`Creating new workflow '${workflowName}' in ${workflowsDir}...`);
 
-  fsPromises.mkdir(workflowsDir, { recursive: true })
-    .then(() => fsPromises.copyFile(templatePath, destinationPath))
-    .then(() => {
-      console.log(`Workflow file created: ${destinationPath}`);
-      // Optionally open the file in an editor or provide further instructions
-    })
-    .catch((err) => {
-      console.error(`Error creating workflow file:`, err);
-      process.exit(1);
-    });
-}
+//   fsPromises.mkdir(workflowsDir, { recursive: true })
+//     .then(() => fsPromises.copyFile(templatePath, destinationPath))
+//     .then(() => {
+//       console.log(`Workflow file created: ${destinationPath}`);
+//       // Optionally open the file in an editor or provide further instructions
+//     })
+//     .catch((err) => {
+//       console.error(`Error creating workflow file:`, err);
+//       process.exit(1);
+//     });
+// }
 
 // Add handler for agent new command
 function handleAgentNew(argv: any) {
@@ -535,45 +539,6 @@ function handleResourceList() {
 // Add handlers for the service commands
 function handleServiceList() {
   console.log('Listing all services');
-}
-
-// Add handler for workflow rerun command
-function handleWorkflowRerun(argv: any) {
-  const workflowName = argv['workflow-name'];
-  const workflowRunId = argv['workflow-run-id'] || 'most recent run';
-  const startsAt = argv['starts-at'] ? ` starting at step ${argv['starts-at']}` : '';
-  const stopsAfter = argv['stops-after'] ? ` stopping after step ${argv['stops-after']}` : '';
-  const verbose = argv.verbose ? ' with verbose output' : '';
-
-  console.log(`Rerunning workflow: ${workflowName} (run: ${workflowRunId})${startsAt}${stopsAfter}${verbose}`);
-}
-
-// Add handler for workflow run command
-function handleWorkflowRun(argv: any) {
-  const workflowName = argv['workflow-name'];
-  const verbose = argv.verbose ? ' with verbose output' : '';
-
-  console.log(`Running workflow: ${workflowName}${verbose}`);
-}
-
-// Add handler for workflow history command
-function handleWorkflowHistory(argv: any) {
-  const workflowName = argv['workflow-name'];
-  const limit = argv.limit;
-
-  console.log(`Listing ${limit} recent runs for workflow: ${workflowName} (including output and state information)`);
-  // Here we would implement:
-  // 1. Query for recent workflow runs for the specified workflow
-  // 2. Display in a table format: Run ID, Start Time, Duration, Status
-  // 3. Include truncated output and state information for each run
-}
-
-// Add handler for workflow watch command
-function handleWorkflowWatch(argv: any) {
-  const workflowName = argv['workflow-name'];
-  const runId = argv['run-id'];
-  console.log(`Watching workflow: ${workflowName}, Run ID: ${runId}`);
-  // TODO: Implement SSE connection logic
 }
 
 // Add handler for agent watch command

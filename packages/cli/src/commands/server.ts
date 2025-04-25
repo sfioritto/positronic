@@ -5,26 +5,6 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
 import type { Workflow } from '@positronic/core'; // Assuming Workflow type might be needed by manifest
 
-// --- Helper Functions (Moved from positronic.ts) ---
-
-// Helper to find project root (Async version used by server command)
-async function findProjectRoot(startDir: string): Promise<string | null> {
-    let currentDir = path.resolve(startDir);
-    while (true) {
-        const configPath = path.join(currentDir, 'positronic.config.json');
-        try {
-            await fsPromises.access(configPath);
-            return currentDir; // Found it
-        } catch (e) {
-            const parentDir = path.dirname(currentDir);
-            if (parentDir === currentDir) {
-                return null;
-            }
-            currentDir = parentDir;
-        }
-    }
-}
-
 // Helper function to copy and process a template file for the server
 async function copyServerTemplate(
     templateFileName: string,
