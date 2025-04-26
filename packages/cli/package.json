@@ -16,21 +16,12 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
-    "@positronic/client-anthropic": "^0.0.1",
     "@positronic/core": "^0.0.1",
-    "@positronic/resources": "^0.0.1",
-    "@positronic/shell": "^0.0.1",
-    "@positronic/sqlite": "^0.0.1",
-    "better-sqlite3": "^11.7.2",
-    "ts-node": "^10.9.2",
+    "chokidar": "^3.6.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@swc/cli": "^0.7.3",
-    "@swc/core": "^1.3.101",
     "@types/node": "^20.11.17",
-    "@types/yargs": "^17.0.32",
-    "chokidar": "^3.6.0",
-    "typescript": "^5.3.3"
+    "@types/yargs": "^17.0.32"
   }
 }
