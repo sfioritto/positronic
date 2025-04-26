@@ -11,7 +11,7 @@ jest.setTimeout(90000); // 90 seconds
 // Resolve paths relative to the workspace root (assuming test runs from workspace root)
 const workspaceRoot = path.resolve(__dirname, '../../../../'); // Adjust based on actual test execution context if needed
 // Correct path to the compiled CLI entry point based on build output and package.json bin entry
-const cliExecutable = path.join(workspaceRoot, 'packages/cli/dist/positronic.js');
+const cliExecutable = path.join(workspaceRoot, 'packages/cli/dist/src/positronic.js');
 const nodeExecutable = process.execPath; // Use the same node executing the test
 
 // --- Cache Configuration ---
