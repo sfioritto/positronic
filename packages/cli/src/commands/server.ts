@@ -17,25 +17,19 @@ async function copyServerTemplate(
 ) {
     const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
     const destinationPath = path.join(destinationDir, destinationFileName);
-    try {
-        let content = await fsPromises.readFile(templatePath, 'utf-8');
-        content = content.replace(/{{projectName}}/g, projectName);
 
-        if (templateFileName === 'package.json.tpl') {
-            const packageJson = await renderPackageJson(
-                projectName,
-                userCoreVersion
-            );
-            content = JSON.stringify(packageJson, null, 2);
-        }
+    let content = await fsPromises.readFile(templatePath, 'utf-8');
+    content = content.replace(/{{projectName}}/g, projectName);
 
-        await fsPromises.writeFile(destinationPath, content);
-        console.log(`   Created ${destinationFileName}`);
-
-    } catch (error: any) {
-        console.error(`   Error processing server template ${templateFileName}: ${error.message}`);
-        throw error;
+    if (templateFileName === 'package.json.tpl') {
+        const packageJson = await renderPackageJson(
+            projectName,
+            userCoreVersion
+        );
+        content = JSON.stringify(packageJson, null, 2);
     }
+
+    await fsPromises.writeFile(destinationPath, content);
 }
 
 // Helper to run npm install
