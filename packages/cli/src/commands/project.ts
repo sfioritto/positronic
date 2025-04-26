@@ -61,7 +61,7 @@ export class ProjectCommand {
      * Handles the 'positronic project add <name> --url <url>' command.
      * Adds a project configuration to the global store.
      */
-    add({ name, url }: ArgumentsCamelCase<AddProjectArgs>): void {
+    add({ name, url }: ArgumentsCamelCase<AddProjectArgs>) {
         console.log('add', name, url);
     }
 
@@ -78,7 +78,7 @@ export class ProjectCommand {
      * Selects the active remote project for subsequent commands.
      * Only available in Global Mode.
      */
-    select({ name }: ArgumentsCamelCase<SelectProjectArgs>): void {
+    select({ name }: ArgumentsCamelCase<SelectProjectArgs>) {
         console.log('select', name);
     }
 
@@ -86,7 +86,7 @@ export class ProjectCommand {
      * Handles the 'positronic project show' command.
      * Shows details of the active project (remote in Global Mode, local in Local Dev Mode).
      */
-    show(): void {
+    show() {
         console.log('show');
     }
 
