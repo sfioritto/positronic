@@ -245,20 +245,26 @@ cli = cli.command('run <name>', 'Run a brain\n', (yargsRun) => {
   }, (argv) => brainCommand.run(argv as any));
 
 // --- Watch Brain Run Command ---
-cli = cli.command('watch <name>', 'Watch a specific brain run for live updates\n', (yargsWatch) => {
+cli = cli.command('watch [name]', 'Watch a brain run: latest by name (default) or specific by ID\n', (yargsWatch) => {
     return yargsWatch
       .positional('name', {
-        describe: 'Name of the brain',
+        describe: 'Name of the brain to watch (watches the most recent run)',
         type: 'string',
-        demandOption: true
       })
       .option('run-id', {
-        describe: 'ID of the brain run to watch',
+        describe: 'ID of the specific brain run to watch',
         type: 'string',
-        demandOption: true,
         alias: 'id'
       })
-      .example('$0 watch my-brain --run-id abc123', 'Watch the brain run with ID abc123');
+      .conflicts('name', 'run-id')
+      .check((argv) => {
+        if (!argv.name && !argv.runId) {
+          throw new Error('You must provide either a brain name or a --run-id.');
+        }
+        return true;
+      })
+      .example('$0 watch my-brain', 'Watch the latest run of the brain named \'my-brain\'')
+      .example('$0 watch --run-id abc123def', 'Watch a specific brain run by its ID');
   }, (argv) => brainCommand.watch(argv as any));
 
 // --- New Brain Command (Local Dev Mode Only) ---

@@ -112,11 +112,22 @@ export class BrainCommand {
     }
 
     // Handler for brain watch
-    watch(argv: ArgumentsCamelCase<{ name: string; runId: string }>): void {
-        const brainName = argv.name;
-        const runId = argv.runId;
-        console.log(`Watching brain: ${brainName}, Run ID: ${runId}`);
-        // TODO: Implement SSE connection logic using the API endpoint `/brains/runs/${runId}/watch` or `/brains/watch`
+    // Updated signature to accept optional runId or name
+    watch(argv: ArgumentsCamelCase<{ runId?: string; name?: string }>): void {
+        if (argv.runId) {
+            const runId = argv.runId;
+            console.log(`Watching specific brain run ID: ${runId}`);
+            // TODO: Implement SSE connection logic using the API endpoint `/brains/runs/${runId}/watch`
+        } else if (argv.name) {
+            const brainName = argv.name;
+            console.log(`Watching latest run for brain name: ${brainName}`);
+            // TODO: Implement logic to first fetch the latest run ID for brainName
+            // TODO: Then, implement SSE connection logic using the fetched run ID
+        } else {
+            // This case should technically not be reachable due to the .check in yargs config
+            console.error("Internal Error: Watch command called without --run-id or --name.");
+            process.exit(1);
+        }
     }
 
     // Handler for brain new (Local Dev Mode only)
