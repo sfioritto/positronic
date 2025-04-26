@@ -142,12 +142,13 @@ export class ProjectCommand {
             });
         });
 
+        const skipServerInstall = process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL === 'true';
         // 5. Set up the .positronic server environment
         await setupPositronicServerEnv(
             projectPath,                    // Path to the newly created project
             cloudflareDevServerTemplateDir, // Path to the server templates
             true,                           // Force setup (it's a new project)
-            false                           // Do not skip npm install for server
+            skipServerInstall
         );
 
 

@@ -82,7 +82,11 @@ describe('CLI Integration: positronic new', () => {
                 execSync(`${nodeExecutable} ${cliExecutable} new ${setupProjectName}`, {
                     cwd: setupTempDir,
                     stdio: 'pipe',
-                    env: { ...process.env }
+                    env: {
+                        ...process.env,
+                        POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot,
+                        POSITRONIC_TEST_SKIP_SERVER_INSTALL: 'true'
+                    }
                 });
 
                 // 3. Start the server with --force to install dependencies
@@ -170,7 +174,10 @@ describe('CLI Integration: positronic new', () => {
         execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
             cwd: tempDir,
             stdio: 'pipe',
-            env: { ...process.env }
+            env: {
+                ...process.env,
+                POSITRONIC_TEST_SKIP_SERVER_INSTALL: 'true'
+            }
         });
 
         // Basic verification

@@ -154,7 +154,7 @@ export async function setupPositronicServerEnv(
     projectRootPath: string,
     cloudflareDevServerTemplateDir: string,
     forceSetup: boolean = false,
-    skipNpmInstall: boolean = false // Add flag to skip npm install
+    skipNpmInstall: boolean = false
 ): Promise<void> {
     console.log("Setting up or verifying .positronic server environment...");
     const serverDir = path.join(projectRootPath, '.positronic');
@@ -217,13 +217,10 @@ export async function setupPositronicServerEnv(
             // Generate initial manifest
             await generateStaticManifest(projectRootPath, srcDir);
 
-            if (!skipNpmInstall && !process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL) {
+            // Only run install if the flag isn't set
+            if (!skipNpmInstall) {
                 await runNpmInstall(serverDir);
-            } else {
-                console.log(" -> Skipping server npm install (skipNpmInstall flag, POSITRONIC_TEST_SKIP_SERVER_INSTALL, or setup not needed).");
             }
-
-            console.log(".positronic environment setup complete.");
         } catch (error) {
             console.error("Failed to set up the .positronic directory:", error);
             // Attempt cleanup only if we created the directory initially
@@ -299,8 +296,8 @@ export class ServerCommand {
             await setupPositronicServerEnv(
                 projectRootPath,
                 this.cloudflareDevServerTemplateDir,
-                argv.force as boolean, // Pass force flag
-                process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL === 'true' // Determine if install should be skipped
+                argv.force as boolean,
+                process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL === 'true'
             );
 
             // Watcher setup remains the same, but uses updated generateStaticManifest
