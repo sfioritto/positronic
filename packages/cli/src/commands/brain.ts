@@ -1,6 +1,8 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import * as path from 'path';
 import * as fsPromises from 'fs/promises';
+import fetch from 'node-fetch';
+import { v4 as uuidv4 } from 'uuid'; // Import if needed for local testing/mocking?
 
 export class BrainCommand {
     private isLocalDevMode: boolean;
@@ -47,15 +49,66 @@ export class BrainCommand {
     }
 
     // Handler for brain run
-    run(argv: ArgumentsCamelCase<{ brainName: string; verbose?: boolean }>): void {
+    async run(argv: ArgumentsCamelCase<{ brainName: string; verbose?: boolean }>): Promise<void> {
         // Note: The actual run logic is likely handled by the top-level 'run' command via RunCommand.
         // This handler within 'brain run' might be redundant or could offer alternative run mechanisms.
         const brainName = argv.brainName;
         const verbose = argv.verbose ? ' with verbose output' : '';
 
-        console.log(`(Brain Command) Running brain: ${brainName}${verbose}`);
+        // console.log(`(Brain Command) Running brain: ${brainName}${verbose}`); // Old message
+        console.log(`Attempting to run brain: ${brainName}...`); // Updated to match test/previous RunCommand
         // Consider if this specific command should delegate to RunCommand or have its own logic.
          console.warn("Warning: Prefer using 'positronic run <brain-name>' for running brains.");
+
+        // --- Start: Logic adapted from former RunCommand --- //
+
+        if (!this.isLocalDevMode) {
+            // This check might be redundant if called via top-level command which already checks, but good for safety
+            console.error("Error: The 'run' command currently only supports Local Development Mode.");
+            console.error("Please ensure you are inside a Positronic project directory and the dev server is running ('positronic server' or 'px s').");
+            process.exit(1);
+        }
+
+        const apiUrl = 'http://localhost:8787/brains/runs'; // Updated endpoint for brains
+
+        console.log(`Attempting to run brain: ${brainName}...`);
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ brainName }), // Updated payload key
+            });
+
+            if (response.status === 201) {
+                // Assuming the response structure is { brainRunId: string }
+                const result = await response.json() as { brainRunId: string };
+                console.log(`Brain run started successfully.`); // Log success
+                console.log(`Run ID: ${result.brainRunId}`);    // Log Run ID
+                if (argv.verbose) {
+                    console.log("Verbose flag detected. You can watch the run with:");
+                    // Updated watch command example
+                    console.log(`  positronic watch ${brainName} --run-id ${result.brainRunId}`);
+                }
+            } else {
+                const errorText = await response.text();
+                console.error(`Error starting brain run: ${response.status} ${response.statusText}`); // Updated log
+                console.error(`Server response: ${errorText}`);
+                process.exit(1);
+            }
+        } catch (error: any) {
+            console.error(`Error connecting to the local development server at ${apiUrl}.`);
+            console.error("Please ensure the server is running ('positronic server' or 'px s').");
+            if (error.code === 'ECONNREFUSED') {
+               console.error("Reason: Connection refused. The server might not be running or is listening on a different port.");
+            } else {
+               console.error(`Fetch error details: ${error.message}`);
+            }
+            process.exit(1);
+        }
+        // --- End: Logic adapted from former RunCommand --- //
     }
 
     // Handler for brain watch

@@ -6,7 +6,6 @@ import { ProjectCommand } from './commands/project.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { RunCommand } from './commands/run.js';
 import { ServerCommand } from './commands/server.js';
 import { PromptCommand } from './commands/prompt.js';
 import { BrainCommand } from './commands/brain.js';
@@ -44,7 +43,6 @@ const brainTemplateDir = path.join(templatesBaseDir, 'brain');
 
 // Instantiate command classes, passing the determined mode and path
 const projectCommand = new ProjectCommand(isLocalDevMode);
-const runCommand = new RunCommand(isLocalDevMode);
 const serverCommand = new ServerCommand(cloudflareDevServerTemplateDir);
 const brainCommand = new BrainCommand(isLocalDevMode, projectRootPath, brainTemplateDir);
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);
@@ -166,115 +164,121 @@ if (isLocalDevMode) {
   );
 }
 
-// --- Brain Management Commands ---
-cli = cli.command('brain', '🧠 Manage Brains: the core executable units you define to build your Positronic project.\n', (yargs) => {
-  yargs
-    .command('list', 'List all brains in the active project\n', () => {}, (argv) => brainCommand.list(argv))
-    .command('history <brain-name>', 'List recent runs of a specific brain\n', (yargsHistory) => {
-      return yargsHistory
-        .positional('brain-name', {
-          describe: 'Name of the brain',
-          type: 'string',
-          demandOption: true
-        })
-        .option('limit', {
-          describe: 'Maximum number of runs to show',
-          type: 'number',
-          default: 10
-        })
-        .example('$0 brain history my-brain', 'List recent runs for my-brain')
-        .example('$0 brain history my-brain --limit=20', 'List more recent runs');
-    }, (argv) => brainCommand.history(argv))
-    .command('show <brain-name>', 'List all steps and other details for the brain\n', (yargsShow) => {
-      return yargsShow
-        .positional('brain-name', {
-          describe: 'Name of the brain',
-          type: 'string',
-          demandOption: true
-        });
-    }, (argv) => brainCommand.show(argv))
-    .command('rerun <brain-name> [brain-run-id]', 'Rerun an existing brain run\n', (yargsRerun) => {
-      return yargsRerun
-        .positional('brain-name', {
-          describe: 'Name of the brain',
-          type: 'string',
-          demandOption: true
-        })
-        .positional('brain-run-id', {
-          describe: 'ID of the brain run to rerun (defaults to the most recent run)',
-          type: 'string'
-        })
-        .option('starts-at', {
-          describe: 'Step number to start execution from',
-          type: 'number'
-        })
-        .alias('starts-at', 's')
-        .option('stops-after', {
-          describe: 'Step number to stop execution after',
-          type: 'number'
-        })
-        .alias('stops-after', 'e')
-        .option('verbose', {
-          describe: 'Show verbose output',
-          type: 'boolean',
-        })
-        .example('$0 brain rerun my-brain', 'Rerun the most recent execution of my-brain')
-        .example('$0 brain rerun my-brain abc123', 'Rerun a specific brain run')
-        .example('$0 brain rerun my-brain --starts-at=3', 'Rerun from step 3')
-        .example('$0 brain rerun my-brain --stops-after=5', 'Rerun and stop after step 5')
-        .example('$0 brain rerun my-brain --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
-        .example('$0 brain rerun my-brain --verbose', 'Rerun with verbose output');
-    }, (argv) => brainCommand.rerun(argv))
-    .command('run <brain-name>', 'Run a brain\n', (yargsRun) => {
-      return yargsRun
-        .positional('brain-name', {
-          describe: 'Name of the brain',
-          type: 'string',
-          demandOption: true
-        })
-        .option('verbose', {
-          describe: 'Show verbose output',
-          type: 'boolean',
-        })
-        .example('$0 brain run my-brain', 'Run a brain by name')
-        .example('$0 brain run my-brain --verbose', 'Run a brain with verbose output');
-    }, (argv) => brainCommand.run(argv))
-    .command('watch <brain-name>', 'Watch a specific brain run for live updates\n', (yargsWatch) => {
-      return yargsWatch
-        .positional('brain-name', {
-          describe: 'Name of the brain',
-          type: 'string',
-          demandOption: true
-        })
-        .option('run-id', {
-          describe: 'ID of the brain run to watch',
-          type: 'string',
-          demandOption: true,
-          alias: 'id'
-        })
-        .example('$0 brain watch my-brain --run-id abc123', 'Watch the brain run with ID abc123');
-    }, (argv) => brainCommand.watch(argv))
+// --- List Brains Command ---
+cli = cli.command('list', 'List all brains in the active project\n', () => {}, (argv) => brainCommand.list(argv));
 
-  if (isLocalDevMode) {
-    yargs.command('new <brain-name>', 'Create a new brain in the current project', (yargsNew) => {
-      return yargsNew
-        .positional('brain-name', {
-          describe: 'Name of the new brain',
-          type: 'string',
-          demandOption: true
-        })
-        .option('prompt', {
-          describe: 'Prompt to use for generating the brain',
-          type: 'string',
-          alias: 'p'
-        })
-        .example('$0 brain new my-brain', 'Create a new brain in the current project directory')
-        .example('$0 brain new my-brain -p "Create a brain for data processing"', 'Create a brain using a prompt');
-    }, (argv) => brainCommand.new(argv));
-  }
+// --- Brain History Command ---
+cli = cli.command('history <brain-name>', 'List recent runs of a specific brain\n', (yargsHistory) => {
+    return yargsHistory
+      .positional('brain-name', {
+        describe: 'Name of the brain',
+        type: 'string',
+        demandOption: true
+      })
+      .option('limit', {
+        describe: 'Maximum number of runs to show',
+        type: 'number',
+        default: 10
+      })
+      .example('$0 history my-brain', 'List recent runs for my-brain')
+      .example('$0 history my-brain --limit=20', 'List more recent runs');
+  }, (argv) => brainCommand.history(argv));
 
-  return yargs.demandCommand(1, 'You need to specify a brain command (new, list, history, show, rerun, run, watch).');
-})
+// --- Show Brain Command ---
+cli = cli.command('show <brain-name>', 'List all steps and other details for the brain\n', (yargsShow) => {
+    return yargsShow
+      .positional('brain-name', {
+        describe: 'Name of the brain',
+        type: 'string',
+        demandOption: true
+      });
+  }, (argv) => brainCommand.show(argv));
+
+// --- Rerun Brain Command ---
+cli = cli.command('rerun <brain-name> [brain-run-id]', 'Rerun an existing brain run\n', (yargsRerun) => {
+    return yargsRerun
+      .positional('brain-name', {
+        describe: 'Name of the brain',
+        type: 'string',
+        demandOption: true
+      })
+      .positional('brain-run-id', {
+        describe: 'ID of the brain run to rerun (defaults to the most recent run)',
+        type: 'string'
+      })
+      .option('starts-at', {
+        describe: 'Step number to start execution from',
+        type: 'number'
+      })
+      .alias('starts-at', 's')
+      .option('stops-after', {
+        describe: 'Step number to stop execution after',
+        type: 'number'
+      })
+      .alias('stops-after', 'e')
+      .option('verbose', {
+        describe: 'Show verbose output',
+        type: 'boolean',
+      })
+      .example('$0 rerun my-brain', 'Rerun the most recent execution of my-brain')
+      .example('$0 rerun my-brain abc123', 'Rerun a specific brain run')
+      .example('$0 rerun my-brain --starts-at=3', 'Rerun from step 3')
+      .example('$0 rerun my-brain --stops-after=5', 'Rerun and stop after step 5')
+      .example('$0 rerun my-brain --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
+      .example('$0 rerun my-brain --verbose', 'Rerun with verbose output');
+  }, (argv) => brainCommand.rerun(argv));
+
+// --- Run Brain Command ---
+cli = cli.command('run <brain-name>', 'Run a brain\n', (yargsRun) => {
+    return yargsRun
+      .positional('brain-name', {
+        describe: 'Name of the brain',
+        type: 'string',
+        demandOption: true
+      })
+      .option('verbose', {
+        describe: 'Show verbose output',
+        type: 'boolean',
+      })
+      .example('$0 run my-brain', 'Run a brain by name')
+      .example('$0 run my-brain --verbose', 'Run a brain with verbose output');
+  }, (argv) => brainCommand.run(argv));
+
+// --- Watch Brain Run Command ---
+cli = cli.command('watch <brain-name>', 'Watch a specific brain run for live updates\n', (yargsWatch) => {
+    return yargsWatch
+      .positional('brain-name', {
+        describe: 'Name of the brain',
+        type: 'string',
+        demandOption: true
+      })
+      .option('run-id', {
+        describe: 'ID of the brain run to watch',
+        type: 'string',
+        demandOption: true,
+        alias: 'id'
+      })
+      .example('$0 watch my-brain --run-id abc123', 'Watch the brain run with ID abc123');
+  }, (argv) => brainCommand.watch(argv));
+
+// --- New Brain Command (Local Dev Mode Only) ---
+if (isLocalDevMode) {
+  cli = cli.command('new-brain <brain-name>', 'Create a new brain in the current project', (yargsNew) => { // Renamed to avoid conflict with project new alias
+    return yargsNew
+      .positional('brain-name', {
+        describe: 'Name of the new brain',
+        type: 'string',
+        demandOption: true
+      })
+      .option('prompt', {
+        describe: 'Prompt to use for generating the brain',
+        type: 'string',
+        alias: 'p'
+      })
+      .example('$0 new-brain my-brain', 'Create a new brain in the current project directory')
+      .example('$0 new-brain my-brain -p "Create a brain for data processing"', 'Create a brain using a prompt');
+  }, (argv) => brainCommand.new(argv));
+}
 
 // --- Prompt Management Commands ---
 cli = cli.command('prompt', 'Prompts are a one-shot call to an LLM with a typed return with no human in the loop (see agents for that) that you can use in your workflows.\n', (yargsPrompt) => {
@@ -314,65 +318,10 @@ cli = cli.command('resource', 'Resources are any data that can be used in your w
     .demandCommand(1, 'You need to specify a resource command');
 })
 
-// --- Execution Commands ---
-cli = cli.command('run <name-or-path>', 'Run a brain\n', (yargsRun) => {
-  return yargsRun
-    .positional('name-or-path', {
-      describe: 'Name of the brain to run',
-      type: 'string',
-      demandOption: true
-    })
-    .option('starts-at', {
-      describe: 'Start brain from specific step',
-      type: 'number',
-    })
-    .alias('starts-at', 's')
-    .option('stops-after', {
-      describe: 'Stop brain after specific step',
-      type: 'number',
-    })
-    .alias('stops-after', 'e')
-    .option('verbose', {
-      describe: 'Show verbose output',
-      type: 'boolean',
-    })
-    .example('$0 run my-brain', 'Run a brain by name')
-    .example('$0 run my-brain --starts-at=3 --verbose', 'Run brain starting at step 3')
-    .example('$0 run my-brain -s 3 -e 5', 'Run brain steps 3 through 5');
-}, (argv) => runCommand.handle(argv));
-
-// --- Global List Command ---
-cli = cli.command(
-  'list',
-  'List entities (brains, resources, etc.) in the current project',
-  (yargsList) => {
-    return yargsList
-      .option('type', {
-        describe: 'Filter by entity type (can be specified multiple times)',
-        choices: ['brain', 'resource', 'prompt', 'all'],
-        default: 'all',
-        array: true
-      })
-      .example('$0 list', 'List all brains, resources, and prompts in the current project')
-      .example('$0 list --type brain', 'List brains')
-      .example('$0 list --type resource', 'List resources')
-      .example('$0 list --type prompt', 'List prompts');
-  }, handleGlobalList);
-
 cli = cli.epilogue('For more information, visit https://positronic.sh');
 
 // Parse the arguments
 cli.parse();
-
-function handleGlobalList(argv: any) {
-  const context = isLocalDevMode ? `local project at ${projectRootPath}` : 'selected remote project';
-  const typesToList = argv.type.includes('all')
-    ? ['brain', 'resource', 'prompt']
-    : argv.type;
-
-  console.log(`Listing entities of types: ${typesToList.join(', ')} in ${context}`);
-  // TODO: Implement actual listing logic, querying either local file system or remote API based on typesToList
-}
 
 // Add handlers for the resource commands
 function handleResourceList() {
