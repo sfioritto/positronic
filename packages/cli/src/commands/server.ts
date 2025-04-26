@@ -2,8 +2,9 @@ import * as path from 'path';
 import * as fsPromises from 'fs/promises';
 import { spawn, type ChildProcess } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
+import { renderPackageJson } from './helpers.js';
 import type { ArgumentsCamelCase } from 'yargs';
-import type { Workflow } from '@positronic/core'; // Assuming Workflow type might be needed by manifest
+
 
 // Helper function to copy and process a template file for the server
 async function copyServerTemplate(
@@ -11,9 +12,9 @@ async function copyServerTemplate(
     destinationDir: string,
     destinationFileName: string,
     projectName: string,
-    userCoreVersion: string | null,
-    cloudflareDevServerTemplateDir: string // Pass template dir path
-): Promise<void> {
+    cloudflareDevServerTemplateDir: string,
+    userCoreVersion?: string,
+) {
     const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
     const destinationPath = path.join(destinationDir, destinationFileName);
     try {
@@ -21,54 +22,11 @@ async function copyServerTemplate(
         content = content.replace(/{{projectName}}/g, projectName);
 
         if (templateFileName === 'package.json.tpl') {
-            const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
-            if (devRootPath) {
-                console.log(` -> Injecting local development paths relative to ${devRootPath} into package.json...`);
-                try {
-                    const packageJson = JSON.parse(content);
-                    const coreDevPath = path.join(devRootPath, 'packages', 'core');
-                    const cloudflareDevPath = path.join(devRootPath, 'packages', 'cloudflare');
-
-                    if (packageJson.dependencies && packageJson.dependencies['@positronic/core']) {
-                        packageJson.dependencies['@positronic/core'] = `file:${coreDevPath}`;
-                        console.log(`    - Using local @positronic/core: file:${coreDevPath}`);
-                    }
-                    if (packageJson.dependencies && packageJson.dependencies['@positronic/cloudflare']) {
-                        packageJson.dependencies['@positronic/cloudflare'] = `file:${cloudflareDevPath}`;
-                        console.log(`    - Using local @positronic/cloudflare: file:${cloudflareDevPath}`);
-                    }
-                    content = JSON.stringify(packageJson, null, 2);
-                } catch (parseError: any) {
-                     console.error(`   Error parsing server template ${templateFileName} for local path injection: ${parseError.message}`);
-                     throw parseError;
-                }
-            } else if (userCoreVersion) {
-                console.log(` -> Syncing @positronic/* versions to user project version: ${userCoreVersion}...`);
-                 try {
-                    const packageJson = JSON.parse(content);
-                    let updated = false;
-
-                    if (packageJson.dependencies && packageJson.dependencies['@positronic/core']) {
-                        packageJson.dependencies['@positronic/core'] = userCoreVersion;
-                        console.log(`    - Set @positronic/core to ${userCoreVersion}`);
-                        updated = true;
-                    }
-                    if (packageJson.dependencies && packageJson.dependencies['@positronic/cloudflare']) {
-                        packageJson.dependencies['@positronic/cloudflare'] = userCoreVersion;
-                        console.log(`    - Set @positronic/cloudflare to ${userCoreVersion}`);
-                         updated = true;
-                    }
-
-                    if (updated) {
-                         content = JSON.stringify(packageJson, null, 2);
-                    } else {
-                         console.log(`    - No matching @positronic/* dependencies found in template to update.`);
-                    }
-                } catch (parseError: any) {
-                     console.error(`   Error parsing server template ${templateFileName} for version syncing: ${parseError.message}`);
-                     throw parseError;
-                }
-            }
+            const packageJson = await renderPackageJson(
+                projectName,
+                userCoreVersion
+            );
+            content = JSON.stringify(packageJson, null, 2);
         }
 
         await fsPromises.writeFile(destinationPath, content);
@@ -161,7 +119,7 @@ export async function setupPositronicServerEnv(
     const srcDir = path.join(serverDir, 'src');
     const projectName = path.basename(projectRootPath);
     const userPackageJsonPath = path.join(projectRootPath, 'package.json');
-    let userCoreVersion: string | null = null;
+    let userCoreVersion: string | undefined;
 
     // Read user project's package.json for version syncing
     try {
@@ -209,10 +167,10 @@ export async function setupPositronicServerEnv(
              try { await fsPromises.rm(path.join(srcDir, '_manifest.ts'), { force: true }); } catch {} // Ensure old manifest is gone
 
             // Pass template dir to helper
-            await copyServerTemplate('package.json.tpl', serverDir, 'package.json', projectName, userCoreVersion, cloudflareDevServerTemplateDir);
-            await copyServerTemplate('tsconfig.json.tpl', serverDir, 'tsconfig.json', projectName, userCoreVersion, cloudflareDevServerTemplateDir);
-            await copyServerTemplate('wrangler.jsonc.tpl', serverDir, 'wrangler.jsonc', projectName, userCoreVersion, cloudflareDevServerTemplateDir);
-            await copyServerTemplate('src/index.ts.tpl', srcDir, 'index.ts', projectName, userCoreVersion, cloudflareDevServerTemplateDir);
+            await copyServerTemplate('package.json.tpl', serverDir, 'package.json', projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+            await copyServerTemplate('tsconfig.json.tpl', serverDir, 'tsconfig.json', projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+            await copyServerTemplate('wrangler.jsonc.tpl', serverDir, 'wrangler.jsonc', projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+            await copyServerTemplate('src/index.ts.tpl', srcDir, 'index.ts', projectName, cloudflareDevServerTemplateDir);
 
             // Generate initial manifest
             await generateStaticManifest(projectRootPath, srcDir);
