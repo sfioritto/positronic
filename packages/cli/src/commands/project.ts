@@ -6,51 +6,34 @@ import { setupPositronicServerEnv } from './server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const templatesBaseDir = path.resolve(__dirname, '../../templates');
-const newProjectTemplateDir = path.join(templatesBaseDir, 'new-project');
+const templatesBasePath = path.resolve(__dirname, '../../templates');
+const templatesPath = path.join(templatesBasePath, 'new-project');
 
 async function copyTemplate(
     templateFileName: string,
     destinationPath: string,
     projectName: string
 ) {
-    const templatePath = path.join(newProjectTemplateDir, templateFileName);
-    try {
-        let content = await fsPromises.readFile(templatePath, 'utf-8');
-        // Always replace project name first
-        content = content.replace(/{{projectName}}/g, projectName);
+    const templatePath = path.join(templatesPath, templateFileName);
+    const template = await fsPromises.readFile(templatePath, 'utf-8');
 
-        // Check for package.json and POSITRONIC_PACKAGES_DEV_PATH
-        if (templateFileName === 'package.json.tpl') {
-            const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
-            if (devRootPath) {
-                console.log(` -> Injecting local development paths into project package.json (using POSITRONIC_PACKAGES_DEV_PATH=${devRootPath})...`);
-                try {
-                    const packageJson = JSON.parse(content);
-                    // TODO: Consider making these paths more robust or configurable
-                    const coreDevPath = path.join(devRootPath, 'packages', 'core');
-                    // const cloudflareDevPath = path.join(devRootPath, 'packages', 'cloudflare'); // Add if cloudflare is a direct project dep later
+    // Check for POSITRONIC_PACKAGES_DEV_PATH, if set, use it to replace @positronic/core with a local path for doing development work on the core package
+    const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
 
-                    if (packageJson.dependencies && packageJson.dependencies['@positronic/core']) {
-                        packageJson.dependencies['@positronic/core'] = `file:${coreDevPath}`;
-                        console.log(`    - Using local @positronic/core: file:${coreDevPath}`);
-                    }
-                    // Add similar logic for devDependencies if needed
-                    // if (packageJson.devDependencies && packageJson.devDependencies['@positronic/core']) { ... }
-
-                    content = JSON.stringify(packageJson, null, 2);
-                } catch (parseError: any) {
-                     console.error(`   Error parsing project template ${templateFileName} for local path injection: ${parseError.message}`);
-                     throw parseError; // Re-throw to stop the process
-                }
-            }
+    let renderedTemplate = template.replace(/{{projectName}}/g, projectName);
+    if (templateFileName === 'package.json.tpl' &&
+        devRootPath
+    ) {
+        const packageJson = JSON.parse(renderedTemplate);
+        const coreDevPath = path.join(devRootPath, 'packages', 'core');
+        if (packageJson.dependencies['@positronic/core']
+        ) {
+            packageJson.dependencies['@positronic/core'] = `file:${coreDevPath}`;
         }
-
-        await fsPromises.writeFile(destinationPath, content);
-    } catch (error: any) {
-        console.error(`Error processing template ${templateFileName}: ${error.message}`);
-        throw error; // Re-throw to stop the process
+        renderedTemplate = JSON.stringify(packageJson, null, 2);
     }
+
+    await fsPromises.writeFile(destinationPath, renderedTemplate);
 }
 
 export class ProjectCommand {
@@ -151,7 +134,7 @@ export class ProjectCommand {
 
         const projectPath = path.resolve(process.cwd(), projectName);
         const brainsPath = path.join(projectPath, 'brains');
-        const cloudflareDevServerTemplateDir = path.join(templatesBaseDir, 'cloudflare-dev-server');
+        const cloudflareDevServerTemplateDir = path.join(templatesBasePath, 'cloudflare-dev-server');
 
         // 1. Check if directory already exists
         try {
