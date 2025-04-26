@@ -8,7 +8,7 @@
     "test:all": "npm run test && cd packages/cloudflare/test-project && npm run test -- --run",
     "dev": "npm run build:workspaces && npm run test:all || /usr/local/bin/terminal-notifier -title \"Positronic\" -message \"Build/Test failed\"",
     "dev:watch": "nodemon --exec 'npm run dev'",
-    "clean:workspaces": "npm run clean --workspaces",
+    "clean:workspaces": "npm run clean --workspaces && rm -rf node_modules",
     "build:workspaces": "npm run build --workspaces",
     "build:watch": "nodemon --exec 'npm run build:workspaces || /usr/local/bin/terminal-notifier -title \"Positronic Build\" -message \"Build failed\"'"
   },

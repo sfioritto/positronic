@@ -10,7 +10,7 @@
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
     "build": "npm run tsc && npm run swc",
-    "clean": "rm -rf tsconfig.tsbuildinfo dist"
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
     "@positronic/core": "^0.0.1",
