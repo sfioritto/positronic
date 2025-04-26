@@ -113,7 +113,7 @@ export class ProjectCommand {
             process.exit(1);
         }
 
-        const projectName: string = argv['project-name'];
+        const projectName: string = argv.name;
         if (!projectName || typeof projectName !== 'string') {
             console.error("Error: Project name must be provided.");
             process.exit(1);

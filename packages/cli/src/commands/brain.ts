@@ -22,8 +22,8 @@ export class BrainCommand {
     }
 
     // Handler for brain history
-    history(argv: ArgumentsCamelCase<{ brainName: string; limit: number }>): void {
-        const brainName = argv.brainName;
+    history(argv: ArgumentsCamelCase<{ name: string; limit: number }>): void {
+        const brainName = argv.name;
         const limit = argv.limit;
 
         console.log(`Listing ${limit} recent runs for brain: ${brainName}`);
@@ -31,28 +31,28 @@ export class BrainCommand {
     }
 
     // Handler for brain show (placeholder)
-    show(argv: ArgumentsCamelCase<{ brainName: string }>): void {
-        console.log(`Showing details for brain: ${argv.brainName}`);
+    show(argv: ArgumentsCamelCase<{ name: string }>): void {
+        console.log(`Showing details for brain: ${argv.name}`);
          // TODO: Implement brain show logic (API call)
     }
 
     // Handler for brain rerun
-    rerun(argv: ArgumentsCamelCase<{ brainName: string; brainRunId?: string; startsAt?: number; stopsAfter?: number; verbose?: boolean }>): void {
-        const brainName = argv.brainName;
-        const brainRunId = argv.brainRunId || 'most recent run';
+    rerun(argv: ArgumentsCamelCase<{ name: string; runId?: string; startsAt?: number; stopsAfter?: number; verbose?: boolean }>): void {
+        const brainName = argv.name;
+        const runId = argv.runId || 'most recent run';
         const startsAt = argv.startsAt ? ` starting at step ${argv.startsAt}` : '';
         const stopsAfter = argv.stopsAfter ? ` stopping after step ${argv.stopsAfter}` : '';
         const verbose = argv.verbose ? ' with verbose output' : '';
 
-        console.log(`Rerunning brain: ${brainName} (run: ${brainRunId})${startsAt}${stopsAfter}${verbose}`);
+        console.log(`Rerunning brain: ${brainName} (run: ${runId})${startsAt}${stopsAfter}${verbose}`);
          // TODO: Implement brain rerun logic (API call)
     }
 
     // Handler for brain run
-    async run(argv: ArgumentsCamelCase<{ brainName: string; verbose?: boolean }>): Promise<void> {
+    async run(argv: ArgumentsCamelCase<{ name: string; verbose?: boolean }>): Promise<void> {
         // Note: The actual run logic is likely handled by the top-level 'run' command via RunCommand.
         // This handler within 'brain run' might be redundant or could offer alternative run mechanisms.
-        const brainName = argv.brainName;
+        const brainName = argv.name;
         const verbose = argv.verbose ? ' with verbose output' : '';
 
         // console.log(`(Brain Command) Running brain: ${brainName}${verbose}`); // Old message
@@ -112,8 +112,8 @@ export class BrainCommand {
     }
 
     // Handler for brain watch
-    watch(argv: ArgumentsCamelCase<{ brainName: string; runId: string }>): void {
-        const brainName = argv.brainName;
+    watch(argv: ArgumentsCamelCase<{ name: string; runId: string }>): void {
+        const brainName = argv.name;
         const runId = argv.runId;
         console.log(`Watching brain: ${brainName}, Run ID: ${runId}`);
         // TODO: Implement SSE connection logic using the API endpoint `/brains/runs/${runId}/watch` or `/brains/watch`
@@ -121,14 +121,14 @@ export class BrainCommand {
 
     // Handler for brain new (Local Dev Mode only)
     // Adapted from WorkflowCommand's new handler
-    new(argv: ArgumentsCamelCase<{ brainName: string; prompt?: string }>): void {
+    new(argv: ArgumentsCamelCase<{ name: string; prompt?: string }>): void {
         // isLocalDevMode check is implicitly handled by command registration
         if (!this.isLocalDevMode || !this.projectRootPath) {
             console.error("Internal Error: 'brain new' command requires local dev mode and project root path.");
             process.exit(1);
         }
 
-        const brainName = argv.brainName;
+        const brainName = argv.name;
         const brainFileName = `${brainName}.ts`; // Brains are TS files like workflows were
         const brainsDir = path.join(this.projectRootPath, 'brains'); // New directory name
         const destinationPath = path.join(brainsDir, brainFileName);

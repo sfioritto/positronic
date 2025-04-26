@@ -63,17 +63,17 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
   if (!isLocalDevMode) {
     yargsProject
       .command(
-        'new <project-name>',
+        'new <name>',
         'Create a new Positronic project directory',
         (yargsNew) => {
             return yargsNew
-                .positional('project-name', {
+                .positional('name', {
                     describe: 'Name of the new project directory to create',
                     type: 'string',
                     demandOption: true
                 });
         },
-        (argv) => projectCommand.create(argv)
+        (argv) => projectCommand.create(argv as any)
       )
   }
 
@@ -131,17 +131,17 @@ cli = cli.command('project', 'Manage your Positronic projects\n', (yargsProject)
 // --- Add the 'new' command alias (Global Mode Only) ---
 if (!isLocalDevMode) {
   cli = cli.command(
-    'new <project-name>',
+    'new <name>',
     'Alias for `project new`. Create a new Positronic project directory.\n',
     (yargsNewAlias) => {
         return yargsNewAlias
-            .positional('project-name', {
+            .positional('name', {
                 describe: 'Name of the new project directory to create',
                 type: 'string',
                 demandOption: true
             });
     },
-    (argv) => projectCommand.create(argv) // Reuse the same handler
+    (argv) => projectCommand.create(argv as any)
   );
 }
 
@@ -168,9 +168,9 @@ if (isLocalDevMode) {
 cli = cli.command('list', 'List all brains in the active project\n', () => {}, (argv) => brainCommand.list(argv));
 
 // --- Brain History Command ---
-cli = cli.command('history <brain-name>', 'List recent runs of a specific brain\n', (yargsHistory) => {
+cli = cli.command('history <name>', 'List recent runs of a specific brain\n', (yargsHistory) => {
     return yargsHistory
-      .positional('brain-name', {
+      .positional('name', {
         describe: 'Name of the brain',
         type: 'string',
         demandOption: true
@@ -182,27 +182,27 @@ cli = cli.command('history <brain-name>', 'List recent runs of a specific brain\
       })
       .example('$0 history my-brain', 'List recent runs for my-brain')
       .example('$0 history my-brain --limit=20', 'List more recent runs');
-  }, (argv) => brainCommand.history(argv));
+  }, (argv) => brainCommand.history(argv as any));
 
 // --- Show Brain Command ---
-cli = cli.command('show <brain-name>', 'List all steps and other details for the brain\n', (yargsShow) => {
+cli = cli.command('show <name>', 'List all steps and other details for the brain\n', (yargsShow) => {
     return yargsShow
-      .positional('brain-name', {
+      .positional('name', {
         describe: 'Name of the brain',
         type: 'string',
         demandOption: true
       });
-  }, (argv) => brainCommand.show(argv));
+  }, (argv) => brainCommand.show(argv as any));
 
 // --- Rerun Brain Command ---
-cli = cli.command('rerun <brain-name> [brain-run-id]', 'Rerun an existing brain run\n', (yargsRerun) => {
+cli = cli.command('rerun <name> [run-id]', 'Rerun an existing brain run\n', (yargsRerun) => {
     return yargsRerun
-      .positional('brain-name', {
+      .positional('name', {
         describe: 'Name of the brain',
         type: 'string',
         demandOption: true
       })
-      .positional('brain-run-id', {
+      .positional('run-id', {
         describe: 'ID of the brain run to rerun (defaults to the most recent run)',
         type: 'string'
       })
@@ -226,12 +226,12 @@ cli = cli.command('rerun <brain-name> [brain-run-id]', 'Rerun an existing brain 
       .example('$0 rerun my-brain --stops-after=5', 'Rerun and stop after step 5')
       .example('$0 rerun my-brain --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
       .example('$0 rerun my-brain --verbose', 'Rerun with verbose output');
-  }, (argv) => brainCommand.rerun(argv));
+  }, (argv) => brainCommand.rerun(argv as any));
 
 // --- Run Brain Command ---
-cli = cli.command('run <brain-name>', 'Run a brain\n', (yargsRun) => {
+cli = cli.command('run <name>', 'Run a brain\n', (yargsRun) => {
     return yargsRun
-      .positional('brain-name', {
+      .positional('name', {
         describe: 'Name of the brain',
         type: 'string',
         demandOption: true
@@ -242,12 +242,12 @@ cli = cli.command('run <brain-name>', 'Run a brain\n', (yargsRun) => {
       })
       .example('$0 run my-brain', 'Run a brain by name')
       .example('$0 run my-brain --verbose', 'Run a brain with verbose output');
-  }, (argv) => brainCommand.run(argv));
+  }, (argv) => brainCommand.run(argv as any));
 
 // --- Watch Brain Run Command ---
-cli = cli.command('watch <brain-name>', 'Watch a specific brain run for live updates\n', (yargsWatch) => {
+cli = cli.command('watch <name>', 'Watch a specific brain run for live updates\n', (yargsWatch) => {
     return yargsWatch
-      .positional('brain-name', {
+      .positional('name', {
         describe: 'Name of the brain',
         type: 'string',
         demandOption: true
@@ -259,13 +259,13 @@ cli = cli.command('watch <brain-name>', 'Watch a specific brain run for live upd
         alias: 'id'
       })
       .example('$0 watch my-brain --run-id abc123', 'Watch the brain run with ID abc123');
-  }, (argv) => brainCommand.watch(argv));
+  }, (argv) => brainCommand.watch(argv as any));
 
 // --- New Brain Command (Local Dev Mode Only) ---
 if (isLocalDevMode) {
-  cli = cli.command('new-brain <brain-name>', 'Create a new brain in the current project', (yargsNew) => { // Renamed to avoid conflict with project new alias
+  cli = cli.command('new-brain <name>', 'Create a new brain in the current project', (yargsNew) => {
     return yargsNew
-      .positional('brain-name', {
+      .positional('name', {
         describe: 'Name of the new brain',
         type: 'string',
         demandOption: true
@@ -277,7 +277,7 @@ if (isLocalDevMode) {
       })
       .example('$0 new-brain my-brain', 'Create a new brain in the current project directory')
       .example('$0 new-brain my-brain -p "Create a brain for data processing"', 'Create a brain using a prompt');
-  }, (argv) => brainCommand.new(argv));
+  }, (argv) => brainCommand.new(argv as any));
 }
 
 // --- Prompt Management Commands ---
@@ -304,7 +304,7 @@ cli = cli.command('prompt', 'Prompts are a one-shot call to an LLM with a typed 
           demandOption: true
         })
         .example('$0 prompt new my-prompt', 'Create a new prompt file in the current project directory');
-    }, (argv) => promptCommand.new(argv));
+    }, (argv) => promptCommand.new(argv))
   }
 
   // Ensure at least one prompt subcommand is given
