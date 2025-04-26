@@ -10,11 +10,11 @@ import type { ArgumentsCamelCase } from 'yargs';
 async function copyServerTemplate(
     templateFileName: string,
     destinationDir: string,
-    destinationFileName: string,
     projectName: string,
     cloudflareDevServerTemplateDir: string,
     userCoreVersion?: string,
 ) {
+    const destinationFileName = path.basename(templateFileName).replace('.tpl', '');
     const templatePath = path.join(cloudflareDevServerTemplateDir, templateFileName);
     const destinationPath = path.join(destinationDir, destinationFileName);
 
@@ -34,7 +34,6 @@ async function copyServerTemplate(
 
 // Helper to run npm install
 function runNpmInstall(targetDir: string): Promise<void> {
-     console.log(` -> Running npm install in ${targetDir}...`);
     const npmInstall = spawn('npm', ['install'], {
         cwd: targetDir,
         stdio: 'inherit',
@@ -44,32 +43,26 @@ function runNpmInstall(targetDir: string): Promise<void> {
     return new Promise((resolve, reject) => {
         npmInstall.on('close', (code) => {
             if (code === 0) {
-                console.log(` -> npm install completed successfully.`);
                 resolve();
             } else {
-                console.error(` -> npm install failed with code ${code}.`);
                 reject(new Error(`npm install failed in ${targetDir}`));
             }
         });
         npmInstall.on('error', (err) => {
-            console.error(` -> Failed to start npm install in ${targetDir}:`, err);
             reject(err);
         });
     });
 }
 
 // Function to generate the static manifest file
-async function generateStaticManifest(projectRootPath: string, serverSrcDir: string): Promise<void> {
+async function generateStaticManifest(projectRootPath: string, serverSrcDir: string) {
     const brainsDir = path.join(projectRootPath, 'brains');
     const manifestPath = path.join(serverSrcDir, '_manifest.ts');
-    console.log(`Generating static manifest for brains in ${brainsDir}...`);
 
     let importStatements = `import type { Workflow } from '@positronic/core';\n`;
     let manifestEntries = '';
 
     try {
-        await fsPromises.mkdir(brainsDir, { recursive: true });
-
         const files = await fsPromises.readdir(brainsDir);
         const brainFiles = files.filter(file => file.endsWith('.ts') && !file.startsWith('_'));
 
@@ -85,16 +78,9 @@ async function generateStaticManifest(projectRootPath: string, serverSrcDir: str
         const manifestContent = `// This file is generated automatically by the Positronic CLI server command. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};\n`;
 
         await fsPromises.writeFile(manifestPath, manifestContent, 'utf-8');
-        console.log(`Static manifest written to ${manifestPath}`);
 
     } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            console.warn(`Brains directory not found at ${brainsDir}. Creating an empty manifest.`);
-             const manifestContent = `// This file is generated automatically by the Positronic CLI server command. Do not edit directly.\nimport type { Workflow } from '@positronic/core';\n\nexport const staticManifest: Record<string, Workflow> = {};\n`;
-             await fsPromises.writeFile(manifestPath, manifestContent, 'utf-8');
-        } else {
-            console.error(`Error generating static manifest:`, error);
-        }
+        throw error;
     }
 }
 
@@ -107,90 +93,72 @@ export async function setupPositronicServerEnv(
     cloudflareDevServerTemplateDir: string,
     forceSetup: boolean = false,
     skipNpmInstall: boolean = false
-): Promise<void> {
-    console.log("Setting up or verifying .positronic server environment...");
+) {
     const serverDir = path.join(projectRootPath, '.positronic');
     const srcDir = path.join(serverDir, 'src');
     const projectName = path.basename(projectRootPath);
     const userPackageJsonPath = path.join(projectRootPath, 'package.json');
-    let userCoreVersion: string | undefined;
-
     // Read user project's package.json for version syncing
-    try {
-        const userPackageJsonContent = await fsPromises.readFile(userPackageJsonPath, 'utf-8');
-        const userPackageJson = JSON.parse(userPackageJsonContent);
-        // Prefer dependency, then devDependency
-        userCoreVersion = userPackageJson.dependencies?.['@positronic/core']
-                       || userPackageJson.devDependencies?.['@positronic/core']
-                       || null;
-        if (userCoreVersion) {
-            // Check if it's a file path (from project new command)
-            if (userCoreVersion.startsWith('file:')) {
-                console.log(`Detected local @positronic/core path in project: ${userCoreVersion}`);
-                // Server setup will prefer POSITRONIC_PACKAGES_DEV_PATH if set, otherwise this won't be used by copyServerTemplate.
-            } else {
-                 console.log(`Found user-specified @positronic/core version: ${userCoreVersion}`);
-            }
-        }
-    } catch (error: any) {
-        console.warn(`Warning: Could not read project's package.json at ${userPackageJsonPath}. Version syncing for .positronic may not work as expected.`);
-        // Allow continuing, setup might still work using defaults or POSITRONIC_PACKAGES_DEV_PATH
-    }
+    const userPackageJsonContent = await fsPromises.readFile(userPackageJsonPath, 'utf-8');
+    const userPackageJson = JSON.parse(userPackageJsonContent);
+    const userCoreVersion = userPackageJson.dependencies?.['@positronic/core'];
 
+    // Determine if a full server environment setup (copying templates, npm install)
+    // is required.
+    // The logic starts by assuming setup *is* needed (`setupNeeded = true`).
+    // It then checks if the `.positronic` directory exists using `fsPromises.access`.
+    // - If `access` succeeds (directory exists):
+    //   - Check `forceSetup`: If true, delete the old dir, create the new `src` dir,
+    //     and `setupNeeded` remains `true`.
+    //   - Check `forceSetup`: If false, the directory exists and we aren't forcing a
+    //     rebuild, so set `setupNeeded = false`.
+    // - If `access` fails (directory doesn't exist, jumps to `catch`):
+    //   - Create the necessary `src` directory.
+    //   - `setupNeeded` remains `true` (its initial value) because the directory had
+    //      to be created.
+    // Ultimately, `setupNeeded` will only be `false` if the directory existed *and*
+    // `forceSetup` was not requested.
     let setupNeeded = true;
     try {
         await fsPromises.access(serverDir);
         if (forceSetup) {
-            console.log("--force specified or initial setup: Regenerating server directory...");
             await fsPromises.rm(serverDir, { recursive: true, force: true });
-            await fsPromises.mkdir(srcDir, { recursive: true }); // Recreate after rm
+            await fsPromises.mkdir(srcDir, { recursive: true });
         } else {
-            console.log(".positronic server directory already exists.");
             setupNeeded = false;
         }
     } catch (e) {
         // Directory doesn't exist, create it
-        console.log(".positronic server directory not found. Creating it...");
         await fsPromises.mkdir(srcDir, { recursive: true });
     }
 
+    // Generate the static manifest, regenerate it every time the command is run
+    await generateStaticManifest(projectRootPath, srcDir);
+
     // Perform full template copy and install only if needed
-    if (setupNeeded) {
-        try {
-            console.log("Creating server directory structure and copying templates...");
-             try { await fsPromises.rm(path.join(srcDir, '_manifest.ts'), { force: true }); } catch {} // Ensure old manifest is gone
 
-            // Pass template dir to helper
-            await copyServerTemplate('package.json.tpl', serverDir, 'package.json', projectName, cloudflareDevServerTemplateDir, userCoreVersion);
-            await copyServerTemplate('tsconfig.json.tpl', serverDir, 'tsconfig.json', projectName, cloudflareDevServerTemplateDir, userCoreVersion);
-            await copyServerTemplate('wrangler.jsonc.tpl', serverDir, 'wrangler.jsonc', projectName, cloudflareDevServerTemplateDir, userCoreVersion);
-            await copyServerTemplate('src/index.ts.tpl', srcDir, 'index.ts', projectName, cloudflareDevServerTemplateDir);
+    try {
+        // Pass template dir to helper
+        await copyServerTemplate('package.json.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+        await copyServerTemplate('tsconfig.json.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+        await copyServerTemplate('wrangler.jsonc.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+        await copyServerTemplate('src/index.ts.tpl', srcDir, projectName, cloudflareDevServerTemplateDir);
 
-            // Generate initial manifest
-            await generateStaticManifest(projectRootPath, srcDir);
-
-            // Only run install if the flag isn't set
-            if (!skipNpmInstall) {
-                await runNpmInstall(serverDir);
-            }
-        } catch (error) {
-            console.error("Failed to set up the .positronic directory:", error);
-            // Attempt cleanup only if we created the directory initially
-            if (setupNeeded) {
-                try {
-                    console.log("Attempting cleanup of partially created .positronic directory...");
-                    await fsPromises.rm(serverDir, { recursive: true, force: true });
-                } catch (cleanupError) {
-                    console.error("Failed to clean up server directory after setup error:", cleanupError);
-                }
-            }
-            throw error; // Re-throw error to signal failure
+        // Only run install if the flag isn't set
+        if (!skipNpmInstall) {
+            await runNpmInstall(serverDir);
         }
-    } else {
-        // If setup wasn't needed, still ensure the manifest is up-to-date
-        console.log("Ensuring static manifest is up-to-date...");
-        await generateStaticManifest(projectRootPath, srcDir);
-        // Optional: Could add a check here to see if npm install is needed based on package.json changes, but maybe too complex for now.
+    } catch (error) {
+        console.error("Failed to set up the .positronic directory:", error);
+        // Attempt cleanup only if we created the directory initially
+        if (setupNeeded) {
+            try {
+                await fsPromises.rm(serverDir, { recursive: true, force: true });
+            } catch (cleanupError) {
+                console.error("Failed to clean up server directory after setup error:", cleanupError);
+            }
+        }
+        throw error; // Re-throw error to signal failure
     }
 }
 
