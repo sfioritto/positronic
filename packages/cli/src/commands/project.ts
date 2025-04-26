@@ -3,6 +3,7 @@ import * as fsPromises from 'fs/promises';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { setupPositronicServerEnv } from './server.js';
+import { renderPackageJson } from './helpers.js';
 import type { ArgumentsCamelCase } from 'yargs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,20 +18,11 @@ async function copyTemplate(
 ) {
     const templatePath = path.join(templatesPath, templateFileName);
     const template = await fsPromises.readFile(templatePath, 'utf-8');
-
-    // Check for POSITRONIC_PACKAGES_DEV_PATH, if set, use it to replace @positronic/core with a local path for doing development work on the core package
-    const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
-
     let renderedTemplate = template.replace(/{{projectName}}/g, projectName);
-    if (templateFileName === 'package.json.tpl' &&
-        devRootPath
-    ) {
-        const packageJson = JSON.parse(renderedTemplate);
-        const coreDevPath = path.join(devRootPath, 'packages', 'core');
-        if (packageJson.dependencies['@positronic/core']
-        ) {
-            packageJson.dependencies['@positronic/core'] = `file:${coreDevPath}`;
-        }
+    if (templateFileName === 'package.json.tpl') {
+        const packageJson = await renderPackageJson(
+            projectName,
+        );
         renderedTemplate = JSON.stringify(packageJson, null, 2);
     }
 
