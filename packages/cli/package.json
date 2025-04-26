@@ -5,8 +5,8 @@
   "type": "module",
   "license": "MIT",
   "bin": {
-    "positronic": "./dist/src/positronic.js",
-    "px": "./dist/src/positronic.js"
+    "positronic": "./dist/positronic.js",
+    "px": "./dist/positronic.js"
   },
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
