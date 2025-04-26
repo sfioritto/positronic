@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as fsPromises from 'fs/promises';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
+import { setupPositronicServerEnv } from './server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,9 +16,37 @@ async function copyTemplate(
 ) {
     const templatePath = path.join(newProjectTemplateDir, templateFileName);
     try {
-        const content = await fsPromises.readFile(templatePath, 'utf-8');
-        const processedContent = content.replace(/{{projectName}}/g, projectName);
-        await fsPromises.writeFile(destinationPath, processedContent);
+        let content = await fsPromises.readFile(templatePath, 'utf-8');
+        // Always replace project name first
+        content = content.replace(/{{projectName}}/g, projectName);
+
+        // Check for package.json and POSITRONIC_PACKAGES_DEV_PATH
+        if (templateFileName === 'package.json.tpl') {
+            const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+            if (devRootPath) {
+                console.log(` -> Injecting local development paths into project package.json (using POSITRONIC_PACKAGES_DEV_PATH=${devRootPath})...`);
+                try {
+                    const packageJson = JSON.parse(content);
+                    // TODO: Consider making these paths more robust or configurable
+                    const coreDevPath = path.join(devRootPath, 'packages', 'core');
+                    // const cloudflareDevPath = path.join(devRootPath, 'packages', 'cloudflare'); // Add if cloudflare is a direct project dep later
+
+                    if (packageJson.dependencies && packageJson.dependencies['@positronic/core']) {
+                        packageJson.dependencies['@positronic/core'] = `file:${coreDevPath}`;
+                        console.log(`    - Using local @positronic/core: file:${coreDevPath}`);
+                    }
+                    // Add similar logic for devDependencies if needed
+                    // if (packageJson.devDependencies && packageJson.devDependencies['@positronic/core']) { ... }
+
+                    content = JSON.stringify(packageJson, null, 2);
+                } catch (parseError: any) {
+                     console.error(`   Error parsing project template ${templateFileName} for local path injection: ${parseError.message}`);
+                     throw parseError; // Re-throw to stop the process
+                }
+            }
+        }
+
+        await fsPromises.writeFile(destinationPath, content);
     } catch (error: any) {
         console.error(`Error processing template ${templateFileName}: ${error.message}`);
         throw error; // Re-throw to stop the process
@@ -104,6 +133,7 @@ export class ProjectCommand {
     /**
      * Handles the 'positronic new <project-name>' command.
      * Creates a new project directory structure and populates it with template files.
+     * Also sets up the .positronic server environment.
      * Only available in Global Mode.
      */
     async create(argv: any): Promise<void> { // Make method async
@@ -121,6 +151,7 @@ export class ProjectCommand {
 
         const projectPath = path.resolve(process.cwd(), projectName);
         const brainsPath = path.join(projectPath, 'brains');
+        const cloudflareDevServerTemplateDir = path.join(templatesBaseDir, 'cloudflare-dev-server');
 
         // 1. Check if directory already exists
         try {
@@ -138,8 +169,10 @@ export class ProjectCommand {
 
         // 2. Create project directories
         try {
+            console.log(`Creating project directory '${projectName}' at ${projectPath}...`);
             await fsPromises.mkdir(projectPath, { recursive: true });
             await fsPromises.mkdir(brainsPath, { recursive: true });
+             console.log("Project directories created.");
         } catch (error: any) {
             console.error(`Error creating project directories: ${error.message}`);
             process.exit(1);
@@ -147,47 +180,72 @@ export class ProjectCommand {
 
         // 3. Copy and process template files
         try {
+            console.log("Copying project template files...");
             await copyTemplate('package.json.tpl', path.join(projectPath, 'package.json'), projectName);
             await copyTemplate('tsconfig.json.tpl', path.join(projectPath, 'tsconfig.json'), projectName);
             await copyTemplate('positronic.config.json.tpl', path.join(projectPath, 'positronic.config.json'), projectName);
             await copyTemplate('.gitignore.tpl', path.join(projectPath, '.gitignore'), projectName);
             await copyTemplate('brains/example.ts.tpl', path.join(brainsPath, 'example.ts'), projectName);
+             console.log("Project template files copied.");
         } catch (error) {
             // Error already logged in copyTemplate, just exit
             console.error('Failed to copy template files. Aborting.');
-            // Consider cleanup? fs.rm(projectPath, { recursive: true, force: true });
+            await fsPromises.rm(projectPath, { recursive: true, force: true }); // Cleanup
             process.exit(1);
         }
 
-        // 4. Run npm install
+        // 4. Run npm install for the main project
+        console.log("Running npm install for the project...");
         const npmInstall = spawn('npm', ['install'], {
             cwd: projectPath,
-            stdio: 'inherit', // Show output to the user
-            shell: true // Use shell for better cross-platform compatibility (e.g., finding npm on Windows)
+            stdio: 'inherit',
+            shell: true
         });
 
-        return new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
              npmInstall.on('close', (code) => {
                 if (code === 0) {
+                    console.log("Project npm install completed successfully.");
                     resolve();
                 } else {
                     console.error(`
-npm install failed with code ${code}.`);
-                    console.error('Please check the errors above and try running `npm install` manually.');
-                    // Consider cleanup? fs.rm(projectPath, { recursive: true, force: true });
-                    reject(new Error(`npm install failed with code ${code}`));
-                    process.exit(1); // Exit process on failure
+Project npm install failed with code ${code}.`);
+                    console.error('Please check the errors above.');
+                    reject(new Error(`Project npm install failed with code ${code}`));
                 }
             });
-
             npmInstall.on('error', (err) => {
                 console.error(`
-Failed to start npm install process: ${err}
-Ensure Node.js and npm are correctly installed and in your PATH.`);
-                // Consider cleanup? fs.rm(projectPath, { recursive: true, force: true });
+Failed to start project npm install process: ${err}`);
                 reject(err);
-                process.exit(1); // Exit process on failure
             });
         });
+
+        // 5. Set up the .positronic server environment
+        try {
+            console.log("\nSetting up the local development server environment (.positronic)...");
+            await setupPositronicServerEnv(
+                projectPath,                    // Path to the newly created project
+                cloudflareDevServerTemplateDir, // Path to the server templates
+                true,                           // Force setup (it's a new project)
+                false                           // Do not skip npm install for server
+            );
+            console.log(".positronic environment setup complete.");
+        } catch (error) {
+            console.error("\nFailed to set up the .positronic server environment:", error);
+            console.error("Project created, but the local server environment setup failed.");
+            console.error("You might need to run 'positronic server --force' later to fix this.");
+            // Don't necessarily need to exit, the project itself was created
+            // process.exit(1); // Or maybe we should exit?
+        }
+
+        console.log(`
+Success! Created project '${projectName}' at ${projectPath}
+`);
+        console.log("Next steps:");
+        console.log(`  cd ${projectName}`);
+        console.log(`  positronic server  # Start the local development server`);
+        console.log(`  positronic run example # Run the example brain (in another terminal)`);
+
     }
 }
