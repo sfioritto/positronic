@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fsPromises from 'fs/promises';
 import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid'; // Import if needed for local testing/mocking?
+import { EventSource } from 'eventsource'; // Use named import
 
 export class BrainCommand {
     private isLocalDevMode: boolean;
@@ -116,8 +117,45 @@ export class BrainCommand {
     watch(argv: ArgumentsCamelCase<{ runId?: string; name?: string }>): void {
         if (argv.runId) {
             const runId = argv.runId;
-            console.log(`Watching specific brain run ID: ${runId}`);
+            console.log(`Watching specific brain run ID: ${runId}...`);
             // TODO: Implement SSE connection logic using the API endpoint `/brains/runs/${runId}/watch`
+            const url = `http://localhost:8787/brains/runs/${runId}/watch`;
+
+            const es = new EventSource(url);
+
+            es.onopen = () => {
+                console.log(`Connected to event stream for run ID: ${runId}`);
+            };
+
+            es.onmessage = (event: MessageEvent) => {
+                try {
+                    // Assuming the server sends JSON data
+                    const eventData = JSON.parse(event.data);
+                    // Pretty-print the JSON event data
+                    console.log(JSON.stringify(eventData, null, 2));
+                } catch (e) {
+                    console.error('Error parsing event data:', e);
+                    console.log('Received raw data:', event.data);
+                }
+            };
+
+            es.onerror = (err: any) => {
+                // The EventSource library automatically handles reconnection on most errors.
+                // We only need to handle fatal errors or provide feedback.
+                console.error('EventSource encountered an error:', err);
+                // You might want to add specific error handling, e.g., check for connection refused
+                // and prompt the user to ensure the server is running.
+                if ((err as any)?.status === 404) {
+                     console.error(`Error: Run ID '${runId}' not found on the server.`);
+                     es.close(); // Close the connection on 404
+                } else if ((err as any)?.message?.includes('ECONNREFUSED')) {
+                     console.error('Error: Connection refused. Is the local dev server running? (px s)');
+                     es.close(); // Close on connection refused
+                }
+                // The EventSource library attempts reconnection automatically for other errors.
+                // If reconnection fails repeatedly, it will eventually stop.
+            };
+
         } else if (argv.name) {
             const brainName = argv.name;
             console.log(`Watching latest run for brain name: ${brainName}`);
