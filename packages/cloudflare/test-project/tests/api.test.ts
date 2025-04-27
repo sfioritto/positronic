@@ -50,46 +50,37 @@ describe("Hono API Tests", () => {
     let buffer = "";
     const events: WorkflowEvent[] = [];
 
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          // Process any remaining buffer content
-          if (buffer.trim().length > 0) {
-            const event = parseSseEvent(buffer);
-            if (event) {
-              events.push(event);
-            }
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        // Process any remaining buffer content
+        if (buffer.trim().length > 0) {
+          const event = parseSseEvent(buffer);
+          if (event) {
+            events.push(event);
           }
-          break; // Exit loop when stream is done
         }
+        break; // Exit loop when stream is done
+      }
 
-        const decodedChunk = decoder.decode(value, { stream: true });
-        buffer += decodedChunk;
-        // Process buffer line by line, looking for complete messages (ending in \n\n)
-        let eventEndIndex;
-        while ((eventEndIndex = buffer.indexOf("\n\n")) !== -1) {
-          const message = buffer.substring(0, eventEndIndex);
-          buffer = buffer.substring(eventEndIndex + 2); // Consume message + \n\n
-          if (message.startsWith("data:")) {
-            const event = parseSseEvent(message);
-            if (event) {
-              events.push(event);
-              if (event.type === WORKFLOW_EVENTS.COMPLETE || event.type === WORKFLOW_EVENTS.ERROR) {
-                try {
-                  reader.cancel(`Received terminal event: ${event.type}`);
-                } catch (cancelError) {
-                  console.error("[TEST_SSE_READ] Error canceling reader:", cancelError);
-                }
-                return events;
-              }
+      const decodedChunk = decoder.decode(value, { stream: true });
+      buffer += decodedChunk;
+      // Process buffer line by line, looking for complete messages (ending in \n\n)
+      let eventEndIndex;
+      while ((eventEndIndex = buffer.indexOf("\n\n")) !== -1) {
+        const message = buffer.substring(0, eventEndIndex);
+        buffer = buffer.substring(eventEndIndex + 2); // Consume message + \n\n
+        if (message.startsWith("data:")) {
+          const event = parseSseEvent(message);
+          if (event) {
+            events.push(event);
+            if (event.type === WORKFLOW_EVENTS.COMPLETE || event.type === WORKFLOW_EVENTS.ERROR) {
+              reader.cancel(`Received terminal event: ${event.type}`);
+              return events;
             }
           }
         }
       }
-    } catch (e) {
-        console.error("[TEST_SSE_READ] Error reading SSE stream:", e);
-        throw e; // Re-throw error after logging
     }
     return events;
   }
@@ -300,7 +291,7 @@ describe("Hono API Tests", () => {
     expect(lastEvent.status).toBe(STATUS.COMPLETE);
   });
 
-  it("Returns brain run history", async () => {
+  it("Watches brain run as it runs", async () => {
     const testEnv = env as TestEnv;
     const brainName = "basic-workflow";
 
@@ -413,12 +404,8 @@ describe("Hono API Tests", () => {
 
       for (const message of messages) {
         if (message.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(message.slice(6));
-            events.push(data);
-          } catch (e) {
-            console.error('Failed to parse SSE message:', message, e);
-          }
+          const data = JSON.parse(message.slice(6));
+          events.push(data);
         }
       }
     };
