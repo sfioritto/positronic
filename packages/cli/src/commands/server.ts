@@ -180,8 +180,8 @@ export class ServerCommand {
             process.exit(1);
         }
 
-        const serverDir = path.join(projectRootPath, '.positronic'); // Needed for wrangler cwd
-        const srcDir = path.join(serverDir, 'src'); // Needed for manifest updates
+        const serverDir = path.join(projectRootPath, '.positronic');
+        const srcDir = path.join(serverDir, 'src');
         const brainsDir = path.join(projectRootPath, 'brains');
 
         let wranglerProcess: ChildProcess | null = null;
@@ -244,9 +244,14 @@ export class ServerCommand {
                 .on('unlink', path => regenerate(path))
                 .on('error', error => console.error(`Watcher error: ${error}`));
 
-            // Wrangler start logic remains the same
-            console.log("Starting Wrangler dev server in .positronic...");
-            wranglerProcess = spawn('npx', ['wrangler', 'dev', '--local'], {
+
+            // Build Wrangler args dynamically
+            const wranglerArgs = ['dev', '--local'];
+            if (argv.port) {
+                wranglerArgs.push('--port', String(argv.port));
+            }
+
+            wranglerProcess = spawn('npx', ['wrangler', ...wranglerArgs], {
                 cwd: serverDir,
                 stdio: 'inherit',
                 shell: true,

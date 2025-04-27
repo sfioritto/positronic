@@ -1,6 +1,8 @@
 import path from 'path';
 import { promises as fsPromises } from 'fs';
 import { fileURLToPath } from 'url';
+import fetch, { type RequestInit, type Response } from 'node-fetch';
+import process from 'process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,4 +35,14 @@ export async function renderPackageJson(
   }
 
   return packageJson;
+}
+
+// API Fetch Helper
+export async function apiFetch(apiPath: string, options?: RequestInit): Promise<Response> {
+    const port = process.env.POSITRONIC_SERVER_PORT || '8787';
+    const baseUrl = `http://localhost:${port}`;
+    const fullUrl = `${baseUrl}${apiPath.startsWith('/') ? apiPath : '/' + apiPath}`;
+
+    const response = await fetch(fullUrl, options);
+    return response;
 }

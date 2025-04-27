@@ -1,9 +1,9 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import * as path from 'path';
 import * as fsPromises from 'fs/promises';
-import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid'; // Import if needed for local testing/mocking?
 import { EventSource } from 'eventsource'; // Use named import
+import { apiFetch } from './helpers.js'; // Import apiFetch
 
 // Define argument types for clarity
 interface BrainListArgs {} // No specific args yet
@@ -47,35 +47,29 @@ export class BrainCommand {
 
     // Handler for brain run
     async run({ name: brainName }: ArgumentsCamelCase<BrainRunArgs>) {
-        console.log(`Attempting to run brain: ${brainName}...`); // Added back for test
-
-        const apiUrl = 'http://localhost:8787/brains/runs'; // Updated endpoint for brains
+        const apiPath = '/brains/runs';
 
         try {
-            const response = await fetch(apiUrl, {
+            const response = await apiFetch(apiPath, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ brainName }), // Updated payload key
+                body: JSON.stringify({ brainName }),
             });
 
             if (response.status === 201) {
-                // Assuming the response structure is { brainRunId: string }
                 const result = await response.json() as { brainRunId: string };
-                console.log(`Brain run started successfully.`); // Added back for test
-                console.log(`Run ID: ${result.brainRunId}`);    // Added back for test
-                // Success, potentially use result.brainRunId
+                console.log(`Brain run started successfully.`);
+                console.log(`Run ID: ${result.brainRunId}`);
             } else {
                 const errorText = await response.text();
-                // Handle error
-                console.error(`Error starting brain run: ${response.status} ${response.statusText}`); // Updated log
+                console.error(`Error starting brain run: ${response.status} ${response.statusText}`);
                 console.error(`Server response: ${errorText}`);
                 process.exit(1);
             }
         } catch (error: any) {
-            // Handle connection error
-            console.error(`Error connecting to the local development server at ${apiUrl}.`);
+            console.error(`Error connecting to the local development server.`);
             console.error("Please ensure the server is running ('positronic server' or 'px s').");
              if (error.code === 'ECONNREFUSED') {
                 console.error("Reason: Connection refused. The server might not be running or is listening on a different port.");
@@ -84,15 +78,15 @@ export class BrainCommand {
              }
             process.exit(1);
         }
-        // --- End: Logic adapted from former RunCommand --- //
     }
 
     // Handler for brain watch
-    // Updated signature to accept optional runId or name
     watch({ runId, name: brainName }: ArgumentsCamelCase<BrainWatchArgs>) {
         if (runId) {
-            // Implement SSE connection logic using the API endpoint `/brains/runs/${runId}/watch`
-            const url = `http://localhost:8787/brains/runs/${runId}/watch`;
+            // Construct URL using apiFetch base logic (but EventSource needs full URL)
+            const port = process.env.POSITRONIC_SERVER_PORT || '8787';
+            const baseUrl = `http://localhost:${port}`;
+            const url = `${baseUrl}/brains/runs/${runId}/watch`;
 
             const es = new EventSource(url);
 
@@ -102,22 +96,24 @@ export class BrainCommand {
 
             es.onmessage = (event: MessageEvent) => {
                 try {
-                    // Assuming the server sends JSON data
                     const eventData = JSON.parse(event.data);
-                    // Process eventData
-                    // Pretty-print the JSON event data
-                    console.log(JSON.stringify(eventData, null, 2)); // Re-enabled logging
+                    console.log(JSON.stringify(eventData, null, 2));
                 } catch (e) {
-                   // Error parsing event data
                    console.error('Error parsing event data:', e);
                 }
             };
+            // Add error handling for EventSource connection
+            es.onerror = (err) => {
+                console.error(`EventSource failed for URL: ${url}`, err);
+                // Decide if we should exit or retry
+                es.close(); // Close on error for now
+                process.exit(1);
+            };
 
         } else if (brainName) {
-             // Implement logic to first fetch the latest run ID for brainName
-             // Then, implement SSE connection logic using the fetched run ID
+             // TODO: Implement logic to first fetch the latest run ID for brainName
+             // This fetch should use apiFetch
         } else {
-            // This case should technically not be reachable due to the .check in yargs config
             console.error("Internal Error: Watch command called without --run-id or --name.");
             process.exit(1);
         }

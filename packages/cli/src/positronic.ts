@@ -158,6 +158,11 @@ if (isLocalDevMode) {
             describe: 'Force regeneration of the .positronic server directory',
             type: 'boolean',
             default: false,
+        })
+        .option('port', {
+            describe: 'Port number for the server to listen on',
+            type: 'number',
+            alias: 'p'
         });
     },
     (argv) => serverCommand.handle(argv, projectRootPath)

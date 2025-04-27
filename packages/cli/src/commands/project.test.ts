@@ -1,22 +1,135 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execSync, spawn, ChildProcess } from 'child_process';
-import http from 'http';
+import { execSync, spawn } from 'child_process';
+import process from 'process';
+import fetch from 'node-fetch';
 
-// Increase timeout for integration tests involving server startup and installs
-jest.setTimeout(90000); // 90 seconds
 
-// --- Configuration ---
-// Resolve paths relative to the workspace root (assuming test runs from workspace root)
-const workspaceRoot = path.resolve(__dirname, '../../../../'); // Adjust based on actual test execution context if needed
-// Correct path to the compiled CLI entry point based on build output and package.json bin entry
+// Resolve paths relative to the workspace root
+const workspaceRoot = path.resolve(__dirname, '../../../../');
 const cliExecutable = path.join(workspaceRoot, 'packages/cli/dist/src/positronic.js');
-const nodeExecutable = process.execPath; // Use the same node executing the test
+const nodeExecutable = process.execPath;
 
+// Simple random port generator (user port range)
+function getRandomPort(): number {
+    return Math.floor(Math.random() * (60000 - 10000 + 1)) + 10000;
+}
+
+async function waitForProcessToExit(pid: number): Promise<boolean> {
+    const attempts = 4;
+    const intervalMs = 50;
+    let processExited = false;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            process.kill(pid, 0);
+        } catch (error) {
+            processExited = true;
+            break;
+        }
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    return processExited;
+}
+
+async function waitForServerReady(url: string): Promise<boolean> {
+    const attempts = 10;
+    const intervalMs = 500;
+    let serverReady = false;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            await fetch(url);
+            // If fetch succeeds (doesn't throw), the server is listening
+            serverReady = true;
+            break;
+        } catch (error) {
+            // Ignore network errors (like ECONNREFUSED), server not ready
+        }
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    return serverReady;
+}
+
+// Increase test timeout to 10 seconds because these tests are slow by their nature
+jest.setTimeout(10000);
+
+describe('CLI Integration: positronic new (Simplified)', () => {
+    let tempDir: string;
+    const projectName = 'test-app-simple';
+
+    beforeEach(() => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-simple-test-'));
+    });
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
+        expect(fs.existsSync(tempDir)).toBe(false);
+    });
+
+    it('should create new project, start server, run a workflow and kill server', async () => {
+        execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
+            cwd: tempDir,
+            stdio: 'inherit',
+            env: {
+                ...process.env,
+                POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot
+            }
+        });
+
+        const projectPath = path.join(tempDir, projectName);
+        expect(fs.existsSync(projectPath)).toBe(true);
+
+        const testPort = getRandomPort();
+        const serverUrl = `http://localhost:${testPort}`;
+
+        const serverProcess = spawn(nodeExecutable, [
+            cliExecutable,
+            'server',
+            '--port',
+            testPort.toString()
+        ], {
+            cwd: projectPath,
+            stdio: 'ignore',
+            detached: false,
+            env: {
+                ...process.env,
+                POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot
+            }
+        });
+
+        const pid = serverProcess.pid;
+        if (!pid) {
+            throw new Error('Server process PID is undefined');
+        }
+
+        const ready = await waitForServerReady(serverUrl);
+        expect(ready).toBe(true);
+
+        execSync(`${nodeExecutable} ${cliExecutable} run example`, {
+            cwd: projectPath,
+            stdio: 'inherit',
+            env: {
+                ...process.env,
+                POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot,
+                POSITRONIC_SERVER_PORT: testPort.toString()
+            }
+        });
+
+        const response = await fetch(`${serverUrl}/brains/example/history?limit=25`);
+        expect(response.ok).toBe(true);
+        const historyData = await response.json();
+        expect(historyData.runs.length).toBe(1);
+
+        serverProcess.kill('SIGTERM');
+        const exited = await waitForProcessToExit(pid);
+        expect(exited).toBe(true);
+    });
+});
+
+/* --- Commented out original test suite ---
 // --- Cache Configuration ---
-const cacheDirParent = path.join(workspaceRoot, 'packages/cli/.test-cache');
-const cacheDirModules = path.join(cacheDirParent, 'server-node_modules');
+// const cacheDirParent = path.join(workspaceRoot, 'packages/cli/.test-cache');
+// const cacheDirModules = path.join(cacheDirParent, 'server-node_modules');
 
 // --- Test Suite ---
 describe('CLI Integration: positronic new', () => {
@@ -142,28 +255,18 @@ describe('CLI Integration: positronic new', () => {
         if (serverProcess && !serverProcess.killed) {
             const killed = serverProcess.kill('SIGTERM');
             if (!killed && pidToStop) {
+                console.warn(`[Cleanup] SIGTERM failed for PID ${pidToStop}, trying SIGKILL...`);
                 process.kill(pidToStop, 'SIGKILL');
             }
             // Wait briefly for potential process termination
-            await new Promise(resolve => setTimeout(resolve, 100)); // Shortened delay
+            await new Promise(resolve => setTimeout(resolve, 500)); // Increased delay slightly for demo
             serverProcess = null;
             serverPid = undefined;
         }
-        // Removed logging for already stopped/not started cases
 
         // Remove the temporary directory
-        if (fs.existsSync(tempDir)) {
-             try {
-                if (process.platform === "win32" && fs.existsSync(projectPath)) {
-                     execSync(`attrib -R "${projectPath}\\*.*" /S /D`, { stdio: 'ignore' });
-                }
-                fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
-             } catch (err: any) {
-                // Log only the error during cleanup
-                console.error(`[Cleanup] Error removing temporary directory ${tempDir}: ${err.message}`);
-             }
-        }
-        // Removed final cleanup log
+        fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
+        expect(fs.existsSync(tempDir)).toBe(false);
     });
 
     it('should create a new project, copy cached modules, start server, and run workflow', async () => {
@@ -238,16 +341,29 @@ describe('CLI Integration: positronic new', () => {
         await checkServerReady(serverUrl);
 
         // 5. Run `positronic run example` - assuming 'example' is now a brain
+        // Let execSync throw if the command fails (non-zero exit code)
         const runOutput = execSync(`${nodeExecutable} ${cliExecutable} run example`, {
              cwd: projectPath,
              encoding: 'utf8',
-             stdio: 'pipe',
+             stdio: 'pipe', // Capture stdout/stderr
              env: { ...process.env }
          });
 
-        // 5. Validate brain run output
-        expect(runOutput).toContain('Attempting to run brain: example...'); // Changed from workflow
-        expect(runOutput).toContain('Brain run started successfully.'); // Changed from workflow
-        expect(runOutput).toMatch(/Run ID: [\w-]+/);
+        // 6. Validate run ID from output
+        const runIdMatch = runOutput.match(/Run ID: ([\w-]+)/);
+        expect(runIdMatch).toBeTruthy(); // Ensure the Run ID line exists
+        const brainRunId = runIdMatch ? runIdMatch[1] : null;
+        expect(brainRunId).not.toBeNull(); // Ensure we extracted an ID
+
+        // 7. Verify the run exists via the history API endpoint
+        const historyUrl = `${serverUrl}/brains/example/history?limit=25`; // Check recent history
+        // Let fetch/expect throw if the API call or assertion fails
+        const response = await fetch(historyUrl);
+        expect(response.ok).toBe(true); // Check if API request was successful
+        const historyData = await response.json() as { runs: Array<{ workflowRunId: string; [key: string]: any }> }; // Assume runs have an 'workflowRunId'
+        // Check if the specific runId is present in the history using the correct field name
+        const runExistsInHistory = historyData.runs.some(run => run.workflowRunId === brainRunId); // Use workflowRunId here
+        expect(runExistsInHistory).toBe(true);
     });
 });
+*/
