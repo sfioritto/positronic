@@ -109,7 +109,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
       logger: {
         log: (...args) => console.log(`[DO ${workflowRunId} RUNNER]`, ...args),
       },
-      verbose: true,
       client: baseClient,
     });
 

@@ -31,7 +31,6 @@ describe('WorkflowRunner', () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
       logger: mockLogger,
-      verbose: false,
       client: mockClient,
     });
 
@@ -96,32 +95,10 @@ describe('WorkflowRunner', () => {
     ]);
   });
 
-  it('should log final state when verbose is true', async () => {
-    const runner = new WorkflowRunner({
-      adapters: [],
-      logger: mockLogger,
-      verbose: true,
-      client: mockClient,
-    });
-
-    const testWorkflow = workflow('Test Workflow')
-      .step('Test Step', () => ({ value: 42 }));
-
-    await runner.run(testWorkflow);
-
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.stringContaining('Workflow completed:')
-    );
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.stringContaining('"value": 42')
-    );
-  });
-
   it('should handle workflow errors', async () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
       logger: mockLogger,
-      verbose: true,
       client: mockClient,
     });
 
@@ -147,36 +124,10 @@ describe('WorkflowRunner', () => {
     );
   });
 
-  it('should truncate long values in verbose output', async () => {
-    const runner = new WorkflowRunner({
-      adapters: [],
-      logger: mockLogger,
-      verbose: true,
-      client: mockClient,
-    });
-
-    const longString = 'a'.repeat(1000); // Make string much longer
-    const testWorkflow = workflow('Test Workflow')
-      .step('Test Step', () => ({
-        longString,
-        nested: { longString }
-      }));
-
-    await runner.run(testWorkflow);
-
-    const logCall = mockLogger.log.mock.calls.find(call =>
-      call[0].includes('Workflow completed:')
-    );
-
-    expect(logCall[0]).toContain('...');
-    expect(logCall[0].length).toBeLessThan(longString.length);
-  });
-
   it('should maintain state between steps', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
       logger: mockLogger,
-      verbose: true,
       client: mockClient,
     });
 
@@ -186,12 +137,8 @@ describe('WorkflowRunner', () => {
         count: state.count + 1
       }));
 
-    await runner.run(testWorkflow);
+    const result = await runner.run(testWorkflow);
 
-    const finalLog = mockLogger.log.mock.calls.find(call =>
-      call[0].includes('Workflow completed:')
-    );
-
-    expect(finalLog[0]).toContain('"count": 2');
+    expect(result.count).toEqual(2);
   });
 });

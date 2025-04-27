@@ -14,7 +14,6 @@ export class WorkflowRunner {
     private options: {
       adapters: Adapter[],
       logger: Logger,
-      verbose: boolean,
       client: PromptClient,
     }
   ) {}
@@ -41,7 +40,6 @@ export class WorkflowRunner {
     const {
       adapters,
       logger: { log },
-      verbose,
       client,
     } = this.options;
 
@@ -77,26 +75,10 @@ export class WorkflowRunner {
 
         // Check if we should stop after this step
         if (endAfter && stepNumber >= endAfter) {
-          // Log final state if verbose
-          if (verbose) {
-            log(`\nWorkflow stopped after step ${endAfter} as requested: \n\n ${JSON.stringify(
-              this.truncateDeep(structuredClone(currentState)), null, 2
-            )}`);
-          }
           return currentState;
         }
 
         stepNumber++;
-      }
-
-      // Log final state on workflow completion/error if verbose
-      if ((
-        event.type === WORKFLOW_EVENTS.COMPLETE ||
-        event.type === WORKFLOW_EVENTS.ERROR
-      ) && verbose) {
-        log(`\nWorkflow completed: \n\n ${JSON.stringify(
-          this.truncateDeep(structuredClone(currentState)), null, 2
-        )}`);
       }
     }
 
