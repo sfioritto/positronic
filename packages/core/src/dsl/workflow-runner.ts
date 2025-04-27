@@ -5,15 +5,10 @@ import type { SerializedStep, Workflow } from './workflow.js';
 import type { State } from './types.js';
 import type { PromptClient } from '../clients/types.js';
 
-interface Logger {
-  log(...args: any[]): void;
-}
-
 export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[],
-      logger: Logger,
       client: PromptClient,
     }
   ) {}
@@ -39,7 +34,6 @@ export class WorkflowRunner {
   ): Promise<TState> {
     const {
       adapters,
-      logger: { log },
       client,
     } = this.options;
 

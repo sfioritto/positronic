@@ -14,14 +14,9 @@ describe('WorkflowRunner', () => {
     execute: jest.fn(),
   };
 
-  const mockLogger = {
-    log: jest.fn()
-  };
-
   const mockAdapter = {
     dispatch: jest.fn()
   };
-
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -30,7 +25,6 @@ describe('WorkflowRunner', () => {
   it('should run a workflow and dispatch events to adapters', async () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
-      logger: mockLogger,
       client: mockClient,
     });
 
@@ -98,7 +92,6 @@ describe('WorkflowRunner', () => {
   it('should handle workflow errors', async () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
-      logger: mockLogger,
       client: mockClient,
     });
 
@@ -127,7 +120,6 @@ describe('WorkflowRunner', () => {
   it('should maintain state between steps', async () => {
     const runner = new WorkflowRunner({
       adapters: [],
-      logger: mockLogger,
       client: mockClient,
     });
 

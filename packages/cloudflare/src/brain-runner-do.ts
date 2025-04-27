@@ -106,9 +106,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const runner = new WorkflowRunner({
       adapters: [sqliteAdapter, eventStreamAdapter, monitorAdapter],
-      logger: {
-        log: (...args) => console.log(`[DO ${workflowRunId} RUNNER]`, ...args),
-      },
       client: baseClient,
     });
 
