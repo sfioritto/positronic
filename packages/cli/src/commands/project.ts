@@ -135,7 +135,6 @@ export class ProjectCommand {
             });
         });
 
-        const skipServerInstall = process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL === 'true';
         // 5. Set up the .positronic server environment
         await setupPositronicServerEnv(
             projectPath,                    // Path to the newly created project
