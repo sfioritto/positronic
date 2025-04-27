@@ -92,8 +92,7 @@ async function generateStaticManifest(projectRootPath: string, serverSrcDir: str
 export async function setupPositronicServerEnv(
     projectRootPath: string,
     cloudflareDevServerTemplateDir: string,
-    forceSetup: boolean = false,
-    skipNpmInstall: boolean = false
+    forceSetup: boolean = false
 ) {
     const serverDir = path.join(projectRootPath, '.positronic');
     const srcDir = path.join(serverDir, 'src');
@@ -145,10 +144,9 @@ export async function setupPositronicServerEnv(
             await copyServerTemplate('wrangler.jsonc.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
             await copyServerTemplate('src/index.ts.tpl', srcDir, projectName, cloudflareDevServerTemplateDir);
 
-            // Only run install if the flag isn't set and setup is needed
-            if (!skipNpmInstall) {
-                await runNpmInstall(serverDir);
-            }
+            // Always run install if setup is needed
+            await runNpmInstall(serverDir);
+
         } catch (error) {
             console.error("Failed to set up the .positronic directory:", error);
             // Attempt cleanup only if we created the directory initially during this run
@@ -211,8 +209,7 @@ export class ServerCommand {
             await setupPositronicServerEnv(
                 projectRootPath,
                 this.cloudflareDevServerTemplateDir,
-                argv.force as boolean,
-                process.env.POSITRONIC_TEST_SKIP_SERVER_INSTALL === 'true'
+                argv.force as boolean
             );
 
             // Watcher setup remains the same, but uses updated generateStaticManifest

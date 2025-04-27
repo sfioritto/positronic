@@ -141,7 +141,6 @@ export class ProjectCommand {
             projectPath,                    // Path to the newly created project
             cloudflareDevServerTemplateDir, // Path to the server templates
             true,                           // Force setup (it's a new project)
-            skipServerInstall
         );
 
 
