@@ -22,6 +22,7 @@ async function copyTemplate(
     if (templateFileName === 'package.json.tpl') {
         const packageJson = await renderPackageJson(
             projectName,
+            templatesPath,
         );
         renderedTemplate = JSON.stringify(packageJson, null, 2);
     }

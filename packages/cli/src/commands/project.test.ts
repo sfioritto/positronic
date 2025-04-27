@@ -88,18 +88,16 @@ describe('CLI Integration: positronic new', () => {
                         POSITRONIC_TEST_SKIP_SERVER_INSTALL: 'true'
                     }
                 });
-
                 // 3. Start the server with --force to install dependencies
                 setupServerProcess = spawn(nodeExecutable, [cliExecutable, 'server', '--force'], {
                     cwd: setupProjectPath,
-                    stdio: 'pipe',
+                    stdio: 'inherit',
                     detached: false,
                     env: {
                         ...process.env,
                         POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot // Still need this for local linking
                     }
                 });
-
                 // 4. Wait for node_modules to appear
                  await checkDirExists(setupNodeModules, 150000);
 
@@ -114,7 +112,6 @@ describe('CLI Integration: positronic new', () => {
                  execSync(`cp -R "${setupNodeModules}" "${cacheDirModules}"`, { stdio: 'pipe' });
 
             } catch (error) {
-                console.error('!!! Cache population failed !!!', error);
                  // Ensure setup server is killed even on error
                  if (setupServerProcess && setupServerProcess.pid && !setupServerProcess.killed) {
                      console.error(` -> Killing setup server process (PID: ${setupServerProcess.pid}) due to error...`);

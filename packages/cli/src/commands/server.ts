@@ -24,6 +24,7 @@ async function copyServerTemplate(
     if (templateFileName === 'package.json.tpl') {
         const packageJson = await renderPackageJson(
             projectName,
+            cloudflareDevServerTemplateDir,
             userCoreVersion
         );
         content = JSON.stringify(packageJson, null, 2);
@@ -173,14 +174,13 @@ export class ServerCommand {
     }
 
     // Main handler logic from handleServer
-    async handle(argv: ArgumentsCamelCase<any>, projectRootPath: string | null): Promise<void> {
+    async handle(argv: ArgumentsCamelCase<any>, projectRootPath: string | null) {
         if (!projectRootPath) {
             console.error("Error: Not inside a Positronic project. Cannot start server.");
             console.error("Navigate to your project directory or use 'positronic project new <name>' to create one.");
             process.exit(1);
         }
 
-        console.log(`Starting server for project: ${projectRootPath}`);
         const serverDir = path.join(projectRootPath, '.positronic'); // Needed for wrangler cwd
         const srcDir = path.join(serverDir, 'src'); // Needed for manifest updates
         const brainsDir = path.join(projectRootPath, 'brains');
@@ -189,14 +189,11 @@ export class ServerCommand {
         let watcher: FSWatcher | null = null;
 
         const cleanup = async () => {
-            console.log('\nShutting down...');
             if (watcher) {
-                console.log('Closing brain watcher...');
                 await watcher.close();
                 watcher = null;
             }
             if (wranglerProcess && !wranglerProcess.killed) {
-                console.log('Stopping Wrangler dev server...');
                 const killed = wranglerProcess.kill('SIGTERM');
                  if (!killed) {
                     console.warn("Failed to kill Wrangler process with SIGTERM, attempting SIGKILL.");
@@ -204,7 +201,6 @@ export class ServerCommand {
                 }
                 wranglerProcess = null;
             }
-            console.log("Cleanup complete.");
             process.exit(0);
         };
 
