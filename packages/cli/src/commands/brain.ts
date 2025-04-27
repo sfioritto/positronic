@@ -5,6 +5,15 @@ import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid'; // Import if needed for local testing/mocking?
 import { EventSource } from 'eventsource'; // Use named import
 
+// Define argument types for clarity
+interface BrainListArgs {} // No specific args yet
+interface BrainHistoryArgs { name: string; limit: number; }
+interface BrainShowArgs { name: string; }
+interface BrainRerunArgs { name: string; runId?: string; startsAt?: number; stopsAfter?: number; }
+interface BrainRunArgs { name: string; }
+interface BrainWatchArgs { runId?: string; name?: string; }
+interface BrainNewArgs { name: string; prompt?: string; }
+
 export class BrainCommand {
     private isLocalDevMode: boolean;
     private projectRootPath: string | null;
@@ -16,59 +25,31 @@ export class BrainCommand {
         this.brainTemplateDir = brainTemplateDir; // Changed from workflowTemplateDir
     }
 
-    // Handler for brain list (placeholder)
-    list(argv: ArgumentsCamelCase<any>): void {
-        console.log('Listing all brains...');
-        // TODO: Implement brain list logic (local or remote)
+    // Handler for brain list
+    list(argv: ArgumentsCamelCase<BrainListArgs>) {
+        // Implement brain list logic (local or remote)
     }
 
     // Handler for brain history
-    history(argv: ArgumentsCamelCase<{ name: string; limit: number }>): void {
-        const brainName = argv.name;
-        const limit = argv.limit;
-
-        console.log(`Listing ${limit} recent runs for brain: ${brainName}`);
-        // TODO: Implement brain history logic (API call)
+    history({ name: brainName, limit }: ArgumentsCamelCase<BrainHistoryArgs>) {
+        // Implement brain history logic (API call)
     }
 
-    // Handler for brain show (placeholder)
-    show(argv: ArgumentsCamelCase<{ name: string }>): void {
-        console.log(`Showing details for brain: ${argv.name}`);
-         // TODO: Implement brain show logic (API call)
+    // Handler for brain show
+    show({ name: brainName }: ArgumentsCamelCase<BrainShowArgs>) {
+        // Implement brain show logic (API call)
     }
 
     // Handler for brain rerun
-    rerun(argv: ArgumentsCamelCase<{ name: string; runId?: string; startsAt?: number; stopsAfter?: number }>): void {
-        const brainName = argv.name;
-        const runId = argv.runId || 'most recent run';
-        const startsAt = argv.startsAt ? ` starting at step ${argv.startsAt}` : '';
-        const stopsAfter = argv.stopsAfter ? ` stopping after step ${argv.stopsAfter}` : '';
-
-        console.log(`Rerunning brain: ${brainName} (run: ${runId})${startsAt}${stopsAfter}`);
-         // TODO: Implement brain rerun logic (API call)
+    rerun({ name: brainName, runId, startsAt, stopsAfter }: ArgumentsCamelCase<BrainRerunArgs>) {
+        // Implement brain rerun logic (API call)
     }
 
     // Handler for brain run
-    async run(argv: ArgumentsCamelCase<{ name: string }>): Promise<void> {
-        const brainName = argv.name;
-
-        // console.log(`(Brain Command) Running brain: ${brainName}${verbose}`); // Old message
-        console.log(`Attempting to run brain: ${brainName}...`); // Updated to match test/previous RunCommand
-        // Consider if this specific command should delegate to RunCommand or have its own logic.
-         console.warn("Warning: Prefer using 'positronic run <brain-name>' for running brains.");
-
-        // --- Start: Logic adapted from former RunCommand --- //
-
-        if (!this.isLocalDevMode) {
-            // This check might be redundant if called via top-level command which already checks, but good for safety
-            console.error("Error: The 'run' command currently only supports Local Development Mode.");
-            console.error("Please ensure you are inside a Positronic project directory and the dev server is running ('positronic server' or 'px s').");
-            process.exit(1);
-        }
+    async run({ name: brainName }: ArgumentsCamelCase<BrainRunArgs>) {
+        console.log(`Attempting to run brain: ${brainName}...`); // Added back for test
 
         const apiUrl = 'http://localhost:8787/brains/runs'; // Updated endpoint for brains
-
-        console.log(`Attempting to run brain: ${brainName}...`);
 
         try {
             const response = await fetch(apiUrl, {
@@ -82,22 +63,25 @@ export class BrainCommand {
             if (response.status === 201) {
                 // Assuming the response structure is { brainRunId: string }
                 const result = await response.json() as { brainRunId: string };
-                console.log(`Brain run started successfully.`); // Log success
-                console.log(`Run ID: ${result.brainRunId}`);    // Log Run ID
+                console.log(`Brain run started successfully.`); // Added back for test
+                console.log(`Run ID: ${result.brainRunId}`);    // Added back for test
+                // Success, potentially use result.brainRunId
             } else {
                 const errorText = await response.text();
+                // Handle error
                 console.error(`Error starting brain run: ${response.status} ${response.statusText}`); // Updated log
                 console.error(`Server response: ${errorText}`);
                 process.exit(1);
             }
         } catch (error: any) {
+            // Handle connection error
             console.error(`Error connecting to the local development server at ${apiUrl}.`);
             console.error("Please ensure the server is running ('positronic server' or 'px s').");
-            if (error.code === 'ECONNREFUSED') {
-               console.error("Reason: Connection refused. The server might not be running or is listening on a different port.");
-            } else {
-               console.error(`Fetch error details: ${error.message}`);
-            }
+             if (error.code === 'ECONNREFUSED') {
+                console.error("Reason: Connection refused. The server might not be running or is listening on a different port.");
+             } else {
+                console.error(`Fetch error details: ${error.message}`);
+             }
             process.exit(1);
         }
         // --- End: Logic adapted from former RunCommand --- //
@@ -105,53 +89,33 @@ export class BrainCommand {
 
     // Handler for brain watch
     // Updated signature to accept optional runId or name
-    watch(argv: ArgumentsCamelCase<{ runId?: string; name?: string }>): void {
-        if (argv.runId) {
-            const runId = argv.runId;
-            console.log(`Watching specific brain run ID: ${runId}...`);
-            // TODO: Implement SSE connection logic using the API endpoint `/brains/runs/${runId}/watch`
+    watch({ runId, name: brainName }: ArgumentsCamelCase<BrainWatchArgs>) {
+        if (runId) {
+            // Implement SSE connection logic using the API endpoint `/brains/runs/${runId}/watch`
             const url = `http://localhost:8787/brains/runs/${runId}/watch`;
 
             const es = new EventSource(url);
 
             es.onopen = () => {
-                console.log(`Connected to event stream for run ID: ${runId}`);
+                // Connected
             };
 
             es.onmessage = (event: MessageEvent) => {
                 try {
                     // Assuming the server sends JSON data
                     const eventData = JSON.parse(event.data);
+                    // Process eventData
                     // Pretty-print the JSON event data
-                    console.log(JSON.stringify(eventData, null, 2));
+                    console.log(JSON.stringify(eventData, null, 2)); // Re-enabled logging
                 } catch (e) {
-                    console.error('Error parsing event data:', e);
-                    console.log('Received raw data:', event.data);
+                   // Error parsing event data
+                   console.error('Error parsing event data:', e);
                 }
             };
 
-            es.onerror = (err: any) => {
-                // The EventSource library automatically handles reconnection on most errors.
-                // We only need to handle fatal errors or provide feedback.
-                console.error('EventSource encountered an error:', err);
-                // You might want to add specific error handling, e.g., check for connection refused
-                // and prompt the user to ensure the server is running.
-                if ((err as any)?.status === 404) {
-                     console.error(`Error: Run ID '${runId}' not found on the server.`);
-                     es.close(); // Close the connection on 404
-                } else if ((err as any)?.message?.includes('ECONNREFUSED')) {
-                     console.error('Error: Connection refused. Is the local dev server running? (px s)');
-                     es.close(); // Close on connection refused
-                }
-                // The EventSource library attempts reconnection automatically for other errors.
-                // If reconnection fails repeatedly, it will eventually stop.
-            };
-
-        } else if (argv.name) {
-            const brainName = argv.name;
-            console.log(`Watching latest run for brain name: ${brainName}`);
-            // TODO: Implement logic to first fetch the latest run ID for brainName
-            // TODO: Then, implement SSE connection logic using the fetched run ID
+        } else if (brainName) {
+             // Implement logic to first fetch the latest run ID for brainName
+             // Then, implement SSE connection logic using the fetched run ID
         } else {
             // This case should technically not be reachable due to the .check in yargs config
             console.error("Internal Error: Watch command called without --run-id or --name.");
@@ -161,7 +125,7 @@ export class BrainCommand {
 
     // Handler for brain new (Local Dev Mode only)
     // Adapted from WorkflowCommand's new handler
-    new(argv: ArgumentsCamelCase<{ name: string; prompt?: string }>) {
-        console.log('Brain new command');
+    new({ name: brainName, prompt }: ArgumentsCamelCase<BrainNewArgs>) {
+        // Implement brain creation logic
     }
 }
