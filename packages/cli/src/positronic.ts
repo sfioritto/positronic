@@ -216,16 +216,11 @@ cli = cli.command('rerun <name> [run-id]', 'Rerun an existing brain run\n', (yar
         type: 'number'
       })
       .alias('stops-after', 'e')
-      .option('verbose', {
-        describe: 'Show verbose output',
-        type: 'boolean',
-      })
       .example('$0 rerun my-brain', 'Rerun the most recent execution of my-brain')
       .example('$0 rerun my-brain abc123', 'Rerun a specific brain run')
       .example('$0 rerun my-brain --starts-at=3', 'Rerun from step 3')
       .example('$0 rerun my-brain --stops-after=5', 'Rerun and stop after step 5')
-      .example('$0 rerun my-brain --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5')
-      .example('$0 rerun my-brain --verbose', 'Rerun with verbose output');
+      .example('$0 rerun my-brain --starts-at=3 --stops-after=5', 'Rerun steps 3 through 5');
   }, (argv) => brainCommand.rerun(argv as any));
 
 // --- Run Brain Command ---
@@ -236,12 +231,7 @@ cli = cli.command('run <name>', 'Run a brain\n', (yargsRun) => {
         type: 'string',
         demandOption: true
       })
-      .option('verbose', {
-        describe: 'Show verbose output',
-        type: 'boolean',
-      })
-      .example('$0 run my-brain', 'Run a brain by name')
-      .example('$0 run my-brain --verbose', 'Run a brain with verbose output');
+      .example('$0 run my-brain', 'Run a brain by name');
   }, (argv) => brainCommand.run(argv as any));
 
 // --- Watch Brain Run Command ---

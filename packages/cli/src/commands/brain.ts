@@ -38,23 +38,19 @@ export class BrainCommand {
     }
 
     // Handler for brain rerun
-    rerun(argv: ArgumentsCamelCase<{ name: string; runId?: string; startsAt?: number; stopsAfter?: number; verbose?: boolean }>): void {
+    rerun(argv: ArgumentsCamelCase<{ name: string; runId?: string; startsAt?: number; stopsAfter?: number }>): void {
         const brainName = argv.name;
         const runId = argv.runId || 'most recent run';
         const startsAt = argv.startsAt ? ` starting at step ${argv.startsAt}` : '';
         const stopsAfter = argv.stopsAfter ? ` stopping after step ${argv.stopsAfter}` : '';
-        const verbose = argv.verbose ? ' with verbose output' : '';
 
-        console.log(`Rerunning brain: ${brainName} (run: ${runId})${startsAt}${stopsAfter}${verbose}`);
+        console.log(`Rerunning brain: ${brainName} (run: ${runId})${startsAt}${stopsAfter}`);
          // TODO: Implement brain rerun logic (API call)
     }
 
     // Handler for brain run
-    async run(argv: ArgumentsCamelCase<{ name: string; verbose?: boolean }>): Promise<void> {
-        // Note: The actual run logic is likely handled by the top-level 'run' command via RunCommand.
-        // This handler within 'brain run' might be redundant or could offer alternative run mechanisms.
+    async run(argv: ArgumentsCamelCase<{ name: string }>): Promise<void> {
         const brainName = argv.name;
-        const verbose = argv.verbose ? ' with verbose output' : '';
 
         // console.log(`(Brain Command) Running brain: ${brainName}${verbose}`); // Old message
         console.log(`Attempting to run brain: ${brainName}...`); // Updated to match test/previous RunCommand
@@ -88,11 +84,6 @@ export class BrainCommand {
                 const result = await response.json() as { brainRunId: string };
                 console.log(`Brain run started successfully.`); // Log success
                 console.log(`Run ID: ${result.brainRunId}`);    // Log Run ID
-                if (argv.verbose) {
-                    console.log("Verbose flag detected. You can watch the run with:");
-                    // Updated watch command example
-                    console.log(`  positronic watch ${brainName} --run-id ${result.brainRunId}`);
-                }
             } else {
                 const errorText = await response.text();
                 console.error(`Error starting brain run: ${response.status} ${response.statusText}`); // Updated log
@@ -170,35 +161,7 @@ export class BrainCommand {
 
     // Handler for brain new (Local Dev Mode only)
     // Adapted from WorkflowCommand's new handler
-    new(argv: ArgumentsCamelCase<{ name: string; prompt?: string }>): void {
-        // isLocalDevMode check is implicitly handled by command registration
-        if (!this.isLocalDevMode || !this.projectRootPath) {
-            console.error("Internal Error: 'brain new' command requires local dev mode and project root path.");
-            process.exit(1);
-        }
-
-        const brainName = argv.name;
-        const brainFileName = `${brainName}.ts`; // Brains are TS files like workflows were
-        const brainsDir = path.join(this.projectRootPath, 'brains'); // New directory name
-        const destinationPath = path.join(brainsDir, brainFileName);
-        // Assuming a generic template exists or the workflow one is suitable
-        const templatePath = path.join(this.brainTemplateDir, 'new.ts.tpl');
-
-        console.log(`Creating new brain '${brainName}' in ${brainsDir}...${argv.prompt ? ` (Prompt: "${argv.prompt}")` : ''}`);
-        // TODO: Potentially use the prompt for generation later
-
-        fsPromises.mkdir(brainsDir, { recursive: true })
-            .then(() => fsPromises.copyFile(templatePath, destinationPath))
-            .then(() => {
-                console.log(`Brain file created: ${destinationPath}`);
-                console.log(`
-Next steps:`);
-                console.log(`  - Edit ${path.relative(process.cwd(), destinationPath)} to define your brain logic.`);
-                console.log(`  - Run your brain locally with: positronic run ${brainName}`);
-            })
-            .catch((err) => {
-                console.error(`Error creating brain file:`, err);
-                process.exit(1);
-            });
+    new(argv: ArgumentsCamelCase<{ name: string; prompt?: string }>) {
+        console.log('Brain new command');
     }
 }
