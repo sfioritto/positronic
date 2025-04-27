@@ -1,5 +1,4 @@
-import { api as app, setManifest, BrainRunnerDO, MonitorDO } from '@positronic/cloudflare';
-import { PositronicManifest } from '@positronic/cloudflare/dist/src/manifest.js';
+import { api as app, setManifest, BrainRunnerDO, MonitorDO, PositronicManifest } from '@positronic/cloudflare';
 // Import the generated manifest - NOTE the .js extension for runtime compatibility
 import { staticManifest } from './_manifest.js';
 

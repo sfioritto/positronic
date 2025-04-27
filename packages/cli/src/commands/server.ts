@@ -137,29 +137,28 @@ export async function setupPositronicServerEnv(
     await generateStaticManifest(projectRootPath, srcDir);
 
     // Perform full template copy and install only if needed
+    if (setupNeeded) {
+        try {
+            // Pass template dir to helper
+            await copyServerTemplate('package.json.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+            await copyServerTemplate('tsconfig.json.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+            await copyServerTemplate('wrangler.jsonc.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
+            await copyServerTemplate('src/index.ts.tpl', srcDir, projectName, cloudflareDevServerTemplateDir);
 
-    try {
-        // Pass template dir to helper
-        await copyServerTemplate('package.json.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
-        await copyServerTemplate('tsconfig.json.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
-        await copyServerTemplate('wrangler.jsonc.tpl', serverDir, projectName, cloudflareDevServerTemplateDir, userCoreVersion);
-        await copyServerTemplate('src/index.ts.tpl', srcDir, projectName, cloudflareDevServerTemplateDir);
-
-        // Only run install if the flag isn't set
-        if (!skipNpmInstall) {
-            await runNpmInstall(serverDir);
-        }
-    } catch (error) {
-        console.error("Failed to set up the .positronic directory:", error);
-        // Attempt cleanup only if we created the directory initially
-        if (setupNeeded) {
+            // Only run install if the flag isn't set and setup is needed
+            if (!skipNpmInstall) {
+                await runNpmInstall(serverDir);
+            }
+        } catch (error) {
+            console.error("Failed to set up the .positronic directory:", error);
+            // Attempt cleanup only if we created the directory initially during this run
             try {
                 await fsPromises.rm(serverDir, { recursive: true, force: true });
             } catch (cleanupError) {
                 console.error("Failed to clean up server directory after setup error:", cleanupError);
             }
+            throw error; // Re-throw error to signal failure
         }
-        throw error; // Re-throw error to signal failure
     }
 }
 
