@@ -1,12 +1,8 @@
 import type { ArgumentsCamelCase } from 'yargs';
-import * as path from 'path';
-import * as fsPromises from 'fs/promises';
-import { v4 as uuidv4 } from 'uuid'; // Import if needed for local testing/mocking?
-import { EventSource } from 'eventsource'; // Use named import
-import { apiFetch } from './helpers.js'; // Import apiFetch
+import { EventSource } from 'eventsource';
+import { apiFetch } from './helpers.js';
 
-// Define argument types for clarity
-interface BrainListArgs {} // No specific args yet
+interface BrainListArgs {}
 interface BrainHistoryArgs { name: string; limit: number; }
 interface BrainShowArgs { name: string; }
 interface BrainRerunArgs { name: string; runId?: string; startsAt?: number; stopsAfter?: number; }
@@ -15,37 +11,22 @@ interface BrainWatchArgs { runId?: string; name?: string; }
 interface BrainNewArgs { name: string; prompt?: string; }
 
 export class BrainCommand {
-    private isLocalDevMode: boolean;
-    private projectRootPath: string | null;
-    private brainTemplateDir: string; // Changed from workflowTemplateDir
-
-    constructor(isLocalDevMode: boolean, projectRootPath: string | null, brainTemplateDir: string) {
-        this.isLocalDevMode = isLocalDevMode;
-        this.projectRootPath = projectRootPath;
-        this.brainTemplateDir = brainTemplateDir; // Changed from workflowTemplateDir
-    }
-
-    // Handler for brain list
     list(argv: ArgumentsCamelCase<BrainListArgs>) {
         // Implement brain list logic (local or remote)
     }
 
-    // Handler for brain history
     history({ name: brainName, limit }: ArgumentsCamelCase<BrainHistoryArgs>) {
         // Implement brain history logic (API call)
     }
 
-    // Handler for brain show
     show({ name: brainName }: ArgumentsCamelCase<BrainShowArgs>) {
         // Implement brain show logic (API call)
     }
 
-    // Handler for brain rerun
     rerun({ name: brainName, runId, startsAt, stopsAfter }: ArgumentsCamelCase<BrainRerunArgs>) {
         // Implement brain rerun logic (API call)
     }
 
-    // Handler for brain run
     async run({ name: brainName }: ArgumentsCamelCase<BrainRunArgs>) {
         const apiPath = '/brains/runs';
 
@@ -60,7 +41,6 @@ export class BrainCommand {
 
             if (response.status === 201) {
                 const result = await response.json() as { brainRunId: string };
-                console.log(`Brain run started successfully.`);
                 console.log(`Run ID: ${result.brainRunId}`);
             } else {
                 const errorText = await response.text();
@@ -80,19 +60,13 @@ export class BrainCommand {
         }
     }
 
-    // Handler for brain watch
     watch({ runId, name: brainName }: ArgumentsCamelCase<BrainWatchArgs>) {
         if (runId) {
-            // Construct URL using apiFetch base logic (but EventSource needs full URL)
             const port = process.env.POSITRONIC_SERVER_PORT || '8787';
             const baseUrl = `http://localhost:${port}`;
             const url = `${baseUrl}/brains/runs/${runId}/watch`;
 
             const es = new EventSource(url);
-
-            es.onopen = () => {
-                // Connected
-            };
 
             es.onmessage = (event: MessageEvent) => {
                 try {
@@ -119,8 +93,6 @@ export class BrainCommand {
         }
     }
 
-    // Handler for brain new (Local Dev Mode only)
-    // Adapted from WorkflowCommand's new handler
     new({ name: brainName, prompt }: ArgumentsCamelCase<BrainNewArgs>) {
         // Implement brain creation logic
     }

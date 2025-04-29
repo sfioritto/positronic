@@ -44,7 +44,7 @@ const brainTemplateDir = path.join(templatesBaseDir, 'brain');
 // Instantiate command classes, passing the determined mode and path
 const projectCommand = new ProjectCommand(isLocalDevMode);
 const serverCommand = new ServerCommand(cloudflareDevServerTemplateDir);
-const brainCommand = new BrainCommand(isLocalDevMode, projectRootPath, brainTemplateDir);
+const brainCommand = new BrainCommand();
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);
 
 // Main CLI definition
