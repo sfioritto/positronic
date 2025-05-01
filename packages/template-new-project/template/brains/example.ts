@@ -7,7 +7,7 @@ const exampleWorkflow = workflow('example')
   }))
   .step('Finish', ({ state }) => ({
     ...state,
-    finalMessage: `${state.message} Your project is set up.`,
+    finalMessage: state.message + ' Your project is set up.',
   }));
 
 export default exampleWorkflow;
