@@ -1,0 +1,22 @@
+{
+  "name": "@positronic/template-new-project",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Caz template for generating a new Positronic project.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "caz-template",
+    "positronic"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "caz": "^2.0.0"
+  }
+}

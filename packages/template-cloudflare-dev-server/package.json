@@ -1,0 +1,27 @@
+{
+  "name": "@positronic/template-cloudflare-dev-server",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Caz template for generating the Positronic Cloudflare dev server environment.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "caz-template",
+    "positronic",
+    "cloudflare"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240405.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^4.7.2",
+    "@types/node": "^20",
+    "caz": "^2.0.0"
+  }
+}

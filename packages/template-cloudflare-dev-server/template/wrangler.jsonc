@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/wrangler/main/config-schema.json",
+  "name": "positronic-dev-<%= projectName %>",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "BrainRunnerDO",
+        "MonitorDO"
+      ]
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "BRAIN_RUNNER_DO", "class_name": "BrainRunnerDO" },
+      { "name": "MONITOR_DO", "class_name": "MonitorDO" }
+    ]
+  },
+  "vars": {
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "positronic-dev-server-<%= projectName %>",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {},
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240405.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^4.7.2"
+  }
+}
