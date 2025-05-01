@@ -1,5 +1,5 @@
 {
-  "projectName": "<%= projectName %>",
+  "projectName": "<%= name %>",
   "backend": {
     "type": "cloudflare"
   },

@@ -1,8 +1,8 @@
 {
-  "name": "<%= projectName %>",
+  "name": "<%= name %>",
   "version": "0.0.1",
   "private": true,
-  "description": "Positronic project: <%= projectName %>",
+  "description": "Positronic project: <%= name %>",
   "license": "MIT",
   "type": "module",
   "scripts": {
