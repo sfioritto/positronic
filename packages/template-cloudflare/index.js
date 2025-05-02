@@ -1,47 +1,35 @@
 const fs = require('fs/promises');
 const path = require('path');
 
-/**
- * Caz template configuration.
- * @type {import('caz').Template}
- */
 module.exports = {
   name: 'positronic-cloudflare',
   version: '0.0.1',
   source: 'template',
-  prompts: [
-    {
-      name: 'projectName',
-      type: 'text',
-      message: 'Project name (used for package.json and wrangler.jsonc)'
-      // Default could be derived from parent directory name in setup?
-    },
-    // userCoreVersion prompt removed, will be read from parent package.json
-  ],
-  // No install needed for the template package itself usually,
-  // but the *generated* project will need install.
-  // Caz handles the install in the destination dir if package.json exists.
-
+  prompts: [],
   /**
-   * Reads the parent project's package.json to determine dependency versions.
+   * Reads the parent project's package.json to determine dependency versions
+   * and the project name.
    */
   setup: async ctx => {
     try {
-      console.log('Setting up template...');
       const parentPackageJsonPath = path.join(ctx.dest, '..', 'package.json');
       const userPackageJsonContent = await fs.readFile(parentPackageJsonPath, 'utf-8');
       const userPackageJson = JSON.parse(userPackageJsonContent);
-      // Store versions needed in answers or directly on config/ctx if preferred
+
+      if (!userPackageJson.name) {
+        throw new Error('Parent project package.json does not contain a "name" field.');
+      }
+
+      const projectName = userPackageJson.name;
+      ctx.answers.projectName = projectName;
       ctx.answers.coreVersion = userPackageJson.dependencies?.['@positronic/core'] || 'latest';
       ctx.answers.cloudflareVersion = userPackageJson.dependencies?.['@positronic/cloudflare'] || 'latest';
-      // If projectName wasn't provided via CLI/override, use parent dir name
-      ctx.answers.projectName = ctx.answers.projectName || path.basename(path.resolve(ctx.dest, '..'));
 
     } catch (error) {
-      console.warn(`Warning: Could not read parent project's package.json at ${path.join(ctx.dest, '..')}. Using latest for Positronic dependencies.`);
+      console.warn(`Warning: Could not read or parse parent project's package.json at ${path.join(ctx.dest, '..')}. Error: ${error.message}. Using default project name and latest for Positronic dependencies.`);
+      ctx.answers.projectName = 'default-positronic-project';
       ctx.answers.coreVersion = 'latest';
       ctx.answers.cloudflareVersion = 'latest';
-      ctx.answers.projectName = ctx.answers.projectName || 'positronic-project'; // Fallback project name
     }
   },
 
