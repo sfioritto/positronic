@@ -82,7 +82,7 @@ module.exports = {
   //   // TODO: custom template helpers
   //   upper: input => input.toUpperCase()
   // },
-  setup: async ctx => {
+  setup: ctx => {
     // TODO: dynamic setup based on answers
     // Uses 'pm' answer if available, otherwise defaults to 'npm'
     // Ensure install is only set if the user confirmed installation

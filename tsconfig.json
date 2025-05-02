@@ -18,6 +18,10 @@
     "sourceMap": true,
     "types": ["jest", "node"],
   },
+  "exclude": [
+    "packages/template-new-project",
+    "packages/template-cloudflare-dev-server",
+  ],
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/cli" },

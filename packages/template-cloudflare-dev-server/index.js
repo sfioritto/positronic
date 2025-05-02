@@ -21,13 +21,13 @@ module.exports = {
   // No install needed for the template package itself usually,
   // but the *generated* project will need install.
   // Caz handles the install in the destination dir if package.json exists.
-  install: true, // Install deps for the generated .positronic server
 
   /**
    * Reads the parent project's package.json to determine dependency versions.
    */
   setup: async ctx => {
     try {
+      console.log('Setting up template...');
       const parentPackageJsonPath = path.join(ctx.dest, '..', 'package.json');
       const userPackageJsonContent = await fs.readFile(parentPackageJsonPath, 'utf-8');
       const userPackageJson = JSON.parse(userPackageJsonContent);
@@ -50,13 +50,35 @@ module.exports = {
    * and generates the _manifest.ts file.
    */
   prepare: async ctx => {
+    console.log('Preparing template...');
     // --- 1. Modify package.json ---
     const packageJsonFile = ctx.files.find(f => f.path === 'package.json');
     if (packageJsonFile) {
       const packageJson = JSON.parse(packageJsonFile.contents.toString());
       packageJson.dependencies = packageJson.dependencies || {};
+
+      // Set versions from context first (might be 'latest' or from parent package.json)
       packageJson.dependencies['@positronic/core'] = ctx.answers.coreVersion;
       packageJson.dependencies['@positronic/cloudflare'] = ctx.answers.cloudflareVersion;
+
+      // Check for local development path override
+      const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+      if (devRootPath) {
+        console.log(`Found POSITRONIC_PACKAGES_DEV_PATH: ${devRootPath}. Using local file paths for @positronic/* dependencies.`);
+        for (const dependency of Object.keys(packageJson.dependencies)) {
+          if (dependency.startsWith('@positronic/')) {
+            const packageName = dependency.replace('@positronic/', '');
+            // Construct the absolute path to the local package
+            const localPackagePath = path.resolve(devRootPath, 'packages', packageName);
+            // Use file: protocol for local dependency
+            packageJson.dependencies[dependency] = `file:${localPackagePath}`;
+            console.log(`  - Mapping ${dependency} to ${packageJson.dependencies[dependency]}`);
+          }
+        }
+      } else {
+        console.log('POSITRONIC_PACKAGES_DEV_PATH not set. Using versions from context/npm for @positronic/* dependencies.');
+      }
+
       packageJsonFile.contents = Buffer.from(JSON.stringify(packageJson, null, 2));
     } else {
       console.warn('Warning: Could not find package.json in template files.');
@@ -80,12 +102,7 @@ module.exports = {
         manifestEntries += `  ${JSON.stringify(brainName)}: ${importAlias}.default as Workflow,\n`;
       }
     } catch (error) {
-      if (error.code === 'ENOENT') {
-        console.warn(`Warning: 'brains' directory not found at ${brainsDir}. Manifest will be empty.`);
-      } else {
-        console.error(`Error reading brains directory for manifest generation: ${error}`);
-        // Decide if this should be a fatal error
-      }
+      console.warn(`Warning: 'brains' directory not found at ${brainsDir}. Manifest will be empty.`);
     }
 
     const manifestContent = `// This file is generated automatically. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};
