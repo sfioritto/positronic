@@ -1,5 +1,5 @@
 {
-  "name": "@positronic/template-cloudflare-dev-server",
+  "name": "@positronic/template-cloudflare",
   "version": "0.0.1",
   "description": "Caz template for generating the Positronic Cloudflare dev server environment.",
   "main": "index.js",

@@ -26,12 +26,12 @@
   },
   "workspaces": [
     "packages/core",
+    "packages/template-new-project",
+    "packages/template-cloudflare",
     "packages/shell",
     "packages/client-anthropic",
     "packages/cli",
     "packages/resources",
-    "packages/cloudflare",
-    "packages/template-new-project",
-    "packages/template-cloudflare-dev-server"
+    "packages/cloudflare"
   ]
 }
