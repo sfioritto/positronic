@@ -26,9 +26,17 @@ export async function setupPositronicServerEnv(
         cloudflareTemplate = '@positronic/template-cloudflare';
     }
 
-    await caz.default(cloudflareTemplate, serverDir, {
-        force: forceSetup,
-    });
+    const serverDirExists = await fsPromises.access(serverDir).then(() => true).catch(() => false);
+
+    if (forceSetup) {
+        await caz.default(cloudflareTemplate, serverDir, {
+            force: forceSetup,
+        });
+    } else if (!serverDirExists) {
+        await caz.default(cloudflareTemplate, serverDir, {
+            force: forceSetup,
+        });
+    }
 }
 
 // --- ServerCommand Class ---
