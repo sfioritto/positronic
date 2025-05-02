@@ -95,8 +95,7 @@ Next steps:`);
             console.log(`  (Review package.json and install dependencies if needed)`);
             console.log(`  positronic server (or just px s)  # To start the local dev server`);
             console.log(` Open a new terminal and run: `);
-            console.log(`  px run example  # To run an example workflow`);
-            console.log(`  px run example --watch  # To run an example workflow and watch for changes`);
+            console.log(`  px run example --watch  # To run the example workflow and watch for changes`);
         } catch (error) {
             console.error(`\nError creating project '${projectName}':`, error);
         }

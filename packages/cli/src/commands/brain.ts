@@ -6,7 +6,7 @@ interface BrainListArgs {}
 interface BrainHistoryArgs { name: string; limit: number; }
 interface BrainShowArgs { name: string; }
 interface BrainRerunArgs { name: string; runId?: string; startsAt?: number; stopsAfter?: number; }
-interface BrainRunArgs { name: string; }
+interface BrainRunArgs { name: string; watch?: boolean; }
 interface BrainWatchArgs { runId?: string; name?: string; }
 interface BrainNewArgs { name: string; prompt?: string; }
 
@@ -27,7 +27,7 @@ export class BrainCommand {
         // Implement brain rerun logic (API call)
     }
 
-    async run({ name: brainName }: ArgumentsCamelCase<BrainRunArgs>) {
+    async run({ name: brainName, watch }: ArgumentsCamelCase<BrainRunArgs>) {
         const apiPath = '/brains/runs';
 
         try {
@@ -41,7 +41,16 @@ export class BrainCommand {
 
             if (response.status === 201) {
                 const result = await response.json() as { brainRunId: string };
-                console.log(`Run ID: ${result.brainRunId}`);
+                if (watch) {
+                    this.watch({
+                        runId: result.brainRunId,
+                        _: [],
+                        $0: ''
+                    });
+                    await new Promise(() => {});
+                } else {
+                    console.log(`Run ID: ${result.brainRunId}`);
+                }
             } else {
                 const errorText = await response.text();
                 console.error(`Error starting brain run: ${response.status} ${response.statusText}`);

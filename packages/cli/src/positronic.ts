@@ -229,14 +229,21 @@ cli = cli.command('rerun <name> [run-id]', 'Rerun an existing brain run\n', (yar
   }, (argv) => brainCommand.rerun(argv as any));
 
 // --- Run Brain Command ---
-cli = cli.command('run <name>', 'Run a brain\n', (yargsRun) => {
+cli = cli.command('run <name>', 'Run a brain and optionally watch its execution\n', (yargsRun) => {
     return yargsRun
       .positional('name', {
         describe: 'Name of the brain',
         type: 'string',
         demandOption: true
       })
-      .example('$0 run my-brain', 'Run a brain by name');
+      .option('watch', {
+        describe: 'Watch the brain run immediately after starting',
+        type: 'boolean',
+        alias: 'w',
+        default: false
+      })
+      .example('$0 run my-brain', 'Run a brain by name')
+      .example('$0 run my-brain --watch', 'Run a brain and watch its execution');
   }, (argv) => brainCommand.run(argv as any));
 
 // --- Watch Brain Run Command ---
