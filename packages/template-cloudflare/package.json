@@ -8,21 +8,9 @@
     "clean": "rm -rf node_modules",
     "build": ""
   },
-  "keywords": [
-    "caz-template",
-    "positronic",
-    "cloudflare"
-  ],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "lodash": "^4.17.21"
-  },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240405.0",
-    "typescript": "^5.0.0",
-    "wrangler": "^4.7.2",
-    "@types/node": "^20",
     "caz": "^2.0.0"
   }
 }
