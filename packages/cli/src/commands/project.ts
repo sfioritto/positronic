@@ -1,34 +1,5 @@
-import * as path from 'path';
-import * as fsPromises from 'fs/promises';
-import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
-import { setupPositronicServerEnv } from './server.js';
-import { renderPackageJson } from './helpers.js';
 import type { ArgumentsCamelCase } from 'yargs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const templatesBasePath = path.resolve(__dirname, '../../templates');
-const templatesPath = path.join(templatesBasePath, 'new-project');
-
-async function copyTemplate(
-    templateFileName: string,
-    destinationPath: string,
-    projectName: string
-) {
-    const templatePath = path.join(templatesPath, templateFileName);
-    const template = await fsPromises.readFile(templatePath, 'utf-8');
-    let renderedTemplate = template.replace(/{{projectName}}/g, projectName);
-    if (templateFileName === 'package.json.tpl') {
-        const packageJson = await renderPackageJson(
-            projectName,
-            templatesPath,
-        );
-        renderedTemplate = JSON.stringify(packageJson, null, 2);
-    }
-
-    await fsPromises.writeFile(destinationPath, renderedTemplate);
-}
 
 interface AddProjectArgs {
   name: string;
@@ -89,65 +60,7 @@ export class ProjectCommand {
      * Also sets up the .positronic server environment.
      */
     async create({ name: projectName }: ArgumentsCamelCase<CreateProjectArgs>) {
-        const projectPath = path.resolve(process.cwd(), projectName);
-        const brainsPath = path.join(projectPath, 'brains');
-        const cloudflareDevServerTemplateDir = path.join(templatesBasePath, 'cloudflare-dev-server');
 
-        // 1. Check if directory already exists
-        try {
-            await fsPromises.access(projectPath);
-            console.error(`Error: Directory '${projectName}' already exists at ${projectPath}.`);
-            process.exit(1);
-        } catch {
-            // ENOENT is expected, meaning the directory doesn't exist, proceed
-        }
-
-        // 2. Create project directories
-        await fsPromises.mkdir(projectPath, { recursive: true });
-        await fsPromises.mkdir(brainsPath, { recursive: true });
-
-
-        // 3. Copy and process template files
-        await copyTemplate('package.json.tpl', path.join(projectPath, 'package.json'), projectName);
-        await copyTemplate('tsconfig.json.tpl', path.join(projectPath, 'tsconfig.json'), projectName);
-        await copyTemplate('positronic.config.json.tpl', path.join(projectPath, 'positronic.config.json'), projectName);
-        await copyTemplate('.gitignore.tpl', path.join(projectPath, '.gitignore'), projectName);
-        await copyTemplate('brains/example.ts.tpl', path.join(brainsPath, 'example.ts'), projectName);
-
-
-        // 4. Run npm install for the main project
-        const npmInstall = spawn('npm', ['install'], {
-            cwd: projectPath,
-            stdio: 'inherit',
-            shell: true
-        });
-
-        await new Promise<void>((resolve, reject) => {
-             npmInstall.on('close', (code) => {
-                if (code === 0) {
-                    resolve();
-                } else {
-                    reject(new Error(`Project npm install failed with code ${code}`));
-                }
-            });
-            npmInstall.on('error', (err) => {
-                reject(err);
-            });
-        });
-
-        // 5. Set up the .positronic server environment
-        await setupPositronicServerEnv(
-            projectPath,                    // Path to the newly created project
-            cloudflareDevServerTemplateDir, // Path to the server templates
-            true,                           // Force setup (it's a new project)
-        );
-
-
-        console.log(`Success! Created project '${projectName}' at ${projectPath}`);
-        console.log("Next steps:");
-        console.log(`  cd ${projectName}`);
-        console.log(`  positronic server  # Start the local development server`);
-        console.log(`  positronic run example # Run the example brain (in another terminal)`);
 
     }
 }
