@@ -1,7 +1,6 @@
 {
   "name": "@positronic/template-cloudflare-dev-server",
   "version": "0.0.1",
-  "private": true,
   "description": "Caz template for generating the Positronic Cloudflare dev server environment.",
   "main": "index.js",
   "scripts": {
@@ -9,7 +8,7 @@
     "build": ""
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "caz": "^2.0.0"
   }

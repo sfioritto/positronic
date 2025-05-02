@@ -1,22 +1,14 @@
 {
   "name": "@positronic/template-new-project",
   "version": "0.0.1",
-  "private": true,
   "description": "Caz template for generating a new Positronic project.",
   "main": "index.js",
   "scripts": {
     "build": "",
     "clean": "rm -rf node_modules"
   },
-  "keywords": [
-    "caz-template",
-    "positronic"
-  ],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "lodash": "^4.17.21"
-  },
+  "license": "MIT",
   "devDependencies": {
     "caz": "^2.0.0"
   }
