@@ -1,7 +1,0 @@
-{
-  "projectName": "{{projectName}}",
-  "backend": {
-    "type": "cloudflare"
-  },
-  "version": "1"
-}
