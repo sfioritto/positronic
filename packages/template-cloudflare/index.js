@@ -38,42 +38,47 @@ module.exports = {
    * and generates the _manifest.ts file.
    */
   prepare: async ctx => {
-    console.log('Preparing template...');
     // --- 1. Modify package.json ---
     const packageJsonFile = ctx.files.find(f => f.path === 'package.json');
-    if (packageJsonFile) {
-      const packageJson = JSON.parse(packageJsonFile.contents.toString());
-      packageJson.dependencies = packageJson.dependencies || {};
+    if (!packageJsonFile) {
+      throw new Error('package.json file not found in template files.');
+    }
 
-      // Set versions from context first (might be 'latest' or from parent package.json)
-      packageJson.dependencies['@positronic/core'] = ctx.answers.coreVersion;
-      packageJson.dependencies['@positronic/cloudflare'] = ctx.answers.cloudflareVersion;
+    const packageJson = JSON.parse(packageJsonFile.contents.toString());
+    packageJson.dependencies = packageJson.dependencies;
 
-      // Check for local development path override
-      const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
-      if (devRootPath) {
-        console.log(`Found POSITRONIC_PACKAGES_DEV_PATH: ${devRootPath}. Using local file paths for @positronic/* dependencies.`);
-        for (const dependency of Object.keys(packageJson.dependencies)) {
-          if (dependency.startsWith('@positronic/')) {
-            const packageName = dependency.replace('@positronic/', '');
-            // Construct the absolute path to the local package
-            const localPackagePath = path.resolve(devRootPath, 'packages', packageName);
-            // Use file: protocol for local dependency
-            packageJson.dependencies[dependency] = `file:${localPackagePath}`;
-            console.log(`  - Mapping ${dependency} to ${packageJson.dependencies[dependency]}`);
-          }
+    if (!packageJson.dependencies) {
+      throw new Error('package.json does not contain a "dependencies" field.');
+    }
+
+    if (!packageJson.dependencies['@positronic/core'] || !packageJson.dependencies['@positronic/cloudflare']) {
+      throw new Error('package.json does not contain @positronic/core or @positronic/cloudflare dependencies.');
+    }
+    packageJson.dependencies['@positronic/core'] = ctx.answers.coreVersion;
+    packageJson.dependencies['@positronic/cloudflare'] = ctx.answers.cloudflareVersion;
+
+    // Check for local development path override
+    // This allows for developers of @positronic/core and @positronic/cloudflare to test changes to the packages
+    // by setting the POSITRONIC_PACKAGES_DEV_PATH environment variable.
+    const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+    if (devRootPath) {
+      console.log(`Found POSITRONIC_PACKAGES_DEV_PATH: ${devRootPath}. Using local file paths for @positronic/* dependencies.`);
+      for (const dependency of Object.keys(packageJson.dependencies)) {
+        if (dependency.startsWith('@positronic/')) {
+          const packageName = dependency.replace('@positronic/', '');
+          // Construct the absolute path to the local package
+          const localPackagePath = path.resolve(devRootPath, 'packages', packageName);
+          // Use file: protocol for local dependency
+          packageJson.dependencies[dependency] = `file:${localPackagePath}`;
+          console.log(`  - Mapping ${dependency} to ${packageJson.dependencies[dependency]}`);
         }
-      } else {
-        console.log('POSITRONIC_PACKAGES_DEV_PATH not set. Using versions from context/npm for @positronic/* dependencies.');
       }
 
       packageJsonFile.contents = Buffer.from(JSON.stringify(packageJson, null, 2));
-    } else {
-      console.warn('Warning: Could not find package.json in template files.');
     }
 
     // --- 2. Generate _manifest.ts ---
-    const brainsDir = path.join(ctx.dest, '..', 'brains'); // Path relative to the final destination (.positronic)
+    const brainsDir = path.join(ctx.dest, '..', 'brains');
     let importStatements = `import type { Workflow } from '@positronic/core';\n`;
     let manifestEntries = '';
     try {
@@ -103,9 +108,4 @@ module.exports = {
     });
 
   },
-
-  complete: ctx => {
-    console.log(`Initialized Cloudflare dev server environment in ${ctx.dest}`); // ctx.dest is .positronic
-    console.log(`Make sure to run 'npm install' in '${ctx.dest}' if it wasn't run automatically.`);
-  }
 };
