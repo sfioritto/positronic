@@ -17,8 +17,8 @@
   },
   "dependencies": {
     "@positronic/core": "^0.0.1",
-    "@positronic/template-new-project": "^0.0.1",
     "@positronic/template-cloudflare": "^0.0.1",
+    "@positronic/template-new-project": "^0.0.1",
     "caz": "^2.0.0",
     "chokidar": "^3.6.0",
     "eventsource": "^3.0.6",
@@ -27,6 +27,6 @@
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^20.11.17",
-    "@types/yargs": "^17.0.32"
+    "@types/yargs": "^17.0.33"
   }
 }

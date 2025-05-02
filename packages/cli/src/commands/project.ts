@@ -78,35 +78,27 @@ export class ProjectCommand {
             cloudflareTemplate = '@positronic/template-cloudflare';
         }
 
-        console.log(`Creating new Positronic project '${projectName}'...`);
-
         try {
             // 1. Scaffold the main project structure
-            console.log(` -> Running template '${path.basename(newProjectTemplate)}' in ${projectDir}...`);
             await caz.default(newProjectTemplate, projectName, {
-                force: false, // Ensure default behavior, don't overwrite unless specified (though `new` implies it shouldn't exist)
+                force: false,
             });
-            console.log(` -> Project structure created successfully.`);
 
             // 2. Scaffold the .positronic directory for Cloudflare
-            console.log(` -> Running template '${path.basename(cloudflareTemplate)}' in ${positronicDir}...`);
-            // Pass the project name and possibly other answers if needed by template-cloudflare
             await caz.default(cloudflareTemplate, positronicDir, {
-                force: false, // Don't force overwrite for the .positronic dir either
+                force: false,
             });
-            console.log(` -> .positronic directory created successfully.`);
 
-            console.log(`
-Project '${projectName}' created successfully at ${projectDir}`);
             console.log(`
 Next steps:`);
             console.log(`  cd ${projectName}`);
             console.log(`  (Review package.json and install dependencies if needed)`);
-            console.log(`  positronic server  # To start the local dev server`);
-
+            console.log(`  positronic server (or just px s)  # To start the local dev server`);
+            console.log(` Open a new terminal and run: `);
+            console.log(`  px run example  # To run an example workflow`);
+            console.log(`  px run example --watch  # To run an example workflow and watch for changes`);
         } catch (error) {
             console.error(`\nError creating project '${projectName}':`, error);
-            // Consider adding cleanup logic here if needed
         }
     }
 }
