@@ -6,7 +6,7 @@ const path = require('path');
  * @type {import('caz').Template}
  */
 module.exports = {
-  name: 'positronic-cloudflare-dev-server',
+  name: 'positronic-cloudflare',
   version: '0.0.1',
   source: 'template',
   prompts: [
