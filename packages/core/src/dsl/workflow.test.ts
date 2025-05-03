@@ -4,27 +4,12 @@ import { State } from './types.js';
 import { workflow, type WorkflowEvent, type WorkflowErrorEvent, type SerializedStep, type SerializedStepStatus } from './workflow.js';
 import { z } from 'zod';
 import { nextStep } from '../../../../test-utils.js';
-import { ResourceLoader } from '@positronic/resources/src/types.js';
+import { jest } from '@jest/globals';
+import { PromptClient } from '../clients/types.js';
 
 // Define a Logger interface for testing
 interface Logger {
   log: (message: string) => void;
-}
-
-class TestResourceLoader implements ResourceLoader {
-  private files: Map<string, string> = new Map();
-
-  setFile(path: string, content: string) {
-    this.files.set(path, content);
-  }
-
-  async load(path: string, type?: 'text' | 'image' | 'binary'): Promise<string | Buffer> {
-    const content = this.files.get(path);
-    if (content === undefined) {
-      throw new Error(`File not found: ${path}`);
-    }
-    return content;
-  }
 }
 
 // Mock services for testing
@@ -38,8 +23,9 @@ type AssertEquals<T, U> =
   [T] extends [U] ? [U] extends [T] ? true : false : false;
 
 // Mock PromptClient for testing
-const mockClient = {
-  execute: jest.fn()
+const mockExecute = jest.fn<PromptClient['execute']>();
+const mockClient: jest.Mocked<PromptClient> = {
+  execute: mockExecute
 };
 
 describe('workflow creation', () => {
@@ -177,8 +163,8 @@ describe('workflow creation', () => {
   });
 
   it('should allow overriding client per step', async () => {
-    const overrideClient = {
-      execute: jest.fn().mockResolvedValue({ override: true })
+    const overrideClient: jest.Mocked<PromptClient> = {
+      execute: jest.fn<PromptClient['execute']>().mockResolvedValue({ override: true })
     };
 
     // Make sure that for the default prompt the default client returns a known value.
@@ -580,7 +566,7 @@ describe('workflow resumption', () => {
 
     // Run workflow until we get the first step completed
     for await (const event of threeStepWorkflow.run({
-      client: mockClient,
+      client: mockClient as PromptClient,
       initialState,
     })) {
       // Capture the full step list from the first status event
@@ -610,7 +596,7 @@ describe('workflow resumption', () => {
     if (!initialCompletedSteps) throw new Error('Expected initialCompletedSteps');
 
     for await (const event of threeStepWorkflow.run({
-      client: mockClient,
+      client: mockClient as PromptClient,
       initialState,
       initialCompletedSteps,
       workflowRunId: 'test-run-id',

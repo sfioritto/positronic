@@ -2,9 +2,10 @@
   "name": "positronic",
   "private": true,
   "license": "MIT",
+  "type": "module",
   "scripts": {
-    "test": "jest --silent",
-    "test:watch": "jest --silent --watch",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent --watch",
     "test:all": "npm run test && cd packages/cloudflare/test-project && npm run test -- --run",
     "dev": "npm run build:workspaces && npm run test:all || /usr/local/bin/terminal-notifier -title \"Positronic\" -message \"Build/Test failed\"",
     "dev:watch": "nodemon --exec 'npm run dev'",
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250430.0",
+    "@jest/globals": "^29.7.0",
     "@swc/cli": "^0.6.0",
     "@swc/core": "^1.10.4",
     "@swc/plugin-transform-imports": "^6.0.4",
