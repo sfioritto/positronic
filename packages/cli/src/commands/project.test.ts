@@ -71,7 +71,7 @@ describe('CLI Integration: positronic new (Simplified)', () => {
     it('should create new project, start server, run a workflow and kill server', async () => {
         execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
             cwd: tempDir,
-            stdio: 'inherit',
+            stdio: 'ignore',
             env: {
                 ...process.env,
                 POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot
@@ -109,7 +109,7 @@ describe('CLI Integration: positronic new (Simplified)', () => {
 
         execSync(`${nodeExecutable} ${cliExecutable} run example`, {
             cwd: projectPath,
-            stdio: 'inherit',
+            stdio: 'ignore',
             env: {
                 ...process.env,
                 POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot,
