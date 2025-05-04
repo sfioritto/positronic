@@ -10,7 +10,7 @@
     "positronic": "positronic"
   },
   "dependencies": {
-    "@positronic/core": "^0.0.1"
+    "@positronic/core": "<%= positronicCoreVersion %>"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

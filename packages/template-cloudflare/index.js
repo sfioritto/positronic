@@ -64,26 +64,60 @@ module.exports = {
    * and the project name.
    */
   setup: async ctx => {
-    try {
-      const parentPackageJsonPath = path.join(ctx.dest, '..', 'package.json');
-      const userPackageJsonContent = await fs.readFile(parentPackageJsonPath, 'utf-8');
-      const userPackageJson = JSON.parse(userPackageJsonContent);
+    const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+    let coreVersion = 'latest'; // Default
+    let cloudflareVersion = 'latest'; // Default
+    let projectName = 'default-positronic-project'; // Default
 
-      if (!userPackageJson.name) {
-        throw new Error('Parent project package.json does not contain a "name" field.');
+    if (devRootPath) {
+      console.log(`Found POSITRONIC_PACKAGES_DEV_PATH: ${devRootPath}. Using local file paths for @positronic/* dependencies.`);
+      // Construct absolute paths for local dependencies
+      const corePath = path.resolve(devRootPath, 'packages', 'core');
+      const cloudflarePath = path.resolve(devRootPath, 'packages', 'cloudflare');
+      coreVersion = `file:${corePath}`;
+      cloudflareVersion = `file:${cloudflarePath}`;
+      console.log(`  - Mapping @positronic/core to ${coreVersion}`);
+      console.log(`  - Mapping @positronic/cloudflare to ${cloudflareVersion}`);
+
+      // Still try to get project name from parent package.json
+      try {
+        const parentPackageJsonPath = path.join(ctx.dest, '..', 'package.json');
+        const userPackageJsonContent = await fs.readFile(parentPackageJsonPath, 'utf-8');
+        const userPackageJson = JSON.parse(userPackageJsonContent);
+        if (userPackageJson.name) {
+          projectName = userPackageJson.name;
+        } else {
+          console.warn(`Warning: Parent project package.json at ${parentPackageJsonPath} does not contain a "name" field. Using default name: ${projectName}`);
+        }
+      } catch (error) {
+        console.warn(`Warning: Could not read or parse parent project's package.json at ${path.join(ctx.dest, '..')}. Error: ${error.message}. Using default project name: ${projectName}`);
       }
 
-      const projectName = userPackageJson.name;
-      ctx.answers.projectName = projectName;
-      ctx.answers.coreVersion = userPackageJson.dependencies?.['@positronic/core'] || 'latest';
-      ctx.answers.cloudflareVersion = userPackageJson.dependencies?.['@positronic/cloudflare'] || 'latest';
+    } else {
+      // If not using dev path, read versions from the parent project's package.json
+      try {
+        const parentPackageJsonPath = path.join(ctx.dest, '..', 'package.json');
+        const userPackageJsonContent = await fs.readFile(parentPackageJsonPath, 'utf-8');
+        const userPackageJson = JSON.parse(userPackageJsonContent);
 
-    } catch (error) {
-      console.warn(`Warning: Could not read or parse parent project's package.json at ${path.join(ctx.dest, '..')}. Error: ${error.message}. Using default project name and latest for Positronic dependencies.`);
-      ctx.answers.projectName = 'default-positronic-project';
-      ctx.answers.coreVersion = 'latest';
-      ctx.answers.cloudflareVersion = 'latest';
+        if (!userPackageJson.name) {
+          throw new Error('Parent project package.json does not contain a "name" field.');
+        }
+        projectName = userPackageJson.name;
+
+        // Use versions from parent project, or default to 'latest' if not found
+        coreVersion = userPackageJson.dependencies?.['@positronic/core'] || coreVersion;
+        cloudflareVersion = userPackageJson.dependencies?.['@positronic/cloudflare'] || cloudflareVersion;
+
+      } catch (error) {
+        console.warn(`Warning: Could not read or parse parent project's package.json at ${path.join(ctx.dest, '..')}. Error: ${error.message}. Using default project name ('${projectName}') and defaults for Positronic dependency versions ('${coreVersion}', '${cloudflareVersion}').`);
+      }
     }
+
+    // Store values in ctx.answers for template rendering
+    ctx.answers.projectName = projectName;
+    ctx.answers.positronicCoreVersion = coreVersion;
+    ctx.answers.positronicCloudflareVersion = cloudflareVersion;
   },
 
   /**
@@ -92,43 +126,45 @@ module.exports = {
    */
   prepare: async ctx => {
     // --- 1. Modify package.json ---
-    const packageJsonFile = ctx.files.find(f => f.path === 'package.json');
-    if (!packageJsonFile) {
-      throw new Error('package.json file not found in template files.');
-    }
+    // This section is removed as versions are now handled by template rendering via ctx.answers set in the setup hook.
+    // const packageJsonFile = ctx.files.find(f => f.path === 'package.json');
+    // if (!packageJsonFile) {
+    //   throw new Error('package.json file not found in template files.');
+    // }
+    //
+    // const packageJson = JSON.parse(packageJsonFile.contents.toString());
+    // packageJson.dependencies = packageJson.dependencies;
+    //
+    // if (!packageJson.dependencies) {
+    //   throw new Error('package.json does not contain a "dependencies" field.');
+    // }
+    //
+    // if (!packageJson.dependencies['@positronic/core'] || !packageJson.dependencies['@positronic/cloudflare']) {
+    //   throw new Error('package.json does not contain @positronic/core or @positronic/cloudflare dependencies.');
+    // }
+    // // These lines are replaced by using template variables in package.json.template
+    // packageJson.dependencies['@positronic/core'] = ctx.answers.coreVersion;
+    // packageJson.dependencies['@positronic/cloudflare'] = ctx.answers.cloudflareVersion;
+    //
+    // // Check for local development path override
+    // // This logic is now handled in the setup hook.
+    // const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+    // if (devRootPath) {
+    //   console.log(`Found POSITRONIC_PACKAGES_DEV_PATH: ${devRootPath}. Using local file paths for @positronic/* dependencies.`);
+    //   for (const dependency of Object.keys(packageJson.dependencies)) {
+    //     if (dependency.startsWith('@positronic/')) {
+    //       const packageName = dependency.replace('@positronic/', '');
+    //       // Construct the absolute path to the local package
+    //       const localPackagePath = path.resolve(devRootPath, 'packages', packageName);
+    //       // Use file: protocol for local dependency
+    //       packageJson.dependencies[dependency] = `file:${localPackagePath}`;
+    //       console.log(`  - Mapping ${dependency} to ${packageJson.dependencies[dependency]}`);
+    //     }
+    //   }
+    //
+    //   packageJsonFile.contents = Buffer.from(JSON.stringify(packageJson, null, 2));
+    // }
 
-    const packageJson = JSON.parse(packageJsonFile.contents.toString());
-    packageJson.dependencies = packageJson.dependencies;
-
-    if (!packageJson.dependencies) {
-      throw new Error('package.json does not contain a "dependencies" field.');
-    }
-
-    if (!packageJson.dependencies['@positronic/core'] || !packageJson.dependencies['@positronic/cloudflare']) {
-      throw new Error('package.json does not contain @positronic/core or @positronic/cloudflare dependencies.');
-    }
-    packageJson.dependencies['@positronic/core'] = ctx.answers.coreVersion;
-    packageJson.dependencies['@positronic/cloudflare'] = ctx.answers.cloudflareVersion;
-
-    // Check for local development path override
-    // This allows for developers of @positronic/core and @positronic/cloudflare to test changes to the packages
-    // by setting the POSITRONIC_PACKAGES_DEV_PATH environment variable.
-    const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
-    if (devRootPath) {
-      console.log(`Found POSITRONIC_PACKAGES_DEV_PATH: ${devRootPath}. Using local file paths for @positronic/* dependencies.`);
-      for (const dependency of Object.keys(packageJson.dependencies)) {
-        if (dependency.startsWith('@positronic/')) {
-          const packageName = dependency.replace('@positronic/', '');
-          // Construct the absolute path to the local package
-          const localPackagePath = path.resolve(devRootPath, 'packages', packageName);
-          // Use file: protocol for local dependency
-          packageJson.dependencies[dependency] = `file:${localPackagePath}`;
-          console.log(`  - Mapping ${dependency} to ${packageJson.dependencies[dependency]}`);
-        }
-      }
-
-      packageJsonFile.contents = Buffer.from(JSON.stringify(packageJson, null, 2));
-    }
 
     // --- 2. Generate _manifest.ts ---
     // The manifest is now generated by calling the dedicated function.
