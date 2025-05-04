@@ -1,8 +1,6 @@
 import type { ArgumentsCamelCase } from 'yargs';
-import caz from 'caz';
+import { generateProject } from './helpers.js';
 import path from 'path';
-import fs from 'fs';
-import os from 'os';
 
 
 interface AddProjectArgs {
@@ -66,40 +64,7 @@ export class ProjectCommand {
     async create({ name: projectPathArg }: ArgumentsCamelCase<CreateProjectArgs>) {
         const projectDir = path.resolve(projectPathArg);
         const projectName = path.basename(projectDir);
-
-        const devPath = process.env.POSITRONIC_LOCAL_PATH;
-        const isTestMode = process.env.NODE_ENV === 'test';
-
-        let newProjectTemplatePath = '@positronic/template-new-project';
-        if (devPath) {
-            const originalNewProjectPath = path.resolve(devPath, 'packages', 'template-new-project');
-
-            // Copying templates, why you ask?
-            // Well because when caz runs if you pass it a path to the template module
-            // it runs npm install --production in the template directory. This is a problem
-            // in our monorepo because this messes up the node_modules at the root of the
-            // monorepo which then causes the tests to fail. Also ny time I was generating a new
-            // project it was a pain to have to run npm install over and over again just
-            // to get back to a good state.
-            const tempNewProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-newproj-'));
-
-            fs.cpSync(originalNewProjectPath, tempNewProjectDir, { recursive: true });
-
-            newProjectTemplatePath = tempNewProjectDir;
-        }
-
-        let cazOptions;
-        if (isTestMode) {
-            cazOptions = { name: projectName, backend: 'cloudflare', install: true, pm: 'npm' };
-        } else {
-            cazOptions = { name: projectName };
-        }
-
-        await caz.default(newProjectTemplatePath, projectDir, {
-            ...cazOptions,
-            force: false,
-        });
-
+        await generateProject(projectName, projectDir);
         console.log(`\nProject '${projectName}' created successfully at ${projectDir}.`);
         console.log(`\nNext steps:`);
         console.log(`\ncd ${projectDir}`);

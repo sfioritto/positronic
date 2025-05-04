@@ -115,29 +115,11 @@ module.exports = {
 
     ctx.answers.projectName = ctx.answers.name;
   },
-  // --- ADD emit hook ---
   emit: async ctx => {
     if (ctx.answers.backend === 'cloudflare') {
       const projectRootPath = ctx.dest;
       const targetDirForManifest = path.join(ctx.dest, '.positronic', 'src');
       await generateManifest(projectRootPath, targetDirForManifest);
     }
-  },
-  complete: async ctx => {
-    const relativeDest = path.relative(process.cwd(), ctx.dest);
-    const cdCmd = relativeDest === '' ? '' : `cd ${relativeDest}`;
-    let message = `Created Positronic project \`${ctx.answers.name}\` with \`${ctx.answers.backend}\` backend in \`${relativeDest || '.'}\`.\\n\\nGetting Started:\\n`;
-    if (cdCmd) {
-      message += `  $ ${cdCmd}\\n`;
-    }
-    if (ctx.config.install === false) {
-      message += `  $ npm install # or pnpm install / yarn\\n`;
-    }
-    if (ctx.answers.backend === 'cloudflare') {
-      message += `  $ npx wrangler dev .positronic/dist/index.mjs --local # Start local dev server\\n`;
-      message += `  $ npm run deploy # Deploy to Cloudflare\\n`;
-    }
-    message += '\\nHappy hacking :)';
-    return message;
   }
 }
