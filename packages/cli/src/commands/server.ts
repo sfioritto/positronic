@@ -39,10 +39,10 @@ async function setupPositronicServerEnv(
             const tempProjectName = 'temp-positronic-gen'; // Name used for temp generation
             await generateProject(
                 tempProjectName,
-                path.join(tempDir, tempDir),
+                tempDir,
                 async () => {
-                    const sourcePositronicDir = path.join(tempDir as string, tempProjectName, '.positronic');
-                    const targetPositronicDir = serverDir; // The actual .positronic in user's project
+                    const sourcePositronicDir = path.join(tempDir!, '.positronic');
+                    const targetPositronicDir = serverDir;
 
                     // If forcing setup, remove existing target first
                     if (serverDirExists && forceSetup) {
