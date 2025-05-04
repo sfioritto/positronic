@@ -4,9 +4,11 @@ import * as os from 'os';
 import { execSync, spawn } from 'child_process';
 import process from 'process';
 import fetch from 'node-fetch';
-
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { fileURLToPath } from 'url';
 
 // Resolve paths relative to the workspace root
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(__dirname, '../../../../');
 const cliExecutable = path.join(workspaceRoot, 'packages/cli/dist/src/positronic.js');
 const nodeExecutable = process.execPath;

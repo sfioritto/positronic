@@ -1,6 +1,8 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import caz from 'caz';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
 
 interface AddProjectArgs {
@@ -66,38 +68,56 @@ export class ProjectCommand {
         const positronicDir = path.join(projectDir, '.positronic');
 
         const devPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
-        let newProjectTemplate: string;
-        let cloudflareTemplate: string;
+        const isTestMode = process.env.NODE_ENV === 'test';
 
+        let newProjectTemplatePath = '@positronic/template-new-project';
+        let cloudflareTemplatePath = '@positronic/template-cloudflare';
         if (devPath) {
-            console.log(`Using local development templates from: ${devPath}`);
-            newProjectTemplate = path.resolve(devPath, 'packages', 'template-new-project');
-            cloudflareTemplate = path.resolve(devPath, 'packages', 'template-cloudflare');
+            const originalNewProjectPath = path.resolve(devPath, 'packages', 'template-new-project');
+            const originalCloudflarePath = path.resolve(devPath, 'packages', 'template-cloudflare');
+
+            // Copying templates, why you ask?
+            // Well because when caz runs if you pass it a path to the template module
+            // it runs npm install --production in the template directory. This is a problem
+            // in our monorepo because this messes up the node_modules at the root of the
+            // monorepo which then causes the tests to fail. Also ny time I was generating a new
+            // project it was a pain to have to run npm install over and over again just
+            // to get back to a good state.
+            const tempNewProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-newproj-'));
+            const tempCloudflareDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-cf-'));
+
+            fs.cpSync(originalNewProjectPath, tempNewProjectDir, { recursive: true });
+            fs.cpSync(originalCloudflarePath, tempCloudflareDir, { recursive: true });
+
+            newProjectTemplatePath = tempNewProjectDir;
+            cloudflareTemplatePath = tempCloudflareDir;
+        }
+
+        let cazOptions;
+        if (isTestMode) {
+            cazOptions = { name: projectName, install: true, pm: 'npm' };
         } else {
-            newProjectTemplate = '@positronic/template-new-project';
-            cloudflareTemplate = '@positronic/template-cloudflare';
+            cazOptions = { name: projectName };
         }
 
-        try {
-            // 1. Scaffold the main project structure
-            await caz.default(newProjectTemplate, projectName, {
-                force: false,
-            });
+        // 1. Scaffold the main project structure
+        await caz.default(newProjectTemplatePath, projectName, {
+            ...cazOptions,
+            force: false,
+        });
 
-            // 2. Scaffold the .positronic directory for Cloudflare
-            await caz.default(cloudflareTemplate, positronicDir, {
-                force: false,
-            });
+        // 2. Scaffold the .positronic directory for Cloudflare
+        await caz.default(cloudflareTemplatePath, positronicDir, {
+            ...cazOptions,
+            force: false,
+        });
 
-            console.log(`
-Next steps:`);
-            console.log(`  cd ${projectName}`);
-            console.log(`  (Review package.json and install dependencies if needed)`);
-            console.log(`  positronic server (or just px s)  # To start the local dev server`);
-            console.log(` Open a new terminal and run: `);
-            console.log(`  px run example --watch  # To run the example workflow and watch for changes`);
-        } catch (error) {
-            console.error(`\nError creating project '${projectName}':`, error);
-        }
+        console.log(`\nProject '${projectName}' created successfully.`);
+        console.log(`\nNext steps:`);
+        console.log(`\ncd ${projectDir}`);
+        console.log(`\nInstall dependencies if needed (using npm/yarn/pnpm/etc)`);
+        console.log(`\npositronic server (or just px s)`);
+        console.log(`\nOpen a new terminal in '${projectName}' and run: `);
+        console.log(`\npx run example --watch`);
     }
 }
