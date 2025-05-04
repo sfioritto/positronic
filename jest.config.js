@@ -21,6 +21,10 @@ const config = {
     '/node_modules/',
     '/dist/',
     '<rootDir>/packages/cloudflare/test-project/',
+    '<rootDir>/packages/template-new-project/template/',
+  ],
+  modulePathIgnorePatterns: [
+    '<rootDir>/packages/template-new-project/template/'
   ],
 };
 

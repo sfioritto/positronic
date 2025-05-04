@@ -20,7 +20,6 @@
   },
   "exclude": [
     "packages/template-new-project",
-    "packages/template-cloudflare",
   ],
   "references": [
     { "path": "./packages/core" },

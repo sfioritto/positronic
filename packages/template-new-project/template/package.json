@@ -1,18 +1,27 @@
 {
   "name": "<%= name %>",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "description": "",
   "private": true,
-  "description": "Positronic project: <%= name %>",
-  "license": "MIT",
-  "type": "module",
   "scripts": {
-    "dev": "positronic server",
-    "positronic": "positronic"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    <% if (backend === 'cloudflare') { %>
+    "dev": "npx wrangler dev .positronic/dist/index.mjs --local",
+    "deploy": "npx wrangler deploy .positronic/src/index.ts"
+    <% } %>
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@positronic/core": "<%= positronicCoreVersion %>"
+    "@positronic/core": "<%= positronicCoreVersion %>"<% if (backend === 'cloudflare') { %>,
+    "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
   },
   "devDependencies": {
+    <% if (backend === 'cloudflare') { %>
+    "wrangler": "^3.0.0"
+    <% } else { %>
     "typescript": "^5.0.0"
+    <% } %>
   }
 }

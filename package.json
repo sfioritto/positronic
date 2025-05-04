@@ -30,7 +30,6 @@
   "workspaces": [
     "packages/core",
     "packages/template-new-project",
-    "packages/template-cloudflare",
     "packages/shell",
     "packages/client-anthropic",
     "packages/cli",
