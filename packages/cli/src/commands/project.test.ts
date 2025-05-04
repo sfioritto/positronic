@@ -3,54 +3,20 @@ import * as path from 'path';
 import * as os from 'os';
 import { execSync, spawn } from 'child_process';
 import process from 'process';
-import fetch from 'node-fetch';
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { fileURLToPath } from 'url';
+import { getRandomPort, waitForProcessToExit, waitForServerReady } from '../../../../test-utils.js';
+
+// Type alias for the expected history response structure
+type HistoryResponse = {
+    runs: any[]; // Assuming runs is an array of any type for simplicity
+};
 
 // Resolve paths relative to the workspace root
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(__dirname, '../../../../');
 const cliExecutable = path.join(workspaceRoot, 'packages/cli/dist/src/positronic.js');
 const nodeExecutable = process.execPath;
-
-// Simple random port generator (user port range)
-function getRandomPort(): number {
-    return Math.floor(Math.random() * (60000 - 10000 + 1)) + 10000;
-}
-
-async function waitForProcessToExit(pid: number): Promise<boolean> {
-    const attempts = 4;
-    const intervalMs = 50;
-    let processExited = false;
-    for (let i = 0; i < attempts; i++) {
-        try {
-            process.kill(pid, 0);
-        } catch (error) {
-            processExited = true;
-            break;
-        }
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
-    }
-    return processExited;
-}
-
-async function waitForServerReady(url: string): Promise<boolean> {
-    const attempts = 10;
-    const intervalMs = 500;
-    let serverReady = false;
-    for (let i = 0; i < attempts; i++) {
-        try {
-            await fetch(url);
-            // If fetch succeeds (doesn't throw), the server is listening
-            serverReady = true;
-            break;
-        } catch (error) {
-            // Ignore network errors (like ECONNREFUSED), server not ready
-        }
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
-    }
-    return serverReady;
-}
 
 // Increase test timeout to 10 seconds because these tests are slow by their nature
 jest.setTimeout(10000);
@@ -119,7 +85,7 @@ describe('CLI Integration: positronic new (Simplified)', () => {
 
         const response = await fetch(`${serverUrl}/brains/example/history?limit=25`);
         expect(response.ok).toBe(true);
-        const historyData = await response.json();
+        const historyData = await response.json() as HistoryResponse;
         expect(historyData.runs.length).toBe(1);
 
         serverProcess.kill('SIGTERM');
