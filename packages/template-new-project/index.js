@@ -40,18 +40,6 @@ module.exports = {
       const corePath = path.resolve(devRootPath, 'packages', 'core');
       coreVersion = `file:${corePath}`;
       console.log(`  - Mapping @positronic/core to ${coreVersion}`);
-    } else {
-      // If not using dev path, try reading the version from the parent project's package.json
-      try {
-        // ctx.dest points to the directory where caz outputs the template, which is the project root for `new`
-        const parentPackageJsonPath = path.join(ctx.dest, 'package.json');
-        const userPackageJsonContent = await fs.readFile(parentPackageJsonPath, 'utf-8');
-        const userPackageJson = JSON.parse(userPackageJsonContent);
-        coreVersion = userPackageJson.dependencies?.['@positronic/core'] || coreVersion;
-      } catch (error) {
-        // It's okay if package.json doesn't exist yet or is unreadable during `positronic new`
-        // console.warn(`Warning: Could not read or parse project package.json at ${path.join(ctx.dest, '..')}. Error: ${error.message}. Using default version for @positronic/core: ${coreVersion}`);
-      }
     }
 
     // Store value in ctx.answers for template rendering

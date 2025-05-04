@@ -10,47 +10,33 @@ async function generateManifest(projectRootPath, targetSrcDir) {
   let importStatements = `import type { Workflow } from '@positronic/core';\n`;
   let manifestEntries = '';
 
-  try {
-    // Ensure brains directory exists before trying to read it
-    try {
-      await fs.access(brainsDir);
-    } catch (e) {
-      console.warn(`Warning: 'brains' directory not found at ${brainsDir}. Manifest will be empty.`);
-      // Fall through to write empty manifest
+  // Proceed only if brainsDir exists. It may not exist if generating this template
+  // outside of a Positronic project e.g. for testing/local development.
+  const brainsDirExists = await fs.access(brainsDir).then(() => true).catch(() => false);
+  if (brainsDirExists) {
+    const files = await fs.readdir(brainsDir);
+    const brainFiles = files.filter(file => file.endsWith('.ts') && !file.startsWith('_'));
+
+    for (const file of brainFiles) {
+      const brainName = path.basename(file, '.ts');
+      // Path relative from within the generated .positronic/src directory
+      const importPath = `../../brains/${brainName}.js`;
+      const importAlias = `brain_${brainName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+
+      importStatements += `import * as ${importAlias} from '${importPath}';\n`;
+      manifestEntries += `  ${JSON.stringify(brainName)}: ${importAlias}.default as Workflow,\n`;
     }
-
-    // Proceed only if brainsDir exists
-    if (await fs.access(brainsDir).then(() => true).catch(() => false)) {
-      const files = await fs.readdir(brainsDir);
-      const brainFiles = files.filter(file => file.endsWith('.ts') && !file.startsWith('_'));
-
-      for (const file of brainFiles) {
-        const brainName = path.basename(file, '.ts');
-        // Path relative from within the generated .positronic/src directory
-        const importPath = `../../brains/${brainName}.js`;
-        const importAlias = `brain_${brainName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
-
-        importStatements += `import * as ${importAlias} from '${importPath}';\n`;
-        manifestEntries += `  ${JSON.stringify(brainName)}: ${importAlias}.default as Workflow,\n`;
-      }
-    }
-
-  } catch (error) {
-    // Log error during reading/processing brains, but still attempt to write the manifest
-    console.error(`Error processing brains directory at ${brainsDir}: ${error.message}. Manifest might be incomplete.`);
   }
 
   const manifestContent = `// This file is generated automatically. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};
 `;
 
   try {
-    // Ensure target directory exists before writing
     await fs.mkdir(targetSrcDir, { recursive: true });
     await fs.writeFile(manifestPath, manifestContent, 'utf-8');
-    // console.log(`Manifest generated at ${manifestPath}`); // Optional: for debugging
   } catch (writeError) {
     console.error(`Error writing manifest file at ${manifestPath}: ${writeError.message}`);
-    throw writeError; // Re-throw write error as it's critical
+    throw writeError;
   }
 }
 
