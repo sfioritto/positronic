@@ -1,21 +1,19 @@
 import { WorkflowRunner } from './workflow-runner.js';
 import { workflow } from './workflow.js';
 import { WORKFLOW_EVENTS, STATUS } from './constants.js';
-import { ResourceLoader } from '@positronic/resources/src/types.js';
-
-class TestResourceLoader implements ResourceLoader {
-  async load(path: string, type?: 'text' | 'image' | 'binary'): Promise<string | Buffer> {
-    return Promise.resolve('');
-  }
-}
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { PromptClient } from '../clients/types.js';
+import { Adapter } from '../adapters/types.js';
 
 describe('WorkflowRunner', () => {
-  const mockClient = {
-    execute: jest.fn(),
+  const mockExecute = jest.fn<PromptClient['execute']>();
+  const mockClient: jest.Mocked<PromptClient> = {
+    execute: mockExecute,
   };
 
-  const mockAdapter = {
-    dispatch: jest.fn()
+  const mockDispatch = jest.fn<Adapter['dispatch']>();
+  const mockAdapter: jest.Mocked<Adapter> = {
+    dispatch: mockDispatch
   };
 
   beforeEach(() => {
@@ -79,8 +77,8 @@ describe('WorkflowRunner', () => {
 
     // Verify the order of events
     const stepCompletions = mockAdapter.dispatch.mock.calls
-      .filter(call => call[0].type === WORKFLOW_EVENTS.STEP_COMPLETE)
-      .map(call => call[0].stepTitle);
+      .filter(call => (call[0] as any).type === WORKFLOW_EVENTS.STEP_COMPLETE)
+      .map(call => (call[0] as any).stepTitle);
 
     expect(stepCompletions).toEqual([
       'First Step',
