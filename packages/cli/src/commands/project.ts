@@ -63,8 +63,9 @@ export class ProjectCommand {
      * Creates a new project directory structure and populates it with template files.
      * Also sets up the .positronic server environment.
      */
-    async create({ name: projectName }: ArgumentsCamelCase<CreateProjectArgs>) {
-        const projectDir = path.resolve(projectName);
+    async create({ name: projectPathArg }: ArgumentsCamelCase<CreateProjectArgs>) {
+        const projectDir = path.resolve(projectPathArg);
+        const projectName = path.basename(projectDir);
         const positronicDir = path.join(projectDir, '.positronic');
 
         const devPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
@@ -101,18 +102,18 @@ export class ProjectCommand {
         }
 
         // 1. Scaffold the main project structure
-        await caz.default(newProjectTemplatePath, projectName, {
+        await caz.default(newProjectTemplatePath, projectDir, {
             ...cazOptions,
             force: false,
         });
 
         // 2. Scaffold the .positronic directory for Cloudflare
         await caz.default(cloudflareTemplatePath, positronicDir, {
-            ...cazOptions,
+            ...cazOptions, // cazOptions already contains { name: projectName }
             force: false,
         });
 
-        console.log(`\nProject '${projectName}' created successfully.`);
+        console.log(`\nProject '${projectName}' created successfully at ${projectDir}.`);
         console.log(`\nNext steps:`);
         console.log(`\ncd ${projectDir}`);
         console.log(`\nInstall dependencies if needed (using npm/yarn/pnpm/etc)`);
