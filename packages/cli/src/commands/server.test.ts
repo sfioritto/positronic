@@ -148,4 +148,55 @@ describe('CLI Integration: positronic server (Regeneration)', () => {
 
         // Next step: Verify .positronic folder regeneration
     });
+
+    it('should force regenerate .positronic folder and start server', async () => {
+        // 1. Generate a project
+        execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
+            cwd: tempDir,
+            stdio: 'ignore',
+            env: {
+                ...process.env,
+                POSITRONIC_LOCAL_PATH: workspaceRoot
+            }
+        });
+        const projectPath = path.join(tempDir, projectName);
+        expect(fs.existsSync(projectPath)).toBe(true);
+
+        // 2. Verify .positronic folder exists initially
+        const positronicDir = path.join(projectPath, '.positronic');
+        expect(fs.existsSync(positronicDir)).toBe(true);
+
+        // 3. Run the server with --force
+        const testPort = getRandomPort();
+        const serverUrl = `http://localhost:${testPort}`;
+
+        serverProcess = spawn(nodeExecutable, [
+            cliExecutable,
+            'server',
+            '--port',
+            testPort.toString(),
+            '--force' // Add the force flag
+        ], {
+            cwd: projectPath,
+            stdio: 'ignore', // Keep stdio ignored for this test
+            detached: false,
+            shell: true,
+            env: {
+                ...process.env,
+                POSITRONIC_LOCAL_PATH: workspaceRoot
+            }
+        });
+
+        const pid = serverProcess.pid;
+        if (!pid) {
+            throw new Error('Server process PID is undefined');
+        }
+
+        // 4. Verify that the server started
+        const ready = await waitForServerReady(serverUrl);
+        expect(ready).toBe(true);
+
+        // 5. Verify .positronic folder still exists (was regenerated)
+        expect(fs.existsSync(positronicDir)).toBe(true);
+    });
 });
