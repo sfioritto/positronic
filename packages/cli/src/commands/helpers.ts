@@ -17,8 +17,8 @@ export async function renderPackageJson(
   const templatePath = path.join(templatesPath, 'package.json.tpl');
   const template = await fsPromises.readFile(templatePath, 'utf-8');
 
-  // Check for POSITRONIC_PACKAGES_DEV_PATH, if set, use it to replace @positronic/core with a local path for doing development work on the core package
-  const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+  // Check for POSITRONIC_LOCAL_PATH, if set, use it to replace @positronic/core with a local path for doing development work on the core package
+  const devRootPath = process.env.POSITRONIC_LOCAL_PATH;
 
   let renderedTemplate = template.replace(/{{projectName}}/g, projectName);
   const packageJson = JSON.parse(renderedTemplate);

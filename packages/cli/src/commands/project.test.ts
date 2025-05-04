@@ -74,7 +74,7 @@ describe('CLI Integration: positronic new (Simplified)', () => {
             stdio: 'ignore',
             env: {
                 ...process.env,
-                POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot
+                POSITRONIC_LOCAL_PATH: workspaceRoot
             }
         });
 
@@ -95,7 +95,7 @@ describe('CLI Integration: positronic new (Simplified)', () => {
             detached: false,
             env: {
                 ...process.env,
-                POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot
+                POSITRONIC_LOCAL_PATH: workspaceRoot
             }
         });
 
@@ -112,7 +112,7 @@ describe('CLI Integration: positronic new (Simplified)', () => {
             stdio: 'ignore',
             env: {
                 ...process.env,
-                POSITRONIC_PACKAGES_DEV_PATH: workspaceRoot,
+                POSITRONIC_LOCAL_PATH: workspaceRoot,
                 POSITRONIC_SERVER_PORT: testPort.toString()
             }
         });

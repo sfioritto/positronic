@@ -32,11 +32,11 @@ module.exports = {
     }
   ],
   setup: async ctx => {
-    const devRootPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+    const devRootPath = process.env.POSITRONIC_LOCAL_PATH;
     let coreVersion = 'latest'; // Default
 
     if (devRootPath) {
-      console.log(`Found POSITRONIC_PACKAGES_DEV_PATH: ${devRootPath}. Using local file path for @positronic/core.`);
+      console.log(`Found POSITRONIC_LOCAL_PATH: ${devRootPath}. Using local file path for @positronic/core.`);
       const corePath = path.resolve(devRootPath, 'packages', 'core');
       coreVersion = `file:${corePath}`;
       console.log(`  - Mapping @positronic/core to ${coreVersion}`);

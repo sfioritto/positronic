@@ -68,7 +68,7 @@ export class ProjectCommand {
         const projectName = path.basename(projectDir);
         const positronicDir = path.join(projectDir, '.positronic');
 
-        const devPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+        const devPath = process.env.POSITRONIC_LOCAL_PATH;
         const isTestMode = process.env.NODE_ENV === 'test';
 
         let newProjectTemplatePath = '@positronic/template-new-project';

@@ -16,7 +16,7 @@ export async function setupPositronicServerEnv(
     forceSetup: boolean = false
 ) {
     const serverDir = path.join(projectRootPath, '.positronic');
-    const devPath = process.env.POSITRONIC_PACKAGES_DEV_PATH;
+    const devPath = process.env.POSITRONIC_LOCAL_PATH;
     let cloudflareTemplate: string;
 
     if (devPath) {
