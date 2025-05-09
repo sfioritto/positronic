@@ -12,38 +12,39 @@ CREATE TABLE IF NOT EXISTS workflow_events (
 `;
 
 export class WorkflowRunSQLiteAdapter implements Adapter {
-    private sql: SqlStorage;
-    private schemaInitialized = false; // Track schema initialization
+  private sql: SqlStorage;
+  private schemaInitialized = false; // Track schema initialization
 
-    constructor(sql: SqlStorage) {
-        this.sql = sql;
+  constructor(sql: SqlStorage) {
+    this.sql = sql;
+  }
+
+  private initializeSchema() {
+    if (!this.schemaInitialized) {
+      this.sql.exec(initSQL);
+      this.schemaInitialized = true;
     }
+  }
 
-    private initializeSchema() {
-        if (!this.schemaInitialized) {
-            this.sql.exec(initSQL);
-            this.schemaInitialized = true;
-        }
-    }
+  public dispatch(event: WorkflowEvent) {
+    try {
+      this.initializeSchema();
 
-    public dispatch(event: WorkflowEvent) {
-        try {
-            this.initializeSchema();
-
-            const insertSql = `
+      const insertSql = `
                 INSERT INTO workflow_events (
                     event_type,
                     serialized_event
                 ) VALUES (?, ?);`;
 
-            this.sql.exec(insertSql,
-                event.type,
-                JSON.stringify(event)
-            );
-
-        } catch (e) {
-            console.error("[SQL_ADAPTER] Error handling workflow event:", e, "Event data:", JSON.stringify(event));
-            throw e;
-        }
+      this.sql.exec(insertSql, event.type, JSON.stringify(event));
+    } catch (e) {
+      console.error(
+        '[SQL_ADAPTER] Error handling workflow event:',
+        e,
+        'Event data:',
+        JSON.stringify(event)
+      );
+      throw e;
     }
+  }
 }

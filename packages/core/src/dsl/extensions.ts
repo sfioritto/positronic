@@ -1,8 +1,8 @@
-import { Workflow } from "./workflow.js";
+import { Workflow } from './workflow.js';
 
 export function createExtension<
   TExtensionKey extends string,
-  TExtension extends Record<string, any>
+  TExtension extends Record<string, any>,
 >(key: TExtensionKey, extension: TExtension) {
   return {
     install() {
@@ -13,7 +13,7 @@ export function createExtension<
             boundMethods[methodKey] = fn.bind(this);
           }
           return boundMethods;
-        }
+        },
       });
     },
   };

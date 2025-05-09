@@ -5,7 +5,10 @@ import type { ResourceLoader } from './types.js';
 export class LocalResourceLoader implements ResourceLoader {
   constructor(private baseDir: string) {}
 
-  async load(resourceName: string, type: 'text' | 'image' | 'binary' = 'text'): Promise<string | Buffer> {
+  async load(
+    resourceName: string,
+    type: 'text' | 'image' | 'binary' = 'text'
+  ): Promise<string | Buffer> {
     const filePath = join(this.baseDir, resourceName);
 
     if (type === 'text') {

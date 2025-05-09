@@ -30,11 +30,13 @@ export class PositronicManifest {
   private importStrategy: WorkflowImportStrategy;
 
   constructor(options: {
-    staticManifest?: Record<string, Workflow>,
-    workflowsDir?: string
+    staticManifest?: Record<string, Workflow>;
+    workflowsDir?: string;
   }) {
     if (options.staticManifest && options.workflowsDir) {
-      throw new Error('Cannot provide both staticManifest and workflowsDir - choose one import strategy');
+      throw new Error(
+        'Cannot provide both staticManifest and workflowsDir - choose one import strategy'
+      );
     }
     if (!options.staticManifest && !options.workflowsDir) {
       throw new Error('Must provide either staticManifest or workflowsDir');

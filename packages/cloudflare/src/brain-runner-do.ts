@@ -1,6 +1,12 @@
 import { WorkflowRunner } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
-import type { Workflow, PromptClient, ResponseModel, Adapter, WorkflowEvent } from '@positronic/core';
+import type {
+  Workflow,
+  PromptClient,
+  ResponseModel,
+  Adapter,
+  WorkflowEvent,
+} from '@positronic/core';
 import { z, TypeOf } from 'zod';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
@@ -10,8 +16,11 @@ export type PositronicManifest = {
 };
 
 const baseClient: PromptClient = {
-  execute: async <T extends z.AnyZodObject>(prompt: string, responseModel: ResponseModel<T>): Promise<TypeOf<T>> => {
-    return "stuff" as any;
+  execute: async <T extends z.AnyZodObject>(
+    prompt: string,
+    responseModel: ResponseModel<T>
+  ): Promise<TypeOf<T>> => {
+    return 'stuff' as any;
   },
 };
 
@@ -41,11 +50,14 @@ class EventStreamAdapter implements Adapter {
   private broadcast(event: WorkflowEvent<any>) {
     const message = `data: ${JSON.stringify(event)}\n\n`;
     const encodedMessage = this.encoder.encode(message);
-    this.subscribers.forEach(controller => {
+    this.subscribers.forEach((controller) => {
       try {
         controller.enqueue(encodedMessage);
       } catch (e) {
-        console.error("[DO_SSE_ADAPTER] Failed to send message to subscriber, removing.", e);
+        console.error(
+          '[DO_SSE_ADAPTER] Failed to send message to subscriber, removing.',
+          e
+        );
         this.unsubscribe(controller);
       }
     });
@@ -55,7 +67,7 @@ class EventStreamAdapter implements Adapter {
     try {
       this.broadcast(event);
     } catch (e) {
-      console.error("[DO_SSE_ADAPTER] Error dispatching event:", e);
+      console.error('[DO_SSE_ADAPTER] Error dispatching event:', e);
       throw e;
     }
   }
@@ -93,7 +105,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const workflowToRun = await runtimeManifest.import(brainName);
     if (!workflowToRun) {
-      console.error(`[DO ${workflowRunId}] Workflow ${brainName} not found in manifest.`);
+      console.error(
+        `[DO ${workflowRunId}] Workflow ${brainName} not found in manifest.`
+      );
       console.error(JSON.stringify(runtimeManifest, null, 2));
       throw new Error(`Workflow ${brainName} not found`);
     }
@@ -109,12 +123,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
       client: baseClient,
     });
 
-    runner.run(workflowToRun, {
+    runner
+      .run(workflowToRun, {
         initialState: initialData || {},
         workflowRunId,
-    }).catch(err => {
-      console.error(`[DO ${workflowRunId}] WorkflowRunner run failed:`, err);
-    });
+      })
+      .catch((err) => {
+        console.error(`[DO ${workflowRunId}] WorkflowRunner run failed:`, err);
+      });
   }
 
   async fetch(request: Request) {
@@ -122,7 +138,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const url = new URL(request.url);
     const encoder = new TextEncoder();
 
-    const sendEvent = (controller: ReadableStreamDefaultController, data: any) => {
+    const sendEvent = (
+      controller: ReadableStreamDefaultController,
+      data: any
+    ) => {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
     };
 
@@ -139,27 +158,36 @@ export class BrainRunnerDO extends DurableObject<Env> {
                 FROM workflow_events
                 ORDER BY event_id ASC;
               `;
-              const existingEventsResult = sql.exec<{ serialized_event: string }>(existingEventsSql).toArray();
+              const existingEventsResult = sql
+                .exec<{ serialized_event: string }>(existingEventsSql)
+                .toArray();
 
               for (const row of existingEventsResult) {
                 try {
                   const event = JSON.parse(row.serialized_event);
                   sendEvent(controller, event);
                 } catch (parseError) {
-                  console.error(`[DO ${workflowRunId} WATCH] Failed to parse historical event JSON: ${row.serialized_event}`, parseError);
+                  console.error(
+                    `[DO ${workflowRunId} WATCH] Failed to parse historical event JSON: ${row.serialized_event}`,
+                    parseError
+                  );
                 }
               }
 
               eventStreamAdapter.subscribe(controller);
             } catch (err) {
-              console.error(`[DO ${workflowRunId} WATCH] Error during stream start:`, err);
+              console.error(
+                `[DO ${workflowRunId} WATCH] Error during stream start:`,
+                err
+              );
               controller.close();
               eventStreamAdapter.unsubscribe(streamController);
               throw err;
             }
           },
           cancel(reason) {
-            if (streamController) eventStreamAdapter.unsubscribe(streamController);
+            if (streamController)
+              eventStreamAdapter.unsubscribe(streamController);
           },
         });
 
@@ -167,12 +195,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
           headers: {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
+            Connection: 'keep-alive',
           },
         });
       }
 
-      console.warn(`[DO ${workflowRunId}] fetch() called with unhandled path: ${url.pathname}`);
+      console.warn(
+        `[DO ${workflowRunId}] fetch() called with unhandled path: ${url.pathname}`
+      );
       return new Response('Not found', { status: 404 });
     } catch (error) {
       console.error(`[DO ${workflowRunId}] Error in fetch():`, error);

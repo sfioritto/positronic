@@ -50,9 +50,9 @@ Here are six real-world workflows that Positronic handles beautifully.
 Update hundreds of docs to match a friendlier, more on-brand tone.
 
 ```ts
-export const rewriteSOP = workflow("rewrite-sop")
-  .step("load", async ({ input }) => ({ doc: await loadFromDocs(input.id) }))
-  .prompt("rewrite", async ({ state }) => ({
+export const rewriteSOP = workflow('rewrite-sop')
+  .step('load', async ({ input }) => ({ doc: await loadFromDocs(input.id) }))
+  .prompt('rewrite', async ({ state }) => ({
     system: `You are an HR writer.`,
     context: state.doc,
     instructions: `Rewrite this using our 2024 tone guide.`,
@@ -64,9 +64,9 @@ export const rewriteSOP = workflow("rewrite-sop")
 Synthesize qualitative feedback across dozens of offboarded employees.
 
 ```ts
-export const summarizeExitInterviews = workflow("exit-summary")
-  .step("load", async () => ({ interviews: await loadCSV("interviews.csv") }))
-  .prompt("summarize", async ({ state }) => ({
+export const summarizeExitInterviews = workflow('exit-summary')
+  .step('load', async () => ({ interviews: await loadCSV('interviews.csv') }))
+  .prompt('summarize', async ({ state }) => ({
     system: `You are an HR analyst.`,
     context: state.interviews,
     instructions: `Summarize themes, issues, and feedback trends.`,
@@ -78,12 +78,12 @@ export const summarizeExitInterviews = workflow("exit-summary")
 Update all your PDPs to reflect new SEO goals and keywords.
 
 ```ts
-export const seoRewrite = workflow("seo-rewrite")
-  .step("load", async ({ input }) => ({
+export const seoRewrite = workflow('seo-rewrite')
+  .step('load', async ({ input }) => ({
     copy: await loadCopy(input.productId),
     keywords: await fetchKeywords(input.productId),
   }))
-  .prompt("rewrite", async ({ state }) => ({
+  .prompt('rewrite', async ({ state }) => ({
     system: `You are an e-commerce copywriter.`,
     context: { ...state },
     instructions: `Rewrite to naturally include these keywords and keep the tone consistent.`,
@@ -97,12 +97,12 @@ export const seoRewrite = workflow("seo-rewrite")
 Auto-generate test coverage for key untested logic.
 
 ```ts
-export const writeMissingTests = workflow("write-tests")
-  .step("load", async () => ({
-    files: await glob("src/**/*.ts"),
+export const writeMissingTests = workflow('write-tests')
+  .step('load', async () => ({
+    files: await glob('src/**/*.ts'),
     coverage: await loadCoverage(),
   }))
-  .prompt("generate", async ({ state }) => ({
+  .prompt('generate', async ({ state }) => ({
     system: `You are a senior engineer.`,
     context: state,
     instructions: `Write Jest tests for these uncovered functions.`,
@@ -114,9 +114,9 @@ export const writeMissingTests = workflow("write-tests")
 Find and safely delete unused functions or components.
 
 ```ts
-export const pruneDeadCode = workflow("dead-code")
-  .step("load", async () => ({ graph: await buildUsageGraph() }))
-  .prompt("detect", async ({ state }) => ({
+export const pruneDeadCode = workflow('dead-code')
+  .step('load', async () => ({ graph: await buildUsageGraph() }))
+  .prompt('detect', async ({ state }) => ({
     system: `You are reviewing a codebase.`,
     context: state.graph,
     instructions: `Identify unused exports and mark them for safe deletion.`,
@@ -128,9 +128,9 @@ export const pruneDeadCode = workflow("dead-code")
 Iteratively convert legacy React code using LLM judgment.
 
 ```ts
-export const migrateReactHooks = workflow("react-hooks")
-  .step("load", async () => ({ components: await findClassComponents("src/") }))
-  .prompt("refactor", async ({ state }) => ({
+export const migrateReactHooks = workflow('react-hooks')
+  .step('load', async () => ({ components: await findClassComponents('src/') }))
+  .prompt('refactor', async ({ state }) => ({
     system: `You are a React engineer.`,
     context: state.components,
     instructions: `Convert these to function components using hooks.`,

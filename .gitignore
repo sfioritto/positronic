@@ -2,7 +2,6 @@ node_modules
 tsconfig.tsbuildinfo
 dist/
 coverage/
-.vscode/
 .swc/
 .env
 .DS_Store

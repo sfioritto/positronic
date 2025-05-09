@@ -3,33 +3,30 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "test-project",
-	"main": "src/index.ts",
-	"compatibility_date": "2025-04-04",
-	"compatibility_flags": ["nodejs_compat"],
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": [
-				"BrainRunnerDO",
-				"MonitorDO"
-			]
-		}
-	],
-	"durable_objects": {
-		"bindings": [
-			{
-				"class_name": "BrainRunnerDO",
-				"name": "BRAIN_RUNNER_DO"
-			},
-			{
-				"class_name": "MonitorDO",
-				"name": "MONITOR_DO"
-			}
-		]
-	},
-	"observability": {
-		"enabled": true
-	}
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "test-project",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-04-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["BrainRunnerDO", "MonitorDO"],
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "BrainRunnerDO",
+        "name": "BRAIN_RUNNER_DO",
+      },
+      {
+        "class_name": "MonitorDO",
+        "name": "MONITOR_DO",
+      },
+    ],
+  },
+  "observability": {
+    "enabled": true,
+  },
 }

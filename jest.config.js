@@ -6,7 +6,7 @@ const config = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@positronic/core$': '<rootDir>/packages/core/src',
-    '^@positronic/(.*)$': '<rootDir>/packages/$1/src'
+    '^@positronic/(.*)$': '<rootDir>/packages/$1/src',
   },
   transform: {
     '^.+\\.tsx?$': [
@@ -24,7 +24,7 @@ const config = {
     '<rootDir>/packages/template-new-project/template/',
   ],
   modulePathIgnorePatterns: [
-    '<rootDir>/packages/template-new-project/template/'
+    '<rootDir>/packages/template-new-project/template/',
   ],
 };
 

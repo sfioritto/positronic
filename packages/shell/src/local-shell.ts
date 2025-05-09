@@ -1,7 +1,11 @@
 import { spawn } from 'child_process';
 import { Readable } from 'stream';
 
-import type { Shell, ExecCommandOptions, ExecCommandResponse } from './types.js';
+import type {
+  Shell,
+  ExecCommandOptions,
+  ExecCommandResponse,
+} from './types.js';
 
 interface LocalShellOptions {
   cwd?: string;
@@ -12,7 +16,10 @@ interface LocalShellOptions {
 export class LocalShell implements Shell {
   constructor(private config: LocalShellOptions = {}) {}
 
-  async execCommand(givenCommand: string, options: ExecCommandOptions = {}): Promise<ExecCommandResponse> {
+  async execCommand(
+    givenCommand: string,
+    options: ExecCommandOptions = {}
+  ): Promise<ExecCommandResponse> {
     return new Promise((resolve, reject) => {
       const {
         cwd = this.config.cwd || process.cwd(),
@@ -23,7 +30,7 @@ export class LocalShell implements Shell {
         onStderr,
         env = this.config.env,
         timeout,
-        shell = this.config.shell || 'bash'
+        shell = this.config.shell || 'bash',
       } = options;
 
       const childProcess = spawn(shell, ['-c', givenCommand], {

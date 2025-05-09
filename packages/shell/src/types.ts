@@ -21,6 +21,13 @@ export interface ExecCommandResponse {
 }
 
 export interface Shell {
-  execCommand(givenCommand: string, options?: ExecCommandOptions): Promise<ExecCommandResponse>;
-  exec(command: string, parameters: string[], options?: ExecCommandOptions): Promise<string | ExecCommandResponse>;
+  execCommand(
+    givenCommand: string,
+    options?: ExecCommandOptions
+  ): Promise<ExecCommandResponse>;
+  exec(
+    command: string,
+    parameters: string[],
+    options?: ExecCommandOptions
+  ): Promise<string | ExecCommandResponse>;
 }

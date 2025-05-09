@@ -16,11 +16,9 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["jest", "node"],
+    "types": ["jest", "node"]
   },
-  "exclude": [
-    "packages/template-new-project",
-  ],
+  "exclude": ["packages/template-new-project"],
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/cli" },

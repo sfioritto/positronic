@@ -2,21 +2,21 @@ import {
   env,
   createExecutionContext,
   waitOnExecutionContext,
-} from "cloudflare:test";
+} from 'cloudflare:test';
 
-import { describe, it, expect } from "vitest";
-import worker from "../src/index";
-import { WORKFLOW_EVENTS, STATUS } from "@positronic/core";
+import { describe, it, expect } from 'vitest';
+import worker from '../src/index';
+import { WORKFLOW_EVENTS, STATUS } from '@positronic/core';
 import type {
   WorkflowEvent,
   WorkflowStartEvent,
   WorkflowCompleteEvent,
   StepStatusEvent,
   StepCompletedEvent,
-  StepStartedEvent
-} from "@positronic/core";
-import type { BrainRunnerDO } from "../../src/brain-runner-do.js";
-import type { MonitorDO } from "../../src/monitor-do.js";
+  StepStartedEvent,
+} from '@positronic/core';
+import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
+import type { MonitorDO } from '../../src/monitor-do.js';
 
 interface TestEnv {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
@@ -24,7 +24,7 @@ interface TestEnv {
   DB: D1Database;
 }
 
-describe("Hono API Tests", () => {
+describe('Hono API Tests', () => {
   // Helper to parse SSE data field
   function parseSseEvent(text: string): any | null {
     const lines = text.trim().split('\n');
@@ -35,7 +35,11 @@ describe("Hono API Tests", () => {
           const parsed = JSON.parse(jsonData);
           return parsed;
         } catch (e) {
-          console.error("[TEST_SSE_PARSE] Failed to parse SSE data:", line.substring(6), e);
+          console.error(
+            '[TEST_SSE_PARSE] Failed to parse SSE data:',
+            line.substring(6),
+            e
+          );
           return null;
         }
       }
@@ -44,10 +48,12 @@ describe("Hono API Tests", () => {
   }
 
   // Helper function to read the entire SSE stream and collect events
-  async function readSseStream(stream: ReadableStream<Uint8Array>): Promise<WorkflowEvent[]> {
+  async function readSseStream(
+    stream: ReadableStream<Uint8Array>
+  ): Promise<WorkflowEvent[]> {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
-    let buffer = "";
+    let buffer = '';
     const events: WorkflowEvent[] = [];
 
     while (true) {
@@ -67,14 +73,17 @@ describe("Hono API Tests", () => {
       buffer += decodedChunk;
       // Process buffer line by line, looking for complete messages (ending in \n\n)
       let eventEndIndex;
-      while ((eventEndIndex = buffer.indexOf("\n\n")) !== -1) {
+      while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
         const message = buffer.substring(0, eventEndIndex);
         buffer = buffer.substring(eventEndIndex + 2); // Consume message + \n\n
-        if (message.startsWith("data:")) {
+        if (message.startsWith('data:')) {
           const event = parseSseEvent(message);
           if (event) {
             events.push(event);
-            if (event.type === WORKFLOW_EVENTS.COMPLETE || event.type === WORKFLOW_EVENTS.ERROR) {
+            if (
+              event.type === WORKFLOW_EVENTS.COMPLETE ||
+              event.type === WORKFLOW_EVENTS.ERROR
+            ) {
               reader.cancel(`Received terminal event: ${event.type}`);
               return events;
             }
@@ -85,12 +94,12 @@ describe("Hono API Tests", () => {
     return events;
   }
 
-  it("POST /brains/runs without brainName should return 400", async () => {
+  it('POST /brains/runs without brainName should return 400', async () => {
     const testEnv = env as TestEnv;
 
-    const request = new Request("http://example.com/brains/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const request = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}), // Empty body, check for missing brainName
     });
     const context = createExecutionContext();
@@ -99,17 +108,19 @@ describe("Hono API Tests", () => {
 
     expect(response.status).toBe(400);
     const responseBody = await response.json();
-    expect(responseBody).toEqual({ error: 'Missing brainName in request body' });
+    expect(responseBody).toEqual({
+      error: 'Missing brainName in request body',
+    });
   });
 
-  it("Create and watch a brain run", async () => {
+  it('Create and watch a brain run', async () => {
     const testEnv = env as TestEnv;
-    const brainName = "basic-workflow";
+    const brainName = 'basic-workflow';
 
     // --- Create the brain run ---
-    const request = new Request("http://example.com/brains/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const request = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brainName }),
     });
     const context = createExecutionContext();
@@ -123,12 +134,18 @@ describe("Hono API Tests", () => {
     const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
     const watchRequest = new Request(watchUrl);
     const watchContext = createExecutionContext();
-    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
 
     expect(watchResponse.status).toBe(200);
-    expect(watchResponse.headers.get('Content-Type')).toContain('text/event-stream');
+    expect(watchResponse.headers.get('Content-Type')).toContain(
+      'text/event-stream'
+    );
     if (!watchResponse.body) {
-      throw new Error("Watch response body is null");
+      throw new Error('Watch response body is null');
     }
 
     // --- Read all events from the SSE stream ---
@@ -136,43 +153,61 @@ describe("Hono API Tests", () => {
 
     // --- Assertions on the collected events ---
     // Check for start event
-    const startEvent = allEvents.find((e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START);
+    const startEvent = allEvents.find(
+      (e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START
+    );
     expect(startEvent).toBeDefined();
     expect(startEvent?.workflowTitle).toBe(brainName);
     expect(startEvent?.status).toBe(STATUS.RUNNING);
 
     // Check for complete event
-    const completeEvent = allEvents.find((e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE);
+    const completeEvent = allEvents.find(
+      (e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE
+    );
     expect(completeEvent).toBeDefined();
     expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
     // Check the final step status event
-    const stepStatusEvents = allEvents.filter((e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS);
+    const stepStatusEvents = allEvents.filter(
+      (e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS
+    );
     expect(stepStatusEvents.length).toBeGreaterThan(0);
     const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
-    expect(lastStepStatusEvent.steps.every((step: any) => step.status === STATUS.COMPLETE)).toBe(true);
+    expect(
+      lastStepStatusEvent.steps.every(
+        (step: any) => step.status === STATUS.COMPLETE
+      )
+    ).toBe(true);
 
     // Check for specific step completion if needed (depends on basic-workflow structure)
-    const stepCompleteEvents = allEvents.filter((e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE);
+    const stepCompleteEvents = allEvents.filter(
+      (e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE
+    );
     expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1); // Assuming basic-workflow has at least one step
 
     await waitOnExecutionContext(watchContext);
   });
 
-  it("Create and watch a delayed brain run", async () => {
+  it('Create and watch a delayed brain run', async () => {
     const testEnv = env as TestEnv;
-    const brainName = "delayed-workflow";
+    const brainName = 'delayed-workflow';
 
     // Create the brain run
-    const createRequest = new Request("http://example.com/brains/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const createRequest = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brainName }),
     });
     const createContext = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createContext
+    );
     expect(createResponse.status).toBe(201);
-    const createResponseBody = await createResponse.json<{ brainRunId: string }>();
+    const createResponseBody = await createResponse.json<{
+      brainRunId: string;
+    }>();
     const brainRunId = createResponseBody.brainRunId;
     await waitOnExecutionContext(createContext);
 
@@ -180,12 +215,18 @@ describe("Hono API Tests", () => {
     const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
     const watchRequest = new Request(watchUrl);
     const watchContext = createExecutionContext();
-    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
 
     expect(watchResponse.status).toBe(200);
-    expect(watchResponse.headers.get('Content-Type')).toContain('text/event-stream');
+    expect(watchResponse.headers.get('Content-Type')).toContain(
+      'text/event-stream'
+    );
     if (!watchResponse.body) {
-      throw new Error("Watch response body is null");
+      throw new Error('Watch response body is null');
     }
 
     // --- Read all events from the SSE stream ---
@@ -193,44 +234,67 @@ describe("Hono API Tests", () => {
 
     // --- Assertions on the collected events ---
     // Check for start event
-    const startEvent = allEvents.find((e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START);
+    const startEvent = allEvents.find(
+      (e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START
+    );
     expect(startEvent).toBeDefined();
     expect(startEvent?.workflowTitle).toBe(brainName);
     expect(startEvent?.status).toBe(STATUS.RUNNING);
 
     // Check for step start/complete events for the delayed step
-    const delayStepStart = allEvents.find((e): e is StepStartedEvent => e.type === WORKFLOW_EVENTS.STEP_START && e.stepTitle === 'Start Delay');
+    const delayStepStart = allEvents.find(
+      (e): e is StepStartedEvent =>
+        e.type === WORKFLOW_EVENTS.STEP_START && e.stepTitle === 'Start Delay'
+    );
     expect(delayStepStart).toBeDefined();
-    const delayStepComplete = allEvents.find((e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE && e.stepTitle === 'Start Delay');
+    const delayStepComplete = allEvents.find(
+      (e): e is StepCompletedEvent =>
+        e.type === WORKFLOW_EVENTS.STEP_COMPLETE &&
+        e.stepTitle === 'Start Delay'
+    );
     expect(delayStepComplete).toBeDefined();
 
     // Check for the final complete event
-    const completeEvent = allEvents.find((e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE);
+    const completeEvent = allEvents.find(
+      (e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE
+    );
     expect(completeEvent).toBeDefined();
     expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
     // Check the final step status event shows completion
-    const stepStatusEvents = allEvents.filter((e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS);
+    const stepStatusEvents = allEvents.filter(
+      (e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS
+    );
     expect(stepStatusEvents.length).toBeGreaterThan(0);
     const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
-    expect(lastStepStatusEvent.steps.every((step: any) => step.status === STATUS.COMPLETE)).toBe(true);
+    expect(
+      lastStepStatusEvent.steps.every(
+        (step: any) => step.status === STATUS.COMPLETE
+      )
+    ).toBe(true);
 
     await waitOnExecutionContext(watchContext);
   });
 
-  it("Asserts brainRunId is present in SSE events", async () => {
+  it('Asserts brainRunId is present in SSE events', async () => {
     const testEnv = env as TestEnv;
-    const brainName = "basic-workflow";
+    const brainName = 'basic-workflow';
 
     // Create brain run
-    const createRequest = new Request("http://example.com/brains/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const createRequest = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brainName }),
     });
     const createContext = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-    const createResponseBody = await createResponse.json<{ brainRunId: string }>();
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createContext
+    );
+    const createResponseBody = await createResponse.json<{
+      brainRunId: string;
+    }>();
     const expectedBrainRunId = createResponseBody.brainRunId;
     await waitOnExecutionContext(createContext);
 
@@ -238,11 +302,15 @@ describe("Hono API Tests", () => {
     const watchUrl = `http://example.com/brains/runs/${expectedBrainRunId}/watch`;
     const watchRequest = new Request(watchUrl);
     const watchContext = createExecutionContext();
-    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
 
     // Get first event from stream
     const reader = watchResponse.body?.getReader();
-    if (!reader) throw new Error("Watch response body is null");
+    if (!reader) throw new Error('Watch response body is null');
 
     const { value } = await reader.read();
     const chunk = new TextDecoder().decode(value);
@@ -257,18 +325,22 @@ describe("Hono API Tests", () => {
     expect(event.workflowRunId).toBe(expectedBrainRunId);
   });
 
-  it("Monitor receives workflow events (checking brain run)", async () => {
+  it('Monitor receives workflow events (checking brain run)', async () => {
     const testEnv = env as TestEnv;
-    const brainName = "basic-workflow";
+    const brainName = 'basic-workflow';
 
     // Start the brain run
-    const createRequest = new Request("http://example.com/brains/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const createRequest = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brainName }),
     });
     const createContext = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createContext
+    );
     const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
     await waitOnExecutionContext(createContext);
 
@@ -276,7 +348,11 @@ describe("Hono API Tests", () => {
     const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
     const watchRequest = new Request(watchUrl);
     const watchContext = createExecutionContext();
-    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
     await readSseStream(watchResponse.body!);
     await waitOnExecutionContext(watchContext);
 
@@ -291,36 +367,52 @@ describe("Hono API Tests", () => {
     expect(lastEvent.status).toBe(STATUS.COMPLETE);
   });
 
-  it("Watches brain run as it runs", async () => {
+  it('Watches brain run as it runs', async () => {
     const testEnv = env as TestEnv;
-    const brainName = "basic-workflow";
+    const brainName = 'basic-workflow';
 
     // Run the brain run twice
     for (let i = 0; i < 2; i++) {
       // Start the brain run
-      const createRequest = new Request("http://example.com/brains/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const createRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainName }),
       });
       const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
 
       // Watch the brain run via SSE until completion
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
       const watchRequest = new Request(watchUrl);
       const watchContext = createExecutionContext();
-      const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+      const watchResponse = await worker.fetch(
+        watchRequest,
+        testEnv,
+        watchContext
+      );
       await readSseStream(watchResponse.body!);
       await waitOnExecutionContext(watchContext);
       await waitOnExecutionContext(createContext);
     }
 
     // Get brain run history
-    const historyRequest = new Request(`http://example.com/brains/${brainName}/history?limit=5`);
+    const historyRequest = new Request(
+      `http://example.com/brains/${brainName}/history?limit=5`
+    );
     const historyContext = createExecutionContext();
-    const historyResponse = await worker.fetch(historyRequest, testEnv, historyContext);
+    const historyResponse = await worker.fetch(
+      historyRequest,
+      testEnv,
+      historyContext
+    );
     await waitOnExecutionContext(historyContext);
 
     expect(historyResponse.status).toBe(200);
@@ -357,50 +449,64 @@ describe("Hono API Tests", () => {
     }
 
     // Verify runs are ordered by createdAt descending
-    const timestamps = history.runs.map((run: { createdAt: number }) => run.createdAt);
+    const timestamps = history.runs.map(
+      (run: { createdAt: number }) => run.createdAt
+    );
     expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a));
   });
 
-  it("Watch endpoint streams running brains", async () => {
+  it('Watch endpoint streams running brains', async () => {
     const testEnv = env as TestEnv;
-    const brainName = "delayed-workflow";
+    const brainName = 'delayed-workflow';
     const brainRuns: string[] = [];
 
     // Start 3 delayed brains
     for (let i = 0; i < 3; i++) {
-      const createRequest = new Request("http://example.com/brains/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const createRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainName }),
       });
       const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       brainRuns.push(brainRunId);
       await waitOnExecutionContext(createContext);
     }
 
     // Connect to watch endpoint
-    const watchRequest = new Request("http://example.com/brains/watch");
+    const watchRequest = new Request('http://example.com/brains/watch');
     const watchContext = createExecutionContext();
-    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
     expect(watchResponse.status).toBe(200);
-    expect(watchResponse.headers.get('Content-Type')).toContain('text/event-stream');
+    expect(watchResponse.headers.get('Content-Type')).toContain(
+      'text/event-stream'
+    );
 
     if (!watchResponse.body) {
-      throw new Error("Watch response body is null");
+      throw new Error('Watch response body is null');
     }
 
     // Read the SSE stream
     const events: any[] = [];
     const reader = watchResponse.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = "";
+    let buffer = '';
 
     // Helper to process SSE messages
     const processBuffer = () => {
       const messages = buffer.split('\n\n');
-      buffer = messages.pop() || ""; // Keep the incomplete message in the buffer
+      buffer = messages.pop() || ''; // Keep the incomplete message in the buffer
 
       for (const message of messages) {
         if (message.startsWith('data: ')) {
@@ -439,7 +545,11 @@ describe("Hono API Tests", () => {
     const initialState = events[0];
     expect(initialState.runningWorkflows).toBeDefined();
     expect(initialState.runningWorkflows.length).toBe(3);
-    expect(initialState.runningWorkflows.every((w: any) => w.status === STATUS.RUNNING)).toBe(true);
+    expect(
+      initialState.runningWorkflows.every(
+        (w: any) => w.status === STATUS.RUNNING
+      )
+    ).toBe(true);
 
     // Last event should show no running brains
     const finalState = events[events.length - 1];
@@ -448,5 +558,4 @@ describe("Hono API Tests", () => {
 
     await waitOnExecutionContext(watchContext);
   });
-
 });
