@@ -12,33 +12,33 @@ export type SerializedError = {
 
 // New Event Type System
 // Base event interface with only type and options
-interface BaseEvent<TOptions extends object = {}> {
+interface BaseEvent<TOptions extends object = object> {
   type: (typeof WORKFLOW_EVENTS)[keyof typeof WORKFLOW_EVENTS];
   options: TOptions;
   workflowRunId: string;
 }
 
 // 1. Workflow Events (all include workflow title/description)
-interface WorkflowBaseEvent<TOptions extends object = {}>
+interface WorkflowBaseEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
   workflowTitle: string;
   workflowDescription?: string;
 }
 
-export interface WorkflowStartEvent<TOptions extends object = {}>
+export interface WorkflowStartEvent<TOptions extends object = object>
   extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.START | typeof WORKFLOW_EVENTS.RESTART;
   initialState: State;
   status: typeof STATUS.RUNNING;
 }
 
-export interface WorkflowCompleteEvent<TOptions extends object = {}>
+export interface WorkflowCompleteEvent<TOptions extends object = object>
   extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.COMPLETE;
   status: typeof STATUS.COMPLETE;
 }
 
-export interface WorkflowErrorEvent<TOptions extends object = {}>
+export interface WorkflowErrorEvent<TOptions extends object = object>
   extends WorkflowBaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.ERROR;
   status: typeof STATUS.ERROR;
@@ -46,14 +46,14 @@ export interface WorkflowErrorEvent<TOptions extends object = {}>
 }
 
 // 2. Step Status Event (just steps array and base event properties)
-export interface StepStatusEvent<TOptions extends object = {}>
+export interface StepStatusEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.STEP_STATUS;
   steps: SerializedStepStatus[];
 }
 
 // 3. Step Events (include step-specific properties)
-export interface StepStartedEvent<TOptions extends object = {}>
+export interface StepStartedEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.STEP_START;
   status: typeof STATUS.RUNNING;
@@ -61,7 +61,7 @@ export interface StepStartedEvent<TOptions extends object = {}>
   stepId: string;
 }
 
-export interface StepCompletedEvent<TOptions extends object = {}>
+export interface StepCompletedEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
   type: typeof WORKFLOW_EVENTS.STEP_COMPLETE;
   status: typeof STATUS.RUNNING;
@@ -71,7 +71,7 @@ export interface StepCompletedEvent<TOptions extends object = {}>
 }
 
 // Union type of all possible events
-export type WorkflowEvent<TOptions extends object = {}> =
+export type WorkflowEvent<TOptions extends object = object> =
   | WorkflowStartEvent<TOptions>
   | WorkflowCompleteEvent<TOptions>
   | WorkflowErrorEvent<TOptions>
@@ -92,8 +92,8 @@ export type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
 type StepBlock<
   TStateIn,
   TStateOut,
-  TOptions extends object = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TServices extends object = object,
 > = {
   type: 'step';
   title: string;
@@ -110,8 +110,8 @@ type WorkflowBlock<
   TOuterState,
   TInnerState extends State,
   TNewState,
-  TOptions extends object = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TServices extends object = object,
 > = {
   type: 'workflow';
   title: string;
@@ -127,23 +127,23 @@ type WorkflowBlock<
 type Block<
   TStateIn,
   TStateOut,
-  TOptions extends object = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TServices extends object = object,
 > =
   | StepBlock<TStateIn, TStateOut, TOptions, TServices>
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
 interface BaseRunParams<
-  TOptions extends object = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TServices extends object = object,
 > {
   client: PromptClient;
   options?: TOptions;
 }
 
 export interface InitialRunParams<
-  TOptions extends object = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TServices extends object = object,
 > extends BaseRunParams<TOptions, TServices> {
   initialState?: State;
   initialCompletedSteps?: never;
@@ -151,8 +151,8 @@ export interface InitialRunParams<
 }
 
 export interface RerunParams<
-  TOptions extends object = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TServices extends object = object,
 > extends BaseRunParams<TOptions, TServices> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
@@ -160,9 +160,9 @@ export interface RerunParams<
 }
 
 export class Workflow<
-  TOptions extends object = {},
-  TState extends State = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TState extends State = object,
+  TServices extends object = object,
 > {
   private blocks: Block<any, any, TOptions, TServices>[] = [];
   public type: 'workflow' = 'workflow';
@@ -396,9 +396,9 @@ class Step {
 }
 
 class WorkflowEventStream<
-  TOptions extends object = {},
-  TState extends State = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TState extends State = object,
+  TServices extends object = object,
 > {
   private currentState: TState;
   private steps: Step[];
@@ -662,9 +662,9 @@ const workflowNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const workflowNames = new Set<string>();
 export function workflow<
-  TOptions extends object = {},
-  TState extends State = {},
-  TServices extends object = {},
+  TOptions extends object = object,
+  TState extends State = object,
+  TServices extends object = object,
 >(workflowConfig: string | { title: string; description?: string }) {
   const title =
     typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
