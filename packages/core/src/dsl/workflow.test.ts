@@ -26,12 +26,12 @@ const testLogger: Logger = {
 type AssertEquals<T, U> = 0 extends 1 & T
   ? false // fails if T is any
   : 0 extends 1 & U
-    ? false // fails if U is any
-    : [T] extends [U]
-      ? [U] extends [T]
-        ? true
-        : false
-      : false;
+  ? false // fails if U is any
+  : [T] extends [U]
+  ? [U] extends [T]
+    ? true
+    : false
+  : false;
 
 // Mock PromptClient for testing
 const mockExecute = jest.fn<PromptClient['execute']>();
@@ -77,6 +77,18 @@ describe('workflow creation', () => {
       })
     );
 
+    // Check first step status (running)
+    const firstStepStatusRunning = await nextStep(workflowRun);
+    expect(firstStepStatusRunning).toEqual(
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+      })
+    );
+    if (firstStepStatusRunning.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      expect(firstStepStatusRunning.steps[0].status).toBe(STATUS.RUNNING);
+    }
+
     // Check first step completion
     const firstStepResult = await nextStep(workflowRun);
     expect(firstStepResult).toEqual(
@@ -108,6 +120,18 @@ describe('workflow creation', () => {
         stepId: expect.any(String),
       })
     );
+
+    // Check second step status (running)
+    const secondStepStatusRunning = await nextStep(workflowRun);
+    expect(secondStepStatusRunning).toEqual(
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+      })
+    );
+    if (secondStepStatusRunning.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      expect(secondStepStatusRunning.steps[1].status).toBe(STATUS.RUNNING);
+    }
 
     // Check second step completion
     const secondStepResult = await nextStep(workflowRun);
@@ -386,6 +410,10 @@ describe('error handling', () => {
         stepTitle: 'First step',
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
@@ -400,6 +428,10 @@ describe('error handling', () => {
         stepTitle: 'Run inner workflow',
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.START,
         workflowTitle: 'Failing Inner Workflow',
         status: STATUS.RUNNING,
@@ -412,6 +444,10 @@ describe('error handling', () => {
         type: WORKFLOW_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Throw error',
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
       }),
       expect.objectContaining({
         type: WORKFLOW_EVENTS.ERROR,
@@ -509,8 +545,20 @@ describe('step creation', () => {
       })
     );
 
-    // Verify the step complete event
+    // Verify the step status event (running)
     expect(events[3]).toEqual(
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+        options: {},
+      })
+    );
+    if (events[3].type === WORKFLOW_EVENTS.STEP_STATUS) {
+      expect(events[3].steps[0].status).toBe(STATUS.RUNNING);
+    }
+
+    // Verify the step complete event
+    expect(events[4]).toEqual(
       expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
@@ -532,7 +580,7 @@ describe('step creation', () => {
       })
     );
 
-    expect(events[4]).toEqual(
+    expect(events[5]).toEqual(
       expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_STATUS,
         steps: [
@@ -547,7 +595,7 @@ describe('step creation', () => {
     );
 
     // Verify the workflow complete event
-    expect(events[5]).toEqual(
+    expect(events[6]).toEqual(
       expect.objectContaining({
         type: WORKFLOW_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
@@ -738,6 +786,13 @@ describe('nested workflows', () => {
         status: STATUS.RUNNING,
         stepTitle: 'Set prefix',
       },
+      // First step status (running)
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined,
+      },
       {
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
         workflowTitle: undefined,
@@ -755,6 +810,13 @@ describe('nested workflows', () => {
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow',
+      },
+      // Step status for inner workflow (running)
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined,
       },
       // Inner workflow start
       {
@@ -776,6 +838,13 @@ describe('nested workflows', () => {
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Double value',
+      },
+      // Inner workflow step status (running)
+      {
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        workflowTitle: undefined,
+        status: undefined,
+        stepTitle: undefined,
       },
       {
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
@@ -901,6 +970,10 @@ describe('nested workflows', () => {
         stepTitle: 'First step',
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
@@ -915,6 +988,10 @@ describe('nested workflows', () => {
         stepTitle: 'Run inner workflow',
       }),
       expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+      }),
+      expect.objectContaining({
         type: WORKFLOW_EVENTS.START,
         workflowTitle: 'Failing Inner Workflow',
         status: STATUS.RUNNING,
@@ -927,6 +1004,10 @@ describe('nested workflows', () => {
         type: WORKFLOW_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Throw error',
+      }),
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
       }),
       expect.objectContaining({
         type: WORKFLOW_EVENTS.ERROR,
@@ -1117,6 +1198,18 @@ describe('workflow options', () => {
         type: WORKFLOW_EVENTS.STEP_START,
       })
     );
+
+    // Check step status (running)
+    const stepStatusRunning = await workflowRun.next();
+    expect(stepStatusRunning.value).toEqual(
+      expect.objectContaining({
+        type: WORKFLOW_EVENTS.STEP_STATUS,
+        steps: expect.any(Array),
+      })
+    );
+    if (stepStatusRunning.value.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      expect(stepStatusRunning.value.steps[0].status).toBe(STATUS.RUNNING);
+    }
 
     // Check step completion
     const stepResult = await workflowRun.next();
@@ -1332,7 +1425,7 @@ describe('type inference', () => {
             processed: workflowState.metadata.processed,
           };
         },
-        () => ({}) as { innerValue: number; metadata: { processed: boolean } }
+        () => ({} as { innerValue: number; metadata: { processed: boolean } })
       );
 
     // Run the workflow to verify runtime behavior
