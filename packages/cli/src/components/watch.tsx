@@ -9,7 +9,7 @@ import { STATUS } from '@positronic/core';
 // Recreate SerializedStepStatus based on the imported SerializedStep
 export type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
 
-interface WorkflowStepStatusViewProps {
+interface WatchStatusProps {
   steps: SerializedStepStatus[];
   workflowTitle?: string;
 }
@@ -17,20 +17,19 @@ interface WorkflowStepStatusViewProps {
 const getStatusIndicator = (status: SerializedStepStatus['status']) => {
   switch (status) {
     case STATUS.COMPLETE:
-      return <Text color="green">[✔]</Text>;
+      return <Text color="green">&#10004;</Text>
     case STATUS.ERROR:
-      return <Text color="red">[✖]</Text>;
+      return <Text color="red">&bull;</Text>
     case STATUS.RUNNING:
-      return <Text color="blue">[▶]</Text>;
+      return <Text color="white">&bull;</Text>
     case STATUS.PENDING:
-      return <Text color="gray">[ ]</Text>;
+      return <Text>&bull;</Text>
     default:
-      // Handle any unknown status gracefully
-      return <Text color="yellow">[?]</Text>;
+      return <Text>❓</Text>
   }
 };
 
-export const WorkflowStepStatusView: React.FC<WorkflowStepStatusViewProps> = ({ steps, workflowTitle }) => {
+export const WatchStatus = ({ steps, workflowTitle }: WatchStatusProps) => {
   if (!steps || steps.length === 0) {
     return <Text>Waiting for workflow steps...</Text>;
   }
@@ -38,25 +37,34 @@ export const WorkflowStepStatusView: React.FC<WorkflowStepStatusViewProps> = ({ 
   return (
     <Box flexDirection="column">
       {workflowTitle && <Text bold>Workflow: {workflowTitle}</Text>}
-      <Box marginTop={1}>
+      <Box marginTop={1} marginBottom={1}>
         <Text bold>Steps:</Text>
       </Box>
       {steps.map((step) => (
-        <Box key={step.id} marginLeft={1} flexDirection="row">
-          <Box width={3}>{getStatusIndicator(step.status)}</Box>
-          <Text>{step.title}</Text>
+        <Box key={step.id} marginLeft={1} marginBottom={1} flexDirection="row">
+          <Box>
+            <Text color={
+              step.status === STATUS.COMPLETE ? 'green' :
+              step.status === STATUS.ERROR ? 'red' :
+              step.status === STATUS.RUNNING ? 'white' :
+              step.status === STATUS.PENDING ? 'gray' :
+              'yellow'
+            }>
+              {getStatusIndicator(step.status)} {step.title}
+            </Text>
+          </Box>
         </Box>
       ))}
     </Box>
   );
 };
 
-interface BrainWatchDisplayProps {
+interface WatchProps {
   runId: string;
   port: string;
 }
 
-export const Watch: React.FC<BrainWatchDisplayProps> = ({ runId, port }) => {
+export const Watch = ({ runId, port }: WatchProps) => {
   const [steps, setSteps] = useState<SerializedStepStatus[]>([]);
   const [workflowTitle, setWorkflowTitle] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -84,29 +92,23 @@ export const Watch: React.FC<BrainWatchDisplayProps> = ({ runId, port }) => {
         }
         if (eventData.type === WORKFLOW_EVENTS.START || eventData.type === WORKFLOW_EVENTS.RESTART) {
           setWorkflowTitle((eventData as WorkflowStartEvent).workflowTitle);
-          setSteps([]); // Reset steps on new workflow start/restart
           setIsCompleted(false);
         }
         if (eventData.type === WORKFLOW_EVENTS.COMPLETE) {
           setIsCompleted(true);
-          // Potentially close the event source if desired
-          // es.close();
         }
         if (eventData.type === WORKFLOW_EVENTS.ERROR) {
           const errorPayload = (eventData as WorkflowErrorEvent).error;
           setError(`Workflow Error: ${errorPayload.name} - ${errorPayload.message}`);
-          setIsCompleted(true); // Consider a workflow with an error as 'completed' for display purposes
-          // es.close();
+          setIsCompleted(true);
         }
       } catch (e: any) {
-        console.error('Error parsing event data:', e);
         setError(`Error parsing event data: ${e.message}`);
       }
     };
 
     es.onerror = (err) => {
       // EventSource does not provide detailed error objects here, often just a generic Event
-      console.error(`EventSource failed for URL: ${url}`, err);
       setError(`Connection to ${url} failed. Ensure the server is running and accessible.`);
       setIsConnected(false);
       es.close();
@@ -118,29 +120,21 @@ export const Watch: React.FC<BrainWatchDisplayProps> = ({ runId, port }) => {
     };
   }, [runId, port]);
 
-  if (error) {
-    return (
-      <Box borderStyle="round" borderColor="red" padding={1}>
-        <Text color="red">{error}</Text>
-      </Box>
-    );
-  }
-
   if (!isConnected && steps.length === 0) {
     return <Text>Connecting to watch service...</Text>;
   }
 
   return (
     <Box flexDirection="column">
-      <WorkflowStepStatusView steps={steps} workflowTitle={workflowTitle} />
+      <WatchStatus steps={steps} workflowTitle={workflowTitle} />
       {isCompleted && !error && (
         <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
             <Text color="green">Workflow completed.</Text>
         </Box>
       )}
-       {isCompleted && error && (
-        <Box marginTop={1} borderStyle="round" borderColor="red" paddingX={1}>
-            <Text color="red">Workflow finished with errors.</Text>
+       {error && (
+        <Box borderStyle="round" borderColor="red" padding={1}>
+          <Text color="red">{error}</Text>
         </Box>
       )}
     </Box>
