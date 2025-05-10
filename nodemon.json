@@ -5,5 +5,5 @@
     "**/dist/**",
     "**/worker-configuration.d.ts"
   ],
-  "ext": "ts,js,json"
+  "ext": "ts,js,json,tsx"
 }

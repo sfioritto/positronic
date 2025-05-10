@@ -522,6 +522,19 @@ class WorkflowEventStream<
           workflowRunId,
         };
 
+        step.withStatus(STATUS.RUNNING);
+
+        // Step Status Event to indicate that the step is running
+        yield {
+          type: WORKFLOW_EVENTS.STEP_STATUS,
+          steps: steps.map((step) => {
+            const { patch, ...rest } = step.serialized;
+            return rest;
+          }),
+          options,
+          workflowRunId,
+        };
+
         // Execute step and yield the STEP_COMPLETE event and
         // all events from inner workflows if any
         yield* this.executeStep(step);
