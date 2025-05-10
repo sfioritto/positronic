@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": "./src",
     "emitDeclarationOnly": true,
-    "declarationDir": "./dist/types"
+    "declarationDir": "./dist/types",
+    "jsx": "react-jsx"
   },
   "include": ["**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]

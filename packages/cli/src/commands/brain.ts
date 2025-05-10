@@ -1,6 +1,9 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import { EventSource } from 'eventsource';
 import { apiFetch } from './helpers.js';
+import React, { useState, useEffect } from 'react';
+import { render, Text } from 'ink';
+import { Watch } from '../components/watch.js';
 
 interface BrainListArgs {}
 interface BrainHistoryArgs {
@@ -105,23 +108,7 @@ export class BrainCommand {
       const baseUrl = `http://localhost:${port}`;
       const url = `${baseUrl}/brains/runs/${runId}/watch`;
 
-      const es = new EventSource(url);
-
-      es.onmessage = (event: MessageEvent) => {
-        try {
-          const eventData = JSON.parse(event.data);
-          console.log(JSON.stringify(eventData, null, 2));
-        } catch (e) {
-          console.error('Error parsing event data:', e);
-        }
-      };
-      // Add error handling for EventSource connection
-      es.onerror = (err) => {
-        console.error(`EventSource failed for URL: ${url}`, err);
-        // Decide if we should exit or retry
-        es.close(); // Close on error for now
-        process.exit(1);
-      };
+      render(React.createElement(Watch, { runId, port }));
     } else if (brainName) {
       // TODO: Implement logic to first fetch the latest run ID for brainName
       // This fetch should use apiFetch
