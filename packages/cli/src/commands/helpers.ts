@@ -23,6 +23,7 @@ export async function generateProject(
     if (devPath) {
       // Copying templates, why you ask?
       // Well because when caz runs if you pass it a path to the template module
+      // (e.g. for development environment setting POSITRONIC_LOCAL_PATH)
       // it runs npm install --production in the template directory. This is a problem
       // in our monorepo because this messes up the node_modules at the root of the
       // monorepo which then causes the tests to fail. Also ny time I was generating a new
@@ -73,7 +74,9 @@ export async function apiFetch(
 ): Promise<Response> {
   const port = process.env.POSITRONIC_SERVER_PORT || '8787';
   const baseUrl = `http://localhost:${port}`;
-  const fullUrl = `${baseUrl}${apiPath.startsWith('/') ? apiPath : '/' + apiPath}`;
+  const fullUrl = `${baseUrl}${
+    apiPath.startsWith('/') ? apiPath : '/' + apiPath
+  }`;
 
   const response = await fetch(fullUrl, options);
   return response;

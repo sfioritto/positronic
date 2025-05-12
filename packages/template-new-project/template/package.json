@@ -16,7 +16,8 @@
   "license": "ISC",
   "dependencies": {
     "@positronic/core": "<%= positronicCoreVersion %>"<% if (backend === 'cloudflare') { %>,
-    "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
+    "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>,
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     <% if (backend === 'cloudflare') { %>

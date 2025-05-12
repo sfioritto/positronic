@@ -18,3 +18,4 @@ export type {
 export type { PromptClient, ResponseModel } from './clients/types.js';
 export type { State } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
+export { z } from 'zod';

@@ -7,7 +7,8 @@
   "scripts": {},
   "dependencies": {
     "@positronic/core": "<%= positronicCoreVersion %>",
-    "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"
+    "@positronic/cloudflare": "<%= positronicCloudflareVersion %>",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240405.0",
