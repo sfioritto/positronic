@@ -115,6 +115,14 @@ module.exports = {
 
     ctx.answers.projectName = ctx.answers.name;
   },
+  prepare: async ctx => {
+    // Find our specially named gitignore file in the list of files to be processed
+    const gitignoreFile = ctx.files.find(file => file.path === '_gitignore');
+    if (gitignoreFile) {
+      // Change its path to '.gitignore' so it's correctly named in the generated project
+      gitignoreFile.path = '.gitignore';
+    }
+  },
   emit: async ctx => {
     if (ctx.answers.backend === 'cloudflare') {
       const projectRootPath = ctx.dest;
