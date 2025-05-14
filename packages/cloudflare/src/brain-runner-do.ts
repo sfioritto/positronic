@@ -3,7 +3,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type {
   Workflow,
   ObjectGenerator,
-  ResponseModel,
+  OutputSchema,
   Adapter,
   WorkflowEvent,
 } from '@positronic/core';
@@ -17,7 +17,7 @@ export type PositronicManifest = {
 
 const baseClient: ObjectGenerator = {
   generateObject: async <T extends z.AnyZodObject>(params: {
-    outputSchema: ResponseModel<T>;
+    outputSchema: OutputSchema<T>;
     prompt: string;
   }): Promise<TypeOf<T>> => {
     const { outputSchema, prompt } = params;

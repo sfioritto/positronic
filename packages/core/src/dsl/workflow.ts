@@ -256,7 +256,7 @@ export class Workflow<
     title: string,
     config: {
       template: (state: TState) => string;
-      responseModel: {
+      outputSchema: {
         schema: TSchema;
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
       };
@@ -275,16 +275,16 @@ export class Workflow<
       type: 'step',
       title,
       action: async ({ state, client: runClient, options, ...services }) => {
-        const { template, responseModel, client: stepClient } = config;
+        const { template, outputSchema, client: stepClient } = config;
         const client = stepClient ?? runClient;
         const prompt = template(state);
         const response = await client.generateObject({
-          outputSchema: responseModel,
+          outputSchema,
           prompt,
         });
         const stateWithResponse = {
           ...state,
-          [config.responseModel.name]: response,
+          [config.outputSchema.name]: response,
         };
 
         return reduce

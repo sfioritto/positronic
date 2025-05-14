@@ -229,14 +229,14 @@ describe('workflow creation', () => {
     const testWorkflow = workflow('Client Override Test')
       .prompt('Use default client', {
         template: () => 'prompt1',
-        responseModel: {
+        outputSchema: {
           schema: z.object({ override: z.boolean() }),
           name: 'overrideResponse',
         },
       })
       .prompt('Use override client', {
         template: () => 'prompt2',
-        responseModel: {
+        outputSchema: {
           schema: z.object({ override: z.boolean() }),
           name: 'overrideResponse',
         },
@@ -1507,7 +1507,7 @@ describe('type inference', () => {
     const testWorkflow = workflow('Prompt Type Test')
       .prompt('Get user info', {
         template: () => "What is the user's info?",
-        responseModel: {
+        outputSchema: {
           schema: z.object({ name: z.string(), age: z.number() }),
           name: 'userInfo' as const, // Must be const or type inference breaks
         },
@@ -1559,7 +1559,7 @@ describe('type inference', () => {
       'Get numbers',
       {
         template: () => 'Give me some numbers',
-        responseModel: {
+        outputSchema: {
           schema: z.object({ numbers: z.array(z.number()) }),
           name: 'numbersResponse' as const,
         },

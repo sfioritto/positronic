@@ -11,7 +11,7 @@ export type Message = {
 /**
  * Defines the expected structure and metadata for a generated object.
  */
-export type ResponseModel<T extends z.AnyZodObject> = {
+export type OutputSchema<T extends z.AnyZodObject> = {
   schema: T;
   name: string;
   description?: string;
@@ -33,7 +33,7 @@ export interface ObjectGenerator {
      * The definition of the expected output object, including its Zod schema
      * and a name for state management within the workflow.
      */
-    outputSchema: ResponseModel<T>;
+    outputSchema: OutputSchema<T>;
 
     /**
      * A simple prompt string for single-turn requests.

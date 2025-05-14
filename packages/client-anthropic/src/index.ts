@@ -1,4 +1,4 @@
-import type { ObjectGenerator, ResponseModel } from '@positronic/core';
+import type { ObjectGenerator, OutputSchema } from '@positronic/core';
 import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from 'llm-polyglot';
 import { z } from 'zod';
@@ -26,7 +26,7 @@ export class AnthropicClient implements ObjectGenerator {
   }
 
   async generateObject<T extends z.AnyZodObject>(params: {
-    outputSchema: ResponseModel<T>;
+    outputSchema: OutputSchema<T>;
     prompt?: string;
     messages?: { role: 'user' | 'assistant' | 'system'; content: string }[];
     system?: string;
