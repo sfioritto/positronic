@@ -11,7 +11,7 @@ import {
 import { z } from 'zod';
 import { nextStep } from '../../../../test-utils.js';
 import { jest } from '@jest/globals';
-import { PromptClient } from '../clients/types.js';
+import { ObjectGenerator } from '../clients/types.js';
 
 // Define a Logger interface for testing
 interface Logger {
@@ -33,10 +33,10 @@ type AssertEquals<T, U> = 0 extends 1 & T
     : false
   : false;
 
-// Mock PromptClient for testing
-const mockExecute = jest.fn<PromptClient['execute']>();
-const mockClient: jest.Mocked<PromptClient> = {
-  execute: mockExecute,
+// Mock ObjectGenerator for testing
+const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+const mockClient: jest.Mocked<ObjectGenerator> = {
+  generateObject: mockGenerateObject,
 };
 
 describe('workflow creation', () => {
@@ -217,14 +217,14 @@ describe('workflow creation', () => {
   });
 
   it('should allow overriding client per step', async () => {
-    const overrideClient: jest.Mocked<PromptClient> = {
-      execute: jest
-        .fn<PromptClient['execute']>()
+    const overrideClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: jest
+        .fn<ObjectGenerator['generateObject']>()
         .mockResolvedValue({ override: true }),
     };
 
     // Make sure that for the default prompt the default client returns a known value.
-    mockClient.execute.mockResolvedValueOnce({ override: false });
+    mockClient.generateObject.mockResolvedValueOnce({ override: false });
 
     const testWorkflow = workflow('Client Override Test')
       .prompt('Use default client', {
@@ -259,14 +259,14 @@ describe('workflow creation', () => {
     });
 
     // Verify that each client was used correctly based on the supplied prompt configuration.
-    expect(mockClient.execute).toHaveBeenCalledWith(
-      'prompt1',
-      expect.any(Object)
-    );
-    expect(overrideClient.execute).toHaveBeenCalledWith(
-      'prompt2',
-      expect.any(Object)
-    );
+    expect(mockClient.generateObject).toHaveBeenCalledWith({
+      outputSchema: expect.any(Object),
+      prompt: 'prompt1',
+    });
+    expect(overrideClient.generateObject).toHaveBeenCalledWith({
+      outputSchema: expect.any(Object),
+      prompt: 'prompt2',
+    });
   });
 
   it('should use the provided workflowRunId for the initial run if supplied', async () => {
@@ -642,7 +642,7 @@ describe('step creation', () => {
 
 describe('workflow resumption', () => {
   const mockClient = {
-    execute: jest.fn(),
+    generateObject: jest.fn(),
   };
 
   it('should resume workflow from the correct step when given initialCompletedSteps', async () => {
@@ -669,7 +669,7 @@ describe('workflow resumption', () => {
 
     // Run workflow until we get the first step completed
     for await (const event of threeStepWorkflow.run({
-      client: mockClient as PromptClient,
+      client: mockClient as ObjectGenerator,
       initialState,
     })) {
       // Capture the full step list from the first status event
@@ -704,7 +704,7 @@ describe('workflow resumption', () => {
       throw new Error('Expected initialCompletedSteps');
 
     for await (const event of threeStepWorkflow.run({
-      client: mockClient as PromptClient,
+      client: mockClient as ObjectGenerator,
       initialState,
       initialCompletedSteps,
       workflowRunId: 'test-run-id',
@@ -1531,7 +1531,7 @@ describe('type inference', () => {
       });
 
     // Mock the client response
-    mockClient.execute.mockResolvedValueOnce({
+    mockClient.generateObject.mockResolvedValueOnce({
       name: 'Test User',
       age: 30,
     });
@@ -1573,7 +1573,7 @@ describe('type inference', () => {
     );
 
     // Mock the client response
-    mockClient.execute.mockResolvedValueOnce({
+    mockClient.generateObject.mockResolvedValueOnce({
       numbers: [1, 2, 3, 4, 5],
     });
 

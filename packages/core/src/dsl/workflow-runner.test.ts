@@ -2,13 +2,13 @@ import { WorkflowRunner } from './workflow-runner.js';
 import { workflow } from './workflow.js';
 import { WORKFLOW_EVENTS, STATUS } from './constants.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { PromptClient } from '../clients/types.js';
+import { ObjectGenerator } from '../clients/types.js';
 import { Adapter } from '../adapters/types.js';
 
 describe('WorkflowRunner', () => {
-  const mockExecute = jest.fn<PromptClient['execute']>();
-  const mockClient: jest.Mocked<PromptClient> = {
-    execute: mockExecute,
+  const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const mockClient: jest.Mocked<ObjectGenerator> = {
+    generateObject: mockGenerateObject,
   };
 
   const mockDispatch = jest.fn<Adapter['dispatch']>();

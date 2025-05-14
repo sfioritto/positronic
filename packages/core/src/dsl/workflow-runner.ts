@@ -3,13 +3,13 @@ import { applyPatches } from './json-patch.js';
 import type { Adapter } from '../adapters/types.js';
 import type { SerializedStep, Workflow } from './workflow.js';
 import type { State } from './types.js';
-import type { PromptClient } from '../clients/types.js';
+import type { ObjectGenerator } from '../clients/types.js';
 
 export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[];
-      client: PromptClient;
+      client: ObjectGenerator;
     }
   ) {}
 

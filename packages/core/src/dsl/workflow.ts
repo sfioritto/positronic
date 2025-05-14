@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { PromptClient } from '../clients/types.js';
+import type { ObjectGenerator } from '../clients/types.js';
 import type { State, JsonPatch } from './types.js';
 import { STATUS, WORKFLOW_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
@@ -93,7 +93,7 @@ type StepBlock<
   TStateIn,
   TStateOut,
   TOptions extends object = object,
-  TServices extends object = object,
+  TServices extends object = object
 > = {
   type: 'step';
   title: string;
@@ -101,7 +101,7 @@ type StepBlock<
     params: {
       state: TStateIn;
       options: TOptions;
-      client: PromptClient;
+      client: ObjectGenerator;
     } & TServices
   ) => TStateOut | Promise<TStateOut>;
 };
@@ -111,7 +111,7 @@ type WorkflowBlock<
   TInnerState extends State,
   TNewState,
   TOptions extends object = object,
-  TServices extends object = object,
+  TServices extends object = object
 > = {
   type: 'workflow';
   title: string;
@@ -128,22 +128,22 @@ type Block<
   TStateIn,
   TStateOut,
   TOptions extends object = object,
-  TServices extends object = object,
+  TServices extends object = object
 > =
   | StepBlock<TStateIn, TStateOut, TOptions, TServices>
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
 interface BaseRunParams<
   TOptions extends object = object,
-  TServices extends object = object,
+  TServices extends object = object
 > {
-  client: PromptClient;
+  client: ObjectGenerator;
   options?: TOptions;
 }
 
 export interface InitialRunParams<
   TOptions extends object = object,
-  TServices extends object = object,
+  TServices extends object = object
 > extends BaseRunParams<TOptions, TServices> {
   initialState?: State;
   initialCompletedSteps?: never;
@@ -152,7 +152,7 @@ export interface InitialRunParams<
 
 export interface RerunParams<
   TOptions extends object = object,
-  TServices extends object = object,
+  TServices extends object = object
 > extends BaseRunParams<TOptions, TServices> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
@@ -162,17 +162,14 @@ export interface RerunParams<
 export class Workflow<
   TOptions extends object = object,
   TState extends State = object,
-  TServices extends object = object,
+  TServices extends object = object
 > {
   private blocks: Block<any, any, TOptions, TServices>[] = [];
   public type: 'workflow' = 'workflow';
   private defaultOptions: Partial<TOptions> = {};
   private services: TServices = {} as TServices;
 
-  constructor(
-    public readonly title: string,
-    private description?: string
-  ) {}
+  constructor(public readonly title: string, private description?: string) {}
 
   // New method to specify default options
   withOptions(options: Partial<TOptions>): this {
@@ -204,7 +201,7 @@ export class Workflow<
       params: {
         state: TState;
         options: TOptions;
-        client: PromptClient;
+        client: ObjectGenerator;
       } & TServices
     ) => TNewState | Promise<TNewState>
   ) {
@@ -237,7 +234,7 @@ export class Workflow<
       type: 'workflow',
       title,
       innerWorkflow,
-      initialState: initialState || (() => ({}) as State),
+      initialState: initialState || (() => ({} as State)),
       action: (outerState, innerState, services) =>
         action({ state: outerState, workflowState: innerState, services }),
     };
@@ -254,7 +251,7 @@ export class Workflow<
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & {
       [K in TResponseKey]: z.infer<TSchema>;
-    },
+    }
   >(
     title: string,
     config: {
@@ -263,7 +260,7 @@ export class Workflow<
         schema: TSchema;
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
       };
-      client?: PromptClient;
+      client?: ObjectGenerator;
     },
     reduce?: (
       params: {
@@ -280,8 +277,11 @@ export class Workflow<
       action: async ({ state, client: runClient, options, ...services }) => {
         const { template, responseModel, client: stepClient } = config;
         const client = stepClient ?? runClient;
-        const promptString = template(state);
-        const response = await client.execute(promptString, responseModel);
+        const prompt = template(state);
+        const response = await client.generateObject({
+          outputSchema: responseModel,
+          prompt,
+        });
         const stateWithResponse = {
           ...state,
           [config.responseModel.name]: response,
@@ -292,7 +292,7 @@ export class Workflow<
               state,
               response,
               options,
-              prompt: promptString,
+              prompt,
               ...(services as TServices),
             })
           : (stateWithResponse as unknown as TNewState);
@@ -367,10 +367,7 @@ class Step {
   private patch?: JsonPatch | string;
   private status: (typeof STATUS)[keyof typeof STATUS] = STATUS.PENDING;
 
-  constructor(
-    public block: Block<any, any, any, any>,
-    id?: string
-  ) {
+  constructor(public block: Block<any, any, any, any>, id?: string) {
     this.id = id || uuidv4();
   }
 
@@ -398,7 +395,7 @@ class Step {
 class WorkflowEventStream<
   TOptions extends object = object,
   TState extends State = object,
-  TServices extends object = object,
+  TServices extends object = object
 > {
   private currentState: TState;
   private steps: Step[];
@@ -407,7 +404,7 @@ class WorkflowEventStream<
   private workflowRunId: string;
   private title: string;
   private description?: string;
-  private client: PromptClient;
+  private client: ObjectGenerator;
   private options: TOptions;
   private services: TServices;
 
@@ -677,7 +674,7 @@ const workflowNames = new Set<string>();
 export function workflow<
   TOptions extends object = object,
   TState extends State = object,
-  TServices extends object = object,
+  TServices extends object = object
 >(workflowConfig: string | { title: string; description?: string }) {
   const title =
     typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
