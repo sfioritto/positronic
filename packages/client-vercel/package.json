@@ -1,0 +1,21 @@
+{
+  "name": "@positronic/client-vercel",
+  "version": "0.0.1",
+  "description": "Vercel AI client for Positronic",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/types/index.d.ts",
+  "license": "MIT",
+  "scripts": {
+    "tsc": "tsc --project tsconfig.json",
+    "swc": "swc src -d dist",
+    "build": "npm run tsc && npm run swc",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
+  },
+  "dependencies": {
+    "@positronic/core": "^0.0.1",
+    "ai": "^3.2.38",
+    "@ai-sdk/openai": "^0.0.40",
+    "zod": "^3.24.1"
+  }
+}
