@@ -82,6 +82,7 @@ module.exports = {
     const devRootPath = process.env.POSITRONIC_LOCAL_PATH;
     let coreVersion = 'latest';
     let cloudflareVersion = 'latest';
+    let clientVercelVersion = 'latest';
 
     if (devRootPath) {
       console.log(`Found POSITRONIC_LOCAL_PATH: ${devRootPath}. Using local file path for @positronic/core.`);
@@ -94,12 +95,19 @@ module.exports = {
       if (existsSync(cloudflarePath)) {
         cloudflareVersion = `file:${cloudflarePath}`;
       }
+
+      const clientVercelPath = path.resolve(devRootPath, 'packages', 'client-vercel');
+      if (existsSync(clientVercelPath)) {
+        clientVercelVersion = `file:${clientVercelPath}`;
+      }
     }
 
     ctx.answers.positronicCoreVersion = coreVersion;
     if (ctx.answers.backend === 'cloudflare') {
       ctx.answers.positronicCloudflareVersion = cloudflareVersion;
     }
+
+    ctx.answers.positronicClientVercelVersion = clientVercelVersion;
 
     if (ctx.answers.install) {
       const pm = ctx.answers.pm;

@@ -15,9 +15,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "zod": "^3.24.1",
+    "@positronic/client-vercel": "<%= positronicClientVercelVersion %>",
     "@positronic/core": "<%= positronicCoreVersion %>"<% if (backend === 'cloudflare') { %>,
-    "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>,
-    "zod": "^3.24.1"
+    "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
   },
   "devDependencies": {
     <% if (backend === 'cloudflare') { %>
