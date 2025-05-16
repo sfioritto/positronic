@@ -5,6 +5,7 @@ node_modules/
 
 # Local development server directory
 .positronic/
+.env
 
 # Cloudflare Wrangler state and temp files
 .wrangler/

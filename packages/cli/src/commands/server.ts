@@ -5,6 +5,7 @@ import * as os from 'os';
 import { spawn, type ChildProcess } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
+import * as dotenv from 'dotenv';
 import { generateProject } from './helpers.js';
 // @ts-ignore Could not find a declaration file for module '@positronic/template-new-project'.
 import pkg from '@positronic/template-new-project';
@@ -70,6 +71,22 @@ async function setupPositronicServerEnv(
       }
     }
   }
+
+  const rootEnvFilePath = path.join(projectRootPath, '.env');
+  const devVarsPath = path.join(serverDir, '.dev.vars');
+  let devVarsContent = '';
+
+  if (fs.existsSync(rootEnvFilePath)) {
+    const rootEnvFileContent = fs.readFileSync(rootEnvFilePath);
+    const parsedRootEnv = dotenv.parse(rootEnvFileContent);
+    if (Object.keys(parsedRootEnv).length > 0) {
+      devVarsContent =
+        Object.entries(parsedRootEnv)
+          .map(([key, value]) => `${key}="${value.replace(/"/g, '\\\\"')}"`)
+          .join('\n') + '\n';
+    }
+  }
+  fs.writeFileSync(devVarsPath, devVarsContent);
 
   // Regenerate manifest based on actual project state AFTER setup/copy
   const srcDir = path.join(serverDir, 'src');
@@ -161,9 +178,9 @@ export class ServerCommand {
         wranglerArgs.push('--port', String(argv.port));
       }
 
-      const npxCommand = 'npx';
+      const npxBaseCommand = 'npx';
 
-      wranglerProcess = spawn(npxCommand, ['wrangler', ...wranglerArgs], {
+      wranglerProcess = spawn(npxBaseCommand, ['wrangler', ...wranglerArgs], {
         cwd: serverDir,
         stdio: 'inherit', // Show wrangler output directly
         shell: true, // Use shell for better compatibility, especially on Windows
