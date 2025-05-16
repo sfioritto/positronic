@@ -1,30 +1,25 @@
-import type { ObjectGenerator, OutputSchema, Message } from '@positronic/core';
+import type { ObjectGenerator, Message } from '@positronic/core';
 import { generateObject } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
-
-const openaiProvider = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const defaultOpenAIModel = openaiProvider('gpt-4o');
+import type { LanguageModel } from 'ai';
 
 export class VercelClient implements ObjectGenerator {
+  private model: LanguageModel;
+
+  constructor(model: LanguageModel) {
+    this.model = model;
+  }
+
   async generateObject<T extends z.AnyZodObject>(params: {
-    outputSchema: OutputSchema<T>;
+    schema: T;
+    schemaName: string;
+    schemaDescription?: string;
     prompt?: string;
     messages?: Message[];
     system?: string;
-    modelConfig?: {
-      modelId?: string;
-      temperature?: number;
-      maxTokens?: number;
-      topP?: number;
-      mode?: 'auto' | 'tool' | 'json';
-      [key: string]: any;
-    };
   }): Promise<z.infer<T>> {
-    const { outputSchema, prompt, messages, system, modelConfig } = params;
+    const { schema, schemaName, schemaDescription, prompt, messages, system } =
+      params;
 
     const coreMessages: Message[] = [];
 
@@ -42,23 +37,14 @@ export class VercelClient implements ObjectGenerator {
       coreMessages.push({ role: 'user', content: prompt });
     }
 
-    const modelInstance = modelConfig?.modelId
-      ? openaiProvider(modelConfig.modelId as any) // Use the provider to get the model
-      : defaultOpenAIModel; // Fallback to the default configured model
-
-    // Remove apiKey and modelId from modelConfig before spreading, if they exist,
-    // as they are handled separately or not applicable here.
-    const { modelId, apiKey, ...restOfModelConfig } = modelConfig || {};
-
     const { object } = await generateObject({
-      model: modelInstance,
-      schema: outputSchema.schema,
+      model: this.model,
+      schema,
+      schemaName,
+      schemaDescription,
       messages: coreMessages.length > 0 ? coreMessages : undefined,
       prompt: coreMessages.length === 0 && prompt ? prompt : undefined,
-      mode: modelConfig?.mode || 'auto',
-      schemaName: outputSchema.name,
-      schemaDescription: outputSchema.description,
-      ...restOfModelConfig, // Spread remaining modelConfig options
+      mode: 'auto',
     });
 
     return object as z.infer<T>;

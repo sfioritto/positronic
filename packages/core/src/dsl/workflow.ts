@@ -276,10 +276,12 @@ export class Workflow<
       title,
       action: async ({ state, client: runClient, options, ...services }) => {
         const { template, outputSchema, client: stepClient } = config;
+        const { schema, name: schemaName } = outputSchema;
         const client = stepClient ?? runClient;
         const prompt = template(state);
         const response = await client.generateObject({
-          outputSchema,
+          schema,
+          schemaName,
           prompt,
         });
         const stateWithResponse = {

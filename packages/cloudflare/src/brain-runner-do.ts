@@ -3,9 +3,9 @@ import { DurableObject } from 'cloudflare:workers';
 import type {
   Workflow,
   ObjectGenerator,
-  OutputSchema,
   Adapter,
   WorkflowEvent,
+  Message,
 } from '@positronic/core';
 import { z, TypeOf } from 'zod';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
@@ -17,10 +17,15 @@ export type PositronicManifest = {
 
 const baseClient: ObjectGenerator = {
   generateObject: async <T extends z.AnyZodObject>(params: {
-    outputSchema: OutputSchema<T>;
+    schema: T;
+    schemaName: string;
+    schemaDescription?: string;
     prompt: string;
+    messages?: Message[];
+    system?: string;
   }): Promise<TypeOf<T>> => {
-    const { outputSchema, prompt } = params;
+    const { schema, schemaName, schemaDescription, prompt, messages, system } =
+      params;
     return 'stuff' as any;
   },
 };

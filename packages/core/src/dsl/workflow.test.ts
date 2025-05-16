@@ -260,13 +260,17 @@ describe('workflow creation', () => {
 
     // Verify that each client was used correctly based on the supplied prompt configuration.
     expect(mockClient.generateObject).toHaveBeenCalledWith({
-      outputSchema: expect.any(Object),
+      schema: expect.any(z.ZodObject),
+      schemaName: 'overrideResponse',
       prompt: 'prompt1',
     });
     expect(overrideClient.generateObject).toHaveBeenCalledWith({
-      outputSchema: expect.any(Object),
+      schema: expect.any(z.ZodObject),
+      schemaName: 'overrideResponse',
       prompt: 'prompt2',
     });
+
+    // Verify that the state was updated correctly with values from both clients.
   });
 
   it('should use the provided workflowRunId for the initial run if supplied', async () => {

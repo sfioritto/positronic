@@ -9,15 +9,6 @@ export type Message = {
 };
 
 /**
- * Defines the expected structure and metadata for a generated object.
- */
-export type OutputSchema<T extends z.AnyZodObject> = {
-  schema: T;
-  name: string;
-  description?: string;
-};
-
-/**
  * Interface for AI model interactions, focused on generating structured objects
  * and potentially other types of content in the future.
  */
@@ -33,7 +24,9 @@ export interface ObjectGenerator {
      * The definition of the expected output object, including its Zod schema
      * and a name for state management within the workflow.
      */
-    outputSchema: OutputSchema<T>;
+    schema: T;
+    schemaName: string;
+    schemaDescription?: string;
 
     /**
      * A simple prompt string for single-turn requests.
@@ -57,16 +50,5 @@ export interface ObjectGenerator {
      * prepend this as a `system` role message to the full message list.
      */
     system?: string;
-
-    /**
-     * Optional configuration specific to the language model or provider.
-     */
-    modelConfig?: {
-      modelId?: string;
-      temperature?: number;
-      maxTokens?: number;
-      topP?: number;
-      [key: string]: any;
-    };
   }): Promise<z.infer<T>>;
 }

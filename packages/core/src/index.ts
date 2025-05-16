@@ -15,11 +15,7 @@ export type {
   StepStartedEvent,
   StepCompletedEvent,
 } from './dsl/workflow.js';
-export type {
-  ObjectGenerator,
-  OutputSchema,
-  Message,
-} from './clients/types.js';
+export type { ObjectGenerator, Message } from './clients/types.js';
 export type { State } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
 export { z } from 'zod';
