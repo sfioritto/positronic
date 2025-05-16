@@ -12,10 +12,11 @@
     "build": "npm run tsc && npm run swc",
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
+  "peerDependencies": {
+    "ai": "^4.3.4"
+  },
   "dependencies": {
     "@positronic/core": "^0.0.1",
-    "ai": "^3.2.38",
-    "@ai-sdk/openai": "^0.0.40",
     "zod": "^3.24.1"
   }
 }
