@@ -36,7 +36,6 @@
     "packages/client-anthropic",
     "packages/client-vercel",
     "packages/cli",
-    "packages/resources",
     "packages/cloudflare"
   ],
   "prettier": {
