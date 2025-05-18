@@ -4,6 +4,7 @@ const fs = require('fs/promises')
 const { existsSync } = require('fs')
 
 async function generateManifest(projectRootPath, targetSrcDir) {
+  const runnerPath = path.join(projectRootPath, 'runner.ts');
   const brainsDir = path.join(projectRootPath, 'brains');
   const manifestPath = path.join(targetSrcDir, '_manifest.ts');
 
@@ -28,9 +29,11 @@ async function generateManifest(projectRootPath, targetSrcDir) {
   const manifestContent = `// This file is generated automatically. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};
 `;
 
+  const runnerContent = await fs.readFile(runnerPath, 'utf-8');
   // Intentionally removing error handling per user request
   await fs.mkdir(targetSrcDir, { recursive: true });
   await fs.writeFile(manifestPath, manifestContent, 'utf-8');
+  await fs.writeFile(path.join(targetSrcDir, 'runner.ts'), runnerContent, 'utf-8');
 
 }
 

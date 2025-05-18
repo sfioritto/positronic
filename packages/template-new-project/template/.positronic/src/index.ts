@@ -1,6 +1,7 @@
 import {
   api as app,
   setManifest,
+  setWorkflowRunner,
   BrainRunnerDO,
   MonitorDO,
   PositronicManifest,
@@ -8,13 +9,14 @@ import {
 // Import the generated manifest - NOTE the .js extension for runtime compatibility
 // @ts-expect-error - _manifest.js is generated during template processing
 import { staticManifest } from "./_manifest.js";
-
+import { runner } from "./runner.js";
 // Configure the manifest to use the statically generated list
 const manifest = new PositronicManifest({
   staticManifest,
 });
 
 setManifest(manifest);
+setWorkflowRunner(runner);
 
 // Define Env type based on wrangler.jsonc bindings
 interface Env {
