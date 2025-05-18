@@ -1,39 +1,18 @@
 import { WorkflowRunner } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
-import type {
-  Workflow,
-  ObjectGenerator,
-  Adapter,
-  WorkflowEvent,
-  Message,
-} from '@positronic/core';
-import { z, TypeOf } from 'zod';
+import type { Adapter, WorkflowEvent } from '@positronic/core';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
+import { PositronicManifest } from './manifest.js';
 
-export type PositronicManifest = {
-  import: (name: string) => Promise<Workflow | undefined>;
-};
+let manifest: PositronicManifest | null = null;
+export function setManifest(generatedManifest: PositronicManifest) {
+  manifest = generatedManifest;
+}
 
-const baseClient: ObjectGenerator = {
-  generateObject: async <T extends z.AnyZodObject>(params: {
-    schema: T;
-    schemaName: string;
-    schemaDescription?: string;
-    prompt: string;
-    messages?: Message[];
-    system?: string;
-  }): Promise<TypeOf<T>> => {
-    const { schema, schemaName, schemaDescription, prompt, messages, system } =
-      params;
-    return 'stuff' as any;
-  },
-};
-
-let runtimeManifest: PositronicManifest | null = null;
-
-export function setManifest(manifest: PositronicManifest) {
-  runtimeManifest = manifest;
+let workflowRunner: WorkflowRunner | null = null;
+export function setWorkflowRunner(runner: WorkflowRunner) {
+  workflowRunner = runner;
 }
 
 export interface Env {
@@ -105,16 +84,16 @@ export class BrainRunnerDO extends DurableObject<Env> {
   ) {
     const { sql } = this;
 
-    if (!runtimeManifest) {
+    if (!manifest) {
       throw new Error('Runtime manifest not initialized');
     }
 
-    const workflowToRun = await runtimeManifest.import(brainName);
+    const workflowToRun = await manifest.import(brainName);
     if (!workflowToRun) {
       console.error(
         `[DO ${workflowRunId}] Workflow ${brainName} not found in manifest.`
       );
-      console.error(JSON.stringify(runtimeManifest, null, 2));
+      console.error(JSON.stringify(manifest, null, 2));
       throw new Error(`Workflow ${brainName} not found`);
     }
 
@@ -124,12 +103,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.MONITOR_DO.get(this.env.MONITOR_DO.idFromName('singleton'))
     );
 
-    const runner = new WorkflowRunner({
-      adapters: [sqliteAdapter, eventStreamAdapter, monitorAdapter],
-      client: baseClient,
-    });
+    if (!workflowRunner) {
+      throw new Error('WorkflowRunner not initialized');
+    }
 
-    runner
+    workflowRunner
+      .withAdapters([sqliteAdapter, eventStreamAdapter, monitorAdapter])
       .run(workflowToRun, {
         initialState: initialData || {},
         workflowRunId,
