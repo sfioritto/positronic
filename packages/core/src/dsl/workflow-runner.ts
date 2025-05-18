@@ -13,6 +13,21 @@ export class WorkflowRunner {
     }
   ) {}
 
+  withAdapters(adapters: Adapter[]): WorkflowRunner {
+    const { adapters: existingAdapters } = this.options;
+    return new WorkflowRunner({
+      ...this.options,
+      adapters: [...existingAdapters, ...adapters],
+    });
+  }
+
+  withClient(client: ObjectGenerator): WorkflowRunner {
+    return new WorkflowRunner({
+      ...this.options,
+      client,
+    });
+  }
+
   async run<TOptions extends object = {}, TState extends State = {}>(
     workflow: Workflow<TOptions, TState, any>,
     {
