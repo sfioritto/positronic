@@ -1,8 +1,13 @@
 import { workflow } from '@positronic/core';
 import app from '../../src/api';
-import { setManifest, BrainRunnerDO } from '../../src/brain-runner-do';
+import {
+  setManifest,
+  BrainRunnerDO,
+  setWorkflowRunner,
+} from '../../src/brain-runner-do';
 import { MonitorDO } from '../../src/monitor-do';
 import { PositronicManifest } from '../../src/manifest.js';
+import { runner } from './runner';
 
 const basicWorkflow = workflow('basic-workflow')
   .step('First step', ({ state }) => ({
@@ -38,6 +43,7 @@ const manifest = new PositronicManifest({
 });
 
 setManifest(manifest);
+setWorkflowRunner(runner);
 
 export default {
   fetch: app.fetch,

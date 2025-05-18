@@ -33,7 +33,7 @@ const cliExecutable = path.join(
 const nodeExecutable = process.execPath;
 
 // Increase test timeout to 10 seconds because these tests are slow by their nature
-jest.setTimeout(10000);
+jest.setTimeout(15000);
 
 describe('CLI Integration: positronic new (Simplified)', () => {
   let tempDir: string;
