@@ -4,12 +4,15 @@ import type { Adapter } from '../adapters/types.js';
 import type { SerializedStep, Workflow } from './workflow.js';
 import type { State } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
+import type { ResourceLoader } from '../resources/resource-loader.js';
+import type { Resources } from '../resources/resources.js';
 
 export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[];
       client: ObjectGenerator;
+      resourceLoader: ResourceLoader;
     }
   ) {}
 
@@ -28,7 +31,18 @@ export class WorkflowRunner {
     });
   }
 
-  async run<TOptions extends object = {}, TState extends State = {}>(
+  withResourceLoader(loader: ResourceLoader): WorkflowRunner {
+    return new WorkflowRunner({
+      ...this.options,
+      resourceLoader: loader,
+    });
+  }
+
+  async run<
+    TOptions extends object = {},
+    TState extends State = {},
+    TResources extends Resources = Resources
+  >(
     workflow: Workflow<TOptions, TState, any>,
     {
       initialState = {} as TState,
@@ -36,15 +50,17 @@ export class WorkflowRunner {
       initialCompletedSteps,
       workflowRunId,
       endAfter,
+      resources,
     }: {
       initialState?: TState;
       options?: TOptions;
       initialCompletedSteps?: SerializedStep[] | never;
       workflowRunId?: string | never;
       endAfter?: number;
+      resources?: TResources;
     } = {}
   ): Promise<TState> {
-    const { adapters, client } = this.options;
+    const { adapters, client, resourceLoader } = this.options;
 
     let currentState = initialState ?? ({} as TState);
     let stepNumber = 1;
@@ -68,8 +84,17 @@ export class WorkflowRunner {
             workflowRunId,
             options,
             client,
+            resourceLoader,
+            resources,
           })
-        : workflow.run({ initialState, options, client, workflowRunId });
+        : workflow.run({
+            initialState,
+            options,
+            client,
+            workflowRunId,
+            resourceLoader,
+            resources,
+          });
 
     for await (const event of workflowRun) {
       // Dispatch event to all adapters

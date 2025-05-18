@@ -7,7 +7,7 @@ export interface ManifestEntry {
 
 export type Manifest = Record<string, ManifestEntry>;
 
-class Resources {
+export class Resources {
   constructor(public loader: ResourceLoader, public manifest: Manifest) {}
 
   public getResource(propertyName: string) {
