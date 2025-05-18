@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "NodeNext",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "WebWorker"],
     "strict": true,
     "moduleResolution": "nodenext",
     "esModuleInterop": true,
