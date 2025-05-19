@@ -26,10 +26,10 @@ export class Resources {
   }
 }
 
-export function createResources<T extends object>(
+export function createResources(
   loader: ResourceLoader,
   manifest: Manifest
-) {
+): Resources {
   const resources = new Resources(loader, manifest);
 
   return new Proxy(resources, {
@@ -64,5 +64,5 @@ export function createResources<T extends object>(
       }
       return Reflect.getOwnPropertyDescriptor(target, prop);
     },
-  }) as T;
+  });
 }

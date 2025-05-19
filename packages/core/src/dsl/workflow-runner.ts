@@ -4,15 +4,13 @@ import type { Adapter } from '../adapters/types.js';
 import type { SerializedStep, Workflow } from './workflow.js';
 import type { State } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
-import type { ResourceLoader } from '../resources/resource-loader.js';
-import type { Resources } from '../resources/resources.js';
+import { Resources } from '../resources/resources.js';
 
 export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[];
       client: ObjectGenerator;
-      resourceLoader: ResourceLoader;
     }
   ) {}
 
@@ -31,36 +29,25 @@ export class WorkflowRunner {
     });
   }
 
-  withResourceLoader(loader: ResourceLoader): WorkflowRunner {
-    return new WorkflowRunner({
-      ...this.options,
-      resourceLoader: loader,
-    });
-  }
-
-  async run<
-    TOptions extends object = {},
-    TState extends State = {},
-    TResources extends Resources = Resources
-  >(
-    workflow: Workflow<TOptions, TState, any, TResources>,
+  async run<TOptions extends object = {}, TState extends State = {}>(
+    workflow: Workflow<TOptions, TState, any>,
     {
       initialState = {} as TState,
       options,
       initialCompletedSteps,
       workflowRunId,
       endAfter,
-      resources = {} as TResources,
+      resources,
     }: {
       initialState?: TState;
       options?: TOptions;
       initialCompletedSteps?: SerializedStep[] | never;
       workflowRunId?: string | never;
       endAfter?: number;
-      resources?: TResources;
-    } = {}
+      resources: Resources;
+    }
   ): Promise<TState> {
-    const { adapters, client, resourceLoader } = this.options;
+    const { adapters, client } = this.options;
 
     let currentState = initialState ?? ({} as TState);
     let stepNumber = 1;

@@ -1,6 +1,12 @@
 import { WorkflowRunner } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
-import type { Adapter, WorkflowEvent } from '@positronic/core';
+import { createResources } from '@positronic/core';
+import type {
+  Adapter,
+  WorkflowEvent,
+  ResourceLoader,
+  ResourceManifest,
+} from '@positronic/core';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 import { PositronicManifest } from './manifest.js';
@@ -66,6 +72,28 @@ class MonitorAdapter implements Adapter {
   }
 }
 
+class NoopResourceLoader implements ResourceLoader {
+  async load(resourceName: string, type?: 'text'): Promise<string>;
+  async load(resourceName: string, type: 'binary'): Promise<Buffer>;
+  async load(
+    resourceName: string,
+    type?: 'text' | 'binary'
+  ): Promise<string | Buffer> {
+    if (type === 'binary') {
+      // @ts-ignore: Buffer may not be available in all environments
+      return typeof Buffer !== 'undefined' ? Buffer.from([]) : new Uint8Array();
+    }
+    return '';
+  }
+}
+
+class NoopManifest implements ResourceManifest {
+  [key: string]: any;
+  async import(_brainName: string): Promise<undefined> {
+    return undefined;
+  }
+}
+
 export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private workflowRunId: string;
@@ -107,11 +135,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('WorkflowRunner not initialized');
     }
 
+    const loader = new NoopResourceLoader();
+    const resourceManifest = new NoopManifest();
+
+    const resources = createResources(loader, resourceManifest);
+
     workflowRunner
       .withAdapters([sqliteAdapter, eventStreamAdapter, monitorAdapter])
       .run(workflowToRun, {
         initialState: initialData || {},
         workflowRunId,
+        resources,
       })
       .catch((err) => {
         console.error(`[DO ${workflowRunId}] WorkflowRunner run failed:`, err);
