@@ -5,4 +5,5 @@ import { openai } from '@ai-sdk/openai';
 export const runner = new WorkflowRunner({
   adapters: [],
   client: new VercelClient(openai('gpt-4o-mini')),
+  resources: {},
 });

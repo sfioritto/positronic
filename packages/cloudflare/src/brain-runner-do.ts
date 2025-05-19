@@ -145,7 +145,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
       .run(workflowToRun, {
         initialState: initialData || {},
         workflowRunId,
-        resources,
       })
       .catch((err) => {
         console.error(`[DO ${workflowRunId}] WorkflowRunner run failed:`, err);

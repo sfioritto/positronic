@@ -4,13 +4,14 @@ import type { Adapter } from '../adapters/types.js';
 import type { SerializedStep, Workflow } from './workflow.js';
 import type { State } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
-import { Resources } from '../resources/resources.js';
+import type { Resources } from '../resources/resources.js';
 
 export class WorkflowRunner {
   constructor(
     private options: {
       adapters: Adapter[];
       client: ObjectGenerator;
+      resources: Resources;
     }
   ) {}
 
@@ -37,17 +38,15 @@ export class WorkflowRunner {
       initialCompletedSteps,
       workflowRunId,
       endAfter,
-      resources,
     }: {
       initialState?: TState;
       options?: TOptions;
       initialCompletedSteps?: SerializedStep[] | never;
       workflowRunId?: string | never;
       endAfter?: number;
-      resources: Resources;
-    }
+    } = {}
   ): Promise<TState> {
-    const { adapters, client } = this.options;
+    const { adapters, client, resources } = this.options;
 
     let currentState = initialState ?? ({} as TState);
     let stepNumber = 1;

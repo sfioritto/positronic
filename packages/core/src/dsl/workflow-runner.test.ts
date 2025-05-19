@@ -24,6 +24,7 @@ describe('WorkflowRunner', () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
       client: mockClient,
+      resources: {},
     });
 
     const testWorkflow = workflow('Test Workflow')
@@ -87,6 +88,7 @@ describe('WorkflowRunner', () => {
     const runner = new WorkflowRunner({
       adapters: [mockAdapter],
       client: mockClient,
+      resources: {},
     });
 
     const errorWorkflow = workflow('Error Workflow').step('Error Step', () => {
@@ -114,6 +116,7 @@ describe('WorkflowRunner', () => {
     const runner = new WorkflowRunner({
       adapters: [],
       client: mockClient,
+      resources: {},
     });
 
     const testWorkflow = workflow('Test Workflow')

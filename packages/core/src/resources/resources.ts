@@ -7,56 +7,53 @@ export interface ManifestEntry {
 
 export type Manifest = Record<string, ManifestEntry>;
 
-export class Resources {
-  constructor(public loader: ResourceLoader, public manifest: Manifest) {}
-
-  public getResource(propertyName: string) {
-    const entry = this.manifest[propertyName];
-    if (!entry) {
-      throw new Error(
-        `Resource "${propertyName}" not found in resource manifest.`
-      );
-    }
-
-    if (entry.type === 'text') {
-      return this.loader.load(entry.key, 'text');
-    } else {
-      return this.loader.load(entry.key, 'binary');
-    }
-  }
+export interface Resources {
+  [key: string]: string | Buffer;
 }
 
 export function createResources(
   loader: ResourceLoader,
   manifest: Manifest
 ): Resources {
-  const resources = new Resources(loader, manifest);
+  function getResource(propertyName: string) {
+    const entry = manifest[propertyName];
+    if (!entry) {
+      throw new Error(
+        `Resource "${propertyName}" not found in resource manifest.`
+      );
+    }
+    if (entry.type === 'text') {
+      return loader.load(entry.key, 'text');
+    } else {
+      return loader.load(entry.key, 'binary');
+    }
+  }
 
-  return new Proxy(resources, {
+  return new Proxy({} as Resources, {
     get: (target, prop, receiver) => {
       if (typeof prop === 'string') {
-        if (Object.prototype.hasOwnProperty.call(target.manifest, prop)) {
-          return target.getResource(prop);
+        if (Object.prototype.hasOwnProperty.call(manifest, prop)) {
+          return getResource(prop);
         }
       }
       return Reflect.get(target, prop, receiver);
     },
     has: (target, prop) => {
       if (typeof prop === 'string') {
-        return Object.prototype.hasOwnProperty.call(target.manifest, prop);
+        return Object.prototype.hasOwnProperty.call(manifest, prop);
       }
       return Reflect.has(target, prop);
     },
-    ownKeys: (target) => {
-      return Object.keys(target.manifest);
+    ownKeys: () => {
+      return Object.keys(manifest);
     },
     getOwnPropertyDescriptor: (target, prop) => {
       if (
         typeof prop === 'string' &&
-        Object.prototype.hasOwnProperty.call(target.manifest, prop)
+        Object.prototype.hasOwnProperty.call(manifest, prop)
       ) {
         return {
-          value: target.getResource(prop),
+          value: getResource(prop),
           writable: false,
           enumerable: true,
           configurable: true,

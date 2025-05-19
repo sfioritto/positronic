@@ -22,4 +22,5 @@ const mockClient: ObjectGenerator = {
 export const runner = new WorkflowRunner({
   adapters: [], // Add any default adapters needed for testing, if any
   client: mockClient,
+  resources: {},
 });
