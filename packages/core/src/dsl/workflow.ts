@@ -133,27 +133,20 @@ type Block<
   | StepBlock<TStateIn, TStateOut, TOptions, TServices>
   | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
-interface BaseRunParams<
-  TOptions extends object = object,
-  TServices extends object = object
-> {
+interface BaseRunParams<TOptions extends object = object> {
   client: ObjectGenerator;
   options?: TOptions;
 }
 
-export interface InitialRunParams<
-  TOptions extends object = object,
-  TServices extends object = object
-> extends BaseRunParams<TOptions, TServices> {
+export interface InitialRunParams<TOptions extends object = object>
+  extends BaseRunParams<TOptions> {
   initialState?: State;
   initialCompletedSteps?: never;
   workflowRunId?: string;
 }
 
-export interface RerunParams<
-  TOptions extends object = object,
-  TServices extends object = object
-> extends BaseRunParams<TOptions, TServices> {
+export interface RerunParams<TOptions extends object = object>
+  extends BaseRunParams<TOptions> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
   workflowRunId: string;
@@ -306,17 +299,13 @@ export class Workflow<
 
   // Overload signatures
   run(
-    params: InitialRunParams<TOptions, TServices>
+    params: InitialRunParams<TOptions>
   ): AsyncGenerator<WorkflowEvent<TOptions>>;
-  run(
-    params: RerunParams<TOptions, TServices>
-  ): AsyncGenerator<WorkflowEvent<TOptions>>;
+  run(params: RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
 
   // Implementation signature
   async *run(
-    params:
-      | InitialRunParams<TOptions, TServices>
-      | RerunParams<TOptions, TServices>
+    params: InitialRunParams<TOptions> | RerunParams<TOptions>
   ): AsyncGenerator<WorkflowEvent<TOptions>> {
     const { title, description, blocks } = this;
 
@@ -411,10 +400,7 @@ class WorkflowEventStream<
   private services: TServices;
 
   constructor(
-    params: (
-      | InitialRunParams<TOptions, TServices>
-      | RerunParams<TOptions, TServices>
-    ) & {
+    params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
       title: string;
       description?: string;
       blocks: Block<any, any, TOptions, TServices>[];
