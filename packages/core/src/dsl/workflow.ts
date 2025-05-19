@@ -4,6 +4,8 @@ import type { ObjectGenerator } from '../clients/types.js';
 import type { State, JsonPatch } from './types.js';
 import { STATUS, WORKFLOW_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
+import type { Resources } from '../resources/resources.js';
+
 export type SerializedError = {
   name: string;
   message: string;
@@ -93,7 +95,8 @@ type StepBlock<
   TStateIn,
   TStateOut,
   TOptions extends object = object,
-  TServices extends object = object
+  TServices extends object = object,
+  TResources extends Resources = Resources
 > = {
   type: 'step';
   title: string;
@@ -102,6 +105,7 @@ type StepBlock<
       state: TStateIn;
       options: TOptions;
       client: ObjectGenerator;
+      resources: TResources;
     } & TServices
   ) => TStateOut | Promise<TStateOut>;
 };
@@ -111,11 +115,12 @@ type WorkflowBlock<
   TInnerState extends State,
   TNewState,
   TOptions extends object = object,
-  TServices extends object = object
+  TServices extends object = object,
+  TResources extends Resources = Resources
 > = {
   type: 'workflow';
   title: string;
-  innerWorkflow: Workflow<TOptions, TInnerState, TServices>;
+  innerWorkflow: Workflow<TOptions, TInnerState, TServices, TResources>;
   initialState: State | ((outerState: TOuterState) => State);
   action: (
     outerState: TOuterState,
@@ -128,25 +133,34 @@ type Block<
   TStateIn,
   TStateOut,
   TOptions extends object = object,
-  TServices extends object = object
+  TServices extends object = object,
+  TResources extends Resources = Resources
 > =
-  | StepBlock<TStateIn, TStateOut, TOptions, TServices>
-  | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices>;
+  | StepBlock<TStateIn, TStateOut, TOptions, TServices, TResources>
+  | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices, TResources>;
 
-interface BaseRunParams<TOptions extends object = object> {
+interface BaseRunParams<
+  TResources extends Resources,
+  TOptions extends object = object
+> {
   client: ObjectGenerator;
+  resources: TResources;
   options?: TOptions;
 }
 
-export interface InitialRunParams<TOptions extends object = object>
-  extends BaseRunParams<TOptions> {
+export interface InitialRunParams<
+  TResources extends Resources,
+  TOptions extends object = object
+> extends BaseRunParams<TResources, TOptions> {
   initialState?: State;
   initialCompletedSteps?: never;
   workflowRunId?: string;
 }
 
-export interface RerunParams<TOptions extends object = object>
-  extends BaseRunParams<TOptions> {
+export interface RerunParams<
+  TResources extends Resources,
+  TOptions extends object = object
+> extends BaseRunParams<TResources, TOptions> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
   workflowRunId: string;
@@ -155,9 +169,10 @@ export interface RerunParams<TOptions extends object = object>
 export class Workflow<
   TOptions extends object = object,
   TState extends State = object,
-  TServices extends object = object
+  TServices extends object = object,
+  TResources extends Resources = Resources
 > {
-  private blocks: Block<any, any, TOptions, TServices>[] = [];
+  private blocks: Block<any, any, TOptions, TServices, TResources>[] = [];
   public type: 'workflow' = 'workflow';
   private defaultOptions: Partial<TOptions> = {};
   private services: TServices = {} as TServices;
@@ -173,11 +188,13 @@ export class Workflow<
   // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
-  ): Workflow<TOptions, TState, TNewServices> {
-    const nextWorkflow = new Workflow<TOptions, TState, TNewServices>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
+  ): Workflow<TOptions, TState, TNewServices, TResources> {
+    const nextWorkflow = new Workflow<
+      TOptions,
+      TState,
+      TNewServices,
+      TResources
+    >(this.title, this.description).withBlocks(this.blocks as any);
 
     // Copy default options
     nextWorkflow.withOptions(this.defaultOptions);
@@ -195,10 +212,17 @@ export class Workflow<
         state: TState;
         options: TOptions;
         client: ObjectGenerator;
+        resources: TResources;
       } & TServices
     ) => TNewState | Promise<TNewState>
   ) {
-    const stepBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
+    const stepBlock: StepBlock<
+      TState,
+      TNewState,
+      TOptions,
+      TServices,
+      TResources
+    > = {
       type: 'step',
       title,
       action,
@@ -209,7 +233,7 @@ export class Workflow<
 
   workflow<TInnerState extends State, TNewState extends State>(
     title: string,
-    innerWorkflow: Workflow<TOptions, TInnerState, TServices>,
+    innerWorkflow: Workflow<TOptions, TInnerState, TServices, TResources>,
     action: (params: {
       state: TState;
       workflowState: TInnerState;
@@ -222,7 +246,8 @@ export class Workflow<
       TInnerState,
       TNewState,
       TOptions,
-      TServices
+      TServices,
+      TResources
     > = {
       type: 'workflow',
       title,
@@ -261,13 +286,26 @@ export class Workflow<
         response: z.infer<TSchema>;
         options: TOptions;
         prompt: string;
+        resources: TResources;
       } & TServices
     ) => TNewState | Promise<TNewState>
   ) {
-    const promptBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
+    const promptBlock: StepBlock<
+      TState,
+      TNewState,
+      TOptions,
+      TServices,
+      TResources
+    > = {
       type: 'step',
       title,
-      action: async ({ state, client: runClient, options, ...services }) => {
+      action: async ({
+        state,
+        client: runClient,
+        options,
+        resources,
+        ...services
+      }) => {
         const { template, outputSchema, client: stepClient } = config;
         const { schema, name: schemaName } = outputSchema;
         const client = stepClient ?? runClient;
@@ -288,6 +326,7 @@ export class Workflow<
               response,
               options,
               prompt,
+              resources,
               ...(services as TServices),
             })
           : (stateWithResponse as unknown as TNewState);
@@ -299,13 +338,17 @@ export class Workflow<
 
   // Overload signatures
   run(
-    params: InitialRunParams<TOptions>
+    params: InitialRunParams<TResources, TOptions>
   ): AsyncGenerator<WorkflowEvent<TOptions>>;
-  run(params: RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
+  run(
+    params: RerunParams<TResources, TOptions>
+  ): AsyncGenerator<WorkflowEvent<TOptions>>;
 
   // Implementation signature
   async *run(
-    params: InitialRunParams<TOptions> | RerunParams<TOptions>
+    params:
+      | InitialRunParams<TResources, TOptions>
+      | RerunParams<TResources, TOptions>
   ): AsyncGenerator<WorkflowEvent<TOptions>> {
     const { title, description, blocks } = this;
 
@@ -320,14 +363,16 @@ export class Workflow<
       description,
       blocks,
       ...params,
-      options: mergedOptions, // Use merged options
-      services: this.services, // Use services from the workflow
+      options: mergedOptions,
+      services: this.services,
     });
 
     yield* stream.next();
   }
 
-  private withBlocks(blocks: Block<any, any, TOptions, TServices>[]): this {
+  private withBlocks(
+    blocks: Block<any, any, TOptions, TServices, TResources>[]
+  ): this {
     this.blocks = blocks;
     return this;
   }
@@ -335,13 +380,16 @@ export class Workflow<
   private nextWorkflow<TNewState extends State>(): Workflow<
     TOptions,
     TNewState,
-    TServices
+    TServices,
+    TResources
   > {
     // Pass default options to the next workflow
-    const nextWorkflow = new Workflow<TOptions, TNewState, TServices>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
+    const nextWorkflow = new Workflow<
+      TOptions,
+      TNewState,
+      TServices,
+      TResources
+    >(this.title, this.description).withBlocks(this.blocks as any);
 
     // Copy default options to the next workflow
     nextWorkflow.withOptions(this.defaultOptions);
@@ -358,7 +406,7 @@ class Step {
   private patch?: JsonPatch | string;
   private status: (typeof STATUS)[keyof typeof STATUS] = STATUS.PENDING;
 
-  constructor(public block: Block<any, any, any, any>, id?: string) {
+  constructor(public block: Block<any, any, any, any, any>, id?: string) {
     this.id = id || uuidv4();
   }
 
@@ -386,7 +434,8 @@ class Step {
 class WorkflowEventStream<
   TOptions extends object = object,
   TState extends State = object,
-  TServices extends object = object
+  TServices extends object = object,
+  TResources extends Resources = Resources
 > {
   private currentState: TState;
   private steps: Step[];
@@ -398,12 +447,16 @@ class WorkflowEventStream<
   private client: ObjectGenerator;
   private options: TOptions;
   private services: TServices;
+  private resources: TResources;
 
   constructor(
-    params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
+    params: (
+      | InitialRunParams<TResources, TOptions>
+      | RerunParams<TResources, TOptions>
+    ) & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices>[];
+      blocks: Block<any, any, TOptions, TServices, TResources>[];
       services: TServices;
     }
   ) {
@@ -417,6 +470,7 @@ class WorkflowEventStream<
       options = {} as TOptions,
       client,
       services,
+      resources,
     } = params;
 
     this.initialState = initialState as TState;
@@ -425,7 +479,7 @@ class WorkflowEventStream<
     this.client = client;
     this.options = options;
     this.services = services;
-
+    this.resources = resources;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -583,7 +637,13 @@ class WorkflowEventStream<
   private async *executeStep(
     step: Step
   ): AsyncGenerator<WorkflowEvent<TOptions>> {
-    const block = step.block;
+    const block = step.block as Block<
+      any,
+      any,
+      TOptions,
+      TServices,
+      TResources
+    >;
 
     if (block.type === 'workflow') {
       const initialState =
@@ -594,6 +654,7 @@ class WorkflowEventStream<
       // Run inner workflow and yield all its events
       let patches: JsonPatch[] = [];
       const innerRun = block.innerWorkflow.run({
+        resources: this.resources,
         client: this.client,
         initialState,
         options: this.options ?? ({} as TOptions),
@@ -628,6 +689,7 @@ class WorkflowEventStream<
         state: this.currentState,
         options: this.options ?? ({} as TOptions),
         client: this.client,
+        resources: this.resources,
         ...this.services,
       });
       yield* this.completeStep(step, prevState);

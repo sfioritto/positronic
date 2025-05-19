@@ -43,14 +43,14 @@ export class WorkflowRunner {
     TState extends State = {},
     TResources extends Resources = Resources
   >(
-    workflow: Workflow<TOptions, TState, any>,
+    workflow: Workflow<TOptions, TState, any, TResources>,
     {
       initialState = {} as TState,
       options,
       initialCompletedSteps,
       workflowRunId,
       endAfter,
-      resources,
+      resources = {} as TResources,
     }: {
       initialState?: TState;
       options?: TOptions;
@@ -84,7 +84,6 @@ export class WorkflowRunner {
             workflowRunId,
             options,
             client,
-            resourceLoader,
             resources,
           })
         : workflow.run({
@@ -92,7 +91,6 @@ export class WorkflowRunner {
             options,
             client,
             workflowRunId,
-            resourceLoader,
             resources,
           });
 
