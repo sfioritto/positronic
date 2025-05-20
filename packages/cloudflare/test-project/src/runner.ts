@@ -20,7 +20,10 @@ const mockClient: ObjectGenerator = {
 };
 
 export const runner = new WorkflowRunner({
-  adapters: [], // Add any default adapters needed for testing, if any
+  adapters: [],
   client: mockClient,
-  resources: {},
+  resources: {
+    'test-resource': 'This is a test resource',
+    'test-resource-binary': Buffer.from('This is a test resource binary'),
+  },
 });

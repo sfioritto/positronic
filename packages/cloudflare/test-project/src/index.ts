@@ -23,10 +23,8 @@ const basicWorkflow = workflow('basic-workflow')
     message: `${state.hello}, ${state.world}`,
   }));
 
-// Define the new delayed workflow
 const delayedWorkflow = workflow('delayed-workflow')
   .step('Start Delay', async ({ state }) => {
-    // Simulate a 1.5 second delay using standard setTimeout
     await new Promise((resolve) => setTimeout(resolve, 1500));
     return { ...state, status_after_sleep: 'awake' };
   })
@@ -35,10 +33,21 @@ const delayedWorkflow = workflow('delayed-workflow')
     final_message: 'Done after delay',
   }));
 
+const resourceWorkflow = workflow('resource-workflow')
+  .step('Load text resource', ({ state, resources }) => ({
+    ...state,
+    text: resources['test-resource'] as string,
+  }))
+  .step('Load binary resource', ({ state, resources }) => ({
+    ...state,
+    buffer: (resources['test-resource-binary'] as Buffer).toString('base64'),
+  }));
+
 const manifest = new PositronicManifest({
   staticManifest: {
     'basic-workflow': basicWorkflow,
     'delayed-workflow': delayedWorkflow,
+    'resource-workflow': resourceWorkflow,
   },
 });
 

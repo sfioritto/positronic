@@ -558,4 +558,112 @@ describe('Hono API Tests', () => {
 
     await waitOnExecutionContext(watchContext);
   });
+
+  it('Loads resources from the resource manifest', async () => {
+    const testEnv = env as TestEnv;
+    const brainName = 'resource-workflow';
+
+    const createRequest = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brainName }),
+    });
+    const createContext = createExecutionContext();
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createContext
+    );
+    const { brainRunId } = await createResponse.json<{
+      brainRunId: string;
+    }>();
+    await waitOnExecutionContext(createContext);
+
+    // Watch the brain run via SSE until completion
+    const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+    const watchRequest = new Request(watchUrl);
+    const watchContext = createExecutionContext();
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
+    expect(watchResponse.status).toBe(200); // Ensure watch connection is OK
+    if (!watchResponse.body) {
+      throw new Error('Watch response body is null');
+    }
+
+    // --- Read all events from the SSE stream ---
+    const allEvents = await readSseStream(watchResponse.body);
+    await waitOnExecutionContext(watchContext); // Wait for SSE stream processing and DOs to settle
+
+    // --- Assertions on the collected events ---
+
+    // Check for overall workflow completion
+    const completeEvent = allEvents.find(
+      (e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE
+    );
+    expect(completeEvent).toBeDefined();
+    expect(completeEvent?.status).toBe(STATUS.COMPLETE);
+
+    // Find the step completion events
+    const stepCompleteEvents = allEvents.filter(
+      (e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE
+    );
+
+    const loadTextStepCompleteEvent = stepCompleteEvents.find(
+      (e) => e.stepTitle === 'Load text resource'
+    );
+    expect(loadTextStepCompleteEvent).toBeDefined();
+    expect(loadTextStepCompleteEvent?.patch).toBeDefined();
+
+    const loadBinaryStepCompleteEvent = stepCompleteEvents.find(
+      (e) => e.stepTitle === 'Load binary resource'
+    );
+    expect(loadBinaryStepCompleteEvent).toBeDefined();
+    expect(loadBinaryStepCompleteEvent?.patch).toBeDefined();
+
+    // Expected resource content from packages/cloudflare/test-project/src/runner.ts
+    const expectedTextContent = 'This is a test resource';
+    const expectedBinaryContentRaw = 'This is a test resource binary';
+    const expectedBinaryContentBase64 = Buffer.from(
+      expectedBinaryContentRaw
+    ).toString('base64');
+
+    // Verify the patch from 'Load text resource' step
+    // This patch is relative to the state *before* this step
+    const textPatch = loadTextStepCompleteEvent!.patch;
+    const addTextOp = textPatch.find(
+      (op) => op.op === 'add' && op.path === '/text'
+    );
+    expect(addTextOp).toBeDefined();
+    expect(addTextOp?.value).toBe(expectedTextContent);
+
+    // Verify the patch from 'Load binary resource' step
+    // This patch is relative to the state *after* 'Load text resource' step
+    const binaryPatch = loadBinaryStepCompleteEvent!.patch;
+    const addBufferOp = binaryPatch.find(
+      (op) => op.op === 'add' && op.path === '/buffer'
+    );
+    expect(addBufferOp).toBeDefined();
+    expect(addBufferOp?.value).toBe(expectedBinaryContentBase64);
+
+    // Check that the steps themselves are marked as completed in the final status
+    const stepStatusEvents = allEvents.filter(
+      (e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS
+    );
+    expect(stepStatusEvents.length).toBeGreaterThan(0);
+    const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
+
+    expect(lastStepStatusEvent.steps.length).toBe(2); // resource-workflow has 2 steps
+    const textStepFinalStatus = lastStepStatusEvent.steps.find(
+      (s) => s.title === 'Load text resource'
+    );
+    const binaryStepFinalStatus = lastStepStatusEvent.steps.find(
+      (s) => s.title === 'Load binary resource'
+    );
+
+    expect(textStepFinalStatus?.status).toBe(STATUS.COMPLETE);
+    expect(binaryStepFinalStatus?.status).toBe(STATUS.COMPLETE);
+  });
 });
