@@ -2,6 +2,9 @@ import {
   WorkflowRunner,
   type ObjectGenerator,
   type Message,
+  type ResourceLoader,
+  createResources,
+  type ResourceManifest,
 } from '@positronic/core';
 import { z, type TypeOf } from 'zod';
 
@@ -19,11 +22,27 @@ const mockClient: ObjectGenerator = {
   },
 };
 
+const mockResourceLoader: ResourceLoader = {
+  load: (async (
+    resourceName: string,
+    type?: 'text' | 'binary'
+  ): Promise<string | Buffer> => {
+    if (type === 'binary') {
+      return Buffer.from('This is a test resource binary');
+    }
+    return 'This is a test resource';
+  }) as ResourceLoader['load'],
+};
+
+const manifest: ResourceManifest = {
+  'test-resource': { key: 'test-resource', type: 'text' },
+  'test-resource-binary': { key: 'test-resource-binary', type: 'binary' },
+};
+
+const resources = createResources(mockResourceLoader, manifest);
+
 export const runner = new WorkflowRunner({
   adapters: [],
   client: mockClient,
-  resources: {
-    'test-resource': 'This is a test resource',
-    'test-resource-binary': Buffer.from('This is a test resource binary'),
-  },
+  resources,
 });
