@@ -1,59 +1,70 @@
 import { ResourceLoader } from './resource-loader.js';
 
 export interface ManifestEntry {
-  key: string;
   type: 'text' | 'binary';
 }
 
 export type Manifest = Record<string, ManifestEntry>;
 
 export interface Resources {
-  [key: string]: string | Buffer;
+  [key: string]: {
+    load: () => Promise<string | Buffer>;
+  };
+}
+
+function toCamelCase(str: string): string {
+  return str.replace(/-(\w)/g, (_, c) => c.toUpperCase());
 }
 
 export function createResources(
   loader: ResourceLoader,
   manifest: Manifest
 ): Resources {
-  function getResource(propertyName: string) {
-    const entry = manifest[propertyName];
-    if (!entry) {
-      throw new Error(
-        `Resource "${propertyName}" not found in resource manifest.`
-      );
-    }
-    if (entry.type === 'text') {
-      return loader.load(entry.key, 'text');
-    } else {
-      return loader.load(entry.key, 'binary');
-    }
-  }
+  const processedManifest: Manifest = Object.fromEntries(
+    Object.entries(manifest).map(([kebabCaseKey, entryData]) => {
+      const camelCaseKey = toCamelCase(kebabCaseKey);
+      return [camelCaseKey, entryData];
+    })
+  );
 
   return new Proxy({} as Resources, {
     get: (target, prop, receiver) => {
-      if (typeof prop === 'string') {
-        if (Object.prototype.hasOwnProperty.call(manifest, prop)) {
-          return getResource(prop);
-        }
+      if (typeof prop === 'string' && prop in processedManifest) {
+        const entry = processedManifest[prop];
+        return {
+          load: () => {
+            if (entry.type === 'text') {
+              return loader.load(prop, 'text');
+            } else {
+              return loader.load(prop, 'binary');
+            }
+          },
+        };
       }
       return Reflect.get(target, prop, receiver);
     },
     has: (target, prop) => {
       if (typeof prop === 'string') {
-        return Object.prototype.hasOwnProperty.call(manifest, prop);
+        return prop in processedManifest;
       }
       return Reflect.has(target, prop);
     },
     ownKeys: () => {
-      return Object.keys(manifest);
+      return Object.keys(processedManifest);
     },
     getOwnPropertyDescriptor: (target, prop) => {
-      if (
-        typeof prop === 'string' &&
-        Object.prototype.hasOwnProperty.call(manifest, prop)
-      ) {
+      if (typeof prop === 'string' && prop in processedManifest) {
+        const entry = processedManifest[prop];
         return {
-          value: getResource(prop),
+          value: {
+            load: () => {
+              if (entry.type === 'text') {
+                return loader.load(prop, 'text');
+              } else {
+                return loader.load(prop, 'binary');
+              }
+            },
+          },
           writable: false,
           enumerable: true,
           configurable: true,

@@ -80,12 +80,21 @@ describe('Hono API Tests', () => {
           const event = parseSseEvent(message);
           if (event) {
             events.push(event);
-            if (
-              event.type === WORKFLOW_EVENTS.COMPLETE ||
-              event.type === WORKFLOW_EVENTS.ERROR
-            ) {
+            if (event.type === WORKFLOW_EVENTS.COMPLETE) {
               reader.cancel(`Received terminal event: ${event.type}`);
               return events;
+            }
+            if (event.type === WORKFLOW_EVENTS.ERROR) {
+              console.error(
+                'Received WORKFLOW_EVENTS.ERROR. Event details:',
+                event
+              );
+              reader.cancel(`Received terminal event: ${event.type}`);
+              throw new Error(
+                `Received terminal event: ${
+                  event.type
+                }. Details: ${JSON.stringify(event)}`
+              );
             }
           }
         }

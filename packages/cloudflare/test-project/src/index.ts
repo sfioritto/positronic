@@ -36,13 +36,11 @@ const delayedWorkflow = workflow('delayed-workflow')
 const resourceWorkflow = workflow('resource-workflow')
   .step('Load text resource', async ({ state, resources }) => ({
     ...state,
-    text: (await resources['test-resource']) as string,
+    text: (await resources.testResource.load()) as string,
   }))
   .step('Load binary resource', async ({ state, resources }) => ({
     ...state,
-    buffer: ((await resources['test-resource-binary']) as Buffer).toString(
-      'base64'
-    ),
+    buffer: (await resources.testResourceBinary.load()).toString('base64'),
   }));
 
 const manifest = new PositronicManifest({

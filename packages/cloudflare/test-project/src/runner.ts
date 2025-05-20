@@ -35,8 +35,8 @@ const mockResourceLoader: ResourceLoader = {
 };
 
 const manifest: ResourceManifest = {
-  'test-resource': { key: 'test-resource', type: 'text' },
-  'test-resource-binary': { key: 'test-resource-binary', type: 'binary' },
+  'test-resource': { type: 'text' },
+  'test-resource-binary': { type: 'binary' },
 };
 
 const resources = createResources(mockResourceLoader, manifest);
