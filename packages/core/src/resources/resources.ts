@@ -9,6 +9,8 @@ export type Manifest = Record<string, ManifestEntry>;
 export interface Resources {
   [key: string]: {
     load: () => Promise<string | Buffer>;
+    loadText: () => Promise<string>;
+    loadBinary: () => Promise<Buffer>;
   };
 }
 
@@ -39,6 +41,22 @@ export function createResources(
               return loader.load(prop, 'binary');
             }
           },
+          loadText: () => {
+            if (entry.type !== 'text') {
+              throw new Error(
+                `Resource "${prop}" is of type "${entry.type}", but was accessed with loadText().`
+              );
+            }
+            return loader.load(prop, 'text');
+          },
+          loadBinary: () => {
+            if (entry.type !== 'binary') {
+              throw new Error(
+                `Resource "${prop}" is of type "${entry.type}", but was accessed with loadBinary().`
+              );
+            }
+            return loader.load(prop, 'binary');
+          },
         };
       }
       return Reflect.get(target, prop, receiver);
@@ -63,6 +81,22 @@ export function createResources(
               } else {
                 return loader.load(prop, 'binary');
               }
+            },
+            loadText: () => {
+              if (entry.type !== 'text') {
+                throw new Error(
+                  `Resource "${prop}" is of type "${entry.type}", but was accessed with loadText().`
+                );
+              }
+              return loader.load(prop, 'text');
+            },
+            loadBinary: () => {
+              if (entry.type !== 'binary') {
+                throw new Error(
+                  `Resource "${prop}" is of type "${entry.type}", but was accessed with loadBinary().`
+                );
+              }
+              return loader.load(prop, 'binary');
             },
           },
           writable: false,
