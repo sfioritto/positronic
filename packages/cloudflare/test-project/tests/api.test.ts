@@ -4,7 +4,7 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import worker from '../src/index';
 import { WORKFLOW_EVENTS, STATUS } from '@positronic/core';
 import type {
