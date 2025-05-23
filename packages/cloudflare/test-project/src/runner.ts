@@ -4,7 +4,6 @@ import {
   type Message,
   type ResourceLoader,
   createResources,
-  type ResourceManifest,
 } from '@positronic/core';
 import { z, type TypeOf } from 'zod';
 
@@ -34,12 +33,13 @@ const mockResourceLoader: ResourceLoader = {
   }) as ResourceLoader['load'],
 };
 
-const manifest: ResourceManifest = {
-  'test-resource': { type: 'text' },
-  'test-resource-binary': { type: 'binary' },
-};
+const resourceManifest = {
+  testResource: { type: 'text' },
+  testResourceBinary: { type: 'binary' },
+  nestedResource: { testNestedResource: { type: 'text' } },
+} as const;
 
-const resources = createResources(mockResourceLoader, manifest);
+const resources = createResources(mockResourceLoader, resourceManifest);
 
 export const runner = new WorkflowRunner({
   adapters: [],

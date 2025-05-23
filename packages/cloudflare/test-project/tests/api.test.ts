@@ -657,6 +657,20 @@ describe('Hono API Tests', () => {
     expect(addBufferOp).toBeDefined();
     expect(addBufferOp?.value).toBe(expectedBinaryContentBase64);
 
+    // Verify the patch from 'Load nested resource' step
+    const loadNestedStepCompleteEvent = stepCompleteEvents.find(
+      (e) => e.stepTitle === 'Load nested resource'
+    );
+    expect(loadNestedStepCompleteEvent).toBeDefined();
+    expect(loadNestedStepCompleteEvent?.patch).toBeDefined();
+    const nestedTextPatch = loadNestedStepCompleteEvent!.patch;
+    const addNestedTextOp = nestedTextPatch.find(
+      (op) => op.op === 'add' && op.path === '/nestedText'
+    );
+    expect(addNestedTextOp).toBeDefined();
+    // The mock loader will return 'This is a test resource' for any text request.
+    expect(addNestedTextOp?.value).toBe(expectedTextContent);
+
     // Check that the steps themselves are marked as completed in the final status
     const stepStatusEvents = allEvents.filter(
       (e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS
@@ -664,15 +678,19 @@ describe('Hono API Tests', () => {
     expect(stepStatusEvents.length).toBeGreaterThan(0);
     const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
 
-    expect(lastStepStatusEvent.steps.length).toBe(2); // resource-workflow has 2 steps
+    expect(lastStepStatusEvent.steps.length).toBe(3); // resource-workflow has 3 steps
     const textStepFinalStatus = lastStepStatusEvent.steps.find(
       (s) => s.title === 'Load text resource'
     );
     const binaryStepFinalStatus = lastStepStatusEvent.steps.find(
       (s) => s.title === 'Load binary resource'
     );
+    const nestedStepFinalStatus = lastStepStatusEvent.steps.find(
+      (s) => s.title === 'Load nested resource'
+    );
 
     expect(textStepFinalStatus?.status).toBe(STATUS.COMPLETE);
     expect(binaryStepFinalStatus?.status).toBe(STATUS.COMPLETE);
+    expect(nestedStepFinalStatus?.status).toBe(STATUS.COMPLETE);
   });
 });

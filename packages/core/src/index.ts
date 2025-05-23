@@ -26,7 +26,4 @@ export { z } from 'zod';
 
 export type { ResourceLoader } from './resources/resource-loader.js';
 export { createResources } from './resources/resources.js';
-export type {
-  Manifest as ResourceManifest,
-  ManifestEntry as ResourceManifestEntry,
-} from './resources/resources.js';
+export type { Manifest as ResourceManifest } from './resources/resources.js';

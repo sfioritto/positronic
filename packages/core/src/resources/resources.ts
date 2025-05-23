@@ -1,110 +1,106 @@
 import { ResourceLoader } from './resource-loader.js';
 
-export interface ManifestEntry {
+interface Entry {
   type: 'text' | 'binary';
 }
 
-export type Manifest = Record<string, ManifestEntry>;
+export interface Manifest {
+  [key: string]: ManifestEntry;
+}
+
+type ManifestEntry = Entry | Manifest;
+
+interface Resource {
+  load: () => Promise<string | Buffer>;
+  loadText: () => Promise<string>;
+  loadBinary: () => Promise<Buffer>;
+}
 
 export interface Resources {
-  [key: string]: {
-    load: () => Promise<string | Buffer>;
-    loadText: () => Promise<string>;
-    loadBinary: () => Promise<Buffer>;
-  };
+  [key: string]: Resource | Resources;
 }
 
-function toCamelCase(str: string): string {
-  return str.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+function isResourceEntry(entry: ManifestEntry): entry is Entry {
+  return typeof (entry as Entry).type === 'string';
 }
 
-export function createResources(
+export function createResources<M extends Manifest>(
   loader: ResourceLoader,
-  manifest: Manifest
-): Resources {
-  const processedManifest: Manifest = Object.fromEntries(
-    Object.entries(manifest).map(([kebabCaseKey, entryData]) => {
-      const camelCaseKey = toCamelCase(kebabCaseKey);
-      return [camelCaseKey, entryData];
-    })
-  );
+  initialManifestWithCamelCaseKeys: M
+) {
+  function createProxiedResources(manifestNode: Manifest): Resources {
+    const resultProxy: Resources = new Proxy({} as Resources, {
+      get: (target, prop, receiver): Resource | Resources | undefined => {
+        if (typeof prop !== 'string' || !(prop in manifestNode)) {
+          return Reflect.get(target, prop, receiver);
+        }
 
-  return new Proxy({} as Resources, {
-    get: (target, prop, receiver) => {
-      if (typeof prop === 'string' && prop in processedManifest) {
-        const entry = processedManifest[prop];
-        return {
-          load: () => {
-            if (entry.type === 'text') {
-              return loader.load(prop, 'text');
-            } else {
-              return loader.load(prop, 'binary');
-            }
-          },
-          loadText: () => {
-            if (entry.type !== 'text') {
-              throw new Error(
-                `Resource "${prop}" is of type "${entry.type}", but was accessed with loadText().`
-              );
-            }
-            return loader.load(prop, 'text');
-          },
-          loadBinary: () => {
-            if (entry.type !== 'binary') {
-              throw new Error(
-                `Resource "${prop}" is of type "${entry.type}", but was accessed with loadBinary().`
-              );
-            }
-            return loader.load(prop, 'binary');
-          },
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has: (target, prop) => {
-      if (typeof prop === 'string') {
-        return prop in processedManifest;
-      }
-      return Reflect.has(target, prop);
-    },
-    ownKeys: () => {
-      return Object.keys(processedManifest);
-    },
-    getOwnPropertyDescriptor: (target, prop) => {
-      if (typeof prop === 'string' && prop in processedManifest) {
-        const entry = processedManifest[prop];
-        return {
-          value: {
-            load: () => {
-              if (entry.type === 'text') {
-                return loader.load(prop, 'text');
-              } else {
-                return loader.load(prop, 'binary');
-              }
-            },
+        const manifestEntry = manifestNode[prop];
+
+        if (isResourceEntry(manifestEntry)) {
+          const apiObject: Resource = {
+            load: () =>
+              manifestEntry.type === 'text'
+                ? loader.load(prop, 'text')
+                : loader.load(prop, 'binary'),
             loadText: () => {
-              if (entry.type !== 'text') {
+              if (manifestEntry.type !== 'text') {
                 throw new Error(
-                  `Resource "${prop}" is of type "${entry.type}", but was accessed with loadText().`
+                  `Resource "${prop}" is of type "${manifestEntry.type}", but was accessed with loadText().`
                 );
               }
               return loader.load(prop, 'text');
             },
             loadBinary: () => {
-              if (entry.type !== 'binary') {
+              if (manifestEntry.type !== 'binary') {
                 throw new Error(
-                  `Resource "${prop}" is of type "${entry.type}", but was accessed with loadBinary().`
+                  `Resource "${prop}" is of type "${manifestEntry.type}", but was accessed with loadBinary().`
                 );
               }
               return loader.load(prop, 'binary');
             },
-          },
-          writable: false,
-          enumerable: true,
-          configurable: true,
-        };
-      }
-      return Reflect.getOwnPropertyDescriptor(target, prop);
-    },
-  });
+          };
+          return apiObject;
+        } else {
+          // manifestEntry is a nested Manifest (already with camelCase keys)
+          const nestedResources = createProxiedResources(
+            manifestEntry as Manifest
+          );
+          return nestedResources;
+        }
+      },
+      has: (target, prop): boolean => {
+        if (typeof prop === 'string') {
+          return prop in manifestNode;
+        }
+        return Reflect.has(target, prop);
+      },
+      ownKeys: (): string[] => {
+        return Object.keys(manifestNode);
+      },
+      getOwnPropertyDescriptor: (
+        target,
+        prop
+      ): PropertyDescriptor | undefined => {
+        if (typeof prop === 'string' && prop in manifestNode) {
+          const value: Resource | Resources | undefined =
+            resultProxy[prop as keyof Resources];
+          if (value === undefined) {
+            return undefined;
+          }
+          return {
+            value,
+            writable: false,
+            enumerable: true,
+            configurable: true,
+          };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, prop);
+      },
+    });
+
+    return resultProxy;
+  }
+
+  return createProxiedResources(initialManifestWithCamelCaseKeys);
 }
