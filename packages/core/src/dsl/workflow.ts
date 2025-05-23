@@ -138,7 +138,7 @@ type Block<
 
 interface BaseRunParams<TOptions extends object = object> {
   client: ObjectGenerator;
-  resources: Resources;
+  resources?: Resources;
   options?: TOptions;
 }
 
@@ -431,7 +431,7 @@ class WorkflowEventStream<
       options = {} as TOptions,
       client,
       services,
-      resources,
+      resources = {} as Resources,
     } = params;
 
     this.initialState = initialState as TState;

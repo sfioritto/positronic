@@ -4,6 +4,8 @@ import { WORKFLOW_EVENTS, STATUS } from './constants.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { ObjectGenerator } from '../clients/types.js';
 import { Adapter } from '../adapters/types.js';
+import { createResources, type Resources } from '../resources/resources.js';
+import type { ResourceLoader } from '../resources/resource-loader.js';
 
 describe('WorkflowRunner', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -128,5 +130,55 @@ describe('WorkflowRunner', () => {
     const result = await runner.run(testWorkflow);
 
     expect(result.count).toEqual(2);
+  });
+
+  it('should pass resources to step actions', async () => {
+    const mockLoad = jest.fn(
+      async (
+        resourceName: string,
+        type?: 'text' | 'binary'
+      ): Promise<string | Buffer> => {
+        if (type === 'binary') {
+          return Buffer.from(`content of ${resourceName}`);
+        }
+        return `content of ${resourceName}`;
+      }
+    ) as jest.MockedFunction<ResourceLoader['load']>;
+
+    const mockResourceLoader: ResourceLoader = {
+      load: mockLoad,
+    };
+
+    const testManifest = {
+      myTextFile: { type: 'text' },
+      myBinaryFile: { type: 'binary' },
+    } as const;
+
+    const testResources = createResources(mockResourceLoader, testManifest);
+
+    const runner = new WorkflowRunner({
+      adapters: [],
+      client: mockClient,
+      resources: {} as Resources,
+    }).withResources(testResources);
+
+    let textContent: string | undefined;
+    let binaryContent: Buffer | undefined;
+
+    const resourceConsumingWorkflow = workflow('Resource Workflow').step(
+      'Load Resources',
+      async ({ resources }) => {
+        textContent = await (resources.myTextFile as any).loadText();
+        binaryContent = await (resources.myBinaryFile as any).loadBinary();
+        return {};
+      }
+    );
+
+    await runner.run(resourceConsumingWorkflow);
+
+    expect(mockLoad).toHaveBeenCalledWith('myTextFile', 'text');
+    expect(mockLoad).toHaveBeenCalledWith('myBinaryFile', 'binary');
+    expect(textContent).toBe('content of myTextFile');
+    expect(binaryContent?.toString()).toBe('content of myBinaryFile');
   });
 });

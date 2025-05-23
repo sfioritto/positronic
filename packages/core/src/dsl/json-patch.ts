@@ -2,6 +2,8 @@ import pkg from 'fast-json-patch';
 const { compare, applyPatch } = pkg;
 import { JsonPatch, State } from './types.js';
 
+export type { JsonPatch };
+
 /**
  * Creates a JSON Patch that describes the changes needed to transform prevState into nextState.
  */

@@ -30,6 +30,13 @@ export class WorkflowRunner {
     });
   }
 
+  withResources(resources: Resources): WorkflowRunner {
+    return new WorkflowRunner({
+      ...this.options,
+      resources,
+    });
+  }
+
   async run<TOptions extends object = {}, TState extends State = {}>(
     workflow: Workflow<TOptions, TState, any>,
     {

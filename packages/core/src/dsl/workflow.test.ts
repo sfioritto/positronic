@@ -1,5 +1,5 @@
 import { WORKFLOW_EVENTS, STATUS } from './constants.js';
-import { applyPatches } from './json-patch.js';
+import { applyPatches, type JsonPatch } from './json-patch.js';
 import { State } from './types.js';
 import {
   workflow,
@@ -12,6 +12,8 @@ import { z } from 'zod';
 import { nextStep } from '../../../../test-utils.js';
 import { jest } from '@jest/globals';
 import { ObjectGenerator } from '../clients/types.js';
+import { createResources, type Resources } from '../resources/resources.js';
+import type { ResourceLoader } from '../resources/resource-loader.js';
 
 // Define a Logger interface for testing
 interface Logger {
@@ -39,7 +41,37 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
 };
 
+// Mock Resources for testing
+const mockResourceLoad = jest.fn(
+  async (
+    resourceName: string,
+    type?: 'text' | 'binary'
+  ): Promise<string | Buffer> => {
+    if (type === 'binary')
+      return Buffer.from(`mock ${resourceName} binary content`);
+    return `mock ${resourceName} text content`;
+  }
+) as jest.MockedFunction<ResourceLoader['load']>;
+
+const mockResourceLoader: ResourceLoader = {
+  load: mockResourceLoad,
+};
+
+const testManifest = {
+  myFile: { type: 'text' },
+  myBinaryFile: { type: 'binary' },
+  nested: {
+    anotherFile: { type: 'text' },
+  },
+} as const;
+const mockResources = createResources(mockResourceLoader, testManifest);
+
 describe('workflow creation', () => {
+  beforeEach(() => {
+    mockGenerateObject.mockClear();
+    mockResourceLoad.mockClear();
+  });
+
   it('should create a workflow with steps and run through them', async () => {
     const testWorkflow = workflow('test workflow')
       .step('First step', () => {
@@ -50,7 +82,9 @@ describe('workflow creation', () => {
         doubled: state.count * 2,
       }));
 
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({
+      client: mockClient,
+    });
 
     // Check start event
     const startResult = await workflowRun.next();
@@ -188,7 +222,9 @@ describe('workflow creation', () => {
       description: 'some description',
     });
 
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({
+      client: mockClient,
+    });
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(
       expect.objectContaining({
@@ -203,7 +239,9 @@ describe('workflow creation', () => {
 
   it('should create a workflow with just a name when passed a string', async () => {
     const testWorkflow = workflow('simple workflow');
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({
+      client: mockClient,
+    });
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(
       expect.objectContaining({
@@ -246,7 +284,9 @@ describe('workflow creation', () => {
     // Run the workflow and capture all events
     const events = [];
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+    })) {
       events.push(event);
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -293,6 +333,123 @@ describe('workflow creation', () => {
       })
     );
   });
+
+  describe('Resource Availability in Steps', () => {
+    it('should make resources available in a simple step action', async () => {
+      let loadedText: string | undefined;
+      const testWorkflow = workflow('Resource Step Test').step(
+        'Load My File',
+        async ({ resources }) => {
+          loadedText = await (resources.myFile as any).loadText();
+          return { loadedText };
+        }
+      );
+
+      const run = testWorkflow.run({
+        client: mockClient,
+        resources: mockResources,
+      });
+      // Iterate through to completion
+      for await (const _ of run) {
+      }
+
+      expect(mockResourceLoad).toHaveBeenCalledWith('myFile', 'text');
+      expect(loadedText).toBe('mock myFile text content');
+    });
+
+    it('should make resources available in a prompt action and reducer', async () => {
+      mockGenerateObject.mockResolvedValue({ summary: 'Generated summary' });
+      let promptTemplateString: string | undefined;
+      let reduceContent: string | undefined;
+
+      const testWorkflow = workflow<
+        { myOption: string },
+        {
+          promptResult?: any;
+          reducedResult?: string;
+          fileContentForPrompt?: string;
+        }
+      >('Resource Prompt Test')
+        .step('Load File For Prompt', async ({ resources }) => {
+          const fileContent = await (resources.myFile as any).loadText();
+          return { fileContentForPrompt: fileContent };
+        })
+        .prompt(
+          'Summarize File',
+          {
+            template: (state) => {
+              return 'Summarize: ' + state.fileContentForPrompt;
+            },
+            outputSchema: {
+              schema: z.object({ summary: z.string() }),
+              name: 'promptResult' as const,
+            },
+          },
+          async ({ state, response, resources }) => {
+            reduceContent = await (
+              (resources.nested as any).anotherFile as any
+            ).loadText();
+            return {
+              ...state,
+              reducedResult: response.summary + ' based on ' + reduceContent,
+            };
+          }
+        );
+
+      const run = testWorkflow.run({
+        client: mockClient,
+        resources: mockResources,
+        options: { myOption: 'test' },
+      });
+      let finalState: any = {};
+      const allPatches: JsonPatch[] = [];
+      const initialStateForReconstruction = {};
+
+      for await (const event of run) {
+        if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.patch) {
+          allPatches.push(event.patch);
+        }
+      }
+      finalState = applyPatches(initialStateForReconstruction, allPatches);
+
+      expect(mockResourceLoad).toHaveBeenCalledWith('myFile', 'text');
+      expect(mockResourceLoad).toHaveBeenCalledWith('anotherFile', 'text');
+      expect(reduceContent).toBe('mock anotherFile text content');
+      expect(finalState.reducedResult).toBe(
+        'Generated summary based on mock anotherFile text content'
+      );
+    });
+
+    it('should make resources available in a nested workflow step', async () => {
+      let nestedLoadedText: string | undefined;
+
+      const innerWorkflow = workflow('Inner Resource Workflow').step(
+        'Inner Load Step',
+        async ({ resources }) => {
+          nestedLoadedText = await (resources.myBinaryFile as any)
+            .loadBinary()
+            .then((b: Buffer) => b.toString());
+          return { nestedLoadedText };
+        }
+      );
+
+      const outerWorkflow = workflow('Outer Resource Workflow').workflow(
+        'Run Inner',
+        innerWorkflow,
+        ({ state, workflowState }) => ({ ...state, ...workflowState })
+      );
+
+      const run = outerWorkflow.run({
+        client: mockClient,
+        resources: mockResources,
+      });
+      for await (const _ of run) {
+      }
+
+      expect(mockResourceLoad).toHaveBeenCalledWith('myBinaryFile', 'binary');
+      expect(nestedLoadedText).toBe('mock myBinaryFile binary content');
+    });
+  });
 });
 
 describe('error handling', () => {
@@ -318,7 +475,9 @@ describe('error handling', () => {
 
     let errorEvent, finalStepStatusEvent;
     try {
-      for await (const event of errorWorkflow.run({ client: mockClient })) {
+      for await (const event of errorWorkflow.run({
+        client: mockClient,
+      })) {
         if (event.type === WORKFLOW_EVENTS.ERROR) {
           errorEvent = event;
         }
@@ -383,7 +542,9 @@ describe('error handling', () => {
     let mainWorkflowId: string | undefined;
 
     try {
-      for await (const event of outerWorkflow.run({ client: mockClient })) {
+      for await (const event of outerWorkflow.run({
+        client: mockClient,
+      })) {
         events.push(event);
         if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
           mainWorkflowId = event.workflowRunId;
@@ -528,7 +689,9 @@ describe('step creation', () => {
 
     const events = [];
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+    })) {
       events.push(event);
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, event.patch);
@@ -630,7 +793,9 @@ describe('step creation', () => {
 
     let finalState = {};
     const patches = [];
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+    })) {
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         patches.push(...event.patch);
       }
@@ -756,7 +921,9 @@ describe('nested workflows', () => {
       );
 
     const events: WorkflowEvent<any>[] = [];
-    for await (const event of outerWorkflow.run({ client: mockClient })) {
+    for await (const event of outerWorkflow.run({
+      client: mockClient,
+    })) {
       events.push(event);
     }
 
@@ -943,7 +1110,9 @@ describe('nested workflows', () => {
     let mainWorkflowId: string | undefined;
 
     try {
-      for await (const event of outerWorkflow.run({ client: mockClient })) {
+      for await (const event of outerWorkflow.run({
+        client: mockClient,
+      })) {
         events.push(event);
         if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
           mainWorkflowId = event.workflowRunId;
@@ -1110,7 +1279,9 @@ describe('nested workflows', () => {
 
     // Run workflow and collect step status events
     let finalStepStatus;
-    for await (const event of outerWorkflow.run({ client: mockClient })) {
+    for await (const event of outerWorkflow.run({
+      client: mockClient,
+    })) {
       if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
       }
@@ -1186,7 +1357,9 @@ describe('workflow options', () => {
       })
     );
 
-    const workflowRun = testWorkflow.run({ client: mockClient });
+    const workflowRun = testWorkflow.run({
+      client: mockClient,
+    });
 
     // Skip start event
     await workflowRun.next();
@@ -1436,7 +1609,9 @@ describe('type inference', () => {
     let finalState = {};
     let mainWorkflowId: string | undefined;
 
-    for await (const event of outerWorkflow.run({ client: mockClient })) {
+    for await (const event of outerWorkflow.run({
+      client: mockClient,
+    })) {
       if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
         mainWorkflowId = event.workflowRunId;
       }
@@ -1486,7 +1661,9 @@ describe('type inference', () => {
     let finalState = {};
     let mainWorkflowId: string | undefined;
 
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+    })) {
       if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
         mainWorkflowId = event.workflowRunId;
       }
@@ -1542,7 +1719,9 @@ describe('type inference', () => {
 
     // Run workflow and collect final state
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+    })) {
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
@@ -1583,7 +1762,9 @@ describe('type inference', () => {
 
     // Run workflow and collect final state
     let finalState = {};
-    for await (const event of testWorkflow.run({ client: mockClient })) {
+    for await (const event of testWorkflow.run({
+      client: mockClient,
+    })) {
       if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
