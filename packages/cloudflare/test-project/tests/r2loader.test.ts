@@ -2,10 +2,9 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { CloudflareR2Loader } from '../../src/r2-loader.js';
 import { Buffer } from 'buffer';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js'; // Keep for TestEnv consistency if other tests use it
-import type { MonitorDO } from '../../src/monitor-do.js'; // Keep for TestEnv consistency
+import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
+import type { MonitorDO } from '../../src/monitor-do.js';
 
-// Define TestEnv locally or import from a shared types file if it becomes common
 interface TestEnv {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
@@ -23,7 +22,6 @@ describe('CloudflareR2Loader Tests', () => {
   const nonExistentFileName = 'not-found.txt';
 
   beforeAll(async () => {
-    // Initialize loader
     if (!testEnv.TEST_RESOURCES_BUCKET) {
       throw new Error(
         'TEST_RESOURCES_BUCKET binding not found in test environment. Ensure wrangler.jsonc is configured and wrangler types generated.'
@@ -64,7 +62,6 @@ describe('CloudflareR2Loader Tests', () => {
     expect(content).toBe(textFileContent);
   });
 
-  // Optional: Test with a file in a subdirectory to ensure paths are handled
   it('should load a text file from a subdirectory in R2', async () => {
     const subDirFileName = 'subdir/another.txt';
     const subDirFileContent = 'Hello from subdirectory!';
@@ -72,7 +69,5 @@ describe('CloudflareR2Loader Tests', () => {
 
     const content = await r2Loader.load(subDirFileName, 'text');
     expect(content).toBe(subDirFileContent);
-
-    await testEnv.TEST_RESOURCES_BUCKET.delete(subDirFileName); // Clean up
   });
 });
