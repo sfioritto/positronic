@@ -8,7 +8,7 @@ export interface Env {
 
 export class MonitorDO extends DurableObject<Env> {
   private readonly storage: SqlStorage;
-  private eventStreamAdapter = new EventStreamAdapter();
+  private eventStreamHandler = new EventStreamHandler();
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -90,7 +90,6 @@ export class MonitorDO extends DurableObject<Env> {
   }
 
   private async broadcastRunningWorkflows() {
-    // Update select query with aliases to maintain external structure for now
     const runningWorkflows = await this.storage
       .exec(
         `
@@ -113,8 +112,7 @@ export class MonitorDO extends DurableObject<Env> {
       )
       .toArray();
 
-    // Broadcast structure remains { runningWorkflows: [...] }
-    this.eventStreamAdapter.broadcast({ runningWorkflows });
+    this.eventStreamHandler.broadcast({ runningWorkflows });
   }
 
   async fetch(request: Request) {
@@ -125,7 +123,6 @@ export class MonitorDO extends DurableObject<Env> {
       const stream = new ReadableStream({
         start: async (controller) => {
           try {
-            // Update select query with aliases
             const runningWorkflows = await this.storage
               .exec(
                 `
@@ -148,22 +145,21 @@ export class MonitorDO extends DurableObject<Env> {
               )
               .toArray();
 
-            // Send initial state, structure remains { runningWorkflows: [...] }
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ runningWorkflows })}\n\n`
               )
             );
 
-            this.eventStreamAdapter.subscribe(controller);
+            this.eventStreamHandler.subscribe(controller);
           } catch (err) {
             console.error('[MONITOR_DO] Error during stream start:', err);
             controller.close();
-            this.eventStreamAdapter.unsubscribe(controller);
+            this.eventStreamHandler.unsubscribe(controller);
           }
         },
         cancel: (controller) => {
-          this.eventStreamAdapter.unsubscribe(controller);
+          this.eventStreamHandler.unsubscribe(controller);
         },
       });
 
@@ -221,7 +217,7 @@ export class MonitorDO extends DurableObject<Env> {
   }
 }
 
-class EventStreamAdapter {
+class EventStreamHandler {
   private subscribers: Set<ReadableStreamDefaultController> = new Set();
   private encoder = new TextEncoder();
 
