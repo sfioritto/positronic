@@ -17,5 +17,11 @@
       { "name": "MONITOR_DO", "class_name": "MonitorDO" },
     ],
   },
+  "r2_buckets": [
+    {
+      "binding": "RESOURCES_BUCKET",
+      "bucket_name": "positronic-resources-<%= projectName %>"
+    }
+  ],
   "vars": {},
 }
