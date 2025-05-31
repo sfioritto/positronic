@@ -11,7 +11,7 @@ export class WorkflowRunner {
     private options: {
       adapters: Adapter[];
       client: ObjectGenerator;
-      resources: Resources;
+      resources?: Resources;
     }
   ) {}
 
@@ -77,14 +77,14 @@ export class WorkflowRunner {
             workflowRunId,
             options,
             client,
-            resources,
+            resources: resources ?? {},
           })
         : workflow.run({
             initialState,
             options,
             client,
             workflowRunId,
-            resources,
+            resources: resources ?? {},
           });
 
     for await (const event of workflowRun) {

@@ -30,7 +30,6 @@ async function generateManifest(projectRootPath, targetSrcDir) {
 `;
 
   const runnerContent = await fs.readFile(runnerPath, 'utf-8');
-  // Intentionally removing error handling per user request
   await fs.mkdir(targetSrcDir, { recursive: true });
   await fs.writeFile(manifestPath, manifestContent, 'utf-8');
   await fs.writeFile(path.join(targetSrcDir, 'runner.ts'), runnerContent, 'utf-8');
@@ -132,13 +131,6 @@ module.exports = {
     if (gitignoreFile) {
       // Change its path to '.gitignore' so it's correctly named in the generated project
       gitignoreFile.path = '.gitignore';
-    }
-  },
-  emit: async ctx => {
-    if (ctx.answers.backend === 'cloudflare') {
-      const projectRootPath = ctx.dest;
-      const targetDirForManifest = path.join(ctx.dest, '.positronic', 'src');
-      await generateManifest(projectRootPath, targetDirForManifest);
     }
   }
 }
