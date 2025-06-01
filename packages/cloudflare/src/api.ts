@@ -2,10 +2,13 @@ import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
+import type { R2Bucket, R2Object } from '@cloudflare/workers-types';
+import type { ResourceEntry } from '@positronic/core';
 
 type Bindings = {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
+  RESOURCES_BUCKET: R2Bucket;
 };
 
 type CreateBrainRunRequest = {
@@ -62,6 +65,54 @@ app.get('/brains/watch', async (context: Context) => {
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
   const response = await monitorStub.fetch(new Request(`http://do/watch`));
   return response;
+});
+
+app.get('/resources', async (context: Context) => {
+  const bucket = context.env.RESOURCES_BUCKET;
+
+  // List all objects in the bucket
+  // R2 returns up to 1000 objects by default
+  const listed = await bucket.list();
+
+  const resources = await Promise.all(
+    listed.objects.map(async (object: R2Object) => {
+      // Get the object to access its custom metadata
+      const r2Object = await bucket.head(object.key);
+
+      if (!r2Object) {
+        throw new Error(`Resource "${object.key}" not found`);
+      }
+
+      // Require metadata to be present
+      if (!r2Object.customMetadata?.type) {
+        throw new Error(
+          `Resource "${object.key}" is missing required metadata field "type"`
+        );
+      }
+
+      if (!r2Object.customMetadata?.path) {
+        throw new Error(
+          `Resource "${object.key}" is missing required metadata field "path"`
+        );
+      }
+
+      const resource: ResourceEntry & { size: number; lastModified: string } = {
+        type: r2Object.customMetadata.type as 'text' | 'binary',
+        path: r2Object.customMetadata.path,
+        key: object.key,
+        size: object.size,
+        lastModified: object.uploaded.toISOString(),
+      };
+
+      return resource;
+    })
+  );
+
+  return context.json({
+    resources,
+    truncated: listed.truncated,
+    count: resources.length,
+  });
 });
 
 export default app;

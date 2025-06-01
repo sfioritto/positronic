@@ -1,6 +1,6 @@
 import { ResourceLoader } from './resource-loader.js';
 
-interface Entry {
+export interface Entry {
   type: 'text' | 'binary';
   path: string; // File path - used during build process
   key: string; // R2 object key (original filename with path)
