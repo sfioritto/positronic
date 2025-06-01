@@ -7,6 +7,9 @@ node_modules/
 .positronic/
 .env
 
+# Generated resource manifest
+_resource-manifest.ts
+
 # Cloudflare Wrangler state and temp files
 .wrangler/
 

@@ -36,10 +36,104 @@ async function generateManifest(projectRootPath, targetSrcDir) {
 
 }
 
+// Convert filename to camelCase (e.g., "my-file.txt" -> "myFileTxt")
+function toCamelCase(fileName) {
+  return fileName
+    .replace(/\.[^.]+$/, '') // Remove extension
+    .replace(/[-_\s]+(.)?/g, (_, char) => char ? char.toUpperCase() : ''); // Convert to camelCase
+}
+
+// Determine file type based on extension
+function getResourceType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const textExtensions = ['.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.csv', '.html', '.css', '.js', '.ts'];
+  return textExtensions.includes(ext) ? 'text' : 'binary';
+}
+
+async function generateResourceManifest(projectRootPath) {
+  const resourcesDir = path.join(projectRootPath, 'resources');
+  const manifestPath = path.join(projectRootPath, '_resource-manifest.ts');
+
+  // Check if resources directory exists
+  const resourcesDirExists = await fs.access(resourcesDir).then(() => true).catch(() => false);
+  if (!resourcesDirExists) {
+    // Create empty manifest if no resources directory
+    const emptyManifest = `// This file is generated automatically. Do not edit directly.
+import type { ResourceManifest } from '@positronic/core';
+
+export const resourceManifest: ResourceManifest = {};
+
+export const resourcePaths: Record<string, string> = {};
+`;
+    await fs.writeFile(manifestPath, emptyManifest, 'utf-8');
+    return;
+  }
+
+  const manifestObj = {};
+  const pathsObj = {};
+
+  // Recursively scan directory
+  async function scanDir(dir, relativePath = '') {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const result = {};
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const resourcePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+
+      if (entry.isDirectory()) {
+        // Recurse into subdirectory
+        const subResult = await scanDir(fullPath, resourcePath);
+        if (Object.keys(subResult).length > 0) {
+          result[toCamelCase(entry.name)] = subResult;
+        }
+      } else if (entry.isFile() && !entry.name.startsWith('.')) {
+        // Add file to manifest
+        const key = toCamelCase(entry.name);
+        result[key] = { type: getResourceType(entry.name) };
+        pathsObj[resourcePath] = fullPath; // Store full path for build process
+      }
+    }
+
+    return result;
+  }
+
+  // Scan the resources directory
+  const manifest = await scanDir(resourcesDir);
+
+  // Flatten nested paths for the pathsObj
+  function flattenPaths(obj, prefix = '') {
+    const flattened = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value.type) {
+        // It's a file entry
+        flattened[key] = prefix ? `${prefix}/${key}` : key;
+      } else {
+        // It's a nested object
+        const nested = flattenPaths(value, prefix ? `${prefix}/${key}` : key);
+        Object.assign(flattened, nested);
+      }
+    }
+    return flattened;
+  }
+
+  // Generate TypeScript content
+  const manifestContent = `// This file is generated automatically. Do not edit directly.
+import type { ResourceManifest } from '@positronic/core';
+
+export const resourceManifest: ResourceManifest = ${JSON.stringify(manifest, null, 2)};
+
+export const resourcePaths: Record<string, string> = ${JSON.stringify(pathsObj, null, 2)};
+`;
+
+  await fs.writeFile(manifestPath, manifestContent, 'utf-8');
+}
+
 module.exports = {
   name,
   version,
   generateManifest,
+  generateResourceManifest,
   prompts: [
     {
       name: 'name',

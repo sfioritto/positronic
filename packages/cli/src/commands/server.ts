@@ -9,7 +9,10 @@ import * as dotenv from 'dotenv';
 import { generateProject } from './helpers.js';
 // @ts-ignore Could not find a declaration file for module '@positronic/template-new-project'.
 import pkg from '@positronic/template-new-project';
-const { generateManifest: regenerateManifestFile } = pkg;
+const {
+  generateManifest: regenerateManifestFile,
+  generateResourceManifest: regenerateResourceManifest,
+} = pkg;
 
 /**
  * Sets up the .positronic server environment directory.
@@ -91,6 +94,7 @@ async function setupPositronicServerEnv(
   // Regenerate manifest based on actual project state AFTER setup/copy
   const srcDir = path.join(serverDir, 'src');
   await regenerateManifestFile(projectRootPath, srcDir);
+  await regenerateResourceManifest(projectRootPath);
 }
 
 // --- ServerCommand Class ---
@@ -110,6 +114,7 @@ export class ServerCommand {
     const serverDir = path.join(projectRootPath, '.positronic');
     const srcDir = path.join(serverDir, 'src'); // Still needed for watcher path
     const brainsDir = path.join(projectRootPath, 'brains'); // Still needed for watcher path
+    const resourcesDir = path.join(projectRootPath, 'resources'); // For resource watching
 
     let wranglerProcess: ChildProcess | null = null;
     let watcher: FSWatcher | null = null;
@@ -151,9 +156,14 @@ export class ServerCommand {
     try {
       await setupPositronicServerEnv(projectRootPath, argv.force);
 
-      // Watcher setup - target the user's brains directory
-      watcher = chokidar.watch(path.join(brainsDir, '*.ts'), {
-        ignored: [/(^|[\/\\])\../, '**/node_modules/**'], // Ignore dotfiles and node_modules within brains
+      // Watcher setup - target the user's brains and resources directories
+      const watchPaths = [
+        path.join(brainsDir, '*.ts'),
+        path.join(resourcesDir, '**/*'),
+      ];
+
+      watcher = chokidar.watch(watchPaths, {
+        ignored: [/(^|[\/\\])\../, '**/node_modules/**'], // Ignore dotfiles and node_modules
         persistent: true,
         ignoreInitial: true,
         awaitWriteFinish: {
@@ -164,6 +174,7 @@ export class ServerCommand {
 
       const regenerate = async () => {
         await regenerateManifestFile(projectRootPath, srcDir);
+        await regenerateResourceManifest(projectRootPath);
       };
 
       watcher
