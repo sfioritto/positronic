@@ -87,9 +87,12 @@ describe('Resources API Tests', () => {
 
   it('POST /resources with key only (no path)', async () => {
     const formData = new FormData();
+    const videoContent = new Uint8Array([
+      0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
+    ]); // Mock video header
     formData.append(
       'file',
-      new Blob(['Binary content for video'], { type: 'video/mp4' }),
+      new Blob([videoContent], { type: 'video/mp4' }),
       'video.mp4'
     );
     formData.append('type', 'binary');
