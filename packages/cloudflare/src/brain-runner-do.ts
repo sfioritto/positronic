@@ -16,11 +16,9 @@ export function setManifest(generatedManifest: PositronicManifest) {
   manifest = generatedManifest;
 }
 
-let resourceManifest: ResourceManifest | null = null;
-export function setResourceManifest(
-  generatedResourceManifest: ResourceManifest
-) {
-  resourceManifest = generatedResourceManifest;
+let resourceLoader: ResourceLoader | null = null;
+export function setResourceLoader(loader: ResourceLoader) {
+  resourceLoader = loader;
 }
 
 let workflowRunner: WorkflowRunner | null = null;
