@@ -85,13 +85,8 @@ describe('Resources API Tests', () => {
     });
   });
 
-  // TODO: This test is temporarily skipped due to a known issue with R2 storage isolation
-  // in Cloudflare's Vitest integration. The test works in isolation but causes storage
-  // isolation errors when run with other tests.
-  // See: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#isolated-storage
-  it.skip('POST /resources with key only (no path)', async () => {
+  it('POST /resources with key only (no path)', async () => {
     const formData = new FormData();
-    // Use a simple binary blob instead of Uint8Array
     formData.append(
       'file',
       new Blob(['Binary content for video'], { type: 'video/mp4' }),
@@ -130,14 +125,14 @@ describe('Resources API Tests', () => {
       'videos/large-video.mp4'
     );
     expect(storedObject).not.toBeNull();
+    // IMPORTANT: Consume the response body to avoid isolated storage issues
+    await storedObject!.arrayBuffer();
     expect(storedObject!.customMetadata).toEqual({
       type: 'binary',
     });
   });
 
-  // TODO: This test is also temporarily skipped due to R2 storage isolation issues
-  // in Cloudflare's Vitest integration.
-  it.skip('POST /resources with both key and path (key takes precedence)', async () => {
+  it('POST /resources with both key and path (key takes precedence)', async () => {
     const formData = new FormData();
     formData.append(
       'file',
@@ -177,6 +172,9 @@ describe('Resources API Tests', () => {
       'assets/branding/logo.png'
     );
     expect(storedAtKey).not.toBeNull();
+    // IMPORTANT: Consume the response body
+    await storedAtKey!.arrayBuffer();
+
     const storedAtPath = await testEnv.RESOURCES_BUCKET.get(
       'resources/images/logo.png'
     );
@@ -221,10 +219,11 @@ describe('Resources API Tests', () => {
       count: number;
     }>();
     expect(responseBody.truncated).toBe(false);
+    // Should have 1 resource (the one we just created)
     expect(responseBody.count).toBe(1);
     expect(responseBody.resources).toHaveLength(1);
 
-    // Check that resources have correct structure
+    // Check that the resource has the correct structure
     const resource = responseBody.resources[0];
     expect(resource).toEqual({
       type: 'text',
