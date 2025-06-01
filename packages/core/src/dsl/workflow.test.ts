@@ -58,10 +58,22 @@ const mockResourceLoader: ResourceLoader = {
 };
 
 const testManifest = {
-  myFile: { type: 'text' },
-  myBinaryFile: { type: 'binary' },
+  myFile: {
+    type: 'text' as const,
+    key: 'myFile',
+    path: '/test/myFile.txt',
+  },
+  myBinaryFile: {
+    type: 'binary' as const,
+    key: 'myBinaryFile',
+    path: '/test/myBinaryFile.bin',
+  },
   nested: {
-    anotherFile: { type: 'text' },
+    anotherFile: {
+      type: 'text' as const,
+      key: 'anotherFile',
+      path: '/test/anotherFile.txt',
+    },
   },
 } as const;
 const mockResources = createResources(mockResourceLoader, testManifest);

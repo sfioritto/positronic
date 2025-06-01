@@ -147,8 +147,16 @@ describe('WorkflowRunner', () => {
     };
 
     const testManifest = {
-      myTextFile: { type: 'text' },
-      myBinaryFile: { type: 'binary' },
+      myTextFile: {
+        type: 'text' as const,
+        key: 'myTextFile',
+        path: '/test/myTextFile.txt',
+      },
+      myBinaryFile: {
+        type: 'binary' as const,
+        key: 'myBinaryFile',
+        path: '/test/myBinaryFile.bin',
+      },
     } as const;
 
     const testResources = createResources(mockResourceLoader, testManifest);

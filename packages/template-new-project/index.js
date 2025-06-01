@@ -52,25 +52,21 @@ function getResourceType(filePath) {
 
 async function generateResourceManifest(projectRootPath) {
   const resourcesDir = path.join(projectRootPath, 'resources');
-  const manifestPath = path.join(projectRootPath, '_resource-manifest.ts');
+  const manifestPath = path.join(projectRootPath, '_resource-manifest.js');
 
   // Check if resources directory exists
   const resourcesDirExists = await fs.access(resourcesDir).then(() => true).catch(() => false);
   if (!resourcesDirExists) {
     // Create empty manifest if no resources directory
     const emptyManifest = `// This file is generated automatically. Do not edit directly.
-import type { ResourceManifest } from '@positronic/core';
+// @ts-check
 
-export const resourceManifest: ResourceManifest = {};
-
-export const resourcePaths: Record<string, string> = {};
+/** @type {import('@positronic/core').ResourceManifest} */
+export const resourceManifest = {};
 `;
     await fs.writeFile(manifestPath, emptyManifest, 'utf-8');
     return;
   }
-
-  const manifestObj = {};
-  const pathsObj = {};
 
   // Recursively scan directory
   async function scanDir(dir, relativePath = '') {
@@ -88,10 +84,13 @@ export const resourcePaths: Record<string, string> = {};
           result[toCamelCase(entry.name)] = subResult;
         }
       } else if (entry.isFile() && !entry.name.startsWith('.')) {
-        // Add file to manifest
+        // Add file to manifest with path and key
         const key = toCamelCase(entry.name);
-        result[key] = { type: getResourceType(entry.name) };
-        pathsObj[resourcePath] = fullPath; // Store full path for build process
+        result[key] = {
+          type: getResourceType(entry.name),
+          path: fullPath,
+          key: resourcePath // R2 object key (e.g., "example.txt" or "images/logo.png")
+        };
       }
     }
 
@@ -101,29 +100,12 @@ export const resourcePaths: Record<string, string> = {};
   // Scan the resources directory
   const manifest = await scanDir(resourcesDir);
 
-  // Flatten nested paths for the pathsObj
-  function flattenPaths(obj, prefix = '') {
-    const flattened = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value.type) {
-        // It's a file entry
-        flattened[key] = prefix ? `${prefix}/${key}` : key;
-      } else {
-        // It's a nested object
-        const nested = flattenPaths(value, prefix ? `${prefix}/${key}` : key);
-        Object.assign(flattened, nested);
-      }
-    }
-    return flattened;
-  }
-
   // Generate TypeScript content
   const manifestContent = `// This file is generated automatically. Do not edit directly.
-import type { ResourceManifest } from '@positronic/core';
+// @ts-check
 
-export const resourceManifest: ResourceManifest = ${JSON.stringify(manifest, null, 2)};
-
-export const resourcePaths: Record<string, string> = ${JSON.stringify(pathsObj, null, 2)};
+/** @type {import('@positronic/core').ResourceManifest} */
+export const resourceManifest = ${JSON.stringify(manifest, null, 2)};
 `;
 
   await fs.writeFile(manifestPath, manifestContent, 'utf-8');

@@ -2,6 +2,8 @@ import { ResourceLoader } from './resource-loader.js';
 
 interface Entry {
   type: 'text' | 'binary';
+  path: string; // File path - used during build process
+  key: string; // R2 object key (original filename with path)
 }
 
 export interface Manifest {
@@ -38,26 +40,27 @@ export function createResources<M extends Manifest>(
         const manifestEntry = manifestNode[prop];
 
         if (isResourceEntry(manifestEntry)) {
+          const { key, type } = manifestEntry;
           const apiObject: Resource = {
             load: () =>
               manifestEntry.type === 'text'
-                ? loader.load(prop, 'text')
-                : loader.load(prop, 'binary'),
+                ? loader.load(key, 'text')
+                : loader.load(key, 'binary'),
             loadText: () => {
-              if (manifestEntry.type !== 'text') {
+              if (type !== 'text') {
                 throw new Error(
-                  `Resource "${prop}" is of type "${manifestEntry.type}", but was accessed with loadText().`
+                  `Resource "${prop}" is of type "${type}", but was accessed with loadText().`
                 );
               }
-              return loader.load(prop, 'text');
+              return loader.load(key, 'text');
             },
             loadBinary: () => {
-              if (manifestEntry.type !== 'binary') {
+              if (type !== 'binary') {
                 throw new Error(
-                  `Resource "${prop}" is of type "${manifestEntry.type}", but was accessed with loadBinary().`
+                  `Resource "${prop}" is of type "${type}", but was accessed with loadBinary().`
                 );
               }
-              return loader.load(prop, 'binary');
+              return loader.load(key, 'binary');
             },
           };
           return apiObject;
