@@ -1,12 +1,7 @@
-import { WorkflowRunner } from '@positronic/core';
+import { WorkflowRunner, type Resources } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
-import type {
-  Adapter,
-  WorkflowEvent,
-  ResourceLoader,
-  ResourceManifest,
-} from '@positronic/core';
+import type { Adapter, WorkflowEvent } from '@positronic/core';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 import { PositronicManifest } from './manifest.js';
@@ -16,9 +11,9 @@ export function setManifest(generatedManifest: PositronicManifest) {
   manifest = generatedManifest;
 }
 
-let resourceLoader: ResourceLoader | null = null;
-export function setResourceLoader(loader: ResourceLoader) {
-  resourceLoader = loader;
+let resources: Resources | null = null;
+export function setResources(res: Resources) {
+  resources = res;
 }
 
 let workflowRunner: WorkflowRunner | null = null;
@@ -118,7 +113,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('WorkflowRunner not initialized');
     }
 
-    workflowRunner
+    // Create an enhanced runner with resources if available
+    let runnerWithResources = workflowRunner;
+    if (resources) {
+      runnerWithResources = workflowRunner.withResources(resources);
+    }
+
+    runnerWithResources
       .withAdapters([sqliteAdapter, eventStreamAdapter, monitorAdapter])
       .run(workflowToRun, {
         initialState: initialData || {},

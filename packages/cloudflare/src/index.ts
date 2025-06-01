@@ -5,6 +5,7 @@ export { default as api } from './api.js';
 export {
   setManifest,
   setWorkflowRunner,
-  setResourceLoader,
+  setResources,
 } from './brain-runner-do.js';
 export { CloudflareR2Loader } from './r2-loader.js';
+export { createResources } from '@positronic/core';
