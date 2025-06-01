@@ -30,6 +30,10 @@
     {
       "binding": "TEST_RESOURCES_BUCKET",
       "bucket_name": "positronic-test-resources"
+    },
+    {
+      "binding": "RESOURCES_BUCKET",
+      "bucket_name": "positronic-test-resources"
     }
   ],
   "observability": {
