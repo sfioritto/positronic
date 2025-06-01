@@ -109,63 +109,54 @@ async function uploadResourcesToR2(projectRootPath: string) {
     throw new Error('Resource manifest not found');
   }
 
-  try {
-    // Dynamically import the manifest
-    const manifestModule = await import(manifestPath);
-    const manifest = manifestModule.resourceManifest;
+  // Dynamically import the manifest
+  const manifestModule = await import(manifestPath);
+  const manifest = manifestModule.resourceManifest;
 
-    if (!manifest || typeof manifest !== 'object') {
-      throw new Error('Invalid resource manifest format.');
-    }
+  if (!manifest || typeof manifest !== 'object') {
+    throw new Error('Invalid resource manifest format.');
+  }
 
-    // Collect all resources with their paths
-    const resources: Array<{ key: string; path: string; type: string }> = [];
+  // Collect all resources with their paths
+  const resources: Array<{ key: string; path: string; type: string }> = [];
 
-    function collectResources(obj: any, prefix = '') {
-      for (const [propName, value] of Object.entries(obj)) {
-        if (value && typeof value === 'object') {
-          if ('type' in value && 'path' in value && 'key' in value) {
-            // It's a resource entry
-            resources.push({
-              key: value.key as string,
-              path: value.path as string,
-              type: value.type as string,
-            });
-          } else {
-            // It's a nested object
-            collectResources(
-              value,
-              prefix ? `${prefix}/${propName}` : propName
-            );
-          }
+  function collectResources(obj: any, prefix = '') {
+    for (const [propName, value] of Object.entries(obj)) {
+      if (value && typeof value === 'object') {
+        if ('type' in value && 'path' in value && 'key' in value) {
+          // It's a resource entry
+          resources.push({
+            key: value.key as string,
+            path: value.path as string,
+            type: value.type as string,
+          });
+        } else {
+          // It's a nested object
+          collectResources(value, prefix ? `${prefix}/${propName}` : propName);
         }
       }
     }
+  }
 
-    collectResources(manifest);
+  collectResources(manifest);
 
-    if (resources.length === 0) {
-      console.log('No resources to upload.');
-      return;
+  if (resources.length === 0) {
+    console.log('No resources to upload.');
+    return;
+  }
+
+  // Note: In development with Wrangler, R2 buckets are simulated locally.
+  // The actual resource loading will happen on-demand when the worker accesses them.
+  // In production, a separate build process would upload these files to real R2.
+
+  // Log the resources that would be available
+  for (const resource of resources) {
+    // Verify file exists
+    if (fs.existsSync(resource.path)) {
+      console.log(`  ✓ ${resource.key} (${resource.type})`);
+    } else {
+      console.warn(`  ✗ ${resource.key} (file not found: ${resource.path})`);
     }
-
-    console.log(`Found ${resources.length} resources in manifest.`);
-
-    // Note: In development with Wrangler, R2 buckets are simulated locally.
-    // The actual resource loading will happen on-demand when the worker accesses them.
-    // In production, a separate build process would upload these files to real R2.
-
-    // Log the resources that would be available
-    for (const resource of resources) {
-      // Verify file exists
-      if (fs.existsSync(resource.path)) {
-        console.log(`  ✓ ${resource.key} (${resource.type})`);
-      } else {
-        console.warn(`  ✗ ${resource.key} (file not found: ${resource.path})`);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to import resource manifest:', error);
   }
 }
 
