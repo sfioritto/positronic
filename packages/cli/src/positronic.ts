@@ -430,6 +430,12 @@ cli = cli.command(
         () => {},
         handleResourceList
       )
+      .command(
+        'sync',
+        'Sync local resources folder with the server so they are available to brains when they run\n',
+        () => {},
+        handleResourceSync
+      )
       .demandCommand(1, 'You need to specify a resource command');
   }
 );
@@ -442,4 +448,8 @@ cli.parse();
 // Add handlers for the resource commands
 function handleResourceList() {
   console.log('Listing all resources');
+}
+
+function handleResourceSync() {
+  console.log('Syncing local resources with server');
 }
