@@ -1,7 +1,11 @@
 import { ResourceLoader } from './resource-loader.js';
 
+// Runtime array of valid resource types
+export const RESOURCE_TYPES = ['text', 'binary'] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+
 export interface Entry {
-  type: 'text' | 'binary';
+  type: ResourceType;
   path: string; // File path - used during build process
   key: string; // R2 object key (original filename with path)
 }

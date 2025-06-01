@@ -29,4 +29,6 @@ export { createResources, type Resources } from './resources/resources.js';
 export type {
   Manifest as ResourceManifest,
   Entry as ResourceEntry,
+  ResourceType,
 } from './resources/resources.js';
+export { RESOURCE_TYPES } from './resources/resources.js';

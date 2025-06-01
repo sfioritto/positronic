@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { R2Bucket, R2Object } from '@cloudflare/workers-types';
-import type { ResourceEntry } from '@positronic/core';
+import { type ResourceEntry, RESOURCE_TYPES } from '@positronic/core';
 
 type Bindings = {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
@@ -17,6 +17,13 @@ type CreateBrainRunRequest = {
 
 type CreateBrainRunResponse = {
   brainRunId: string;
+};
+
+// Override ResourceEntry to make path optional for resources that aren't in version control
+type R2Resource = Omit<ResourceEntry, 'path'> & {
+  path?: string;
+  size: number;
+  lastModified: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -83,22 +90,17 @@ app.get('/resources', async (context: Context) => {
         throw new Error(`Resource "${object.key}" not found`);
       }
 
-      // Require metadata to be present
       if (!r2Object.customMetadata?.type) {
         throw new Error(
           `Resource "${object.key}" is missing required metadata field "type"`
         );
       }
 
-      if (!r2Object.customMetadata?.path) {
-        throw new Error(
-          `Resource "${object.key}" is missing required metadata field "path"`
-        );
-      }
-
-      const resource: ResourceEntry & { size: number; lastModified: string } = {
-        type: r2Object.customMetadata.type as 'text' | 'binary',
-        path: r2Object.customMetadata.path,
+      const resource: R2Resource = {
+        type: r2Object.customMetadata.type as (typeof RESOURCE_TYPES)[number],
+        ...(r2Object.customMetadata.path && {
+          path: r2Object.customMetadata.path,
+        }),
         key: object.key,
         size: object.size,
         lastModified: object.uploaded.toISOString(),
@@ -113,6 +115,58 @@ app.get('/resources', async (context: Context) => {
     truncated: listed.truncated,
     count: resources.length,
   });
+});
+
+app.post('/resources', async (context: Context) => {
+  const bucket = context.env.RESOURCES_BUCKET;
+
+  const formData = await context.req.formData();
+
+  const file = formData.get('file') as File | null;
+  const type = formData.get('type') as string | null;
+  const path = formData.get('path') as string | null;
+  const key = formData.get('key') as string | null;
+
+  if (!file) {
+    throw new Error('Missing required field "file"');
+  }
+
+  if (!type) {
+    throw new Error('Missing required field "type"');
+  }
+
+  if (!RESOURCE_TYPES.includes(type as any)) {
+    throw new Error(
+      `Field "type" must be one of: ${RESOURCE_TYPES.join(', ')}`
+    );
+  }
+
+  // Either key or path must be provided
+  if (!key && !path) {
+    throw new Error('Either "key" or "path" must be provided');
+  }
+
+  // Use key if provided, otherwise use path
+  const objectKey = key || path!;
+
+  // Upload to R2 with custom metadata
+  const arrayBuffer = await file.arrayBuffer();
+  const uploadedObject = await bucket.put(objectKey, arrayBuffer, {
+    customMetadata: {
+      type,
+      ...(path && { path }),
+    },
+  });
+
+  const resource: R2Resource = {
+    type: type as (typeof RESOURCE_TYPES)[number],
+    ...(path && { path }),
+    key: objectKey,
+    size: uploadedObject.size,
+    lastModified: uploadedObject.uploaded.toISOString(),
+  };
+
+  return context.json(resource, 201);
 });
 
 export default app;
