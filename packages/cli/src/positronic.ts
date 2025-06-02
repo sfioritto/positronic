@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { ServerCommand } from './commands/server.js';
 import { PromptCommand } from './commands/prompt.js';
 import { BrainCommand } from './commands/brain.js';
+import { ResourceCommand } from './commands/resource.js';
 
 function findProjectRootSync(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
@@ -49,6 +50,7 @@ const projectCommand = new ProjectCommand(isLocalDevMode);
 const serverCommand = new ServerCommand();
 const brainCommand = new BrainCommand();
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);
+const resourceCommand = new ResourceCommand(isLocalDevMode, projectRootPath);
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -423,20 +425,37 @@ cli = cli.command(
   'resource',
   'Resources are any data that can be used in your workflows, agents, and prompts. They can be text or binaries.\n',
   (yargsResource) => {
-    return yargsResource
-      .command(
-        'list',
-        'List all resources in the active project\n',
-        () => {},
-        handleResourceList
-      )
-      .command(
+    yargsResource.command(
+      'list',
+      'List all resources in the active project\n',
+      (yargsListCmd) => {
+        return yargsListCmd.example(
+          '$0 resource list',
+          'List all resources in the active project'
+        );
+      },
+      (argv) => resourceCommand.list(argv)
+    );
+
+    // Command available ONLY in Local Dev Mode
+    if (isLocalDevMode) {
+      yargsResource.command(
         'sync',
         'Sync local resources folder with the server so they are available to brains when they run\n',
-        () => {},
-        handleResourceSync
-      )
-      .demandCommand(1, 'You need to specify a resource command');
+        (yargsSyncCmd) => {
+          return yargsSyncCmd.example(
+            '$0 resource sync',
+            'Upload new or modified resources to the server'
+          );
+        },
+        (argv) => resourceCommand.sync(argv)
+      );
+    }
+
+    return yargsResource.demandCommand(
+      1,
+      'You need to specify a resource command'
+    );
   }
 );
 
@@ -444,12 +463,3 @@ cli = cli.epilogue('For more information, visit https://positronic.sh');
 
 // Parse the arguments
 cli.parse();
-
-// Add handlers for the resource commands
-function handleResourceList() {
-  console.log('Listing all resources');
-}
-
-function handleResourceSync() {
-  console.log('Syncing local resources with server');
-}
