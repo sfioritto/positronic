@@ -239,7 +239,7 @@ describe('Resources API Tests', () => {
   });
 
   describe('Error cases', () => {
-    it('POST /resources without file should return 500 error', async () => {
+    it('POST /resources without file should return 400 error', async () => {
       const formData = new FormData();
       formData.append('type', 'text');
       formData.append('path', 'resources/test.txt');
@@ -251,12 +251,12 @@ describe('Resources API Tests', () => {
       const context = createExecutionContext();
 
       const response = await worker.fetch(request, testEnv, context);
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
 
       await waitOnExecutionContext(context);
     });
 
-    it('POST /resources without type should return 500 error', async () => {
+    it('POST /resources without type should return 400 error', async () => {
       const formData = new FormData();
       formData.append('file', new Blob(['content']), 'test.txt');
       formData.append('path', 'resources/test.txt');
@@ -268,12 +268,12 @@ describe('Resources API Tests', () => {
       const context = createExecutionContext();
 
       const response = await worker.fetch(request, testEnv, context);
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
 
       await waitOnExecutionContext(context);
     });
 
-    it('POST /resources with invalid type should return 500 error', async () => {
+    it('POST /resources with invalid type should return 400 error', async () => {
       const formData = new FormData();
       formData.append('file', new Blob(['content']), 'test.txt');
       formData.append('type', 'invalid');
@@ -286,12 +286,12 @@ describe('Resources API Tests', () => {
       const context = createExecutionContext();
 
       const response = await worker.fetch(request, testEnv, context);
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
 
       await waitOnExecutionContext(context);
     });
 
-    it('POST /resources without key or path should return 500 error', async () => {
+    it('POST /resources without key or path should return 400 error', async () => {
       const formData = new FormData();
       formData.append('file', new Blob(['content']), 'test.txt');
       formData.append('type', 'text');
@@ -303,7 +303,7 @@ describe('Resources API Tests', () => {
       const context = createExecutionContext();
 
       const response = await worker.fetch(request, testEnv, context);
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
 
       await waitOnExecutionContext(context);
     });

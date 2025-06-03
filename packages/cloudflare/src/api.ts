@@ -78,44 +78,50 @@ app.get('/brains/watch', async (context: Context) => {
 app.get('/resources', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
 
-  // List all objects in the bucket
-  // R2 returns up to 1000 objects by default
-  const listed = await bucket.list();
+  try {
+    // List all objects in the bucket
+    // R2 returns up to 1000 objects by default
+    const listed = await bucket.list();
 
-  const resources = await Promise.all(
-    listed.objects.map(async (object: R2Object) => {
-      // Get the object to access its custom metadata
-      const r2Object = await bucket.head(object.key);
+    const resources = await Promise.all(
+      listed.objects.map(async (object: R2Object) => {
+        // Get the object to access its custom metadata
+        const r2Object = await bucket.head(object.key);
 
-      if (!r2Object) {
-        throw new Error(`Resource "${object.key}" not found`);
-      }
+        if (!r2Object) {
+          throw new Error(`Resource "${object.key}" not found`);
+        }
 
-      if (!r2Object.customMetadata?.type) {
-        throw new Error(
-          `Resource "${object.key}" is missing required metadata field "type"`
-        );
-      }
+        if (!r2Object.customMetadata?.type) {
+          throw new Error(
+            `Resource "${object.key}" is missing required metadata field "type"`
+          );
+        }
 
-      const resource: R2Resource = {
-        type: r2Object.customMetadata.type as (typeof RESOURCE_TYPES)[number],
-        ...(r2Object.customMetadata.path && {
-          path: r2Object.customMetadata.path,
-        }),
-        key: object.key,
-        size: object.size,
-        lastModified: object.uploaded.toISOString(),
-      };
+        const resource: R2Resource = {
+          type: r2Object.customMetadata.type as (typeof RESOURCE_TYPES)[number],
+          ...(r2Object.customMetadata.path && {
+            path: r2Object.customMetadata.path,
+          }),
+          key: object.key,
+          size: object.size,
+          lastModified: object.uploaded.toISOString(),
+        };
 
-      return resource;
-    })
-  );
+        return resource;
+      })
+    );
 
-  return context.json({
-    resources,
-    truncated: listed.truncated,
-    count: resources.length,
-  });
+    return context.json({
+      resources,
+      truncated: listed.truncated,
+      count: resources.length,
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+    return context.json({ error: errorMessage }, 500);
+  }
 });
 
 app.post('/resources', async (context: Context) => {
@@ -129,45 +135,55 @@ app.post('/resources', async (context: Context) => {
   const key = formData.get('key') as string | null;
 
   if (!file) {
-    throw new Error('Missing required field "file"');
+    return context.json({ error: 'Missing required field "file"' }, 400);
   }
 
   if (!type) {
-    throw new Error('Missing required field "type"');
+    return context.json({ error: 'Missing required field "type"' }, 400);
   }
 
   if (!RESOURCE_TYPES.includes(type as any)) {
-    throw new Error(
-      `Field "type" must be one of: ${RESOURCE_TYPES.join(', ')}`
+    return context.json(
+      { error: `Field "type" must be one of: ${RESOURCE_TYPES.join(', ')}` },
+      400
     );
   }
 
   // Either key or path must be provided
   if (!key && !path) {
-    throw new Error('Either "key" or "path" must be provided');
+    return context.json(
+      { error: 'Either "key" or "path" must be provided' },
+      400
+    );
   }
 
   // Use key if provided, otherwise use path
   const objectKey = key || path!;
 
-  // Upload to R2 with custom metadata
-  const arrayBuffer = await file.arrayBuffer();
-  const uploadedObject = await bucket.put(objectKey, arrayBuffer, {
-    customMetadata: {
-      type,
+  try {
+    // Upload to R2 with custom metadata
+    const arrayBuffer = await file.arrayBuffer();
+    const uploadedObject = await bucket.put(objectKey, arrayBuffer, {
+      customMetadata: {
+        type,
+        ...(path && { path }),
+      },
+    });
+
+    const resource: R2Resource = {
+      type: type as (typeof RESOURCE_TYPES)[number],
       ...(path && { path }),
-    },
-  });
+      key: objectKey,
+      size: uploadedObject.size,
+      lastModified: uploadedObject.uploaded.toISOString(),
+    };
 
-  const resource: R2Resource = {
-    type: type as (typeof RESOURCE_TYPES)[number],
-    ...(path && { path }),
-    key: objectKey,
-    size: uploadedObject.size,
-    lastModified: uploadedObject.uploaded.toISOString(),
-  };
-
-  return context.json(resource, 201);
+    return context.json(resource, 201);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to upload resource';
+    return context.json({ error: errorMessage }, 500);
+  }
 });
 
 // Delete a single resource by key
