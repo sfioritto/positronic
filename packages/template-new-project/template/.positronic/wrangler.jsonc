@@ -23,5 +23,7 @@
       "bucket_name": "positronic-resources-<%= projectName %>"
     }
   ],
-  "vars": {},
+  "vars": {
+    "NODE_ENV": "development"
+  }
 }

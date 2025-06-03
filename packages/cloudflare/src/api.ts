@@ -9,6 +9,7 @@ type Bindings = {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   RESOURCES_BUCKET: R2Bucket;
+  NODE_ENV?: string;
 };
 
 type CreateBrainRunRequest = {
@@ -167,6 +168,64 @@ app.post('/resources', async (context: Context) => {
   };
 
   return context.json(resource, 201);
+});
+
+// Delete a single resource by key
+app.delete('/resources/:key', async (context: Context) => {
+  const bucket = context.env.RESOURCES_BUCKET;
+  const key = context.req.param('key');
+
+  // URL decode the key since it might contain slashes
+  const decodedKey = decodeURIComponent(key);
+
+  // Check if the resource exists
+  const existingResource = await bucket.head(decodedKey);
+  if (!existingResource) {
+    return context.json({ error: `Resource "${decodedKey}" not found` }, 404);
+  }
+
+  // Delete the resource
+  await bucket.delete(decodedKey);
+
+  return new Response(null, { status: 204 });
+});
+
+// Delete all resources (bulk delete) - only available in development mode
+app.delete('/resources', async (context: Context) => {
+  // Check if we're in development mode
+  const isDevelopment = context.env.NODE_ENV === 'development';
+
+  if (!isDevelopment) {
+    return context.json(
+      { error: 'Bulk delete is only available in development mode' },
+      403
+    );
+  }
+
+  const bucket = context.env.RESOURCES_BUCKET;
+
+  // List all objects
+  const listed = await bucket.list();
+  let deletedCount = 0;
+
+  // Delete each object
+  for (const object of listed.objects) {
+    await bucket.delete(object.key);
+    deletedCount++;
+  }
+
+  // Handle pagination if there are more than 1000 objects
+  let cursor = listed.cursor;
+  while (listed.truncated && cursor) {
+    const nextBatch = await bucket.list({ cursor });
+    for (const object of nextBatch.objects) {
+      await bucket.delete(object.key);
+      deletedCount++;
+    }
+    cursor = nextBatch.cursor;
+  }
+
+  return context.json({ deletedCount });
 });
 
 export default app;

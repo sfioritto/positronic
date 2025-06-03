@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import caz from 'caz';
+import { type ResourceEntry } from '@positronic/core';
 
 export async function generateProject(
   projectName: string,
@@ -80,4 +81,44 @@ export async function apiFetch(
 
   const response = await fetch(fullUrl, options);
   return response;
+}
+
+export function scanLocalResources(
+  resourcesDir: string,
+  textExtensions: Set<string>
+): ResourceEntry[] {
+  const localResources: ResourceEntry[] = [];
+
+  const scanDirectory = (dir: string, baseDir: string) => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        // Recursively scan subdirectories
+        scanDirectory(fullPath, baseDir);
+      } else if (entry.isFile()) {
+        // Calculate relative path from resources directory
+        const relativePath = path.relative(baseDir, fullPath);
+        // Use forward slashes for consistency across platforms
+        const key = relativePath.replace(/\\/g, '/');
+
+        // Determine file type based on extension
+        const ext = path.extname(entry.name).toLowerCase();
+        const type: ResourceEntry['type'] = textExtensions.has(ext)
+          ? 'text'
+          : 'binary';
+
+        localResources.push({
+          key,
+          path: fullPath,
+          type,
+        });
+      }
+    }
+  };
+
+  scanDirectory(resourcesDir, resourcesDir);
+  return localResources;
 }

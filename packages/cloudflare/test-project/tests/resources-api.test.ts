@@ -4,11 +4,12 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import worker from '../src/index';
 
 interface TestEnv {
   RESOURCES_BUCKET: R2Bucket;
+  NODE_ENV?: string;
 }
 
 describe('Resources API Tests', () => {
@@ -326,6 +327,224 @@ describe('Resources API Tests', () => {
 
       // Clean up
       await testEnv.RESOURCES_BUCKET.delete('bad-resource.txt');
+    });
+  });
+
+  describe('DELETE /resources/:key', () => {
+    it('should delete an existing resource', async () => {
+      // First create a resource
+      const formData = new FormData();
+      formData.append(
+        'file',
+        new Blob(['Content to delete'], { type: 'text/plain' }),
+        'delete-test.txt'
+      );
+      formData.append('type', 'text');
+      formData.append('key', 'resources/delete-test.txt');
+
+      const createRequest = new Request('http://example.com/resources', {
+        method: 'POST',
+        body: formData,
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      await waitOnExecutionContext(createContext);
+      expect(createResponse.status).toBe(201);
+
+      // Now delete it
+      const deleteRequest = new Request(
+        'http://example.com/resources/' +
+          encodeURIComponent('resources/delete-test.txt'),
+        { method: 'DELETE' }
+      );
+      const deleteContext = createExecutionContext();
+      const deleteResponse = await worker.fetch(
+        deleteRequest,
+        testEnv,
+        deleteContext
+      );
+      await waitOnExecutionContext(deleteContext);
+
+      expect(deleteResponse.status).toBe(204);
+
+      // Verify it's deleted
+      const deletedObject = await testEnv.RESOURCES_BUCKET.get(
+        'resources/delete-test.txt'
+      );
+      expect(deletedObject).toBeNull();
+    });
+
+    it('should handle URL encoded keys with slashes', async () => {
+      // Create a resource with a path containing subdirectories
+      const formData = new FormData();
+      formData.append(
+        'file',
+        new Blob(['Nested content'], { type: 'text/plain' }),
+        'nested.txt'
+      );
+      formData.append('type', 'text');
+      formData.append('key', 'resources/subfolder/nested.txt');
+
+      const createRequest = new Request('http://example.com/resources', {
+        method: 'POST',
+        body: formData,
+      });
+      const createContext = createExecutionContext();
+      await worker.fetch(createRequest, testEnv, createContext);
+      await waitOnExecutionContext(createContext);
+
+      // Delete with URL encoded key
+      const deleteRequest = new Request(
+        'http://example.com/resources/' +
+          encodeURIComponent('resources/subfolder/nested.txt'),
+        { method: 'DELETE' }
+      );
+      const deleteContext = createExecutionContext();
+      const deleteResponse = await worker.fetch(
+        deleteRequest,
+        testEnv,
+        deleteContext
+      );
+      await waitOnExecutionContext(deleteContext);
+
+      expect(deleteResponse.status).toBe(204);
+
+      // Verify it's deleted
+      const deletedObject = await testEnv.RESOURCES_BUCKET.get(
+        'resources/subfolder/nested.txt'
+      );
+      expect(deletedObject).toBeNull();
+    });
+
+    it('should return 404 for non-existent resources', async () => {
+      const deleteRequest = new Request(
+        'http://example.com/resources/' +
+          encodeURIComponent('non-existent.txt'),
+        { method: 'DELETE' }
+      );
+      const deleteContext = createExecutionContext();
+      const deleteResponse = await worker.fetch(
+        deleteRequest,
+        testEnv,
+        deleteContext
+      );
+      await waitOnExecutionContext(deleteContext);
+
+      expect(deleteResponse.status).toBe(404);
+      const errorBody = await deleteResponse.json<{ error: string }>();
+      expect(errorBody.error).toBe('Resource "non-existent.txt" not found');
+    });
+  });
+
+  describe('DELETE /resources (bulk delete)', () => {
+    beforeEach(async () => {
+      // Create some test resources
+      const resources = ['file1.txt', 'file2.txt', 'subfolder/file3.txt'];
+
+      for (const resource of resources) {
+        const formData = new FormData();
+        formData.append(
+          'file',
+          new Blob([`Content of ${resource}`], { type: 'text/plain' }),
+          resource
+        );
+        formData.append('type', 'text');
+        formData.append('key', `resources/${resource}`);
+
+        const request = new Request('http://example.com/resources', {
+          method: 'POST',
+          body: formData,
+        });
+        const context = createExecutionContext();
+        await worker.fetch(request, testEnv, context);
+        await waitOnExecutionContext(context);
+      }
+    });
+
+    it('should delete all resources when in development mode', async () => {
+      // Explicitly set environment to development mode
+      const devEnv = {
+        ...testEnv,
+        NODE_ENV: 'development',
+      };
+
+      const deleteRequest = new Request('http://example.com/resources', {
+        method: 'DELETE',
+      });
+      const deleteContext = createExecutionContext();
+      const deleteResponse = await worker.fetch(
+        deleteRequest,
+        devEnv,
+        deleteContext
+      );
+      await waitOnExecutionContext(deleteContext);
+
+      expect(deleteResponse.status).toBe(200);
+      const responseBody = await deleteResponse.json<{
+        deletedCount: number;
+      }>();
+      expect(responseBody.deletedCount).toBeGreaterThanOrEqual(3);
+
+      // Verify all resources are deleted
+      const listed = await testEnv.RESOURCES_BUCKET.list();
+      expect(listed.objects.length).toBe(0);
+    });
+
+    it('should return 403 when not in development mode', async () => {
+      // Create an environment without NODE_ENV
+      const envWithoutNodeEnv = {
+        RESOURCES_BUCKET: testEnv.RESOURCES_BUCKET,
+        // Explicitly omit NODE_ENV
+      };
+
+      const deleteRequest = new Request('http://example.com/resources', {
+        method: 'DELETE',
+      });
+      const deleteContext = createExecutionContext();
+      const deleteResponse = await worker.fetch(
+        deleteRequest,
+        envWithoutNodeEnv,
+        deleteContext
+      );
+      await waitOnExecutionContext(deleteContext);
+
+      expect(deleteResponse.status).toBe(403);
+      const errorBody = await deleteResponse.json<{ error: string }>();
+      expect(errorBody.error).toBe(
+        'Bulk delete is only available in development mode'
+      );
+
+      // Verify resources are not deleted
+      const listed = await testEnv.RESOURCES_BUCKET.list();
+      expect(listed.objects.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should return 403 when NODE_ENV is production', async () => {
+      const prodEnv = {
+        ...testEnv,
+        NODE_ENV: 'production',
+      };
+
+      const deleteRequest = new Request('http://example.com/resources', {
+        method: 'DELETE',
+      });
+      const deleteContext = createExecutionContext();
+      const deleteResponse = await worker.fetch(
+        deleteRequest,
+        prodEnv,
+        deleteContext
+      );
+      await waitOnExecutionContext(deleteContext);
+
+      expect(deleteResponse.status).toBe(403);
+      const errorBody = await deleteResponse.json<{ error: string }>();
+      expect(errorBody.error).toBe(
+        'Bulk delete is only available in development mode'
+      );
     });
   });
 });

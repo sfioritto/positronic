@@ -434,7 +434,7 @@ cli = cli.command(
           'List all resources in the active project'
         );
       },
-      (argv) => resourceCommand.list(argv)
+      () => resourceCommand.list()
     );
 
     // Command available ONLY in Local Dev Mode
@@ -448,9 +448,45 @@ cli = cli.command(
             'Upload new or modified resources to the server'
           );
         },
-        (argv) => resourceCommand.sync(argv)
+        () => resourceCommand.sync()
+      );
+
+      yargsResource.command(
+        'clear',
+        'Delete ALL resources from the server (development only)\n',
+        (yargsClearCmd) => {
+          return yargsClearCmd.example(
+            '$0 resource clear',
+            'Delete all resources from the server'
+          );
+        },
+        () => resourceCommand.clear()
       );
     }
+
+    // Delete command available in both dev and production modes
+    yargsResource.command(
+      'delete <path>',
+      'Delete a specific resource from the server\n',
+      (yargsDeleteCmd) => {
+        return yargsDeleteCmd
+          .positional('path', {
+            describe:
+              'Path of the resource to delete (relative to resources directory)',
+            type: 'string',
+            demandOption: true,
+          })
+          .example(
+            '$0 resource delete myfile.txt',
+            'Delete a resource at the root of resources directory'
+          )
+          .example(
+            '$0 resource delete subfolder/data.json',
+            'Delete a resource in a subdirectory'
+          );
+      },
+      (argv) => resourceCommand.delete(argv.path as string)
+    );
 
     return yargsResource.demandCommand(
       1,
