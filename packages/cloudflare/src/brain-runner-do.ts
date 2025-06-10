@@ -5,15 +5,13 @@ import type { Adapter, WorkflowEvent } from '@positronic/core';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 import { PositronicManifest } from './manifest.js';
+import { CloudflareR2Loader } from './r2-loader.js';
+import { createResources, type ResourceManifest } from '@positronic/core';
+import type { R2Bucket } from '@cloudflare/workers-types';
 
 let manifest: PositronicManifest | null = null;
 export function setManifest(generatedManifest: PositronicManifest) {
   manifest = generatedManifest;
-}
-
-let resources: Resources | null = null;
-export function setResources(res: Resources) {
-  resources = res;
 }
 
 let workflowRunner: WorkflowRunner | null = null;
@@ -24,6 +22,7 @@ export function setWorkflowRunner(runner: WorkflowRunner) {
 export interface Env {
   WORKFLOW_RUNNER_DO: DurableObjectNamespace;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
+  RESOURCES_BUCKET: R2Bucket;
 }
 
 class EventStreamAdapter implements Adapter {
@@ -81,6 +80,103 @@ export class BrainRunnerDO extends DurableObject<Env> {
     super(state, env);
     this.sql = state.storage.sql;
     this.workflowRunId = state.id.toString();
+    this.env = env;
+  }
+
+  private async loadResourcesFromR2(): Promise<Resources | null> {
+    const bucket = this.env.RESOURCES_BUCKET;
+
+    // List all resources in R2
+    const listed = await bucket.list();
+
+    // Check if results are truncated
+    if (listed.truncated) {
+      throw new Error(
+        `Too many resources in R2 bucket (more than 1000). ` +
+          `Resource pagination is not yet supported. ` +
+          `Please reduce the number of resources.`
+      );
+    }
+
+    console.log(
+      `[DO ${this.workflowRunId}] R2 list result:`,
+      JSON.stringify(listed, null, 2)
+    );
+
+    if (listed.objects.length === 0) {
+      console.log(`[DO ${this.workflowRunId}] No resources found in R2`);
+      return null;
+    }
+
+    // Build the manifest structure
+    const manifest: ResourceManifest = {};
+    let resourceCount = 0;
+
+    for (const object of listed.objects) {
+      // Get object metadata
+      const r2Object = await bucket.head(object.key);
+
+      if (!r2Object || !r2Object.customMetadata?.type) {
+        console.warn(
+          `[DO ${this.workflowRunId}] Skipping resource ${object.key} - missing metadata`
+        );
+        continue;
+      }
+
+      console.log(`[DO ${this.workflowRunId}] Processing resource:`, {
+        key: object.key,
+        metadata: r2Object.customMetadata,
+      });
+
+      // Parse the key to create nested structure
+      // e.g., "resources/folder/file.txt" becomes manifest.folder.file
+      const keyParts = object.key.split('/');
+
+      // Skip if not in resources directory
+      if (keyParts[0] !== 'resources' || keyParts.length < 2) {
+        continue;
+      }
+
+      // Remove 'resources/' prefix
+      const relativeParts = keyParts.slice(1);
+      const fileName = relativeParts[relativeParts.length - 1];
+      const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+
+      // Navigate/create nested structure
+      let current: any = manifest;
+      for (let i = 0; i < relativeParts.length - 1; i++) {
+        const part = relativeParts[i];
+        if (!current[part]) {
+          current[part] = {};
+        }
+        current = current[part];
+      }
+
+      // Add the resource entry
+      current[fileNameWithoutExt] = {
+        type: r2Object.customMetadata.type as 'text' | 'binary',
+        key: object.key,
+        path: r2Object.customMetadata.path || object.key,
+      };
+
+      resourceCount++;
+    }
+
+    if (resourceCount === 0) {
+      console.log(`[DO ${this.workflowRunId}] No valid resources found in R2`);
+      return null;
+    }
+
+    console.log(
+      `[DO ${this.workflowRunId}] Final manifest structure:`,
+      JSON.stringify(manifest, null, 2)
+    );
+
+    // Create the loader and resources
+    const loader = new CloudflareR2Loader(bucket);
+    const resources = createResources(loader, manifest);
+
+    return resources;
   }
 
   async start(
@@ -113,10 +209,15 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('WorkflowRunner not initialized');
     }
 
+    // Load resources from R2
+    const r2Resources = await this.loadResourcesFromR2();
+
     // Create an enhanced runner with resources if available
     let runnerWithResources = workflowRunner;
-    if (resources) {
-      runnerWithResources = workflowRunner.withResources(resources);
+
+    // Use R2 resources if available
+    if (r2Resources) {
+      runnerWithResources = workflowRunner.withResources(r2Resources);
     }
 
     runnerWithResources

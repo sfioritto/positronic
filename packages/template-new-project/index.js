@@ -36,86 +36,12 @@ async function generateManifest(projectRootPath, targetSrcDir) {
 
 }
 
-// Convert filename to camelCase (e.g., "my-file.txt" -> "myFileTxt")
-function toCamelCase(fileName) {
-  return fileName
-    .replace(/\.[^.]+$/, '') // Remove extension
-    .replace(/[-_\s]+(.)?/g, (_, char) => char ? char.toUpperCase() : ''); // Convert to camelCase
-}
 
-// Determine file type based on extension
-function getResourceType(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  const textExtensions = ['.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.csv', '.html', '.css', '.js', '.ts'];
-  return textExtensions.includes(ext) ? 'text' : 'binary';
-}
-
-async function generateResourceManifest(projectRootPath) {
-  const resourcesDir = path.join(projectRootPath, 'resources');
-  const manifestPath = path.join(projectRootPath, '_resource-manifest.js');
-
-  // Check if resources directory exists
-  const resourcesDirExists = await fs.access(resourcesDir).then(() => true).catch(() => false);
-  if (!resourcesDirExists) {
-    // Create empty manifest if no resources directory
-    const emptyManifest = `// This file is generated automatically. Do not edit directly.
-// @ts-check
-
-/** @type {import('@positronic/core').ResourceManifest} */
-export const resourceManifest = {};
-`;
-    await fs.writeFile(manifestPath, emptyManifest, 'utf-8');
-    return;
-  }
-
-  // Recursively scan directory
-  async function scanDir(dir, relativePath = '') {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    const result = {};
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      const resourcePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
-
-      if (entry.isDirectory()) {
-        // Recurse into subdirectory
-        const subResult = await scanDir(fullPath, resourcePath);
-        if (Object.keys(subResult).length > 0) {
-          result[toCamelCase(entry.name)] = subResult;
-        }
-      } else if (entry.isFile() && !entry.name.startsWith('.')) {
-        // Add file to manifest with path and key
-        const key = toCamelCase(entry.name);
-        result[key] = {
-          type: getResourceType(entry.name),
-          path: fullPath,
-          key: resourcePath // R2 object key (e.g., "example.txt" or "images/logo.png")
-        };
-      }
-    }
-
-    return result;
-  }
-
-  // Scan the resources directory
-  const manifest = await scanDir(resourcesDir);
-
-  // Generate TypeScript content
-  const manifestContent = `// This file is generated automatically. Do not edit directly.
-// @ts-check
-
-/** @type {import('@positronic/core').ResourceManifest} */
-export const resourceManifest = ${JSON.stringify(manifest, null, 2)};
-`;
-
-  await fs.writeFile(manifestPath, manifestContent, 'utf-8');
-}
 
 module.exports = {
   name,
   version,
   generateManifest,
-  generateResourceManifest,
   prompts: [
     {
       name: 'name',

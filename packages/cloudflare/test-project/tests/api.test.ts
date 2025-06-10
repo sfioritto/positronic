@@ -22,6 +22,7 @@ interface TestEnv {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   DB: D1Database;
+  RESOURCES_BUCKET: R2Bucket;
 }
 
 describe('Hono API Tests', () => {
@@ -572,6 +573,43 @@ describe('Hono API Tests', () => {
     const testEnv = env as TestEnv;
     const brainName = 'resource-workflow';
 
+    // First, set up test resources in R2
+    // Create testResource
+    await testEnv.RESOURCES_BUCKET.put(
+      'resources/testResource.txt',
+      'This is a test resource',
+      {
+        customMetadata: {
+          type: 'text',
+          path: 'resources/testResource.txt',
+        },
+      }
+    );
+
+    // Create testResourceBinary
+    await testEnv.RESOURCES_BUCKET.put(
+      'resources/testResourceBinary.bin',
+      'This is a test resource binary',
+      {
+        customMetadata: {
+          type: 'binary',
+          path: 'resources/testResourceBinary.bin',
+        },
+      }
+    );
+
+    // Create nested resource
+    await testEnv.RESOURCES_BUCKET.put(
+      'resources/nestedResource/testNestedResource.txt',
+      'This is a test resource',
+      {
+        customMetadata: {
+          type: 'text',
+          path: 'resources/nestedResource/testNestedResource.txt',
+        },
+      }
+    );
+
     const createRequest = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -692,5 +730,12 @@ describe('Hono API Tests', () => {
     expect(textStepFinalStatus?.status).toBe(STATUS.COMPLETE);
     expect(binaryStepFinalStatus?.status).toBe(STATUS.COMPLETE);
     expect(nestedStepFinalStatus?.status).toBe(STATUS.COMPLETE);
+
+    // Clean up test resources
+    await testEnv.RESOURCES_BUCKET.delete('resources/testResource.txt');
+    await testEnv.RESOURCES_BUCKET.delete('resources/testResourceBinary.bin');
+    await testEnv.RESOURCES_BUCKET.delete(
+      'resources/nestedResource/testNestedResource.txt'
+    );
   });
 });
