@@ -100,7 +100,7 @@ export function createResources<M extends Manifest>(
       return loader.load(entry.key, 'text');
     };
 
-    const loadBinary = async (path: string): Promise<Buffer> => {
+    const loadBinary = async (path: string) => {
       const entry = findResourceByPath(manifestNode, path);
       if (!entry) {
         throw new Error(`Resource not found: ${path}`);

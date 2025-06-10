@@ -11,6 +11,10 @@ class MockLoader implements ResourceLoader {
     'special-chars!@#.txt': 'Special characters content',
   };
 
+  addMockData(path: string, content: string | Buffer): void {
+    this.mockData[path] = content;
+  }
+
   async load(key: string, type: 'text'): Promise<string>;
   async load(key: string, type: 'binary'): Promise<Buffer>;
   async load(key: string, type: 'text' | 'binary'): Promise<string | Buffer> {
@@ -180,12 +184,12 @@ describe('Resources API', () => {
 
       const mockLoader = new MockLoader();
       // Add the ambiguous files to mock data
-      (mockLoader as any).mockData['example.md'] = 'Example markdown content';
-      (mockLoader as any).mockData['example.txt'] = 'Example text content';
-      (mockLoader as any).mockData['report.pdf'] = Buffer.from('PDF content');
-      (mockLoader as any).mockData['report.docx'] = Buffer.from('DOCX content');
-      (mockLoader as any).mockData['nested/config.json'] = '{"config": "json"}';
-      (mockLoader as any).mockData['nested/config.yaml'] = 'config: yaml';
+      mockLoader.addMockData('example.md', 'Example markdown content');
+      mockLoader.addMockData('example.txt', 'Example text content');
+      mockLoader.addMockData('report.pdf', Buffer.from('PDF content'));
+      mockLoader.addMockData('report.docx', Buffer.from('DOCX content'));
+      mockLoader.addMockData('nested/config.json', '{"config": "json"}');
+      mockLoader.addMockData('nested/config.yaml', 'config: yaml');
 
       ambiguousResources = createResources(mockLoader, ambiguousManifest);
     });
