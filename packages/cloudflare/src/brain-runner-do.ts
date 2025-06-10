@@ -98,13 +98,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       );
     }
 
-    console.log(
-      `[DO ${this.workflowRunId}] R2 list result:`,
-      JSON.stringify(listed, null, 2)
-    );
-
     if (listed.objects.length === 0) {
-      console.log(`[DO ${this.workflowRunId}] No resources found in R2`);
       return null;
     }
 
@@ -122,11 +116,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
         );
         continue;
       }
-
-      console.log(`[DO ${this.workflowRunId}] Processing resource:`, {
-        key: object.key,
-        metadata: r2Object.customMetadata,
-      });
 
       // Parse the key to create nested structure
       // e.g., "resources/folder/file.txt" becomes manifest.folder.file
@@ -163,14 +152,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     if (resourceCount === 0) {
-      console.log(`[DO ${this.workflowRunId}] No valid resources found in R2`);
       return null;
     }
-
-    console.log(
-      `[DO ${this.workflowRunId}] Final manifest structure:`,
-      JSON.stringify(manifest, null, 2)
-    );
 
     // Create the loader and resources
     const loader = new CloudflareR2Loader(bucket);
