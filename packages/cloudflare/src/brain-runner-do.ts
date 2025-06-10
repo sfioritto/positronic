@@ -88,7 +88,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // List all resources in R2
     const listed = await bucket.list();
-
     // Check if results are truncated
     if (listed.truncated) {
       throw new Error(
@@ -112,29 +111,26 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
       if (!r2Object || !r2Object.customMetadata?.type) {
         console.warn(
-          `[DO ${this.workflowRunId}] Skipping resource ${object.key} - missing metadata`
+          `[DO ${this.workflowRunId}] Skipping resource ${object.key} - ` +
+            `missing metadata.type (found: ${JSON.stringify(
+              r2Object?.customMetadata || {}
+            )})`
         );
         continue;
       }
 
       // Parse the key to create nested structure
-      // e.g., "resources/folder/file.txt" becomes manifest.folder.file
+      // e.g., "folder/file.txt" becomes manifest.folder.file
       const keyParts = object.key.split('/');
 
-      // Skip if not in resources directory
-      if (keyParts[0] !== 'resources' || keyParts.length < 2) {
-        continue;
-      }
-
-      // Remove 'resources/' prefix
-      const relativeParts = keyParts.slice(1);
-      const fileName = relativeParts[relativeParts.length - 1];
+      // Get the file name and remove extension
+      const fileName = keyParts[keyParts.length - 1];
       const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
 
       // Navigate/create nested structure
       let current: any = manifest;
-      for (let i = 0; i < relativeParts.length - 1; i++) {
-        const part = relativeParts[i];
+      for (let i = 0; i < keyParts.length - 1; i++) {
+        const part = keyParts[i];
         if (!current[part]) {
           current[part] = {};
         }
@@ -194,7 +190,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // Load resources from R2
     const r2Resources = await this.loadResourcesFromR2();
-
     // Create an enhanced runner with resources if available
     let runnerWithResources = workflowRunner;
 

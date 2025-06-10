@@ -139,7 +139,7 @@ export const ResourceSync = ({
               path.basename(resource.path)
             );
             formData.append('type', resource.type);
-            formData.append('path', `resources/${resource.key}`);
+            formData.append('path', resource.key);
             formData.append('key', resource.key);
 
             await uploadResource(formData);

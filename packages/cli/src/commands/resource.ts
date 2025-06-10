@@ -130,10 +130,7 @@ export class ResourceCommand {
     }
 
     // The resourcePath should be relative to the resources directory
-    // If the user provides "subfolder/file.txt", the key is "resources/subfolder/file.txt"
-    const resourceKey = resourcePath.startsWith('resources/')
-      ? resourcePath
-      : `resources/${resourcePath}`;
+    const resourceKey = resourcePath;
 
     render(
       React.createElement(ResourceDelete, {

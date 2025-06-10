@@ -576,36 +576,36 @@ describe('Hono API Tests', () => {
     // First, set up test resources in R2
     // Create testResource
     await testEnv.RESOURCES_BUCKET.put(
-      'resources/testResource.txt',
+      'testResource.txt',
       'This is a test resource',
       {
         customMetadata: {
           type: 'text',
-          path: 'resources/testResource.txt',
+          path: 'testResource.txt',
         },
       }
     );
 
     // Create testResourceBinary
     await testEnv.RESOURCES_BUCKET.put(
-      'resources/testResourceBinary.bin',
+      'testResourceBinary.bin',
       'This is a test resource binary',
       {
         customMetadata: {
           type: 'binary',
-          path: 'resources/testResourceBinary.bin',
+          path: 'testResourceBinary.bin',
         },
       }
     );
 
     // Create nested resource
     await testEnv.RESOURCES_BUCKET.put(
-      'resources/nestedResource/testNestedResource.txt',
+      'nestedResource/testNestedResource.txt',
       'This is a test resource',
       {
         customMetadata: {
           type: 'text',
-          path: 'resources/nestedResource/testNestedResource.txt',
+          path: 'nestedResource/testNestedResource.txt',
         },
       }
     );
@@ -732,10 +732,10 @@ describe('Hono API Tests', () => {
     expect(nestedStepFinalStatus?.status).toBe(STATUS.COMPLETE);
 
     // Clean up test resources
-    await testEnv.RESOURCES_BUCKET.delete('resources/testResource.txt');
-    await testEnv.RESOURCES_BUCKET.delete('resources/testResourceBinary.bin');
+    await testEnv.RESOURCES_BUCKET.delete('testResource.txt');
+    await testEnv.RESOURCES_BUCKET.delete('testResourceBinary.bin');
     await testEnv.RESOURCES_BUCKET.delete(
-      'resources/nestedResource/testNestedResource.txt'
+      'nestedResource/testNestedResource.txt'
     );
   });
 });
