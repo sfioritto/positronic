@@ -32,11 +32,67 @@ function isResourceEntry(entry: ManifestEntry): entry is Entry {
 
 export function createResources<M extends Manifest>(
   loader: ResourceLoader,
-  initialManifestWithCamelCaseKeys: M
+  initialManifest: M
 ) {
+  function findResourceByPath(manifest: Manifest, path: string) {
+    // Remove file extension to match manifest keys
+    const pathWithoutExt = path.replace(/\.[^/.]+$/, '');
+    const parts = pathWithoutExt.split('/');
+
+    let current: Manifest | Entry = manifest;
+    for (let i = 0; i < parts.length; i++) {
+      current = current[parts[i]] as Manifest;
+      if (!current) {
+        throw new Error(`Resource not found: ${path}`);
+      }
+
+      const isLastPart = i === parts.length - 1;
+      if (isLastPart) {
+        if (isResourceEntry(current)) {
+          return current;
+        } else {
+          throw new Error(`Resource entry not found: ${path}`);
+        }
+      }
+    }
+
+    throw new Error(`Resource not found: ${path}`);
+  }
+
   function createProxiedResources(manifestNode: Manifest): Resources {
+    // Create methods that will be shared across all instances
+    const loadText = async (path: string): Promise<string> => {
+      const entry = findResourceByPath(manifestNode, path);
+      if (entry.type !== 'text') {
+        throw new Error(
+          `Resource "${path}" is of type "${entry.type}", but was accessed with loadText().`
+        );
+      }
+      return loader.load(entry.key, 'text');
+    };
+
+    const loadBinary = async (path: string): Promise<Buffer> => {
+      const entry = findResourceByPath(manifestNode, path);
+      if (!entry) {
+        throw new Error(`Resource not found: ${path}`);
+      }
+      if (entry.type !== 'binary') {
+        throw new Error(
+          `Resource "${path}" is of type "${entry.type}", but was accessed with loadBinary().`
+        );
+      }
+      return loader.load(entry.key, 'binary');
+    };
+
     const resultProxy: Resources = new Proxy({} as Resources, {
-      get: (target, prop, receiver): Resource | Resources | undefined => {
+      get: (target, prop, receiver): any => {
+        if (prop === 'loadText') {
+          return loadText;
+        }
+        if (prop === 'loadBinary') {
+          return loadBinary;
+        }
+
         if (typeof prop !== 'string' || !(prop in manifestNode)) {
           return Reflect.get(target, prop, receiver);
         }
@@ -69,7 +125,7 @@ export function createResources<M extends Manifest>(
           };
           return apiObject;
         } else {
-          // manifestEntry is a nested Manifest (already with camelCase keys)
+          // manifestEntry is a nested Manifest
           const nestedResources = createProxiedResources(
             manifestEntry as Manifest
           );
@@ -77,18 +133,33 @@ export function createResources<M extends Manifest>(
         }
       },
       has: (target, prop): boolean => {
+        // Check for special methods
+        if (prop === 'loadText' || prop === 'loadBinary') {
+          return true;
+        }
+        // Then check manifest
         if (typeof prop === 'string') {
           return prop in manifestNode;
         }
         return Reflect.has(target, prop);
       },
-      ownKeys: (): string[] => {
-        return Object.keys(manifestNode);
+      ownKeys: (target): string[] => {
+        // Combine special methods with manifest keys
+        return ['loadText', 'loadBinary', ...Object.keys(manifestNode)];
       },
       getOwnPropertyDescriptor: (
         target,
         prop
       ): PropertyDescriptor | undefined => {
+        if (prop === 'loadText' || prop === 'loadBinary') {
+          return {
+            value: prop === 'loadText' ? loadText : loadBinary,
+            writable: false,
+            enumerable: true,
+            configurable: true,
+          };
+        }
+
         if (typeof prop === 'string' && prop in manifestNode) {
           const value: Resource | Resources | undefined =
             resultProxy[prop as keyof Resources];
@@ -109,5 +180,5 @@ export function createResources<M extends Manifest>(
     return resultProxy;
   }
 
-  return createProxiedResources(initialManifestWithCamelCaseKeys);
+  return createProxiedResources(initialManifest);
 }
