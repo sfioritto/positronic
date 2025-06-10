@@ -34,35 +34,64 @@ export function createResources<M extends Manifest>(
   loader: ResourceLoader,
   initialManifest: M
 ) {
-  function findResourceByPath(manifest: Manifest, path: string) {
-    // Remove file extension to match manifest keys
-    const pathWithoutExt = path.replace(/\.[^/.]+$/, '');
-    const parts = pathWithoutExt.split('/');
+  // Helper function to find a resource entry by path in the manifest
+  function findResourceByPath(manifest: Manifest, path: string): Entry | null {
+    const parts = path.split('/');
 
     let current: Manifest | Entry = manifest;
     for (let i = 0; i < parts.length; i++) {
-      current = current[parts[i]] as Manifest;
-      if (!current) {
-        throw new Error(`Resource not found: ${path}`);
+      const part = parts[i];
+      if (isResourceEntry(current)) {
+        // We hit a resource entry before consuming all parts
+        return null;
       }
 
-      const isLastPart = i === parts.length - 1;
-      if (isLastPart) {
-        if (isResourceEntry(current)) {
-          return current;
-        } else {
-          throw new Error(`Resource entry not found: ${path}`);
+      const currentManifest = current as Manifest;
+      const next = currentManifest[part];
+      if (!next) {
+        // If exact match not found and this is the last part, try without extension
+        if (i === parts.length - 1) {
+          const partWithoutExt = part.replace(/\.[^/.]+$/, '');
+          const currentManifest = current as Manifest; // We know it's a Manifest since we checked isResourceEntry above
+          const matches = Object.keys(currentManifest).filter((key) => {
+            const keyWithoutExt = key.replace(/\.[^/.]+$/, '');
+            return (
+              keyWithoutExt === partWithoutExt &&
+              isResourceEntry(currentManifest[key])
+            );
+          });
+
+          if (matches.length === 1) {
+            return currentManifest[matches[0]] as Entry;
+          } else if (matches.length > 1) {
+            throw new Error(
+              `Ambiguous resource path '${path}': found ${matches.join(
+                ', '
+              )}. ` + `Please specify the full filename with extension.`
+            );
+          }
         }
+        return null;
       }
+
+      if (i === parts.length - 1 && isResourceEntry(next)) {
+        // Found the resource
+        return next;
+      }
+
+      current = next as Manifest;
     }
 
-    throw new Error(`Resource not found: ${path}`);
+    return null;
   }
 
   function createProxiedResources(manifestNode: Manifest): Resources {
     // Create methods that will be shared across all instances
     const loadText = async (path: string): Promise<string> => {
       const entry = findResourceByPath(manifestNode, path);
+      if (!entry) {
+        throw new Error(`Resource not found: ${path}`);
+      }
       if (entry.type !== 'text') {
         throw new Error(
           `Resource "${path}" is of type "${entry.type}", but was accessed with loadText().`
@@ -93,23 +122,77 @@ export function createResources<M extends Manifest>(
           return loadBinary;
         }
 
-        if (typeof prop !== 'string' || !(prop in manifestNode)) {
+        // Handle dynamic resource properties
+        if (typeof prop !== 'string') {
           return Reflect.get(target, prop, receiver);
         }
 
-        const manifestEntry = manifestNode[prop];
+        // Check if the property exists directly (with extension)
+        if (prop in manifestNode) {
+          const manifestEntry = manifestNode[prop];
 
-        if (isResourceEntry(manifestEntry)) {
+          if (isResourceEntry(manifestEntry)) {
+            const { key, type } = manifestEntry;
+            const apiObject: Resource = {
+              load: () =>
+                manifestEntry.type === 'text'
+                  ? loader.load(key, 'text')
+                  : loader.load(key, 'binary'),
+              loadText: () => {
+                if (type !== 'text') {
+                  throw new Error(
+                    `Resource "${prop}" is of type "${type}", but was accessed with loadText().`
+                  );
+                }
+                return loader.load(key, 'text');
+              },
+              loadBinary: () => {
+                if (type !== 'binary') {
+                  throw new Error(
+                    `Resource "${prop}" is of type "${type}", but was accessed with loadBinary().`
+                  );
+                }
+                return loader.load(key, 'binary');
+              },
+            };
+            return apiObject;
+          } else {
+            // manifestEntry is a nested Manifest
+            const nestedResources = createProxiedResources(
+              manifestEntry as Manifest
+            );
+            return nestedResources;
+          }
+        }
+
+        // If not found directly, check for files without extension
+        // Find all keys that match when extension is removed
+        const matches = Object.keys(manifestNode).filter((key) => {
+          const keyWithoutExt = key.replace(/\.[^/.]+$/, '');
+          return keyWithoutExt === prop && isResourceEntry(manifestNode[key]);
+        });
+
+        if (matches.length === 0) {
+          // No matches - might be a nested directory
+          if (prop in manifestNode && !isResourceEntry(manifestNode[prop])) {
+            return createProxiedResources(manifestNode[prop] as Manifest);
+          }
+          return undefined;
+        }
+
+        if (matches.length === 1) {
+          // Single match - return it
+          const manifestEntry = manifestNode[matches[0]] as Entry;
           const { key, type } = manifestEntry;
           const apiObject: Resource = {
             load: () =>
-              manifestEntry.type === 'text'
+              type === 'text'
                 ? loader.load(key, 'text')
                 : loader.load(key, 'binary'),
             loadText: () => {
               if (type !== 'text') {
                 throw new Error(
-                  `Resource "${prop}" is of type "${type}", but was accessed with loadText().`
+                  `Resource "${matches[0]}" is of type "${type}", but was accessed with loadText().`
                 );
               }
               return loader.load(key, 'text');
@@ -117,20 +200,20 @@ export function createResources<M extends Manifest>(
             loadBinary: () => {
               if (type !== 'binary') {
                 throw new Error(
-                  `Resource "${prop}" is of type "${type}", but was accessed with loadBinary().`
+                  `Resource "${matches[0]}" is of type "${type}", but was accessed with loadBinary().`
                 );
               }
               return loader.load(key, 'binary');
             },
           };
           return apiObject;
-        } else {
-          // manifestEntry is a nested Manifest
-          const nestedResources = createProxiedResources(
-            manifestEntry as Manifest
-          );
-          return nestedResources;
         }
+
+        // Multiple matches - throw helpful error
+        throw new Error(
+          `Ambiguous resource name '${prop}': found ${matches.join(', ')}. ` +
+            `Please use resources.loadText('${matches[0]}') or resources.loadBinary('${matches[1]}') instead.`
+        );
       },
       has: (target, prop): boolean => {
         // Check for special methods

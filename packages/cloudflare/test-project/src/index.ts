@@ -36,19 +36,19 @@ const delayedWorkflow = workflow('delayed-workflow')
 const resourceWorkflow = workflow('resource-workflow')
   .step('Load text resource', async ({ state, resources }) => ({
     ...state,
-    text: await (resources.testResource as any).loadText(),
+    text: await (resources['testResource.txt'] as any).loadText(),
   }))
   .step('Load binary resource', async ({ state, resources }) => ({
     ...state,
-    buffer: (await (resources.testResourceBinary as any).loadBinary()).toString(
-      'base64'
-    ),
+    buffer: (
+      await (resources['testResourceBinary.bin'] as any).loadBinary()
+    ).toString('base64'),
   }))
   .step('Load nested resource', async ({ state, resources }) => ({
     ...state,
-    nestedText: await (
-      resources.nestedResource as any
-    ).testNestedResource.loadText(),
+    nestedText: await (resources.nestedResource as any)[
+      'testNestedResource.txt'
+    ].loadText(),
   }));
 
 const manifest = new PositronicManifest({

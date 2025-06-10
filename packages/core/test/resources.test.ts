@@ -35,31 +35,31 @@ describe('Resources API', () => {
 
   beforeEach(() => {
     const manifest: Manifest = {
-      example: {
+      'example.md': {
         type: 'text',
         path: 'example.md',
         key: 'example.md',
       },
-      'my file with spaces': {
+      'my file with spaces.txt': {
         type: 'text',
         path: 'my file with spaces.txt',
         key: 'my file with spaces.txt',
       },
       data: {
-        '2024-report': {
+        '2024-report.pdf': {
           type: 'binary',
           path: 'data/2024-report.pdf',
           key: 'data/2024-report.pdf',
         },
       },
       docs: {
-        readme: {
+        'readme.md': {
           type: 'text',
           path: 'docs/readme.md',
           key: 'docs/readme.md',
         },
       },
-      'special-chars!@#': {
+      'special-chars!@#.txt': {
         type: 'text',
         path: 'special-chars!@#.txt',
         key: 'special-chars!@#.txt',
@@ -82,7 +82,7 @@ describe('Resources API', () => {
     });
 
     it('should load binary resource via proxy', async () => {
-      const buffer = await resources.data['2024-report'].loadBinary();
+      const buffer = await resources.data['2024-report.pdf'].loadBinary();
       expect(buffer.toString()).toBe('Mock PDF content');
     });
   });
@@ -136,6 +136,109 @@ describe('Resources API', () => {
       // Both should work
       expect(example).toBe('Example content');
       expect(withSpaces).toBe('Content with spaces in filename');
+    });
+  });
+
+  describe('Ambiguous resource names', () => {
+    let ambiguousResources: any;
+
+    beforeEach(() => {
+      const ambiguousManifest: Manifest = {
+        'example.md': {
+          type: 'text',
+          path: 'example.md',
+          key: 'example.md',
+        },
+        'example.txt': {
+          type: 'text',
+          path: 'example.txt',
+          key: 'example.txt',
+        },
+        'report.pdf': {
+          type: 'binary',
+          path: 'report.pdf',
+          key: 'report.pdf',
+        },
+        'report.docx': {
+          type: 'binary',
+          path: 'report.docx',
+          key: 'report.docx',
+        },
+        nested: {
+          'config.json': {
+            type: 'text',
+            path: 'nested/config.json',
+            key: 'nested/config.json',
+          },
+          'config.yaml': {
+            type: 'text',
+            path: 'nested/config.yaml',
+            key: 'nested/config.yaml',
+          },
+        },
+      };
+
+      const mockLoader = new MockLoader();
+      // Add the ambiguous files to mock data
+      (mockLoader as any).mockData['example.md'] = 'Example markdown content';
+      (mockLoader as any).mockData['example.txt'] = 'Example text content';
+      (mockLoader as any).mockData['report.pdf'] = Buffer.from('PDF content');
+      (mockLoader as any).mockData['report.docx'] = Buffer.from('DOCX content');
+      (mockLoader as any).mockData['nested/config.json'] = '{"config": "json"}';
+      (mockLoader as any).mockData['nested/config.yaml'] = 'config: yaml';
+
+      ambiguousResources = createResources(mockLoader, ambiguousManifest);
+    });
+
+    it('should throw error when accessing ambiguous resource via proxy', () => {
+      expect(() => ambiguousResources.example).toThrow(
+        "Ambiguous resource name 'example': found example.md, example.txt. " +
+          "Please use resources.loadText('example.md') or resources.loadBinary('example.txt') instead."
+      );
+    });
+
+    it('should throw error for ambiguous binary resources', () => {
+      expect(() => ambiguousResources.report).toThrow(
+        "Ambiguous resource name 'report': found report.pdf, report.docx"
+      );
+    });
+
+    it('should throw error for ambiguous nested resources', () => {
+      expect(() => ambiguousResources.nested.config).toThrow(
+        "Ambiguous resource name 'config': found config.json, config.yaml"
+      );
+    });
+
+    it('should allow direct access with full filename', async () => {
+      const markdownContent = await ambiguousResources['example.md'].loadText();
+      const textContent = await ambiguousResources['example.txt'].loadText();
+
+      expect(markdownContent).toBe('Example markdown content');
+      expect(textContent).toBe('Example text content');
+    });
+
+    it('should work with method API for ambiguous resources', async () => {
+      const markdownContent = await ambiguousResources.loadText('example.md');
+      const textContent = await ambiguousResources.loadText('example.txt');
+
+      expect(markdownContent).toBe('Example markdown content');
+      expect(textContent).toBe('Example text content');
+    });
+
+    it('should handle ambiguous paths in loadText/loadBinary methods', async () => {
+      // Should work with full path
+      const jsonContent = await ambiguousResources.loadText(
+        'nested/config.json'
+      );
+      expect(jsonContent).toBe('{"config": "json"}');
+
+      // Should throw error for ambiguous path without extension
+      await expect(
+        ambiguousResources.loadText('nested/config')
+      ).rejects.toThrow(
+        "Ambiguous resource path 'nested/config': found config.json, config.yaml. " +
+          'Please specify the full filename with extension.'
+      );
     });
   });
 });

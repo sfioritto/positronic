@@ -120,12 +120,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
       }
 
       // Parse the key to create nested structure
-      // e.g., "folder/file.txt" becomes manifest.folder.file
+      // e.g., "folder/file.txt" becomes manifest.folder["file.txt"]
       const keyParts = object.key.split('/');
 
-      // Get the file name and remove extension
+      // Get the file name (with extension preserved)
       const fileName = keyParts[keyParts.length - 1];
-      const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
 
       // Navigate/create nested structure
       let current: any = manifest;
@@ -137,8 +136,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
         current = current[part];
       }
 
-      // Add the resource entry
-      current[fileNameWithoutExt] = {
+      // Add the resource entry with full filename
+      current[fileName] = {
         type: r2Object.customMetadata.type as 'text' | 'binary',
         key: object.key,
         path: r2Object.customMetadata.path || object.key,
