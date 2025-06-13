@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
 import * as dotenv from 'dotenv';
-import { generateProject } from './helpers.js';
+import { generateProject, syncResources, generateTypes } from './helpers.js';
 // @ts-ignore Could not find a declaration file for module '@positronic/template-new-project'.
 import pkg from '@positronic/template-new-project';
 const { generateManifest: regenerateManifestFile } = pkg;
@@ -152,33 +152,8 @@ export class ServerCommand {
     try {
       await setupPositronicServerEnv(projectRootPath, argv.force);
 
-      // Watcher setup - target the user's brains and resources directories
-      const watchPaths = [
-        path.join(brainsDir, '*.ts'),
-        path.join(resourcesDir, '**/*'),
-      ];
-
-      watcher = chokidar.watch(watchPaths, {
-        ignored: [/(^|[\/\\])\../, '**/node_modules/**'], // Ignore dotfiles and node_modules
-        persistent: true,
-        ignoreInitial: true,
-        awaitWriteFinish: {
-          stabilityThreshold: 200,
-          pollInterval: 100,
-        },
-      });
-
-      const regenerate = async () => {
-        await regenerateManifestFile(projectRootPath, srcDir);
-      };
-
-      watcher
-        .on('add', regenerate)
-        .on('change', regenerate)
-        .on('unlink', regenerate)
-        .on('error', (error) => console.error(`Watcher error: ${error}`));
-
-      // Start dev server
+      // Start the server AFTER setting up .positronic environment but BEFORE resource sync
+      // This way the server is available for the resource sync API calls
       const wranglerArgs = ['dev', '--local'];
       if (argv.port) {
         wranglerArgs.push('--port', String(argv.port));
@@ -208,6 +183,75 @@ export class ServerCommand {
         }
         process.exit(1);
       });
+
+      // Wait a moment for the server to start before syncing resources
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Initial resource sync and type generation
+      const syncResult = await syncResources(projectRootPath);
+      if (syncResult.errorCount > 0) {
+        console.log(
+          `⚠️  Resource sync completed with ${syncResult.errorCount} errors:`
+        );
+        syncResult.errors.forEach((error) => {
+          console.log(`   • ${error.file}: ${error.message}`);
+        });
+      } else {
+        console.log(
+          `✅ Synced ${syncResult.uploadCount} resources (${syncResult.skipCount} up to date)`
+        );
+      }
+
+      const typesFilePath = await generateTypes(projectRootPath);
+
+      // Watcher setup - target the user's brains and resources directories
+      const watchPaths = [
+        path.join(brainsDir, '*.ts'),
+        path.join(resourcesDir, '**/*'),
+      ];
+
+      watcher = chokidar.watch(watchPaths, {
+        ignored: [/(^|[\/\\])\../, '**/node_modules/**'],
+        persistent: true,
+        ignoreInitial: true,
+        awaitWriteFinish: {
+          stabilityThreshold: 200,
+          pollInterval: 100,
+        },
+      });
+
+      const regenerate = async () => {
+        await regenerateManifestFile(projectRootPath, srcDir);
+      };
+
+      const handleResourceChange = async () => {
+        await syncResources(projectRootPath);
+        await generateTypes(projectRootPath);
+      };
+
+      watcher
+        .on('add', (filePath) => {
+          if (filePath.startsWith(resourcesDir)) {
+            handleResourceChange();
+          } else {
+            regenerate();
+          }
+        })
+        .on('change', (filePath) => {
+          if (filePath.startsWith(resourcesDir)) {
+            handleResourceChange();
+          } else {
+            regenerate();
+          }
+        })
+        .on('unlink', (filePath) => {
+          if (filePath.startsWith(resourcesDir)) {
+            handleResourceChange();
+          } else {
+            regenerate();
+          }
+        })
+        .on('error', (error) => console.error(`Watcher error: ${error}`));
     } catch (error) {
       console.error('An error occurred during server startup:', error);
       await cleanup(); // Attempt cleanup on error
