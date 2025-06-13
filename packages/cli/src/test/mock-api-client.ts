@@ -1,0 +1,140 @@
+import { Response } from 'node-fetch';
+import type { ApiClient } from '../commands/helpers.js';
+
+interface MockResource {
+  key: string;
+  type: 'text' | 'binary';
+  path?: string;
+  size: number;
+  lastModified: string;
+}
+
+export class MockApiClient implements ApiClient {
+  private resources: MockResource[] = [];
+  private brainRuns: Map<string, any> = new Map();
+
+  // Track all calls for assertions
+  public calls: Array<{ path: string; options?: any }> = [];
+
+  async fetch(path: string, options?: any): Promise<Response> {
+    this.calls.push({ path, options });
+
+    // Mock GET /resources
+    if (path === '/resources' && (!options || options.method === 'GET')) {
+      return new Response(
+        JSON.stringify({
+          resources: this.resources,
+          truncated: false,
+          count: this.resources.length,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Mock POST /resources
+    if (path === '/resources' && options?.method === 'POST') {
+      // Extract form data from the request
+      const formData = options.body;
+      if (formData && typeof formData.get === 'function') {
+        const type = formData.get('type');
+        const key = formData.get('key');
+        const file = formData.get('file');
+
+        if (type && key && file) {
+          const newResource: MockResource = {
+            key: key as string,
+            type: type as 'text' | 'binary',
+            size: file.size || 100, // Mock size
+            lastModified: new Date().toISOString(),
+          };
+
+          // Update existing or add new
+          const existingIndex = this.resources.findIndex((r) => r.key === key);
+          if (existingIndex >= 0) {
+            this.resources[existingIndex] = newResource;
+          } else {
+            this.resources.push(newResource);
+          }
+
+          return new Response(JSON.stringify(newResource), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      return new Response('Bad Request', { status: 400 });
+    }
+
+    // Mock DELETE /resources/:key
+    const deleteMatch = path.match(/^\/resources\/(.+)$/);
+    if (deleteMatch && options?.method === 'DELETE') {
+      const key = decodeURIComponent(deleteMatch[1]);
+      const index = this.resources.findIndex((r) => r.key === key);
+
+      if (index >= 0) {
+        this.resources.splice(index, 1);
+        return new Response(null, { status: 204 });
+      }
+
+      return new Response(
+        JSON.stringify({ error: `Resource "${key}" not found` }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Mock POST /brains/runs
+    if (path === '/brains/runs' && options?.method === 'POST') {
+      const body = JSON.parse(options.body);
+      const brainRunId = `run-${Date.now()}`;
+      this.brainRuns.set(brainRunId, {
+        brainName: body.brainName,
+        id: brainRunId,
+      });
+
+      return new Response(JSON.stringify({ brainRunId }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Default: Not found
+    return new Response('Not Found', { status: 404 });
+  }
+
+  // Helper methods for test setup
+  addResource(resource: MockResource) {
+    this.resources.push(resource);
+  }
+
+  clearResources() {
+    this.resources = [];
+  }
+
+  getResources() {
+    return [...this.resources];
+  }
+
+  reset() {
+    this.resources = [];
+    this.brainRuns.clear();
+    this.calls = [];
+  }
+}
+
+// Factory function for creating mock clients with initial data
+export function createMockApiClient(
+  initialResources?: MockResource[]
+): MockApiClient {
+  const client = new MockApiClient();
+  if (initialResources) {
+    initialResources.forEach((r) => client.addResource(r));
+  }
+  return client;
+}

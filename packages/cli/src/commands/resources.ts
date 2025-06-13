@@ -1,14 +1,8 @@
 import React from 'react';
 import { render } from 'ink';
-import {
-  scanLocalResources,
-  apiFetch,
-  syncResources,
-  generateTypes,
-} from './helpers.js';
+import { scanLocalResources, generateTypes } from './helpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { type ResourceEntry } from '@positronic/core';
 import { ResourceList } from '../components/resource-list.js';
 import { ResourceSync } from '../components/resource-sync.js';
 import { ResourceDelete } from '../components/resource-delete.js';

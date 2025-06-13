@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '../commands/helpers.js';
+import { apiClient } from '../commands/helpers.js';
 
 export function useApiGet<T>(endpoint: string, options?: any) {
   const [data, setData] = useState<T | null>(null);
@@ -16,7 +16,7 @@ export function useApiGet<T>(endpoint: string, options?: any) {
         setLoading(true);
         setError(null);
 
-        const response = await apiFetch(endpoint, {
+        const response = await apiClient.fetch(endpoint, {
           method: 'GET',
           ...options,
         });
@@ -70,7 +70,7 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
         setLoading(true);
         setError(null);
 
-        const response = await apiFetch(endpoint, {
+        const response = await apiClient.fetch(endpoint, {
           method: 'POST',
           ...defaultOptions,
           ...options,
@@ -134,7 +134,7 @@ export function useApiDelete() {
       setLoading(true);
       setError(null);
 
-      const response = await apiFetch(endpoint, {
+      const response = await apiClient.fetch(endpoint, {
         method: 'DELETE',
         ...options,
       });

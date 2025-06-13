@@ -1,6 +1,6 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import { EventSource } from 'eventsource';
-import { apiFetch } from './helpers.js';
+import { apiClient } from './helpers.js';
 import React, { useState, useEffect } from 'react';
 import { render, Text } from 'ink';
 import { Watch } from '../components/watch.js';
@@ -58,7 +58,7 @@ export class BrainCommand {
     const apiPath = '/brains/runs';
 
     try {
-      const response = await apiFetch(apiPath, {
+      const response = await apiClient.fetch(apiPath, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +111,7 @@ export class BrainCommand {
       render(React.createElement(Watch, { runId, port }));
     } else if (brainName) {
       // TODO: Implement logic to first fetch the latest run ID for brainName
-      // This fetch should use apiFetch
+      // This fetch should use apiClient.fetch
     } else {
       console.error(
         'Internal Error: Watch command called without --run-id or --name.'

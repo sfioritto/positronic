@@ -7,6 +7,24 @@ import caz from 'caz';
 import { type ResourceEntry } from '@positronic/core';
 import { isText } from 'istextorbinary';
 
+// API Client interface for dependency injection
+export interface ApiClient {
+  fetch(path: string, options?: RequestInit): Promise<Response>;
+}
+
+// Singleton API client instance
+export const apiClient: ApiClient = {
+  fetch: async (apiPath: string, options?: RequestInit): Promise<Response> => {
+    const port = process.env.POSITRONIC_SERVER_PORT || '8787';
+    const baseUrl = `http://localhost:${port}`;
+    const fullUrl = `${baseUrl}${
+      apiPath.startsWith('/') ? apiPath : '/' + apiPath
+    }`;
+
+    const response = await fetch(fullUrl, options);
+    return response;
+  },
+};
 export async function generateProject(
   projectName: string,
   projectDir: string,
@@ -67,21 +85,6 @@ export async function generateProject(
       });
     }
   }
-}
-
-// API Fetch Helper
-export async function apiFetch(
-  apiPath: string,
-  options?: RequestInit
-): Promise<Response> {
-  const port = process.env.POSITRONIC_SERVER_PORT || '8787';
-  const baseUrl = `http://localhost:${port}`;
-  const fullUrl = `${baseUrl}${
-    apiPath.startsWith('/') ? apiPath : '/' + apiPath
-  }`;
-
-  const response = await fetch(fullUrl, options);
-  return response;
 }
 
 export function scanLocalResources(resourcesDir: string): ResourceEntry[] {
@@ -148,7 +151,8 @@ interface SyncResult {
  * Core resource sync logic without UI dependencies
  */
 export async function syncResources(
-  projectRootPath: string
+  projectRootPath: string,
+  client: ApiClient = apiClient
 ): Promise<SyncResult> {
   const resourcesDir = path.join(projectRootPath, 'resources');
 
@@ -170,7 +174,7 @@ export async function syncResources(
   }
 
   // Fetch server resources
-  const response = await apiFetch('/resources');
+  const response = await client.fetch('/resources');
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
@@ -218,7 +222,7 @@ export async function syncResources(
         formData.append('path', resource.key);
         formData.append('key', resource.key);
 
-        const uploadResponse = await apiFetch('/resources', {
+        const uploadResponse = await client.fetch('/resources', {
           method: 'POST',
           body: formData,
         });
@@ -422,11 +426,14 @@ export {}; // Make this a module
 /**
  * Core type generation logic without UI dependencies
  */
-export async function generateTypes(projectRootPath: string): Promise<string> {
+export async function generateTypes(
+  projectRootPath: string,
+  client: ApiClient = apiClient
+): Promise<string> {
   const typesFilePath = path.join(projectRootPath, 'resources.d.ts');
 
   // Fetch resources from the API
-  const response = await apiFetch('/resources');
+  const response = await client.fetch('/resources');
 
   if (!response.ok) {
     const errorText = await response.text();
