@@ -452,6 +452,18 @@ cli = cli.command(
       );
 
       yargsResource.command(
+        'types',
+        'Generate TypeScript type definitions for resources\n',
+        (yargsTypesCmd) => {
+          return yargsTypesCmd.example(
+            '$0 resource types',
+            'Generate a resources.d.ts file with type definitions for all resources'
+          );
+        },
+        () => resourceCommand.types()
+      );
+
+      yargsResource.command(
         'clear',
         'Delete ALL resources from the server (development only)\n',
         (yargsClearCmd) => {

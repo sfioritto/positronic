@@ -10,5 +10,8 @@ node_modules/
 # Cloudflare Wrangler state and temp files
 .wrangler/
 
+# Generated TypeScript resource types (uncomment to ignore)
+# resources.d.ts
+
 # Mac specific
 .DS_Store
