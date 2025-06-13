@@ -31,13 +31,11 @@ interface ResourcesResponse {
 interface ResourceSyncProps {
   localResources: ResourceEntry[];
   resourcesDir: string | null;
-  textExtensions: Set<string>;
 }
 
 export const ResourceSync = ({
   localResources,
-  resourcesDir,
-  textExtensions
+  resourcesDir
 }: ResourceSyncProps) => {
   const [stats, setStats] = useState<SyncStats>({
     uploadCount: 0,
@@ -165,7 +163,7 @@ export const ResourceSync = ({
     };
 
     performSync();
-  }, [localResources, resourcesDir, textExtensions, serverResourcesData, uploadResource]);
+  }, [localResources, resourcesDir, serverResourcesData, uploadResource]);
 
   const {
     uploadCount,

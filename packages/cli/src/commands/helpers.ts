@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import caz from 'caz';
 import { type ResourceEntry } from '@positronic/core';
+import { isText } from 'istextorbinary';
 
 export async function generateProject(
   projectName: string,
@@ -83,10 +84,7 @@ export async function apiFetch(
   return response;
 }
 
-export function scanLocalResources(
-  resourcesDir: string,
-  textExtensions: Set<string>
-): ResourceEntry[] {
+export function scanLocalResources(resourcesDir: string): ResourceEntry[] {
   const localResources: ResourceEntry[] = [];
 
   const scanDirectory = (dir: string, baseDir: string) => {
@@ -104,9 +102,12 @@ export function scanLocalResources(
         // Use forward slashes for consistency across platforms
         const key = relativePath.replace(/\\/g, '/');
 
-        // Determine file type based on extension
-        const ext = path.extname(entry.name).toLowerCase();
-        const type: ResourceEntry['type'] = textExtensions.has(ext)
+        // Determine file type using istextorbinary
+        // It checks both filename and content (first few bytes)
+        const type: ResourceEntry['type'] = isText(
+          entry.name,
+          fs.readFileSync(fullPath)
+        )
           ? 'text'
           : 'binary';
 

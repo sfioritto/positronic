@@ -21,59 +21,6 @@ interface ResourcesListResponse {
   count: number;
 }
 
-// Common text file extensions
-const TEXT_EXTENSIONS = new Set([
-  '.txt',
-  '.md',
-  '.json',
-  '.js',
-  '.ts',
-  '.jsx',
-  '.tsx',
-  '.css',
-  '.scss',
-  '.sass',
-  '.html',
-  '.xml',
-  '.yaml',
-  '.yml',
-  '.toml',
-  '.ini',
-  '.cfg',
-  '.conf',
-  '.sh',
-  '.bash',
-  '.zsh',
-  '.fish',
-  '.py',
-  '.rb',
-  '.php',
-  '.java',
-  '.c',
-  '.cpp',
-  '.h',
-  '.hpp',
-  '.rs',
-  '.go',
-  '.swift',
-  '.kt',
-  '.scala',
-  '.r',
-  '.sql',
-  '.graphql',
-  '.vue',
-  '.svelte',
-  '.csv',
-  '.log',
-  '.env',
-  '.gitignore',
-  '.dockerignore',
-  '.editorconfig',
-  '.prettierrc',
-  '.eslintrc',
-  '.babelrc',
-]);
-
 /**
  * Check if a string is a valid JavaScript identifier
  */
@@ -271,13 +218,12 @@ export class ResourceCommand {
     if (!fs.existsSync(resourcesDir)) {
       fs.mkdirSync(resourcesDir, { recursive: true });
     }
-    const localResources = scanLocalResources(resourcesDir, TEXT_EXTENSIONS);
+    const localResources = scanLocalResources(resourcesDir);
 
     render(
       React.createElement(ResourceSync, {
         localResources,
         resourcesDir,
-        textExtensions: TEXT_EXTENSIONS,
       })
     );
   }
