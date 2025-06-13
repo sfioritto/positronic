@@ -6,8 +6,7 @@ import { WORKFLOW_EVENTS } from '@positronic/core';
 import type { SerializedStep } from '@positronic/core';
 import { STATUS } from '@positronic/core';
 
-// Recreate SerializedStepStatus based on the imported SerializedStep
-export type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
+type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
 
 const getStatusIndicator = (status: SerializedStepStatus['status']) => {
   switch (status) {
@@ -30,7 +29,7 @@ interface WatchStatusProps {
   runId?: string;
 }
 
-export const WatchStatus = ({ steps, workflowTitle, runId }: WatchStatusProps) => {
+const WatchStatus = ({ steps, workflowTitle, runId }: WatchStatusProps) => {
   if (!steps || steps.length === 0) {
     return <Text>Waiting for workflow steps...</Text>;
   }
