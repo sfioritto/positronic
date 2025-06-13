@@ -30,7 +30,7 @@ const nodeExecutable = process.execPath;
 // Increase test timeout - server tests need more time
 jest.setTimeout(20000);
 
-describe('CLI Integration: positronic resource types', () => {
+describe('CLI Integration: positronic resources types', () => {
   let tempDir: string;
   const projectName = 'test-resource-types';
   let serverProcess: ChildProcess | null = null;
@@ -109,7 +109,7 @@ describe('CLI Integration: positronic resource types', () => {
     );
 
     // 4. Sync resources to the server
-    execSync(`${nodeExecutable} ${cliExecutable} resource sync`, {
+    execSync(`${nodeExecutable} ${cliExecutable} resources sync`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
@@ -120,7 +120,7 @@ describe('CLI Integration: positronic resource types', () => {
     });
 
     // 5. Run the types command
-    execSync(`${nodeExecutable} ${cliExecutable} resource types`, {
+    execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
@@ -201,7 +201,7 @@ describe('CLI Integration: positronic resource types', () => {
     fs.mkdirSync(resourcesDir, { recursive: true });
 
     // 4. Run the types command (no sync needed since no resources)
-    execSync(`${nodeExecutable} ${cliExecutable} resource types`, {
+    execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
@@ -271,7 +271,7 @@ describe('CLI Integration: positronic resource types', () => {
     ); // Invalid
 
     // 4. Sync resources to the server
-    execSync(`${nodeExecutable} ${cliExecutable} resource sync`, {
+    execSync(`${nodeExecutable} ${cliExecutable} resources sync`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
@@ -282,7 +282,7 @@ describe('CLI Integration: positronic resource types', () => {
     });
 
     // 5. Run the types command
-    execSync(`${nodeExecutable} ${cliExecutable} resource types`, {
+    execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
@@ -365,7 +365,7 @@ describe('CLI Integration: positronic resource types', () => {
     fs.writeFileSync(path.join(resourcesDir, 'document.pdf'), pdfHeader);
 
     // 4. Sync resources to the server
-    execSync(`${nodeExecutable} ${cliExecutable} resource sync`, {
+    execSync(`${nodeExecutable} ${cliExecutable} resources sync`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
@@ -376,7 +376,7 @@ describe('CLI Integration: positronic resource types', () => {
     });
 
     // 5. Run the types command
-    execSync(`${nodeExecutable} ${cliExecutable} resource types`, {
+    execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {

@@ -188,7 +188,7 @@ export {}; // Make this a module
 `;
 }
 
-export class ResourceCommand {
+export class ResourcesCommand {
   constructor(
     private isLocalDevMode: boolean,
     private projectRootPath: string | null
@@ -288,7 +288,7 @@ export class ResourceCommand {
           error: {
             title: 'Missing Resource Path',
             message: 'Please provide a resource path to delete.',
-            details: 'Usage: positronic resource delete <path>',
+            details: 'Usage: positronic resources delete <path>',
           },
         })
       );

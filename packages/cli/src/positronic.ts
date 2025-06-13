@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { ServerCommand } from './commands/server.js';
 import { PromptCommand } from './commands/prompt.js';
 import { BrainCommand } from './commands/brain.js';
-import { ResourceCommand } from './commands/resource.js';
+import { ResourcesCommand } from './commands/resources.js';
 
 function findProjectRootSync(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
@@ -50,7 +50,7 @@ const projectCommand = new ProjectCommand(isLocalDevMode);
 const serverCommand = new ServerCommand();
 const brainCommand = new BrainCommand();
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);
-const resourceCommand = new ResourceCommand(isLocalDevMode, projectRootPath);
+const resourcesCommand = new ResourcesCommand(isLocalDevMode, projectRootPath);
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -422,7 +422,7 @@ cli = cli.command(
 
 // --- Resource Management Commands ---
 cli = cli.command(
-  'resource',
+  'resources',
   'Resources are any data that can be used in your workflows, agents, and prompts. They can be text or binaries.\n',
   (yargsResource) => {
     yargsResource.command(
@@ -430,11 +430,11 @@ cli = cli.command(
       'List all resources in the active project\n',
       (yargsListCmd) => {
         return yargsListCmd.example(
-          '$0 resource list',
+          '$0 resources list',
           'List all resources in the active project'
         );
       },
-      () => resourceCommand.list()
+      () => resourcesCommand.list()
     );
 
     // Command available ONLY in Local Dev Mode
@@ -444,11 +444,11 @@ cli = cli.command(
         'Sync local resources folder with the server so they are available to brains when they run\n',
         (yargsSyncCmd) => {
           return yargsSyncCmd.example(
-            '$0 resource sync',
+            '$0 resources sync',
             'Upload new or modified resources to the server'
           );
         },
-        () => resourceCommand.sync()
+        () => resourcesCommand.sync()
       );
 
       yargsResource.command(
@@ -456,11 +456,11 @@ cli = cli.command(
         'Generate TypeScript type definitions for resources\n',
         (yargsTypesCmd) => {
           return yargsTypesCmd.example(
-            '$0 resource types',
+            '$0 resources types',
             'Generate a resources.d.ts file with type definitions for all resources'
           );
         },
-        () => resourceCommand.types()
+        () => resourcesCommand.types()
       );
 
       yargsResource.command(
@@ -468,11 +468,11 @@ cli = cli.command(
         'Delete ALL resources from the server (development only)\n',
         (yargsClearCmd) => {
           return yargsClearCmd.example(
-            '$0 resource clear',
+            '$0 resources clear',
             'Delete all resources from the server'
           );
         },
-        () => resourceCommand.clear()
+        () => resourcesCommand.clear()
       );
     }
 
@@ -489,20 +489,20 @@ cli = cli.command(
             demandOption: true,
           })
           .example(
-            '$0 resource delete myfile.txt',
+            '$0 resources delete myfile.txt',
             'Delete a resource at the root of resources directory'
           )
           .example(
-            '$0 resource delete subfolder/data.json',
+            '$0 resources delete subfolder/data.json',
             'Delete a resource in a subdirectory'
           );
       },
-      (argv) => resourceCommand.delete(argv.path as string)
+      (argv) => resourcesCommand.delete(argv.path as string)
     );
 
     return yargsResource.demandCommand(
       1,
-      'You need to specify a resource command'
+      'You need to specify a resources command'
     );
   }
 );
