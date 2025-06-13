@@ -83,18 +83,89 @@ function isValidJSIdentifier(name: string): boolean {
   return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name);
 }
 
+// TypeScript AST-like structures for cleaner generation
+interface TypeProperty {
+  name: string;
+  type: string | TypeObject;
+}
+
+interface TypeObject {
+  properties: TypeProperty[];
+}
+
+// Internal structure for building resource tree
+interface ResourceNode {
+  type?: 'text' | 'binary';
+  fullName?: string; // Store the full filename for resources
+  children?: Record<string, ResourceNode>;
+}
+
+/**
+ * Build TypeScript structure from resource tree
+ */
+function buildTypeStructure(node: ResourceNode): TypeProperty[] {
+  if (!node.children) return [];
+
+  const properties: TypeProperty[] = [];
+  const processedNames = new Set<string>();
+
+  for (const [name, child] of Object.entries(node.children)) {
+    if (processedNames.has(name)) continue;
+
+    if (child.type) {
+      // File resource
+      const resourceType =
+        child.type === 'text' ? 'TextResource' : 'BinaryResource';
+      properties.push({ name, type: resourceType });
+      processedNames.add(name);
+
+      if (child.fullName) {
+        processedNames.add(child.fullName);
+      }
+    } else if (child.children) {
+      // Directory with nested resources
+      const nestedProps = buildTypeStructure(child);
+      if (nestedProps.length > 0) {
+        properties.push({
+          name,
+          type: { properties: nestedProps },
+        });
+        processedNames.add(name);
+      }
+    }
+  }
+
+  return properties;
+}
+
+/**
+ * Render TypeScript from structure
+ */
+function renderTypeScript(
+  properties: TypeProperty[],
+  indent: string = '    '
+): string {
+  return properties
+    .map((prop) => {
+      if (typeof prop.type === 'string') {
+        return `${indent}${prop.name}: ${prop.type};`;
+      } else {
+        const nestedContent = renderTypeScript(
+          prop.type.properties,
+          indent + '  '
+        );
+        return `${indent}${prop.name}: {\n${nestedContent}\n${indent}};`;
+      }
+    })
+    .join('\n');
+}
+
 /**
  * Generate TypeScript declarations for resources
  */
 function generateResourceTypes(resources: ApiResourceEntry[]): string {
-  // Build a nested structure from flat resource list
-  interface ResourceNode {
-    type?: 'text' | 'binary';
-    fullName?: string; // Store the full filename for resources
-    children?: Record<string, ResourceNode>;
-  }
-
   const root: ResourceNode = { children: {} };
+
   // Build the tree structure
   for (const resource of resources) {
     const parts = resource.key.split('/');
@@ -109,83 +180,36 @@ function generateResourceTypes(resources: ApiResourceEntry[]): string {
       }
 
       if (isLeaf) {
-        // This is a file - create the resource node
-        const resourceNode = {
+        const resourceNode: ResourceNode = {
           type: resource.type,
           fullName: part,
         };
 
-        // Add with full filename if it's a valid identifier
         if (isValidJSIdentifier(part)) {
           current.children[part] = resourceNode;
         }
 
-        // Also add without extension if the base name is a valid identifier
         const withoutExt = part.replace(/\.[^/.]+$/, '');
         if (withoutExt !== part && isValidJSIdentifier(withoutExt)) {
-          // Check if there's already something with this name
           if (!current.children[withoutExt]) {
             current.children[withoutExt] = resourceNode;
           }
-          // If there's already something with this name, we skip to avoid ambiguity
         }
       } else {
-        // This is a directory
         if (isValidJSIdentifier(part)) {
           if (!current.children[part]) {
             current.children[part] = { children: {} };
           }
           current = current.children[part];
         } else {
-          // Skip invalid directory names - they won't be accessible
           break;
         }
       }
     }
   }
 
-  // Generate the TypeScript interface
-  function generateInterface(
-    node: ResourceNode,
-    indent: string = '    '
-  ): string {
-    let result = '';
-
-    if (!node.children) {
-      return result;
-    }
-
-    const entries = Object.entries(node.children);
-    const processedNames = new Set<string>();
-
-    for (const [name, child] of entries) {
-      // Skip if we've already processed this (e.g., handled by extension-less version)
-      if (processedNames.has(name)) continue;
-
-      if (child.type) {
-        // This is a file resource
-        const resourceType =
-          child.type === 'text' ? 'TextResource' : 'BinaryResource';
-        result += `${indent}${name}: ${resourceType};\n`;
-        processedNames.add(name);
-
-        // If this has a full name, mark it as processed too
-        if (child.fullName) {
-          processedNames.add(child.fullName);
-        }
-      } else if (child.children) {
-        // This is a directory
-        result += `${indent}${name}: {\n`;
-        result += generateInterface(child, indent + '  ');
-        result += `${indent}};\n`;
-        processedNames.add(name);
-      }
-    }
-
-    return result;
-  }
-
-  const interfaceContent = generateInterface(root);
+  const typeStructure = buildTypeStructure(root);
+  const interfaceContent = renderTypeScript(typeStructure);
 
   return `// Generated by Positronic CLI
 // This file provides TypeScript types for your resources
@@ -209,7 +233,8 @@ declare module '@positronic/core' {
     loadBinary(path: string): Promise<Buffer>;
 
     // Resource properties accessible via dot notation
-${interfaceContent}  }
+${interfaceContent}
+  }
 }
 
 export {}; // Make this a module
