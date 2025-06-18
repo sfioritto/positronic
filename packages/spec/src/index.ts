@@ -1,3 +1,15 @@
+/**
+ * @positronic/spec
+ *
+ * This package contains:
+ * - Interface specifications for Positronic implementations
+ * - Conformance test suites
+ * - Shared types and contracts
+ *
+ * Currently includes the PositronicDevServer interface.
+ * Future additions will include REST API specifications and tests.
+ */
+
 import type { ChildProcess } from 'child_process';
 
 /**
