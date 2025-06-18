@@ -1,0 +1,107 @@
+import * as path from 'path';
+import * as fsPromises from 'fs/promises';
+import * as fs from 'fs';
+import * as os from 'os';
+import { spawn, type ChildProcess } from 'child_process';
+import * as dotenv from 'dotenv';
+import type { PositronicDevServer } from '@positronic/spec';
+// @ts-ignore Could not find a declaration file for module '@positronic/template-new-project'.
+import pkg from '@positronic/template-new-project';
+const { generateManifest: regenerateManifestFile, generateProject } = pkg;
+
+export class CloudflareDevServer implements PositronicDevServer {
+  async setup(projectRoot: string, force?: boolean): Promise<void> {
+    const serverDir = path.join(projectRoot, '.positronic');
+    const serverDirExists = await fsPromises
+      .access(serverDir)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!serverDirExists || force) {
+      console.log(
+        force
+          ? 'Forcing regeneration of .positronic environment...'
+          : 'Missing .positronic environment, generating...'
+      );
+      let tempDir: string | undefined;
+      try {
+        // Create a temp directory to generate the project in
+        // so we can copy the .positronic directory to the user's project
+        tempDir = fs.mkdtempSync(
+          path.join(os.tmpdir(), 'positronic-server-setup-')
+        );
+        const tempProjectName = 'temp-positronic-gen';
+        await generateProject(tempProjectName, tempDir, async () => {
+          const sourcePositronicDir = path.join(tempDir!, '.positronic');
+          const targetPositronicDir = serverDir;
+
+          // If forcing setup, remove existing target first
+          if (serverDirExists && force) {
+            await fsPromises.rm(targetPositronicDir, {
+              recursive: true,
+              force: true,
+            });
+          }
+
+          // Copy the generated .positronic directory
+          await fsPromises.cp(sourcePositronicDir, targetPositronicDir, {
+            recursive: true,
+          });
+        });
+      } finally {
+        // Clean up the temporary generation directory
+        if (tempDir) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      }
+    }
+
+    // Handle .env file conversion to .dev.vars
+    const rootEnvFilePath = path.join(projectRoot, '.env');
+    const devVarsPath = path.join(serverDir, '.dev.vars');
+    let devVarsContent = '';
+
+    if (fs.existsSync(rootEnvFilePath)) {
+      const rootEnvFileContent = fs.readFileSync(rootEnvFilePath);
+      const parsedRootEnv = dotenv.parse(rootEnvFileContent);
+      if (Object.keys(parsedRootEnv).length > 0) {
+        devVarsContent =
+          Object.entries(parsedRootEnv)
+            .map(([key, value]) => `${key}="${value.replace(/"/g, '\\\\"')}"`)
+            .join('\n') + '\n';
+      }
+    }
+    fs.writeFileSync(devVarsPath, devVarsContent);
+
+    // Regenerate manifest based on actual project state
+    const srcDir = path.join(serverDir, 'src');
+    await regenerateManifestFile(projectRoot, srcDir);
+  }
+
+  async start(projectRoot: string, port?: number): Promise<ChildProcess> {
+    const serverDir = path.join(projectRoot, '.positronic');
+
+    // Start wrangler dev server
+    const wranglerArgs = ['dev', '--local'];
+    if (port) {
+      wranglerArgs.push('--port', String(port));
+    }
+
+    const wranglerProcess = spawn('npx', ['wrangler', ...wranglerArgs], {
+      cwd: serverDir,
+      stdio: 'inherit',
+      shell: true,
+    });
+
+    wranglerProcess.on('error', (err) => {
+      console.error('Failed to start Wrangler dev server:', err);
+    });
+
+    return wranglerProcess;
+  }
+
+  // Optional deploy method can be implemented later
+  // async deploy(projectRoot: string, config?: any): Promise<void> {
+  //   // Implementation for deploying to Cloudflare Workers
+  // }
+}
