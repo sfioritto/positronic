@@ -100,8 +100,16 @@ export class CloudflareDevServer implements PositronicDevServer {
     return wranglerProcess;
   }
 
-  // Optional deploy method can be implemented later
-  // async deploy(projectRoot: string, config?: any): Promise<void> {
-  //   // Implementation for deploying to Cloudflare Workers
-  // }
+  async watch(
+    projectRoot: string,
+    filePath: string,
+    event: 'add' | 'change' | 'unlink'
+  ): Promise<void> {
+    // Regenerate manifest when brain files change
+    const serverDir = path.join(projectRoot, '.positronic');
+    const srcDir = path.join(serverDir, 'src');
+
+    console.log(`Brain file ${event}: ${path.relative(projectRoot, filePath)}`);
+    await regenerateManifestFile(projectRoot, srcDir);
+  }
 }
