@@ -10,6 +10,18 @@ import pkg from '@positronic/template-new-project';
 const { generateManifest: regenerateManifestFile, generateProject } = pkg;
 
 export class CloudflareDevServer implements PositronicDevServer {
+  /**
+   * Sets up the .positronic server environment directory.
+   * If the directory is missing or forceSetup is true, it generates the
+   * full project in a temporary directory and copies the .positronic
+   * part into the actual project.
+   *
+   * Doing it this way because it's tricky to split the template-new-project
+   * into a template-cloudflare without lots of extra code, was better to combine
+   * backend templates into a single template-new-project. But then we still need
+   * a way to generate the .positronic directory if it's not there, so this is the
+   * simplest solution.
+   */
   async setup(projectRoot: string, force?: boolean): Promise<void> {
     const serverDir = path.join(projectRoot, '.positronic');
     const serverDirExists = await fsPromises

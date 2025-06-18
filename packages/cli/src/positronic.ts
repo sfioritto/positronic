@@ -10,6 +10,8 @@ import { ServerCommand } from './commands/server.js';
 import { PromptCommand } from './commands/prompt.js';
 import { BrainCommand } from './commands/brain.js';
 import { ResourcesCommand } from './commands/resources.js';
+import { CloudflareDevServer } from '@positronic/cloudflare';
+import type { PositronicDevServer } from '@positronic/spec';
 
 function findProjectRootSync(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
@@ -47,7 +49,12 @@ const brainTemplateDir = path.join(templatesBaseDir, 'brain');
 
 // Instantiate command classes, passing the determined mode and path
 const projectCommand = new ProjectCommand(isLocalDevMode);
-const serverCommand = new ServerCommand();
+
+// Temporarily hardcode CloudflareDevServer instance - this will eventually
+// come from dynamic import based on positronic.config.json
+const devServer: PositronicDevServer = new CloudflareDevServer();
+const serverCommand = new ServerCommand(devServer);
+
 const brainCommand = new BrainCommand();
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);
 const resourcesCommand = new ResourcesCommand(isLocalDevMode, projectRootPath);
