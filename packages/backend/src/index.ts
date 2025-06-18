@@ -1,0 +1,31 @@
+import type { ChildProcess } from 'child_process';
+
+/**
+ * Development server interface for Positronic backends
+ *
+ * This interface is used by the Positronic CLI to manage local development servers and deploy to the backend.
+ */
+export interface PositronicDevServer {
+  /**
+   * Setup the development environment (e.g., create .positronic directory)
+   * This is called once when setting up a project or when --force is used
+   * @param projectRoot The root path of the Positronic project
+   * @param force Force regeneration even if environment exists
+   */
+  setup(projectRoot: string, force?: boolean): Promise<void>;
+
+  /**
+   * Start the development server
+   * @param projectRoot The root path of the Positronic project
+   * @param port Optional port number
+   * @returns The child process running the server
+   */
+  start(projectRoot: string, port?: number): Promise<ChildProcess>;
+
+  /**
+   * Optional: Deploy to the backend's hosting service
+   * @param projectRoot The root path of the Positronic project
+   * @param config Deployment configuration
+   */
+  deploy?(projectRoot: string, config?: any): Promise<void>;
+}
