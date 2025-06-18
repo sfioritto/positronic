@@ -36,8 +36,8 @@
     "packages/shell",
     "packages/client-anthropic",
     "packages/client-vercel",
-    "packages/cli",
-    "packages/cloudflare"
+    "packages/cloudflare",
+    "packages/cli"
   ],
   "prettier": {
     "semi": true,
