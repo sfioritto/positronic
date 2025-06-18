@@ -31,7 +31,7 @@
   },
   "workspaces": [
     "packages/core",
-    "packages/backend",
+    "packages/spec",
     "packages/template-new-project",
     "packages/shell",
     "packages/client-anthropic",
