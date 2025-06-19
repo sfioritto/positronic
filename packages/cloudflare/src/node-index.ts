@@ -12,6 +12,3 @@ export { CloudflareDevServer } from './dev-server.js';
 
 // Note: We do NOT export BrainRunnerDO, MonitorDO, or api here
 // because they depend on cloudflare:workers runtime
-
-// TODO: When CloudflareDevServer is implemented, add:
-// export { CloudflareDevServer } from './dev-server.js';
