@@ -34,70 +34,12 @@ jest.setTimeout(30000);
 describe('CLI Integration: positronic resources types', () => {
   let tempDir: string;
   const projectName = 'test-resource-types';
+  let projectPath: string;
   let serverProcess: ChildProcess | null = null;
   let testPort: number;
 
-  beforeEach(() => {
-    tempDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'positronic-resource-test-')
-    );
-    testPort = getRandomPort();
-    // Set the port in the current process environment so API client uses it
-    process.env.POSITRONIC_SERVER_PORT = testPort.toString();
-  });
-
-  afterEach(async () => {
-    // Kill server if running
-    if (serverProcess && serverProcess.pid) {
-      serverProcess.kill('SIGTERM');
-      await waitForProcessToExit(serverProcess.pid);
-      serverProcess = null;
-    }
-
-    // Clean up environment variable
-    delete process.env.POSITRONIC_SERVER_PORT;
-
-    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
-    expect(fs.existsSync(tempDir)).toBe(false);
-  });
-
-  it('should generate type definitions for resources', async () => {
-    // 1. Generate a project
-    execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
-      cwd: tempDir,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
-    const projectPath = path.join(tempDir, projectName);
-    expect(fs.existsSync(projectPath)).toBe(true);
-
-    // 2. Create resources directory and some test files
-    const resourcesDir = path.join(projectPath, 'resources');
-    fs.mkdirSync(resourcesDir, { recursive: true });
-    fs.mkdirSync(path.join(resourcesDir, 'docs'), { recursive: true });
-    fs.mkdirSync(path.join(resourcesDir, 'data'), { recursive: true });
-
-    // Create test files
-    fs.writeFileSync(path.join(resourcesDir, 'example.md'), '# Example');
-    fs.writeFileSync(path.join(resourcesDir, 'test.txt'), 'Test content');
-    fs.writeFileSync(path.join(resourcesDir, 'docs', 'readme.md'), '# Readme');
-    fs.writeFileSync(path.join(resourcesDir, 'data', 'config.json'), '{}');
-    // PNG magic bytes
-    const pngHeader = Buffer.from([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    ]);
-    fs.writeFileSync(path.join(resourcesDir, 'data', 'logo.png'), pngHeader);
-
-    // File with spaces (should be excluded from dot notation)
-    fs.writeFileSync(
-      path.join(resourcesDir, 'file with spaces.txt'),
-      'content'
-    );
-
-    // 3. Start the server
+  // Helper function to start the server
+  async function startServer() {
     serverProcess = spawn(
       nodeExecutable,
       [cliExecutable, 'server', '--port', testPort.toString()],
@@ -125,12 +67,76 @@ describe('CLI Integration: positronic resources types', () => {
 
     // Wait for server to complete initial sync and type generation
     await new Promise((resolve) => setTimeout(resolve, 6000));
+  }
 
-    // 5. Check if the types file was generated
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'positronic-resource-test-')
+    );
+    testPort = getRandomPort();
+    // Set the port in the current process environment so API client uses it
+    process.env.POSITRONIC_SERVER_PORT = testPort.toString();
+
+    // Generate a project
+    execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
+      cwd: tempDir,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        POSITRONIC_LOCAL_PATH: workspaceRoot,
+      },
+    });
+    projectPath = path.join(tempDir, projectName);
+    expect(fs.existsSync(projectPath)).toBe(true);
+  });
+
+  afterEach(async () => {
+    // Kill server if running
+    if (serverProcess && serverProcess.pid) {
+      serverProcess.kill('SIGTERM');
+      await waitForProcessToExit(serverProcess.pid);
+      serverProcess = null;
+    }
+
+    // Clean up environment variable
+    delete process.env.POSITRONIC_SERVER_PORT;
+
+    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
+    expect(fs.existsSync(tempDir)).toBe(false);
+  });
+
+  it('should generate type definitions for resources', async () => {
+    // Create resources directory and some test files
+    const resourcesDir = path.join(projectPath, 'resources');
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    fs.mkdirSync(path.join(resourcesDir, 'docs'), { recursive: true });
+    fs.mkdirSync(path.join(resourcesDir, 'data'), { recursive: true });
+
+    // Create test files
+    fs.writeFileSync(path.join(resourcesDir, 'example.md'), '# Example');
+    fs.writeFileSync(path.join(resourcesDir, 'test.txt'), 'Test content');
+    fs.writeFileSync(path.join(resourcesDir, 'docs', 'readme.md'), '# Readme');
+    fs.writeFileSync(path.join(resourcesDir, 'data', 'config.json'), '{}');
+    // PNG magic bytes
+    const pngHeader = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+    fs.writeFileSync(path.join(resourcesDir, 'data', 'logo.png'), pngHeader);
+
+    // File with spaces (should be excluded from dot notation)
+    fs.writeFileSync(
+      path.join(resourcesDir, 'file with spaces.txt'),
+      'content'
+    );
+
+    // Start the server
+    await startServer();
+
+    // Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
     expect(fs.existsSync(typesPath)).toBe(true);
 
-    // 6. Read and verify the generated content
+    // Read and verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Check the module declaration
@@ -162,51 +168,14 @@ describe('CLI Integration: positronic resources types', () => {
   });
 
   it('should handle empty resources directory', async () => {
-    // 1. Generate a project
-    execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
-      cwd: tempDir,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
-    const projectPath = path.join(tempDir, projectName);
-
-    // 2. Create empty resources directory (might not exist by default)
+    // Create empty resources directory (might not exist by default)
     const resourcesDir = path.join(projectPath, 'resources');
     fs.mkdirSync(resourcesDir, { recursive: true });
 
-    // 3. Start the server
-    serverProcess = spawn(
-      nodeExecutable,
-      [cliExecutable, 'server', '--port', testPort.toString()],
-      {
-        cwd: projectPath,
-        stdio: 'ignore',
-        detached: false,
-        env: {
-          ...process.env,
-          POSITRONIC_LOCAL_PATH: workspaceRoot,
-          POSITRONIC_TEST_MODE: 'true',
-        },
-      }
-    );
+    // Start the server
+    await startServer();
 
-    const pid = serverProcess.pid;
-    if (!pid) {
-      throw new Error('Server process PID is undefined');
-    }
-
-    // Wait for server to be ready
-    const serverUrl = `http://localhost:${testPort}`;
-    const ready = await waitForServerReady(serverUrl);
-    expect(ready).toBe(true);
-
-    // Wait for server to complete initial sync and type generation
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-
-    // 4. Run the types command again (even though server already did it)
+    // Run the types command again (even though server already did it)
     execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
@@ -217,11 +186,11 @@ describe('CLI Integration: positronic resources types', () => {
       },
     });
 
-    // 5. Check if the types file was generated
+    // Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
     expect(fs.existsSync(typesPath)).toBe(true);
 
-    // 6. Read and verify the generated content
+    // Read and verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Should still have the basic structure
@@ -232,18 +201,7 @@ describe('CLI Integration: positronic resources types', () => {
   });
 
   it('should handle resources with special characters', async () => {
-    // 1. Generate a project
-    execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
-      cwd: tempDir,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
-    const projectPath = path.join(tempDir, projectName);
-
-    // 2. Create resources
+    // Create resources
     const resourcesDir = path.join(projectPath, 'resources');
     fs.mkdirSync(resourcesDir, { recursive: true });
 
@@ -257,36 +215,10 @@ describe('CLI Integration: positronic resources types', () => {
       'content'
     ); // Invalid
 
-    // 3. Start the server
-    serverProcess = spawn(
-      nodeExecutable,
-      [cliExecutable, 'server', '--port', testPort.toString()],
-      {
-        cwd: projectPath,
-        stdio: 'ignore',
-        detached: false,
-        env: {
-          ...process.env,
-          POSITRONIC_LOCAL_PATH: workspaceRoot,
-          POSITRONIC_TEST_MODE: 'true',
-        },
-      }
-    );
+    // Start the server
+    await startServer();
 
-    const pid = serverProcess.pid;
-    if (!pid) {
-      throw new Error('Server process PID is undefined');
-    }
-
-    // Wait for server to be ready
-    const serverUrl = `http://localhost:${testPort}`;
-    const ready = await waitForServerReady(serverUrl);
-    expect(ready).toBe(true);
-
-    // Wait for server to complete initial sync and type generation
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-
-    // 4. Run the types command
+    // Run the types command
     execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
@@ -297,11 +229,11 @@ describe('CLI Integration: positronic resources types', () => {
       },
     });
 
-    // 5. Check if the types file was generated
+    // Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
     expect(fs.existsSync(typesPath)).toBe(true);
 
-    // 6. Verify the generated content
+    // Verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Check valid identifiers are included
@@ -315,18 +247,7 @@ describe('CLI Integration: positronic resources types', () => {
   });
 
   it('should correctly identify text vs binary files', async () => {
-    // 1. Generate a project
-    execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
-      cwd: tempDir,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
-    const projectPath = path.join(tempDir, projectName);
-
-    // 2. Create resources
+    // Create resources
     const resourcesDir = path.join(projectPath, 'resources');
     fs.mkdirSync(resourcesDir, { recursive: true });
 
@@ -353,36 +274,10 @@ describe('CLI Integration: positronic resources types', () => {
     const pdfHeader = Buffer.from('%PDF-1.4\n%âÌÊÓ\n');
     fs.writeFileSync(path.join(resourcesDir, 'document.pdf'), pdfHeader);
 
-    // 3. Start the server
-    serverProcess = spawn(
-      nodeExecutable,
-      [cliExecutable, 'server', '--port', testPort.toString()],
-      {
-        cwd: projectPath,
-        stdio: 'ignore',
-        detached: false,
-        env: {
-          ...process.env,
-          POSITRONIC_LOCAL_PATH: workspaceRoot,
-          POSITRONIC_TEST_MODE: 'true',
-        },
-      }
-    );
+    // Start the server
+    await startServer();
 
-    const pid = serverProcess.pid;
-    if (!pid) {
-      throw new Error('Server process PID is undefined');
-    }
-
-    // Wait for server to be ready
-    const serverUrl = `http://localhost:${testPort}`;
-    const ready = await waitForServerReady(serverUrl);
-    expect(ready).toBe(true);
-
-    // Wait for server to complete initial sync and type generation
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-
-    // 4. Run the types command
+    // Run the types command
     execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
@@ -393,11 +288,11 @@ describe('CLI Integration: positronic resources types', () => {
       },
     });
 
-    // 5. Check if the types file was generated
+    // Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
     expect(fs.existsSync(typesPath)).toBe(true);
 
-    // 6. Verify the generated content
+    // Verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Check text resources
