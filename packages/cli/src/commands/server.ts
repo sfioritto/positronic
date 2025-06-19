@@ -4,9 +4,10 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
 import { syncResources, generateTypes } from './helpers.js';
 import type { PositronicDevServer } from '@positronic/spec';
+import { CloudflareDevServer } from '@positronic/cloudflare';
 
 export class ServerCommand {
-  constructor(private devServer: PositronicDevServer) {}
+  constructor() {}
 
   async handle(argv: ArgumentsCamelCase<any>, projectRootPath: string | null) {
     if (!projectRootPath) {
@@ -17,6 +18,15 @@ export class ServerCommand {
         "Navigate to your project directory or use 'positronic project new <name>' to create one."
       );
       process.exit(1);
+    }
+
+    // Get the appropriate dev server instance
+    let devServer: PositronicDevServer;
+    if (process.env.POSITRONIC_TEST_MODE) {
+      const { TestDevServer } = await import('../test/test-dev-server.js');
+      devServer = new TestDevServer();
+    } else {
+      devServer = new CloudflareDevServer();
     }
 
     const brainsDir = path.join(projectRootPath, 'brains');
@@ -61,10 +71,10 @@ export class ServerCommand {
 
     try {
       // Use the dev server's setup method
-      await this.devServer.setup(projectRootPath, argv.force);
+      await devServer.setup(projectRootPath, argv.force);
 
       // Use the dev server's start method
-      serverProcess = await this.devServer.start(projectRootPath, argv.port);
+      serverProcess = await devServer.start(projectRootPath, argv.port);
 
       serverProcess.on('close', (code) => {
         if (watcher) {
@@ -130,8 +140,8 @@ export class ServerCommand {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
-            if (this.devServer.watch) {
-              await this.devServer.watch(projectRootPath, filePath, 'add');
+            if (devServer.watch) {
+              await devServer.watch(projectRootPath, filePath, 'add');
             }
           }
         })
@@ -140,8 +150,8 @@ export class ServerCommand {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
-            if (this.devServer.watch) {
-              await this.devServer.watch(projectRootPath, filePath, 'change');
+            if (devServer.watch) {
+              await devServer.watch(projectRootPath, filePath, 'change');
             }
           }
         })
@@ -150,8 +160,8 @@ export class ServerCommand {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
-            if (this.devServer.watch) {
-              await this.devServer.watch(projectRootPath, filePath, 'unlink');
+            if (devServer.watch) {
+              await devServer.watch(projectRootPath, filePath, 'unlink');
             }
           }
         })

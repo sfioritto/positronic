@@ -50,10 +50,7 @@ const brainTemplateDir = path.join(templatesBaseDir, 'brain');
 // Instantiate command classes, passing the determined mode and path
 const projectCommand = new ProjectCommand(isLocalDevMode);
 
-// Temporarily hardcode CloudflareDevServer instance - this will eventually
-// come from dynamic import based on positronic.config.json
-const devServer: PositronicDevServer = new CloudflareDevServer();
-const serverCommand = new ServerCommand(devServer);
+const serverCommand = new ServerCommand();
 
 const brainCommand = new BrainCommand();
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);

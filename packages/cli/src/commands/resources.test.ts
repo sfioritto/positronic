@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execSync } from 'child_process';
+import { execSync, spawn, type ChildProcess } from 'child_process';
 import process from 'process';
 import {
   jest,
@@ -13,8 +13,11 @@ import {
   beforeAll,
 } from '@jest/globals';
 import { fileURLToPath } from 'url';
-import type { ApiClient } from '../commands/helpers.js';
-import { apiClient } from '../commands/helpers.js';
+import {
+  getRandomPort,
+  waitForProcessToExit,
+  waitForServerReady,
+} from '../../../../test-utils.js';
 
 // Resolve paths relative to the workspace root
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,73 +28,34 @@ const cliExecutable = path.join(
 );
 const nodeExecutable = process.execPath;
 
-// Mock server responses storage
-let mockServerResources: Map<string, any> = new Map();
-
-// Create a mock API client
-const createMockApiClient = (): jest.MockedObject<ApiClient> => {
-  return {
-    fetch: jest.fn(async (apiPath: string, options?: any) => {
-      if (apiPath === '/resources' && (!options || options.method === 'GET')) {
-        // GET /resources - list resources
-        const resources = Array.from(mockServerResources.values());
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            resources,
-            truncated: false,
-            count: resources.length,
-          }),
-        } as any;
-      } else if (apiPath === '/resources' && options?.method === 'POST') {
-        // POST /resources - upload resource
-        const formData = options.body;
-        // In real FormData, we'd parse this, but for testing we'll simulate
-        // Since we can't easily parse FormData in tests, we'll just simulate success
-        // and update our mock storage based on what we expect the sync to do
-        return {
-          ok: true,
-          status: 201,
-        } as any;
-      }
-
-      return {
-        ok: false,
-        status: 404,
-        text: async () => 'Not found',
-      } as any;
-    }),
-  };
-};
+// Increase test timeout
+jest.setTimeout(30000);
 
 describe('CLI Integration: positronic resources types', () => {
   let tempDir: string;
   const projectName = 'test-resource-types';
-  let originalFetch: ApiClient['fetch'];
-  let mockApiClient: jest.MockedObject<ApiClient>;
-
-  beforeAll(() => {
-    // Save the original fetch method
-    originalFetch = apiClient.fetch;
-  });
+  let serverProcess: ChildProcess | null = null;
+  let testPort: number;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'positronic-resource-test-')
     );
-
-    // Reset mock storage
-    mockServerResources.clear();
-
-    // Create and install mock API client
-    mockApiClient = createMockApiClient();
-    (apiClient as any).fetch = mockApiClient.fetch;
+    testPort = getRandomPort();
+    // Set the port in the current process environment so API client uses it
+    process.env.POSITRONIC_SERVER_PORT = testPort.toString();
   });
 
-  afterEach(() => {
-    // Restore original fetch method
-    (apiClient as any).fetch = originalFetch;
+  afterEach(async () => {
+    // Kill server if running
+    if (serverProcess && serverProcess.pid) {
+      serverProcess.kill('SIGTERM');
+      await waitForProcessToExit(serverProcess.pid);
+      serverProcess = null;
+    }
+
+    // Clean up environment variable
+    delete process.env.POSITRONIC_SERVER_PORT;
 
     fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
     expect(fs.existsSync(tempDir)).toBe(false);
@@ -133,69 +97,40 @@ describe('CLI Integration: positronic resources types', () => {
       'content'
     );
 
-    // 3. Mock the server resources as if sync had happened
-    mockServerResources.set('example.md', {
-      key: 'example.md',
-      type: 'text',
-      size: 9,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('test.txt', {
-      key: 'test.txt',
-      type: 'text',
-      size: 12,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('docs/readme.md', {
-      key: 'docs/readme.md',
-      type: 'text',
-      size: 8,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('data/config.json', {
-      key: 'data/config.json',
-      type: 'text',
-      size: 2,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('data/logo.png', {
-      key: 'data/logo.png',
-      type: 'binary',
-      size: 8,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('file with spaces.txt', {
-      key: 'file with spaces.txt',
-      type: 'text',
-      size: 7,
-      lastModified: new Date().toISOString(),
-    });
+    // 3. Start the server
+    serverProcess = spawn(
+      nodeExecutable,
+      [cliExecutable, 'server', '--port', testPort.toString()],
+      {
+        cwd: projectPath,
+        stdio: 'ignore',
+        detached: false,
+        env: {
+          ...process.env,
+          POSITRONIC_LOCAL_PATH: workspaceRoot,
+          POSITRONIC_TEST_MODE: 'true',
+        },
+      }
+    );
 
-    // 4. Run the sync command (will use our mock)
-    execSync(`${nodeExecutable} ${cliExecutable} resources sync`, {
-      cwd: projectPath,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
+    const pid = serverProcess.pid;
+    if (!pid) {
+      throw new Error('Server process PID is undefined');
+    }
 
-    // 5. Run the types command
-    execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
-      cwd: projectPath,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
+    // Wait for server to be ready
+    const serverUrl = `http://localhost:${testPort}`;
+    const ready = await waitForServerReady(serverUrl);
+    expect(ready).toBe(true);
 
-    // 6. Check if the types file was generated
+    // Wait for server to complete initial sync and type generation
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+
+    // 5. Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
     expect(fs.existsSync(typesPath)).toBe(true);
 
-    // 7. Read and verify the generated content
+    // 6. Read and verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Check the module declaration
@@ -242,21 +177,51 @@ describe('CLI Integration: positronic resources types', () => {
     const resourcesDir = path.join(projectPath, 'resources');
     fs.mkdirSync(resourcesDir, { recursive: true });
 
-    // 3. Run the types command (no sync needed since no resources)
+    // 3. Start the server
+    serverProcess = spawn(
+      nodeExecutable,
+      [cliExecutable, 'server', '--port', testPort.toString()],
+      {
+        cwd: projectPath,
+        stdio: 'ignore',
+        detached: false,
+        env: {
+          ...process.env,
+          POSITRONIC_LOCAL_PATH: workspaceRoot,
+          POSITRONIC_TEST_MODE: 'true',
+        },
+      }
+    );
+
+    const pid = serverProcess.pid;
+    if (!pid) {
+      throw new Error('Server process PID is undefined');
+    }
+
+    // Wait for server to be ready
+    const serverUrl = `http://localhost:${testPort}`;
+    const ready = await waitForServerReady(serverUrl);
+    expect(ready).toBe(true);
+
+    // Wait for server to complete initial sync and type generation
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+
+    // 4. Run the types command again (even though server already did it)
     execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
         ...process.env,
         POSITRONIC_LOCAL_PATH: workspaceRoot,
+        POSITRONIC_SERVER_PORT: testPort.toString(),
       },
     });
 
-    // 4. Check if the types file was generated
+    // 5. Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
     expect(fs.existsSync(typesPath)).toBe(true);
 
-    // 5. Read and verify the generated content
+    // 6. Read and verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Should still have the basic structure
@@ -292,60 +257,51 @@ describe('CLI Integration: positronic resources types', () => {
       'content'
     ); // Invalid
 
-    // 3. Mock the server resources
-    mockServerResources.set('valid_file.txt', {
-      key: 'valid_file.txt',
-      type: 'text',
-      size: 7,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('$special.txt', {
-      key: '$special.txt',
-      type: 'text',
-      size: 7,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('_underscore.txt', {
-      key: '_underscore.txt',
-      type: 'text',
-      size: 7,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('123invalid.txt', {
-      key: '123invalid.txt',
-      type: 'text',
-      size: 7,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('special-chars!@#.txt', {
-      key: 'special-chars!@#.txt',
-      type: 'text',
-      size: 7,
-      lastModified: new Date().toISOString(),
-    });
+    // 3. Start the server
+    serverProcess = spawn(
+      nodeExecutable,
+      [cliExecutable, 'server', '--port', testPort.toString()],
+      {
+        cwd: projectPath,
+        stdio: 'ignore',
+        detached: false,
+        env: {
+          ...process.env,
+          POSITRONIC_LOCAL_PATH: workspaceRoot,
+          POSITRONIC_TEST_MODE: 'true',
+        },
+      }
+    );
 
-    // 4. Run the sync command
-    execSync(`${nodeExecutable} ${cliExecutable} resources sync`, {
-      cwd: projectPath,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
+    const pid = serverProcess.pid;
+    if (!pid) {
+      throw new Error('Server process PID is undefined');
+    }
 
-    // 5. Run the types command
+    // Wait for server to be ready
+    const serverUrl = `http://localhost:${testPort}`;
+    const ready = await waitForServerReady(serverUrl);
+    expect(ready).toBe(true);
+
+    // Wait for server to complete initial sync and type generation
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+
+    // 4. Run the types command
     execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
         ...process.env,
         POSITRONIC_LOCAL_PATH: workspaceRoot,
+        POSITRONIC_SERVER_PORT: testPort.toString(),
       },
     });
 
-    // 6. Verify the generated content
+    // 5. Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
+    expect(fs.existsSync(typesPath)).toBe(true);
+
+    // 6. Verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Check valid identifiers are included
@@ -397,72 +353,51 @@ describe('CLI Integration: positronic resources types', () => {
     const pdfHeader = Buffer.from('%PDF-1.4\n%âÌÊÓ\n');
     fs.writeFileSync(path.join(resourcesDir, 'document.pdf'), pdfHeader);
 
-    // 3. Mock the server resources
-    mockServerResources.set('text.txt', {
-      key: 'text.txt',
-      type: 'text',
-      size: 4,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('script.js', {
-      key: 'script.js',
-      type: 'text',
-      size: 4,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('config.json', {
-      key: 'config.json',
-      type: 'text',
-      size: 2,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('styles.css', {
-      key: 'styles.css',
-      type: 'text',
-      size: 3,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('image.jpg', {
-      key: 'image.jpg',
-      type: 'binary',
-      size: 10,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('binary.bin', {
-      key: 'binary.bin',
-      type: 'binary',
-      size: 10,
-      lastModified: new Date().toISOString(),
-    });
-    mockServerResources.set('document.pdf', {
-      key: 'document.pdf',
-      type: 'binary',
-      size: 16,
-      lastModified: new Date().toISOString(),
-    });
+    // 3. Start the server
+    serverProcess = spawn(
+      nodeExecutable,
+      [cliExecutable, 'server', '--port', testPort.toString()],
+      {
+        cwd: projectPath,
+        stdio: 'ignore',
+        detached: false,
+        env: {
+          ...process.env,
+          POSITRONIC_LOCAL_PATH: workspaceRoot,
+          POSITRONIC_TEST_MODE: 'true',
+        },
+      }
+    );
 
-    // 4. Run the sync command
-    execSync(`${nodeExecutable} ${cliExecutable} resources sync`, {
-      cwd: projectPath,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
+    const pid = serverProcess.pid;
+    if (!pid) {
+      throw new Error('Server process PID is undefined');
+    }
 
-    // 5. Run the types command
+    // Wait for server to be ready
+    const serverUrl = `http://localhost:${testPort}`;
+    const ready = await waitForServerReady(serverUrl);
+    expect(ready).toBe(true);
+
+    // Wait for server to complete initial sync and type generation
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+
+    // 4. Run the types command
     execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
       cwd: projectPath,
       stdio: 'ignore',
       env: {
         ...process.env,
         POSITRONIC_LOCAL_PATH: workspaceRoot,
+        POSITRONIC_SERVER_PORT: testPort.toString(),
       },
     });
 
-    // 6. Verify the generated content
+    // 5. Check if the types file was generated
     const typesPath = path.join(projectPath, 'resources.d.ts');
+    expect(fs.existsSync(typesPath)).toBe(true);
+
+    // 6. Verify the generated content
     const content = fs.readFileSync(typesPath, 'utf-8');
 
     // Check text resources
