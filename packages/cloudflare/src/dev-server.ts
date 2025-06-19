@@ -6,9 +6,6 @@ import { spawn, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
 import caz from 'caz';
 import type { PositronicDevServer } from '@positronic/spec';
-// @ts-ignore Could not find a declaration file for module '@positronic/template-new-project'.
-import pkg from '@positronic/template-new-project';
-const { generateManifest: regenerateManifestFile } = pkg;
 
 async function generateProject(
   projectName: string,
@@ -70,6 +67,52 @@ async function generateProject(
       });
     }
   }
+}
+
+async function regenerateManifestFile(
+  projectRootPath: string,
+  targetSrcDir: string
+) {
+  const runnerPath = path.join(projectRootPath, 'runner.ts');
+  const brainsDir = path.join(projectRootPath, 'brains');
+  const manifestPath = path.join(targetSrcDir, '_manifest.ts');
+
+  let importStatements = `import type { Workflow } from '@positronic/core';\n`;
+  let manifestEntries = '';
+
+  const brainsDirExists = await fsPromises
+    .access(brainsDir)
+    .then(() => true)
+    .catch(() => false);
+  if (brainsDirExists) {
+    const files = await fsPromises.readdir(brainsDir);
+    const brainFiles = files.filter(
+      (file) => file.endsWith('.ts') && !file.startsWith('_')
+    );
+
+    for (const file of brainFiles) {
+      const brainName = path.basename(file, '.ts');
+      const importPath = `../../brains/${brainName}.js`;
+      const importAlias = `brain_${brainName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+
+      importStatements += `import * as ${importAlias} from '${importPath}';\n`;
+      manifestEntries += `  ${JSON.stringify(
+        brainName
+      )}: ${importAlias}.default as Workflow,\n`;
+    }
+  }
+
+  const manifestContent = `// This file is generated automatically. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};
+`;
+
+  const runnerContent = await fsPromises.readFile(runnerPath, 'utf-8');
+  await fsPromises.mkdir(targetSrcDir, { recursive: true });
+  await fsPromises.writeFile(manifestPath, manifestContent, 'utf-8');
+  await fsPromises.writeFile(
+    path.join(targetSrcDir, 'runner.ts'),
+    runnerContent,
+    'utf-8'
+  );
 }
 
 export class CloudflareDevServer implements PositronicDevServer {
