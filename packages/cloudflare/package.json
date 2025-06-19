@@ -2,9 +2,21 @@
   "name": "@positronic/cloudflare",
   "version": "0.0.1",
   "description": "Cloudflare bindings for Positronic workflows",
-  "main": "dist/src/index.js",
-  "types": "dist/types/index.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./dist/types/node-index.d.ts",
+        "import": "./dist/src/node-index.js"
+      },
+      "default": {
+        "types": "./dist/types/index.d.ts",
+        "import": "./dist/src/index.js"
+      }
+    }
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/types/index.d.ts",
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
