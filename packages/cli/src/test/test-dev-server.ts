@@ -12,12 +12,20 @@ interface MockResource {
   lastModified: string;
 }
 
+export interface MethodCall {
+  method: string;
+  args: any[];
+  timestamp: number;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private server: any = null;
   private port: number = 0;
   private projectRoot: string = '';
   private serverProcess: ChildProcess | null = null;
+  private callLog: MethodCall[] = [];
+  private isReady: boolean = false;
 
   constructor(initialResources?: MockResource[]) {
     if (initialResources) {
@@ -25,7 +33,17 @@ export class TestDevServer implements PositronicDevServer {
     }
   }
 
+  private logCall(method: string, args: any[]) {
+    const call: MethodCall = {
+      method,
+      args,
+      timestamp: Date.now(),
+    };
+    this.callLog.push(call);
+  }
+
   async setup(projectRoot: string, force?: boolean): Promise<void> {
+    this.logCall('setup', [projectRoot, force]);
     // For tests, we don't need to set up .positronic directory
     // Just ensure we're ready to serve
     this.projectRoot = projectRoot;
@@ -69,6 +87,7 @@ export class TestDevServer implements PositronicDevServer {
   }
 
   async start(projectRoot: string, port?: number): Promise<ChildProcess> {
+    this.logCall('start', [projectRoot, port]);
     this.projectRoot = projectRoot;
     this.port = port || 8787;
 
@@ -102,6 +121,32 @@ export class TestDevServer implements PositronicDevServer {
           res.end();
           return;
         }
+
+        // TEST ENDPOINTS
+
+        // GET /test/status - Check if server is ready
+        if (req.method === 'GET' && url.pathname === '/test/status') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ready: this.isReady }));
+          return;
+        }
+
+        // GET /test/logs - Get all method call logs
+        if (req.method === 'GET' && url.pathname === '/test/logs') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(this.callLog));
+          return;
+        }
+
+        // POST /test/clear - Clear the method call logs
+        if (req.method === 'POST' && url.pathname === '/test/clear') {
+          this.callLog = [];
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
+        // EXISTING API ENDPOINTS
 
         // GET /resources
         if (req.method === 'GET' && url.pathname === '/resources') {
@@ -182,6 +227,7 @@ export class TestDevServer implements PositronicDevServer {
       });
 
       this.server.listen(this.port, () => {
+        this.isReady = true;
         resolve();
       });
     });
@@ -217,6 +263,15 @@ export class TestDevServer implements PositronicDevServer {
     return fakeProcess;
   }
 
+  // Add watch method to track calls
+  async watch(
+    projectRoot: string,
+    filePath: string,
+    event: 'add' | 'change' | 'unlink'
+  ): Promise<void> {
+    this.logCall('watch', [projectRoot, filePath, event]);
+  }
+
   // Helper methods for tests to manipulate the server state
   addResource(resource: MockResource) {
     this.resources.set(resource.key, resource);
@@ -234,6 +289,7 @@ export class TestDevServer implements PositronicDevServer {
     if (this.server) {
       this.server.close();
       this.server = null;
+      this.isReady = false;
     }
   }
 }
