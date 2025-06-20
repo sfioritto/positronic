@@ -34,13 +34,14 @@ interface PxResult {
   stdout: string;
   stderr: string;
   exitCode: number;
-  cleanup?: () => Promise<void>; // optional cleanup handler when spawn is true
+  serverPort: number | null;
+  cleanup: () => Promise<void>; // optional cleanup handler when spawn is true
 }
 
 let serverProcess: ChildProcess | null = null;
 
 async function px(
-  command: string,
+  command?: string,
   options?: PxOptions,
   shouldSpawnServer: boolean = true
 ): Promise<PxResult> {
@@ -126,25 +127,30 @@ async function px(
       },
     };
 
-    const finalSyncOptions = { ...defaultSyncOptions, ...options?.syncOptions };
-
-    // Execute the command
-    const result = execSync(
-      `${nodeExecutable} ${cliExecutable} ${command}`,
-      finalSyncOptions
-    );
-    stdout = result?.toString() || '';
+    if (command) {
+      const finalSyncOptions = {
+        ...defaultSyncOptions,
+        ...options?.syncOptions,
+      };
+      const result = execSync(
+        `${nodeExecutable} ${cliExecutable} ${command}`,
+        finalSyncOptions
+      );
+      stdout = result?.toString() || '';
+    }
   } catch (error: any) {
     // If command execution fails, clean up everything
     await cleanup();
     throw error;
   }
 
+  // Return result with cleanup function for successful cases
   return {
     tempDir,
     stdout,
     stderr,
     exitCode,
+    serverPort,
     cleanup,
   };
 }
@@ -242,41 +248,18 @@ describe('CLI Integration: positronic server', () => {
 
   describe('Server lifecycle', () => {
     it('should call setup() and start() methods on the dev server', async () => {
-      // Create a minimal project structure
-      const projectDir = path.join(tempDir, 'test-project');
-      fs.mkdirSync(projectDir, { recursive: true });
+      const { tempDir, cleanup, serverPort } = await px();
 
-      // Create project structure
-      createMinimalProject(projectDir);
-
-      // Use a random port to avoid conflicts
-      const testPort = 9000 + Math.floor(Math.random() * 1000);
-
-      // Start the server
-      const serverProcess = spawn(
-        nodeExecutable,
-        [cliExecutable, 'server', '--port', testPort.toString()],
-        {
-          cwd: projectDir,
-          env: {
-            ...process.env,
-            POSITRONIC_TEST_MODE: 'true',
-            POSITRONIC_SERVER_PORT: testPort.toString(),
-          },
-          stdio: 'pipe',
-        }
-      );
+      if (!serverPort) {
+        throw new Error('Server port is not set');
+      }
 
       // Wait for server to be ready
-      const isReady = await waitUntilReady(testPort);
+      const isReady = await waitUntilReady(serverPort);
       expect(isReady).toBe(true);
 
       // Get the method call logs
-      const methodCalls = await fetchLogs(testPort);
-
-      // Clean up the server process
-      serverProcess.kill('SIGTERM');
-      await new Promise((resolve) => serverProcess.on('close', resolve));
+      const methodCalls = await fetchLogs(serverPort);
 
       // Verify the method calls
       const setupCall = methodCalls.find((call) => call.method === 'setup');
@@ -285,15 +268,18 @@ describe('CLI Integration: positronic server', () => {
       expect(setupCall).toBeDefined();
       // Resolve symlinks before comparing paths
       expect(fs.realpathSync(setupCall!.args[0])).toBe(
-        fs.realpathSync(projectDir)
+        fs.realpathSync(tempDir)
       );
       expect(setupCall!.args[1]).toBe(false); // force flag not set
 
       expect(startCall).toBeDefined();
       expect(fs.realpathSync(startCall!.args[0])).toBe(
-        fs.realpathSync(projectDir)
+        fs.realpathSync(tempDir)
       );
-      expect(startCall!.args[1]).toBe(testPort);
+      expect(startCall!.args[1]).toBe(serverPort);
+
+      // Clean up the server process
+      await cleanup();
     });
   });
 });
