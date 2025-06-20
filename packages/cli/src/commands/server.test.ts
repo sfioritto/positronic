@@ -39,6 +39,11 @@ interface PxResult {
   cleanup: () => Promise<void>; // optional cleanup handler when spawn is true
 }
 
+// IMPORTANT: serverProcess is intentionally global to support a common CLI pattern:
+// 1. Call px() once to start a server
+// 2. Call px() multiple times with different commands that talk to the same server
+// 3. Call cleanup() at the end to shut down the server
+// This mirrors real CLI usage where commands need a running server to operate against.
 let serverProcess: ChildProcess | null = null;
 
 async function px(
@@ -314,5 +319,103 @@ describe('CLI Integration: positronic server', () => {
       // Clean up
       await cleanup();
     });
+  });
+
+  describe('Initial sync tests', () => {
+    it('should sync resources after server starts', async () => {
+      const { tempDir, cleanup, serverPort } = await px();
+
+      if (!serverPort) {
+        throw new Error('Server port is not set');
+      }
+
+      // Create some resource files before server fully initializes
+      const resourcesDir = path.join(tempDir, 'resources');
+      fs.mkdirSync(resourcesDir, { recursive: true });
+      fs.writeFileSync(path.join(resourcesDir, 'test.txt'), 'Hello World');
+      fs.writeFileSync(
+        path.join(resourcesDir, 'data.json'),
+        '{"key": "value"}'
+      );
+
+      // Wait for server to be ready
+      const isReady = await waitUntilReady(serverPort);
+      expect(isReady).toBe(true);
+
+      // Wait for initial sync to complete (server waits 3 seconds before syncing)
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+
+      // Check that resources endpoint was called (GET request to check existing resources)
+      const response = await fetch(`http://localhost:${serverPort}/resources`);
+      expect(response.ok).toBe(true);
+
+      const data = (await response.json()) as {
+        resources: Array<{ key: string }>;
+        count: number;
+      };
+      expect(data.resources).toBeDefined();
+      expect(data.count).toBe(2); // Should have scanned and loaded the two files
+
+      // Verify the resources were loaded from filesystem
+      const resourceKeys = data.resources.map((r) => r.key);
+      expect(resourceKeys).toContain('test.txt');
+      expect(resourceKeys).toContain('data.json');
+
+      // Clean up
+      await cleanup();
+    }, 10000); // 10 second timeout
+
+    it('should generate types file after server starts', async () => {
+      const { tempDir, cleanup, serverPort } = await px();
+
+      if (!serverPort) {
+        throw new Error('Server port is not set');
+      }
+
+      // Create some resource files
+      const resourcesDir = path.join(tempDir, 'resources');
+      fs.mkdirSync(resourcesDir, { recursive: true });
+      fs.writeFileSync(path.join(resourcesDir, 'readme.md'), '# README');
+      fs.writeFileSync(
+        path.join(resourcesDir, 'config.json'),
+        '{"setting": true}'
+      );
+
+      // Create a subdirectory with a resource
+      const docsDir = path.join(resourcesDir, 'docs');
+      fs.mkdirSync(docsDir, { recursive: true });
+      fs.writeFileSync(path.join(docsDir, 'api.md'), '# API Documentation');
+
+      // Wait for server to be ready
+      const isReady = await waitUntilReady(serverPort);
+      expect(isReady).toBe(true);
+
+      // Wait for initial sync and type generation to complete
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+
+      // Check that the types file was generated
+      const typesPath = path.join(tempDir, 'resources.d.ts');
+      expect(fs.existsSync(typesPath)).toBe(true);
+
+      // Read and verify the generated types content
+      const typesContent = fs.readFileSync(typesPath, 'utf-8');
+
+      // Check for the module declaration
+      expect(typesContent).toContain("declare module '@positronic/core'");
+
+      // Check for resource type definitions
+      expect(typesContent).toContain('interface TextResource');
+      expect(typesContent).toContain('interface BinaryResource');
+      expect(typesContent).toContain('interface Resources');
+
+      // Check for the specific resources we created
+      expect(typesContent).toContain('readme: TextResource;');
+      expect(typesContent).toContain('config: TextResource;');
+      expect(typesContent).toContain('docs: {');
+      expect(typesContent).toContain('api: TextResource;');
+
+      // Clean up
+      await cleanup();
+    }, 10000); // 10 second timeout
   });
 });
