@@ -37,42 +37,34 @@ interface PxResult {
   cleanup?: () => Promise<void>; // optional cleanup handler when spawn is true
 }
 
-// Helper function to execute CLI commands synchronously
-function px(
+let serverProcess: ChildProcess | null = null;
+
+async function px(
   command: string,
   options?: PxOptions,
   shouldSpawnServer: boolean = true
-): PxResult {
+): Promise<PxResult> {
   // Create temp directory
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'positronic-server-test-')
   );
 
-  // Check if we need to spawn a server (defaults to true)
-  let serverProcess: ChildProcess | null = null;
+  let serverPort: number | null = null;
+  let localServerProcess: ChildProcess | null = null;
 
-  // Default options for execSync
-  const defaultSyncOptions: ExecSyncOptions = {
-    cwd: tempDir,
-    stdio: 'pipe',
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      POSITRONIC_TEST_MODE: 'true',
-    },
+  // Define cleanup function
+  const cleanup = async () => {
+    if (localServerProcess && !localServerProcess.killed) {
+      localServerProcess.kill('SIGTERM');
+      await new Promise<void>((resolve) => {
+        localServerProcess!.on('close', () => resolve());
+      });
+    }
+    fs.rmSync(tempDir, { recursive: true, force: true });
   };
 
-  // Merge sync options
-  const finalSyncOptions = { ...defaultSyncOptions, ...options?.syncOptions };
-
-  let stdout = '';
-  let stderr = '';
-  let exitCode = 0;
-
   try {
-    // If we need to spawn a server, do it first
-    if (shouldSpawnServer) {
-      // Create project structure for the server
+    if (shouldSpawnServer && !serverProcess) {
       createMinimalProject(tempDir);
 
       // Use a random port to avoid conflicts
@@ -89,47 +81,52 @@ function px(
         stdio: 'pipe',
       };
 
-      // Merge spawn options
       const finalSpawnOptions = {
         ...defaultSpawnOptions,
         ...options?.spawnOptions,
       };
 
       // Start the server
-      serverProcess = spawn(
+      localServerProcess = serverProcess = spawn(
         nodeExecutable,
         [cliExecutable, 'server', '--port', testPort.toString()],
         finalSpawnOptions
       );
 
-      // Wait for server to be ready
-      // Note: This is synchronous for now, but we might want to make it async
-      const startTime = Date.now();
-      const maxWaitMs = 5000;
-      let isReady = false;
-
-      while (Date.now() - startTime < maxWaitMs && !isReady) {
-        try {
-          execSync(`curl -s http://localhost:${testPort}/test/status`, {
-            stdio: 'ignore',
-          });
-          isReady = true;
-        } catch {
-          // Server not ready yet
-          execSync(`sleep 0.1`, { stdio: 'ignore' });
-        }
-      }
+      const isReady = await waitUntilReady(testPort);
 
       if (!isReady) {
         throw new Error(`Server failed to start on port ${testPort}`);
       }
 
-      // Update environment for the command to know about the server
-      finalSyncOptions.env = {
-        ...finalSyncOptions.env,
-        POSITRONIC_SERVER_PORT: testPort.toString(),
-      };
+      serverPort = testPort;
     }
+  } catch (error) {
+    // If server setup fails, clean up
+    await cleanup();
+    throw error;
+  }
+
+  let stdout = '';
+  let stderr = '';
+  let exitCode = 0;
+
+  try {
+    // Default options for execSync
+    const defaultSyncOptions: ExecSyncOptions = {
+      cwd: tempDir,
+      stdio: 'pipe',
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        POSITRONIC_TEST_MODE: 'true',
+        ...(serverPort
+          ? { POSITRONIC_SERVER_PORT: serverPort.toString() }
+          : {}),
+      },
+    };
+
+    const finalSyncOptions = { ...defaultSyncOptions, ...options?.syncOptions };
 
     // Execute the command
     const result = execSync(
@@ -138,24 +135,10 @@ function px(
     );
     stdout = result?.toString() || '';
   } catch (error: any) {
-    stderr = error.stderr?.toString() || '';
-    stdout = error.stdout?.toString() || '';
-    exitCode = error.status || 1;
+    // If command execution fails, clean up everything
+    await cleanup();
+    throw error;
   }
-
-  // Create cleanup function if server was spawned
-  const cleanup =
-    shouldSpawnServer && serverProcess
-      ? async () => {
-          if (serverProcess && !serverProcess.killed) {
-            serverProcess.kill('SIGTERM');
-            await new Promise<void>((resolve) => {
-              serverProcess!.on('close', () => resolve());
-            });
-          }
-          fs.rmSync(tempDir, { recursive: true, force: true });
-        }
-      : undefined;
 
   return {
     tempDir,
@@ -232,26 +215,28 @@ describe('CLI Integration: positronic server', () => {
   });
 
   describe('Project validation', () => {
-    it('should not have server command available outside a Positronic project', () => {
+    it('should not have server command available outside a Positronic project', async () => {
       // Run server command in a directory that is NOT a Positronic project
-      const result = px('server', undefined, false);
-
-      // The server command should not be recognized outside a project
-      // Yargs will show an error about unknown command
-      expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain('Unknown command: server');
+      try {
+        await px('server', undefined, false);
+        // Should not reach here
+        expect(true).toBe(false);
+      } catch (error: any) {
+        // The server command should not be recognized outside a project
+        expect(error.stderr).toContain('Unknown command: server');
+        expect(error.status).toBe(1);
+      }
 
       // Additionally, if we check help, server command should not be listed
-      const helpResult = px('--help', undefined, false);
+      const helpResult = await px('--help', undefined, false);
 
       expect(helpResult.stdout).not.toContain('server');
       expect(helpResult.stdout).not.toContain(
         'Start the local development server'
       );
 
-      // Clean up temp directories
-      fs.rmSync(result.tempDir, { recursive: true, force: true });
-      fs.rmSync(helpResult.tempDir, { recursive: true, force: true });
+      // Clean up
+      await helpResult.cleanup?.();
     });
   });
 
