@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync, spawn } from 'child_process';
+import type { ChildProcess, ExecSyncOptions } from 'child_process';
 import process from 'process';
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { fileURLToPath } from 'url';
@@ -16,6 +17,75 @@ const cliExecutable = path.join(
   'packages/cli/dist/src/positronic.js'
 );
 const nodeExecutable = process.execPath;
+
+// Helper function results
+interface PxResult {
+  tempDir: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+// Helper function to execute CLI commands synchronously
+function px(command: string, options?: Partial<ExecSyncOptions>): PxResult {
+  // Create temp directory
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'positronic-server-test-')
+  );
+
+  // Default options
+  const defaultOptions: ExecSyncOptions = {
+    cwd: tempDir,
+    stdio: 'pipe',
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      POSITRONIC_TEST_MODE: 'true',
+    },
+  };
+
+  // Merge options
+  const finalOptions = { ...defaultOptions, ...options };
+
+  let stdout = '';
+  let stderr = '';
+  let exitCode = 0;
+
+  try {
+    const result = execSync(
+      `${nodeExecutable} ${cliExecutable} ${command}`,
+      finalOptions
+    );
+    stdout = result?.toString() || '';
+  } catch (error: any) {
+    stderr = error.stderr?.toString() || '';
+    stdout = error.stdout?.toString() || '';
+    exitCode = error.status || 1;
+  }
+
+  return {
+    tempDir,
+    stdout,
+    stderr,
+    exitCode,
+  };
+}
+
+// Helper function to create a minimal Positronic project structure
+function createMinimalProject(dir: string, config?: any) {
+  const defaultConfig = {
+    name: 'test-project',
+    version: '1.0.0',
+  };
+
+  fs.writeFileSync(
+    path.join(dir, 'positronic.config.json'),
+    JSON.stringify({ ...defaultConfig, ...config }, null, 2)
+  );
+
+  fs.mkdirSync(path.join(dir, 'brains'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'resources'), { recursive: true });
+}
 
 // Helper function to wait for test server to be ready
 async function waitUntilReady(
@@ -69,41 +139,24 @@ describe('CLI Integration: positronic server', () => {
   describe('Project validation', () => {
     it('should not have server command available outside a Positronic project', () => {
       // Run server command in a directory that is NOT a Positronic project
-      let stderr: string = '';
-      let exitCode: number = 0;
-
-      try {
-        execSync(`${nodeExecutable} ${cliExecutable} server`, {
-          cwd: tempDir, // Empty directory, no positronic.config.json
-          stdio: 'pipe',
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            POSITRONIC_TEST_MODE: 'true',
-          },
-        });
-      } catch (error: any) {
-        stderr = error.stderr || '';
-        exitCode = error.status || 1;
-      }
+      const result = px('server');
 
       // The server command should not be recognized outside a project
       // Yargs will show an error about unknown command
-      expect(exitCode).toBe(1);
-      expect(stderr).toContain('Unknown command: server');
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('Unknown command: server');
 
       // Additionally, if we check help, server command should not be listed
-      const helpOutput = execSync(`${nodeExecutable} ${cliExecutable} --help`, {
-        cwd: tempDir,
-        stdio: 'pipe',
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-        },
-      });
+      const helpResult = px('--help', { cwd: result.tempDir });
 
-      expect(helpOutput).not.toContain('server');
-      expect(helpOutput).not.toContain('Start the local development server');
+      expect(helpResult.stdout).not.toContain('server');
+      expect(helpResult.stdout).not.toContain(
+        'Start the local development server'
+      );
+
+      // Clean up temp directories
+      fs.rmSync(result.tempDir, { recursive: true, force: true });
+      fs.rmSync(helpResult.tempDir, { recursive: true, force: true });
     });
   });
 
@@ -113,19 +166,8 @@ describe('CLI Integration: positronic server', () => {
       const projectDir = path.join(tempDir, 'test-project');
       fs.mkdirSync(projectDir, { recursive: true });
 
-      // Create a minimal positronic.config.json
-      const config = {
-        name: 'test-project',
-        version: '1.0.0',
-      };
-      fs.writeFileSync(
-        path.join(projectDir, 'positronic.config.json'),
-        JSON.stringify(config, null, 2)
-      );
-
-      // Create required directories
-      fs.mkdirSync(path.join(projectDir, 'brains'), { recursive: true });
-      fs.mkdirSync(path.join(projectDir, 'resources'), { recursive: true });
+      // Create project structure
+      createMinimalProject(projectDir);
 
       // Use a random port to avoid conflicts
       const testPort = 9000 + Math.floor(Math.random() * 1000);
