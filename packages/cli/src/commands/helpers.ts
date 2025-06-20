@@ -449,3 +449,32 @@ export async function generateTypes(
 
   return path.relative(process.cwd(), typesFilePath);
 }
+
+/**
+ * Helper function to wait for server to be ready
+ */
+export async function waitUntilReady(
+  port?: number,
+  maxWaitMs = 5000
+): Promise<boolean> {
+  const serverPort = port || Number(process.env.POSITRONIC_SERVER_PORT) || 8787;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const url = `http://localhost:${serverPort}/status`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const status = (await response.json()) as { ready: boolean };
+        if (status.ready) {
+          return true;
+        }
+      }
+    } catch (e: any) {
+      // Server not ready yet - connection refused is expected
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return false;
+}

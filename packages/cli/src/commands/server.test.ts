@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { fileURLToPath } from 'url';
 import type { MethodCall } from '../test/test-dev-server.js';
 import fetch from 'node-fetch';
+import { waitUntilReady } from './helpers.js';
 
 // Resolve paths relative to the workspace root
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -181,35 +182,6 @@ function createMinimalProject(dir: string, config?: any) {
 
   fs.mkdirSync(path.join(dir, 'brains'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'resources'), { recursive: true });
-}
-
-// Helper function to wait for test server to be ready
-async function waitUntilReady(
-  port: number,
-  maxWaitMs = 5000
-): Promise<boolean> {
-  const startTime = Date.now();
-
-  // Give the server a moment to start listening
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      const url = `http://localhost:${port}/test/status`;
-      const response = await fetch(url);
-      if (response.ok) {
-        const status = (await response.json()) as { ready: boolean };
-        if (status.ready) {
-          return true;
-        }
-      }
-    } catch (e: any) {
-      // Server not ready yet - connection refused is expected
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  return false;
 }
 
 // Helper function to fetch method call logs

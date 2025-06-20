@@ -2,7 +2,7 @@ import * as path from 'path';
 import { type ChildProcess } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
-import { syncResources, generateTypes } from './helpers.js';
+import { syncResources, generateTypes, waitUntilReady } from './helpers.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import { CloudflareDevServer } from '@positronic/cloudflare';
 
@@ -92,9 +92,14 @@ export class ServerCommand {
         }
         process.exit(1);
       });
+      // Wait for the server to be ready before syncing resources
+      const isReady = await waitUntilReady(argv.port);
 
-      // Wait a moment for the server to start before syncing resources
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      if (!isReady) {
+        console.error(
+          'Warning: Server did not become ready within timeout period'
+        );
+      }
 
       // Initial resource sync and type generation
       const syncResult = await syncResources(projectRootPath);

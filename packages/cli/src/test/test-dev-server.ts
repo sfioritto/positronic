@@ -124,8 +124,8 @@ export class TestDevServer implements PositronicDevServer {
 
         // TEST ENDPOINTS
 
-        // GET /test/status - Check if server is ready
-        if (req.method === 'GET' && url.pathname === '/test/status') {
+        // GET /status - Check if server is ready
+        if (req.method === 'GET' && url.pathname === '/status') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ready: this.isReady }));
           return;
