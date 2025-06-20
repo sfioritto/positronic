@@ -245,12 +245,24 @@ async function waitForTypesFile(
 
 describe('CLI Integration: positronic server', () => {
   let tempDir: string;
+  let cleanup: (() => Promise<void>) | null = null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-server-test-'));
+
+    // Get cleanup function from px() - this will work for all px() calls in the test
+    const result = await px(undefined, undefined, false); // Don't spawn server yet
+    cleanup = result.cleanup;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Always cleanup server if it was started
+    if (cleanup) {
+      await cleanup();
+      cleanup = null;
+    }
+
+    // Clean up temp directory
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -274,9 +286,6 @@ describe('CLI Integration: positronic server', () => {
       expect(helpResult.stdout).not.toContain(
         'Start the local development server'
       );
-
-      // Clean up
-      await helpResult.cleanup?.();
     });
   });
 
@@ -311,9 +320,6 @@ describe('CLI Integration: positronic server', () => {
         fs.realpathSync(tempDir)
       );
       expect(startCall!.args[1]).toBe(serverPort);
-
-      // Clean up the server process
-      await cleanup();
     });
 
     it('should call setup() with force=true when --force flag is used', async () => {
@@ -337,9 +343,6 @@ describe('CLI Integration: positronic server', () => {
       const setupCall = methodCalls.find((call) => call.method === 'setup');
       expect(setupCall).toBeDefined();
       expect(setupCall!.args[1]).toBe(true); // force flag should be true
-
-      // Clean up
-      await cleanup();
     });
   });
 
@@ -376,9 +379,6 @@ describe('CLI Integration: positronic server', () => {
       const resourceKeys = data!.resources.map((r) => r.key);
       expect(resourceKeys).toContain('test.txt');
       expect(resourceKeys).toContain('data.json');
-
-      // Clean up
-      await cleanup();
     });
 
     it('should generate types file after server starts', async () => {
@@ -430,9 +430,6 @@ describe('CLI Integration: positronic server', () => {
       expect(typesContent).toContain('config: TextResource;');
       expect(typesContent).toContain('docs: {');
       expect(typesContent).toContain('api: TextResource;');
-
-      // Clean up
-      await cleanup();
     });
   });
 });
