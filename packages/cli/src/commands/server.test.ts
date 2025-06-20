@@ -193,6 +193,56 @@ async function fetchLogs(port: number): Promise<MethodCall[]> {
   return (await response.json()) as MethodCall[];
 }
 
+// Helper function to wait for resources to sync
+async function waitForResourcesSync(
+  serverPort: number,
+  expectedCount: number,
+  maxWaitMs = 5000
+): Promise<{ resources: Array<{ key: string }>; count: number } | null> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    const response = await fetch(`http://localhost:${serverPort}/resources`);
+    if (response.ok) {
+      const data = (await response.json()) as {
+        resources: Array<{ key: string }>;
+        count: number;
+      };
+      if (data.count === expectedCount) {
+        return data;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return null;
+}
+
+// Helper function to wait for types file to contain specific content
+async function waitForTypesFile(
+  typesPath: string,
+  expectedContent: string | string[],
+  maxWaitMs = 5000
+): Promise<string> {
+  const startTime = Date.now();
+  const contentToCheck = Array.isArray(expectedContent)
+    ? expectedContent
+    : [expectedContent];
+
+  while (Date.now() - startTime < maxWaitMs) {
+    if (fs.existsSync(typesPath)) {
+      const content = fs.readFileSync(typesPath, 'utf-8');
+      // Check if all expected content is present
+      if (contentToCheck.every((expected) => content.includes(expected))) {
+        return content;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return '';
+}
+
 describe('CLI Integration: positronic server', () => {
   let tempDir: string;
 
@@ -314,28 +364,22 @@ describe('CLI Integration: positronic server', () => {
       const isReady = await waitUntilReady(serverPort);
       expect(isReady).toBe(true);
 
-      // Wait for initial sync to complete (server waits 3 seconds before syncing)
-      await new Promise((resolve) => setTimeout(resolve, 4000));
+      // Wait for initial sync to complete
+      const data = await waitForResourcesSync(serverPort, 2);
 
-      // Check that resources endpoint was called (GET request to check existing resources)
-      const response = await fetch(`http://localhost:${serverPort}/resources`);
-      expect(response.ok).toBe(true);
-
-      const data = (await response.json()) as {
-        resources: Array<{ key: string }>;
-        count: number;
-      };
-      expect(data.resources).toBeDefined();
-      expect(data.count).toBe(2); // Should have scanned and loaded the two files
+      // Now verify the results
+      expect(data).not.toBeNull();
+      expect(data!.resources).toBeDefined();
+      expect(data!.count).toBe(2);
 
       // Verify the resources were loaded from filesystem
-      const resourceKeys = data.resources.map((r) => r.key);
+      const resourceKeys = data!.resources.map((r) => r.key);
       expect(resourceKeys).toContain('test.txt');
       expect(resourceKeys).toContain('data.json');
 
       // Clean up
       await cleanup();
-    }, 10000); // 10 second timeout
+    });
 
     it('should generate types file after server starts', async () => {
       const { tempDir, cleanup, serverPort } = await px();
@@ -362,15 +406,16 @@ describe('CLI Integration: positronic server', () => {
       const isReady = await waitUntilReady(serverPort);
       expect(isReady).toBe(true);
 
-      // Wait for initial sync and type generation to complete
-      await new Promise((resolve) => setTimeout(resolve, 4000));
-
-      // Check that the types file was generated
+      // Wait for types file to be generated with our resources
       const typesPath = path.join(tempDir, 'resources.d.ts');
-      expect(fs.existsSync(typesPath)).toBe(true);
+      const typesContent = await waitForTypesFile(typesPath, [
+        'readme: TextResource;',
+        'config: TextResource;',
+        'api: TextResource;',
+      ]);
 
-      // Read and verify the generated types content
-      const typesContent = fs.readFileSync(typesPath, 'utf-8');
+      // Check that the types file was generated with content
+      expect(typesContent).not.toBe('');
 
       // Check for the module declaration
       expect(typesContent).toContain("declare module '@positronic/core'");
@@ -388,6 +433,6 @@ describe('CLI Integration: positronic server', () => {
 
       // Clean up
       await cleanup();
-    }, 10000); // 10 second timeout
+    });
   });
 });
