@@ -26,6 +26,7 @@ const nodeExecutable = process.execPath;
 interface PxOptions {
   syncOptions?: Partial<ExecSyncOptions>;
   spawnOptions?: Partial<SpawnOptions>;
+  serverOptions?: string[]; // Command-line options to pass to server (e.g., ['--force'])
 }
 
 // Helper function results
@@ -51,15 +52,15 @@ async function px(
   );
 
   let serverPort: number | null = null;
-  let localServerProcess: ChildProcess | null = null;
 
   // Define cleanup function
   const cleanup = async () => {
-    if (localServerProcess && !localServerProcess.killed) {
-      localServerProcess.kill('SIGTERM');
+    if (serverProcess && !serverProcess.killed) {
+      serverProcess.kill('SIGTERM');
       await new Promise<void>((resolve) => {
-        localServerProcess!.on('close', () => resolve());
+        serverProcess!.on('close', () => resolve());
       });
+      serverProcess = null; // Reset the global serverProcess
     }
     fs.rmSync(tempDir, { recursive: true, force: true });
   };
@@ -88,9 +89,15 @@ async function px(
       };
 
       // Start the server
-      localServerProcess = serverProcess = spawn(
+      serverProcess = spawn(
         nodeExecutable,
-        [cliExecutable, 'server', '--port', testPort.toString()],
+        [
+          cliExecutable,
+          'server',
+          '--port',
+          testPort.toString(),
+          ...(options?.serverOptions || []),
+        ],
         finalSpawnOptions
       );
 
@@ -279,6 +286,32 @@ describe('CLI Integration: positronic server', () => {
       expect(startCall!.args[1]).toBe(serverPort);
 
       // Clean up the server process
+      await cleanup();
+    });
+
+    it('should call setup() with force=true when --force flag is used', async () => {
+      // Start server with --force flag
+      const { cleanup, serverPort } = await px(undefined, {
+        serverOptions: ['--force'],
+      });
+
+      if (!serverPort) {
+        throw new Error('Server port is not set');
+      }
+
+      // Wait for server to be ready
+      const isReady = await waitUntilReady(serverPort);
+      expect(isReady).toBe(true);
+
+      // Get the method call logs
+      const methodCalls = await fetchLogs(serverPort);
+
+      // Verify setup was called with force=true
+      const setupCall = methodCalls.find((call) => call.method === 'setup');
+      expect(setupCall).toBeDefined();
+      expect(setupCall!.args[1]).toBe(true); // force flag should be true
+
+      // Clean up
       await cleanup();
     });
   });
