@@ -1,110 +1,89 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
-import { execSync, spawn } from 'child_process';
-import process from 'process';
+import { describe, it, expect, afterEach } from '@jest/globals';
 import {
-  jest,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-} from '@jest/globals';
-import { fileURLToPath } from 'url';
-import {
-  getRandomPort,
-  waitForProcessToExit,
-  waitForServerReady,
-} from '../../../../test-utils.js';
+  createTestServer,
+  fetchLogs,
+  cli,
+  type TestServer,
+} from './test-utils.js';
+import type { MethodCall } from '../test/test-dev-server.js';
 
-// Type alias for the expected history response structure
-type HistoryResponse = {
-  runs: any[]; // Assuming runs is an array of any type for simplicity
-};
+describe('CLI Integration: positronic server with project', () => {
+  let server: TestServer;
 
-// Resolve paths relative to the workspace root
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = path.resolve(__dirname, '../../../../');
-const cliExecutable = path.join(
-  workspaceRoot,
-  'packages/cli/dist/src/positronic.js'
-);
-const nodeExecutable = process.execPath;
-
-// Increase test timeout to 10 seconds because these tests are slow by their nature
-jest.setTimeout(15000);
-
-describe('CLI Integration: positronic new (Simplified)', () => {
-  let tempDir: string;
-  const projectName = 'test-app-simple';
-
-  beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-simple-test-'));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
-    expect(fs.existsSync(tempDir)).toBe(false);
-  });
-
-  it('should create new project, start server, run a workflow and kill server', async () => {
-    execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
-      cwd: tempDir,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
-
-    const projectPath = path.join(tempDir, projectName);
-    expect(fs.existsSync(projectPath)).toBe(true);
-
-    const testPort = getRandomPort();
-    const serverUrl = `http://localhost:${testPort}`;
-
-    const serverProcess = spawn(
-      nodeExecutable,
-      [cliExecutable, 'server', '--port', testPort.toString()],
-      {
-        cwd: projectPath,
-        stdio: 'ignore',
-        detached: false,
-        env: {
-          ...process.env,
-          POSITRONIC_LOCAL_PATH: workspaceRoot,
-        },
-      }
-    );
-
-    const pid = serverProcess.pid;
-    if (!pid) {
-      throw new Error('Server process PID is undefined');
+  afterEach(async () => {
+    if (server) {
+      await server.cleanup();
     }
+  });
 
-    const ready = await waitForServerReady(serverUrl);
-    expect(ready).toBe(true);
+  it('should call dev server setup() and start() methods correctly', async () => {
+    // Create a test server
+    server = await createTestServer();
 
-    execSync(`${nodeExecutable} ${cliExecutable} run example`, {
-      cwd: projectPath,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-        POSITRONIC_SERVER_PORT: testPort.toString(),
+    // Fetch the method call logs
+    const methodCalls = await fetchLogs(server.port);
+
+    // Verify setup() was called
+    const setupCall = methodCalls.find(
+      (call: MethodCall) => call.method === 'setup'
+    );
+    expect(setupCall).toBeDefined();
+    expect(fs.realpathSync(setupCall!.args[0])).toBe(
+      fs.realpathSync(server.dir)
+    );
+    expect(setupCall!.args[1]).toBe(false); // force flag
+
+    // Verify start() was called
+    const startCall = methodCalls.find(
+      (call: MethodCall) => call.method === 'start'
+    );
+    expect(startCall).toBeDefined();
+    expect(fs.realpathSync(startCall!.args[0])).toBe(
+      fs.realpathSync(server.dir)
+    );
+    expect(startCall!.args[1]).toBe(server.port);
+  });
+
+  it('should support running workflows after server starts', async () => {
+    // Create a test server with a test brain
+    server = await createTestServer({
+      setup: (dir: string) => {
+        const brainsDir = path.join(dir, 'brains');
+        fs.mkdirSync(brainsDir, { recursive: true });
+
+        // Create a simple test brain
+        fs.writeFileSync(
+          path.join(brainsDir, 'test-brain.ts'),
+          `
+          export default function testBrain() {
+            return {
+              title: 'Test Brain',
+              steps: [
+                {
+                  title: 'Test Step',
+                  run: async () => {
+                    return { success: true };
+                  }
+                }
+              ]
+            };
+          }
+          `
+        );
       },
     });
 
-    const response = await fetch(
-      `${serverUrl}/brains/example/history?limit=25`
-    );
-    expect(response.ok).toBe(true);
-    const historyData = (await response.json()) as HistoryResponse;
-    expect(historyData.runs.length).toBe(1);
+    // Run a workflow using the CLI
+    const px = cli(server);
+    const result = await px('run test-brain');
 
-    serverProcess.kill('SIGTERM');
-    const exited = await waitForProcessToExit(pid);
-    expect(exited).toBe(true);
+    // Should succeed (exit code 0)
+    expect(result.exitCode).toBe(0);
+
+    // Verify the run command connected to the server
+    // (The actual workflow execution is tested elsewhere)
+    expect(result.stdout).toContain('Run ID:');
   });
 });

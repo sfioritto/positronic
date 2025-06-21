@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { jest, describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import { createTestServer, waitForTypesFile, cli } from './test-utils.js';
 
 describe('CLI Integration: positronic resources types', () => {
