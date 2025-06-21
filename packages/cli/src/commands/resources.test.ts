@@ -18,6 +18,7 @@ import {
   waitForProcessToExit,
   waitForServerReady,
 } from '../../../../test-utils.js';
+import { createTestServer, waitForTypesFile } from './test-utils.js';
 
 // Resolve paths relative to the workspace root
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -106,65 +107,87 @@ describe('CLI Integration: positronic resources types', () => {
   });
 
   it('should generate type definitions for resources', async () => {
-    // Create resources directory and some test files
-    const resourcesDir = path.join(projectPath, 'resources');
-    fs.mkdirSync(resourcesDir, { recursive: true });
-    fs.mkdirSync(path.join(resourcesDir, 'docs'), { recursive: true });
-    fs.mkdirSync(path.join(resourcesDir, 'data'), { recursive: true });
+    const server = await createTestServer({
+      setup: (dir: string) => {
+        // Create resources directory and subdirectories
+        const resourcesDir = path.join(dir, 'resources');
+        fs.mkdirSync(resourcesDir, { recursive: true });
+        fs.mkdirSync(path.join(resourcesDir, 'docs'), { recursive: true });
+        fs.mkdirSync(path.join(resourcesDir, 'data'), { recursive: true });
 
-    // Create test files
-    fs.writeFileSync(path.join(resourcesDir, 'example.md'), '# Example');
-    fs.writeFileSync(path.join(resourcesDir, 'test.txt'), 'Test content');
-    fs.writeFileSync(path.join(resourcesDir, 'docs', 'readme.md'), '# Readme');
-    fs.writeFileSync(path.join(resourcesDir, 'data', 'config.json'), '{}');
-    // PNG magic bytes
-    const pngHeader = Buffer.from([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    ]);
-    fs.writeFileSync(path.join(resourcesDir, 'data', 'logo.png'), pngHeader);
+        // Create test files
+        fs.writeFileSync(path.join(resourcesDir, 'example.md'), '# Example');
+        fs.writeFileSync(path.join(resourcesDir, 'test.txt'), 'Test content');
+        fs.writeFileSync(
+          path.join(resourcesDir, 'docs', 'readme.md'),
+          '# Readme'
+        );
+        fs.writeFileSync(path.join(resourcesDir, 'data', 'config.json'), '{}');
 
-    // File with spaces (should be excluded from dot notation)
-    fs.writeFileSync(
-      path.join(resourcesDir, 'file with spaces.txt'),
-      'content'
-    );
+        // PNG magic bytes
+        const pngHeader = Buffer.from([
+          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        ]);
+        fs.writeFileSync(
+          path.join(resourcesDir, 'data', 'logo.png'),
+          pngHeader
+        );
 
-    // Start the server
-    await startServer();
+        // File with spaces (should be excluded from dot notation)
+        fs.writeFileSync(
+          path.join(resourcesDir, 'file with spaces.txt'),
+          'content'
+        );
+      },
+    });
 
-    // Check if the types file was generated
-    const typesPath = path.join(projectPath, 'resources.d.ts');
-    expect(fs.existsSync(typesPath)).toBe(true);
+    try {
+      // Wait for types file to be generated with our resources
+      const typesPath = path.join(server.dir, 'resources.d.ts');
+      const typesContent = await waitForTypesFile(typesPath, [
+        'example: TextResource;',
+        'test: TextResource;',
+        'docs: {',
+        'readme: TextResource;',
+        'data: {',
+        'config: TextResource;',
+        'logo: BinaryResource;',
+      ]);
 
-    // Read and verify the generated content
-    const content = fs.readFileSync(typesPath, 'utf-8');
+      // Check that the types file was generated
+      expect(fs.existsSync(typesPath)).toBe(true);
 
-    // Check the module declaration
-    expect(content).toContain("declare module '@positronic/core'");
+      // Check the module declaration
+      expect(typesContent).toContain("declare module '@positronic/core'");
 
-    // Check interface definitions
-    expect(content).toContain('interface TextResource');
-    expect(content).toContain('interface BinaryResource');
-    expect(content).toContain('interface Resources');
+      // Check interface definitions
+      expect(typesContent).toContain('interface TextResource');
+      expect(typesContent).toContain('interface BinaryResource');
+      expect(typesContent).toContain('interface Resources');
 
-    // Check method signatures
-    expect(content).toContain('loadText(path: string): Promise<string>');
-    expect(content).toContain('loadBinary(path: string): Promise<Buffer>');
+      // Check method signatures
+      expect(typesContent).toContain('loadText(path: string): Promise<string>');
+      expect(typesContent).toContain(
+        'loadBinary(path: string): Promise<Buffer>'
+      );
 
-    // Check generated resource properties
-    expect(content).toContain('example: TextResource;');
-    expect(content).toContain('test: TextResource;');
-    expect(content).toContain('docs: {');
-    expect(content).toContain('readme: TextResource;');
-    expect(content).toContain('data: {');
-    expect(content).toContain('config: TextResource;');
-    expect(content).toContain('logo: BinaryResource;');
+      // Check generated resource properties
+      expect(typesContent).toContain('example: TextResource;');
+      expect(typesContent).toContain('test: TextResource;');
+      expect(typesContent).toContain('docs: {');
+      expect(typesContent).toContain('readme: TextResource;');
+      expect(typesContent).toContain('data: {');
+      expect(typesContent).toContain('config: TextResource;');
+      expect(typesContent).toContain('logo: BinaryResource;');
 
-    // Should NOT contain files with invalid JS identifiers
-    expect(content).not.toContain('file with spaces');
+      // Should NOT contain files with invalid JS identifiers
+      expect(typesContent).not.toContain('file with spaces');
 
-    // Check export statement
-    expect(content).toContain('export {};');
+      // Check export statement
+      expect(typesContent).toContain('export {};');
+    } finally {
+      await server.cleanup();
+    }
   });
 
   it('should handle empty resources directory', async () => {

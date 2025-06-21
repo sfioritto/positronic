@@ -9,7 +9,6 @@ import {
   waitForTypesFile,
   type TestServer,
 } from './test-utils.js';
-import type { MethodCall } from '../test/test-dev-server.js';
 
 describe('CLI Integration: positronic server', () => {
   describe('Project validation', () => {

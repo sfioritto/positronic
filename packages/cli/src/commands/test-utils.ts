@@ -37,9 +37,11 @@ export interface TestServer {
 export async function createTestServer({
   args = [],
   spawnOptions = {},
+  setup,
 }: {
   args?: string[];
   spawnOptions?: SpawnOptions;
+  setup?: (dir: string) => void | Promise<void>;
 } = {}): Promise<TestServer> {
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'positronic-server-test-')
@@ -59,6 +61,11 @@ export async function createTestServer({
 
   try {
     createMinimalProject(tempDir);
+
+    // Run setup callback if provided
+    if (setup) {
+      await setup(tempDir);
+    }
 
     const port = 9000 + Math.floor(Math.random() * 1000);
 
