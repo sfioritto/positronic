@@ -124,6 +124,10 @@ app.get('/resources', async (context: Context) => {
   }
 });
 
+app.get('/status', async (context: Context) => {
+  return context.json({ ready: true });
+});
+
 app.post('/resources', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
 
