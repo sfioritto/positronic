@@ -1,111 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
-import { execSync, spawn, type ChildProcess } from 'child_process';
-import process from 'process';
-import {
-  jest,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  beforeAll,
-} from '@jest/globals';
-import { fileURLToPath } from 'url';
-import {
-  getRandomPort,
-  waitForProcessToExit,
-  waitForServerReady,
-} from '../../../../test-utils.js';
+import { jest, describe, it, expect } from '@jest/globals';
 import { createTestServer, waitForTypesFile, cli } from './test-utils.js';
-
-// Resolve paths relative to the workspace root
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = path.resolve(__dirname, '../../../../');
-const cliExecutable = path.join(
-  workspaceRoot,
-  'packages/cli/dist/src/positronic.js'
-);
-const nodeExecutable = process.execPath;
 
 // Increase test timeout
 jest.setTimeout(30000);
 
 describe('CLI Integration: positronic resources types', () => {
-  let tempDir: string;
-  const projectName = 'test-resource-types';
-  let projectPath: string;
-  let serverProcess: ChildProcess | null = null;
-  let testPort: number;
-
-  // Helper function to start the server
-  async function startServer() {
-    serverProcess = spawn(
-      nodeExecutable,
-      [cliExecutable, 'server', '--port', testPort.toString()],
-      {
-        cwd: projectPath,
-        stdio: 'ignore',
-        detached: false,
-        env: {
-          ...process.env,
-          POSITRONIC_LOCAL_PATH: workspaceRoot,
-          POSITRONIC_TEST_MODE: 'true',
-        },
-      }
-    );
-
-    const pid = serverProcess.pid;
-    if (!pid) {
-      throw new Error('Server process PID is undefined');
-    }
-
-    // Wait for server to be ready
-    const serverUrl = `http://localhost:${testPort}`;
-    const ready = await waitForServerReady(serverUrl);
-    expect(ready).toBe(true);
-
-    // Wait for server to complete initial sync and type generation
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-  }
-
-  beforeEach(() => {
-    tempDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'positronic-resource-test-')
-    );
-    testPort = getRandomPort();
-    // Set the port in the current process environment so API client uses it
-    process.env.POSITRONIC_SERVER_PORT = testPort.toString();
-
-    // Generate a project
-    execSync(`${nodeExecutable} ${cliExecutable} new ${projectName}`, {
-      cwd: tempDir,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-      },
-    });
-    projectPath = path.join(tempDir, projectName);
-    expect(fs.existsSync(projectPath)).toBe(true);
-  });
-
-  afterEach(async () => {
-    // Kill server if running
-    if (serverProcess && serverProcess.pid) {
-      serverProcess.kill('SIGTERM');
-      await waitForProcessToExit(serverProcess.pid);
-      serverProcess = null;
-    }
-
-    // Clean up environment variable
-    delete process.env.POSITRONIC_SERVER_PORT;
-
-    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 3 });
-    expect(fs.existsSync(tempDir)).toBe(false);
-  });
-
   it('should generate type definitions for resources', async () => {
     const server = await createTestServer({
       setup: (dir: string) => {
@@ -229,109 +130,111 @@ describe('CLI Integration: positronic resources types', () => {
   });
 
   it('should handle resources with special characters', async () => {
-    // Create resources
-    const resourcesDir = path.join(projectPath, 'resources');
-    fs.mkdirSync(resourcesDir, { recursive: true });
+    const server = await createTestServer({
+      setup: (dir: string) => {
+        // Create resources directory
+        const resourcesDir = path.join(dir, 'resources');
+        fs.mkdirSync(resourcesDir, { recursive: true });
 
-    // Create files with special characters
-    fs.writeFileSync(path.join(resourcesDir, 'valid_file.txt'), 'content');
-    fs.writeFileSync(path.join(resourcesDir, '$special.txt'), 'content'); // Valid JS identifier
-    fs.writeFileSync(path.join(resourcesDir, '_underscore.txt'), 'content'); // Valid JS identifier
-    fs.writeFileSync(path.join(resourcesDir, '123invalid.txt'), 'content'); // Invalid - starts with number
-    fs.writeFileSync(
-      path.join(resourcesDir, 'special-chars!@#.txt'),
-      'content'
-    ); // Invalid
-
-    // Start the server
-    await startServer();
-
-    // Run the types command
-    execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
-      cwd: projectPath,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-        POSITRONIC_SERVER_PORT: testPort.toString(),
+        // Create files with special characters
+        fs.writeFileSync(path.join(resourcesDir, 'valid_file.txt'), 'content');
+        fs.writeFileSync(path.join(resourcesDir, '$special.txt'), 'content'); // Valid JS identifier
+        fs.writeFileSync(path.join(resourcesDir, '_underscore.txt'), 'content'); // Valid JS identifier
+        fs.writeFileSync(path.join(resourcesDir, '123invalid.txt'), 'content'); // Invalid - starts with number
+        fs.writeFileSync(
+          path.join(resourcesDir, 'special-chars!@#.txt'),
+          'content'
+        ); // Invalid
       },
     });
 
-    // Check if the types file was generated
-    const typesPath = path.join(projectPath, 'resources.d.ts');
-    expect(fs.existsSync(typesPath)).toBe(true);
+    try {
+      // Run the types command
+      const px = cli(server);
+      const result = await px('resources types');
 
-    // Verify the generated content
-    const content = fs.readFileSync(typesPath, 'utf-8');
+      // Command should succeed
+      expect(result.exitCode).toBe(0);
 
-    // Check valid identifiers are included
-    expect(content).toContain('valid_file: TextResource;');
-    expect(content).toContain('$special: TextResource;');
-    expect(content).toContain('_underscore: TextResource;');
+      // Check if the types file was generated
+      const typesPath = path.join(server.dir, 'resources.d.ts');
+      expect(fs.existsSync(typesPath)).toBe(true);
 
-    // Check invalid identifiers are excluded
-    expect(content).not.toContain('123invalid');
-    expect(content).not.toContain('special-chars');
+      // Verify the generated content
+      const content = fs.readFileSync(typesPath, 'utf-8');
+
+      // Check valid identifiers are included
+      expect(content).toContain('valid_file: TextResource;');
+      expect(content).toContain('$special: TextResource;');
+      expect(content).toContain('_underscore: TextResource;');
+
+      // Check invalid identifiers are excluded
+      expect(content).not.toContain('123invalid');
+      expect(content).not.toContain('special-chars');
+    } finally {
+      await server.cleanup();
+    }
   });
 
   it('should correctly identify text vs binary files', async () => {
-    // Create resources
-    const resourcesDir = path.join(projectPath, 'resources');
-    fs.mkdirSync(resourcesDir, { recursive: true });
+    const server = await createTestServer({
+      setup: (dir: string) => {
+        // Create resources directory
+        const resourcesDir = path.join(dir, 'resources');
+        fs.mkdirSync(resourcesDir, { recursive: true });
 
-    // Create various file types
-    fs.writeFileSync(path.join(resourcesDir, 'text.txt'), 'text');
-    fs.writeFileSync(path.join(resourcesDir, 'script.js'), 'code');
-    fs.writeFileSync(path.join(resourcesDir, 'config.json'), '{}');
-    fs.writeFileSync(path.join(resourcesDir, 'styles.css'), 'css');
+        // Create various file types
+        fs.writeFileSync(path.join(resourcesDir, 'text.txt'), 'text');
+        fs.writeFileSync(path.join(resourcesDir, 'script.js'), 'code');
+        fs.writeFileSync(path.join(resourcesDir, 'config.json'), '{}');
+        fs.writeFileSync(path.join(resourcesDir, 'styles.css'), 'css');
 
-    // Create actual binary content for binary files
-    // JPEG magic bytes
-    const jpegHeader = Buffer.from([
-      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
-    ]);
-    fs.writeFileSync(path.join(resourcesDir, 'image.jpg'), jpegHeader);
+        // Create actual binary content for binary files
+        // JPEG magic bytes
+        const jpegHeader = Buffer.from([
+          0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+        ]);
+        fs.writeFileSync(path.join(resourcesDir, 'image.jpg'), jpegHeader);
 
-    // Random binary data
-    const binaryData = Buffer.from([
-      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
-    ]);
-    fs.writeFileSync(path.join(resourcesDir, 'binary.bin'), binaryData);
+        // Random binary data
+        const binaryData = Buffer.from([
+          0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+        ]);
+        fs.writeFileSync(path.join(resourcesDir, 'binary.bin'), binaryData);
 
-    // PDF magic bytes
-    const pdfHeader = Buffer.from('%PDF-1.4\n%âÌÊÓ\n');
-    fs.writeFileSync(path.join(resourcesDir, 'document.pdf'), pdfHeader);
-
-    // Start the server
-    await startServer();
-
-    // Run the types command
-    execSync(`${nodeExecutable} ${cliExecutable} resources types`, {
-      cwd: projectPath,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        POSITRONIC_LOCAL_PATH: workspaceRoot,
-        POSITRONIC_SERVER_PORT: testPort.toString(),
+        // PDF magic bytes
+        const pdfHeader = Buffer.from('%PDF-1.4\n%âÌÊÓ\n');
+        fs.writeFileSync(path.join(resourcesDir, 'document.pdf'), pdfHeader);
       },
     });
 
-    // Check if the types file was generated
-    const typesPath = path.join(projectPath, 'resources.d.ts');
-    expect(fs.existsSync(typesPath)).toBe(true);
+    try {
+      // Run the types command
+      const px = cli(server);
+      const result = await px('resources types');
 
-    // Verify the generated content
-    const content = fs.readFileSync(typesPath, 'utf-8');
+      // Command should succeed
+      expect(result.exitCode).toBe(0);
 
-    // Check text resources
-    expect(content).toContain('text: TextResource;');
-    expect(content).toContain('script: TextResource;');
-    expect(content).toContain('config: TextResource;');
-    expect(content).toContain('styles: TextResource;');
+      // Check if the types file was generated
+      const typesPath = path.join(server.dir, 'resources.d.ts');
+      expect(fs.existsSync(typesPath)).toBe(true);
 
-    // Check binary resources
-    expect(content).toContain('image: BinaryResource;');
-    expect(content).toContain('binary: BinaryResource;');
-    expect(content).toContain('document: BinaryResource;');
+      // Verify the generated content
+      const content = fs.readFileSync(typesPath, 'utf-8');
+
+      // Check text resources
+      expect(content).toContain('text: TextResource;');
+      expect(content).toContain('script: TextResource;');
+      expect(content).toContain('config: TextResource;');
+      expect(content).toContain('styles: TextResource;');
+
+      // Check binary resources
+      expect(content).toContain('image: BinaryResource;');
+      expect(content).toContain('binary: BinaryResource;');
+      expect(content).toContain('document: BinaryResource;');
+    } finally {
+      await server.cleanup();
+    }
   });
 });
