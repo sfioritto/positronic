@@ -28,16 +28,130 @@ export interface PxResult {
   exitCode: number;
 }
 
-// IMPORTANT: serverProcess and serverPort are intentionally global to support a common CLI pattern:
-// 1. Call server() once to start a server and get a cleanup function
-// 2. Call px() multiple times with different commands that talk to the same server
-// 3. Call cleanup() at the end to shut down the server
-// So you can call server multiple times in a test and each time it will use the same server, but you can call it safely to get tempDir or serverPort or whatever else you need.
-// This mirrors real CLI usage where commands need a running server to operate against.
-let serverProcess: ChildProcess | null = null;
-let serverPort: number | null = null;
-let tempDir: string | null = null;
+export interface TestServer {
+  port: number;
+  dir: string;
+  cleanup: () => Promise<void>;
+}
 
+export async function createTestServer({
+  args = [],
+  spawnOptions = {},
+}: {
+  args?: string[];
+  spawnOptions?: SpawnOptions;
+} = {}): Promise<TestServer> {
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'positronic-server-test-')
+  );
+
+  let serverProcess: ChildProcess | null = null;
+
+  const cleanup = async () => {
+    if (serverProcess && !serverProcess.killed) {
+      serverProcess.kill('SIGTERM');
+      await new Promise<void>((resolve) => {
+        serverProcess!.on('close', () => resolve());
+      });
+    }
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  };
+
+  try {
+    createMinimalProject(tempDir);
+
+    const port = 9000 + Math.floor(Math.random() * 1000);
+
+    // Default spawn options
+    const defaultOptions: SpawnOptions = {
+      cwd: tempDir,
+      env: {
+        ...process.env,
+        POSITRONIC_TEST_MODE: 'true',
+        POSITRONIC_SERVER_PORT: port.toString(),
+      },
+      stdio: 'pipe',
+    };
+
+    const finalOptions = {
+      ...defaultOptions,
+      ...spawnOptions,
+    };
+
+    // Start the server
+    serverProcess = spawn(
+      nodeExecutable,
+      [cliExecutable, 'server', '--port', port.toString(), ...args],
+      finalOptions
+    );
+
+    const isReady = await waitUntilReady(port);
+
+    if (!isReady) {
+      throw new Error(`Server failed to start on port ${port}`);
+    }
+
+    return {
+      port,
+      dir: tempDir,
+      cleanup,
+    };
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+}
+
+export function cli(server?: TestServer) {
+  return async (
+    command: string,
+    options: Partial<ExecSyncOptions> = {}
+  ): Promise<PxResult> => {
+    // Default options for execSync
+    const defaultSyncOptions: ExecSyncOptions = {
+      cwd: server?.dir || process.cwd(),
+      stdio: 'pipe',
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        POSITRONIC_TEST_MODE: 'true',
+        ...(server ? { POSITRONIC_SERVER_PORT: server.port.toString() } : {}),
+      },
+    };
+
+    const finalSyncOptions = {
+      ...defaultSyncOptions,
+      ...options,
+    };
+
+    let stdout = '';
+    let stderr = '';
+    let exitCode = 0;
+
+    try {
+      const result = execSync(
+        `${nodeExecutable} ${cliExecutable} ${command}`,
+        finalSyncOptions
+      );
+      stdout = result.toString() || '';
+    } catch (error: any) {
+      stdout = error.stdout || '';
+      stderr = error.stderr || '';
+      exitCode = error.status || 1;
+    }
+
+    return {
+      stdout,
+      stderr,
+      exitCode,
+    };
+  };
+}
+
+// Legacy functions for backward compatibility - mark as deprecated
+/**
+ * @deprecated Use createTestServer() instead
+ */
 export async function server({
   args = [],
   options = {},
@@ -49,129 +163,40 @@ export async function server({
   serverPort: number;
   cleanup: () => Promise<void>;
 }> {
-  const cleanup = async () => {
-    if (serverProcess && !serverProcess.killed) {
-      serverProcess.kill('SIGTERM');
-      await new Promise<void>((resolve) => {
-        serverProcess!.on('close', () => resolve());
-      });
-      serverProcess = null; // Reset the global serverProcess
-      serverPort = null; // Reset the global serverPort
-    }
-    if (tempDir) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-      tempDir = null; // Reset the global tempDir
-    }
-  };
-
-  try {
-    if (!tempDir) {
-      tempDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), 'positronic-server-test-')
-      );
-    }
-
-    if (!serverProcess && !serverPort) {
-      createMinimalProject(tempDir);
-
-      const testPort = 9000 + Math.floor(Math.random() * 1000);
-
-      // Default spawn options
-      const defaultOptions: SpawnOptions = {
-        cwd: tempDir,
-        env: {
-          ...process.env,
-          POSITRONIC_TEST_MODE: 'true',
-          POSITRONIC_SERVER_PORT: testPort.toString(),
-        },
-        stdio: 'pipe',
-      };
-
-      const finalOptions = {
-        ...defaultOptions,
-        ...options,
-      };
-
-      // Start the server
-      serverProcess = spawn(
-        nodeExecutable,
-        [cliExecutable, 'server', '--port', testPort.toString(), ...args],
-        finalOptions
-      );
-
-      const isReady = await waitUntilReady(testPort);
-
-      if (!isReady) {
-        throw new Error(`Server failed to start on port ${testPort}`);
-      }
-
-      serverPort = testPort;
-    }
-  } catch (error) {
-    await cleanup();
-    throw error;
-  }
-
+  const testServer = await createTestServer({ args, spawnOptions: options });
   return {
-    tempDir,
-    serverPort: serverPort!,
-    cleanup,
+    tempDir: testServer.dir,
+    serverPort: testServer.port,
+    cleanup: testServer.cleanup,
   };
 }
 
+/**
+ * @deprecated Use cli() instead
+ */
 export async function px(
   command: string,
   options: Partial<ExecSyncOptions> = {}
 ): Promise<PxResult> {
-  let tempDir: string | null = null;
-  let serverPort: number | null = null;
-  if (!command.startsWith('server')) {
-    const result = await server();
-    tempDir = result.tempDir;
-    serverPort = result.serverPort;
+  // For backward compatibility, px creates its own server if needed
+  let server: TestServer | undefined = undefined;
+
+  if (
+    !command.startsWith('server') &&
+    !command.startsWith('new') &&
+    !command.includes('--help')
+  ) {
+    server = await createTestServer();
   }
-
-  // Default options for execSync
-  const defaultSyncOptions: ExecSyncOptions = {
-    cwd:
-      tempDir ||
-      fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-server-test-')),
-    stdio: 'pipe',
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      POSITRONIC_TEST_MODE: 'true',
-      ...(serverPort ? { POSITRONIC_SERVER_PORT: serverPort.toString() } : {}),
-    },
-  };
-
-  const finalSyncOptions = {
-    ...defaultSyncOptions,
-    ...options,
-  };
-
-  let stdout = '';
-  let stderr = '';
-  let exitCode = 0;
 
   try {
-    const result = execSync(
-      `${nodeExecutable} ${cliExecutable} ${command}`,
-      finalSyncOptions
-    );
-    stdout = result.toString() || '';
-  } catch (error: any) {
-    stdout = error.stdout;
-    exitCode = error.status;
-    stderr = error.stderr;
+    const px = cli(server);
+    return await px(command, options);
+  } finally {
+    if (server) {
+      await server.cleanup();
+    }
   }
-
-  // Return result with cleanup function for successful cases
-  return {
-    stdout,
-    stderr,
-    exitCode,
-  };
 }
 
 // Helper function to create a minimal Positronic project structure
@@ -251,3 +276,5 @@ export async function waitForFileChange(
 
   return false;
 }
+
+// No more resetTestGlobals - each test manages its own server
