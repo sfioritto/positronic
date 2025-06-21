@@ -451,6 +451,43 @@ export async function generateTypes(
 }
 
 /**
+ * Wait for resources to stabilize (indicating initial sync is complete)
+ */
+async function waitForResources(
+  serverPort: number,
+  maxWaitMs: number,
+  startTime: number
+): Promise<boolean> {
+  let lastCount = -1;
+  let stableCount = 0;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const response = await fetch(`http://localhost:${serverPort}/resources`);
+      if (response.ok) {
+        const data = (await response.json()) as { count: number };
+
+        // If the count hasn't changed for 3 checks, we consider it stable
+        if (data.count === lastCount) {
+          stableCount++;
+          if (stableCount >= 3) {
+            return true; // Resources are stable
+          }
+        } else {
+          lastCount = data.count;
+          stableCount = 0;
+        }
+      }
+    } catch (e) {
+      // Server might still be initializing
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return false;
+}
+
+/**
  * Helper function to wait for server to be ready
  */
 export async function waitUntilReady(
@@ -460,6 +497,7 @@ export async function waitUntilReady(
   const serverPort = port || Number(process.env.POSITRONIC_SERVER_PORT) || 8787;
   const startTime = Date.now();
 
+  // First wait for basic HTTP readiness
   while (Date.now() - startTime < maxWaitMs) {
     try {
       const url = `http://localhost:${serverPort}/status`;
@@ -467,7 +505,7 @@ export async function waitUntilReady(
       if (response.ok) {
         const status = (await response.json()) as { ready: boolean };
         if (status.ready) {
-          return true;
+          break; // HTTP server is ready
         }
       }
     } catch (e: any) {
@@ -476,5 +514,6 @@ export async function waitUntilReady(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  return false;
+  // Now wait for resources to stabilize (indicating initial sync is done)
+  return waitForResources(serverPort, maxWaitMs, startTime);
 }

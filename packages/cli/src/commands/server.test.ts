@@ -23,43 +23,33 @@ const cliExecutable = path.join(
 );
 const nodeExecutable = process.execPath;
 
-// Helper function options
-interface PxOptions {
-  syncOptions?: Partial<ExecSyncOptions>;
-  spawnOptions?: Partial<SpawnOptions>;
-  serverOptions?: string[]; // Command-line options to pass to server (e.g., ['--force'])
-}
-
-// Helper function results
 interface PxResult {
-  tempDir: string;
   stdout: string;
   stderr: string;
   exitCode: number;
-  serverPort: number | null;
-  cleanup: () => Promise<void>; // optional cleanup handler when spawn is true
 }
 
-// IMPORTANT: serverProcess is intentionally global to support a common CLI pattern:
-// 1. Call px() once to start a server
+// IMPORTANT: serverProcess and serverPort are intentionally global to support a common CLI pattern:
+// 1. Call server() once to start a server and get a cleanup function
 // 2. Call px() multiple times with different commands that talk to the same server
 // 3. Call cleanup() at the end to shut down the server
+// So you can call server multiple times in a test and each time it will use the same server, but you can call it safely to get tempDir or serverPort or whatever else you need.
 // This mirrors real CLI usage where commands need a running server to operate against.
 let serverProcess: ChildProcess | null = null;
+let serverPort: number | null = null;
+let tempDir: string | null = null;
 
-async function px(
-  command?: string,
-  options?: PxOptions,
-  shouldSpawnServer: boolean = true
-): Promise<PxResult> {
-  // Create temp directory
-  const tempDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'positronic-server-test-')
-  );
-
-  let serverPort: number | null = null;
-
-  // Define cleanup function
+async function server({
+  args = [],
+  options = {},
+}: {
+  args?: string[];
+  options?: SpawnOptions;
+} = {}): Promise<{
+  tempDir: string;
+  serverPort: number;
+  cleanup: () => Promise<void>;
+}> {
   const cleanup = async () => {
     if (serverProcess && !serverProcess.killed) {
       serverProcess.kill('SIGTERM');
@@ -67,19 +57,28 @@ async function px(
         serverProcess!.on('close', () => resolve());
       });
       serverProcess = null; // Reset the global serverProcess
+      serverPort = null; // Reset the global serverPort
     }
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    if (tempDir) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      tempDir = null; // Reset the global tempDir
+    }
   };
 
   try {
-    if (shouldSpawnServer && !serverProcess) {
+    if (!tempDir) {
+      tempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'positronic-server-test-')
+      );
+    }
+
+    if (!serverProcess && !serverPort) {
       createMinimalProject(tempDir);
 
-      // Use a random port to avoid conflicts
       const testPort = 9000 + Math.floor(Math.random() * 1000);
 
       // Default spawn options
-      const defaultSpawnOptions: SpawnOptions = {
+      const defaultOptions: SpawnOptions = {
         cwd: tempDir,
         env: {
           ...process.env,
@@ -89,22 +88,16 @@ async function px(
         stdio: 'pipe',
       };
 
-      const finalSpawnOptions = {
-        ...defaultSpawnOptions,
-        ...options?.spawnOptions,
+      const finalOptions = {
+        ...defaultOptions,
+        ...options,
       };
 
       // Start the server
       serverProcess = spawn(
         nodeExecutable,
-        [
-          cliExecutable,
-          'server',
-          '--port',
-          testPort.toString(),
-          ...(options?.serverOptions || []),
-        ],
-        finalSpawnOptions
+        [cliExecutable, 'server', '--port', testPort.toString(), ...args],
+        finalOptions
       );
 
       const isReady = await waitUntilReady(testPort);
@@ -116,55 +109,69 @@ async function px(
       serverPort = testPort;
     }
   } catch (error) {
-    // If server setup fails, clean up
     await cleanup();
     throw error;
   }
+
+  return {
+    tempDir,
+    serverPort: serverPort!,
+    cleanup,
+  };
+}
+
+async function px(
+  command: string,
+  options: Partial<ExecSyncOptions> = {}
+): Promise<PxResult> {
+  let tempDir: string | null = null;
+  let serverPort: number | null = null;
+  if (!command.startsWith('server')) {
+    const result = await server();
+    tempDir = result.tempDir;
+    serverPort = result.serverPort;
+  }
+
+  // Default options for execSync
+  const defaultSyncOptions: ExecSyncOptions = {
+    cwd:
+      tempDir ||
+      fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-server-test-')),
+    stdio: 'pipe',
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      POSITRONIC_TEST_MODE: 'true',
+      ...(serverPort ? { POSITRONIC_SERVER_PORT: serverPort.toString() } : {}),
+    },
+  };
+
+  const finalSyncOptions = {
+    ...defaultSyncOptions,
+    ...options,
+  };
 
   let stdout = '';
   let stderr = '';
   let exitCode = 0;
 
   try {
-    // Default options for execSync
-    const defaultSyncOptions: ExecSyncOptions = {
-      cwd: tempDir,
-      stdio: 'pipe',
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        POSITRONIC_TEST_MODE: 'true',
-        ...(serverPort
-          ? { POSITRONIC_SERVER_PORT: serverPort.toString() }
-          : {}),
-      },
-    };
-
-    if (command) {
-      const finalSyncOptions = {
-        ...defaultSyncOptions,
-        ...options?.syncOptions,
-      };
-      const result = execSync(
-        `${nodeExecutable} ${cliExecutable} ${command}`,
-        finalSyncOptions
-      );
-      stdout = result?.toString() || '';
-    }
+    const result = execSync(
+      `${nodeExecutable} ${cliExecutable} ${command}`,
+      finalSyncOptions
+    );
+    stdout = result.toString() || '';
   } catch (error: any) {
-    // If command execution fails, clean up everything
-    await cleanup();
-    throw error;
+    stdout = error.stdout;
+    exitCode = error.status;
+    stderr = error.stderr;
   }
 
   // Return result with cleanup function for successful cases
   return {
-    tempDir,
     stdout,
     stderr,
     exitCode,
-    serverPort,
-    cleanup,
   };
 }
 
@@ -182,6 +189,16 @@ function createMinimalProject(dir: string, config?: any) {
 
   fs.mkdirSync(path.join(dir, 'brains'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'resources'), { recursive: true });
+
+  // Create default resources
+  fs.writeFileSync(
+    path.join(dir, 'resources', 'test.txt'),
+    'Default test resource'
+  );
+  fs.writeFileSync(
+    path.join(dir, 'resources', 'data.json'),
+    '{"default": true}'
+  );
 }
 
 // Helper function to fetch method call logs
@@ -191,31 +208,6 @@ async function fetchLogs(port: number): Promise<MethodCall[]> {
     throw new Error(`Failed to fetch logs: ${response.status}`);
   }
   return (await response.json()) as MethodCall[];
-}
-
-// Helper function to wait for resources to sync
-async function waitForResourcesSync(
-  serverPort: number,
-  expectedCount: number,
-  maxWaitMs = 5000
-): Promise<{ resources: Array<{ key: string }>; count: number } | null> {
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitMs) {
-    const response = await fetch(`http://localhost:${serverPort}/resources`);
-    if (response.ok) {
-      const data = (await response.json()) as {
-        resources: Array<{ key: string }>;
-        count: number;
-      };
-      if (data.count === expectedCount) {
-        return data;
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  return null;
 }
 
 // Helper function to wait for types file to contain specific content
@@ -244,43 +236,15 @@ async function waitForTypesFile(
 }
 
 describe('CLI Integration: positronic server', () => {
-  let tempDir: string;
-  let cleanup: (() => Promise<void>) | null = null;
-
-  beforeEach(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-server-test-'));
-
-    // Get cleanup function from px() - this will work for all px() calls in the test
-    const result = await px(undefined, undefined, false); // Don't spawn server yet
-    cleanup = result.cleanup;
-  });
-
-  afterEach(async () => {
-    // Always cleanup server if it was started
-    if (cleanup) {
-      await cleanup();
-      cleanup = null;
-    }
-
-    // Clean up temp directory
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  });
-
   describe('Project validation', () => {
     it('should not have server command available outside a Positronic project', async () => {
       // Run server command in a directory that is NOT a Positronic project
-      try {
-        await px('server', undefined, false);
-        // Should not reach here
-        expect(true).toBe(false);
-      } catch (error: any) {
-        // The server command should not be recognized outside a project
-        expect(error.stderr).toContain('Unknown command: server');
-        expect(error.status).toBe(1);
-      }
+      const { stderr, exitCode } = await px('server');
+      expect(exitCode).toBe(1);
+      expect(stderr).toContain('Unknown command: server');
 
       // Additionally, if we check help, server command should not be listed
-      const helpResult = await px('--help', undefined, false);
+      const helpResult = await px('server --help');
 
       expect(helpResult.stdout).not.toContain('server');
       expect(helpResult.stdout).not.toContain(
@@ -291,145 +255,99 @@ describe('CLI Integration: positronic server', () => {
 
   describe('Server lifecycle', () => {
     it('should call setup() and start() methods on the dev server', async () => {
-      const { tempDir, cleanup, serverPort } = await px();
+      // Call this to get the port and tempDir, server is already started
+      // though in the beforeEach.
+      const { serverPort, tempDir, cleanup } = await server();
 
-      if (!serverPort) {
-        throw new Error('Server port is not set');
+      try {
+        const methodCalls = await fetchLogs(serverPort);
+
+        // Verify the method calls
+        const setupCall = methodCalls.find((call) => call.method === 'setup');
+        const startCall = methodCalls.find((call) => call.method === 'start');
+
+        expect(setupCall).toBeDefined();
+        // Resolve symlinks before comparing paths
+        expect(fs.realpathSync(setupCall!.args[0])).toBe(
+          fs.realpathSync(tempDir)
+        );
+        expect(setupCall!.args[1]).toBe(false); // force flag not set
+
+        expect(startCall).toBeDefined();
+        expect(fs.realpathSync(startCall!.args[0])).toBe(
+          fs.realpathSync(tempDir)
+        );
+        expect(startCall!.args[1]).toBe(serverPort);
+      } finally {
+        await cleanup();
       }
-
-      // Wait for server to be ready
-      const isReady = await waitUntilReady(serverPort);
-      expect(isReady).toBe(true);
-
-      // Get the method call logs
-      const methodCalls = await fetchLogs(serverPort);
-
-      // Verify the method calls
-      const setupCall = methodCalls.find((call) => call.method === 'setup');
-      const startCall = methodCalls.find((call) => call.method === 'start');
-
-      expect(setupCall).toBeDefined();
-      // Resolve symlinks before comparing paths
-      expect(fs.realpathSync(setupCall!.args[0])).toBe(
-        fs.realpathSync(tempDir)
-      );
-      expect(setupCall!.args[1]).toBe(false); // force flag not set
-
-      expect(startCall).toBeDefined();
-      expect(fs.realpathSync(startCall!.args[0])).toBe(
-        fs.realpathSync(tempDir)
-      );
-      expect(startCall!.args[1]).toBe(serverPort);
-    });
-
-    it('should call setup() with force=true when --force flag is used', async () => {
-      // Start server with --force flag
-      const { cleanup, serverPort } = await px(undefined, {
-        serverOptions: ['--force'],
-      });
-
-      if (!serverPort) {
-        throw new Error('Server port is not set');
-      }
-
-      // Wait for server to be ready
-      const isReady = await waitUntilReady(serverPort);
-      expect(isReady).toBe(true);
-
-      // Get the method call logs
-      const methodCalls = await fetchLogs(serverPort);
-
-      // Verify setup was called with force=true
-      const setupCall = methodCalls.find((call) => call.method === 'setup');
-      expect(setupCall).toBeDefined();
-      expect(setupCall!.args[1]).toBe(true); // force flag should be true
     });
   });
 
   describe('Initial sync tests', () => {
     it('should sync resources after server starts', async () => {
-      const { tempDir, cleanup, serverPort } = await px();
+      const { serverPort, cleanup } = await server();
 
-      if (!serverPort) {
-        throw new Error('Server port is not set');
+      try {
+        // Get resources that should have been synced from createMinimalProject
+        const response = await fetch(
+          `http://localhost:${serverPort}/resources`
+        );
+        const data = (await response.json()) as {
+          resources: Array<{ key: string }>;
+          count: number;
+        };
+        // Now verify the results
+        expect(data).not.toBeNull();
+        expect(data!.resources).toBeDefined();
+        expect(data!.count).toBe(2); // 2 default resources from createMinimalProject
+        // Verify the resources were loaded from filesystem
+        const resourceKeys = data!.resources.map((r) => r.key);
+        expect(resourceKeys).toContain('test.txt');
+        expect(resourceKeys).toContain('data.json');
+      } finally {
+        await cleanup();
       }
-
-      // Create some resource files before server fully initializes
-      const resourcesDir = path.join(tempDir, 'resources');
-      fs.mkdirSync(resourcesDir, { recursive: true });
-      fs.writeFileSync(path.join(resourcesDir, 'test.txt'), 'Hello World');
-      fs.writeFileSync(
-        path.join(resourcesDir, 'data.json'),
-        '{"key": "value"}'
-      );
-
-      // Wait for server to be ready
-      const isReady = await waitUntilReady(serverPort);
-      expect(isReady).toBe(true);
-
-      // Wait for initial sync to complete
-      const data = await waitForResourcesSync(serverPort, 2);
-
-      // Now verify the results
-      expect(data).not.toBeNull();
-      expect(data!.resources).toBeDefined();
-      expect(data!.count).toBe(2);
-
-      // Verify the resources were loaded from filesystem
-      const resourceKeys = data!.resources.map((r) => r.key);
-      expect(resourceKeys).toContain('test.txt');
-      expect(resourceKeys).toContain('data.json');
     });
-
     it('should generate types file after server starts', async () => {
-      const { tempDir, cleanup, serverPort } = await px();
+      const { tempDir, cleanup } = await server();
 
-      if (!serverPort) {
-        throw new Error('Server port is not set');
+      try {
+        // Create some resource files
+        const resourcesDir = path.join(tempDir, 'resources');
+        fs.mkdirSync(resourcesDir, { recursive: true });
+        fs.writeFileSync(path.join(resourcesDir, 'readme.md'), '# README');
+        fs.writeFileSync(
+          path.join(resourcesDir, 'config.json'),
+          '{"setting": true}'
+        );
+        // Create a subdirectory with a resource
+        const docsDir = path.join(resourcesDir, 'docs');
+        fs.mkdirSync(docsDir, { recursive: true });
+        fs.writeFileSync(path.join(docsDir, 'api.md'), '# API Documentation');
+        // Wait for types file to be generated with our resources
+        const typesPath = path.join(tempDir, 'resources.d.ts');
+        const typesContent = await waitForTypesFile(typesPath, [
+          'readme: TextResource;',
+          'config: TextResource;',
+          'api: TextResource;',
+        ]);
+        // Check that the types file was generated with content
+        expect(typesContent).not.toBe('');
+        // Check for the module declaration
+        expect(typesContent).toContain("declare module '@positronic/core'");
+        // Check for resource type definitions
+        expect(typesContent).toContain('interface TextResource');
+        expect(typesContent).toContain('interface BinaryResource');
+        expect(typesContent).toContain('interface Resources');
+        // Check for the specific resources we created
+        expect(typesContent).toContain('readme: TextResource;');
+        expect(typesContent).toContain('config: TextResource;');
+        expect(typesContent).toContain('docs: {');
+        expect(typesContent).toContain('api: TextResource;');
+      } finally {
+        await cleanup();
       }
-
-      // Create some resource files
-      const resourcesDir = path.join(tempDir, 'resources');
-      fs.mkdirSync(resourcesDir, { recursive: true });
-      fs.writeFileSync(path.join(resourcesDir, 'readme.md'), '# README');
-      fs.writeFileSync(
-        path.join(resourcesDir, 'config.json'),
-        '{"setting": true}'
-      );
-
-      // Create a subdirectory with a resource
-      const docsDir = path.join(resourcesDir, 'docs');
-      fs.mkdirSync(docsDir, { recursive: true });
-      fs.writeFileSync(path.join(docsDir, 'api.md'), '# API Documentation');
-
-      // Wait for server to be ready
-      const isReady = await waitUntilReady(serverPort);
-      expect(isReady).toBe(true);
-
-      // Wait for types file to be generated with our resources
-      const typesPath = path.join(tempDir, 'resources.d.ts');
-      const typesContent = await waitForTypesFile(typesPath, [
-        'readme: TextResource;',
-        'config: TextResource;',
-        'api: TextResource;',
-      ]);
-
-      // Check that the types file was generated with content
-      expect(typesContent).not.toBe('');
-
-      // Check for the module declaration
-      expect(typesContent).toContain("declare module '@positronic/core'");
-
-      // Check for resource type definitions
-      expect(typesContent).toContain('interface TextResource');
-      expect(typesContent).toContain('interface BinaryResource');
-      expect(typesContent).toContain('interface Resources');
-
-      // Check for the specific resources we created
-      expect(typesContent).toContain('readme: TextResource;');
-      expect(typesContent).toContain('config: TextResource;');
-      expect(typesContent).toContain('docs: {');
-      expect(typesContent).toContain('api: TextResource;');
     });
   });
 });
