@@ -3,9 +3,6 @@ import * as path from 'path';
 import { jest, describe, it, expect } from '@jest/globals';
 import { createTestServer, waitForTypesFile, cli } from './test-utils.js';
 
-// Increase test timeout
-jest.setTimeout(30000);
-
 describe('CLI Integration: positronic resources types', () => {
   it('should generate type definitions for resources', async () => {
     const server = await createTestServer({
