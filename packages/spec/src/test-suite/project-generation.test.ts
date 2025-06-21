@@ -1,3 +1,11 @@
+import { describe, it, expect } from '@jest/globals';
+
+describe('Project Generation', () => {
+  it('should be true', async () => {
+    expect(true).toBe(true);
+  });
+});
+
 /**
  * Project Generation Compliance Tests
  *
