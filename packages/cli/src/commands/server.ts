@@ -28,25 +28,14 @@ export class ServerCommand {
     } else {
       // Read the backend configuration from positronic.config.json
       const configPath = path.join(projectRootPath, 'positronic.config.json');
-      let backendPackage = '@positronic/cloudflare'; // Default fallback
-
-      try {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        if (config.backend?.package) {
-          backendPackage = config.backend.package;
-        } else if (config.backend?.type === 'cloudflare') {
-          // Legacy support for configs without package field
-          backendPackage = '@positronic/cloudflare';
-        }
-      } catch (error) {
-        console.warn(
-          `Warning: Could not read backend configuration from ${configPath}, using default: ${backendPackage}`
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      if (!config.backend) {
+        throw new Error(
+          'No backend configuration found in positronic.config.json'
         );
       }
-
-      // Handle different package types
+      const backendPackage = config.backend.package;
       if (backendPackage.startsWith('file:')) {
-        // Direct file path from config
         const packagePath = backendPackage.replace('file:', '');
         const localModulePath = path.join(
           packagePath,
@@ -54,110 +43,11 @@ export class ServerCommand {
           'src',
           'node-index.js'
         );
-        try {
-          const localPackage = await import(localModulePath);
-          // Try common export patterns
-          const DevServerClass =
-            localPackage.DevServer ||
-            localPackage.CloudflareDevServer ||
-            localPackage.default?.DevServer;
-          if (!DevServerClass) {
-            throw new Error(
-              `Backend package at '${packagePath}' does not export a DevServer class`
-            );
-          }
-          devServer = new DevServerClass();
-        } catch (error: any) {
-          console.error(`Failed to load local backend from ${localModulePath}`);
-          console.error(`Error: ${error.message}`);
-          console.error(`Make sure the backend package is built.`);
-          process.exit(1);
-        }
-      } else if (
-        process.env.POSITRONIC_LOCAL_PATH &&
-        backendPackage.startsWith('@positronic/')
-      ) {
-        // Handle @positronic/ packages with POSITRONIC_LOCAL_PATH override
-        const packageName = backendPackage.replace('@positronic/', '');
-        const localPath = path.resolve(
-          process.env.POSITRONIC_LOCAL_PATH,
-          'packages',
-          packageName
-        );
-        if (fs.existsSync(localPath)) {
-          // Import from local path - use the built output
-          const localModulePath = path.join(
-            localPath,
-            'dist',
-            'src',
-            'node-index.js'
-          );
-          try {
-            const localPackage = await import(localModulePath);
-            // Try common export patterns
-            const DevServerClass =
-              localPackage.DevServer ||
-              localPackage.CloudflareDevServer ||
-              localPackage.default?.DevServer;
-            if (!DevServerClass) {
-              throw new Error(
-                `Backend package '${backendPackage}' does not export a DevServer class`
-              );
-            }
-            devServer = new DevServerClass();
-          } catch (error: any) {
-            console.error(
-              `Failed to load local backend from ${localModulePath}`
-            );
-            console.error(`Error: ${error.message}`);
-            console.error(`Make sure the backend package is built.`);
-            process.exit(1);
-          }
-        } else {
-          // Fallback to npm package
-          try {
-            const backendModule = await import(backendPackage);
-            const DevServerClass =
-              backendModule.DevServer ||
-              backendModule.CloudflareDevServer ||
-              backendModule.default?.DevServer;
-            if (!DevServerClass) {
-              throw new Error(
-                `Backend package '${backendPackage}' does not export a DevServer class`
-              );
-            }
-            devServer = new DevServerClass();
-          } catch (error: any) {
-            console.error(
-              `Failed to load backend '${backendPackage}'. Is it installed?`
-            );
-            console.error(`Error: ${error.message}`);
-            console.error(`Try running: npm install ${backendPackage}`);
-            process.exit(1);
-          }
-        }
+        const { DevServer } = await import(localModulePath);
+        devServer = new DevServer();
       } else {
-        // Normal npm package import
-        try {
-          const backendModule = await import(backendPackage);
-          const DevServerClass =
-            backendModule.DevServer ||
-            backendModule.CloudflareDevServer ||
-            backendModule.default?.DevServer;
-          if (!DevServerClass) {
-            throw new Error(
-              `Backend package '${backendPackage}' does not export a DevServer class`
-            );
-          }
-          devServer = new DevServerClass();
-        } catch (error: any) {
-          console.error(
-            `Failed to load backend '${backendPackage}'. Is it installed?`
-          );
-          console.error(`Error: ${error.message}`);
-          console.error(`Try running: npm install ${backendPackage}`);
-          process.exit(1);
-        }
+        const { DevServer } = await import(backendPackage);
+        devServer = new DevServer();
       }
     }
 
