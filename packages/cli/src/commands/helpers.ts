@@ -63,7 +63,6 @@ export async function generateProject(
       newProjectTemplatePath = copiedNewProjectPkg;
       cazOptions = {
         name: projectName,
-        backend: 'cloudflare',
         install: true,
         pm: 'npm',
       };

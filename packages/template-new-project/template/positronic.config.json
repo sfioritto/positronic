@@ -1,7 +1,8 @@
 {
   "projectName": "<%= name %>",
   "backend": {
-    "type": "cloudflare"
+    "type": "<%= backend %>",
+    "package": "<%= backendPackage %>"
   },
   "version": "1"
 }

@@ -9,6 +9,8 @@ export { PositronicManifest } from './manifest.js';
 export { CloudflareR2Loader } from './r2-loader.js';
 export { createResources } from '@positronic/core';
 export { CloudflareDevServer } from './dev-server.js';
+// Export with standard name for CLI to use
+export { CloudflareDevServer as DevServer } from './dev-server.js';
 
 // Note: We do NOT export BrainRunnerDO, MonitorDO, or api here
 // because they depend on cloudflare:workers runtime

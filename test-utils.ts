@@ -1,6 +1,3 @@
-import process from 'process';
-import fetch from 'node-fetch';
-
 /**
  * Helper function to get the next value from an AsyncIterator.
  * Throws an error if the iterator is done.

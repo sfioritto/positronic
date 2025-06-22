@@ -10,7 +10,6 @@ import { ServerCommand } from './commands/server.js';
 import { PromptCommand } from './commands/prompt.js';
 import { BrainCommand } from './commands/brain.js';
 import { ResourcesCommand } from './commands/resources.js';
-import { CloudflareDevServer } from '@positronic/cloudflare';
 import type { PositronicDevServer } from '@positronic/spec';
 
 function findProjectRootSync(startDir: string): string | null {

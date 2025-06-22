@@ -51,17 +51,42 @@ module.exports = {
     let cloudflareVersion = 'latest';
     let clientVercelVersion = 'latest';
 
+    // Map backend selection to package names
+    const backendPackageMap = {
+      'cloudflare': '@positronic/cloudflare',
+      'aws': '@positronic/aws-lambda', // Future
+      'azure': '@positronic/azure-functions', // Future
+      'gcp': '@positronic/gcp-functions', // Future
+      'fly': '@positronic/fly', // Future
+      'none': null
+    };
+
+    ctx.answers.backendPackage = backendPackageMap[ctx.answers.backend];
+
     if (devRootPath) {
       console.log(`Found POSITRONIC_LOCAL_PATH: ${devRootPath}. Using local file path for @positronic/core.`);
       const corePath = path.resolve(devRootPath, 'packages', 'core');
       coreVersion = `file:${corePath}`;
       console.log(`  - Mapping @positronic/core to ${coreVersion}`);
-      console.log(`  - Mapping @positronic/cloudflare to ${cloudflareVersion}`);
 
-      const cloudflarePath = path.resolve(devRootPath, 'packages', 'cloudflare');
-      if (existsSync(cloudflarePath)) {
-        cloudflareVersion = `file:${cloudflarePath}`;
+      // Handle backend packages for local development
+      if (ctx.answers.backend === 'cloudflare') {
+        const cloudflarePath = path.resolve(devRootPath, 'packages', 'cloudflare');
+        if (existsSync(cloudflarePath)) {
+          cloudflareVersion = `file:${cloudflarePath}`;
+          // Also update the backend package for the config file
+          ctx.answers.backendPackage = `file:${cloudflarePath}`;
+          console.log(`  - Mapping @positronic/cloudflare to ${cloudflareVersion}`);
+        }
       }
+      // Add similar blocks for other backends when they exist
+      // Example for future backends:
+      // if (ctx.answers.backend === 'aws') {
+      //   const awsPath = path.resolve(devRootPath, 'packages', 'aws-lambda');
+      //   if (existsSync(awsPath)) {
+      //     ctx.answers.backendPackage = `file:${awsPath}`;
+      //   }
+      // }
 
       const clientVercelPath = path.resolve(devRootPath, 'packages', 'client-vercel');
       if (existsSync(clientVercelPath)) {

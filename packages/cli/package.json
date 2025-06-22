@@ -18,7 +18,6 @@
   "dependencies": {
     "@positronic/core": "^0.0.1",
     "@positronic/spec": "^0.0.1",
-    "@positronic/cloudflare": "^0.0.1",
     "@positronic/template-new-project": "^0.0.1",
     "caz": "^2.0.0",
     "chokidar": "^3.6.0",
