@@ -33,19 +33,6 @@ function findProjectRootSync(startDir: string): string | null {
 const projectRootPath = findProjectRootSync(process.cwd());
 const isLocalDevMode = !!projectRootPath;
 
-// Helper to resolve template paths relative to the current file
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Assuming templates are inside the cli package at packages/cli/templates
-// Compiled file likely at packages/cli/dist/positronic.js
-// Need to go up 1 level to packages/cli/, then into templates/
-const templatesBaseDir = path.resolve(__dirname, '../templates');
-const cloudflareDevServerTemplateDir = path.join(
-  templatesBaseDir,
-  'cloudflare-dev-server'
-);
-const brainTemplateDir = path.join(templatesBaseDir, 'brain');
-
 // Instantiate command classes, passing the determined mode and path
 const projectCommand = new ProjectCommand(isLocalDevMode);
 
