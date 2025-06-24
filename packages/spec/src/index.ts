@@ -55,4 +55,4 @@ export interface PositronicDevServer {
   deploy?(projectRoot: string, config?: any): Promise<void>;
 }
 
-export { testStatus, resources } from './api.js';
+export { testStatus, resources, brains } from './api.js';

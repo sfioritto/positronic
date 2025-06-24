@@ -235,3 +235,220 @@ export const resources = {
     }
   },
 };
+
+export const brains = {
+  /**
+   * Test POST /brains/runs - Create a new brain run
+   */
+  async run(fetch: Fetch, brainName: string): Promise<string | null> {
+    try {
+      const request = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ brainName }),
+      });
+
+      const response = await fetch(request);
+
+      if (response.status !== 201) {
+        console.error(
+          `POST /brains/runs returned ${response.status}, expected 201`
+        );
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (!data.brainRunId || typeof data.brainRunId !== 'string') {
+        console.error(
+          `Expected brainRunId to be string, got ${typeof data.brainRunId}`
+        );
+        return null;
+      }
+
+      return data.brainRunId;
+    } catch (error) {
+      console.error(`Failed to test POST /brains/runs:`, error);
+      return null;
+    }
+  },
+
+  /**
+   * Test GET /brains/runs/:runId/watch - Watch a brain run via SSE
+   */
+  async watch(fetch: Fetch, runId: string): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/brains/runs/${runId}/watch`,
+        {
+          method: 'GET',
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(
+          `GET /brains/runs/${runId}/watch returned ${response.status}`
+        );
+        return false;
+      }
+
+      // Check that it's an event stream
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('text/event-stream')) {
+        console.error(
+          `Expected content-type to be text/event-stream, got ${contentType}`
+        );
+        return false;
+      }
+
+      // Read a bit of the stream to verify it's actually SSE format
+      if (response.body) {
+        const reader = response.body.getReader();
+        try {
+          // Read first chunk
+          const { value } = await reader.read();
+          if (value) {
+            const text = new TextDecoder().decode(value);
+            // SSE data should contain "data: " lines
+            if (!text.includes('data: ')) {
+              console.error(
+                `Expected SSE format with "data: " prefix, got: ${text.substring(
+                  0,
+                  100
+                )}`
+              );
+              return false;
+            }
+          }
+        } finally {
+          // Always cancel the reader to clean up
+          await reader.cancel();
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /brains/runs/${runId}/watch:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test GET /brains/:brainName/history - Get history of brain runs
+   */
+  async history(
+    fetch: Fetch,
+    brainName: string,
+    limit?: number
+  ): Promise<boolean> {
+    try {
+      const url = new URL(
+        'http://example.com/brains/' + brainName + '/history'
+      );
+      if (limit !== undefined) {
+        url.searchParams.set('limit', limit.toString());
+      }
+
+      const request = new Request(url.toString(), {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(
+          `GET /brains/${brainName}/history returned ${response.status}`
+        );
+        return false;
+      }
+
+      const data = await response.json();
+
+      // Validate response structure
+      if (!data.runs || !Array.isArray(data.runs)) {
+        console.error(`Expected runs to be an array, got ${typeof data.runs}`);
+        return false;
+      }
+
+      // Validate each run has required fields
+      for (const run of data.runs) {
+        if (
+          !run.workflowRunId ||
+          !run.workflowTitle ||
+          !run.type ||
+          !run.status ||
+          typeof run.createdAt !== 'number'
+        ) {
+          console.error(`Run missing required fields: ${JSON.stringify(run)}`);
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /brains/${brainName}/history:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test GET /brains/watch - Watch all running brains
+   */
+  async watchAll(fetch: Fetch): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/brains/watch', {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /brains/watch returned ${response.status}`);
+        return false;
+      }
+
+      // Check that it's an event stream
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('text/event-stream')) {
+        console.error(
+          `Expected content-type to be text/event-stream, got ${contentType}`
+        );
+        return false;
+      }
+
+      // Read a bit of the stream to verify it's actually SSE format
+      if (response.body) {
+        const reader = response.body.getReader();
+        try {
+          // Read first chunk
+          const { value } = await reader.read();
+          if (value) {
+            const text = new TextDecoder().decode(value);
+            // SSE data should contain "data: " lines
+            if (!text.includes('data: ')) {
+              console.error(
+                `Expected SSE format with "data: " prefix, got: ${text.substring(
+                  0,
+                  100
+                )}`
+              );
+              return false;
+            }
+          }
+        } finally {
+          // Always cancel the reader to clean up
+          await reader.cancel();
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /brains/watch:`, error);
+      return false;
+    }
+  },
+};
