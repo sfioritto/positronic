@@ -83,6 +83,14 @@ export const ResourceList = () => {
           <Text color="yellow">⚠️  Results truncated. More resources exist than shown.</Text>
         </Box>
       )}
+
+      {/* Legend for resource types */}
+      {resources.some(r => !r.local) && (
+        <Box marginTop={1} flexDirection="column">
+          <Text dimColor>─────</Text>
+          <Text dimColor>↗ = uploaded resource (not in local filesystem)</Text>
+        </Box>
+      )}
     </Box>
   );
 };
@@ -127,14 +135,22 @@ const TreeView: React.FC<TreeViewProps> = ({ node, prefix = '', isLast = true, d
   const extension = isLast ? '    ' : '│   ';
   const isTopLevel = depth === 0;
 
+  // Determine if this is a remote resource
+  const isRemote = node.resource && !node.resource.local;
+
   return (
     <Box flexDirection="column">
       <Box>
         {!isTopLevel && <Text dimColor>{prefix}{connector}</Text>}
-        <Text>
+        <Text
+          dimColor={isRemote}
+        >
           {node.name}
           {node.resource && (
-            <Text dimColor> ({formatSize(node.resource.size)})</Text>
+            <>
+              <Text dimColor> ({formatSize(node.resource.size)})</Text>
+              {isRemote && <Text dimColor> ↗</Text>}
+            </>
           )}
         </Text>
       </Box>
