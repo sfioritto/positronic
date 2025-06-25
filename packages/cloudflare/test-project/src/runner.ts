@@ -3,7 +3,6 @@ import {
   type ObjectGenerator,
   type Message,
 } from '@positronic/core';
-import { z, type TypeOf } from 'zod';
 
 // A simple mock client for testing purposes
 const mockClient: ObjectGenerator = {
@@ -15,7 +14,7 @@ const mockClient: ObjectGenerator = {
     messages?: Message[];
     system?: string;
   }) => {
-    return Promise.resolve({} as TypeOf<any>);
+    return Promise.resolve({} as any);
   },
 };
 

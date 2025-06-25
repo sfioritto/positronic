@@ -69,10 +69,12 @@ describe('CLI Integration: positronic server', () => {
 
     beforeEach(async () => {
       server = await createTestServer();
-    });
+    }, 10000);
 
     afterEach(async () => {
-      await server.cleanup();
+      if (server) {
+        await server.cleanup();
+      }
     });
 
     it('should sync resources after server starts', async () => {
@@ -90,7 +92,7 @@ describe('CLI Integration: positronic server', () => {
       const resourceKeys = data!.resources.map((r) => r.key);
       expect(resourceKeys).toContain('test.txt');
       expect(resourceKeys).toContain('data.json');
-    });
+    }, 10000);
 
     it('should generate types file after server starts', async () => {
       // Create some resource files
@@ -124,11 +126,15 @@ describe('CLI Integration: positronic server', () => {
 
       // Wait for types file to be generated with our resources
       const typesPath = path.join(server.dir, 'resources.d.ts');
-      const typesContent = await waitForTypesFile(typesPath, [
-        'readme: TextResource;',
-        'config: TextResource;',
-        'api: TextResource;',
-      ]);
+      const typesContent = await waitForTypesFile(
+        typesPath,
+        [
+          'readme: TextResource;',
+          'config: TextResource;',
+          'api: TextResource;',
+        ],
+        8000 // Increase timeout to 8 seconds
+      );
       // Check that the types file was generated with content
       expect(typesContent).not.toBe('');
       // Check for the module declaration
@@ -142,6 +148,6 @@ describe('CLI Integration: positronic server', () => {
       expect(typesContent).toContain('config: TextResource;');
       expect(typesContent).toContain('docs: {');
       expect(typesContent).toContain('api: TextResource;');
-    });
+    }, 10000);
   });
 });

@@ -10,10 +10,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./test-suite": {
-      "types": "./dist/test-suite/index.d.ts",
-      "import": "./dist/test-suite/index.js"
     }
   },
   "scripts": {
@@ -21,9 +17,6 @@
     "swc": "swc src -d dist",
     "build": "npm run tsc && npm run swc",
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
-  },
-  "peerDependencies": {
-    "@positronic/core": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

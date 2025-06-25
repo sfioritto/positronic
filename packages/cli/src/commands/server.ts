@@ -115,30 +115,63 @@ export class ServerCommand {
         process.exit(1);
       });
       // Wait for the server to be ready before syncing resources
-      const isReady = await waitUntilReady(argv.port);
+      const isReady = await waitUntilReady(argv.port, 15000);
 
       if (!isReady) {
         console.error(
-          'Warning: Server did not become ready within timeout period'
+          '⚠️  Server startup timeout: The server is taking longer than expected to initialize.'
         );
+        console.error(
+          '\nThis often happens when you have a large number of resources that need to be loaded.'
+        );
+        console.error('\nTo resolve this, try the following:');
+        console.error(
+          '  1. Run `px resources sync` in a separate terminal to sync your resources first'
+        );
+        console.error(
+          '  2. Once the sync is complete, restart the server with `px server`'
+        );
+        console.error(
+          '\nThis will pre-populate the server with your resources and speed up initialization.'
+        );
+
+        // Clean up and exit
+        if (serverProcess && !serverProcess.killed) {
+          serverProcess.kill('SIGTERM');
+        }
+        process.exit(1);
       }
 
       // Initial resource sync and type generation
-      const syncResult = await syncResources(projectRootPath);
-      if (syncResult.errorCount > 0) {
-        console.log(
-          `⚠️  Resource sync completed with ${syncResult.errorCount} errors:`
-        );
-        syncResult.errors.forEach((error) => {
-          console.log(`   • ${error.file}: ${error.message}`);
-        });
-      } else {
-        console.log(
-          `✅ Synced ${syncResult.uploadCount} resources (${syncResult.skipCount} up to date)`
-        );
-      }
+      try {
+        const syncResult = await syncResources(projectRootPath);
+        if (syncResult.errorCount > 0) {
+          console.log(
+            `⚠️  Resource sync completed with ${syncResult.errorCount} errors:`
+          );
+          syncResult.errors.forEach((error) => {
+            console.log(`   • ${error.file}: ${error.message}`);
+          });
+        } else {
+          console.log(
+            `✅ Synced ${syncResult.uploadCount} resources (${syncResult.skipCount} up to date)`
+          );
+        }
 
-      await generateTypes(projectRootPath);
+        await generateTypes(projectRootPath);
+      } catch (error) {
+        console.error(
+          '❌ Error during resource synchronization:',
+          error instanceof Error ? error.message : String(error)
+        );
+        console.error(
+          '\nThe server is running, but resources may not be available to your workflows.'
+        );
+        console.error(
+          '\nYou can manually sync resources by running: px resources sync'
+        );
+        // Don't exit here - let the server continue running
+      }
 
       // Watcher setup - target the user's brains and resources directories
       const watchPaths = [

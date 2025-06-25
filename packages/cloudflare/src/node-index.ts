@@ -7,7 +7,6 @@
 // Only export modules that don't depend on cloudflare:workers
 export { PositronicManifest } from './manifest.js';
 export { CloudflareR2Loader } from './r2-loader.js';
-export { createResources } from '@positronic/core';
 export { CloudflareDevServer } from './dev-server.js';
 // Export with standard name for CLI to use
 export { CloudflareDevServer as DevServer } from './dev-server.js';

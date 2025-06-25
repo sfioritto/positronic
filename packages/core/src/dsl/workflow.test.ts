@@ -9,7 +9,7 @@ import {
   type SerializedStepStatus,
 } from './workflow.js';
 import { z } from 'zod';
-import { nextStep } from '../../../../test-utils.js';
+import { nextStep } from '../test-utils.js';
 import { jest } from '@jest/globals';
 import { ObjectGenerator } from '../clients/types.js';
 import { createResources, type Resources } from '../resources/resources.js';
