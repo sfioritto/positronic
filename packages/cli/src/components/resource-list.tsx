@@ -15,6 +15,13 @@ interface ResourcesResponse {
   count: number;
 }
 
+interface TreeNode {
+  name: string;
+  type: 'directory' | 'file';
+  resource?: ApiResourceEntry;
+  children: Map<string, TreeNode>;
+}
+
 export const ResourceList = () => {
   const { data, loading, error } = useApiGet<ResourcesResponse>('/resources');
 
@@ -32,9 +39,33 @@ export const ResourceList = () => {
 
   const { resources, truncated } = data;
 
-  // Group resources by type
-  const textResources = resources.filter(r => r.type === 'text');
-  const binaryResources = resources.filter(r => r.type === 'binary');
+  // Build tree structure
+  const root: TreeNode = {
+    name: 'resources',
+    type: 'directory',
+    children: new Map(),
+  };
+
+  // Build the tree from flat resources
+  resources.forEach((resource) => {
+    const parts = resource.key.split('/');
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          name: part,
+          type: isLast ? 'file' : 'directory',
+          resource: isLast ? resource : undefined,
+          children: new Map(),
+        });
+      }
+      current = current.children.get(part)!;
+    }
+  });
 
   return (
     <Box flexDirection="column" paddingTop={1}>
@@ -42,33 +73,79 @@ export const ResourceList = () => {
         Found {resources.length} resource{resources.length === 1 ? '' : 's'}:
       </Text>
 
-      {textResources.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text>📄 Text Resources:</Text>
-          {textResources.map((resource) => (
-            <Box key={resource.key} paddingLeft={2}>
-              <Text>- {resource.key} ({formatSize(resource.size)})</Text>
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {binaryResources.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text>📦 Binary Resources:</Text>
-          {binaryResources.map((resource) => (
-            <Box key={resource.key} paddingLeft={2}>
-              <Text>- {resource.key} ({formatSize(resource.size)})</Text>
-            </Box>
-          ))}
-        </Box>
-      )}
+      <Box marginTop={1}>
+        <TreeView node={root} />
+      </Box>
 
       {truncated && (
         <Box marginTop={1}>
           <Text color="yellow">⚠️  Results truncated. More resources exist than shown.</Text>
         </Box>
       )}
+    </Box>
+  );
+};
+
+interface TreeViewProps {
+  node: TreeNode;
+  prefix?: string;
+  isLast?: boolean;
+  depth?: number;
+}
+
+const TreeView: React.FC<TreeViewProps> = ({ node, prefix = '', isLast = true, depth = 0 }) => {
+  const children = Array.from(node.children.entries()).sort(([a], [b]) => {
+    // Sort directories first, then alphabetically
+    const aIsDir = node.children.get(a)!.type === 'directory';
+    const bIsDir = node.children.get(b)!.type === 'directory';
+    if (aIsDir && !bIsDir) return -1;
+    if (!aIsDir && bIsDir) return 1;
+    return a.localeCompare(b);
+  });
+
+  // Don't render the root node itself, just its children
+  if (node.name === 'resources' && node.type === 'directory') {
+    return (
+      <Box flexDirection="column">
+        {children.map(([name, child], index) => (
+          <React.Fragment key={name}>
+            {index > 0 && <Box><Text> </Text></Box>}
+            <TreeView
+              node={child}
+              prefix=""
+              isLast={index === children.length - 1}
+              depth={0}
+            />
+          </React.Fragment>
+        ))}
+      </Box>
+    );
+  }
+
+  const connector = isLast ? '└── ' : '├── ';
+  const extension = isLast ? '    ' : '│   ';
+  const isTopLevel = depth === 0;
+
+  return (
+    <Box flexDirection="column">
+      <Box>
+        {!isTopLevel && <Text dimColor>{prefix}{connector}</Text>}
+        <Text>
+          {node.name}
+          {node.resource && (
+            <Text dimColor> ({formatSize(node.resource.size)})</Text>
+          )}
+        </Text>
+      </Box>
+      {children.map(([name, child], index) => (
+        <TreeView
+          key={name}
+          node={child}
+          prefix={prefix + (isTopLevel ? '' : extension)}
+          isLast={index === children.length - 1}
+          depth={depth + 1}
+        />
+      ))}
     </Box>
   );
 };
