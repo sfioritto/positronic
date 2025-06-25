@@ -1,7 +1,7 @@
 import {
   api as app,
   setManifest,
-  setWorkflowRunner,
+  setBrainRunner,
   BrainRunnerDO,
   MonitorDO,
   PositronicManifest,
@@ -16,7 +16,7 @@ const manifest = new PositronicManifest({
 });
 
 setManifest(manifest);
-setWorkflowRunner(runner);
+setBrainRunner(runner);
 
 // Define Env type based on wrangler.jsonc bindings
 interface Env {

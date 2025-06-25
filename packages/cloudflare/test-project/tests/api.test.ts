@@ -525,9 +525,9 @@ describe('Hono API Tests', () => {
       }
     };
 
-    // Read for a while to capture workflow completions
+    // Read for a while to capture brain completions
     const startTime = Date.now();
-    const TIMEOUT = 5000; // 5 seconds should be enough for our test workflows
+    const TIMEOUT = 5000; // 5 seconds should be enough for our test brains
 
     try {
       while (Date.now() - startTime < TIMEOUT) {

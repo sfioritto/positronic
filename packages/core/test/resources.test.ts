@@ -130,7 +130,7 @@ describe('Resources API', () => {
   });
 
   describe('Mixed usage', () => {
-    it('should support both APIs in the same workflow', async () => {
+    it('should support both APIs in the same brain', async () => {
       // Use proxy API for clean names
       const example = await resources.example.loadText();
 

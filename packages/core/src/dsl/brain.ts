@@ -366,7 +366,7 @@ export class Brain<
 
 class Step {
   public id: string;
-  private patch?: JsonPatch | string;
+  private patch?: JsonPatch;
   private status: (typeof STATUS)[keyof typeof STATUS] = STATUS.PENDING;
 
   constructor(public block: Block<any, any, any, any>, id?: string) {

@@ -1,6 +1,6 @@
-import { workflow } from '@positronic/core';
+import { brain } from '@positronic/core';
 
-const exampleWorkflow = workflow('example')
+const exampleBrain = brain('example')
   .step('Start', ({ state }) => ({
     ...state,
     message: 'Welcome to Positronic!',
@@ -10,4 +10,4 @@ const exampleWorkflow = workflow('example')
     finalMessage: state.message + ' Your project is set up.',
   }));
 
-export default exampleWorkflow;
+export default exampleBrain;
