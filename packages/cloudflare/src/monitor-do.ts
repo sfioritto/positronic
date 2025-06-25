@@ -16,7 +16,7 @@ export class MonitorDO extends DurableObject<Env> {
 
     // Update table schema and indexes
     this.storage.exec(`
-      CREATE TABLE IF NOT EXISTS workflow_runs (
+      CREATE TABLE IF NOT EXISTS brain_runs (
         run_id TEXT PRIMARY KEY,
         brain_title TEXT NOT NULL, -- Renamed column
         brain_description TEXT, -- Renamed column
@@ -30,10 +30,10 @@ export class MonitorDO extends DurableObject<Env> {
       );
 
       CREATE INDEX IF NOT EXISTS idx_brain_status -- Renamed index
-      ON workflow_runs(brain_title, status);
+      ON brain_runs(brain_title, status);
 
       CREATE INDEX IF NOT EXISTS idx_brain_time -- Renamed index
-      ON workflow_runs(created_at DESC);
+      ON brain_runs(created_at DESC);
     `);
   }
 
@@ -60,7 +60,7 @@ export class MonitorDO extends DurableObject<Env> {
       // Update SQL insert/update with new column names, read from existing event fields
       this.storage.exec(
         `
-        INSERT INTO workflow_runs (
+        INSERT INTO brain_runs (
           run_id, brain_title, brain_description, type, status,
           options, error, created_at, started_at, completed_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -101,7 +101,7 @@ export class MonitorDO extends DurableObject<Env> {
         created_at as createdAt,
         started_at as startedAt,
         completed_at as completedAt
-      FROM workflow_runs
+      FROM brain_runs
       WHERE status = ?
       ORDER BY created_at DESC
     `,
@@ -134,7 +134,7 @@ export class MonitorDO extends DurableObject<Env> {
                 created_at as createdAt,
                 started_at as startedAt,
                 completed_at as completedAt
-              FROM workflow_runs
+              FROM brain_runs
               WHERE status = ?
               ORDER BY created_at DESC
             `,
@@ -175,7 +175,7 @@ export class MonitorDO extends DurableObject<Env> {
     return this.storage
       .exec(
         `
-      SELECT * FROM workflow_runs WHERE run_id = ?
+      SELECT * FROM brain_runs WHERE run_id = ?
     `,
         brainRunId
       )
@@ -200,7 +200,7 @@ export class MonitorDO extends DurableObject<Env> {
         created_at as createdAt,
         started_at as startedAt,
         completed_at as completedAt
-      FROM workflow_runs
+      FROM brain_runs
       WHERE brain_title = ? -- Filter by new column name
       ORDER BY created_at DESC
       LIMIT ?

@@ -1,7 +1,7 @@
 {
   "name": "@positronic/cloudflare",
   "version": "0.0.1",
-  "description": "Cloudflare bindings for Positronic workflows",
+  "description": "Cloudflare bindings for Positronic brains",
   "type": "module",
   "exports": {
     ".": {

@@ -2,7 +2,7 @@ import { BrainRunner, type Resources } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
-import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
+import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 import { PositronicManifest } from './manifest.js';
 import { CloudflareR2Loader } from './r2-loader.js';
@@ -20,7 +20,7 @@ export function setBrainRunner(runner: BrainRunner) {
 }
 
 export interface Env {
-  WORKFLOW_RUNNER_DO: DurableObjectNamespace;
+  BRAIN_RUNNER_DO: DurableObjectNamespace;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   RESOURCES_BUCKET: R2Bucket;
 }
@@ -168,16 +168,16 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('Runtime manifest not initialized');
     }
 
-    const workflowToRun = await manifest.import(brainName);
-    if (!workflowToRun) {
+    const brainToRun = await manifest.import(brainName);
+    if (!brainToRun) {
       console.error(
-        `[DO ${brainRunId}] Workflow ${brainName} not found in manifest.`
+        `[DO ${brainRunId}] Brain ${brainName} not found in manifest.`
       );
       console.error(JSON.stringify(manifest, null, 2));
-      throw new Error(`Workflow ${brainName} not found`);
+      throw new Error(`Brain ${brainName} not found`);
     }
 
-    const sqliteAdapter = new WorkflowRunSQLiteAdapter(sql);
+    const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
     const monitorAdapter = new MonitorAdapter(
       this.env.MONITOR_DO.get(this.env.MONITOR_DO.idFromName('singleton'))
@@ -199,7 +199,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     runnerWithResources
       .withAdapters([sqliteAdapter, eventStreamAdapter, monitorAdapter])
-      .run(workflowToRun, {
+      .run(brainToRun, {
         initialState: initialData || {},
         brainRunId,
       })
@@ -230,7 +230,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
               streamController = controller;
               const existingEventsSql = `
                 SELECT serialized_event
-                FROM workflow_events
+                FROM brain_events
                 ORDER BY event_id ASC;
               `;
               const existingEventsResult = sql

@@ -67,7 +67,7 @@ interface WatchProps {
 export const Watch = ({ runId, port }: WatchProps) => {
   const [steps, setSteps] = useState<SerializedStepStatus[]>([]);
   const [brainTitle, setBrainTitle] = useState<string | undefined>(undefined);
-  const [workflowError, setWorkflowError] = useState<BrainErrorEvent | undefined>(undefined);
+  const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
@@ -105,7 +105,7 @@ export const Watch = ({ runId, port }: WatchProps) => {
         }
 
         if (eventData.type === BRAIN_EVENTS.ERROR) {
-          setWorkflowError(eventData);
+          setBrainError(eventData);
         }
       } catch (e: any) {
         setError(new Error(`Error parsing event data: ${e.message}`));
@@ -132,7 +132,7 @@ export const Watch = ({ runId, port }: WatchProps) => {
   return (
     <Box flexDirection="column">
       <WatchStatus steps={steps} brainTitle={brainTitle} runId={runId} />
-      {isCompleted && !error && !workflowError && (
+      {isCompleted && !error && !brainError && (
         <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
             <Text color="green">Brain completed.</Text>
         </Box>
@@ -143,11 +143,11 @@ export const Watch = ({ runId, port }: WatchProps) => {
           <Text color="red">{error.stack}</Text>
         </Box>
       )}
-      {workflowError && (
+      {brainError && (
         <Box borderStyle="round" borderColor="red" padding={1}>
-          <Text color="red">{workflowError.error.name}</Text>
-          <Text color="red">{workflowError.error.message}</Text>
-          <Text color="red">{workflowError.error.stack}</Text>
+          <Text color="red">{brainError.error.name}</Text>
+          <Text color="red">{brainError.error.message}</Text>
+          <Text color="red">{brainError.error.stack}</Text>
         </Box>
       )}
     </Box>

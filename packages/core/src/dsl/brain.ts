@@ -109,14 +109,14 @@ type StepBlock<
   ) => TStateOut | Promise<TStateOut>;
 };
 
-type WorkflowBlock<
+type BrainBlock<
   TOuterState,
   TInnerState extends State,
   TNewState,
   TOptions extends object = object,
   TServices extends object = object
 > = {
-  type: 'workflow';
+  type: 'brain';
   title: string;
   innerBrain: Brain<TOptions, TInnerState, TServices>;
   initialState: State | ((outerState: TOuterState) => State);
@@ -134,7 +134,7 @@ type Block<
   TServices extends object = object
 > =
   | StepBlock<TStateIn, TStateOut, TOptions, TServices>
-  | WorkflowBlock<TStateIn, any, TStateOut, TOptions, TServices>;
+  | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
 interface BaseRunParams<TOptions extends object = object> {
   client: ObjectGenerator;
@@ -222,14 +222,14 @@ export class Brain<
     }) => TNewState,
     initialState?: State | ((state: TState) => State)
   ) {
-    const nestedBlock: WorkflowBlock<
+    const nestedBlock: BrainBlock<
       TState,
       TInnerState,
       TNewState,
       TOptions,
       TServices
     > = {
-      type: 'workflow',
+      type: 'brain',
       title,
       innerBrain,
       initialState: initialState || (() => ({} as State)),
@@ -594,7 +594,7 @@ class BrainEventStream<
   private async *executeStep(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as Block<any, any, TOptions, TServices>;
 
-    if (block.type === 'workflow') {
+    if (block.type === 'brain') {
       const initialState =
         typeof block.initialState === 'function'
           ? block.initialState(this.currentState)
@@ -667,25 +667,25 @@ class BrainEventStream<
   }
 }
 
-const workflowNamesAreUnique = process.env.NODE_ENV !== 'test';
+const brainNamesAreUnique = process.env.NODE_ENV !== 'test';
 
-const workflowNames = new Set<string>();
+const brainNames = new Set<string>();
 export function brain<
   TOptions extends object = object,
   TState extends State = object,
   TServices extends object = object
->(workflowConfig: string | { title: string; description?: string }) {
+>(brainConfig: string | { title: string; description?: string }) {
   const title =
-    typeof workflowConfig === 'string' ? workflowConfig : workflowConfig.title;
+    typeof brainConfig === 'string' ? brainConfig : brainConfig.title;
   const description =
-    typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
-  if (workflowNamesAreUnique && workflowNames.has(title)) {
+    typeof brainConfig === 'string' ? undefined : brainConfig.description;
+  if (brainNamesAreUnique && brainNames.has(title)) {
     throw new Error(
       `Brain with name "${title}" already exists. Brain names must be unique.`
     );
   }
-  if (workflowNamesAreUnique) {
-    workflowNames.add(title);
+  if (brainNamesAreUnique) {
+    brainNames.add(title);
   }
   return new Brain<TOptions, TState, TServices>(title, description);
 }

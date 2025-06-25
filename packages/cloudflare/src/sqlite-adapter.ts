@@ -3,7 +3,7 @@ import type { SqlStorage } from '@cloudflare/workers-types';
 
 // Define the new schema with a single events table
 const initSQL = `
-CREATE TABLE IF NOT EXISTS workflow_events (
+CREATE TABLE IF NOT EXISTS brain_events (
     event_id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_type TEXT NOT NULL,
     serialized_event TEXT NOT NULL CHECK(json_valid(serialized_event)),
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS workflow_events (
 );
 `;
 
-export class WorkflowRunSQLiteAdapter implements Adapter {
+export class BrainRunSQLiteAdapter implements Adapter {
   private sql: SqlStorage;
   private schemaInitialized = false; // Track schema initialization
 
@@ -31,7 +31,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
       this.initializeSchema();
 
       const insertSql = `
-                INSERT INTO workflow_events (
+                INSERT INTO brain_events (
                     event_type,
                     serialized_event
                 ) VALUES (?, ?);`;

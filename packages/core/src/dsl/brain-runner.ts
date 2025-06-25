@@ -59,9 +59,9 @@ export class BrainRunner {
     let stepNumber = 1;
 
     // Apply any patches from completed steps
-    // to the initial state so that the workflow
+    // to the initial state so that the brain
     // starts with a state that reflects all of the completed steps.
-    // Need to do this when a workflow is restarted with completed steps.
+    // Need to do this when a brain is restarted with completed steps.
     initialCompletedSteps?.forEach((step) => {
       if (step.patch) {
         currentState = applyPatches(currentState, [step.patch]) as TState;
@@ -69,7 +69,7 @@ export class BrainRunner {
       }
     });
 
-    const workflowRun =
+    const brainRun =
       brainRunId && initialCompletedSteps
         ? brain.run({
             initialState,
@@ -87,7 +87,7 @@ export class BrainRunner {
             resources: resources ?? {},
           });
 
-    for await (const event of workflowRun) {
+    for await (const event of brainRun) {
       // Dispatch event to all adapters
       await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
 

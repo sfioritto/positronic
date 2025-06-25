@@ -46,7 +46,7 @@ describe('CLI Integration: positronic server with project', () => {
     expect(startCall!.args[1]).toBe(server.port);
   });
 
-  it('should support running workflows after server starts', async () => {
+  it('should support running brains after server starts', async () => {
     // Create a test server with a test brain
     server = await createTestServer({
       setup: (dir: string) => {
@@ -75,7 +75,7 @@ describe('CLI Integration: positronic server with project', () => {
       },
     });
 
-    // Run a workflow using the CLI
+    // Run a brain using the CLI
     const px = cli(server);
     const result = await px('run test-brain');
 
@@ -83,7 +83,7 @@ describe('CLI Integration: positronic server with project', () => {
     expect(result.exitCode).toBe(0);
 
     // Verify the run command connected to the server
-    // (The actual workflow execution is tested elsewhere)
+    // (The actual brain execution is tested elsewhere)
     expect(result.stdout).toContain('Run ID:');
   });
 });

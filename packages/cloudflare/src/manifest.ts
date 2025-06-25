@@ -1,10 +1,10 @@
 import type { Brain } from '@positronic/core';
 
-interface WorkflowImportStrategy {
+interface BrainImportStrategy {
   import(name: string): Promise<Brain | undefined>;
 }
 
-class StaticManifestStrategy implements WorkflowImportStrategy {
+class StaticManifestStrategy implements BrainImportStrategy {
   constructor(private manifest: Record<string, Brain>) {}
 
   async import(name: string): Promise<Brain | undefined> {
@@ -12,12 +12,12 @@ class StaticManifestStrategy implements WorkflowImportStrategy {
   }
 }
 
-class DynamicImportStrategy implements WorkflowImportStrategy {
-  constructor(private workflowsDir: string) {}
+class DynamicImportStrategy implements BrainImportStrategy {
+  constructor(private brainsDir: string) {}
 
   async import(name: string): Promise<Brain | undefined> {
     try {
-      const module = await import(`${this.workflowsDir}/${name}.ts`);
+      const module = await import(`${this.brainsDir}/${name}.ts`);
       return module.default;
     } catch (e) {
       console.error(`Failed to import brain ${name}:`, e);
@@ -27,24 +27,24 @@ class DynamicImportStrategy implements WorkflowImportStrategy {
 }
 
 export class PositronicManifest {
-  private importStrategy: WorkflowImportStrategy;
+  private importStrategy: BrainImportStrategy;
 
   constructor(options: {
     staticManifest?: Record<string, Brain>;
-    workflowsDir?: string;
+    brainsDir?: string;
   }) {
-    if (options.staticManifest && options.workflowsDir) {
+    if (options.staticManifest && options.brainsDir) {
       throw new Error(
-        'Cannot provide both staticManifest and workflowsDir - choose one import strategy'
+        'Cannot provide both staticManifest and brainsDir - choose one import strategy'
       );
     }
-    if (!options.staticManifest && !options.workflowsDir) {
-      throw new Error('Must provide either staticManifest or workflowsDir');
+    if (!options.staticManifest && !options.brainsDir) {
+      throw new Error('Must provide either staticManifest or brainsDir');
     }
 
     this.importStrategy = options.staticManifest
       ? new StaticManifestStrategy(options.staticManifest)
-      : new DynamicImportStrategy(options.workflowsDir!);
+      : new DynamicImportStrategy(options.brainsDir!);
   }
 
   async import(name: string): Promise<Brain | undefined> {

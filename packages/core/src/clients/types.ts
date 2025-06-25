@@ -22,7 +22,7 @@ export interface ObjectGenerator {
   generateObject<T extends z.AnyZodObject>(params: {
     /**
      * The definition of the expected output object, including its Zod schema
-     * and a name for state management within the workflow.
+     * and a name for state management within the brain.
      */
     schema: T;
     schemaName: string;
