@@ -102,7 +102,7 @@ interface TreeViewProps {
   depth?: number;
 }
 
-const TreeView: React.FC<TreeViewProps> = ({ node, prefix = '', isLast = true, depth = 0 }) => {
+const TreeView = ({ node, prefix = '', isLast = true, depth = 0 }: TreeViewProps) => {
   const children = Array.from(node.children.entries()).sort(([a], [b]) => {
     // Sort directories first, then alphabetically
     const aIsDir = node.children.get(a)!.type === 'directory';

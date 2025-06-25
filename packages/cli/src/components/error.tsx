@@ -9,7 +9,7 @@ interface ErrorComponentProps {
   };
 }
 
-export const ErrorComponent: React.FC<ErrorComponentProps> = ({ error }) => {
+export const ErrorComponent = ({ error }: ErrorComponentProps) => {
   return (
     <Box flexDirection="column">
       <Text color="red" bold>❌ {error.title}</Text>

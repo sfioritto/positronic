@@ -6,6 +6,7 @@ import * as path from 'path';
 import { ResourceList } from '../components/resource-list.js';
 import { ResourceSync } from '../components/resource-sync.js';
 import { ResourceDelete } from '../components/resource-delete.js';
+import { ResourceUpload } from '../components/resource-upload.js';
 import { ErrorComponent } from '../components/error.js';
 
 export class ResourcesCommand {
@@ -123,5 +124,14 @@ export class ResourcesCommand {
     // Import and render ResourceClear component (to be created)
     const { ResourceClear } = await import('../components/resource-clear.js');
     render(React.createElement(ResourceClear));
+  }
+
+  async upload(filePath: string, customKey?: string) {
+    render(
+      React.createElement(ResourceUpload, {
+        filePath,
+        customKey,
+      })
+    );
   }
 }

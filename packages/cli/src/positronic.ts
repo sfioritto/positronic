@@ -516,6 +516,35 @@ cli = cli.command(
       (argv) => resourcesCommand.delete(argv.path as string)
     );
 
+    // Upload command available in both dev and production modes
+    yargsResource.command(
+      'upload <file>',
+      'Upload a file as a resource to the server\n',
+      (yargsUploadCmd) => {
+        return yargsUploadCmd
+          .positional('file', {
+            describe: 'Path to the file to upload',
+            type: 'string',
+            demandOption: true,
+          })
+          .option('key', {
+            describe: 'Custom key/path for the resource (defaults to filename)',
+            type: 'string',
+            alias: 'k',
+          })
+          .example('$0 resources upload video.mp4', 'Upload a video file')
+          .example(
+            '$0 resources upload /path/to/large-file.zip --key archive/backup.zip',
+            'Upload with custom resource key'
+          );
+      },
+      (argv) =>
+        resourcesCommand.upload(
+          argv.file as string,
+          argv.key as string | undefined
+        )
+    );
+
     return yargsResource.demandCommand(
       1,
       'You need to specify a resources command'
