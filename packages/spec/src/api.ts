@@ -72,7 +72,8 @@ export const resources = {
           !resource.key ||
           !resource.type ||
           typeof resource.size !== 'number' ||
-          !resource.lastModified
+          !resource.lastModified ||
+          typeof resource.local !== 'boolean'
         ) {
           console.error(
             `Resource missing required fields: ${JSON.stringify(resource)}`
@@ -106,6 +107,7 @@ export const resources = {
       );
       formData.append('type', 'text');
       formData.append('key', 'test-resource.txt');
+      formData.append('local', 'false');
 
       const request = new Request('http://example.com/resources', {
         method: 'POST',
@@ -128,7 +130,8 @@ export const resources = {
         !data.key ||
         !data.type ||
         typeof data.size !== 'number' ||
-        !data.lastModified
+        !data.lastModified ||
+        typeof data.local !== 'boolean'
       ) {
         console.error(
           `Response missing required fields: ${JSON.stringify(data)}`
@@ -145,6 +148,11 @@ export const resources = {
 
       if (data.type !== 'text') {
         console.error(`Expected type to be 'text', got ${data.type}`);
+        return false;
+      }
+
+      if (data.local !== false) {
+        console.error(`Expected local to be false, got ${data.local}`);
         return false;
       }
 

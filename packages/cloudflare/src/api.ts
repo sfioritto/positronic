@@ -25,6 +25,7 @@ type R2Resource = Omit<ResourceEntry, 'path'> & {
   path?: string;
   size: number;
   lastModified: string;
+  local: boolean;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -106,6 +107,7 @@ app.get('/resources', async (context: Context) => {
           key: object.key,
           size: object.size,
           lastModified: object.uploaded.toISOString(),
+          local: r2Object.customMetadata.local === 'true', // R2 metadata is always strings
         };
 
         return resource;
@@ -137,6 +139,7 @@ app.post('/resources', async (context: Context) => {
   const type = formData.get('type') as string | null;
   const path = formData.get('path') as string | null;
   const key = formData.get('key') as string | null;
+  const local = formData.get('local') as string | null;
 
   if (!file) {
     return context.json({ error: 'Missing required field "file"' }, 400);
@@ -171,6 +174,7 @@ app.post('/resources', async (context: Context) => {
       customMetadata: {
         type,
         ...(path && { path }),
+        local: local === 'true' ? 'true' : 'false', // R2 metadata must be strings
       },
     });
 
@@ -180,6 +184,7 @@ app.post('/resources', async (context: Context) => {
       key: objectKey,
       size: uploadedObject.size,
       lastModified: uploadedObject.uploaded.toISOString(),
+      local: local === 'true',
     };
 
     return context.json(resource, 201);

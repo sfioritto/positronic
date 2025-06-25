@@ -7,6 +7,7 @@ import { ResourceEntry } from '@positronic/core';
 interface ApiResourceEntry extends ResourceEntry {
   size: number;
   lastModified: string;
+  local: boolean;
 }
 
 interface ResourcesResponse {

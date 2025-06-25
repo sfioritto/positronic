@@ -7,6 +7,7 @@ interface MockResource {
   path?: string;
   size: number;
   lastModified: string;
+  local: boolean;
 }
 
 export class MockApiClient implements ApiClient {
@@ -42,6 +43,7 @@ export class MockApiClient implements ApiClient {
         const type = formData.get('type');
         const key = formData.get('key');
         const file = formData.get('file');
+        const local = formData.get('local');
 
         if (type && key && file) {
           const newResource: MockResource = {
@@ -49,6 +51,7 @@ export class MockApiClient implements ApiClient {
             type: type as 'text' | 'binary',
             size: file.size || 100, // Mock size
             lastModified: new Date().toISOString(),
+            local: local === 'true',
           };
 
           // Update existing or add new

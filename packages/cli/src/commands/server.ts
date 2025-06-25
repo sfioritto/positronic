@@ -154,7 +154,7 @@ export class ServerCommand {
           });
         } else {
           console.log(
-            `✅ Synced ${syncResult.uploadCount} resources (${syncResult.skipCount} up to date)`
+            `✅ Synced ${syncResult.uploadCount} resources (${syncResult.skipCount} up to date, ${syncResult.deleteCount} deleted)`
           );
         }
         await generateTypes(projectRootPath);

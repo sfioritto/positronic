@@ -44,11 +44,12 @@ describe('Helper Functions Unit Tests', () => {
         skipCount: 0,
         errorCount: 0,
         totalCount: 0,
+        deleteCount: 0,
         errors: [],
       });
 
       // Should not make any API calls for empty directory
-      expect(mockClient.calls.length).toBe(0);
+      expect(mockClient.calls.length).toBe(1); // Only GET /resources call
     });
 
     it('should upload new resources', async () => {
@@ -92,6 +93,7 @@ describe('Helper Functions Unit Tests', () => {
         type: 'text',
         size: 8,
         lastModified: new Date(Date.now() + 10000).toISOString(), // 10 seconds in the future
+        local: false, // Default to false for existing tests
       });
 
       // Create matching file
@@ -118,6 +120,7 @@ describe('Helper Functions Unit Tests', () => {
         type: 'text',
         size: 5,
         lastModified: new Date(Date.now() - 10000).toISOString(),
+        local: false, // Default to false for existing tests
       });
 
       // Create file with different content
@@ -139,6 +142,7 @@ describe('Helper Functions Unit Tests', () => {
         type: 'text',
         size: 11, // Same size as "Same content"
         lastModified: new Date(Date.now() - 10000).toISOString(), // 10 seconds ago
+        local: false, // Default to false for existing tests
       });
 
       // Create file with same size but it will have a newer modification time
@@ -199,6 +203,150 @@ describe('Helper Functions Unit Tests', () => {
         message: 'Upload failed',
       });
     });
+
+    it('should delete server resources with local=true when files are removed', async () => {
+      const resourcesDir = path.join(projectPath, 'resources');
+      fs.mkdirSync(resourcesDir, { recursive: true });
+
+      // Create the file that should still exist first
+      fs.writeFileSync(
+        path.join(resourcesDir, 'still-exists.txt'),
+        'I still exist'
+      );
+
+      // Add existing resources to mock - some synced (local=true), some manual (local=false)
+      mockClient.addResource({
+        key: 'deleted-file.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString(),
+        local: true, // This one should be deleted
+      });
+      mockClient.addResource({
+        key: 'still-exists.txt',
+        type: 'text',
+        size: 13, // Exact size of "I still exist"
+        lastModified: new Date(Date.now() + 10000).toISOString(), // Future timestamp to prevent re-upload
+        local: true, // This one should NOT be deleted
+      });
+      mockClient.addResource({
+        key: 'docs/removed-doc.md',
+        type: 'text',
+        size: 200,
+        lastModified: new Date().toISOString(),
+        local: true, // This one should be deleted
+      });
+
+      const result = await syncResources(projectPath, mockClient);
+
+      expect(result.deleteCount).toBe(2);
+      expect(result.uploadCount).toBe(0); // No new uploads
+      expect(result.skipCount).toBe(1); // still-exists.txt is up to date
+
+      // Verify the correct resources were deleted
+      const remainingResources = mockClient.getResources();
+      expect(remainingResources).toHaveLength(1);
+      expect(remainingResources[0].key).toBe('still-exists.txt');
+
+      // Verify DELETE API calls were made
+      const deleteCalls = mockClient.calls.filter(
+        (call) => call.options?.method === 'DELETE'
+      );
+      expect(deleteCalls).toHaveLength(2);
+      expect(deleteCalls[0].path).toBe('/resources/deleted-file.txt');
+      expect(deleteCalls[1].path).toBe('/resources/docs%2Fremoved-doc.md'); // URL encoded
+    });
+
+    it('should preserve manually uploaded resources (local=false)', async () => {
+      const resourcesDir = path.join(projectPath, 'resources');
+      fs.mkdirSync(resourcesDir, { recursive: true });
+
+      // Add existing resources to mock
+      mockClient.addResource({
+        key: 'manual-upload.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString(),
+        local: false, // Manually uploaded - should NOT be deleted
+      });
+      mockClient.addResource({
+        key: 'another-manual.png',
+        type: 'binary',
+        size: 5000,
+        lastModified: new Date().toISOString(),
+        local: false, // Manually uploaded - should NOT be deleted
+      });
+      mockClient.addResource({
+        key: 'synced-file.txt',
+        type: 'text',
+        size: 75,
+        lastModified: new Date().toISOString(),
+        local: true, // Synced file that was deleted locally
+      });
+
+      // Don't create any local files - all are "deleted" locally
+
+      const result = await syncResources(projectPath, mockClient);
+
+      expect(result.deleteCount).toBe(1); // Only the synced file
+      expect(result.uploadCount).toBe(0);
+      expect(result.skipCount).toBe(0);
+
+      // Verify manual uploads are still there
+      const remainingResources = mockClient.getResources();
+      expect(remainingResources).toHaveLength(2);
+      expect(
+        remainingResources.find((r) => r.key === 'manual-upload.txt')
+      ).toBeDefined();
+      expect(
+        remainingResources.find((r) => r.key === 'another-manual.png')
+      ).toBeDefined();
+      expect(
+        remainingResources.find((r) => r.key === 'synced-file.txt')
+      ).toBeUndefined();
+
+      // Verify only one DELETE call was made
+      const deleteCalls = mockClient.calls.filter(
+        (call) => call.options?.method === 'DELETE'
+      );
+      expect(deleteCalls).toHaveLength(1);
+      expect(deleteCalls[0].path).toBe('/resources/synced-file.txt');
+    });
+
+    it('should handle delete errors gracefully', async () => {
+      const resourcesDir = path.join(projectPath, 'resources');
+      fs.mkdirSync(resourcesDir, { recursive: true });
+
+      // Create a client that fails on DELETE requests
+      const badClient = createMockApiClient();
+      badClient.addResource({
+        key: 'will-fail-delete.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+
+      const originalFetch = badClient.fetch;
+      badClient.fetch = async (path, options) => {
+        if (options?.method === 'DELETE') {
+          return new Response('Internal Server Error', { status: 500 });
+        }
+        return originalFetch.call(badClient, path, options);
+      };
+
+      // Don't create the file locally so it should be deleted
+
+      const result = await syncResources(projectPath, badClient);
+
+      expect(result.deleteCount).toBe(0); // Failed to delete
+      expect(result.errorCount).toBe(1);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toEqual({
+        file: 'will-fail-delete.txt',
+        message: 'Failed to delete: Delete failed: 500 Internal Server Error',
+      });
+    });
   });
 
   describe('generateTypes', () => {
@@ -222,18 +370,21 @@ describe('Helper Functions Unit Tests', () => {
         type: 'text',
         size: 100,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
       mockClient.addResource({
         key: 'logo.png',
         type: 'binary',
         size: 1000,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
       mockClient.addResource({
         key: 'data.json',
         type: 'text',
         size: 50,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
 
       await generateTypes(projectPath, mockClient);
@@ -253,18 +404,21 @@ describe('Helper Functions Unit Tests', () => {
         type: 'text',
         size: 100,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
       mockClient.addResource({
         key: 'docs/images/diagram.png',
         type: 'binary',
         size: 500,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
       mockClient.addResource({
         key: 'config/settings.json',
         type: 'text',
         size: 200,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
 
       await generateTypes(projectPath, mockClient);
@@ -287,18 +441,21 @@ describe('Helper Functions Unit Tests', () => {
         type: 'text',
         size: 100,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
       mockClient.addResource({
         key: 'file-with-dash.txt',
         type: 'text',
         size: 100,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
       mockClient.addResource({
         key: 'valid_file.txt',
         type: 'text',
         size: 100,
         lastModified: new Date().toISOString(),
+        local: false, // Default to false for existing tests
       });
 
       await generateTypes(projectPath, mockClient);

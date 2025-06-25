@@ -48,6 +48,7 @@ describe('Resources API Tests', () => {
     );
     formData.append('type', 'text');
     formData.append('path', 'resources/test-files/test.txt');
+    formData.append('local', 'false');
 
     const request = new Request('http://example.com/resources', {
       method: 'POST',
@@ -64,6 +65,7 @@ describe('Resources API Tests', () => {
       key: string;
       size: number;
       lastModified: string;
+      local: boolean;
     }>();
     expect(responseBody).toEqual({
       type: 'text',
@@ -71,6 +73,7 @@ describe('Resources API Tests', () => {
       key: 'resources/test-files/test.txt',
       size: expect.any(Number),
       lastModified: expect.any(String),
+      local: false,
     });
 
     // Verify the resource was actually stored in R2
@@ -83,6 +86,7 @@ describe('Resources API Tests', () => {
     expect(storedObject!.customMetadata).toEqual({
       type: 'text',
       path: 'resources/test-files/test.txt',
+      local: 'false',
     });
   });
 
@@ -98,6 +102,7 @@ describe('Resources API Tests', () => {
     );
     formData.append('type', 'binary');
     formData.append('key', 'videos/large-video.mp4');
+    formData.append('local', 'false');
 
     const request = new Request('http://example.com/resources', {
       method: 'POST',
@@ -114,12 +119,14 @@ describe('Resources API Tests', () => {
       key: string;
       size: number;
       lastModified: string;
+      local: boolean;
     }>();
     expect(responseBody).toEqual({
       type: 'binary',
       key: 'videos/large-video.mp4',
       size: expect.any(Number),
       lastModified: expect.any(String),
+      local: false,
     });
     // Should not have path since we didn't provide one
     expect(responseBody.path).toBeUndefined();
@@ -133,6 +140,7 @@ describe('Resources API Tests', () => {
     await storedObject!.arrayBuffer();
     expect(storedObject!.customMetadata).toEqual({
       type: 'binary',
+      local: 'false',
     });
   });
 
@@ -146,6 +154,7 @@ describe('Resources API Tests', () => {
     formData.append('type', 'binary');
     formData.append('path', 'resources/images/logo.png');
     formData.append('key', 'assets/branding/logo.png');
+    formData.append('local', 'true'); // Testing with local=true
 
     const request = new Request('http://example.com/resources', {
       method: 'POST',
@@ -162,6 +171,7 @@ describe('Resources API Tests', () => {
       key: string;
       size: number;
       lastModified: string;
+      local: boolean;
     }>();
     expect(responseBody).toEqual({
       type: 'binary',
@@ -169,6 +179,7 @@ describe('Resources API Tests', () => {
       key: 'assets/branding/logo.png',
       size: expect.any(Number),
       lastModified: expect.any(String),
+      local: true,
     });
 
     // Verify stored at key location, not path location
@@ -195,6 +206,7 @@ describe('Resources API Tests', () => {
     );
     formData.append('type', 'text');
     formData.append('path', 'resources/list-test.txt');
+    formData.append('local', 'true');
 
     const createRequest = new Request('http://example.com/resources', {
       method: 'POST',
@@ -218,6 +230,7 @@ describe('Resources API Tests', () => {
         key: string;
         size: number;
         lastModified: string;
+        local: boolean;
       }>;
       truncated: boolean;
       count: number;
@@ -235,6 +248,7 @@ describe('Resources API Tests', () => {
       key: 'resources/list-test.txt',
       size: expect.any(Number),
       lastModified: expect.any(String),
+      local: true,
     });
   });
 

@@ -130,6 +130,7 @@ export function scanLocalResources(resourcesDir: string): ResourceEntry[] {
 interface ApiResourceEntry extends ResourceEntry {
   size: number;
   lastModified: string;
+  local: boolean;
 }
 
 interface ResourcesListResponse {
@@ -143,6 +144,7 @@ interface SyncResult {
   skipCount: number;
   errorCount: number;
   totalCount: number;
+  deleteCount: number;
   errors: Array<{ file: string; message: string }>;
 }
 
@@ -162,16 +164,6 @@ export async function syncResources(
 
   const localResources = scanLocalResources(resourcesDir);
 
-  if (localResources.length === 0) {
-    return {
-      uploadCount: 0,
-      skipCount: 0,
-      errorCount: 0,
-      totalCount: 0,
-      errors: [],
-    };
-  }
-
   // Fetch server resources
   const response = await client.fetch('/resources');
   if (!response.ok) {
@@ -184,11 +176,16 @@ export async function syncResources(
   const data = (await response.json()) as ResourcesListResponse;
   const serverResourceMap = new Map(data.resources.map((r) => [r.key, r]));
 
+  // Create a set of local resource keys for easy lookup
+  const localResourceKeys = new Set(localResources.map((r) => r.key));
+
   let uploadCount = 0;
   let skipCount = 0;
   let errorCount = 0;
+  let deleteCount = 0;
   const errors: Array<{ file: string; message: string }> = [];
 
+  // First, handle uploads and updates
   for (const resource of localResources) {
     const fileStats = fs.statSync(resource.path);
     const serverResource = serverResourceMap.get(resource.key);
@@ -220,6 +217,7 @@ export async function syncResources(
         formData.append('type', resource.type);
         formData.append('path', resource.key);
         formData.append('key', resource.key);
+        formData.append('local', 'true');
 
         const uploadResponse = await client.fetch('/resources', {
           method: 'POST',
@@ -246,11 +244,45 @@ export async function syncResources(
     }
   }
 
+  // Now handle deletions - only delete resources that were synced (local === true)
+  // and are no longer present in the local filesystem
+  for (const [key, serverResource] of serverResourceMap) {
+    // Only consider deleting if:
+    // 1. The resource was synced from local (local === true)
+    // 2. The resource no longer exists locally
+    if (serverResource.local && !localResourceKeys.has(key)) {
+      try {
+        const deleteResponse = await client.fetch(
+          `/resources/${encodeURIComponent(key)}`,
+          {
+            method: 'DELETE',
+          }
+        );
+
+        if (!deleteResponse.ok && deleteResponse.status !== 404) {
+          const errorText = await deleteResponse.text();
+          throw new Error(
+            `Delete failed: ${deleteResponse.status} ${errorText}`
+          );
+        }
+
+        deleteCount++;
+      } catch (error: any) {
+        errorCount++;
+        errors.push({
+          file: key,
+          message: `Failed to delete: ${error.message || 'Unknown error'}`,
+        });
+      }
+    }
+  }
+
   return {
     uploadCount,
     skipCount,
     errorCount,
     totalCount: localResources.length,
+    deleteCount,
     errors,
   };
 }
