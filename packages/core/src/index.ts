@@ -1,4 +1,4 @@
-export { Brain, brain } from './dsl/workflow.js';
+export { Brain, brain } from './dsl/brain.js';
 export { BrainRunner } from './dsl/brain-runner.js';
 export { STATUS, BRAIN_EVENTS } from './dsl/constants.js';
 export type { Adapter } from './adapters/types.js';
@@ -13,7 +13,7 @@ export type {
   StepStatusEvent,
   StepStartedEvent,
   StepCompletedEvent,
-} from './dsl/workflow.js';
+} from './dsl/brain.js';
 export type { ObjectGenerator, Message } from './clients/types.js';
 export type { State } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';

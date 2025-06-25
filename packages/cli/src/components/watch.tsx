@@ -25,18 +25,18 @@ const getStatusIndicator = (status: SerializedStepStatus['status']) => {
 
 interface WatchStatusProps {
   steps: SerializedStepStatus[];
-  workflowTitle?: string;
+  brainTitle?: string;
   runId?: string;
 }
 
-const WatchStatus = ({ steps, workflowTitle, runId }: WatchStatusProps) => {
+const WatchStatus = ({ steps, brainTitle, runId }: WatchStatusProps) => {
   if (!steps || steps.length === 0) {
     return <Text>Waiting for brain steps...</Text>;
   }
 
   return (
     <Box flexDirection="column">
-      {workflowTitle && <Text bold>Brain: {workflowTitle} Run ID: {runId}</Text>}
+      {brainTitle && <Text bold>Brain: {brainTitle} Run ID: {runId}</Text>}
       <Box marginTop={1} marginBottom={1}>
         <Text bold>Steps:</Text>
       </Box>
@@ -66,7 +66,7 @@ interface WatchProps {
 
 export const Watch = ({ runId, port }: WatchProps) => {
   const [steps, setSteps] = useState<SerializedStepStatus[]>([]);
-  const [workflowTitle, setWorkflowTitle] = useState<string | undefined>(undefined);
+  const [brainTitle, setBrainTitle] = useState<string | undefined>(undefined);
   const [workflowError, setWorkflowError] = useState<BrainErrorEvent | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -96,7 +96,7 @@ export const Watch = ({ runId, port }: WatchProps) => {
           eventData.type === BRAIN_EVENTS.START ||
           eventData.type === BRAIN_EVENTS.RESTART
         ) {
-          setWorkflowTitle((eventData as BrainStartEvent).workflowTitle);
+          setBrainTitle((eventData as BrainStartEvent).brainTitle);
           setIsCompleted(false);
         }
 
@@ -131,7 +131,7 @@ export const Watch = ({ runId, port }: WatchProps) => {
 
   return (
     <Box flexDirection="column">
-      <WatchStatus steps={steps} workflowTitle={workflowTitle} runId={runId} />
+      <WatchStatus steps={steps} brainTitle={brainTitle} runId={runId} />
       {isCompleted && !error && !workflowError && (
         <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
             <Text color="green">Brain completed.</Text>

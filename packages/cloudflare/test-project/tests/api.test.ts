@@ -167,7 +167,7 @@ describe('Hono API Tests', () => {
       (e): e is BrainStartEvent => e.type === BRAIN_EVENTS.START
     );
     expect(startEvent).toBeDefined();
-    expect(startEvent?.workflowTitle).toBe(brainName);
+    expect(startEvent?.brainTitle).toBe(brainName);
     expect(startEvent?.status).toBe(STATUS.RUNNING);
 
     // Check for complete event
@@ -248,7 +248,7 @@ describe('Hono API Tests', () => {
       (e): e is BrainStartEvent => e.type === BRAIN_EVENTS.START
     );
     expect(startEvent).toBeDefined();
-    expect(startEvent?.workflowTitle).toBe(brainName);
+    expect(startEvent?.brainTitle).toBe(brainName);
     expect(startEvent?.status).toBe(STATUS.RUNNING);
 
     // Check for step start/complete events for the delayed step
@@ -330,8 +330,8 @@ describe('Hono API Tests', () => {
     await waitOnExecutionContext(watchContext);
 
     // Assert
-    expect(event.workflowRunId).toBeDefined();
-    expect(event.workflowRunId).toBe(expectedBrainRunId);
+    expect(event.brainRunId).toBeDefined();
+    expect(event.brainRunId).toBe(expectedBrainRunId);
   });
 
   it('Monitor receives brain events (checking brain run)', async () => {
@@ -427,7 +427,7 @@ describe('Hono API Tests', () => {
     expect(historyResponse.status).toBe(200);
     const history = await historyResponse.json<{
       runs: Array<{
-        workflowRunId: string;
+        brainRunId: string;
         brainTitle: string;
         brainDescription: string | null;
         type: string;
@@ -443,7 +443,7 @@ describe('Hono API Tests', () => {
 
     // Verify each run has the expected properties
     for (const run of history.runs) {
-      expect(run).toHaveProperty('workflowRunId');
+      expect(run).toHaveProperty('brainRunId');
       expect(run).toHaveProperty('brainTitle');
       expect(run).toHaveProperty('brainDescription');
       expect(run).toHaveProperty('type');

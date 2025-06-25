@@ -73,13 +73,13 @@ class MonitorAdapter implements Adapter {
 
 export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
-  private workflowRunId: string;
+  private brainRunId: string;
   private eventStreamAdapter = new EventStreamAdapter();
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
     this.sql = state.storage.sql;
-    this.workflowRunId = state.id.toString();
+    this.brainRunId = state.id.toString();
     this.env = env;
   }
 
@@ -111,7 +111,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
       if (!r2Object || !r2Object.customMetadata?.type) {
         console.warn(
-          `[DO ${this.workflowRunId}] Skipping resource ${object.key} - ` +
+          `[DO ${this.brainRunId}] Skipping resource ${object.key} - ` +
             `missing metadata.type (found: ${JSON.stringify(
               r2Object?.customMetadata || {}
             )})`
@@ -159,7 +159,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
   async start(
     brainName: string,
-    workflowRunId: string,
+    brainRunId: string,
     initialData?: Record<string, any>
   ) {
     const { sql } = this;
@@ -171,7 +171,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const workflowToRun = await manifest.import(brainName);
     if (!workflowToRun) {
       console.error(
-        `[DO ${workflowRunId}] Workflow ${brainName} not found in manifest.`
+        `[DO ${brainRunId}] Workflow ${brainName} not found in manifest.`
       );
       console.error(JSON.stringify(manifest, null, 2));
       throw new Error(`Workflow ${brainName} not found`);
@@ -201,15 +201,15 @@ export class BrainRunnerDO extends DurableObject<Env> {
       .withAdapters([sqliteAdapter, eventStreamAdapter, monitorAdapter])
       .run(workflowToRun, {
         initialState: initialData || {},
-        workflowRunId,
+        brainRunId,
       })
       .catch((err: any) => {
-        console.error(`[DO ${workflowRunId}] BrainRunner run failed:`, err);
+        console.error(`[DO ${brainRunId}] BrainRunner run failed:`, err);
       });
   }
 
   async fetch(request: Request) {
-    const { sql, eventStreamAdapter, workflowRunId } = this;
+    const { sql, eventStreamAdapter, brainRunId } = this;
     const url = new URL(request.url);
     const encoder = new TextEncoder();
 
@@ -243,7 +243,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
                   sendEvent(controller, event);
                 } catch (parseError) {
                   console.error(
-                    `[DO ${workflowRunId} WATCH] Failed to parse historical event JSON: ${row.serialized_event}`,
+                    `[DO ${brainRunId} WATCH] Failed to parse historical event JSON: ${row.serialized_event}`,
                     parseError
                   );
                 }
@@ -252,7 +252,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
               eventStreamAdapter.subscribe(controller);
             } catch (err) {
               console.error(
-                `[DO ${workflowRunId} WATCH] Error during stream start:`,
+                `[DO ${brainRunId} WATCH] Error during stream start:`,
                 err
               );
               controller.close();
@@ -276,11 +276,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
       }
 
       console.warn(
-        `[DO ${workflowRunId}] fetch() called with unhandled path: ${url.pathname}`
+        `[DO ${brainRunId}] fetch() called with unhandled path: ${url.pathname}`
       );
       return new Response('Not found', { status: 404 });
     } catch (error) {
-      console.error(`[DO ${workflowRunId}] Error in fetch():`, error);
+      console.error(`[DO ${brainRunId}] Error in fetch():`, error);
       return new Response('Internal server error', { status: 500 });
     }
   }

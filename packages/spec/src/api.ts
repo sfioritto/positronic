@@ -377,8 +377,8 @@ export const brains = {
       // Validate each run has required fields
       for (const run of data.runs) {
         if (
-          !run.workflowRunId ||
-          !run.workflowTitle ||
+          !run.brainRunId ||
+          !run.brainTitle ||
           !run.type ||
           !run.status ||
           typeof run.createdAt !== 'number'

@@ -1,5 +1,5 @@
 import { BrainRunner } from './brain-runner.js';
-import { brain } from './workflow.js';
+import { brain } from './brain.js';
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { ObjectGenerator } from '../clients/types.js';
@@ -45,7 +45,7 @@ describe('BrainRunner', () => {
     expect(mockAdapter.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
-        workflowTitle: 'Test Brain',
+        brainTitle: 'Test Brain',
       })
     );
 

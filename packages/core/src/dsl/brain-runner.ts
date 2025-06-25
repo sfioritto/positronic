@@ -1,7 +1,7 @@
 import { BRAIN_EVENTS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { Adapter } from '../adapters/types.js';
-import type { SerializedStep, Brain } from './workflow.js';
+import type { SerializedStep, Brain } from './brain.js';
 import type { State } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
@@ -43,13 +43,13 @@ export class BrainRunner {
       initialState = {} as TState,
       options,
       initialCompletedSteps,
-      workflowRunId,
+      brainRunId,
       endAfter,
     }: {
       initialState?: TState;
       options?: TOptions;
       initialCompletedSteps?: SerializedStep[] | never;
-      workflowRunId?: string | never;
+      brainRunId?: string | never;
       endAfter?: number;
     } = {}
   ): Promise<TState> {
@@ -70,11 +70,11 @@ export class BrainRunner {
     });
 
     const workflowRun =
-      workflowRunId && initialCompletedSteps
+      brainRunId && initialCompletedSteps
         ? brain.run({
             initialState,
             initialCompletedSteps,
-            workflowRunId,
+            brainRunId,
             options,
             client,
             resources: resources ?? {},
@@ -83,7 +83,7 @@ export class BrainRunner {
             initialState,
             options,
             client,
-            workflowRunId,
+            brainRunId,
             resources: resources ?? {},
           });
 

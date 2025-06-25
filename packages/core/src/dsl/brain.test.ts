@@ -7,7 +7,7 @@ import {
   type BrainErrorEvent,
   type SerializedStep,
   type SerializedStepStatus,
-} from './workflow.js';
+} from './brain.js';
 import { z } from 'zod';
 import { nextStep } from '../test-utils.js';
 import { jest } from '@jest/globals';
@@ -104,8 +104,8 @@ describe('workflow creation', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle: 'test workflow',
-        workflowDescription: undefined,
+        brainTitle: 'test workflow',
+        brainDescription: undefined,
       })
     );
 
@@ -222,8 +222,8 @@ describe('workflow creation', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
-        workflowTitle: 'test workflow',
-        workflowDescription: undefined,
+        brainTitle: 'test workflow',
+        brainDescription: undefined,
       })
     );
   });
@@ -242,8 +242,8 @@ describe('workflow creation', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle: 'my named workflow',
-        workflowDescription: 'some description',
+        brainTitle: 'my named workflow',
+        brainDescription: 'some description',
         options: {},
       })
     );
@@ -259,8 +259,8 @@ describe('workflow creation', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle: 'simple workflow',
-        workflowDescription: undefined,
+        brainTitle: 'simple workflow',
+        brainDescription: undefined,
         options: {},
       })
     );
@@ -331,7 +331,7 @@ describe('workflow creation', () => {
 
     const workflowRun = testWorkflow.run({
       client: mockClient,
-      workflowRunId: providedId,
+      brainRunId: providedId,
     });
 
     // Check start event
@@ -340,8 +340,8 @@ describe('workflow creation', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle: 'Workflow with Provided ID',
-        workflowRunId: providedId, // Expect the provided ID here
+        brainTitle: 'Workflow with Provided ID',
+        brainRunId: providedId, // Expect the provided ID here
       })
     );
   });
@@ -448,7 +448,7 @@ describe('workflow creation', () => {
       const outerWorkflow = brain('Outer Resource Workflow').brain(
         'Run Inner',
         innerWorkflow,
-        ({ state, workflowState }) => ({ ...state, ...workflowState })
+        ({ state, brainState }) => ({ ...state, ...brainState })
       );
 
       const run = outerWorkflow.run({
@@ -518,7 +518,7 @@ describe('error handling', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
         status: STATUS.ERROR,
-        workflowTitle: 'Error Workflow',
+        brainTitle: 'Error Workflow',
         error: expect.objectContaining({
           name: expect.any(String),
           message: expect.any(String),
@@ -541,10 +541,10 @@ describe('error handling', () => {
       .brain(
         'Run inner workflow',
         innerWorkflow,
-        ({ state, workflowState }) => ({
+        ({ state, brainState }) => ({
           ...state,
           step: 'second',
-          innerResult: workflowState.value,
+          innerResult: brainState.value,
         }),
         () => ({ value: 5 })
       );
@@ -559,7 +559,7 @@ describe('error handling', () => {
       })) {
         events.push(event);
         if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
-          mainWorkflowId = event.workflowRunId;
+          mainWorkflowId = event.brainRunId;
         }
       }
     } catch (e) {
@@ -573,9 +573,9 @@ describe('error handling', () => {
     expect(events).toEqual([
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
-        workflowTitle: 'Outer Workflow',
+        brainTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
-        workflowRunId: mainWorkflowId,
+        brainRunId: mainWorkflowId,
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.STEP_STATUS,
@@ -610,7 +610,7 @@ describe('error handling', () => {
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
-        workflowTitle: 'Failing Inner Workflow',
+        brainTitle: 'Failing Inner Workflow',
         status: STATUS.RUNNING,
       }),
       expect.objectContaining({
@@ -628,7 +628,7 @@ describe('error handling', () => {
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
-        workflowTitle: 'Failing Inner Workflow',
+        brainTitle: 'Failing Inner Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
           name: expect.any(String),
@@ -646,7 +646,7 @@ describe('error handling', () => {
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
-        workflowTitle: 'Outer Workflow',
+        brainTitle: 'Outer Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
           name: expect.any(String),
@@ -666,11 +666,11 @@ describe('error handling', () => {
 
     // Find inner and outer error events by workflowRunId
     const innerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId !== mainWorkflowId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId !== mainWorkflowId
     ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId === mainWorkflowId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId === mainWorkflowId
     ) as BrainErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(
@@ -776,7 +776,7 @@ describe('step creation', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
-        workflowTitle: 'Simple Workflow',
+        brainTitle: 'Simple Workflow',
         options: {},
       })
     );
@@ -886,7 +886,7 @@ describe('workflow resumption', () => {
       client: mockClient as ObjectGenerator,
       initialState,
       initialCompletedSteps,
-      workflowRunId: 'test-run-id',
+      brainRunId: 'test-run-id',
     })) {
       if (event.type === BRAIN_EVENTS.RESTART) {
         resumedState = event.initialState;
@@ -924,9 +924,9 @@ describe('nested workflows', () => {
       .brain(
         'Run inner workflow',
         innerWorkflow,
-        ({ state, workflowState }) => ({
+        ({ state, brainState }) => ({
           ...state,
-          innerResult: workflowState.value,
+          innerResult: brainState.value,
         }),
         () => ({ value: 5 })
       );
@@ -942,7 +942,7 @@ describe('nested workflows', () => {
     expect(
       events.map((e) => ({
         type: e.type,
-        workflowTitle: 'workflowTitle' in e ? e.workflowTitle : undefined,
+        brainTitle: 'brainTitle' in e ? e.brainTitle : undefined,
         status: 'status' in e ? e.status : undefined,
         stepTitle: 'stepTitle' in e ? e.stepTitle : undefined,
       }))
@@ -950,119 +950,119 @@ describe('nested workflows', () => {
       // Outer workflow start
       {
         type: BRAIN_EVENTS.START,
-        workflowTitle: 'Outer Workflow',
+        brainTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
         stepTitle: undefined,
       },
       // Initial step status for outer workflow
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // First step of outer workflow
       {
         type: BRAIN_EVENTS.STEP_START,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Set prefix',
       },
       // First step status (running)
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
         type: BRAIN_EVENTS.STEP_COMPLETE,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Set prefix',
       },
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
         type: BRAIN_EVENTS.STEP_START,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow',
       },
       // Step status for inner workflow (running)
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // Inner workflow start
       {
         type: BRAIN_EVENTS.START,
-        workflowTitle: 'Inner Workflow',
+        brainTitle: 'Inner Workflow',
         status: STATUS.RUNNING,
         stepTitle: undefined,
       },
       // Initial step status for inner workflow
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // Inner workflow step
       {
         type: BRAIN_EVENTS.STEP_START,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Double value',
       },
       // Inner workflow step status (running)
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
         type: BRAIN_EVENTS.STEP_COMPLETE,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Double value',
       },
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
         type: BRAIN_EVENTS.COMPLETE,
-        workflowTitle: 'Inner Workflow',
+        brainTitle: 'Inner Workflow',
         status: STATUS.COMPLETE,
         stepTitle: undefined,
       },
       // Outer workflow nested step completion
       {
         type: BRAIN_EVENTS.STEP_COMPLETE,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow',
       },
       {
         type: BRAIN_EVENTS.STEP_STATUS,
-        workflowTitle: undefined,
+        brainTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // Outer workflow completion
       {
         type: BRAIN_EVENTS.COMPLETE,
-        workflowTitle: 'Outer Workflow',
+        brainTitle: 'Outer Workflow',
         status: STATUS.COMPLETE,
         stepTitle: undefined,
       },
@@ -1108,10 +1108,10 @@ describe('nested workflows', () => {
       .brain(
         'Run inner workflow',
         innerWorkflow,
-        ({ state, workflowState }) => ({
+        ({ state, brainState }) => ({
           ...state,
           step: 'second',
-          innerResult: workflowState.value,
+          innerResult: brainState.value,
         }),
         () => ({ value: 5 })
       );
@@ -1126,7 +1126,7 @@ describe('nested workflows', () => {
       })) {
         events.push(event);
         if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
-          mainWorkflowId = event.workflowRunId;
+          mainWorkflowId = event.brainRunId;
         }
       }
     } catch (e) {
@@ -1140,9 +1140,9 @@ describe('nested workflows', () => {
     expect(events).toEqual([
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
-        workflowTitle: 'Outer Workflow',
+        brainTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
-        workflowRunId: mainWorkflowId,
+        brainRunId: mainWorkflowId,
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.STEP_STATUS,
@@ -1177,7 +1177,7 @@ describe('nested workflows', () => {
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
-        workflowTitle: 'Failing Inner Workflow',
+        brainTitle: 'Failing Inner Workflow',
         status: STATUS.RUNNING,
       }),
       expect.objectContaining({
@@ -1195,7 +1195,7 @@ describe('nested workflows', () => {
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
-        workflowTitle: 'Failing Inner Workflow',
+        brainTitle: 'Failing Inner Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
           name: expect.any(String),
@@ -1213,7 +1213,7 @@ describe('nested workflows', () => {
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
-        workflowTitle: 'Outer Workflow',
+        brainTitle: 'Outer Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
           name: expect.any(String),
@@ -1233,11 +1233,11 @@ describe('nested workflows', () => {
 
     // Find inner and outer error events by workflowRunId
     const innerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId !== mainWorkflowId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId !== mainWorkflowId
     ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId === mainWorkflowId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId === mainWorkflowId
     ) as BrainErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(
@@ -1279,9 +1279,9 @@ describe('nested workflows', () => {
       .brain(
         'Run inner workflow',
         innerWorkflow,
-        ({ state, workflowState }) => ({
+        ({ state, brainState }) => ({
           ...state,
-          result: workflowState.value,
+          result: brainState.value,
         }),
         (state) => ({ value: state.value })
       );
@@ -1340,8 +1340,8 @@ describe('workflow options', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
-        workflowTitle: 'Options Workflow',
-        workflowDescription: undefined,
+        brainTitle: 'Options Workflow',
+        brainDescription: undefined,
         options: workflowOptions,
       })
     );
@@ -1460,10 +1460,10 @@ describe('type inference', () => {
       .brain(
         'Nested workflow',
         innerWorkflow,
-        ({ state, workflowState }) => ({
+        ({ state, brainState }) => ({
           ...state,
-          processedValue: workflowState.processedValue,
-          totalFeatures: workflowState.featureCount,
+          processedValue: brainState.processedValue,
+          totalFeatures: brainState.featureCount,
         }),
         () => ({
           processedValue: 0,
@@ -1505,14 +1505,14 @@ describe('type inference', () => {
 
       // Capture the main workflow's ID from its start event
       if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
-        mainWorkflowId = event.workflowRunId;
+        mainWorkflowId = event.brainRunId;
       }
 
       if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
       } else if (
         event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        event.workflowRunId === mainWorkflowId // Only process events from main workflow
+        event.brainRunId === mainWorkflowId // Only process events from main workflow
       ) {
         finalState = applyPatches(finalState, [event.patch]);
       }
@@ -1523,10 +1523,10 @@ describe('type inference', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle: 'Complex Type Test',
-        workflowDescription: undefined,
+        brainTitle: 'Complex Type Test',
+        brainDescription: undefined,
         options: { features: ['fast', 'secure'] },
-        workflowRunId: mainWorkflowId,
+        brainRunId: mainWorkflowId,
       })
     );
 
@@ -1534,14 +1534,14 @@ describe('type inference', () => {
     const innerStartEvent = events.find(
       (e) =>
         e.type === BRAIN_EVENTS.START &&
-        'workflowRunId' in e &&
-        e.workflowRunId !== mainWorkflowId
+        'brainRunId' in e &&
+        e.brainRunId !== mainWorkflowId
     );
     expect(innerStartEvent).toEqual(
       expect.objectContaining({
         type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle: 'Inner Type Test',
+        brainTitle: 'Inner Type Test',
         options: { features: ['fast', 'secure'] },
       })
     );
@@ -1577,7 +1577,7 @@ describe('type inference', () => {
       .brain(
         'Nested workflow',
         innerWorkflow,
-        ({ state, workflowState }) => {
+        ({ state, brainState }) => {
           // Type assertion for outer state
           type ExpectedOuterState = {
             outerValue: number;
@@ -1595,7 +1595,7 @@ describe('type inference', () => {
             innerValue: number;
             metadata: { processed: true };
           };
-          type ActualInnerState = typeof workflowState;
+          type ActualInnerState = typeof brainState;
           type InnerStateTest = AssertEquals<
             ActualInnerState,
             ExpectedInnerState
@@ -1604,8 +1604,8 @@ describe('type inference', () => {
 
           return {
             ...state,
-            innerResult: workflowState.innerValue,
-            processed: workflowState.metadata.processed,
+            innerResult: brainState.innerValue,
+            processed: brainState.metadata.processed,
           };
         },
         () => ({} as { innerValue: number; metadata: { processed: boolean } })
@@ -1619,11 +1619,11 @@ describe('type inference', () => {
       client: mockClient,
     })) {
       if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
-        mainWorkflowId = event.workflowRunId;
+        mainWorkflowId = event.brainRunId;
       }
       if (
         event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        event.workflowRunId === mainWorkflowId
+        event.brainRunId === mainWorkflowId
       ) {
         finalState = applyPatches(finalState, [event.patch]);
       }
@@ -1671,11 +1671,11 @@ describe('type inference', () => {
       client: mockClient,
     })) {
       if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
-        mainWorkflowId = event.workflowRunId;
+        mainWorkflowId = event.brainRunId;
       }
       if (
         event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        event.workflowRunId === mainWorkflowId
+        event.brainRunId === mainWorkflowId
       ) {
         finalState = applyPatches(finalState, [event.patch]);
       }

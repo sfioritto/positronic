@@ -17,14 +17,14 @@ export type SerializedError = {
 interface BaseEvent<TOptions extends object = object> {
   type: (typeof BRAIN_EVENTS)[keyof typeof BRAIN_EVENTS];
   options: TOptions;
-  workflowRunId: string;
+  brainRunId: string;
 }
 
 // 1. Brain Events (all include brain title/description)
 interface BrainBaseEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
-  workflowTitle: string;
-  workflowDescription?: string;
+  brainTitle: string;
+  brainDescription?: string;
 }
 
 export interface BrainStartEvent<TOptions extends object = object>
@@ -146,14 +146,14 @@ export interface InitialRunParams<TOptions extends object = object>
   extends BaseRunParams<TOptions> {
   initialState?: State;
   initialCompletedSteps?: never;
-  workflowRunId?: string;
+  brainRunId?: string;
 }
 
 export interface RerunParams<TOptions extends object = object>
   extends BaseRunParams<TOptions> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
-  workflowRunId: string;
+  brainRunId: string;
 }
 
 export class Brain<
@@ -217,7 +217,7 @@ export class Brain<
     innerBrain: Brain<TOptions, TInnerState, TServices>,
     action: (params: {
       state: TState;
-      workflowState: TInnerState;
+      brainState: TInnerState;
       services: TServices;
     }) => TNewState,
     initialState?: State | ((state: TState) => State)
@@ -234,7 +234,7 @@ export class Brain<
       innerBrain,
       initialState: initialState || (() => ({} as State)),
       action: (outerState, innerState, services) =>
-        action({ state: outerState, workflowState: innerState, services }),
+        action({ state: outerState, brainState: innerState, services }),
     };
     this.blocks.push(nestedBlock);
     return this.nextBrain<TNewState>();
@@ -403,7 +403,7 @@ class BrainEventStream<
   private steps: Step[];
   private currentStepIndex: number = 0;
   private initialState: TState;
-  private workflowRunId: string;
+  private brainRunId: string;
   private title: string;
   private description?: string;
   private client: ObjectGenerator;
@@ -425,7 +425,7 @@ class BrainEventStream<
       blocks,
       title,
       description,
-      workflowRunId: providedWorkflowRunId,
+      brainRunId: providedBrainRunId,
       options = {} as TOptions,
       client,
       services,
@@ -461,17 +461,17 @@ class BrainEventStream<
     }
 
     // Use provided ID if available, otherwise generate one
-    this.workflowRunId = providedWorkflowRunId ?? uuidv4();
+    this.brainRunId = providedBrainRunId ?? uuidv4();
   }
 
   async *next(): AsyncGenerator<BrainEvent<TOptions>> {
     const {
       steps,
-      title: workflowTitle,
-      description: workflowDescription,
+      title: brainTitle,
+      description: brainDescription,
       currentState,
       options,
-      workflowRunId,
+      brainRunId,
     } = this;
 
     try {
@@ -481,11 +481,11 @@ class BrainEventStream<
       yield {
         type: hasCompletedSteps ? BRAIN_EVENTS.RESTART : BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
-        workflowTitle,
-        workflowDescription,
+        brainTitle,
+        brainDescription,
         initialState: currentState,
         options,
-        workflowRunId,
+        brainRunId,
       };
 
       // Emit initial step status after brain starts
@@ -496,7 +496,7 @@ class BrainEventStream<
           return rest;
         }),
         options,
-        workflowRunId,
+        brainRunId,
       };
 
       // Process each step
@@ -515,7 +515,7 @@ class BrainEventStream<
           stepTitle: step.block.title,
           stepId: step.id,
           options,
-          workflowRunId,
+          brainRunId,
         };
 
         step.withStatus(STATUS.RUNNING);
@@ -528,7 +528,7 @@ class BrainEventStream<
             return rest;
           }),
           options,
-          workflowRunId,
+          brainRunId,
         };
 
         // Execute step and yield the STEP_COMPLETE event and
@@ -543,7 +543,7 @@ class BrainEventStream<
             return rest;
           }),
           options,
-          workflowRunId,
+          brainRunId,
         };
 
         this.currentStepIndex++;
@@ -552,9 +552,9 @@ class BrainEventStream<
       yield {
         type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
-        workflowTitle,
-        workflowDescription,
-        workflowRunId,
+        brainTitle,
+        brainDescription,
+        brainRunId,
         options,
       };
     } catch (err: any) {
@@ -565,9 +565,9 @@ class BrainEventStream<
       yield {
         type: BRAIN_EVENTS.ERROR,
         status: STATUS.ERROR,
-        workflowTitle,
-        workflowDescription,
-        workflowRunId,
+        brainTitle,
+        brainDescription,
+        brainRunId,
         error: {
           name: error.name,
           message: error.message,
@@ -584,7 +584,7 @@ class BrainEventStream<
           return rest;
         }),
         options,
-        workflowRunId,
+        brainRunId,
       };
 
       throw error;
@@ -662,7 +662,7 @@ class BrainEventStream<
       stepId: step.id,
       patch,
       options: this.options ?? ({} as TOptions),
-      workflowRunId: this.workflowRunId,
+      brainRunId: this.brainRunId,
     };
   }
 }

@@ -70,9 +70,9 @@ export class MonitorDO extends DurableObject<Env> {
           error = excluded.error,
           completed_at = excluded.completed_at
       `,
-        event.workflowRunId, // Use workflowRunId for run_id
-        event.workflowTitle, // Read from event field, store in brain_title
-        event.workflowDescription || null, // Read from event field, store in brain_description
+        event.brainRunId, // Use brainRunId for run_id
+        event.brainTitle, // Read from event field, store in brain_title
+        event.brainDescription || null, // Read from event field, store in brain_description
         event.type,
         event.status,
         JSON.stringify(event.options || {}),
@@ -91,9 +91,9 @@ export class MonitorDO extends DurableObject<Env> {
       .exec(
         `
       SELECT
-        run_id as workflowRunId,
-        brain_title as workflowTitle,
-        brain_description as workflowDescription,
+        run_id as brainRunId,
+        brain_title as brainTitle,
+        brain_description as brainDescription,
         type,
         status,
         options,
@@ -124,9 +124,9 @@ export class MonitorDO extends DurableObject<Env> {
               .exec(
                 `
               SELECT
-                run_id as workflowRunId,
-                brain_title as workflowTitle,
-                brain_description as workflowDescription,
+                run_id as brainRunId,
+                brain_title as brainTitle,
+                brain_description as brainDescription,
                 type,
                 status,
                 options,
@@ -171,13 +171,13 @@ export class MonitorDO extends DurableObject<Env> {
   }
 
   // No changes needed for getLastEvent, uses run_id
-  getLastEvent(workflowRunId: string) {
+  getLastEvent(brainRunId: string) {
     return this.storage
       .exec(
         `
       SELECT * FROM workflow_runs WHERE run_id = ?
     `,
-        workflowRunId
+        brainRunId
       )
       .one();
   }
@@ -190,7 +190,7 @@ export class MonitorDO extends DurableObject<Env> {
       .exec(
         `
       SELECT
-        run_id as workflowRunId,
+        run_id as brainRunId,
         brain_title as brainTitle,
         brain_description as brainDescription,
         type,
