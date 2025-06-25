@@ -69,7 +69,7 @@ export const ResourceList = () => {
   });
 
   return (
-    <Box flexDirection="column" paddingTop={1}>
+    <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
       <Text bold>
         Found {resources.length} resource{resources.length === 1 ? '' : 's'}:
       </Text>
@@ -87,8 +87,10 @@ export const ResourceList = () => {
       {/* Legend for resource types */}
       {resources.some(r => !r.local) && (
         <Box marginTop={1} flexDirection="column">
-          <Text dimColor>─────</Text>
-          <Text dimColor>↗ = uploaded resource (not in local filesystem)</Text>
+          <Text color="gray">─────</Text>
+          <Text color="blueBright">
+            <Text color="blueBright">↗</Text> = uploaded resource (not in local filesystem)
+          </Text>
         </Box>
       )}
     </Box>
@@ -143,13 +145,13 @@ const TreeView = ({ node, prefix = '', isLast = true, depth = 0 }: TreeViewProps
       <Box>
         {!isTopLevel && <Text dimColor>{prefix}{connector}</Text>}
         <Text
-          dimColor={isRemote}
+          color={isRemote ? 'blueBright' : undefined}
         >
           {node.name}
           {node.resource && (
             <>
-              <Text dimColor> ({formatSize(node.resource.size)})</Text>
-              {isRemote && <Text dimColor> ↗</Text>}
+              <Text color={isRemote ? 'blueBright' : 'gray'}> ({formatSize(node.resource.size)})</Text>
+              {isRemote && <Text color="blueBright"> ↗</Text>}
             </>
           )}
         </Text>
