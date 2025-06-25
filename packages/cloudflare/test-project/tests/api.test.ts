@@ -6,11 +6,11 @@ import {
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker from '../src/index';
-import { WORKFLOW_EVENTS, STATUS } from '@positronic/core';
+import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import type {
-  WorkflowEvent,
-  WorkflowStartEvent,
-  WorkflowCompleteEvent,
+  BrainEvent,
+  BrainStartEvent,
+  BrainCompleteEvent,
   StepStatusEvent,
   StepCompletedEvent,
   StepStartedEvent,
@@ -51,11 +51,11 @@ describe('Hono API Tests', () => {
   // Helper function to read the entire SSE stream and collect events
   async function readSseStream(
     stream: ReadableStream<Uint8Array>
-  ): Promise<WorkflowEvent[]> {
+  ): Promise<BrainEvent[]> {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    const events: WorkflowEvent[] = [];
+    const events: BrainEvent[] = [];
 
     while (true) {
       const { value, done } = await reader.read();
@@ -81,13 +81,13 @@ describe('Hono API Tests', () => {
           const event = parseSseEvent(message);
           if (event) {
             events.push(event);
-            if (event.type === WORKFLOW_EVENTS.COMPLETE) {
+            if (event.type === BRAIN_EVENTS.COMPLETE) {
               reader.cancel(`Received terminal event: ${event.type}`);
               return events;
             }
-            if (event.type === WORKFLOW_EVENTS.ERROR) {
+            if (event.type === BRAIN_EVENTS.ERROR) {
               console.error(
-                'Received WORKFLOW_EVENTS.ERROR. Event details:',
+                'Received BRAIN_EVENTS.ERROR. Event details:',
                 event
               );
               reader.cancel(`Received terminal event: ${event.type}`);
@@ -125,7 +125,7 @@ describe('Hono API Tests', () => {
 
   it('Create and watch a brain run', async () => {
     const testEnv = env as TestEnv;
-    const brainName = 'basic-workflow';
+    const brainName = 'basic-brain';
 
     // --- Create the brain run ---
     const request = new Request('http://example.com/brains/runs', {
@@ -164,7 +164,7 @@ describe('Hono API Tests', () => {
     // --- Assertions on the collected events ---
     // Check for start event
     const startEvent = allEvents.find(
-      (e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START
+      (e): e is BrainStartEvent => e.type === BRAIN_EVENTS.START
     );
     expect(startEvent).toBeDefined();
     expect(startEvent?.workflowTitle).toBe(brainName);
@@ -172,14 +172,14 @@ describe('Hono API Tests', () => {
 
     // Check for complete event
     const completeEvent = allEvents.find(
-      (e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE
+      (e): e is BrainCompleteEvent => e.type === BRAIN_EVENTS.COMPLETE
     );
     expect(completeEvent).toBeDefined();
     expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
     // Check the final step status event
     const stepStatusEvents = allEvents.filter(
-      (e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS
+      (e): e is StepStatusEvent => e.type === BRAIN_EVENTS.STEP_STATUS
     );
     expect(stepStatusEvents.length).toBeGreaterThan(0);
     const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
@@ -189,18 +189,18 @@ describe('Hono API Tests', () => {
       )
     ).toBe(true);
 
-    // Check for specific step completion if needed (depends on basic-workflow structure)
+    // Check for specific step completion if needed (depends on basic-brain structure)
     const stepCompleteEvents = allEvents.filter(
-      (e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE
+      (e): e is StepCompletedEvent => e.type === BRAIN_EVENTS.STEP_COMPLETE
     );
-    expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1); // Assuming basic-workflow has at least one step
+    expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1); // Assuming basic-brain has at least one step
 
     await waitOnExecutionContext(watchContext);
   });
 
   it('Create and watch a delayed brain run', async () => {
     const testEnv = env as TestEnv;
-    const brainName = 'delayed-workflow';
+    const brainName = 'delayed-brain';
 
     // Create the brain run
     const createRequest = new Request('http://example.com/brains/runs', {
@@ -245,7 +245,7 @@ describe('Hono API Tests', () => {
     // --- Assertions on the collected events ---
     // Check for start event
     const startEvent = allEvents.find(
-      (e): e is WorkflowStartEvent => e.type === WORKFLOW_EVENTS.START
+      (e): e is BrainStartEvent => e.type === BRAIN_EVENTS.START
     );
     expect(startEvent).toBeDefined();
     expect(startEvent?.workflowTitle).toBe(brainName);
@@ -254,26 +254,25 @@ describe('Hono API Tests', () => {
     // Check for step start/complete events for the delayed step
     const delayStepStart = allEvents.find(
       (e): e is StepStartedEvent =>
-        e.type === WORKFLOW_EVENTS.STEP_START && e.stepTitle === 'Start Delay'
+        e.type === BRAIN_EVENTS.STEP_START && e.stepTitle === 'Start Delay'
     );
     expect(delayStepStart).toBeDefined();
     const delayStepComplete = allEvents.find(
       (e): e is StepCompletedEvent =>
-        e.type === WORKFLOW_EVENTS.STEP_COMPLETE &&
-        e.stepTitle === 'Start Delay'
+        e.type === BRAIN_EVENTS.STEP_COMPLETE && e.stepTitle === 'Start Delay'
     );
     expect(delayStepComplete).toBeDefined();
 
     // Check for the final complete event
     const completeEvent = allEvents.find(
-      (e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE
+      (e): e is BrainCompleteEvent => e.type === BRAIN_EVENTS.COMPLETE
     );
     expect(completeEvent).toBeDefined();
     expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
     // Check the final step status event shows completion
     const stepStatusEvents = allEvents.filter(
-      (e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS
+      (e): e is StepStatusEvent => e.type === BRAIN_EVENTS.STEP_STATUS
     );
     expect(stepStatusEvents.length).toBeGreaterThan(0);
     const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
@@ -288,7 +287,7 @@ describe('Hono API Tests', () => {
 
   it('Asserts brainRunId is present in SSE events', async () => {
     const testEnv = env as TestEnv;
-    const brainName = 'basic-workflow';
+    const brainName = 'basic-brain';
 
     // Create brain run
     const createRequest = new Request('http://example.com/brains/runs', {
@@ -335,9 +334,9 @@ describe('Hono API Tests', () => {
     expect(event.workflowRunId).toBe(expectedBrainRunId);
   });
 
-  it('Monitor receives workflow events (checking brain run)', async () => {
+  it('Monitor receives brain events (checking brain run)', async () => {
     const testEnv = env as TestEnv;
-    const brainName = 'basic-workflow';
+    const brainName = 'basic-brain';
 
     // Start the brain run
     const createRequest = new Request('http://example.com/brains/runs', {
@@ -371,15 +370,15 @@ describe('Hono API Tests', () => {
     const monitorStub = testEnv.MONITOR_DO.get(monitorId);
     const lastEvent = await monitorStub.getLastEvent(brainRunId);
 
-    // The last event should be a workflow complete event
+    // The last event should be a brain complete event
     expect(lastEvent).toBeDefined();
-    expect(lastEvent.type).toBe(WORKFLOW_EVENTS.COMPLETE);
+    expect(lastEvent.type).toBe(BRAIN_EVENTS.COMPLETE);
     expect(lastEvent.status).toBe(STATUS.COMPLETE);
   });
 
   it('Watches brain run as it runs', async () => {
     const testEnv = env as TestEnv;
-    const brainName = 'basic-workflow';
+    const brainName = 'basic-brain';
 
     // Run the brain run twice
     for (let i = 0; i < 2; i++) {
@@ -429,8 +428,8 @@ describe('Hono API Tests', () => {
     const history = await historyResponse.json<{
       runs: Array<{
         workflowRunId: string;
-        workflowTitle: string;
-        workflowDescription: string | null;
+        brainTitle: string;
+        brainDescription: string | null;
         type: string;
         status: string;
         options: string;
@@ -445,8 +444,8 @@ describe('Hono API Tests', () => {
     // Verify each run has the expected properties
     for (const run of history.runs) {
       expect(run).toHaveProperty('workflowRunId');
-      expect(run).toHaveProperty('workflowTitle');
-      expect(run).toHaveProperty('workflowDescription');
+      expect(run).toHaveProperty('brainTitle');
+      expect(run).toHaveProperty('brainDescription');
       expect(run).toHaveProperty('type');
       expect(run).toHaveProperty('status');
       expect(run).toHaveProperty('options');
@@ -455,7 +454,7 @@ describe('Hono API Tests', () => {
       expect(run).toHaveProperty('startedAt');
       expect(run).toHaveProperty('completedAt');
       expect(run.status).toBe(STATUS.COMPLETE);
-      expect(run.workflowTitle).toBe(brainName);
+      expect(run.brainTitle).toBe(brainName);
     }
 
     // Verify runs are ordered by createdAt descending
@@ -467,7 +466,7 @@ describe('Hono API Tests', () => {
 
   it('Watch endpoint streams running brains', async () => {
     const testEnv = env as TestEnv;
-    const brainName = 'delayed-workflow';
+    const brainName = 'delayed-brain';
     const brainRuns: string[] = [];
 
     // Start 3 delayed brains
@@ -540,7 +539,7 @@ describe('Hono API Tests', () => {
 
         // If we've seen all brains complete, we can stop early
         const lastEvent = events[events.length - 1];
-        if (lastEvent?.runningWorkflows?.length === 0) {
+        if (lastEvent?.runningBrains?.length === 0) {
           break;
         }
       }
@@ -553,25 +552,23 @@ describe('Hono API Tests', () => {
 
     // First event should show all brains running
     const initialState = events[0];
-    expect(initialState.runningWorkflows).toBeDefined();
-    expect(initialState.runningWorkflows.length).toBe(3);
+    expect(initialState.runningBrains).toBeDefined();
+    expect(initialState.runningBrains.length).toBe(3);
     expect(
-      initialState.runningWorkflows.every(
-        (w: any) => w.status === STATUS.RUNNING
-      )
+      initialState.runningBrains.every((w: any) => w.status === STATUS.RUNNING)
     ).toBe(true);
 
     // Last event should show no running brains
     const finalState = events[events.length - 1];
-    expect(finalState.runningWorkflows).toBeDefined();
-    expect(finalState.runningWorkflows.length).toBe(0);
+    expect(finalState.runningBrains).toBeDefined();
+    expect(finalState.runningBrains.length).toBe(0);
 
     await waitOnExecutionContext(watchContext);
   });
 
   it('Loads resources from the resource manifest', async () => {
     const testEnv = env as TestEnv;
-    const brainName = 'resource-workflow';
+    const brainName = 'resource-brain';
 
     // First, set up test resources in R2
     // Create testResource
@@ -646,16 +643,16 @@ describe('Hono API Tests', () => {
 
     // --- Assertions on the collected events ---
 
-    // Check for overall workflow completion
+    // Check for overall brain completion
     const completeEvent = allEvents.find(
-      (e): e is WorkflowCompleteEvent => e.type === WORKFLOW_EVENTS.COMPLETE
+      (e): e is BrainCompleteEvent => e.type === BRAIN_EVENTS.COMPLETE
     );
     expect(completeEvent).toBeDefined();
     expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
     // Find the step completion events
     const stepCompleteEvents = allEvents.filter(
-      (e): e is StepCompletedEvent => e.type === WORKFLOW_EVENTS.STEP_COMPLETE
+      (e): e is StepCompletedEvent => e.type === BRAIN_EVENTS.STEP_COMPLETE
     );
 
     const loadTextStepCompleteEvent = stepCompleteEvents.find(
@@ -711,12 +708,12 @@ describe('Hono API Tests', () => {
 
     // Check that the steps themselves are marked as completed in the final status
     const stepStatusEvents = allEvents.filter(
-      (e): e is StepStatusEvent => e.type === WORKFLOW_EVENTS.STEP_STATUS
+      (e): e is StepStatusEvent => e.type === BRAIN_EVENTS.STEP_STATUS
     );
     expect(stepStatusEvents.length).toBeGreaterThan(0);
     const lastStepStatusEvent = stepStatusEvents[stepStatusEvents.length - 1];
 
-    expect(lastStepStatusEvent.steps.length).toBe(3); // resource-workflow has 3 steps
+    expect(lastStepStatusEvent.steps.length).toBe(3); // resource-brain has 3 steps
     const textStepFinalStatus = lastStepStatusEvent.steps.find(
       (s) => s.title === 'Load text resource'
     );

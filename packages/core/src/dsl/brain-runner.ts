@@ -1,12 +1,12 @@
-import { WORKFLOW_EVENTS } from './constants.js';
+import { BRAIN_EVENTS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { Adapter } from '../adapters/types.js';
-import type { SerializedStep, Workflow } from './workflow.js';
+import type { SerializedStep, Brain } from './workflow.js';
 import type { State } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 
-export class WorkflowRunner {
+export class BrainRunner {
   constructor(
     private options: {
       adapters: Adapter[];
@@ -15,30 +15,30 @@ export class WorkflowRunner {
     }
   ) {}
 
-  withAdapters(adapters: Adapter[]): WorkflowRunner {
+  withAdapters(adapters: Adapter[]): BrainRunner {
     const { adapters: existingAdapters } = this.options;
-    return new WorkflowRunner({
+    return new BrainRunner({
       ...this.options,
       adapters: [...existingAdapters, ...adapters],
     });
   }
 
-  withClient(client: ObjectGenerator): WorkflowRunner {
-    return new WorkflowRunner({
+  withClient(client: ObjectGenerator): BrainRunner {
+    return new BrainRunner({
       ...this.options,
       client,
     });
   }
 
-  withResources(resources: Resources): WorkflowRunner {
-    return new WorkflowRunner({
+  withResources(resources: Resources): BrainRunner {
+    return new BrainRunner({
       ...this.options,
       resources,
     });
   }
 
   async run<TOptions extends object = {}, TState extends State = {}>(
-    workflow: Workflow<TOptions, TState, any>,
+    brain: Brain<TOptions, TState, any>,
     {
       initialState = {} as TState,
       options,
@@ -71,7 +71,7 @@ export class WorkflowRunner {
 
     const workflowRun =
       workflowRunId && initialCompletedSteps
-        ? workflow.run({
+        ? brain.run({
             initialState,
             initialCompletedSteps,
             workflowRunId,
@@ -79,7 +79,7 @@ export class WorkflowRunner {
             client,
             resources: resources ?? {},
           })
-        : workflow.run({
+        : brain.run({
             initialState,
             options,
             client,
@@ -92,7 +92,7 @@ export class WorkflowRunner {
       await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
 
       // Update current state when steps complete
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         if (event.patch) {
           currentState = applyPatches(currentState, [event.patch]) as TState;
         }

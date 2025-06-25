@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
-import { WORKFLOW_EVENTS, STATUS } from '@positronic/core';
-import type { WorkflowEvent } from '@positronic/core';
+import { BRAIN_EVENTS, STATUS } from '@positronic/core';
+import type { BrainEvent } from '@positronic/core';
 
 export interface Env {
   // Add any environment bindings here as needed
@@ -37,28 +37,25 @@ export class MonitorDO extends DurableObject<Env> {
     `);
   }
 
-  handleWorkflowEvent(event: WorkflowEvent) {
+  handleBrainEvent(event: BrainEvent<any>) {
     if (
-      event.type === WORKFLOW_EVENTS.START ||
-      event.type === WORKFLOW_EVENTS.RESTART ||
-      event.type === WORKFLOW_EVENTS.COMPLETE ||
-      event.type === WORKFLOW_EVENTS.ERROR
+      event.type === BRAIN_EVENTS.START ||
+      event.type === BRAIN_EVENTS.RESTART ||
+      event.type === BRAIN_EVENTS.COMPLETE ||
+      event.type === BRAIN_EVENTS.ERROR
     ) {
       const currentTime = Date.now();
       const startTime =
-        event.type === WORKFLOW_EVENTS.START ||
-        event.type === WORKFLOW_EVENTS.RESTART
+        event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART
           ? currentTime
           : null;
       const completeTime =
-        event.type === WORKFLOW_EVENTS.COMPLETE ||
-        event.type === WORKFLOW_EVENTS.ERROR
+        event.type === BRAIN_EVENTS.COMPLETE ||
+        event.type === BRAIN_EVENTS.ERROR
           ? currentTime
           : null;
       const error =
-        event.type === WORKFLOW_EVENTS.ERROR
-          ? JSON.stringify(event.error)
-          : null;
+        event.type === BRAIN_EVENTS.ERROR ? JSON.stringify(event.error) : null;
 
       // Update SQL insert/update with new column names, read from existing event fields
       this.storage.exec(
@@ -85,12 +82,12 @@ export class MonitorDO extends DurableObject<Env> {
         completeTime
       );
 
-      this.broadcastRunningWorkflows();
+      this.broadcastRunningBrains();
     }
   }
 
-  private async broadcastRunningWorkflows() {
-    const runningWorkflows = await this.storage
+  private async broadcastRunningBrains() {
+    const runningBrains = await this.storage
       .exec(
         `
       SELECT
@@ -112,7 +109,7 @@ export class MonitorDO extends DurableObject<Env> {
       )
       .toArray();
 
-    this.eventStreamHandler.broadcast({ runningWorkflows });
+    this.eventStreamHandler.broadcast({ runningBrains });
   }
 
   async fetch(request: Request) {
@@ -123,7 +120,7 @@ export class MonitorDO extends DurableObject<Env> {
       const stream = new ReadableStream({
         start: async (controller) => {
           try {
-            const runningWorkflows = await this.storage
+            const runningBrains = await this.storage
               .exec(
                 `
               SELECT
@@ -146,9 +143,7 @@ export class MonitorDO extends DurableObject<Env> {
               .toArray();
 
             controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ runningWorkflows })}\n\n`
-              )
+              encoder.encode(`data: ${JSON.stringify({ runningBrains })}\n\n`)
             );
 
             this.eventStreamHandler.subscribe(controller);
@@ -196,8 +191,8 @@ export class MonitorDO extends DurableObject<Env> {
         `
       SELECT
         run_id as workflowRunId,
-        brain_title as workflowTitle,
-        brain_description as workflowDescription,
+        brain_title as brainTitle,
+        brain_description as brainDescription,
         type,
         status,
         options,

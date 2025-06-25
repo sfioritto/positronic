@@ -1,7 +1,7 @@
-import { WorkflowRunner, type Resources } from '@positronic/core';
+import { BrainRunner, type Resources } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
-import type { Adapter, WorkflowEvent } from '@positronic/core';
+import type { Adapter, BrainEvent } from '@positronic/core';
 import { WorkflowRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 import { PositronicManifest } from './manifest.js';
@@ -14,9 +14,9 @@ export function setManifest(generatedManifest: PositronicManifest) {
   manifest = generatedManifest;
 }
 
-let workflowRunner: WorkflowRunner | null = null;
-export function setWorkflowRunner(runner: WorkflowRunner) {
-  workflowRunner = runner;
+let brainRunner: BrainRunner | null = null;
+export function setBrainRunner(runner: BrainRunner) {
+  brainRunner = runner;
 }
 
 export interface Env {
@@ -37,7 +37,7 @@ class EventStreamAdapter implements Adapter {
     this.subscribers.delete(controller);
   }
 
-  private broadcast(event: WorkflowEvent<any>) {
+  private broadcast(event: BrainEvent<any>) {
     const message = `data: ${JSON.stringify(event)}\n\n`;
     const encodedMessage = this.encoder.encode(message);
     this.subscribers.forEach((controller) => {
@@ -53,7 +53,7 @@ class EventStreamAdapter implements Adapter {
     });
   }
 
-  async dispatch(event: WorkflowEvent<any>): Promise<void> {
+  async dispatch(event: BrainEvent<any>): Promise<void> {
     try {
       this.broadcast(event);
     } catch (e) {
@@ -66,8 +66,8 @@ class EventStreamAdapter implements Adapter {
 class MonitorAdapter implements Adapter {
   constructor(private monitorStub: DurableObjectStub<MonitorDO>) {}
 
-  async dispatch(event: WorkflowEvent<any>): Promise<void> {
-    await this.monitorStub.handleWorkflowEvent(event);
+  async dispatch(event: BrainEvent<any>): Promise<void> {
+    await this.monitorStub.handleBrainEvent(event);
   }
 }
 
@@ -183,18 +183,18 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.MONITOR_DO.get(this.env.MONITOR_DO.idFromName('singleton'))
     );
 
-    if (!workflowRunner) {
-      throw new Error('WorkflowRunner not initialized');
+    if (!brainRunner) {
+      throw new Error('BrainRunner not initialized');
     }
 
     // Load resources from R2
     const r2Resources = await this.loadResourcesFromR2();
     // Create an enhanced runner with resources if available
-    let runnerWithResources = workflowRunner;
+    let runnerWithResources = brainRunner;
 
     // Use R2 resources if available
     if (r2Resources) {
-      runnerWithResources = workflowRunner.withResources(r2Resources);
+      runnerWithResources = brainRunner.withResources(r2Resources);
     }
 
     runnerWithResources
@@ -203,8 +203,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
         initialState: initialData || {},
         workflowRunId,
       })
-      .catch((err) => {
-        console.error(`[DO ${workflowRunId}] WorkflowRunner run failed:`, err);
+      .catch((err: any) => {
+        console.error(`[DO ${workflowRunId}] BrainRunner run failed:`, err);
       });
   }
 

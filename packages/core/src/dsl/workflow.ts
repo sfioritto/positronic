@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { State, JsonPatch } from './types.js';
-import { STATUS, WORKFLOW_EVENTS } from './constants.js';
+import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
 
@@ -15,34 +15,34 @@ export type SerializedError = {
 // New Event Type System
 // Base event interface with only type and options
 interface BaseEvent<TOptions extends object = object> {
-  type: (typeof WORKFLOW_EVENTS)[keyof typeof WORKFLOW_EVENTS];
+  type: (typeof BRAIN_EVENTS)[keyof typeof BRAIN_EVENTS];
   options: TOptions;
   workflowRunId: string;
 }
 
-// 1. Workflow Events (all include workflow title/description)
-interface WorkflowBaseEvent<TOptions extends object = object>
+// 1. Brain Events (all include brain title/description)
+interface BrainBaseEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
   workflowTitle: string;
   workflowDescription?: string;
 }
 
-export interface WorkflowStartEvent<TOptions extends object = object>
-  extends WorkflowBaseEvent<TOptions> {
-  type: typeof WORKFLOW_EVENTS.START | typeof WORKFLOW_EVENTS.RESTART;
+export interface BrainStartEvent<TOptions extends object = object>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.START | typeof BRAIN_EVENTS.RESTART;
   initialState: State;
   status: typeof STATUS.RUNNING;
 }
 
-export interface WorkflowCompleteEvent<TOptions extends object = object>
-  extends WorkflowBaseEvent<TOptions> {
-  type: typeof WORKFLOW_EVENTS.COMPLETE;
+export interface BrainCompleteEvent<TOptions extends object = object>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.COMPLETE;
   status: typeof STATUS.COMPLETE;
 }
 
-export interface WorkflowErrorEvent<TOptions extends object = object>
-  extends WorkflowBaseEvent<TOptions> {
-  type: typeof WORKFLOW_EVENTS.ERROR;
+export interface BrainErrorEvent<TOptions extends object = object>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.ERROR;
   status: typeof STATUS.ERROR;
   error: SerializedError;
 }
@@ -50,14 +50,14 @@ export interface WorkflowErrorEvent<TOptions extends object = object>
 // 2. Step Status Event (just steps array and base event properties)
 export interface StepStatusEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
-  type: typeof WORKFLOW_EVENTS.STEP_STATUS;
+  type: typeof BRAIN_EVENTS.STEP_STATUS;
   steps: SerializedStepStatus[];
 }
 
 // 3. Step Events (include step-specific properties)
 export interface StepStartedEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
-  type: typeof WORKFLOW_EVENTS.STEP_START;
+  type: typeof BRAIN_EVENTS.STEP_START;
   status: typeof STATUS.RUNNING;
   stepTitle: string;
   stepId: string;
@@ -65,7 +65,7 @@ export interface StepStartedEvent<TOptions extends object = object>
 
 export interface StepCompletedEvent<TOptions extends object = object>
   extends BaseEvent<TOptions> {
-  type: typeof WORKFLOW_EVENTS.STEP_COMPLETE;
+  type: typeof BRAIN_EVENTS.STEP_COMPLETE;
   status: typeof STATUS.RUNNING;
   stepTitle: string;
   stepId: string;
@@ -73,10 +73,10 @@ export interface StepCompletedEvent<TOptions extends object = object>
 }
 
 // Union type of all possible events
-export type WorkflowEvent<TOptions extends object = object> =
-  | WorkflowStartEvent<TOptions>
-  | WorkflowCompleteEvent<TOptions>
-  | WorkflowErrorEvent<TOptions>
+export type BrainEvent<TOptions extends object = object> =
+  | BrainStartEvent<TOptions>
+  | BrainCompleteEvent<TOptions>
+  | BrainErrorEvent<TOptions>
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>;
@@ -118,7 +118,7 @@ type WorkflowBlock<
 > = {
   type: 'workflow';
   title: string;
-  innerWorkflow: Workflow<TOptions, TInnerState, TServices>;
+  innerBrain: Brain<TOptions, TInnerState, TServices>;
   initialState: State | ((outerState: TOuterState) => State);
   action: (
     outerState: TOuterState,
@@ -156,13 +156,13 @@ export interface RerunParams<TOptions extends object = object>
   workflowRunId: string;
 }
 
-export class Workflow<
+export class Brain<
   TOptions extends object = object,
   TState extends State = object,
   TServices extends object = object
 > {
   private blocks: Block<any, any, TOptions, TServices>[] = [];
-  public type: 'workflow' = 'workflow';
+  public type: 'brain' = 'brain';
   private defaultOptions: Partial<TOptions> = {};
   private services: TServices = {} as TServices;
 
@@ -177,19 +177,19 @@ export class Workflow<
   // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
-  ): Workflow<TOptions, TState, TNewServices> {
-    const nextWorkflow = new Workflow<TOptions, TState, TNewServices>(
+  ): Brain<TOptions, TState, TNewServices> {
+    const nextBrain = new Brain<TOptions, TState, TNewServices>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
 
     // Copy default options
-    nextWorkflow.withOptions(this.defaultOptions);
+    nextBrain.withOptions(this.defaultOptions);
 
     // Set services
-    nextWorkflow.services = services;
+    nextBrain.services = services;
 
-    return nextWorkflow;
+    return nextBrain;
   }
 
   step<TNewState extends State>(
@@ -209,12 +209,12 @@ export class Workflow<
       action,
     };
     this.blocks.push(stepBlock);
-    return this.nextWorkflow<TNewState>();
+    return this.nextBrain<TNewState>();
   }
 
-  workflow<TInnerState extends State, TNewState extends State>(
+  brain<TInnerState extends State, TNewState extends State>(
     title: string,
-    innerWorkflow: Workflow<TOptions, TInnerState, TServices>,
+    innerBrain: Brain<TOptions, TInnerState, TServices>,
     action: (params: {
       state: TState;
       workflowState: TInnerState;
@@ -231,18 +231,18 @@ export class Workflow<
     > = {
       type: 'workflow',
       title,
-      innerWorkflow,
+      innerBrain,
       initialState: initialState || (() => ({} as State)),
       action: (outerState, innerState, services) =>
         action({ state: outerState, workflowState: innerState, services }),
     };
     this.blocks.push(nestedBlock);
-    return this.nextWorkflow<TNewState>();
+    return this.nextBrain<TNewState>();
   }
 
   // TResponseKey:
   // The response key must be a string literal, so if defining a response model
-  // a consumer of this workflow must use "as const" to ensure the key is a string literal
+  // a consumer of this brain must use "as const" to ensure the key is a string literal
   // this type makes sure that the will get a ts error if they don't.
   prompt<
     TResponseKey extends string & { readonly brand?: unique symbol },
@@ -307,19 +307,17 @@ export class Workflow<
       },
     };
     this.blocks.push(promptBlock);
-    return this.nextWorkflow<TNewState>();
+    return this.nextBrain<TNewState>();
   }
 
   // Overload signatures
-  run(
-    params: InitialRunParams<TOptions>
-  ): AsyncGenerator<WorkflowEvent<TOptions>>;
-  run(params: RerunParams<TOptions>): AsyncGenerator<WorkflowEvent<TOptions>>;
+  run(params: InitialRunParams<TOptions>): AsyncGenerator<BrainEvent<TOptions>>;
+  run(params: RerunParams<TOptions>): AsyncGenerator<BrainEvent<TOptions>>;
 
   // Implementation signature
   async *run(
     params: InitialRunParams<TOptions> | RerunParams<TOptions>
-  ): AsyncGenerator<WorkflowEvent<TOptions>> {
+  ): AsyncGenerator<BrainEvent<TOptions>> {
     const { title, description, blocks } = this;
 
     // Merge default options with provided options
@@ -328,7 +326,7 @@ export class Workflow<
       ...(params.options || {}),
     } as TOptions;
 
-    const stream = new WorkflowEventStream({
+    const stream = new BrainEventStream({
       title,
       description,
       blocks,
@@ -345,24 +343,24 @@ export class Workflow<
     return this;
   }
 
-  private nextWorkflow<TNewState extends State>(): Workflow<
+  private nextBrain<TNewState extends State>(): Brain<
     TOptions,
     TNewState,
     TServices
   > {
-    // Pass default options to the next workflow
-    const nextWorkflow = new Workflow<TOptions, TNewState, TServices>(
+    // Pass default options to the next brain
+    const nextBrain = new Brain<TOptions, TNewState, TServices>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
 
-    // Copy default options to the next workflow
-    nextWorkflow.withOptions(this.defaultOptions);
+    // Copy default options to the next brain
+    nextBrain.withOptions(this.defaultOptions);
 
-    // Copy services to the next workflow
-    nextWorkflow.services = this.services;
+    // Copy services to the next brain
+    nextBrain.services = this.services;
 
-    return nextWorkflow;
+    return nextBrain;
   }
 }
 
@@ -396,7 +394,7 @@ class Step {
   }
 }
 
-class WorkflowEventStream<
+class BrainEventStream<
   TOptions extends object = object,
   TState extends State = object,
   TServices extends object = object
@@ -466,7 +464,7 @@ class WorkflowEventStream<
     this.workflowRunId = providedWorkflowRunId ?? uuidv4();
   }
 
-  async *next(): AsyncGenerator<WorkflowEvent<TOptions>> {
+  async *next(): AsyncGenerator<BrainEvent<TOptions>> {
     const {
       steps,
       title: workflowTitle,
@@ -481,9 +479,7 @@ class WorkflowEventStream<
         (step) => step.serialized.status !== STATUS.PENDING
       );
       yield {
-        type: hasCompletedSteps
-          ? WORKFLOW_EVENTS.RESTART
-          : WORKFLOW_EVENTS.START,
+        type: hasCompletedSteps ? BRAIN_EVENTS.RESTART : BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         workflowTitle,
         workflowDescription,
@@ -492,9 +488,9 @@ class WorkflowEventStream<
         workflowRunId,
       };
 
-      // Emit initial step status after workflow starts
+      // Emit initial step status after brain starts
       yield {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: steps.map((step) => {
           const { patch, ...rest } = step.serialized;
           return rest;
@@ -514,7 +510,7 @@ class WorkflowEventStream<
         }
         // Step start event
         yield {
-          type: WORKFLOW_EVENTS.STEP_START,
+          type: BRAIN_EVENTS.STEP_START,
           status: STATUS.RUNNING,
           stepTitle: step.block.title,
           stepId: step.id,
@@ -526,7 +522,7 @@ class WorkflowEventStream<
 
         // Step Status Event to indicate that the step is running
         yield {
-          type: WORKFLOW_EVENTS.STEP_STATUS,
+          type: BRAIN_EVENTS.STEP_STATUS,
           steps: steps.map((step) => {
             const { patch, ...rest } = step.serialized;
             return rest;
@@ -536,12 +532,12 @@ class WorkflowEventStream<
         };
 
         // Execute step and yield the STEP_COMPLETE event and
-        // all events from inner workflows if any
+        // all events from inner brains if any
         yield* this.executeStep(step);
 
         // Step Status Event
         yield {
-          type: WORKFLOW_EVENTS.STEP_STATUS,
+          type: BRAIN_EVENTS.STEP_STATUS,
           steps: steps.map((step) => {
             const { patch, ...rest } = step.serialized;
             return rest;
@@ -554,7 +550,7 @@ class WorkflowEventStream<
       }
 
       yield {
-        type: WORKFLOW_EVENTS.COMPLETE,
+        type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
         workflowTitle,
         workflowDescription,
@@ -567,7 +563,7 @@ class WorkflowEventStream<
       currentStep?.withStatus(STATUS.ERROR);
 
       yield {
-        type: WORKFLOW_EVENTS.ERROR,
+        type: BRAIN_EVENTS.ERROR,
         status: STATUS.ERROR,
         workflowTitle,
         workflowDescription,
@@ -582,7 +578,7 @@ class WorkflowEventStream<
 
       // Step Status Event
       yield {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: steps.map((step) => {
           const { patch, ...rest } = step.serialized;
           return rest;
@@ -595,9 +591,7 @@ class WorkflowEventStream<
     }
   }
 
-  private async *executeStep(
-    step: Step
-  ): AsyncGenerator<WorkflowEvent<TOptions>> {
+  private async *executeStep(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as Block<any, any, TOptions, TServices>;
 
     if (block.type === 'workflow') {
@@ -606,9 +600,9 @@ class WorkflowEventStream<
           ? block.initialState(this.currentState)
           : block.initialState;
 
-      // Run inner workflow and yield all its events
+      // Run inner brain and yield all its events
       let patches: JsonPatch[] = [];
-      const innerRun = block.innerWorkflow.run({
+      const innerRun = block.innerBrain.run({
         resources: this.resources,
         client: this.client,
         initialState,
@@ -616,8 +610,8 @@ class WorkflowEventStream<
       });
 
       for await (const event of innerRun) {
-        yield event; // Forward all inner workflow events
-        if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+        yield event; // Forward all inner brain events
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           patches.push(event.patch);
         }
       }
@@ -628,7 +622,7 @@ class WorkflowEventStream<
       // Get previous state before action
       const prevState = this.currentState;
 
-      // Update state with inner workflow results
+      // Update state with inner brain results
       this.currentState = await block.action(
         this.currentState,
         innerState,
@@ -654,7 +648,7 @@ class WorkflowEventStream<
   private *completeStep(
     step: Step,
     prevState: TState
-  ): Generator<WorkflowEvent<TOptions>> {
+  ): Generator<BrainEvent<TOptions>> {
     step.withStatus(STATUS.COMPLETE);
 
     // Create patch for the state change
@@ -662,7 +656,7 @@ class WorkflowEventStream<
     step.withPatch(patch);
 
     yield {
-      type: WORKFLOW_EVENTS.STEP_COMPLETE,
+      type: BRAIN_EVENTS.STEP_COMPLETE,
       status: STATUS.RUNNING,
       stepTitle: step.block.title,
       stepId: step.id,
@@ -676,7 +670,7 @@ class WorkflowEventStream<
 const workflowNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const workflowNames = new Set<string>();
-export function workflow<
+export function brain<
   TOptions extends object = object,
   TState extends State = object,
   TServices extends object = object
@@ -687,13 +681,13 @@ export function workflow<
     typeof workflowConfig === 'string' ? undefined : workflowConfig.description;
   if (workflowNamesAreUnique && workflowNames.has(title)) {
     throw new Error(
-      `Workflow with name "${title}" already exists. Workflow names must be unique.`
+      `Brain with name "${title}" already exists. Brain names must be unique.`
     );
   }
   if (workflowNamesAreUnique) {
     workflowNames.add(title);
   }
-  return new Workflow<TOptions, TState, TServices>(title, description);
+  return new Brain<TOptions, TState, TServices>(title, description);
 }
 
 const clone = <T>(value: T): T => structuredClone(value);

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import { EventSource } from 'eventsource';
-import type { WorkflowEvent, StepStatusEvent, WorkflowStartEvent, WorkflowErrorEvent } from '@positronic/core';
-import { WORKFLOW_EVENTS } from '@positronic/core';
+import type { BrainEvent, StepStatusEvent, BrainStartEvent, BrainErrorEvent } from '@positronic/core';
+import { BRAIN_EVENTS } from '@positronic/core';
 import type { SerializedStep } from '@positronic/core';
 import { STATUS } from '@positronic/core';
 
@@ -31,12 +31,12 @@ interface WatchStatusProps {
 
 const WatchStatus = ({ steps, workflowTitle, runId }: WatchStatusProps) => {
   if (!steps || steps.length === 0) {
-    return <Text>Waiting for workflow steps...</Text>;
+    return <Text>Waiting for brain steps...</Text>;
   }
 
   return (
     <Box flexDirection="column">
-      {workflowTitle && <Text bold>Workflow: {workflowTitle} Run ID: {runId}</Text>}
+      {workflowTitle && <Text bold>Brain: {workflowTitle} Run ID: {runId}</Text>}
       <Box marginTop={1} marginBottom={1}>
         <Text bold>Steps:</Text>
       </Box>
@@ -67,7 +67,7 @@ interface WatchProps {
 export const Watch = ({ runId, port }: WatchProps) => {
   const [steps, setSteps] = useState<SerializedStepStatus[]>([]);
   const [workflowTitle, setWorkflowTitle] = useState<string | undefined>(undefined);
-  const [workflowError, setWorkflowError] = useState<WorkflowErrorEvent | undefined>(undefined);
+  const [workflowError, setWorkflowError] = useState<BrainErrorEvent | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
@@ -87,24 +87,24 @@ export const Watch = ({ runId, port }: WatchProps) => {
 
     es.onmessage = (event: MessageEvent) => {
       try {
-        const eventData = JSON.parse(event.data) as WorkflowEvent;
-        if (eventData.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        const eventData = JSON.parse(event.data) as BrainEvent;
+        if (eventData.type === BRAIN_EVENTS.STEP_STATUS) {
           setSteps((eventData as StepStatusEvent).steps);
         }
 
         if (
-          eventData.type === WORKFLOW_EVENTS.START ||
-          eventData.type === WORKFLOW_EVENTS.RESTART
+          eventData.type === BRAIN_EVENTS.START ||
+          eventData.type === BRAIN_EVENTS.RESTART
         ) {
-          setWorkflowTitle((eventData as WorkflowStartEvent).workflowTitle);
+          setWorkflowTitle((eventData as BrainStartEvent).workflowTitle);
           setIsCompleted(false);
         }
 
-        if (eventData.type === WORKFLOW_EVENTS.COMPLETE || eventData.type === WORKFLOW_EVENTS.ERROR) {
+        if (eventData.type === BRAIN_EVENTS.COMPLETE || eventData.type === BRAIN_EVENTS.ERROR) {
           setIsCompleted(true);
         }
 
-        if (eventData.type === WORKFLOW_EVENTS.ERROR) {
+        if (eventData.type === BRAIN_EVENTS.ERROR) {
           setWorkflowError(eventData);
         }
       } catch (e: any) {
@@ -134,7 +134,7 @@ export const Watch = ({ runId, port }: WatchProps) => {
       <WatchStatus steps={steps} workflowTitle={workflowTitle} runId={runId} />
       {isCompleted && !error && !workflowError && (
         <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
-            <Text color="green">Workflow completed.</Text>
+            <Text color="green">Brain completed.</Text>
         </Box>
       )}
        {error && (

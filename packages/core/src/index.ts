@@ -1,15 +1,15 @@
-export { Workflow, workflow } from './dsl/workflow.js';
-export { WorkflowRunner } from './dsl/workflow-runner.js';
-export { STATUS, WORKFLOW_EVENTS } from './dsl/constants.js';
+export { Brain, brain } from './dsl/workflow.js';
+export { BrainRunner } from './dsl/brain-runner.js';
+export { STATUS, BRAIN_EVENTS } from './dsl/constants.js';
 export type { Adapter } from './adapters/types.js';
 export type {
-  WorkflowEvent,
+  BrainEvent,
   SerializedStep,
   InitialRunParams,
   RerunParams,
-  WorkflowStartEvent,
-  WorkflowCompleteEvent,
-  WorkflowErrorEvent,
+  BrainStartEvent,
+  BrainCompleteEvent,
+  BrainErrorEvent,
   StepStatusEvent,
   StepStartedEvent,
   StepCompletedEvent,

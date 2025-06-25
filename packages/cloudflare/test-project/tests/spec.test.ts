@@ -49,14 +49,14 @@ describe('Positronic Spec', () => {
 
   describe('Brains', () => {
     it('passes POST /brains/runs test', async () => {
-      const brainRunId = await brains.run(createFetch(), 'basic-workflow');
+      const brainRunId = await brains.run(createFetch(), 'basic-brain');
       expect(brainRunId).toBeTruthy();
       expect(typeof brainRunId).toBe('string');
     });
 
     it('passes GET /brains/runs/:runId/watch test', async () => {
       // First create a brain run
-      const brainRunId = await brains.run(createFetch(), 'basic-workflow');
+      const brainRunId = await brains.run(createFetch(), 'basic-brain');
       expect(brainRunId).toBeTruthy();
 
       // Then test watching it
@@ -67,7 +67,7 @@ describe('Positronic Spec', () => {
     it('passes GET /brains/:brainName/history test', async () => {
       // Just test that the endpoint exists and returns the right structure
       // Don't create a run first to avoid storage issues
-      const result = await brains.history(createFetch(), 'basic-workflow', 5);
+      const result = await brains.history(createFetch(), 'basic-brain', 5);
       expect(result).toBe(true);
     });
 

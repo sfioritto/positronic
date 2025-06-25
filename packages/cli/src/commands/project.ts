@@ -76,7 +76,7 @@ export class ProjectCommand {
     );
     console.log(`\nRun the development server: px s or positronic server`);
     console.log(
-      `\nOpen a new terminal in '${projectName}' and run a workflow: px run example --watch`
+      `\nOpen a new terminal in '${projectName}' and run a brain: px run example --watch`
     );
   }
 }

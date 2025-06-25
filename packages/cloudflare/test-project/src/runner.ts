@@ -1,5 +1,5 @@
 import {
-  WorkflowRunner,
+  BrainRunner,
   type ObjectGenerator,
   type Message,
 } from '@positronic/core';
@@ -18,7 +18,7 @@ const mockClient: ObjectGenerator = {
   },
 };
 
-export const runner = new WorkflowRunner({
+export const runner = new BrainRunner({
   adapters: [],
   client: mockClient,
 });

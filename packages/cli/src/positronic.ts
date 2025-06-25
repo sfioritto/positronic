@@ -324,15 +324,49 @@ cli = cli.command(
   (argv) => brainCommand.watch(argv as any)
 );
 
-// --- New Brain Command (Local Dev Mode Only) ---
+// --- Brain Commands ---
+cli = cli.command('brain', 'Manage your brains\n', (yargsBrain) => {
+  // --- New Brain Command (Local Dev Mode Only) ---
+  if (isLocalDevMode) {
+    yargsBrain.command(
+      'new <name>',
+      'Create a new brain in the current project',
+      (yargsNew) => {
+        return yargsNew
+          .positional('name', {
+            describe: 'Name of the new brain',
+            type: 'string',
+            demandOption: true,
+          })
+          .option('prompt', {
+            describe: 'Prompt to use for generating the brain',
+            type: 'string',
+            alias: 'p',
+          })
+          .example(
+            '$0 brain new my-brain',
+            'Create a new brain in the current project directory'
+          )
+          .example(
+            '$0 brain new my-brain -p "Create a brain for data processing"',
+            'Create a brain using a prompt'
+          );
+      },
+      (argv) => brainCommand.new(argv as any)
+    );
+  }
+  return yargsBrain;
+});
+
+// --- Add the 'new' command alias (Local Dev Mode only) ---
 if (isLocalDevMode) {
   cli = cli.command(
-    'new-brain <name>',
-    'Create a new brain in the current project',
-    (yargsNew) => {
-      return yargsNew
+    'new <name>',
+    'Alias for `brain new`. Create a new brain in the current project.\n',
+    (yargsNewAlias) => {
+      return yargsNewAlias
         .positional('name', {
-          describe: 'Name of the new brain',
+          describe: 'Name of the new brain to create',
           type: 'string',
           demandOption: true,
         })
@@ -340,15 +374,7 @@ if (isLocalDevMode) {
           describe: 'Prompt to use for generating the brain',
           type: 'string',
           alias: 'p',
-        })
-        .example(
-          '$0 new-brain my-brain',
-          'Create a new brain in the current project directory'
-        )
-        .example(
-          '$0 new-brain my-brain -p "Create a brain for data processing"',
-          'Create a brain using a prompt'
-        );
+        });
     },
     (argv) => brainCommand.new(argv as any)
   );
@@ -357,7 +383,7 @@ if (isLocalDevMode) {
 // --- Prompt Management Commands ---
 cli = cli.command(
   'prompt',
-  'Prompts are a one-shot call to an LLM with a typed return with no human in the loop (see agents for that) that you can use in your workflows.\n',
+  'Prompts are a one-shot call to an LLM with a typed return with no human in the loop (see brains for that) that you can use in your brains.\n',
   (yargsPrompt) => {
     yargsPrompt
       .command(
@@ -413,7 +439,7 @@ cli = cli.command(
 // --- Resource Management Commands ---
 cli = cli.command(
   'resources',
-  'Resources are any data that can be used in your workflows, agents, and prompts. They can be text or binaries.\n',
+  'Resources are any data that can be used in your brains, agents, and prompts. They can be text or binaries.\n',
   (yargsResource) => {
     yargsResource.command(
       'list',

@@ -1,15 +1,15 @@
-import { workflow } from '@positronic/core';
+import { brain } from '@positronic/core';
 import app from '../../src/api';
 import {
   setManifest,
   BrainRunnerDO,
-  setWorkflowRunner,
+  setBrainRunner,
 } from '../../src/brain-runner-do';
 import { MonitorDO } from '../../src/monitor-do';
 import { PositronicManifest } from '../../src/manifest.js';
 import { runner } from './runner';
 
-const basicWorkflow = workflow('basic-workflow')
+const basicBrain = brain('basic-brain')
   .step('First step', ({ state }) => ({
     ...state,
     hello: 'Hello',
@@ -23,7 +23,7 @@ const basicWorkflow = workflow('basic-workflow')
     message: `${state.hello}, ${state.world}`,
   }));
 
-const delayedWorkflow = workflow('delayed-workflow')
+const delayedBrain = brain('delayed-brain')
   .step('Start Delay', async ({ state }) => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     return { ...state, status_after_sleep: 'awake' };
@@ -33,7 +33,7 @@ const delayedWorkflow = workflow('delayed-workflow')
     final_message: 'Done after delay',
   }));
 
-const resourceWorkflow = workflow('resource-workflow')
+const resourceBrain = brain('resource-brain')
   .step('Load text resource', async ({ state, resources }) => ({
     ...state,
     text: await (resources['testResource.txt'] as any).loadText(),
@@ -53,14 +53,14 @@ const resourceWorkflow = workflow('resource-workflow')
 
 const manifest = new PositronicManifest({
   staticManifest: {
-    'basic-workflow': basicWorkflow,
-    'delayed-workflow': delayedWorkflow,
-    'resource-workflow': resourceWorkflow,
+    'basic-brain': basicBrain,
+    'delayed-brain': delayedBrain,
+    'resource-brain': resourceBrain,
   },
 });
 
 setManifest(manifest);
-setWorkflowRunner(runner);
+setBrainRunner(runner);
 
 export default {
   fetch: app.fetch,

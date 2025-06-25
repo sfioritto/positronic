@@ -1,4 +1,4 @@
-import type { Adapter, WorkflowEvent } from '@positronic/core';
+import type { Adapter, BrainEvent } from '@positronic/core';
 import type { SqlStorage } from '@cloudflare/workers-types';
 
 // Define the new schema with a single events table
@@ -26,7 +26,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
     }
   }
 
-  public dispatch(event: WorkflowEvent) {
+  public dispatch(event: BrainEvent) {
     try {
       this.initializeSchema();
 
@@ -39,7 +39,7 @@ export class WorkflowRunSQLiteAdapter implements Adapter {
       this.sql.exec(insertSql, event.type, JSON.stringify(event));
     } catch (e) {
       console.error(
-        '[SQL_ADAPTER] Error handling workflow event:',
+        '[SQL_ADAPTER] Error handling brain event:',
         e,
         'Event data:',
         JSON.stringify(event)

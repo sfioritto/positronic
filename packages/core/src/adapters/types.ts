@@ -1,5 +1,5 @@
-import type { WorkflowEvent } from '../dsl/workflow.js';
+import type { BrainEvent } from '../dsl/workflow.js';
 
 export interface Adapter<Options extends object = any> {
-  dispatch(event: WorkflowEvent<Options>): void | Promise<void>;
+  dispatch(event: BrainEvent<Options>): void | Promise<void>;
 }

@@ -1,10 +1,10 @@
-import { WORKFLOW_EVENTS, STATUS } from './constants.js';
+import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches, type JsonPatch } from './json-patch.js';
 import { State } from './types.js';
 import {
-  workflow,
-  type WorkflowEvent,
-  type WorkflowErrorEvent,
+  brain,
+  type BrainEvent,
+  type BrainErrorEvent,
   type SerializedStep,
   type SerializedStepStatus,
 } from './workflow.js';
@@ -85,7 +85,7 @@ describe('workflow creation', () => {
   });
 
   it('should create a workflow with steps and run through them', async () => {
-    const testWorkflow = workflow('test workflow')
+    const testWorkflow = brain('test workflow')
       .step('First step', () => {
         return { count: 1 };
       })
@@ -102,7 +102,7 @@ describe('workflow creation', () => {
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         workflowTitle: 'test workflow',
         workflowDescription: undefined,
@@ -116,7 +116,7 @@ describe('workflow creation', () => {
     const firstStepStartResult = await nextStep(workflowRun);
     expect(firstStepStartResult).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
         stepId: expect.any(String),
@@ -127,11 +127,11 @@ describe('workflow creation', () => {
     const firstStepStatusRunning = await nextStep(workflowRun);
     expect(firstStepStatusRunning).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       })
     );
-    if (firstStepStatusRunning.type === WORKFLOW_EVENTS.STEP_STATUS) {
+    if (firstStepStatusRunning.type === BRAIN_EVENTS.STEP_STATUS) {
       expect(firstStepStatusRunning.steps[0].status).toBe(STATUS.RUNNING);
     }
 
@@ -139,7 +139,7 @@ describe('workflow creation', () => {
     const firstStepResult = await nextStep(workflowRun);
     expect(firstStepResult).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
         stepId: expect.any(String),
@@ -160,7 +160,7 @@ describe('workflow creation', () => {
     const secondStepStartResult = await nextStep(workflowRun);
     expect(secondStepStartResult).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Second step',
         stepId: expect.any(String),
@@ -171,11 +171,11 @@ describe('workflow creation', () => {
     const secondStepStatusRunning = await nextStep(workflowRun);
     expect(secondStepStatusRunning).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       })
     );
-    if (secondStepStatusRunning.type === WORKFLOW_EVENTS.STEP_STATUS) {
+    if (secondStepStatusRunning.type === BRAIN_EVENTS.STEP_STATUS) {
       expect(secondStepStatusRunning.steps[1].status).toBe(STATUS.RUNNING);
     }
 
@@ -183,7 +183,7 @@ describe('workflow creation', () => {
     const secondStepResult = await nextStep(workflowRun);
     expect(secondStepResult).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         stepTitle: 'Second step',
         stepId: expect.any(String),
         patch: [
@@ -200,7 +200,7 @@ describe('workflow creation', () => {
     const stepStatusResult = await nextStep(workflowRun);
     expect(stepStatusResult).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: [
           expect.objectContaining({
             title: 'First step',
@@ -220,7 +220,7 @@ describe('workflow creation', () => {
     const completeResult = await nextStep(workflowRun);
     expect(completeResult).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.COMPLETE,
+        type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
         workflowTitle: 'test workflow',
         workflowDescription: undefined,
@@ -229,7 +229,7 @@ describe('workflow creation', () => {
   });
 
   it('should create a workflow with a name and description when passed an object', async () => {
-    const testWorkflow = workflow({
+    const testWorkflow = brain({
       title: 'my named workflow',
       description: 'some description',
     });
@@ -240,7 +240,7 @@ describe('workflow creation', () => {
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         workflowTitle: 'my named workflow',
         workflowDescription: 'some description',
@@ -250,14 +250,14 @@ describe('workflow creation', () => {
   });
 
   it('should create a workflow with just a name when passed a string', async () => {
-    const testWorkflow = workflow('simple workflow');
+    const testWorkflow = brain('simple workflow');
     const workflowRun = testWorkflow.run({
       client: mockClient,
     });
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         workflowTitle: 'simple workflow',
         workflowDescription: undefined,
@@ -276,7 +276,7 @@ describe('workflow creation', () => {
     // Make sure that for the default prompt the default client returns a known value.
     mockClient.generateObject.mockResolvedValueOnce({ override: false });
 
-    const testWorkflow = workflow('Client Override Test')
+    const testWorkflow = brain('Client Override Test')
       .prompt('Use default client', {
         template: () => 'prompt1',
         outputSchema: {
@@ -300,7 +300,7 @@ describe('workflow creation', () => {
       client: mockClient,
     })) {
       events.push(event);
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
     }
@@ -326,7 +326,7 @@ describe('workflow creation', () => {
   });
 
   it('should use the provided workflowRunId for the initial run if supplied', async () => {
-    const testWorkflow = workflow('Workflow with Provided ID');
+    const testWorkflow = brain('Workflow with Provided ID');
     const providedId = 'my-custom-run-id-123';
 
     const workflowRun = testWorkflow.run({
@@ -338,7 +338,7 @@ describe('workflow creation', () => {
     const startResult = await workflowRun.next();
     expect(startResult.value).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         workflowTitle: 'Workflow with Provided ID',
         workflowRunId: providedId, // Expect the provided ID here
@@ -349,7 +349,7 @@ describe('workflow creation', () => {
   describe('Resource Availability in Steps', () => {
     it('should make resources available in a simple step action', async () => {
       let loadedText: string | undefined;
-      const testWorkflow = workflow('Resource Step Test').step(
+      const testWorkflow = brain('Resource Step Test').step(
         'Load My File',
         async ({ resources }) => {
           loadedText = await (resources.myFile as any).loadText();
@@ -374,7 +374,7 @@ describe('workflow creation', () => {
       let promptTemplateString: string | undefined;
       let reduceContent: string | undefined;
 
-      const testWorkflow = workflow<
+      const testWorkflow = brain<
         { myOption: string },
         {
           promptResult?: any;
@@ -418,7 +418,7 @@ describe('workflow creation', () => {
       const initialStateForReconstruction = {};
 
       for await (const event of run) {
-        if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE && event.patch) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE && event.patch) {
           allPatches.push(event.patch);
         }
       }
@@ -435,7 +435,7 @@ describe('workflow creation', () => {
     it('should make resources available in a nested workflow step', async () => {
       let nestedLoadedText: string | undefined;
 
-      const innerWorkflow = workflow('Inner Resource Workflow').step(
+      const innerWorkflow = brain('Inner Resource Workflow').step(
         'Inner Load Step',
         async ({ resources }) => {
           nestedLoadedText = await (resources.myBinaryFile as any)
@@ -445,7 +445,7 @@ describe('workflow creation', () => {
         }
       );
 
-      const outerWorkflow = workflow('Outer Resource Workflow').workflow(
+      const outerWorkflow = brain('Outer Resource Workflow').brain(
         'Run Inner',
         innerWorkflow,
         ({ state, workflowState }) => ({ ...state, ...workflowState })
@@ -466,7 +466,7 @@ describe('workflow creation', () => {
 
 describe('error handling', () => {
   it('should handle errors in actions and maintain correct status', async () => {
-    const errorWorkflow = workflow('Error Workflow')
+    const errorWorkflow = brain('Error Workflow')
       // Step 1: Normal step
       .step('First step', () => ({
         value: 1,
@@ -490,10 +490,10 @@ describe('error handling', () => {
       for await (const event of errorWorkflow.run({
         client: mockClient,
       })) {
-        if (event.type === WORKFLOW_EVENTS.ERROR) {
+        if (event.type === BRAIN_EVENTS.ERROR) {
           errorEvent = event;
         }
-        if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+        if (event.type === BRAIN_EVENTS.STEP_STATUS) {
           finalStepStatusEvent = event;
         }
       }
@@ -516,7 +516,7 @@ describe('error handling', () => {
     // Verify error event structure
     expect(errorEvent).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.ERROR,
+        type: BRAIN_EVENTS.ERROR,
         status: STATUS.ERROR,
         workflowTitle: 'Error Workflow',
         error: expect.objectContaining({
@@ -529,16 +529,16 @@ describe('error handling', () => {
 
   it('should handle errors in nested workflows and propagate them up', async () => {
     // Create an inner workflow that will throw an error
-    const innerWorkflow = workflow<{}, { inner?: boolean; value?: number }>(
+    const innerWorkflow = brain<{}, { inner?: boolean; value?: number }>(
       'Failing Inner Workflow'
     ).step('Throw error', (): { value: number } => {
       throw new Error('Inner workflow error');
     });
 
     // Create outer workflow that uses the failing inner workflow
-    const outerWorkflow = workflow('Outer Workflow')
+    const outerWorkflow = brain('Outer Workflow')
       .step('First step', () => ({ step: 'first' }))
-      .workflow(
+      .brain(
         'Run inner workflow',
         innerWorkflow,
         ({ state, workflowState }) => ({
@@ -549,7 +549,7 @@ describe('error handling', () => {
         () => ({ value: 5 })
       );
 
-    const events: WorkflowEvent<any>[] = [];
+    const events: BrainEvent<any>[] = [];
     let error: Error | undefined;
     let mainWorkflowId: string | undefined;
 
@@ -558,7 +558,7 @@ describe('error handling', () => {
         client: mockClient,
       })) {
         events.push(event);
-        if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+        if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
           mainWorkflowId = event.workflowRunId;
         }
       }
@@ -572,62 +572,62 @@ describe('error handling', () => {
     // Verify event sequence including error
     expect(events).toEqual([
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
         workflowRunId: mainWorkflowId,
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         workflowTitle: 'Failing Inner Workflow',
         status: STATUS.RUNNING,
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Throw error',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.ERROR,
+        type: BRAIN_EVENTS.ERROR,
         workflowTitle: 'Failing Inner Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
@@ -636,7 +636,7 @@ describe('error handling', () => {
         }),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.arrayContaining([
           expect.objectContaining({
             title: 'Throw error',
@@ -645,7 +645,7 @@ describe('error handling', () => {
         ]),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.ERROR,
+        type: BRAIN_EVENTS.ERROR,
         workflowTitle: 'Outer Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
@@ -654,7 +654,7 @@ describe('error handling', () => {
         }),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.arrayContaining([
           expect.objectContaining({
             title: 'Run inner workflow',
@@ -666,14 +666,12 @@ describe('error handling', () => {
 
     // Find inner and outer error events by workflowRunId
     const innerErrorEvent = events.find(
-      (e) =>
-        e.type === WORKFLOW_EVENTS.ERROR && e.workflowRunId !== mainWorkflowId
-    ) as WorkflowErrorEvent<any>;
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId !== mainWorkflowId
+    ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
-      (e) =>
-        e.type === WORKFLOW_EVENTS.ERROR && e.workflowRunId === mainWorkflowId
-    ) as WorkflowErrorEvent<any>;
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId === mainWorkflowId
+    ) as BrainErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(
       expect.objectContaining({
@@ -690,7 +688,7 @@ describe('error handling', () => {
 
 describe('step creation', () => {
   it('should create a step that updates state', async () => {
-    const testWorkflow = workflow('Simple Workflow').step(
+    const testWorkflow = brain('Simple Workflow').step(
       'Simple step',
       ({ state }) => ({
         ...state,
@@ -705,7 +703,7 @@ describe('step creation', () => {
       client: mockClient,
     })) {
       events.push(event);
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, event.patch);
       }
     }
@@ -716,7 +714,7 @@ describe('step creation', () => {
     // Verify the step start event
     expect(events[2]).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Simple step',
         stepId: expect.any(String),
@@ -727,19 +725,19 @@ describe('step creation', () => {
     // Verify the step status event (running)
     expect(events[3]).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
         options: {},
       })
     );
-    if (events[3].type === WORKFLOW_EVENTS.STEP_STATUS) {
+    if (events[3].type === BRAIN_EVENTS.STEP_STATUS) {
       expect(events[3].steps[0].status).toBe(STATUS.RUNNING);
     }
 
     // Verify the step complete event
     expect(events[4]).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
         stepTitle: 'Simple step',
         stepId: expect.any(String),
@@ -761,7 +759,7 @@ describe('step creation', () => {
 
     expect(events[5]).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: [
           expect.objectContaining({
             title: 'Simple step',
@@ -776,7 +774,7 @@ describe('step creation', () => {
     // Verify the workflow complete event
     expect(events[6]).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.COMPLETE,
+        type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
         workflowTitle: 'Simple Workflow',
         options: {},
@@ -791,7 +789,7 @@ describe('step creation', () => {
   });
 
   it('should maintain immutable results between steps', async () => {
-    const testWorkflow = workflow('Immutable Steps Workflow')
+    const testWorkflow = brain('Immutable Steps Workflow')
       .step('First step', () => ({
         value: 1,
       }))
@@ -808,7 +806,7 @@ describe('step creation', () => {
     for await (const event of testWorkflow.run({
       client: mockClient,
     })) {
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         patches.push(...event.patch);
       }
     }
@@ -828,7 +826,7 @@ describe('workflow resumption', () => {
 
   it('should resume workflow from the correct step when given initialCompletedSteps', async () => {
     const executedSteps: string[] = [];
-    const threeStepWorkflow = workflow('Three Step Workflow')
+    const threeStepWorkflow = brain('Three Step Workflow')
       .step('Step 1', ({ state }) => {
         executedSteps.push('Step 1');
         return { ...state, value: 2 };
@@ -854,12 +852,12 @@ describe('workflow resumption', () => {
       initialState,
     })) {
       // Capture the full step list from the first status event
-      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         allStepsInfo = event.steps; // Direct assignment, type is SerializedStepStatus[]
       }
 
       if (
-        event.type === WORKFLOW_EVENTS.STEP_COMPLETE &&
+        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
         event.stepTitle === 'Step 1'
       ) {
         firstStepState = applyPatches(firstStepState, [event.patch]);
@@ -890,9 +888,9 @@ describe('workflow resumption', () => {
       initialCompletedSteps,
       workflowRunId: 'test-run-id',
     })) {
-      if (event.type === WORKFLOW_EVENTS.RESTART) {
+      if (event.type === BRAIN_EVENTS.RESTART) {
         resumedState = event.initialState;
-      } else if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      } else if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         resumedState = applyPatches(resumedState!, [event.patch]);
       }
     }
@@ -912,17 +910,18 @@ describe('workflow resumption', () => {
 describe('nested workflows', () => {
   it('should execute nested workflows and yield all inner workflow events', async () => {
     // Create an inner workflow that will be nested
-    const innerWorkflow = workflow<{}, { value: number }>(
-      'Inner Workflow'
-    ).step('Double value', ({ state }) => ({
-      inner: true,
-      value: state.value * 2,
-    }));
+    const innerWorkflow = brain<{}, { value: number }>('Inner Workflow').step(
+      'Double value',
+      ({ state }) => ({
+        inner: true,
+        value: state.value * 2,
+      })
+    );
 
     // Create outer workflow that uses the inner workflow
-    const outerWorkflow = workflow('Outer Workflow')
+    const outerWorkflow = brain('Outer Workflow')
       .step('Set prefix', () => ({ prefix: 'test-' }))
-      .workflow(
+      .brain(
         'Run inner workflow',
         innerWorkflow,
         ({ state, workflowState }) => ({
@@ -932,7 +931,7 @@ describe('nested workflows', () => {
         () => ({ value: 5 })
       );
 
-    const events: WorkflowEvent<any>[] = [];
+    const events: BrainEvent<any>[] = [];
     for await (const event of outerWorkflow.run({
       client: mockClient,
     })) {
@@ -950,119 +949,119 @@ describe('nested workflows', () => {
     ).toEqual([
       // Outer workflow start
       {
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
         stepTitle: undefined,
       },
       // Initial step status for outer workflow
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // First step of outer workflow
       {
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Set prefix',
       },
       // First step status (running)
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Set prefix',
       },
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow',
       },
       // Step status for inner workflow (running)
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // Inner workflow start
       {
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         workflowTitle: 'Inner Workflow',
         status: STATUS.RUNNING,
         stepTitle: undefined,
       },
       // Initial step status for inner workflow
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // Inner workflow step
       {
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Double value',
       },
       // Inner workflow step status (running)
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Double value',
       },
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       {
-        type: WORKFLOW_EVENTS.COMPLETE,
+        type: BRAIN_EVENTS.COMPLETE,
         workflowTitle: 'Inner Workflow',
         status: STATUS.COMPLETE,
         stepTitle: undefined,
       },
       // Outer workflow nested step completion
       {
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         workflowTitle: undefined,
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow',
       },
       {
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         workflowTitle: undefined,
         status: undefined,
         stepTitle: undefined,
       },
       // Outer workflow completion
       {
-        type: WORKFLOW_EVENTS.COMPLETE,
+        type: BRAIN_EVENTS.COMPLETE,
         workflowTitle: 'Outer Workflow',
         status: STATUS.COMPLETE,
         stepTitle: undefined,
@@ -1074,7 +1073,7 @@ describe('nested workflows', () => {
     let outerState = {};
 
     for (const event of events) {
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         if (event.stepTitle === 'Double value') {
           innerState = applyPatches(innerState, [event.patch]);
         } else {
@@ -1097,16 +1096,16 @@ describe('nested workflows', () => {
 
   it('should handle errors in nested workflows and propagate them up', async () => {
     // Create an inner workflow that will throw an error
-    const innerWorkflow = workflow<{}, { inner: boolean; value: number }>(
+    const innerWorkflow = brain<{}, { inner: boolean; value: number }>(
       'Failing Inner Workflow'
     ).step('Throw error', (): { value: number } => {
       throw new Error('Inner workflow error');
     });
 
     // Create outer workflow that uses the failing inner workflow
-    const outerWorkflow = workflow('Outer Workflow')
+    const outerWorkflow = brain('Outer Workflow')
       .step('First step', () => ({ step: 'first' }))
-      .workflow(
+      .brain(
         'Run inner workflow',
         innerWorkflow,
         ({ state, workflowState }) => ({
@@ -1117,7 +1116,7 @@ describe('nested workflows', () => {
         () => ({ value: 5 })
       );
 
-    const events: WorkflowEvent<any>[] = [];
+    const events: BrainEvent<any>[] = [];
     let error: Error | undefined;
     let mainWorkflowId: string | undefined;
 
@@ -1126,7 +1125,7 @@ describe('nested workflows', () => {
         client: mockClient,
       })) {
         events.push(event);
-        if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+        if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
           mainWorkflowId = event.workflowRunId;
         }
       }
@@ -1140,62 +1139,62 @@ describe('nested workflows', () => {
     // Verify event sequence including error
     expect(events).toEqual([
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         workflowTitle: 'Outer Workflow',
         status: STATUS.RUNNING,
         workflowRunId: mainWorkflowId,
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         status: STATUS.RUNNING,
         stepTitle: 'First step',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Run inner workflow',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         workflowTitle: 'Failing Inner Workflow',
         status: STATUS.RUNNING,
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
         status: STATUS.RUNNING,
         stepTitle: 'Throw error',
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.ERROR,
+        type: BRAIN_EVENTS.ERROR,
         workflowTitle: 'Failing Inner Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
@@ -1204,7 +1203,7 @@ describe('nested workflows', () => {
         }),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.arrayContaining([
           expect.objectContaining({
             title: 'Throw error',
@@ -1213,7 +1212,7 @@ describe('nested workflows', () => {
         ]),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.ERROR,
+        type: BRAIN_EVENTS.ERROR,
         workflowTitle: 'Outer Workflow',
         status: STATUS.ERROR,
         error: expect.objectContaining({
@@ -1222,7 +1221,7 @@ describe('nested workflows', () => {
         }),
       }),
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.arrayContaining([
           expect.objectContaining({
             title: 'Run inner workflow',
@@ -1234,14 +1233,12 @@ describe('nested workflows', () => {
 
     // Find inner and outer error events by workflowRunId
     const innerErrorEvent = events.find(
-      (e) =>
-        e.type === WORKFLOW_EVENTS.ERROR && e.workflowRunId !== mainWorkflowId
-    ) as WorkflowErrorEvent<any>;
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId !== mainWorkflowId
+    ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
-      (e) =>
-        e.type === WORKFLOW_EVENTS.ERROR && e.workflowRunId === mainWorkflowId
-    ) as WorkflowErrorEvent<any>;
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.workflowRunId === mainWorkflowId
+    ) as BrainErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(
       expect.objectContaining({
@@ -1266,7 +1263,7 @@ describe('nested workflows', () => {
     }
 
     // Create an inner workflow that modifies state
-    const innerWorkflow = workflow<{}, InnerState>('Inner Workflow').step(
+    const innerWorkflow = brain<{}, InnerState>('Inner Workflow').step(
       'Double value',
       ({ state }) => ({
         ...state,
@@ -1275,11 +1272,11 @@ describe('nested workflows', () => {
     );
 
     // Create outer workflow that uses the inner workflow
-    const outerWorkflow = workflow<{}, OuterState>('Outer Workflow')
+    const outerWorkflow = brain<{}, OuterState>('Outer Workflow')
       .step('Set initial', () => ({
         value: 5,
       }))
-      .workflow(
+      .brain(
         'Run inner workflow',
         innerWorkflow,
         ({ state, workflowState }) => ({
@@ -1294,7 +1291,7 @@ describe('nested workflows', () => {
     for await (const event of outerWorkflow.run({
       client: mockClient,
     })) {
-      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
       }
     }
@@ -1315,12 +1312,13 @@ describe('nested workflows', () => {
 
 describe('workflow options', () => {
   it('should pass options through to workflow events', async () => {
-    const testWorkflow = workflow<{ testOption: string }>(
-      'Options Workflow'
-    ).step('Simple step', ({ state, options }) => ({
-      value: 1,
-      passedOption: options.testOption,
-    }));
+    const testWorkflow = brain<{ testOption: string }>('Options Workflow').step(
+      'Simple step',
+      ({ state, options }) => ({
+        value: 1,
+        passedOption: options.testOption,
+      })
+    );
 
     const workflowOptions = {
       testOption: 'test-value',
@@ -1331,7 +1329,7 @@ describe('workflow options', () => {
       client: mockClient,
       options: workflowOptions,
     })) {
-      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
       } else {
         finalEvent = event;
@@ -1340,7 +1338,7 @@ describe('workflow options', () => {
 
     expect(finalEvent).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.COMPLETE,
+        type: BRAIN_EVENTS.COMPLETE,
         status: STATUS.COMPLETE,
         workflowTitle: 'Options Workflow',
         workflowDescription: undefined,
@@ -1349,7 +1347,7 @@ describe('workflow options', () => {
     );
     expect(finalStepStatus).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: [
           expect.objectContaining({
             title: 'Simple step',
@@ -1362,7 +1360,7 @@ describe('workflow options', () => {
   });
 
   it('should provide empty object as default options', async () => {
-    const testWorkflow = workflow('Default Options Workflow').step(
+    const testWorkflow = brain('Default Options Workflow').step(
       'Simple step',
       ({ options }) => ({
         hasOptions: Object.keys(options).length === 0,
@@ -1384,7 +1382,7 @@ describe('workflow options', () => {
     expect(stepStartResult.value).toEqual(
       expect.objectContaining({
         options: {},
-        type: WORKFLOW_EVENTS.STEP_START,
+        type: BRAIN_EVENTS.STEP_START,
       })
     );
 
@@ -1392,11 +1390,11 @@ describe('workflow options', () => {
     const stepStatusRunning = await workflowRun.next();
     expect(stepStatusRunning.value).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_STATUS,
+        type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       })
     );
-    if (stepStatusRunning.value.type === WORKFLOW_EVENTS.STEP_STATUS) {
+    if (stepStatusRunning.value.type === BRAIN_EVENTS.STEP_STATUS) {
       expect(stepStatusRunning.value.steps[0].status).toBe(STATUS.RUNNING);
     }
 
@@ -1404,7 +1402,7 @@ describe('workflow options', () => {
     const stepResult = await workflowRun.next();
     expect(stepResult.value).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.STEP_COMPLETE,
+        type: BRAIN_EVENTS.STEP_COMPLETE,
         stepTitle: 'Simple step',
         options: {},
       })
@@ -1415,7 +1413,7 @@ describe('workflow options', () => {
 describe('services support', () => {
   it('should allow adding custom services to workflows', async () => {
     // Create a workflow with services
-    const testWorkflow = workflow('Services Test')
+    const testWorkflow = brain('Services Test')
       .withServices({
         logger: testLogger,
       })
@@ -1429,7 +1427,7 @@ describe('services support', () => {
     for await (const event of testWorkflow.run({
       client: mockClient,
     })) {
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
     }
@@ -1445,22 +1443,21 @@ describe('services support', () => {
 describe('type inference', () => {
   it('should correctly infer complex workflow state types', async () => {
     // Create an inner workflow that uses the shared options type
-    const innerWorkflow = workflow<{ features: string[] }>(
-      'Inner Type Test'
-    ).step('Process features', ({ options }) => ({
-      processedValue: options.features.includes('fast') ? 100 : 42,
-      featureCount: options.features.length,
-    }));
+    const innerWorkflow = brain<{ features: string[] }>('Inner Type Test').step(
+      'Process features',
+      ({ options }) => ({
+        processedValue: options.features.includes('fast') ? 100 : 42,
+        featureCount: options.features.length,
+      })
+    );
 
     // Create a complex workflow using multiple features
-    const complexWorkflow = workflow<{ features: string[] }>(
-      'Complex Type Test'
-    )
+    const complexWorkflow = brain<{ features: string[] }>('Complex Type Test')
       .step('First step', ({ options }) => ({
         initialFeatures: options.features,
         value: 42,
       }))
-      .workflow(
+      .brain(
         'Nested workflow',
         innerWorkflow,
         ({ state, workflowState }) => ({
@@ -1507,14 +1504,14 @@ describe('type inference', () => {
       events.push(event);
 
       // Capture the main workflow's ID from its start event
-      if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+      if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
         mainWorkflowId = event.workflowRunId;
       }
 
-      if (event.type === WORKFLOW_EVENTS.STEP_STATUS) {
+      if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
       } else if (
-        event.type === WORKFLOW_EVENTS.STEP_COMPLETE &&
+        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
         event.workflowRunId === mainWorkflowId // Only process events from main workflow
       ) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -1524,7 +1521,7 @@ describe('type inference', () => {
     // Verify workflow start event
     expect(events[0]).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         workflowTitle: 'Complex Type Test',
         workflowDescription: undefined,
@@ -1536,13 +1533,13 @@ describe('type inference', () => {
     // Verify inner workflow events are included
     const innerStartEvent = events.find(
       (e) =>
-        e.type === WORKFLOW_EVENTS.START &&
+        e.type === BRAIN_EVENTS.START &&
         'workflowRunId' in e &&
         e.workflowRunId !== mainWorkflowId
     );
     expect(innerStartEvent).toEqual(
       expect.objectContaining({
-        type: WORKFLOW_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         workflowTitle: 'Inner Type Test',
         options: { features: ['fast', 'secure'] },
@@ -1566,21 +1563,18 @@ describe('type inference', () => {
 
   it('should correctly infer workflow reducer state types', async () => {
     // Create an inner workflow with a specific state shape
-    const innerWorkflow = workflow('Inner State Test').step(
-      'Inner step',
-      () => ({
-        innerValue: 42,
-        metadata: { processed: true },
-      })
-    );
+    const innerWorkflow = brain('Inner State Test').step('Inner step', () => ({
+      innerValue: 42,
+      metadata: { processed: true },
+    }));
 
     // Create outer workflow to test reducer type inference
-    const outerWorkflow = workflow('Outer State Test')
+    const outerWorkflow = brain('Outer State Test')
       .step('First step', () => ({
         outerValue: 100,
         status: 'ready',
       }))
-      .workflow(
+      .brain(
         'Nested workflow',
         innerWorkflow,
         ({ state, workflowState }) => {
@@ -1624,11 +1618,11 @@ describe('type inference', () => {
     for await (const event of outerWorkflow.run({
       client: mockClient,
     })) {
-      if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+      if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
         mainWorkflowId = event.workflowRunId;
       }
       if (
-        event.type === WORKFLOW_EVENTS.STEP_COMPLETE &&
+        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
         event.workflowRunId === mainWorkflowId
       ) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -1644,7 +1638,7 @@ describe('type inference', () => {
   });
 
   it('should correctly infer step action state types', async () => {
-    const testWorkflow = workflow('Action State Test')
+    const testWorkflow = brain('Action State Test')
       .step('First step', () => ({
         count: 1,
         metadata: { created: new Date().toISOString() },
@@ -1676,11 +1670,11 @@ describe('type inference', () => {
     for await (const event of testWorkflow.run({
       client: mockClient,
     })) {
-      if (event.type === WORKFLOW_EVENTS.START && !mainWorkflowId) {
+      if (event.type === BRAIN_EVENTS.START && !mainWorkflowId) {
         mainWorkflowId = event.workflowRunId;
       }
       if (
-        event.type === WORKFLOW_EVENTS.STEP_COMPLETE &&
+        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
         event.workflowRunId === mainWorkflowId
       ) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -1697,7 +1691,7 @@ describe('type inference', () => {
   });
 
   it('should correctly infer prompt response types in subsequent steps', async () => {
-    const testWorkflow = workflow('Prompt Type Test')
+    const testWorkflow = brain('Prompt Type Test')
       .prompt('Get user info', {
         template: () => "What is the user's info?",
         outputSchema: {
@@ -1734,7 +1728,7 @@ describe('type inference', () => {
     for await (const event of testWorkflow.run({
       client: mockClient,
     })) {
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
     }
@@ -1750,7 +1744,7 @@ describe('type inference', () => {
   });
 
   it('should correctly handle prompt reduce function', async () => {
-    const testWorkflow = workflow('Prompt Reduce Test').prompt(
+    const testWorkflow = brain('Prompt Reduce Test').prompt(
       'Get numbers',
       {
         template: () => 'Give me some numbers',
@@ -1777,7 +1771,7 @@ describe('type inference', () => {
     for await (const event of testWorkflow.run({
       client: mockClient,
     })) {
-      if (event.type === WORKFLOW_EVENTS.STEP_COMPLETE) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
     }

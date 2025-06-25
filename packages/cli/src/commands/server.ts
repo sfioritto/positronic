@@ -157,7 +157,6 @@ export class ServerCommand {
             `✅ Synced ${syncResult.uploadCount} resources (${syncResult.skipCount} up to date)`
           );
         }
-
         await generateTypes(projectRootPath);
       } catch (error) {
         console.error(
@@ -165,7 +164,7 @@ export class ServerCommand {
           error instanceof Error ? error.message : String(error)
         );
         console.error(
-          '\nThe server is running, but resources may not be available to your workflows.'
+          '\nThe server is running, but resources may not be available to your brains.'
         );
         console.error(
           '\nYou can manually sync resources by running: px resources sync'

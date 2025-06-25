@@ -77,7 +77,7 @@ async function regenerateManifestFile(
   const brainsDir = path.join(projectRootPath, 'brains');
   const manifestPath = path.join(targetSrcDir, '_manifest.ts');
 
-  let importStatements = `import type { Workflow } from '@positronic/core';\n`;
+  let importStatements = `import type { Brain } from '@positronic/core';\n`;
   let manifestEntries = '';
 
   const brainsDirExists = await fsPromises
@@ -98,11 +98,11 @@ async function regenerateManifestFile(
       importStatements += `import * as ${importAlias} from '${importPath}';\n`;
       manifestEntries += `  ${JSON.stringify(
         brainName
-      )}: ${importAlias}.default as Workflow,\n`;
+      )}: ${importAlias}.default as Brain,\n`;
     }
   }
 
-  const manifestContent = `// This file is generated automatically. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Workflow> = {\n${manifestEntries}};
+  const manifestContent = `// This file is generated automatically. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Brain> = {\n${manifestEntries}};
 `;
 
   const runnerContent = await fsPromises.readFile(runnerPath, 'utf-8');
