@@ -58,11 +58,10 @@ export const ResourceClear = () => {
 
   useEffect(() => {
     if (confirmed && !deleteLoading && !deleteError && !deleted) {
-      deleteResources('/resources').then(() => {
-        setDeleted(true);
-      }).catch(() => {
-        // Error is handled by the hook
-      });
+      deleteResources('/resources')
+        .then(() => {
+          setDeleted(true);
+        })
     }
   }, [confirmed, deleteLoading, deleteError, deleted, deleteResources]);
 

@@ -80,16 +80,10 @@ export class MockApiClient implements ApiClient {
 
       if (index >= 0) {
         this.resources.splice(index, 1);
-        return new Response(null, { status: 204 });
       }
 
-      return new Response(
-        JSON.stringify({ error: `Resource "${key}" not found` }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      // Always return 204 for delete (idempotent)
+      return new Response(null, { status: 204 });
     }
 
     // Mock POST /brains/runs

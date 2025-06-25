@@ -492,38 +492,14 @@ cli = cli.command(
       );
     }
 
-    // Delete command available in both dev and production modes
-    yargsResource.command(
-      'delete <path>',
-      'Delete a specific resource from the server\n',
-      (yargsDeleteCmd) => {
-        return yargsDeleteCmd
-          .positional('path', {
-            describe:
-              'Path of the resource to delete (relative to resources directory)',
-            type: 'string',
-            demandOption: true,
-          })
-          .example(
-            '$0 resources delete myfile.txt',
-            'Delete a resource at the root of resources directory'
-          )
-          .example(
-            '$0 resources delete subfolder/data.json',
-            'Delete a resource in a subdirectory'
-          );
-      },
-      (argv) => resourcesCommand.delete(argv.path as string)
-    );
-
-    // Upload command available in both dev and production modes
+    // Upload/delete command available in both dev and production modes
     yargsResource.command(
       'upload <file>',
-      'Upload a file as a resource to the server\n',
+      'Upload a file as a resource, or delete with -d flag\n',
       (yargsUploadCmd) => {
         return yargsUploadCmd
           .positional('file', {
-            describe: 'Path to the file to upload',
+            describe: 'File path to upload, or resource key when using -d flag',
             type: 'string',
             demandOption: true,
           })
@@ -532,17 +508,35 @@ cli = cli.command(
             type: 'string',
             alias: 'k',
           })
+          .option('delete', {
+            describe: 'Delete the resource instead of uploading',
+            type: 'boolean',
+            alias: 'd',
+            default: false,
+          })
           .example('$0 resources upload video.mp4', 'Upload a video file')
           .example(
             '$0 resources upload /path/to/large-file.zip --key archive/backup.zip',
             'Upload with custom resource key'
+          )
+          .example(
+            '$0 resources upload -d video.mp4',
+            'Delete the resource with key "video.mp4"'
+          )
+          .example(
+            '$0 resources upload -d archive/backup.zip',
+            'Delete a resource with a nested key'
           );
       },
-      (argv) =>
-        resourcesCommand.upload(
+      (argv) => {
+        if (argv.delete) {
+          return resourcesCommand.delete(argv.file as string);
+        }
+        return resourcesCommand.upload(
           argv.file as string,
           argv.key as string | undefined
-        )
+        );
+      }
     );
 
     return yargsResource.demandCommand(

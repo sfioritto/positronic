@@ -177,13 +177,6 @@ export const resources = {
 
       const response = await fetch(request);
 
-      if (response.status === 404) {
-        console.error(
-          `DELETE /resources/${key} returned 404 - resource not found`
-        );
-        return false;
-      }
-
       if (response.status !== 204) {
         console.error(
           `DELETE /resources/${key} returned ${response.status}, expected 204`

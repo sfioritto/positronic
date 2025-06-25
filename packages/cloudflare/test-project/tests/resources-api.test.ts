@@ -434,7 +434,7 @@ describe('Resources API Tests', () => {
       expect(deletedObject).toBeNull();
     });
 
-    it('should return 404 for non-existent resources', async () => {
+    it('should return 204 even for non-existent resources (idempotent delete)', async () => {
       const deleteRequest = new Request(
         'http://example.com/resources/' +
           encodeURIComponent('non-existent.txt'),
@@ -448,9 +448,8 @@ describe('Resources API Tests', () => {
       );
       await waitOnExecutionContext(deleteContext);
 
-      expect(deleteResponse.status).toBe(404);
-      const errorBody = await deleteResponse.json<{ error: string }>();
-      expect(errorBody.error).toBe('Resource "non-existent.txt" not found');
+      // Should return 204 No Content even if resource doesn't exist (idempotent)
+      expect(deleteResponse.status).toBe(204);
     });
   });
 

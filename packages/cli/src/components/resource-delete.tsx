@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useStdin, useApp } from 'ink';
 import { ErrorComponent } from './error.js';
-import { useApiDelete } from '../hooks/useApi.js';
+import { useApiDelete, useApiGet } from '../hooks/useApi.js';
+
+interface ApiResourceEntry {
+  key: string;
+  type: 'text' | 'binary';
+  size: number;
+  lastModified: string;
+  local: boolean;
+}
+
+interface ResourcesResponse {
+  resources: ApiResourceEntry[];
+  truncated: boolean;
+  count: number;
+}
 
 interface ResourceDeleteProps {
   resourceKey: string;
@@ -12,10 +26,26 @@ export const ResourceDelete = ({ resourceKey, resourcePath }: ResourceDeleteProp
   const [confirmed, setConfirmed] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [input, setInput] = useState('');
+  const [isLocalResource, setIsLocalResource] = useState<boolean | null>(null);
   const { stdin, setRawMode } = useStdin();
   const { exit } = useApp();
 
+  const {
+    data: resourcesData, loading: listLoading, error: listError,
+  } = useApiGet<ResourcesResponse>('/resources');
   const { execute: deleteResource, loading, error } = useApiDelete();
+
+  // Check if the resource is local
+  useEffect(() => {
+    if (resourcesData) {
+      const resource = resourcesData.resources.find(r => r.key === resourceKey);
+      if (resource) {
+        setIsLocalResource(resource.local);
+      } else {
+        setIsLocalResource(false); // Resource doesn't exist
+      }
+    }
+  }, [resourcesData, resourceKey]);
 
   useEffect(() => {
     if (stdin && !confirmed && !deleted) {
@@ -52,14 +82,39 @@ export const ResourceDelete = ({ resourceKey, resourcePath }: ResourceDeleteProp
     if (confirmed && !loading && !error && !deleted) {
       // URL encode the key for the API endpoint
       const encodedKey = encodeURIComponent(resourceKey);
-      deleteResource(`/resources/${encodedKey}`).then(() => {
-        setDeleted(true);
-      });
+      deleteResource(`/resources/${encodedKey}`)
+        .then(() => {
+          setDeleted(true);
+        })
     }
   }, [confirmed, loading, error, deleted, deleteResource, resourceKey]);
 
+  if (listError) {
+    return <ErrorComponent error={listError} />;
+  }
+
   if (error) {
     return <ErrorComponent error={error} />;
+  }
+
+  if (listLoading || isLocalResource === null) {
+    return (
+      <Box>
+        <Text>Checking resource...</Text>
+      </Box>
+    );
+  }
+
+  if (isLocalResource) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red" bold>❌ Cannot Delete Local Resource</Text>
+        <Box marginTop={1} paddingLeft={2} flexDirection="column">
+          <Text>This resource was synced from your local filesystem.</Text>
+          <Text dimColor>To remove it, delete the file locally and run 'px resources sync'.</Text>
+        </Box>
+      </Box>
+    );
   }
 
   if (!confirmed) {

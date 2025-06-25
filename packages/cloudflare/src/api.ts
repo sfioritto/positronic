@@ -203,16 +203,21 @@ app.delete('/resources/:key', async (context: Context) => {
   // URL decode the key since it might contain slashes
   const decodedKey = decodeURIComponent(key);
 
-  // Check if the resource exists
-  const existingResource = await bucket.head(decodedKey);
-  if (!existingResource) {
-    return context.json({ error: `Resource "${decodedKey}" not found` }, 404);
+  try {
+    // Delete the resource - R2 delete is idempotent, so it's safe to delete non-existent resources
+    await bucket.delete(decodedKey);
+    return new Response(null, { status: 204 });
+  } catch (error) {
+    console.error(`Failed to delete resource "${decodedKey}":`, error);
+    return context.json(
+      {
+        error: `Failed to delete resource: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
   }
-
-  // Delete the resource
-  await bucket.delete(decodedKey);
-
-  return new Response(null, { status: 204 });
 });
 
 // Delete all resources (bulk delete) - only available in development mode

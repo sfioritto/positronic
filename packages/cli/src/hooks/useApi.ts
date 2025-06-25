@@ -141,15 +141,6 @@ export function useApiDelete() {
 
       if (response.status === 204 || response.status === 200) {
         return true;
-      } else if (response.status === 404) {
-        const errorText = await response.text();
-        const errorObj = {
-          title: 'Resource Not Found',
-          message: 'The resource you are trying to delete does not exist.',
-          details: errorText,
-        };
-        setError(errorObj);
-        throw errorObj;
       } else {
         const errorText = await response.text();
         const errorObj = {
