@@ -85,14 +85,14 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDe
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
 
-      // Note: node-fetch doesn't support upload progress out of the box
-      // For now, we'll show the file size and a simple uploading state
-      // For production, you might want to use a different HTTP client that supports progress
-
+      // Use apiClient with progress callback
       const response = await apiClient.fetch('/resources', {
         method: 'POST',
         body: formData,
         signal: abortControllerRef.current.signal,
+        onUploadProgress: (progressInfo) => {
+          setProgress(progressInfo);
+        },
       });
 
       if (!response.ok) {
@@ -117,7 +117,7 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDe
         }
       }
     } catch (err: any) {
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || err.message === 'AbortError') {
         setError({
           title: 'Upload Cancelled',
           message: 'The upload was cancelled.',

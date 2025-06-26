@@ -6,25 +6,302 @@ import * as os from 'os';
 import caz from 'caz';
 import { type ResourceEntry } from '@positronic/core';
 import { isText } from 'istextorbinary';
+import * as http from 'http';
+import * as https from 'https';
+import { URL } from 'url';
+
+// Progress callback types
+export interface ProgressInfo {
+  loaded: number;
+  total: number;
+  percentage: number;
+}
+
+export type ProgressCallback = (progress: ProgressInfo) => void;
+
+// Extended RequestInit to support progress callbacks
+export interface ExtendedRequestInit extends RequestInit {
+  onUploadProgress?: ProgressCallback;
+  onDownloadProgress?: ProgressCallback;
+}
 
 // API Client interface for dependency injection
 export interface ApiClient {
-  fetch(path: string, options?: RequestInit): Promise<Response>;
+  fetch(path: string, options?: ExtendedRequestInit): Promise<Response>;
+}
+
+// Helper to convert Node.js http response to fetch-like Response
+class NodeHttpResponse implements Response {
+  private _body: Buffer | null = null;
+  private _bodyUsed = false;
+
+  constructor(private res: http.IncomingMessage, private bodyBuffer: Buffer) {
+    this._body = bodyBuffer;
+  }
+
+  get ok(): boolean {
+    return this.status >= 200 && this.status < 300;
+  }
+
+  get status(): number {
+    return this.res.statusCode || 0;
+  }
+
+  get statusText(): string {
+    return this.res.statusMessage || '';
+  }
+
+  get headers(): any {
+    return this.res.headers;
+  }
+
+  get bodyUsed(): boolean {
+    return this._bodyUsed;
+  }
+
+  async text(): Promise<string> {
+    if (this._bodyUsed) throw new Error('Body already used');
+    this._bodyUsed = true;
+    return this._body?.toString('utf8') || '';
+  }
+
+  async json(): Promise<any> {
+    const text = await this.text();
+    return JSON.parse(text);
+  }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    if (this._bodyUsed) throw new Error('Body already used');
+    this._bodyUsed = true;
+    const buffer = this._body || Buffer.alloc(0);
+    // Create a proper ArrayBuffer and copy the data
+    const arrayBuffer = new ArrayBuffer(buffer.length);
+    const view = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < buffer.length; i++) {
+      view[i] = buffer[i];
+    }
+    return arrayBuffer;
+  }
+
+  async blob(): Promise<Blob> {
+    const buffer = await this.arrayBuffer();
+    return new Blob([buffer]);
+  }
+
+  // Stub implementations for fetch Response interface
+  get url(): string {
+    return '';
+  }
+  get redirected(): boolean {
+    return false;
+  }
+  get type(): any {
+    return 'basic';
+  }
+  clone(): Response {
+    throw new Error('Not implemented');
+  }
+  async formData(): Promise<FormData> {
+    throw new Error('Not implemented');
+  }
+
+  // Add missing properties/methods for Response interface
+  get body(): any {
+    return null;
+  }
+  get trailer(): Promise<any> {
+    return Promise.resolve({});
+  }
+
+  // Missing methods from node-fetch Response
+  get size(): number {
+    return this._body?.length || 0;
+  }
+  async buffer(): Promise<Buffer> {
+    if (this._bodyUsed) throw new Error('Body already used');
+    this._bodyUsed = true;
+    return this._body || Buffer.alloc(0);
+  }
+}
+
+// Convert fetch RequestInit body to Buffer
+async function bodyToBuffer(
+  bodyData: any
+): Promise<{ buffer: Buffer; contentType?: string }> {
+  if (!bodyData) {
+    return { buffer: Buffer.alloc(0) };
+  }
+
+  if (Buffer.isBuffer(bodyData)) {
+    return { buffer: bodyData };
+  }
+
+  if (typeof bodyData === 'string') {
+    return { buffer: Buffer.from(bodyData, 'utf8'), contentType: 'text/plain' };
+  }
+
+  if (bodyData instanceof FormData) {
+    // Convert FormData to multipart/form-data
+    const boundary = `----FormDataBoundary${Date.now()}`;
+    const chunks: Buffer[] = [];
+
+    for (const [key, value] of bodyData.entries()) {
+      chunks.push(Buffer.from(`--${boundary}\r\n`));
+
+      if (value instanceof Blob) {
+        const fileName = (value as any).name || 'file';
+        chunks.push(
+          Buffer.from(
+            `Content-Disposition: form-data; name="${key}"; filename="${fileName}"\r\n`
+          )
+        );
+        chunks.push(
+          Buffer.from(
+            `Content-Type: ${value.type || 'application/octet-stream'}\r\n\r\n`
+          )
+        );
+        const buffer = Buffer.from(await value.arrayBuffer());
+        chunks.push(buffer);
+      } else {
+        chunks.push(
+          Buffer.from(`Content-Disposition: form-data; name="${key}"\r\n\r\n`)
+        );
+        chunks.push(Buffer.from(String(value)));
+      }
+      chunks.push(Buffer.from('\r\n'));
+    }
+    chunks.push(Buffer.from(`--${boundary}--\r\n`));
+
+    return {
+      buffer: Buffer.concat(chunks),
+      contentType: `multipart/form-data; boundary=${boundary}`,
+    };
+  }
+
+  // For other types, try to convert to string
+  return {
+    buffer: Buffer.from(JSON.stringify(bodyData), 'utf8'),
+    contentType: 'application/json',
+  };
 }
 
 // Singleton API client instance
 export const apiClient: ApiClient = {
-  fetch: async (apiPath: string, options?: RequestInit): Promise<Response> => {
+  fetch: async (
+    apiPath: string,
+    options?: ExtendedRequestInit
+  ): Promise<Response> => {
     const port = process.env.POSITRONIC_SERVER_PORT || '8787';
     const baseUrl = `http://localhost:${port}`;
     const fullUrl = `${baseUrl}${
       apiPath.startsWith('/') ? apiPath : '/' + apiPath
     }`;
 
-    const response = await fetch(fullUrl, options);
-    return response;
+    // Extract progress callbacks before passing to fetch
+    const { onUploadProgress, onDownloadProgress, ...fetchOptions } =
+      options || {};
+
+    // If no progress callbacks, use original node-fetch for simplicity
+    if (!onUploadProgress && !onDownloadProgress) {
+      return fetch(fullUrl, fetchOptions as RequestInit);
+    }
+
+    // Use http module for progress tracking
+    const url = new URL(fullUrl);
+    const httpModule = url.protocol === 'https:' ? https : http;
+
+    const { buffer: bodyBuffer, contentType } = await bodyToBuffer(
+      fetchOptions.body
+    );
+
+    return new Promise<Response>((resolve, reject) => {
+      const requestOptions: http.RequestOptions = {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === 'https:' ? 443 : 80),
+        path: url.pathname + url.search,
+        method: fetchOptions.method || 'GET',
+        headers: {
+          ...(fetchOptions.headers as any),
+          'Content-Length': bodyBuffer.length.toString(),
+        },
+      };
+
+      if (contentType && !requestOptions.headers!['Content-Type']) {
+        requestOptions.headers!['Content-Type'] = contentType;
+      }
+
+      const req = httpModule.request(requestOptions, (res) => {
+        const chunks: Buffer[] = [];
+        let downloadedBytes = 0;
+        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+
+        res.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+          downloadedBytes += chunk.length;
+
+          if (onDownloadProgress && totalBytes > 0) {
+            onDownloadProgress({
+              loaded: downloadedBytes,
+              total: totalBytes,
+              percentage: Math.round((downloadedBytes / totalBytes) * 100),
+            });
+          }
+        });
+
+        res.on('end', () => {
+          const responseBody = Buffer.concat(chunks);
+          resolve(new NodeHttpResponse(res, responseBody));
+        });
+
+        res.on('error', reject);
+      });
+
+      req.on('error', reject);
+
+      // Handle upload progress
+      if (bodyBuffer.length > 0) {
+        let uploadedBytes = 0;
+        const totalBytes = bodyBuffer.length;
+        const chunkSize = 65536; // 64KB chunks
+        let index = 0;
+
+        const sendNextChunk = () => {
+          if (index >= bodyBuffer.length) {
+            req.end();
+            return;
+          }
+
+          const chunk = bodyBuffer.subarray(
+            index,
+            Math.min(index + chunkSize, bodyBuffer.length)
+          );
+          const writeMore = req.write(chunk);
+          uploadedBytes += chunk.length;
+          index += chunk.length;
+
+          if (onUploadProgress) {
+            onUploadProgress({
+              loaded: uploadedBytes,
+              total: totalBytes,
+              percentage: Math.round((uploadedBytes / totalBytes) * 100),
+            });
+          }
+
+          if (writeMore) {
+            setImmediate(sendNextChunk);
+          } else {
+            req.once('drain', sendNextChunk);
+          }
+        };
+
+        sendNextChunk();
+      } else {
+        req.end();
+      }
+    });
   },
 };
+
 export async function generateProject(
   projectName: string,
   projectDir: string,
