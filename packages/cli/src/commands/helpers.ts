@@ -485,14 +485,10 @@ function generateResourceTypes(resources: ApiResourceEntry[]): string {
 declare module '@positronic/core' {
   interface TextResource {
     load(): Promise<string>;
-    loadText(): Promise<string>;
-    loadBinary(): never;
   }
 
   interface BinaryResource {
     load(): Promise<Buffer>;
-    loadText(): never;
-    loadBinary(): Promise<Buffer>;
   }
 
   interface Resources {
