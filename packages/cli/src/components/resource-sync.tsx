@@ -1,10 +1,8 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import * as fs from 'fs';
-import * as path from 'path';
 import { ErrorComponent } from './error.js';
-import { useApiGet, useApiPost } from '../hooks/useApi.js';
+import { syncResources, generateTypes, type SyncProgressCallback } from '../commands/helpers.js';
 import { ResourceEntry } from '@positronic/core';
 
 interface SyncStats {
@@ -12,20 +10,10 @@ interface SyncStats {
   skipCount: number;
   errorCount: number;
   totalCount: number;
+  deleteCount: number;
   currentFile?: string;
-  currentAction?: 'connecting' | 'uploading' | 'checking' | 'done' | 'error';
+  currentAction?: 'connecting' | 'uploading' | 'checking' | 'deleting' | 'done' | 'error';
   errors: Array<{ file: string; message: string }>;
-}
-
-interface ApiResourceEntry extends ResourceEntry {
-  size: number;
-  lastModified: string;
-}
-
-interface ResourcesResponse {
-  resources: ApiResourceEntry[];
-  truncated: boolean;
-  count: number;
 }
 
 interface ResourceSyncProps {
@@ -42,134 +30,71 @@ export const ResourceSync = ({
     skipCount: 0,
     errorCount: 0,
     totalCount: localResources.length,
+    deleteCount: 0,
     errors: [],
     currentAction: 'connecting'
   });
-
-  // Use the hook to fetch resources
-  const {
-    data: serverResourcesData,
-    error: fetchError
-  } = useApiGet<ResourcesResponse>('/resources');
-  const { execute: uploadResource } = useApiPost<any>('/resources');
+  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
 
   useEffect(() => {
-    if (!resourcesDir || !serverResourcesData) {
+    if (!resourcesDir) {
       return;
     }
 
     const performSync = async () => {
-      const serverResourceMap = new Map(
-        serverResourcesData.resources.map((r) => [r.key, r])
-      );
+      try {
+        // Get the project root path (parent of resources dir)
+        const projectRootPath = resourcesDir.replace(/[/\\]resources$/, '');
 
-      if (localResources.length === 0) {
-        setStats(prev => ({
-          ...prev,
-          currentAction: 'done',
-          totalCount: 0
-        }));
-        return;
-      }
+        const onProgress: SyncProgressCallback = (progress) => {
+          setStats({
+            uploadCount: progress.stats.uploadCount || 0,
+            skipCount: progress.stats.skipCount || 0,
+            errorCount: progress.stats.errorCount || 0,
+            totalCount: progress.stats.totalCount || localResources.length,
+            deleteCount: progress.stats.deleteCount || 0,
+            errors: progress.stats.errors || [],
+            currentFile: progress.currentFile,
+            currentAction: progress.action,
+          });
+        };
 
-      // Initialize stats
-      setStats({
-        uploadCount: 0,
-        skipCount: 0,
-        errorCount: 0,
-        totalCount: localResources.length,
-        errors: [],
-        currentAction: 'checking',
-      });
+        const result = await syncResources(projectRootPath, undefined, onProgress);
 
-      // Step 2: Compare and sync
-      let uploadCount = 0;
-      let skipCount = 0;
-      let errorCount = 0;
-      const errors: Array<{ file: string; message: string }> = [];
-
-      for (const resource of localResources) {
+        // Update final stats with done status
         setStats({
-          uploadCount,
-          skipCount,
-          errorCount,
-          totalCount: localResources.length,
-          currentFile: resource.key,
-          currentAction: 'checking',
-          errors,
+          ...result,
+          currentAction: 'done',
         });
 
-        const fileStats = fs.statSync(resource.path);
-        const serverResource = serverResourceMap.get(resource.key);
-
-        // Check if we need to upload (new or modified)
-        let shouldUpload = !serverResource;
-
-        if (serverResource && serverResource.size !== fileStats.size) {
-          // Size mismatch indicates file has changed
-          shouldUpload = true;
-        } else if (serverResource) {
-          // For same-size files, check modification time if available
-          const localModTime = fileStats.mtime.toISOString();
-          if (localModTime > serverResource.lastModified) {
-            shouldUpload = true;
-          }
+        // Generate types after successful sync
+        try {
+          await generateTypes(projectRootPath);
+        } catch (typeError) {
+          // Don't fail the sync if type generation fails
+          console.error('Failed to generate types:', typeError);
         }
-
-        if (shouldUpload) {
-          try {
-            setStats({
-              uploadCount,
-              skipCount,
-              errorCount,
-              totalCount: localResources.length,
-              currentFile: resource.key,
-              currentAction: 'uploading',
-              errors,
-            });
-
-            const fileContent = fs.readFileSync(resource.path);
-            const formData = new FormData();
-
-            formData.append(
-              'file',
-              new Blob([fileContent]),
-              path.basename(resource.path)
-            );
-            formData.append('type', resource.type);
-            formData.append('path', resource.key);
-            formData.append('key', resource.key);
-
-            await uploadResource(formData);
-            uploadCount++;
-          } catch (error: any) {
-            errorCount++;
-            errors.push({ file: resource.key, message: error.details || error.message });
-          }
-        } else {
-          skipCount++;
-        }
+      } catch (err: any) {
+        setError({
+          title: 'Sync Failed',
+          message: err.message || 'An unknown error occurred',
+          details: err.code === 'ECONNREFUSED'
+            ? "Please ensure the server is running ('positronic server' or 'px s')"
+            : undefined,
+        });
+        setStats(prev => ({ ...prev, currentAction: 'error' }));
       }
-
-      // Final update
-      setStats({
-        uploadCount,
-        skipCount,
-        errorCount,
-        totalCount: localResources.length,
-        currentAction: 'done',
-        errors,
-      });
     };
 
     performSync();
-  }, [localResources, resourcesDir, serverResourcesData, uploadResource]);
+  }, [localResources, resourcesDir]);
 
   const {
     uploadCount,
     skipCount,
     errorCount,
     totalCount,
+    deleteCount,
     currentFile,
     currentAction,
     errors,
@@ -177,11 +102,11 @@ export const ResourceSync = ({
 
   const processedCount = uploadCount + skipCount + errorCount;
 
-  if (fetchError) {
-    return <ErrorComponent error={fetchError} />;
+  if (error) {
+    return <ErrorComponent error={error} />;
   }
 
-  if (currentAction === 'connecting' && !serverResourcesData) {
+  if (currentAction === 'connecting') {
     return (
       <Box>
         <Text>🔌 Connecting to server...</Text>
@@ -193,11 +118,15 @@ export const ResourceSync = ({
     <Box flexDirection="column">
       {currentAction !== 'done' && currentFile && (
         <Box>
-          <Text>{currentAction === 'uploading' ? '⬆️  Uploading' : '🔍 Checking'} {currentFile}...</Text>
+          <Text>
+            {currentAction === 'uploading' ? '⬆️  Uploading' :
+             currentAction === 'deleting' ? '🗑️  Deleting' :
+             '🔍 Checking'} {currentFile}...
+          </Text>
         </Box>
       )}
 
-      {totalCount > 0 && (
+      {totalCount > 0 && currentAction !== 'done' && (
         <Box marginTop={1}>
           <Text dimColor>Progress: {processedCount}/{totalCount} files processed</Text>
         </Box>
@@ -227,6 +156,9 @@ export const ResourceSync = ({
           <Box paddingLeft={2} flexDirection="column">
             <Text color="green">  • Uploaded: {uploadCount}</Text>
             <Text color="blue">  • Skipped (up to date): {skipCount}</Text>
+            {deleteCount > 0 && (
+              <Text color="yellow">  • Deleted: {deleteCount}</Text>
+            )}
             {errorCount > 0 && (
               <Text color="red">  • Errors: {errorCount}</Text>
             )}

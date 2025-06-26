@@ -148,12 +148,19 @@ interface SyncResult {
   errors: Array<{ file: string; message: string }>;
 }
 
+export type SyncProgressCallback = (progress: {
+  currentFile: string;
+  action: 'checking' | 'uploading' | 'deleting';
+  stats: Partial<SyncResult>;
+}) => void;
+
 /**
  * Core resource sync logic without UI dependencies
  */
 export async function syncResources(
   projectRootPath: string,
-  client: ApiClient = apiClient
+  client: ApiClient = apiClient,
+  onProgress?: SyncProgressCallback
 ): Promise<SyncResult> {
   const resourcesDir = path.join(projectRootPath, 'resources');
 
@@ -187,6 +194,22 @@ export async function syncResources(
 
   // First, handle uploads and updates
   for (const resource of localResources) {
+    // Report progress for checking
+    if (onProgress) {
+      onProgress({
+        currentFile: resource.key,
+        action: 'checking',
+        stats: {
+          uploadCount,
+          skipCount,
+          errorCount,
+          totalCount: localResources.length,
+          deleteCount,
+          errors,
+        },
+      });
+    }
+
     const fileStats = fs.statSync(resource.path);
     const serverResource = serverResourceMap.get(resource.key);
 
@@ -206,6 +229,22 @@ export async function syncResources(
 
     if (shouldUpload) {
       try {
+        // Report progress for uploading
+        if (onProgress) {
+          onProgress({
+            currentFile: resource.key,
+            action: 'uploading',
+            stats: {
+              uploadCount,
+              skipCount,
+              errorCount,
+              totalCount: localResources.length,
+              deleteCount,
+              errors,
+            },
+          });
+        }
+
         const fileContent = fs.readFileSync(resource.path);
         const formData = new FormData();
 
@@ -252,6 +291,22 @@ export async function syncResources(
     // 2. The resource no longer exists locally
     if (serverResource.local && !localResourceKeys.has(key)) {
       try {
+        // Report progress for deleting
+        if (onProgress) {
+          onProgress({
+            currentFile: key,
+            action: 'deleting',
+            stats: {
+              uploadCount,
+              skipCount,
+              errorCount,
+              totalCount: localResources.length,
+              deleteCount,
+              errors,
+            },
+          });
+        }
+
         const deleteResponse = await client.fetch(
           `/resources/${encodeURIComponent(key)}`,
           {
