@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useStdin, useApp } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
+import { generateTypes } from '../commands/helpers.js';
 
 interface ApiResourceEntry {
   key: string;
@@ -20,9 +21,11 @@ interface ResourcesResponse {
 interface ResourceDeleteProps {
   resourceKey: string;
   resourcePath: string;
+  projectRootPath: string | null;
+  isLocalDevMode: boolean;
 }
 
-export const ResourceDelete = ({ resourceKey, resourcePath }: ResourceDeleteProps) => {
+export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, isLocalDevMode }: ResourceDeleteProps) => {
   const [confirmed, setConfirmed] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [input, setInput] = useState('');
@@ -85,9 +88,18 @@ export const ResourceDelete = ({ resourceKey, resourcePath }: ResourceDeleteProp
       deleteResource(`/resources/${encodedKey}`)
         .then(() => {
           setDeleted(true);
-        })
+
+          // Generate types after successful deletion if in local dev mode
+          if (isLocalDevMode && projectRootPath) {
+            generateTypes(projectRootPath)
+              .catch((typeError) => {
+                // Don't fail the delete if type generation fails
+                console.error('Failed to generate types:', typeError);
+              });
+          }
+        });
     }
-  }, [confirmed, loading, error, deleted, deleteResource, resourceKey]);
+  }, [confirmed, loading, error, deleted, deleteResource, resourceKey, isLocalDevMode, projectRootPath]);
 
   if (listError) {
     return <ErrorComponent error={listError} />;
@@ -139,7 +151,7 @@ export const ResourceDelete = ({ resourceKey, resourcePath }: ResourceDeleteProp
 
   if (deleted) {
     return (
-      <Box>
+      <Box flexDirection="column">
         <Text color="green">✅ Successfully deleted: {resourcePath}</Text>
       </Box>
     );

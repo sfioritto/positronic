@@ -101,6 +101,8 @@ export class ResourcesCommand {
       React.createElement(ResourceDelete, {
         resourceKey,
         resourcePath,
+        projectRootPath: this.projectRootPath,
+        isLocalDevMode: this.isLocalDevMode,
       })
     );
   }
