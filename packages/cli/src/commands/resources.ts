@@ -131,6 +131,8 @@ export class ResourcesCommand {
       React.createElement(ResourceUpload, {
         filePath,
         customKey,
+        projectRootPath: this.projectRootPath,
+        isLocalDevMode: this.isLocalDevMode,
       })
     );
   }

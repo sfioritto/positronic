@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
-import { apiClient } from '../commands/helpers.js';
+import { apiClient, generateTypes } from '../commands/helpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { isText } from 'istextorbinary';
@@ -9,6 +9,8 @@ import { isText } from 'istextorbinary';
 interface ResourceUploadProps {
   filePath: string;
   customKey?: string;
+  projectRootPath: string | null;
+  isLocalDevMode: boolean;
 }
 
 interface UploadProgress {
@@ -17,7 +19,7 @@ interface UploadProgress {
   percentage: number;
 }
 
-export const ResourceUpload = ({ filePath, customKey }: ResourceUploadProps) => {
+export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDevMode }: ResourceUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [complete, setComplete] = useState(false);
@@ -98,14 +100,22 @@ export const ResourceUpload = ({ filePath, customKey }: ResourceUploadProps) => 
         throw new Error(`Upload failed: ${response.status} ${errorText}`);
       }
 
-      const result = await response.json();
-
       setProgress({
         loaded: stats.size,
         total: stats.size,
         percentage: 100,
       });
       setComplete(true);
+
+      // Generate types after successful upload if in local dev mode
+      if (isLocalDevMode && projectRootPath) {
+        try {
+          await generateTypes(projectRootPath);
+        } catch (typeError) {
+          // Don't fail the upload if type generation fails
+          console.error('Failed to generate types:', typeError);
+        }
+      }
     } catch (err: any) {
       if (err.name === 'AbortError') {
         setError({
