@@ -116,6 +116,13 @@ async function regenerateManifestFile(
 }
 
 export class CloudflareDevServer implements PositronicDevServer {
+  // TODO: Future architectural improvements:
+  // 1. Extract .positronic directory into its own template package to eliminate temp directory hack
+  // 2. Create a declarative configuration model for wrangler updates
+  // 3. Move more logic into the template itself using template interpolation
+  // 4. Consider a pipeline-based setup process for better composability
+  // 5. Separate concerns better between template generation, env syncing, and dynamic configuration
+
   /**
    * Sets up the .positronic server environment directory.
    * If the directory is missing or forceSetup is true, it generates the
@@ -130,6 +137,25 @@ export class CloudflareDevServer implements PositronicDevServer {
    */
   async setup(projectRoot: string, force?: boolean): Promise<void> {
     const serverDir = path.join(projectRoot, '.positronic');
+
+    // Ensure .positronic directory exists
+    await this.ensureServerDirectory(projectRoot, serverDir, force);
+
+    // Sync environment variables to .dev.vars
+    await this.syncEnvironmentVariables(projectRoot, serverDir);
+
+    // Regenerate manifest based on actual project state
+    await this.regenerateProjectManifest(projectRoot, serverDir);
+
+    // Update wrangler config based on environment
+    await this.updateWranglerConfiguration(projectRoot, serverDir);
+  }
+
+  private async ensureServerDirectory(
+    projectRoot: string,
+    serverDir: string,
+    force?: boolean
+  ): Promise<void> {
     const serverDirExists = await fsPromises
       .access(serverDir)
       .then(() => true)
@@ -173,8 +199,12 @@ export class CloudflareDevServer implements PositronicDevServer {
         }
       }
     }
+  }
 
-    // Handle .env file conversion to .dev.vars
+  private async syncEnvironmentVariables(
+    projectRoot: string,
+    serverDir: string
+  ): Promise<void> {
     const rootEnvFilePath = path.join(projectRoot, '.env');
     const devVarsPath = path.join(serverDir, '.dev.vars');
     let devVarsContent = '';
@@ -190,102 +220,135 @@ export class CloudflareDevServer implements PositronicDevServer {
       }
     }
     fs.writeFileSync(devVarsPath, devVarsContent);
+  }
 
-    // Regenerate manifest based on actual project state
+  private async regenerateProjectManifest(
+    projectRoot: string,
+    serverDir: string
+  ): Promise<void> {
     const srcDir = path.join(serverDir, 'src');
     await regenerateManifestFile(projectRoot, srcDir);
+  }
 
-    // Update wrangler.jsonc based on R2 credentials presence
+  private async updateWranglerConfiguration(
+    projectRoot: string,
+    serverDir: string
+  ): Promise<void> {
     const wranglerConfigPath = path.join(serverDir, 'wrangler.jsonc');
-    if (fs.existsSync(wranglerConfigPath)) {
-      // Read and parse the wrangler config
-      const wranglerContent = fs.readFileSync(wranglerConfigPath, 'utf-8');
-      const wranglerConfig = JSON.parse(wranglerContent);
-      let configChanged = false;
+    if (!fs.existsSync(wranglerConfigPath)) {
+      return;
+    }
 
-      // Parse environment variables if .env file exists
-      let parsedRootEnv: Record<string, string> = {};
-      if (fs.existsSync(rootEnvFilePath)) {
-        const rootEnvFileContent = fs.readFileSync(rootEnvFilePath);
-        parsedRootEnv = dotenv.parse(rootEnvFileContent);
+    // Parse environment variables
+    const parsedEnv = this.parseEnvironmentFile(projectRoot);
+
+    // Check R2 configuration mode
+    const hasR2Credentials = this.hasCompleteR2Credentials(parsedEnv);
+
+    // Update wrangler config if needed
+    await this.applyWranglerConfigUpdates(
+      wranglerConfigPath,
+      parsedEnv,
+      hasR2Credentials
+    );
+  }
+
+  private parseEnvironmentFile(projectRoot: string): Record<string, string> {
+    const rootEnvFilePath = path.join(projectRoot, '.env');
+    if (!fs.existsSync(rootEnvFilePath)) {
+      return {};
+    }
+
+    const rootEnvFileContent = fs.readFileSync(rootEnvFilePath);
+    return dotenv.parse(rootEnvFileContent);
+  }
+
+  private hasCompleteR2Credentials(env: Record<string, string>): boolean {
+    return Boolean(
+      env.R2_ACCESS_KEY_ID?.trim() &&
+        env.R2_SECRET_ACCESS_KEY?.trim() &&
+        env.R2_ACCOUNT_ID?.trim() &&
+        env.R2_BUCKET_NAME?.trim()
+    );
+  }
+
+  private async applyWranglerConfigUpdates(
+    configPath: string,
+    env: Record<string, string>,
+    hasR2Credentials: boolean
+  ): Promise<void> {
+    // Read and parse the wrangler config
+    const wranglerContent = fs.readFileSync(configPath, 'utf-8');
+    const wranglerConfig = JSON.parse(wranglerContent);
+    let configChanged = false;
+
+    if (hasR2Credentials) {
+      configChanged = this.configureRemoteR2(wranglerConfig, env);
+    } else {
+      configChanged = this.configureLocalR2(wranglerConfig);
+    }
+
+    // Write back the updated configuration only if it changed
+    if (configChanged) {
+      const updatedContent = JSON.stringify(wranglerConfig, null, 2);
+      fs.writeFileSync(configPath, updatedContent);
+      console.log(
+        hasR2Credentials
+          ? '🔗 Configured for remote R2 bindings'
+          : '🏠 Configured for local R2 bindings'
+      );
+    }
+  }
+
+  private configureRemoteR2(config: any, env: Record<string, string>): boolean {
+    let changed = false;
+
+    if (config.r2_buckets && config.r2_buckets[0]) {
+      if (config.r2_buckets[0].bucket_name !== env.R2_BUCKET_NAME) {
+        config.r2_buckets[0].bucket_name = env.R2_BUCKET_NAME;
+        changed = true;
       }
-
-      // Check if all required R2 credentials are present and not empty
-      const hasR2Credentials =
-        parsedRootEnv.R2_ACCESS_KEY_ID &&
-        parsedRootEnv.R2_SECRET_ACCESS_KEY &&
-        parsedRootEnv.R2_ACCOUNT_ID &&
-        parsedRootEnv.R2_BUCKET_NAME &&
-        parsedRootEnv.R2_ACCESS_KEY_ID.trim() !== '' &&
-        parsedRootEnv.R2_SECRET_ACCESS_KEY.trim() !== '' &&
-        parsedRootEnv.R2_ACCOUNT_ID.trim() !== '' &&
-        parsedRootEnv.R2_BUCKET_NAME.trim() !== '';
-
-      if (hasR2Credentials) {
-        // Configure for remote mode
-        if (wranglerConfig.r2_buckets && wranglerConfig.r2_buckets[0]) {
-          if (
-            wranglerConfig.r2_buckets[0].bucket_name !==
-            parsedRootEnv.R2_BUCKET_NAME
-          ) {
-            wranglerConfig.r2_buckets[0].bucket_name =
-              parsedRootEnv.R2_BUCKET_NAME;
-            configChanged = true;
-          }
-          if (!wranglerConfig.r2_buckets[0].experimental_remote) {
-            wranglerConfig.r2_buckets[0].experimental_remote = true;
-            configChanged = true;
-          }
-
-          // Also update the vars section
-          if (wranglerConfig.vars) {
-            if (
-              wranglerConfig.vars.R2_BUCKET_NAME !==
-              parsedRootEnv.R2_BUCKET_NAME
-            ) {
-              wranglerConfig.vars.R2_BUCKET_NAME = parsedRootEnv.R2_BUCKET_NAME;
-              configChanged = true;
-            }
-          }
-        }
-      } else {
-        // Configure for local mode (revert from remote)
-        if (wranglerConfig.r2_buckets && wranglerConfig.r2_buckets[0]) {
-          // Get project name from the wrangler config name (remove "positronic-dev-" prefix)
-          const configName = wranglerConfig.name || 'local-project';
-          const projectName =
-            configName.replace(/^positronic-dev-/, '') || 'local-project';
-
-          if (wranglerConfig.r2_buckets[0].experimental_remote) {
-            delete wranglerConfig.r2_buckets[0].experimental_remote;
-            configChanged = true;
-          }
-          if (wranglerConfig.r2_buckets[0].bucket_name !== projectName) {
-            wranglerConfig.r2_buckets[0].bucket_name = projectName;
-            configChanged = true;
-          }
-
-          // Also update the vars section
-          if (wranglerConfig.vars) {
-            if (wranglerConfig.vars.R2_BUCKET_NAME !== projectName) {
-              wranglerConfig.vars.R2_BUCKET_NAME = projectName;
-              configChanged = true;
-            }
-          }
-        }
-      }
-
-      // Write back the updated configuration only if it changed
-      if (configChanged) {
-        const updatedContent = JSON.stringify(wranglerConfig, null, 2);
-        fs.writeFileSync(wranglerConfigPath, updatedContent);
-        console.log(
-          hasR2Credentials
-            ? '🔗 Configured for remote R2 bindings'
-            : '🏠 Configured for local R2 bindings'
-        );
+      if (!config.r2_buckets[0].experimental_remote) {
+        config.r2_buckets[0].experimental_remote = true;
+        changed = true;
       }
     }
+
+    // Also update the vars section
+    if (config.vars && config.vars.R2_BUCKET_NAME !== env.R2_BUCKET_NAME) {
+      config.vars.R2_BUCKET_NAME = env.R2_BUCKET_NAME;
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  private configureLocalR2(config: any): boolean {
+    let changed = false;
+
+    if (config.r2_buckets && config.r2_buckets[0]) {
+      // Get project name from the wrangler config name (remove "positronic-dev-" prefix)
+      const configName = config.name || 'local-project';
+      const projectName =
+        configName.replace(/^positronic-dev-/, '') || 'local-project';
+
+      if (config.r2_buckets[0].experimental_remote) {
+        delete config.r2_buckets[0].experimental_remote;
+        changed = true;
+      }
+      if (config.r2_buckets[0].bucket_name !== projectName) {
+        config.r2_buckets[0].bucket_name = projectName;
+        changed = true;
+      }
+
+      // Also update the vars section
+      if (config.vars && config.vars.R2_BUCKET_NAME !== projectName) {
+        config.vars.R2_BUCKET_NAME = projectName;
+        changed = true;
+      }
+    }
+
+    return changed;
   }
 
   async start(projectRoot: string, port?: number): Promise<ChildProcess> {
