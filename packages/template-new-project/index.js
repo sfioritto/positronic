@@ -122,5 +122,12 @@ module.exports = {
       // Change its path to '.gitignore' so it's correctly named in the generated project
       gitignoreFile.path = '.gitignore';
     }
+
+    // Find our specially named env file in the list of files to be processed
+    const envFile = ctx.files.find(file => file.path === '_env');
+    if (envFile) {
+      // Change its path to '.env' so it's correctly named in the generated project
+      envFile.path = '.env';
+    }
   }
 }

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
-import { apiClient, generateTypes } from '../commands/helpers.js';
+import { uploadFileWithPresignedUrl, generateTypes } from '../commands/helpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { isText } from 'istextorbinary';
 
 interface ResourceUploadProps {
   filePath: string;
@@ -61,20 +60,6 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDe
       const key = customKey || path.basename(filePath);
       setResourceKey(key);
 
-      // Read file content
-      const fileContent = fs.readFileSync(filePath);
-      const fileName = path.basename(filePath);
-
-      // Determine file type
-      const fileType = isText(fileName, fileContent) ? 'text' : 'binary';
-
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', new Blob([fileContent]), fileName);
-      formData.append('type', fileType);
-      formData.append('key', key);
-      formData.append('local', 'false'); // Manual upload
-
       setUploading(true);
       setProgress({
         loaded: 0,
@@ -85,20 +70,16 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDe
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
 
-      // Use apiClient with progress callback
-      const response = await apiClient.fetch('/resources', {
-        method: 'POST',
-        body: formData,
-        signal: abortControllerRef.current.signal,
-        onUploadProgress: (progressInfo) => {
+            // Use presigned URL upload with progress callback
+      await uploadFileWithPresignedUrl(
+        filePath,
+        key,
+        undefined, // Use default apiClient
+        (progressInfo) => {
           setProgress(progressInfo);
         },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Upload failed: ${response.status} ${errorText}`);
-      }
+        abortControllerRef.current?.signal
+      );
 
       setProgress({
         loaded: stats.size,
@@ -121,6 +102,12 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDe
         setError({
           title: 'Upload Cancelled',
           message: 'The upload was cancelled.',
+        });
+      } else if (err.message?.includes('R2 credentials not configured')) {
+        setError({
+          title: 'R2 Configuration Required',
+          message: 'Large file uploads require R2 configuration.',
+          details: 'Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, and R2_BUCKET_NAME in your .env file.',
         });
       } else {
         setError({

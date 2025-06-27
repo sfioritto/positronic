@@ -876,3 +876,207 @@ export async function waitUntilReady(
   // Now wait for resources to stabilize (indicating initial sync is done)
   return waitForResources(serverPort, maxWaitMs, startTime);
 }
+
+/**
+ * Upload a file using presigned URL for large files
+ * This function is used by the `px resources upload` command to upload files
+ * directly to R2 storage, bypassing the 100MB Worker limit.
+ *
+ * @param filePath - Path to the file to upload
+ * @param customKey - The key (path) where the file will be stored in R2
+ * @param client - Optional API client (defaults to singleton)
+ * @param onProgress - Optional progress callback
+ * @param signal - Optional AbortSignal for cancellation
+ */
+export async function uploadFileWithPresignedUrl(
+  filePath: string,
+  customKey: string,
+  client: ApiClient = apiClient,
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
+): Promise<void> {
+  // Get file info
+  const stats = fs.statSync(filePath);
+  const fileName = path.basename(filePath);
+
+  // For small files, read to determine type
+  // For large files, use extension-based detection to avoid reading entire file
+  let fileType: 'text' | 'binary';
+  if (stats.size < 1024 * 1024) {
+    // 1MB
+    const fileContent = fs.readFileSync(filePath);
+    fileType = isText(fileName, fileContent) ? 'text' : 'binary';
+  } else {
+    // For large files, use extension-based detection
+    fileType = isText(fileName) ? 'text' : 'binary';
+  }
+
+  // Request presigned URL
+  const presignedResponse = await client.fetch('/resources/presigned-link', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      key: customKey,
+      type: fileType,
+      size: stats.size,
+    }),
+  });
+
+  if (!presignedResponse.ok) {
+    const errorText = await presignedResponse.text();
+    let errorMessage = `Failed to get presigned URL: ${presignedResponse.status}`;
+
+    // Parse error response if it's JSON
+    try {
+      const errorData = JSON.parse(errorText);
+      if (errorData.error) {
+        errorMessage = errorData.error;
+      }
+    } catch {
+      errorMessage += ` ${errorText}`;
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  const { url, method } = (await presignedResponse.json()) as {
+    url: string;
+    method: string;
+    expiresIn: number;
+  };
+
+  // Headers that must be included in the upload to match the presigned URL signature
+  const requiredHeaders = {
+    'x-amz-meta-type': fileType,
+    'x-amz-meta-local': 'false',
+  };
+
+  // For large files, use streaming with progress
+  if (stats.size > 10 * 1024 * 1024) {
+    // 10MB
+    await uploadLargeFileWithProgress(
+      filePath,
+      url,
+      method,
+      stats.size,
+      requiredHeaders,
+      onProgress,
+      signal
+    );
+  } else {
+    // For small files, use simple upload
+    const fileContent = fs.readFileSync(filePath);
+    const uploadResponse = await fetch(url, {
+      method,
+      body: fileContent,
+      headers: requiredHeaders,
+      signal,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(
+        `Failed to upload file: ${uploadResponse.status} ${uploadResponse.statusText}`
+      );
+    }
+  }
+}
+
+/**
+ * Stream upload large file with progress tracking
+ * Uses Node.js https module for true streaming without loading entire file into memory
+ */
+async function uploadLargeFileWithProgress(
+  filePath: string,
+  url: string,
+  method: string,
+  totalSize: number,
+  requiredHeaders: Record<string, string>,
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
+): Promise<void> {
+  const parsedUrl = new URL(url);
+  const httpModule = parsedUrl.protocol === 'https:' ? https : http;
+
+  return new Promise<void>((resolve, reject) => {
+    // Abort handler
+    const onAbort = () => {
+      req.destroy();
+      reject(new Error('AbortError'));
+    };
+
+    if (signal) {
+      signal.addEventListener('abort', onAbort);
+    }
+
+    const options: https.RequestOptions = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: method,
+      headers: {
+        ...requiredHeaders,
+        'Content-Length': totalSize.toString(), // R2 requires Content-Length
+      },
+    };
+
+    const req = httpModule.request(options, (res) => {
+      let responseBody = '';
+
+      res.on('data', (chunk) => {
+        responseBody += chunk.toString();
+      });
+
+      res.on('end', () => {
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
+
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `Failed to upload file: ${res.statusCode} ${res.statusMessage}. Response: ${responseBody}`
+            )
+          );
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      if (signal) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      reject(err);
+    });
+
+    // Stream the file directly to the request
+    const fileStream = fs.createReadStream(filePath);
+    let uploadedBytes = 0;
+
+    fileStream.on('data', (chunk) => {
+      const chunkLength = Buffer.isBuffer(chunk)
+        ? chunk.length
+        : Buffer.byteLength(chunk);
+      uploadedBytes += chunkLength;
+
+      if (onProgress) {
+        onProgress({
+          loaded: uploadedBytes,
+          total: totalSize,
+          percentage: Math.round((uploadedBytes / totalSize) * 100),
+        });
+      }
+    });
+
+    fileStream.on('error', (err) => {
+      req.destroy();
+      reject(err);
+    });
+
+    // Pipe the file stream to the request
+    fileStream.pipe(req);
+  });
+}

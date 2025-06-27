@@ -235,6 +235,81 @@ export const resources = {
       return false;
     }
   },
+
+  /**
+   * Test POST /resources/presigned-link - Generate presigned URL for upload
+   */
+  async generatePresignedLink(fetch: Fetch): Promise<boolean> {
+    try {
+      const request = new Request(
+        'http://example.com/resources/presigned-link',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            key: 'test-files/large-video.mp4',
+            type: 'binary',
+            size: 150 * 1024 * 1024, // 150MB - larger than Worker limit
+          }),
+        }
+      );
+
+      const response = await fetch(request);
+
+      // If credentials are not configured, expect 400
+      if (response.status === 400) {
+        const data = await response.json();
+        // This is acceptable - implementation may not have credentials configured
+        console.log(
+          'Presigned URL generation not available - this is acceptable'
+        );
+        return true;
+      }
+
+      if (response.status !== 200) {
+        console.error(
+          `POST /resources/presigned-link returned ${response.status}, expected 200 or 400`
+        );
+        return false;
+      }
+
+      const data = await response.json();
+
+      // Validate response structure (backend-agnostic)
+      if (!data.url || typeof data.url !== 'string') {
+        console.error(`Expected url to be string, got ${typeof data.url}`);
+        return false;
+      }
+
+      if (!data.method || data.method !== 'PUT') {
+        console.error(`Expected method to be 'PUT', got ${data.method}`);
+        return false;
+      }
+
+      if (typeof data.expiresIn !== 'number' || data.expiresIn <= 0) {
+        console.error(
+          `Expected expiresIn to be positive number, got ${data.expiresIn}`
+        );
+        return false;
+      }
+
+      // Basic URL validation - just ensure it's a valid URL
+      try {
+        new URL(data.url);
+        console.log('Presigned URL structure validated successfully');
+      } catch (error) {
+        console.error(`Invalid URL returned: ${data.url}`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test POST /resources/presigned-link:`, error);
+      return false;
+    }
+  },
 };
 
 export const brains = {

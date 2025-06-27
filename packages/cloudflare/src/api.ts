@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
+import { AwsClient } from 'aws4fetch';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { R2Bucket, R2Object } from '@cloudflare/workers-types';
@@ -10,6 +11,10 @@ type Bindings = {
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   RESOURCES_BUCKET: R2Bucket;
   NODE_ENV?: string;
+  R2_ACCESS_KEY_ID?: string;
+  R2_SECRET_ACCESS_KEY?: string;
+  R2_ACCOUNT_ID?: string;
+  R2_BUCKET_NAME?: string;
 };
 
 type CreateBrainRunRequest = {
@@ -256,6 +261,105 @@ app.delete('/resources', async (context: Context) => {
   }
 
   return context.json({ deletedCount });
+});
+
+// Generate presigned URL for large file uploads
+app.post('/resources/presigned-link', async (context: Context) => {
+  try {
+    const body = await context.req.json();
+    const { key, type, size } = body;
+
+    // Validate required fields
+    if (!key) {
+      return context.json({ error: 'Missing required field "key"' }, 400);
+    }
+    if (!type) {
+      return context.json({ error: 'Missing required field "type"' }, 400);
+    }
+    if (size === undefined || size === null) {
+      return context.json({ error: 'Missing required field "size"' }, 400);
+    }
+
+    // Validate type
+    if (type !== 'text' && type !== 'binary') {
+      return context.json(
+        { error: 'type must be either "text" or "binary"' },
+        400
+      );
+    }
+
+    // Check if R2 credentials are configured
+    const {
+      R2_ACCESS_KEY_ID,
+      R2_SECRET_ACCESS_KEY,
+      R2_ACCOUNT_ID,
+      R2_BUCKET_NAME,
+    } = context.env;
+
+    if (
+      !R2_ACCESS_KEY_ID ||
+      !R2_SECRET_ACCESS_KEY ||
+      !R2_ACCOUNT_ID ||
+      !R2_BUCKET_NAME
+    ) {
+      return context.json(
+        {
+          error:
+            'R2 credentials not configured. Please set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, and R2_BUCKET_NAME environment variables.',
+        },
+        400
+      );
+    }
+
+    // Create AWS client with R2 credentials
+    const client = new AwsClient({
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    });
+
+    // Construct the R2 URL
+    const url = new URL(
+      `https://${R2_BUCKET_NAME}.${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`
+    );
+
+    // Set expiration to 1 hour (3600 seconds)
+    const expiresIn = 3600;
+    url.searchParams.set('X-Amz-Expires', expiresIn.toString());
+
+    // Create a request to sign
+    const requestToSign = new Request(url, {
+      method: 'PUT',
+      headers: {
+        'x-amz-meta-type': type,
+        'x-amz-meta-local': 'false', // Manual uploads are not local
+      },
+    });
+
+    // Sign the request
+    const signedRequest = await client.sign(requestToSign, {
+      aws: {
+        signQuery: true,
+        service: 's3',
+      },
+    });
+
+    // Return the presigned URL
+    return context.json({
+      url: signedRequest.url,
+      method: 'PUT',
+      expiresIn,
+    });
+  } catch (error) {
+    console.error('Error generating presigned URL:', error);
+    return context.json(
+      {
+        error: `Failed to generate presigned URL: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
+  }
 });
 
 export default app;

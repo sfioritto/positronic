@@ -20,10 +20,11 @@
   "r2_buckets": [
     {
       "binding": "RESOURCES_BUCKET",
-      "bucket_name": "positronic-resources-<%= projectName %>"
+      "bucket_name": "<%= projectName %>"
     }
   ],
   "vars": {
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "R2_BUCKET_NAME": "<%= projectName %>"
   }
 }

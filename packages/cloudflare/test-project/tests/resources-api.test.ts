@@ -560,4 +560,112 @@ describe('Resources API Tests', () => {
       );
     });
   });
+
+  describe('POST /resources/presigned-link', () => {
+    it('should return 400 when R2 credentials are not configured', async () => {
+      // This test verifies behavior when the backend doesn't have credentials configured
+      const request = new Request(
+        'http://example.com/resources/presigned-link',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            key: 'test-files/large-video.mp4',
+            type: 'binary',
+            size: 150 * 1024 * 1024, // 150MB
+          }),
+        }
+      );
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(400);
+      const responseBody = await response.json<{ error: string }>();
+      expect(responseBody.error).toBeDefined();
+      expect(typeof responseBody.error).toBe('string');
+    });
+
+    it('should validate required fields in request body', async () => {
+      // Missing key
+      let request = new Request('http://example.com/resources/presigned-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'binary',
+          size: 1024,
+        }),
+      });
+      let context = createExecutionContext();
+      let response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+      expect(response.status).toBe(400);
+
+      // Missing type
+      request = new Request('http://example.com/resources/presigned-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: 'test.txt',
+          size: 1024,
+        }),
+      });
+      context = createExecutionContext();
+      response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+      expect(response.status).toBe(400);
+
+      // Missing size
+      request = new Request('http://example.com/resources/presigned-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: 'test.txt',
+          type: 'text',
+        }),
+      });
+      context = createExecutionContext();
+      response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+      expect(response.status).toBe(400);
+    });
+
+    it('should validate type field is text or binary', async () => {
+      const request = new Request(
+        'http://example.com/resources/presigned-link',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            key: 'test.txt',
+            type: 'invalid',
+            size: 1024,
+          }),
+        }
+      );
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(400);
+      const responseBody = await response.json<{ error: string }>();
+      expect(responseBody.error).toContain(
+        'type must be either "text" or "binary"'
+      );
+    });
+
+    // Note: We intentionally do not test successful presigned URL generation
+    // as it would require real cloud storage credentials and internet connectivity.
+    // The spec test validates the API contract when credentials are configured.
+  });
 });

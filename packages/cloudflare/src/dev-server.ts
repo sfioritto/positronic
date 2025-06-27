@@ -194,13 +194,106 @@ export class CloudflareDevServer implements PositronicDevServer {
     // Regenerate manifest based on actual project state
     const srcDir = path.join(serverDir, 'src');
     await regenerateManifestFile(projectRoot, srcDir);
+
+    // Update wrangler.jsonc based on R2 credentials presence
+    const wranglerConfigPath = path.join(serverDir, 'wrangler.jsonc');
+    if (fs.existsSync(wranglerConfigPath)) {
+      // Read and parse the wrangler config
+      const wranglerContent = fs.readFileSync(wranglerConfigPath, 'utf-8');
+      const wranglerConfig = JSON.parse(wranglerContent);
+      let configChanged = false;
+
+      // Parse environment variables if .env file exists
+      let parsedRootEnv: Record<string, string> = {};
+      if (fs.existsSync(rootEnvFilePath)) {
+        const rootEnvFileContent = fs.readFileSync(rootEnvFilePath);
+        parsedRootEnv = dotenv.parse(rootEnvFileContent);
+      }
+
+      // Check if all required R2 credentials are present and not empty
+      const hasR2Credentials =
+        parsedRootEnv.R2_ACCESS_KEY_ID &&
+        parsedRootEnv.R2_SECRET_ACCESS_KEY &&
+        parsedRootEnv.R2_ACCOUNT_ID &&
+        parsedRootEnv.R2_BUCKET_NAME &&
+        parsedRootEnv.R2_ACCESS_KEY_ID.trim() !== '' &&
+        parsedRootEnv.R2_SECRET_ACCESS_KEY.trim() !== '' &&
+        parsedRootEnv.R2_ACCOUNT_ID.trim() !== '' &&
+        parsedRootEnv.R2_BUCKET_NAME.trim() !== '';
+
+      if (hasR2Credentials) {
+        // Configure for remote mode
+        if (wranglerConfig.r2_buckets && wranglerConfig.r2_buckets[0]) {
+          if (
+            wranglerConfig.r2_buckets[0].bucket_name !==
+            parsedRootEnv.R2_BUCKET_NAME
+          ) {
+            wranglerConfig.r2_buckets[0].bucket_name =
+              parsedRootEnv.R2_BUCKET_NAME;
+            configChanged = true;
+          }
+          if (!wranglerConfig.r2_buckets[0].experimental_remote) {
+            wranglerConfig.r2_buckets[0].experimental_remote = true;
+            configChanged = true;
+          }
+
+          // Also update the vars section
+          if (wranglerConfig.vars) {
+            if (
+              wranglerConfig.vars.R2_BUCKET_NAME !==
+              parsedRootEnv.R2_BUCKET_NAME
+            ) {
+              wranglerConfig.vars.R2_BUCKET_NAME = parsedRootEnv.R2_BUCKET_NAME;
+              configChanged = true;
+            }
+          }
+        }
+      } else {
+        // Configure for local mode (revert from remote)
+        if (wranglerConfig.r2_buckets && wranglerConfig.r2_buckets[0]) {
+          // Get project name from the wrangler config name (remove "positronic-dev-" prefix)
+          const configName = wranglerConfig.name || 'local-project';
+          const projectName =
+            configName.replace(/^positronic-dev-/, '') || 'local-project';
+
+          if (wranglerConfig.r2_buckets[0].experimental_remote) {
+            delete wranglerConfig.r2_buckets[0].experimental_remote;
+            configChanged = true;
+          }
+          if (wranglerConfig.r2_buckets[0].bucket_name !== projectName) {
+            wranglerConfig.r2_buckets[0].bucket_name = projectName;
+            configChanged = true;
+          }
+
+          // Also update the vars section
+          if (wranglerConfig.vars) {
+            if (wranglerConfig.vars.R2_BUCKET_NAME !== projectName) {
+              wranglerConfig.vars.R2_BUCKET_NAME = projectName;
+              configChanged = true;
+            }
+          }
+        }
+      }
+
+      // Write back the updated configuration only if it changed
+      if (configChanged) {
+        const updatedContent = JSON.stringify(wranglerConfig, null, 2);
+        fs.writeFileSync(wranglerConfigPath, updatedContent);
+        console.log(
+          hasR2Credentials
+            ? '🔗 Configured for remote R2 bindings'
+            : '🏠 Configured for local R2 bindings'
+        );
+      }
+    }
   }
 
   async start(projectRoot: string, port?: number): Promise<ChildProcess> {
     const serverDir = path.join(projectRoot, '.positronic');
 
     // Start wrangler dev server
-    const wranglerArgs = ['dev', '--local'];
+    const wranglerArgs = ['dev', '--x-remote-bindings'];
+
     if (port) {
       wranglerArgs.push('--port', String(port));
     }

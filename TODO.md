@@ -1,6 +1,4 @@
-# TODO
-
-## 2. Refactor CLI server.ts Command - Reduce Orchestration Logic
+## 1. Refactor CLI server.ts Command - Reduce Orchestration Logic
 
 ### Problem
 

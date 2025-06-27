@@ -22,6 +22,7 @@ setBrainRunner(runner);
 interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
+  RESOURCES_BUCKET: R2Bucket;
 }
 
 // Export the API handler and Durable Objects

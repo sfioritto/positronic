@@ -45,6 +45,11 @@ describe('Positronic Spec', () => {
       const result = await resources.deleteAll(createFetch());
       expect(result).toBe(true);
     });
+
+    it('passes POST /resources/presigned-link test', async () => {
+      const result = await resources.generatePresignedLink(createFetch());
+      expect(result).toBe(true);
+    });
   });
 
   describe('Brains', () => {

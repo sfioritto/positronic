@@ -27,6 +27,7 @@
     "@positronic/core": "^0.0.1",
     "@positronic/spec": "^0.0.1",
     "@positronic/template-new-project": "^0.0.1",
+    "aws4fetch": "^1.0.18",
     "caz": "^2.0.0",
     "dotenv": "^16.0.3",
     "hono": "^4.2.3",
