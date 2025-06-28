@@ -6,6 +6,7 @@ import {
   setBrainRunner,
 } from '../../src/brain-runner-do';
 import { MonitorDO } from '../../src/monitor-do';
+import { ScheduleDO } from '../../src/schedule-do';
 import { PositronicManifest } from '../../src/manifest.js';
 import { runner } from './runner';
 
@@ -66,4 +67,4 @@ export default {
   fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { BrainRunnerDO, MonitorDO };
+export { BrainRunnerDO, MonitorDO, ScheduleDO };

@@ -17,10 +17,12 @@ import type {
 } from '@positronic/core';
 import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
 import type { MonitorDO } from '../../src/monitor-do.js';
+import type { ScheduleDO } from '../../src/schedule-do.js';
 
 interface TestEnv {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
+  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   DB: D1Database;
   RESOURCES_BUCKET: R2Bucket;
 }

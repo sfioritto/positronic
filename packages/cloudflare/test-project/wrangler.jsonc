@@ -14,7 +14,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["BrainRunnerDO", "MonitorDO"]
+      "new_sqlite_classes": ["BrainRunnerDO", "MonitorDO", "ScheduleDO"]
     }
   ],
   "durable_objects": {
@@ -26,6 +26,10 @@
       {
         "class_name": "MonitorDO",
         "name": "MONITOR_DO"
+      },
+      {
+        "class_name": "ScheduleDO",
+        "name": "SCHEDULE_DO"
       }
     ]
   },
