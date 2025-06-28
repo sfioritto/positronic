@@ -706,65 +706,6 @@ export const schedules = {
   },
 
   /**
-   * Test PUT /brains/schedules/:scheduleId - Update a schedule
-   */
-  async update(
-    fetch: Fetch,
-    scheduleId: string,
-    updates: { cronExpression?: string; enabled?: boolean }
-  ): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/brains/schedules/${scheduleId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updates),
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(
-          `PUT /brains/schedules/${scheduleId} returned ${response.status}`
-        );
-        return false;
-      }
-
-      const data = await response.json();
-
-      // Validate updated fields match what was sent
-      if (
-        updates.cronExpression !== undefined &&
-        data.cronExpression !== updates.cronExpression
-      ) {
-        console.error(
-          `Expected cronExpression to be '${updates.cronExpression}', got ${data.cronExpression}`
-        );
-        return false;
-      }
-
-      if (updates.enabled !== undefined && data.enabled !== updates.enabled) {
-        console.error(
-          `Expected enabled to be ${updates.enabled}, got ${data.enabled}`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        `Failed to test PUT /brains/schedules/${scheduleId}:`,
-        error
-      );
-      return false;
-    }
-  },
-
-  /**
    * Test DELETE /brains/schedules/:scheduleId - Delete a schedule
    */
   async delete(fetch: Fetch, scheduleId: string): Promise<boolean> {
