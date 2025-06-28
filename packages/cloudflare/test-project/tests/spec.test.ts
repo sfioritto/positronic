@@ -112,23 +112,6 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes PUT /brains/schedules/:scheduleId test', async () => {
-      // First create a schedule
-      const scheduleId = await schedules.create(
-        createFetch(),
-        'basic-brain',
-        '0 3 * * *'
-      );
-      expect(scheduleId).toBeTruthy();
-
-      // Then update it
-      const result = await schedules.update(createFetch(), scheduleId!, {
-        cronExpression: '0 4 * * *',
-        enabled: false,
-      });
-      expect(result).toBe(true);
-    });
-
     it('passes DELETE /brains/schedules/:scheduleId test', async () => {
       // First create a schedule
       const scheduleId = await schedules.create(

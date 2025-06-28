@@ -3,12 +3,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { AwsClient } from 'aws4fetch';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
+import type { ScheduleDO } from './schedule-do.js';
 import type { R2Bucket, R2Object } from '@cloudflare/workers-types';
 import { type ResourceEntry, RESOURCE_TYPES } from '@positronic/core';
 
 type Bindings = {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
+  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   RESOURCES_BUCKET: R2Bucket;
   NODE_ENV?: string;
   R2_ACCESS_KEY_ID?: string;
@@ -360,6 +362,93 @@ app.post('/resources/presigned-link', async (context: Context) => {
       500
     );
   }
+});
+
+// Schedule endpoints
+
+// Create a new schedule
+app.post('/brains/schedules', async (context: Context) => {
+  try {
+    const body = await context.req.json();
+    const { brainName, cronExpression } = body;
+
+    if (!brainName) {
+      return context.json({ error: 'Missing required field "brainName"' }, 400);
+    }
+    if (!cronExpression) {
+      return context.json(
+        { error: 'Missing required field "cronExpression"' },
+        400
+      );
+    }
+
+    // Get the schedule singleton instance
+    const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
+    const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId) as ScheduleDO;
+
+    const schedule = await scheduleStub.createSchedule(
+      brainName,
+      cronExpression
+    );
+    return context.json(schedule, 201);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to create schedule';
+    return context.json({ error: errorMessage }, 400);
+  }
+});
+
+// List all schedules
+app.get('/brains/schedules', async (context: Context) => {
+  const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId) as ScheduleDO;
+
+  const result = await scheduleStub.listSchedules();
+  return context.json(result);
+});
+
+// Get scheduled run history - MUST be before :scheduleId route
+app.get('/brains/schedules/runs', async (context: Context) => {
+  const scheduleIdParam = context.req.query('scheduleId');
+  const limit = Number(context.req.query('limit') || '100');
+
+  const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId) as ScheduleDO;
+
+  const result = await scheduleStub.getScheduledRuns(scheduleIdParam, limit);
+  return context.json(result);
+});
+
+// Get a specific schedule
+app.get('/brains/schedules/:scheduleId', async (context: Context) => {
+  const scheduleIdParam = context.req.param('scheduleId');
+
+  const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId) as ScheduleDO;
+
+  const schedule = await scheduleStub.getSchedule(scheduleIdParam);
+
+  if (!schedule) {
+    return context.json({ error: 'Schedule not found' }, 404);
+  }
+
+  return context.json(schedule);
+});
+
+// Delete a schedule
+app.delete('/brains/schedules/:scheduleId', async (context: Context) => {
+  const scheduleIdParam = context.req.param('scheduleId');
+
+  const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId) as ScheduleDO;
+
+  const deleted = await scheduleStub.deleteSchedule(scheduleIdParam);
+
+  if (!deleted) {
+    return context.json({ error: 'Schedule not found' }, 404);
+  }
+
+  return new Response(null, { status: 204 });
 });
 
 export default app;

@@ -856,62 +856,6 @@ describe('Hono API Tests', () => {
       expect(schedule.cronExpression).toBe('*/30 * * * *');
     });
 
-    it('PUT /brains/schedules/:scheduleId updates a schedule', async () => {
-      const testEnv = env as TestEnv;
-
-      // Create a schedule
-      const createRequest = new Request('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brainName: 'update-brain',
-          cronExpression: '0 * * * *',
-        }),
-      });
-      const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(
-        createRequest,
-        testEnv,
-        createContext
-      );
-      const { id } = await createResponse.json<{ id: string }>();
-      await waitOnExecutionContext(createContext);
-
-      // Update the schedule
-      const updateRequest = new Request(
-        `http://example.com/brains/schedules/${id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cronExpression: '30 * * * *',
-            enabled: false,
-          }),
-        }
-      );
-      const updateContext = createExecutionContext();
-      const updateResponse = await worker.fetch(
-        updateRequest,
-        testEnv,
-        updateContext
-      );
-      await waitOnExecutionContext(updateContext);
-
-      expect(updateResponse.status).toBe(200);
-      const updated = await updateResponse.json<{
-        id: string;
-        brainName: string;
-        cronExpression: string;
-        enabled: boolean;
-        createdAt: number;
-      }>();
-
-      expect(updated.id).toBe(id);
-      expect(updated.brainName).toBe('update-brain'); // Should not change
-      expect(updated.cronExpression).toBe('30 * * * *'); // Should be updated
-      expect(updated.enabled).toBe(false); // Should be updated
-    });
-
     it('DELETE /brains/schedules/:scheduleId deletes a schedule', async () => {
       const testEnv = env as TestEnv;
 

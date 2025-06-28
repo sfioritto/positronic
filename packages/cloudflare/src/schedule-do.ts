@@ -21,7 +21,7 @@ interface ScheduledRun {
   id: number;
   scheduleId: string;
   brainRunId?: string;
-  status: 'triggered' | 'error' | 'complete';
+  status: 'triggered' | 'failed' | 'complete';
   ranAt: number;
   completedAt?: number;
   error?: string;
@@ -55,7 +55,7 @@ export class ScheduleDO extends DurableObject<Env> {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         schedule_id TEXT NOT NULL,
         brain_run_id TEXT UNIQUE,
-        status TEXT NOT NULL CHECK(status IN ('triggered', 'error', 'complete')),
+        status TEXT NOT NULL CHECK(status IN ('triggered', 'failed', 'complete')),
         ran_at INTEGER NOT NULL,
         completed_at INTEGER,
         error TEXT,
@@ -113,17 +113,19 @@ export class ScheduleDO extends DurableObject<Env> {
   }
 
   async getSchedule(scheduleId: string): Promise<Schedule | null> {
-    const result = this.storage
+    const results = this.storage
       .exec(
         `SELECT id, brain_name, cron_expression, enabled, created_at, next_run_at
          FROM schedules WHERE id = ?`,
         scheduleId
       )
-      .one();
+      .toArray();
 
-    if (!result) {
+    if (results.length === 0) {
       return null;
     }
+
+    const result = results[0];
 
     return {
       id: result.id as string,
@@ -195,7 +197,7 @@ export class ScheduleDO extends DurableObject<Env> {
         id: row.id as number,
         scheduleId: row.schedule_id as string,
         brainRunId: row.brain_run_id as string | undefined,
-        status: row.status as 'triggered' | 'error' | 'complete',
+        status: row.status as 'triggered' | 'failed' | 'complete',
         ranAt: row.ran_at as number,
         completedAt: row.completed_at as number | undefined,
         error: row.error as string | undefined,
@@ -258,7 +260,7 @@ export class ScheduleDO extends DurableObject<Env> {
             error instanceof Error ? error.message : 'Unknown error';
           this.storage.exec(
             `INSERT INTO scheduled_runs (schedule_id, status, ran_at, error)
-               VALUES (?, 'error', ?, ?)`,
+               VALUES (?, 'failed', ?, ?)`,
             scheduleId,
             now,
             errorMessage
@@ -309,20 +311,22 @@ export class ScheduleDO extends DurableObject<Env> {
     }
 
     // Check if this brain run was triggered by a schedule
-    const scheduledRun = this.storage
+    const result = this.storage
       .exec(
         `SELECT id FROM scheduled_runs WHERE brain_run_id = ?`,
         event.brainRunId
       )
-      .one();
+      .toArray();
 
-    if (!scheduledRun) {
+    if (result.length === 0) {
       // This brain run wasn't triggered by a schedule, ignore it
       return;
     }
 
+    const scheduledRun = result[0];
+
     const completedAt = Date.now();
-    const status = event.type === BRAIN_EVENTS.COMPLETE ? 'complete' : 'error';
+    const status = event.type === BRAIN_EVENTS.COMPLETE ? 'complete' : 'failed';
     const error =
       event.type === BRAIN_EVENTS.ERROR
         ? event.error
