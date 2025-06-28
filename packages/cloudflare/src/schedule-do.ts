@@ -1,11 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import { v4 as uuidv4 } from 'uuid';
 import { parseCronExpression, type Cron } from 'cron-schedule';
+import { BRAIN_EVENTS, type BrainEvent } from '@positronic/core';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 
 export interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  SCHEDULE_DO: DurableObjectNamespace;
 }
 
 interface Schedule {
@@ -298,35 +298,53 @@ export class ScheduleDO extends DurableObject<Env> {
     return brainRunId;
   }
 
-  // Called by BrainRunnerDO when a scheduled run completes
-  async reportRunCompletion(
-    brainRunId: string,
-    status: 'complete' | 'error',
-    error?: string
-  ): Promise<void> {
-    const completedAt = Date.now();
-
-    if (status === 'complete') {
-      // Update the scheduled run record to mark it as successfully completed
-      this.storage.exec(
-        `UPDATE scheduled_runs
-         SET status = 'complete', completed_at = ?
-         WHERE brain_run_id = ?`,
-        completedAt,
-        brainRunId
-      );
-    } else if (status === 'error') {
-      // Update with error information
-      this.storage.exec(
-        `UPDATE scheduled_runs
-         SET status = ?, completed_at = ?, error = ?
-         WHERE brain_run_id = ?`,
-        status,
-        completedAt,
-        error || 'Unknown error',
-        brainRunId
-      );
+  // Called by ScheduleAdapter when brain events occur
+  async handleBrainEvent(event: BrainEvent<any>): Promise<void> {
+    // We only care about completion events for scheduled runs
+    if (
+      event.type !== BRAIN_EVENTS.COMPLETE &&
+      event.type !== BRAIN_EVENTS.ERROR
+    ) {
+      return;
     }
+
+    // Check if this brain run was triggered by a schedule
+    const scheduledRun = this.storage
+      .exec(
+        `SELECT id FROM scheduled_runs WHERE brain_run_id = ?`,
+        event.brainRunId
+      )
+      .one();
+
+    if (!scheduledRun) {
+      // This brain run wasn't triggered by a schedule, ignore it
+      return;
+    }
+
+    const completedAt = Date.now();
+    const status = event.type === BRAIN_EVENTS.COMPLETE ? 'complete' : 'error';
+    const error =
+      event.type === BRAIN_EVENTS.ERROR
+        ? event.error
+          ? JSON.stringify(event.error)
+          : 'Unknown error'
+        : null;
+
+    // Update the scheduled run record
+    this.storage.exec(
+      `UPDATE scheduled_runs
+       SET status = ?, completed_at = ?, error = ?
+       WHERE brain_run_id = ?`,
+      status,
+      completedAt,
+      error,
+      event.brainRunId
+    );
+
+    console.log(
+      `[ScheduleDO] Scheduled run ${event.brainRunId} ${status}`,
+      error ? `with error: ${error}` : ''
+    );
   }
 
   private isValidCronExpression(expression: string): boolean {

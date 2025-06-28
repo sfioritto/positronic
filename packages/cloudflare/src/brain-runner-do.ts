@@ -4,6 +4,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Adapter, BrainEvent } from '@positronic/core';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
+import type { ScheduleDO } from './schedule-do.js';
 import { PositronicManifest } from './manifest.js';
 import { CloudflareR2Loader } from './r2-loader.js';
 import { createResources, type ResourceManifest } from '@positronic/core';
@@ -22,6 +23,7 @@ export function setBrainRunner(runner: BrainRunner) {
 export interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
+  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   RESOURCES_BUCKET: R2Bucket;
 }
 
@@ -68,6 +70,14 @@ class MonitorAdapter implements Adapter {
 
   async dispatch(event: BrainEvent<any>): Promise<void> {
     await this.monitorStub.handleBrainEvent(event);
+  }
+}
+
+class ScheduleAdapter implements Adapter {
+  constructor(private scheduleStub: DurableObjectStub<ScheduleDO>) {}
+
+  async dispatch(event: BrainEvent<any>): Promise<void> {
+    await this.scheduleStub.handleBrainEvent(event);
   }
 }
 
@@ -182,6 +192,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const monitorAdapter = new MonitorAdapter(
       this.env.MONITOR_DO.get(this.env.MONITOR_DO.idFromName('singleton'))
     );
+    const scheduleAdapter = new ScheduleAdapter(
+      this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
+    );
 
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
@@ -198,7 +211,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     runnerWithResources
-      .withAdapters([sqliteAdapter, eventStreamAdapter, monitorAdapter])
+      .withAdapters([
+        sqliteAdapter,
+        eventStreamAdapter,
+        monitorAdapter,
+        scheduleAdapter,
+      ])
       .run(brainToRun, {
         initialState: initialData || {},
         brainRunId,
