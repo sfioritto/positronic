@@ -5,7 +5,7 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import worker from '../src/index';
-import { testStatus, resources, brains } from '@positronic/spec';
+import { testStatus, resources, brains, schedules } from '@positronic/spec';
 
 describe('Positronic Spec', () => {
   // Helper function to create fetch wrapper for Cloudflare workers
@@ -78,6 +78,73 @@ describe('Positronic Spec', () => {
 
     it('passes GET /brains/watch test', async () => {
       const result = await brains.watchAll(createFetch());
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('Schedules', () => {
+    it('passes POST /brains/schedules test', async () => {
+      const scheduleId = await schedules.create(
+        createFetch(),
+        'basic-brain',
+        '0 3 * * *'
+      );
+      expect(scheduleId).toBeTruthy();
+      expect(typeof scheduleId).toBe('string');
+    });
+
+    it('passes GET /brains/schedules test', async () => {
+      const result = await schedules.list(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /brains/schedules/:scheduleId test', async () => {
+      // First create a schedule
+      const scheduleId = await schedules.create(
+        createFetch(),
+        'basic-brain',
+        '0 3 * * *'
+      );
+      expect(scheduleId).toBeTruthy();
+
+      // Then get it
+      const result = await schedules.get(createFetch(), scheduleId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes PUT /brains/schedules/:scheduleId test', async () => {
+      // First create a schedule
+      const scheduleId = await schedules.create(
+        createFetch(),
+        'basic-brain',
+        '0 3 * * *'
+      );
+      expect(scheduleId).toBeTruthy();
+
+      // Then update it
+      const result = await schedules.update(createFetch(), scheduleId!, {
+        cronExpression: '0 4 * * *',
+        enabled: false,
+      });
+      expect(result).toBe(true);
+    });
+
+    it('passes DELETE /brains/schedules/:scheduleId test', async () => {
+      // First create a schedule
+      const scheduleId = await schedules.create(
+        createFetch(),
+        'basic-brain',
+        '0 3 * * *'
+      );
+      expect(scheduleId).toBeTruthy();
+
+      // Then delete it
+      const result = await schedules.delete(createFetch(), scheduleId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /brains/schedules/runs test', async () => {
+      const result = await schedules.runs(createFetch());
       expect(result).toBe(true);
     });
   });

@@ -735,4 +735,351 @@ describe('Hono API Tests', () => {
       'nestedResource/testNestedResource.txt'
     );
   });
+
+  describe('Brain Schedules API Tests', () => {
+    it('POST /brains/schedules creates a new schedule', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'basic-brain';
+      const cronExpression = '0 3 * * *'; // Daily at 3am
+
+      const request = new Request('http://example.com/brains/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainName, cronExpression }),
+      });
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(201);
+      const responseBody = await response.json<{
+        id: string;
+        brainName: string;
+        cronExpression: string;
+        enabled: boolean;
+        createdAt: number;
+      }>();
+
+      expect(responseBody.id).toBeDefined();
+      expect(responseBody.brainName).toBe(brainName);
+      expect(responseBody.cronExpression).toBe(cronExpression);
+      expect(responseBody.enabled).toBe(true);
+      expect(responseBody.createdAt).toBeDefined();
+    });
+
+    it('GET /brains/schedules lists all schedules', async () => {
+      const testEnv = env as TestEnv;
+
+      // Create a few schedules first
+      for (let i = 0; i < 3; i++) {
+        const request = new Request('http://example.com/brains/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brainName: `brain-${i}`,
+            cronExpression: `${i} * * * *`,
+          }),
+        });
+        const context = createExecutionContext();
+        await worker.fetch(request, testEnv, context);
+        await waitOnExecutionContext(context);
+      }
+
+      // List schedules
+      const listRequest = new Request('http://example.com/brains/schedules');
+      const listContext = createExecutionContext();
+      const listResponse = await worker.fetch(
+        listRequest,
+        testEnv,
+        listContext
+      );
+      await waitOnExecutionContext(listContext);
+
+      expect(listResponse.status).toBe(200);
+      const responseBody = await listResponse.json<{
+        schedules: Array<{
+          id: string;
+          brainName: string;
+          cronExpression: string;
+          enabled: boolean;
+          createdAt: number;
+        }>;
+        count: number;
+      }>();
+
+      expect(responseBody.schedules).toBeInstanceOf(Array);
+      expect(responseBody.count).toBeGreaterThanOrEqual(3);
+    });
+
+    it('GET /brains/schedules/:scheduleId gets a specific schedule', async () => {
+      const testEnv = env as TestEnv;
+
+      // Create a schedule
+      const createRequest = new Request('http://example.com/brains/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brainName: 'test-brain',
+          cronExpression: '*/30 * * * *',
+        }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { id } = await createResponse.json<{ id: string }>();
+      await waitOnExecutionContext(createContext);
+
+      // Get the schedule
+      const getRequest = new Request(
+        `http://example.com/brains/schedules/${id}`
+      );
+      const getContext = createExecutionContext();
+      const getResponse = await worker.fetch(getRequest, testEnv, getContext);
+      await waitOnExecutionContext(getContext);
+
+      expect(getResponse.status).toBe(200);
+      const schedule = await getResponse.json<{
+        id: string;
+        brainName: string;
+        cronExpression: string;
+        enabled: boolean;
+        createdAt: number;
+      }>();
+
+      expect(schedule.id).toBe(id);
+      expect(schedule.brainName).toBe('test-brain');
+      expect(schedule.cronExpression).toBe('*/30 * * * *');
+    });
+
+    it('PUT /brains/schedules/:scheduleId updates a schedule', async () => {
+      const testEnv = env as TestEnv;
+
+      // Create a schedule
+      const createRequest = new Request('http://example.com/brains/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brainName: 'update-brain',
+          cronExpression: '0 * * * *',
+        }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { id } = await createResponse.json<{ id: string }>();
+      await waitOnExecutionContext(createContext);
+
+      // Update the schedule
+      const updateRequest = new Request(
+        `http://example.com/brains/schedules/${id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cronExpression: '30 * * * *',
+            enabled: false,
+          }),
+        }
+      );
+      const updateContext = createExecutionContext();
+      const updateResponse = await worker.fetch(
+        updateRequest,
+        testEnv,
+        updateContext
+      );
+      await waitOnExecutionContext(updateContext);
+
+      expect(updateResponse.status).toBe(200);
+      const updated = await updateResponse.json<{
+        id: string;
+        brainName: string;
+        cronExpression: string;
+        enabled: boolean;
+        createdAt: number;
+      }>();
+
+      expect(updated.id).toBe(id);
+      expect(updated.brainName).toBe('update-brain'); // Should not change
+      expect(updated.cronExpression).toBe('30 * * * *'); // Should be updated
+      expect(updated.enabled).toBe(false); // Should be updated
+    });
+
+    it('DELETE /brains/schedules/:scheduleId deletes a schedule', async () => {
+      const testEnv = env as TestEnv;
+
+      // Create a schedule
+      const createRequest = new Request('http://example.com/brains/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brainName: 'delete-brain',
+          cronExpression: '0 0 * * *',
+        }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { id } = await createResponse.json<{ id: string }>();
+      await waitOnExecutionContext(createContext);
+
+      // Delete the schedule
+      const deleteRequest = new Request(
+        `http://example.com/brains/schedules/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      const deleteContext = createExecutionContext();
+      const deleteResponse = await worker.fetch(
+        deleteRequest,
+        testEnv,
+        deleteContext
+      );
+      await waitOnExecutionContext(deleteContext);
+
+      expect(deleteResponse.status).toBe(204);
+
+      // Verify it's deleted
+      const getRequest = new Request(
+        `http://example.com/brains/schedules/${id}`
+      );
+      const getContext = createExecutionContext();
+      const getResponse = await worker.fetch(getRequest, testEnv, getContext);
+      await waitOnExecutionContext(getContext);
+
+      expect(getResponse.status).toBe(404);
+    });
+
+    it('GET /brains/schedules/runs lists scheduled run history', async () => {
+      const testEnv = env as TestEnv;
+
+      const request = new Request('http://example.com/brains/schedules/runs');
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(200);
+      const responseBody = await response.json<{
+        runs: Array<{
+          id: number;
+          scheduleId: string;
+          brainRunId?: string;
+          status: 'triggered' | 'failed';
+          ranAt: number;
+        }>;
+        count: number;
+      }>();
+
+      expect(responseBody.runs).toBeInstanceOf(Array);
+      expect(typeof responseBody.count).toBe('number');
+    });
+
+    it('GET /brains/schedules/runs with scheduleId filter', async () => {
+      const testEnv = env as TestEnv;
+      const scheduleId = 'test-schedule-123';
+
+      const request = new Request(
+        `http://example.com/brains/schedules/runs?scheduleId=${scheduleId}`
+      );
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(200);
+      const responseBody = await response.json<{
+        runs: Array<{
+          id: number;
+          scheduleId: string;
+          brainRunId?: string;
+          status: 'triggered' | 'failed';
+          ranAt: number;
+        }>;
+        count: number;
+      }>();
+
+      // All runs should belong to the specified schedule
+      for (const run of responseBody.runs) {
+        expect(run.scheduleId).toBe(scheduleId);
+      }
+    });
+
+    it('POST /brains/schedules validates cron expression', async () => {
+      const testEnv = env as TestEnv;
+
+      const request = new Request('http://example.com/brains/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brainName: 'invalid-cron-brain',
+          cronExpression: 'invalid cron',
+        }),
+      });
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(400);
+      const error = (await response.json()) as { error: string };
+      expect(error.error).toContain('Invalid cron expression');
+    });
+
+    it('POST /brains/schedules allows multiple schedules per brain', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'multi-schedule-brain';
+
+      // Create first schedule
+      const request1 = new Request('http://example.com/brains/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brainName,
+          cronExpression: '0 9 * * *', // 9am daily
+        }),
+      });
+      const context1 = createExecutionContext();
+      const response1 = await worker.fetch(request1, testEnv, context1);
+      await waitOnExecutionContext(context1);
+      expect(response1.status).toBe(201);
+
+      // Create second schedule for same brain
+      const request2 = new Request('http://example.com/brains/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brainName,
+          cronExpression: '0 17 * * *', // 5pm daily
+        }),
+      });
+      const context2 = createExecutionContext();
+      const response2 = await worker.fetch(request2, testEnv, context2);
+      await waitOnExecutionContext(context2);
+      expect(response2.status).toBe(201);
+
+      // Verify both schedules exist
+      const listRequest = new Request('http://example.com/brains/schedules');
+      const listContext = createExecutionContext();
+      const listResponse = await worker.fetch(
+        listRequest,
+        testEnv,
+        listContext
+      );
+      await waitOnExecutionContext(listContext);
+
+      const { schedules } = await listResponse.json<{
+        schedules: Array<{ brainName: string }>;
+      }>();
+
+      const multiSchedules = schedules.filter((s) => s.brainName === brainName);
+      expect(multiSchedules.length).toBe(2);
+    });
+  });
 });
