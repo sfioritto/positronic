@@ -6,6 +6,7 @@ import type { BrainRunnerDO } from './brain-runner-do.js';
 
 export interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
+  IS_TEST?: string;
 }
 
 interface Schedule {
@@ -66,14 +67,20 @@ export class ScheduleDO extends DurableObject<Env> {
       ON scheduled_runs(schedule_id, ran_at DESC);
     `);
 
-    // Always ensure the alarm cycle is running
-    // Alarms persist across DO evictions, so check if one already exists
-    this.ctx.storage.getAlarm().then((existingAlarm) => {
-      if (!existingAlarm) {
-        console.log('[ScheduleDO] Starting alarm cycle');
-        this.ctx.storage.setAlarm(Date.now() + 60 * 1000);
-      }
-    });
+    // Only start the alarm cycle if not in test environment
+    if (env.IS_TEST !== 'true') {
+      // Alarms persist across DO evictions, so check if one already exists
+      this.ctx.storage.getAlarm().then((existingAlarm) => {
+        if (!existingAlarm) {
+          console.log('[ScheduleDO] Starting alarm cycle');
+          this.ctx.storage.setAlarm(Date.now() + 60 * 1000);
+        }
+      });
+    } else {
+      console.log(
+        '[ScheduleDO] Test environment detected, skipping alarm cycle'
+      );
+    }
   }
 
   async createSchedule(
@@ -83,11 +90,7 @@ export class ScheduleDO extends DurableObject<Env> {
     const id = uuidv4();
     const createdAt = Date.now();
 
-    // Validate cron expression
-    if (!this.isValidCronExpression(cronExpression)) {
-      throw new Error(`Invalid cron expression: ${cronExpression}`);
-    }
-
+    // Note: Cron expression is validated at the API level before calling this method
     // Calculate next run time
     const cron = parseCronExpression(cronExpression);
     const nextRunAt = this.calculateNextRunTime(cron, createdAt);
@@ -285,7 +288,10 @@ export class ScheduleDO extends DurableObject<Env> {
       // Always schedule the next alarm for 1 minute from now
       // This creates a perpetual cycle that checks for due schedules every minute
       // The finally block ensures this happens even if there's an error above
-      await this.ctx.storage.setAlarm(Date.now() + 60 * 1000);
+      // Skip in test environment to avoid isolated storage issues
+      if (this.env.IS_TEST !== 'true') {
+        await this.ctx.storage.setAlarm(Date.now() + 60 * 1000);
+      }
     }
   }
 

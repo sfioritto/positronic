@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
 import { AwsClient } from 'aws4fetch';
+import { parseCronExpression } from 'cron-schedule';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
@@ -13,6 +14,7 @@ type Bindings = {
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   RESOURCES_BUCKET: R2Bucket;
   NODE_ENV?: string;
+  IS_TEST?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
   R2_ACCOUNT_ID?: string;
@@ -47,7 +49,7 @@ app.post('/brains/runs', async (context: Context) => {
   const brainRunId = uuidv4();
   const namespace = context.env.BRAIN_RUNNER_DO;
   const doId = namespace.idFromName(brainRunId);
-  const stub = namespace.get(doId) as BrainRunnerDO;
+  const stub = namespace.get(doId);
   await stub.start(brainName, brainRunId);
   const response: CreateBrainRunResponse = {
     brainRunId,
@@ -70,7 +72,7 @@ app.get('/brains/:brainName/history', async (context: Context) => {
 
   // Get the monitor singleton instance
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
-  const monitorStub = context.env.MONITOR_DO.get(monitorId) as MonitorDO;
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
 
   const runs = await monitorStub.history(brainName, limit);
   return context.json({ runs });
@@ -382,9 +384,19 @@ app.post('/brains/schedules', async (context: Context) => {
       );
     }
 
+    // Validate cron expression before calling DO
+    try {
+      parseCronExpression(cronExpression);
+    } catch {
+      return context.json(
+        { error: `Invalid cron expression: ${cronExpression}` },
+        400
+      );
+    }
+
     // Get the schedule singleton instance
     const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
-    const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId) as ScheduleDO;
+    const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId);
 
     const schedule = await scheduleStub.createSchedule(
       brainName,
@@ -401,7 +413,7 @@ app.post('/brains/schedules', async (context: Context) => {
 // List all schedules
 app.get('/brains/schedules', async (context: Context) => {
   const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
-  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId) as ScheduleDO;
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId);
 
   const result = await scheduleStub.listSchedules();
   return context.json(result);
@@ -413,7 +425,7 @@ app.get('/brains/schedules/runs', async (context: Context) => {
   const limit = Number(context.req.query('limit') || '100');
 
   const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
-  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId) as ScheduleDO;
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
   const result = await scheduleStub.getScheduledRuns(scheduleIdParam, limit);
   return context.json(result);
@@ -424,7 +436,7 @@ app.get('/brains/schedules/:scheduleId', async (context: Context) => {
   const scheduleIdParam = context.req.param('scheduleId');
 
   const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
-  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId) as ScheduleDO;
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
   const schedule = await scheduleStub.getSchedule(scheduleIdParam);
 
@@ -440,7 +452,7 @@ app.delete('/brains/schedules/:scheduleId', async (context: Context) => {
   const scheduleIdParam = context.req.param('scheduleId');
 
   const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
-  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId) as ScheduleDO;
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
   const deleted = await scheduleStub.deleteSchedule(scheduleIdParam);
 

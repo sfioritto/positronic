@@ -33,6 +33,9 @@
       }
     ]
   },
+  "vars": {
+    "IS_TEST": "true"
+  },
   "r2_buckets": [
     {
       "binding": "TEST_RESOURCES_BUCKET",
