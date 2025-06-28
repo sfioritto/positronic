@@ -29,6 +29,7 @@
     "@positronic/template-new-project": "^0.0.1",
     "aws4fetch": "^1.0.18",
     "caz": "^2.0.0",
+    "cron-schedule": "^5.0.4",
     "dotenv": "^16.0.3",
     "hono": "^4.2.3",
     "uuid": "^9.0.1"
