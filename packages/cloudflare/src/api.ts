@@ -427,7 +427,7 @@ app.get('/brains/schedules/runs', async (context: Context) => {
   const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
   const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
-  const result = await scheduleStub.getScheduledRuns(scheduleIdParam, limit);
+  const result = await scheduleStub.getAllRuns(scheduleIdParam, limit);
   return context.json(result);
 });
 

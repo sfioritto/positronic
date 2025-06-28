@@ -175,7 +175,7 @@ export class ScheduleDO extends DurableObject<Env> {
     };
   }
 
-  async getScheduledRuns(
+  async getAllRuns(
     scheduleId?: string,
     limit: number = 100
   ): Promise<{ runs: ScheduledRun[]; count: number }> {
