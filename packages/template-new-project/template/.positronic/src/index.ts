@@ -4,6 +4,7 @@ import {
   setBrainRunner,
   BrainRunnerDO,
   MonitorDO,
+  ScheduleDO,
   PositronicManifest,
 } from "@positronic/cloudflare";
 // Import the generated manifest - NOTE the .js extension for runtime compatibility
@@ -22,6 +23,7 @@ setBrainRunner(runner);
 interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
+  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   RESOURCES_BUCKET: R2Bucket;
 }
 
@@ -30,4 +32,4 @@ export default {
   fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { BrainRunnerDO, MonitorDO };
+export { BrainRunnerDO, MonitorDO, ScheduleDO };

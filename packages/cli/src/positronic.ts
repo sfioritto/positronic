@@ -10,6 +10,7 @@ import { ServerCommand } from './commands/server.js';
 import { PromptCommand } from './commands/prompt.js';
 import { BrainCommand } from './commands/brain.js';
 import { ResourcesCommand } from './commands/resources.js';
+import { ScheduleCommand } from './commands/schedule.js';
 import type { PositronicDevServer } from '@positronic/spec';
 
 function findProjectRootSync(startDir: string): string | null {
@@ -41,6 +42,7 @@ const serverCommand = new ServerCommand();
 const brainCommand = new BrainCommand();
 const promptCommand = new PromptCommand(isLocalDevMode, projectRootPath);
 const resourcesCommand = new ResourcesCommand(isLocalDevMode, projectRootPath);
+const scheduleCommand = new ScheduleCommand();
 
 // Main CLI definition
 let cli = yargs(hideBin(process.argv))
@@ -581,13 +583,7 @@ cli = cli.command(
               'Run weekly-report every Monday at 9am'
             );
         },
-        (argv) => {
-          console.log(
-            'TODO: Create schedule',
-            argv.brainName,
-            argv.cronExpression
-          );
-        }
+        (argv) => scheduleCommand.create(argv as any)
       )
       .command(
         'list',
@@ -605,9 +601,7 @@ cli = cli.command(
               'List schedules for a specific brain'
             );
         },
-        (argv) => {
-          console.log('TODO: List schedules', argv.brain);
-        }
+        (argv) => scheduleCommand.list(argv as any)
       )
       .command(
         'delete <schedule-id>',
@@ -634,9 +628,7 @@ cli = cli.command(
               'Delete without confirmation'
             );
         },
-        (argv) => {
-          console.log('TODO: Delete schedule', argv.scheduleId, argv.force);
-        }
+        (argv) => scheduleCommand.delete(argv as any)
       )
       .command(
         'runs',
@@ -669,18 +661,11 @@ cli = cli.command(
               'List last 50 failed scheduled runs'
             );
         },
-        (argv) => {
-          console.log(
-            'TODO: List scheduled runs',
-            argv.scheduleId,
-            argv.limit,
-            argv.status
-          );
-        }
+        (argv) => scheduleCommand.runs(argv as any)
       )
       .demandCommand(
         1,
-        'You need to specify a schedule command (create, list, show, delete, runs)'
+        'You need to specify a schedule command (create, list, delete, runs)'
       );
 
     return yargsSchedule;
