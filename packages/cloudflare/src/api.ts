@@ -431,22 +431,6 @@ app.get('/brains/schedules/runs', async (context: Context) => {
   return context.json(result);
 });
 
-// Get a specific schedule
-app.get('/brains/schedules/:scheduleId', async (context: Context) => {
-  const scheduleIdParam = context.req.param('scheduleId');
-
-  const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
-  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
-
-  const schedule = await scheduleStub.getSchedule(scheduleIdParam);
-
-  if (!schedule) {
-    return context.json({ error: 'Schedule not found' }, 404);
-  }
-
-  return context.json(schedule);
-});
-
 // Delete a schedule
 app.delete('/brains/schedules/:scheduleId', async (context: Context) => {
   const scheduleIdParam = context.req.param('scheduleId');

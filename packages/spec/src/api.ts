@@ -654,58 +654,6 @@ export const schedules = {
   },
 
   /**
-   * Test GET /brains/schedules/:scheduleId - Get a specific schedule
-   */
-  async get(fetch: Fetch, scheduleId: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/brains/schedules/${scheduleId}`,
-        {
-          method: 'GET',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(
-          `GET /brains/schedules/${scheduleId} returned ${response.status}`
-        );
-        return false;
-      }
-
-      const data = await response.json();
-
-      // Validate schedule structure
-      if (
-        !data.id ||
-        !data.brainName ||
-        !data.cronExpression ||
-        typeof data.enabled !== 'boolean' ||
-        typeof data.createdAt !== 'number'
-      ) {
-        console.error(
-          `Schedule missing required fields: ${JSON.stringify(data)}`
-        );
-        return false;
-      }
-
-      if (data.id !== scheduleId) {
-        console.error(`Expected id to be '${scheduleId}', got ${data.id}`);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        `Failed to test GET /brains/schedules/${scheduleId}:`,
-        error
-      );
-      return false;
-    }
-  },
-
-  /**
    * Test DELETE /brains/schedules/:scheduleId - Delete a schedule
    */
   async delete(fetch: Fetch, scheduleId: string): Promise<boolean> {

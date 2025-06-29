@@ -813,49 +813,6 @@ describe('Hono API Tests', () => {
       expect(responseBody.count).toBeGreaterThanOrEqual(3);
     });
 
-    it('GET /brains/schedules/:scheduleId gets a specific schedule', async () => {
-      const testEnv = env as TestEnv;
-
-      // Create a schedule
-      const createRequest = new Request('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brainName: 'test-brain',
-          cronExpression: '*/30 * * * *',
-        }),
-      });
-      const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(
-        createRequest,
-        testEnv,
-        createContext
-      );
-      const { id } = await createResponse.json<{ id: string }>();
-      await waitOnExecutionContext(createContext);
-
-      // Get the schedule
-      const getRequest = new Request(
-        `http://example.com/brains/schedules/${id}`
-      );
-      const getContext = createExecutionContext();
-      const getResponse = await worker.fetch(getRequest, testEnv, getContext);
-      await waitOnExecutionContext(getContext);
-
-      expect(getResponse.status).toBe(200);
-      const schedule = await getResponse.json<{
-        id: string;
-        brainName: string;
-        cronExpression: string;
-        enabled: boolean;
-        createdAt: number;
-      }>();
-
-      expect(schedule.id).toBe(id);
-      expect(schedule.brainName).toBe('test-brain');
-      expect(schedule.cronExpression).toBe('*/30 * * * *');
-    });
-
     it('DELETE /brains/schedules/:scheduleId deletes a schedule', async () => {
       const testEnv = env as TestEnv;
 
