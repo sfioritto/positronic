@@ -67,20 +67,20 @@ export class ScheduleDO extends DurableObject<Env> {
       ON scheduled_runs(schedule_id, ran_at DESC);
     `);
 
-    // Only start the alarm cycle if not in test environment
-    if (env.IS_TEST !== 'true') {
-      // Alarms persist across DO evictions, so check if one already exists
-      this.ctx.storage.getAlarm().then((existingAlarm) => {
-        if (!existingAlarm) {
-          console.log('[ScheduleDO] Starting alarm cycle');
-          this.ctx.storage.setAlarm(Date.now() + 60 * 1000);
+    // Use blockConcurrencyWhile to ensure alarm setup completes before DO can be evicted
+    this.ctx.blockConcurrencyWhile(async () => {
+      // Only start the alarm cycle if not in test environment
+      if (env.IS_TEST !== 'true') {
+        // Always start fresh - cancel any existing alarm
+        const existingAlarm = await this.ctx.storage.getAlarm();
+        if (existingAlarm) {
+          await this.ctx.storage.deleteAlarm();
         }
-      });
-    } else {
-      console.log(
-        '[ScheduleDO] Test environment detected, skipping alarm cycle'
-      );
-    }
+
+        // Run the alarm handler which will check for overdue schedules and set the next alarm
+        await this.alarm();
+      }
+    });
   }
 
   async createSchedule(
@@ -230,6 +230,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
       // Get all enabled schedules that are due
       const now = Date.now();
+
       const dueSchedules = this.storage
         .exec(
           `SELECT id, brain_name, cron_expression
@@ -278,6 +279,7 @@ export class ScheduleDO extends DurableObject<Env> {
         // Calculate and update next run time
         const cron = parseCronExpression(cronExpression);
         const nextRunAt = this.calculateNextRunTime(cron, now);
+
         this.storage.exec(
           `UPDATE schedules SET next_run_at = ? WHERE id = ?`,
           nextRunAt,
@@ -349,11 +351,6 @@ export class ScheduleDO extends DurableObject<Env> {
       completedAt,
       error,
       event.brainRunId
-    );
-
-    console.log(
-      `[ScheduleDO] Scheduled run ${event.brainRunId} ${status}`,
-      error ? `with error: ${error}` : ''
     );
   }
 
