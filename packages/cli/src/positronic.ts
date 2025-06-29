@@ -555,7 +555,10 @@ cli = cli.command(
   (yargsSchedule) => {
     yargsSchedule
       .command(
-        'create <brain-name> <cron-expression>',
+        [
+          'create <brain-name> <cron-expression>',
+          'c <brain-name> <cron-expression>',
+        ],
         'Create a new schedule for a brain\n',
         (yargsCreate) => {
           return yargsCreate
@@ -575,6 +578,10 @@ cli = cli.command(
               'Run my-brain daily at 3am'
             )
             .example(
+              '$0 schedule c my-brain "0 3 * * *"',
+              'Run my-brain daily at 3am (shorthand)'
+            )
+            .example(
               '$0 schedule create data-sync "*/30 * * * *"',
               'Run data-sync every 30 minutes'
             )
@@ -586,7 +593,7 @@ cli = cli.command(
         (argv) => scheduleCommand.create(argv as any)
       )
       .command(
-        'list',
+        ['list', 'l'],
         'List all scheduled brain runs\n',
         (yargsList) => {
           return yargsList
@@ -596,6 +603,7 @@ cli = cli.command(
               alias: 'b',
             })
             .example('$0 schedule list', 'List all schedules')
+            .example('$0 schedule l', 'List all schedules (shorthand)')
             .example(
               '$0 schedule list --brain my-brain',
               'List schedules for a specific brain'
@@ -604,7 +612,7 @@ cli = cli.command(
         (argv) => scheduleCommand.list(argv as any)
       )
       .command(
-        'delete <schedule-id>',
+        ['delete <schedule-id>', 'd <schedule-id>'],
         'Delete a schedule\n',
         (yargsDelete) => {
           return yargsDelete
@@ -622,6 +630,10 @@ cli = cli.command(
             .example(
               '$0 schedule delete abc123',
               'Delete schedule with ID abc123'
+            )
+            .example(
+              '$0 schedule d abc123',
+              'Delete schedule with ID abc123 (shorthand)'
             )
             .example(
               '$0 schedule delete abc123 --force',
@@ -665,7 +677,7 @@ cli = cli.command(
       )
       .demandCommand(
         1,
-        'You need to specify a schedule command (create, list, delete, runs)'
+        'You need to specify a schedule command (create, list/l, delete/d, runs)'
       );
 
     return yargsSchedule;
