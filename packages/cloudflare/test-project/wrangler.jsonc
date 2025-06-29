@@ -34,7 +34,8 @@
     ]
   },
   "vars": {
-    "IS_TEST": "true"
+    "IS_TEST": "true",
+    "NODE_ENV": "development"
   },
   "r2_buckets": [
     {

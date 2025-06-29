@@ -14,7 +14,6 @@ type Bindings = {
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   RESOURCES_BUCKET: R2Bucket;
   NODE_ENV?: string;
-  IS_TEST?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
   R2_ACCOUNT_ID?: string;

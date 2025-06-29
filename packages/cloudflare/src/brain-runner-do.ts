@@ -25,7 +25,6 @@ export interface Env {
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   RESOURCES_BUCKET: R2Bucket;
-  IS_TEST?: string;
 }
 
 class EventStreamAdapter implements Adapter {

@@ -7,6 +7,7 @@ import type { BrainRunnerDO } from './brain-runner-do.js';
 export interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   IS_TEST?: string;
+  NODE_ENV?: string;
 }
 
 interface Schedule {
@@ -27,6 +28,8 @@ interface ScheduledRun {
   completedAt?: number;
   error?: string;
 }
+
+const ALARM_INTERVAL = 60 * 1000;
 
 export class ScheduleDO extends DurableObject<Env> {
   private readonly storage: SqlStorage;
@@ -67,20 +70,10 @@ export class ScheduleDO extends DurableObject<Env> {
       ON scheduled_runs(schedule_id, ran_at DESC);
     `);
 
-    // Use blockConcurrencyWhile to ensure alarm setup completes before DO can be evicted
-    this.ctx.blockConcurrencyWhile(async () => {
-      // Only start the alarm cycle if not in test environment
-      if (env.IS_TEST !== 'true') {
-        // Always start fresh - cancel any existing alarm
-        const existingAlarm = await this.ctx.storage.getAlarm();
-        if (existingAlarm) {
-          await this.ctx.storage.deleteAlarm();
-        }
-
-        // Run the alarm handler which will check for overdue schedules and set the next alarm
-        await this.alarm();
-      }
-    });
+    if (env.NODE_ENV === 'development') {
+      console.log('[ScheduleDO] Running in development mode');
+      this.alarm();
+    }
   }
 
   async createSchedule(
@@ -89,7 +82,12 @@ export class ScheduleDO extends DurableObject<Env> {
   ): Promise<Schedule> {
     const id = uuidv4();
     const createdAt = Date.now();
-
+    if (this.env.IS_TEST !== 'true') {
+      const alarm = await this.ctx.storage.getAlarm();
+      if (!alarm) {
+        await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL);
+      }
+    }
     // Note: Cron expression is validated at the API level before calling this method
     // Calculate next run time
     const cron = parseCronExpression(cronExpression);
@@ -292,7 +290,7 @@ export class ScheduleDO extends DurableObject<Env> {
       // The finally block ensures this happens even if there's an error above
       // Skip in test environment to avoid isolated storage issues
       if (this.env.IS_TEST !== 'true') {
-        await this.ctx.storage.setAlarm(Date.now() + 60 * 1000);
+        await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL);
       }
     }
   }
@@ -302,7 +300,9 @@ export class ScheduleDO extends DurableObject<Env> {
     const namespace = this.env.BRAIN_RUNNER_DO;
     const doId = namespace.idFromName(brainRunId);
     const stub = namespace.get(doId);
-
+    console.log(
+      `[ScheduleDO] Triggering brain run ${brainName} with id ${brainRunId}`
+    );
     await stub.start(brainName, brainRunId);
 
     return brainRunId;
