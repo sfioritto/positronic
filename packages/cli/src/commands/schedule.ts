@@ -32,29 +32,35 @@ export class ScheduleCommand {
     brainName,
     cronExpression,
   }: ArgumentsCamelCase<ScheduleCreateArgs>) {
-    render(
+    const { waitUntilExit } = render(
       React.createElement(ScheduleCreate, {
         brainName,
         cronExpression,
       })
     );
+
+    await waitUntilExit();
   }
 
   async list({ brain }: ArgumentsCamelCase<ScheduleListArgs>) {
-    render(
+    const { waitUntilExit } = render(
       React.createElement(ScheduleList, {
         brainFilter: brain,
       })
     );
+
+    await waitUntilExit();
   }
 
   async delete({ scheduleId, force }: ArgumentsCamelCase<ScheduleDeleteArgs>) {
-    render(
+    const { waitUntilExit } = render(
       React.createElement(ScheduleDelete, {
         scheduleId,
         force,
       })
     );
+
+    await waitUntilExit();
   }
 
   async runs({

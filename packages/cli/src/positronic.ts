@@ -553,6 +553,75 @@ cli = cli.command(
   'schedule',
   'Schedule brain runs to execute automatically on a cron schedule\n',
   (yargsSchedule) => {
+    // Add top-level options for list and delete
+    yargsSchedule
+      .option('list', {
+        describe: 'List all scheduled brain runs',
+        type: 'boolean',
+        alias: 'l',
+      })
+      .option('delete', {
+        describe: 'Delete a schedule by ID',
+        type: 'string',
+        alias: 'd',
+      })
+      .option('brain', {
+        describe: 'Filter schedules by brain name (used with -l)',
+        type: 'string',
+        alias: 'b',
+      })
+      .option('force', {
+        describe: 'Skip confirmation prompt (used with -d)',
+        type: 'boolean',
+        alias: 'f',
+        default: false,
+      })
+      .example('$0 schedule -l', 'List all schedules')
+      .example(
+        '$0 schedule -l --brain my-brain',
+        'List schedules for a specific brain'
+      )
+      .example('$0 schedule -d abc123', 'Delete schedule with ID abc123')
+      .example('$0 schedule -d abc123 --force', 'Delete without confirmation')
+      .check((argv) => {
+        // Count how many operations are specified
+        const operations = [
+          argv.list,
+          argv.delete,
+          argv._.includes('create') || argv._.includes('c'),
+          argv._.includes('runs'),
+        ].filter(Boolean).length;
+
+        if (operations === 0) {
+          throw new Error(
+            'You must specify an operation: create, -l (list), -d (delete), or runs'
+          );
+        }
+        if (operations > 1) {
+          throw new Error('You can only specify one operation at a time');
+        }
+        return true;
+      });
+
+    // Handle top-level list/delete options
+    yargsSchedule.middleware(async (argv) => {
+      // If -l flag is used, call list command
+      if (argv.list) {
+        await scheduleCommand.list({ brain: argv.brain } as any);
+        // Exit after completion to prevent further command processing
+        process.exit(0);
+      }
+      // If -d flag is used, call delete command
+      if (argv.delete) {
+        await scheduleCommand.delete({
+          scheduleId: argv.delete as string,
+          force: argv.force,
+        } as any);
+        // Exit after completion to prevent further command processing
+        process.exit(0);
+      }
+    }, true);
+
     yargsSchedule
       .command(
         [
@@ -593,56 +662,6 @@ cli = cli.command(
         (argv) => scheduleCommand.create(argv as any)
       )
       .command(
-        ['list', 'l'],
-        'List all scheduled brain runs\n',
-        (yargsList) => {
-          return yargsList
-            .option('brain', {
-              describe: 'Filter schedules by brain name',
-              type: 'string',
-              alias: 'b',
-            })
-            .example('$0 schedule list', 'List all schedules')
-            .example('$0 schedule l', 'List all schedules (shorthand)')
-            .example(
-              '$0 schedule list --brain my-brain',
-              'List schedules for a specific brain'
-            );
-        },
-        (argv) => scheduleCommand.list(argv as any)
-      )
-      .command(
-        ['delete <schedule-id>', 'd <schedule-id>'],
-        'Delete a schedule\n',
-        (yargsDelete) => {
-          return yargsDelete
-            .positional('schedule-id', {
-              describe: 'ID of the schedule to delete',
-              type: 'string',
-              demandOption: true,
-            })
-            .option('force', {
-              describe: 'Skip confirmation prompt',
-              type: 'boolean',
-              alias: 'f',
-              default: false,
-            })
-            .example(
-              '$0 schedule delete abc123',
-              'Delete schedule with ID abc123'
-            )
-            .example(
-              '$0 schedule d abc123',
-              'Delete schedule with ID abc123 (shorthand)'
-            )
-            .example(
-              '$0 schedule delete abc123 --force',
-              'Delete without confirmation'
-            );
-        },
-        (argv) => scheduleCommand.delete(argv as any)
-      )
-      .command(
         'runs',
         'List scheduled run history\n',
         (yargsRuns) => {
@@ -655,7 +674,7 @@ cli = cli.command(
             .option('limit', {
               describe: 'Maximum number of runs to show',
               type: 'number',
-              alias: 'l',
+              alias: 'n',
               default: 20,
             })
             .option('status', {
@@ -674,10 +693,6 @@ cli = cli.command(
             );
         },
         (argv) => scheduleCommand.runs(argv as any)
-      )
-      .demandCommand(
-        1,
-        'You need to specify a schedule command (create, list/l, delete/d, runs)'
       );
 
     return yargsSchedule;
