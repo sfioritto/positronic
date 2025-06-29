@@ -16,7 +16,7 @@ export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
   const { exit } = useApp();
   const isDeleting = useRef(false);
 
-  const { execute: deleteSchedule, loading, error } = useApiDelete();
+  const { execute: deleteSchedule, loading, error } = useApiDelete('schedule');
 
   useEffect(() => {
     if (stdin && !confirmed && !deleted) {
@@ -77,12 +77,7 @@ export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
         </Box>
       );
     }
-    // Override generic error message for schedules
-    const scheduleError = {
-      ...error,
-      message: error.message.replace('Error deleting resource', 'Error deleting schedule'),
-    };
-    return <ErrorComponent error={scheduleError} />;
+    return <ErrorComponent error={error} />;
   }
 
   if (loading) {

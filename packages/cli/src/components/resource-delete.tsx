@@ -36,7 +36,7 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, isL
   const {
     data: resourcesData, loading: listLoading, error: listError,
   } = useApiGet<ResourcesResponse>('/resources');
-  const { execute: deleteResource, loading, error } = useApiDelete();
+  const { execute: deleteResource, loading, error } = useApiDelete('resource');
 
   // Check if the resource is local
   useEffect(() => {

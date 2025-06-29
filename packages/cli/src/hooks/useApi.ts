@@ -121,7 +121,7 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
   return { data, loading, error, execute };
 }
 
-export function useApiDelete() {
+export function useApiDelete(resourceType: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{
     title: string;
@@ -129,52 +129,55 @@ export function useApiDelete() {
     details?: string;
   } | null>(null);
 
-  const execute = useCallback(async (endpoint: string, options?: any) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const execute = useCallback(
+    async (endpoint: string, options?: any) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const response = await apiClient.fetch(endpoint, {
-        method: 'DELETE',
-        ...options,
-      });
+        const response = await apiClient.fetch(endpoint, {
+          method: 'DELETE',
+          ...options,
+        });
 
-      if (response.status === 204 || response.status === 200) {
-        return true;
-      } else {
-        const errorText = await response.text();
+        if (response.status === 204 || response.status === 200) {
+          return true;
+        } else {
+          const errorText = await response.text();
+          const errorObj = {
+            title: 'Server Error',
+            message: `Error deleting ${resourceType}: ${response.status} ${response.statusText}`,
+            details: `Server response: ${errorText}`,
+          };
+          setError(errorObj);
+          throw errorObj;
+        }
+      } catch (err: any) {
+        // If it's already our error object, don't wrap it again
+        if (err.title && err.message) {
+          setError(err);
+          throw err;
+        }
+
+        let errorDetails = err.message;
+        if (err.code === 'ECONNREFUSED') {
+          errorDetails =
+            'Connection refused. The server might not be running or is listening on a different port.';
+        }
+
         const errorObj = {
-          title: 'Server Error',
-          message: `Error deleting resource: ${response.status} ${response.statusText}`,
-          details: `Server response: ${errorText}`,
+          title: 'Connection Error',
+          message: 'Error connecting to the local development server.',
+          details: `Please ensure the server is running ('positronic server' or 'px s'). ${errorDetails}`,
         };
         setError(errorObj);
         throw errorObj;
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      // If it's already our error object, don't wrap it again
-      if (err.title && err.message) {
-        setError(err);
-        throw err;
-      }
-
-      let errorDetails = err.message;
-      if (err.code === 'ECONNREFUSED') {
-        errorDetails =
-          'Connection refused. The server might not be running or is listening on a different port.';
-      }
-
-      const errorObj = {
-        title: 'Connection Error',
-        message: 'Error connecting to the local development server.',
-        details: `Please ensure the server is running ('positronic server' or 'px s'). ${errorDetails}`,
-      };
-      setError(errorObj);
-      throw errorObj;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [resourceType]
+  );
 
   return { loading, error, execute };
 }

@@ -23,7 +23,7 @@ export const ResourceClear = () => {
   const { exit } = useApp();
 
   const { data: resourcesData, loading: listLoading, error: listError } = useApiGet<ResourcesResponse>('/resources');
-  const { execute: deleteResources, loading: deleteLoading, error: deleteError } = useApiDelete();
+  const { execute: deleteResources, loading: deleteLoading, error: deleteError } = useApiDelete('resources');
 
   useEffect(() => {
     if (stdin && !confirmed && !deleted && resourcesData && resourcesData.count > 0) {
