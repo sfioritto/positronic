@@ -115,7 +115,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
     status: { header: 'Status', width: 10 },
     nextRun: { header: 'Next Run', width: 12 },
     created: { header: 'Created', width: 20 },
-    id: { header: 'ID', width: 12 },
+    id: { header: 'ID', width: 36 },
   };
 
   // Calculate total width for separator
@@ -176,7 +176,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
               <Text>  </Text>
               <Text dimColor>{padRight(truncate(formatDate(schedule.createdAt), columns.created.width), columns.created.width)}</Text>
               <Text>  </Text>
-              <Text dimColor>{padRight(truncate(schedule.id, columns.id.width), columns.id.width)}</Text>
+              <Text dimColor>{padRight(schedule.id, columns.id.width)}</Text>
             </Box>
           );
         })}
