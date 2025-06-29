@@ -546,6 +546,147 @@ cli = cli.command(
   }
 );
 
+// --- Schedule Management Commands ---
+cli = cli.command(
+  'schedule',
+  'Schedule brain runs to execute automatically on a cron schedule\n',
+  (yargsSchedule) => {
+    yargsSchedule
+      .command(
+        'create <brain-name> <cron-expression>',
+        'Create a new schedule for a brain\n',
+        (yargsCreate) => {
+          return yargsCreate
+            .positional('brain-name', {
+              describe: 'Name of the brain to schedule',
+              type: 'string',
+              demandOption: true,
+            })
+            .positional('cron-expression', {
+              describe:
+                'Cron expression for the schedule (e.g., "0 3 * * *" for daily at 3am)',
+              type: 'string',
+              demandOption: true,
+            })
+            .example(
+              '$0 schedule create my-brain "0 3 * * *"',
+              'Run my-brain daily at 3am'
+            )
+            .example(
+              '$0 schedule create data-sync "*/30 * * * *"',
+              'Run data-sync every 30 minutes'
+            )
+            .example(
+              '$0 schedule create weekly-report "0 9 * * 1"',
+              'Run weekly-report every Monday at 9am'
+            );
+        },
+        (argv) => {
+          console.log(
+            'TODO: Create schedule',
+            argv.brainName,
+            argv.cronExpression
+          );
+        }
+      )
+      .command(
+        'list',
+        'List all scheduled brain runs\n',
+        (yargsList) => {
+          return yargsList
+            .option('brain', {
+              describe: 'Filter schedules by brain name',
+              type: 'string',
+              alias: 'b',
+            })
+            .example('$0 schedule list', 'List all schedules')
+            .example(
+              '$0 schedule list --brain my-brain',
+              'List schedules for a specific brain'
+            );
+        },
+        (argv) => {
+          console.log('TODO: List schedules', argv.brain);
+        }
+      )
+      .command(
+        'delete <schedule-id>',
+        'Delete a schedule\n',
+        (yargsDelete) => {
+          return yargsDelete
+            .positional('schedule-id', {
+              describe: 'ID of the schedule to delete',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('force', {
+              describe: 'Skip confirmation prompt',
+              type: 'boolean',
+              alias: 'f',
+              default: false,
+            })
+            .example(
+              '$0 schedule delete abc123',
+              'Delete schedule with ID abc123'
+            )
+            .example(
+              '$0 schedule delete abc123 --force',
+              'Delete without confirmation'
+            );
+        },
+        (argv) => {
+          console.log('TODO: Delete schedule', argv.scheduleId, argv.force);
+        }
+      )
+      .command(
+        'runs',
+        'List scheduled run history\n',
+        (yargsRuns) => {
+          return yargsRuns
+            .option('schedule-id', {
+              describe: 'Filter runs by schedule ID',
+              type: 'string',
+              alias: 's',
+            })
+            .option('limit', {
+              describe: 'Maximum number of runs to show',
+              type: 'number',
+              alias: 'l',
+              default: 20,
+            })
+            .option('status', {
+              describe: 'Filter by run status',
+              type: 'string',
+              choices: ['triggered', 'failed', 'complete'],
+            })
+            .example('$0 schedule runs', 'List recent scheduled runs')
+            .example(
+              '$0 schedule runs --schedule-id abc123',
+              'List runs for a specific schedule'
+            )
+            .example(
+              '$0 schedule runs --status failed --limit 50',
+              'List last 50 failed scheduled runs'
+            );
+        },
+        (argv) => {
+          console.log(
+            'TODO: List scheduled runs',
+            argv.scheduleId,
+            argv.limit,
+            argv.status
+          );
+        }
+      )
+      .demandCommand(
+        1,
+        'You need to specify a schedule command (create, list, show, delete, runs)'
+      );
+
+    return yargsSchedule;
+  }
+);
+
 cli = cli.epilogue('For more information, visit https://positronic.sh');
 
 // Parse the arguments
