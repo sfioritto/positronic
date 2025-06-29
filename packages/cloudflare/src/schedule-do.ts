@@ -69,11 +69,6 @@ export class ScheduleDO extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS idx_runs_schedule
       ON scheduled_runs(schedule_id, ran_at DESC);
     `);
-
-    if (env.NODE_ENV === 'development') {
-      console.log('[ScheduleDO] Running in development mode');
-      this.alarm();
-    }
   }
 
   async createSchedule(
@@ -151,6 +146,17 @@ export class ScheduleDO extends DurableObject<Env> {
   }
 
   async listSchedules(): Promise<{ schedules: Schedule[]; count: number }> {
+    if (this.env.NODE_ENV === 'development') {
+      console.log('[ScheduleDO] Checking alarm');
+      const alarm = await this.ctx.storage.getAlarm();
+      if (alarm) {
+        console.log('[ScheduleDO] Deleting alarm');
+        await this.ctx.storage.deleteAlarm();
+        console.log('[ScheduleDO] Running alarm handler');
+        await this.alarm();
+      }
+    }
+
     const schedules = this.storage
       .exec(
         `SELECT id, brain_name, cron_expression, enabled, created_at, next_run_at
