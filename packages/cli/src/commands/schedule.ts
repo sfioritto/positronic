@@ -3,6 +3,7 @@ import React from 'react';
 import { render } from 'ink';
 import { ScheduleCreate } from '../components/schedule-create.js';
 import { ScheduleList } from '../components/schedule-list.js';
+import { ScheduleDelete } from '../components/schedule-delete.js';
 
 interface ScheduleCreateArgs {
   brainName: string;
@@ -48,8 +49,12 @@ export class ScheduleCommand {
   }
 
   async delete({ scheduleId, force }: ArgumentsCamelCase<ScheduleDeleteArgs>) {
-    // TODO: Implement delete
-    console.log('TODO: Delete schedule', scheduleId, force);
+    render(
+      React.createElement(ScheduleDelete, {
+        scheduleId,
+        force,
+      })
+    );
   }
 
   async runs({

@@ -150,7 +150,7 @@ const ScheduleItem = ({ schedule }: ScheduleItemProps) => {
           <Text>
             <Text dimColor>Next run: </Text>
             {nextRunDate.toLocaleString()}
-            <Text dimColor> (in {formatRelativeTime(nextRunDate)})</Text>
+            <Text dimColor> {nextRunDate.getTime() < Date.now() ? '(overdue)' : `(in ${formatRelativeTime(nextRunDate)})`}</Text>
           </Text>
         )}
       </Box>
