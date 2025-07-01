@@ -174,6 +174,66 @@ if (isLocalDevMode) {
     },
     (argv) => serverCommand.handle(argv, projectRootPath)
   );
+
+  // Add deploy command (only in local dev mode)
+  cli = cli.command(
+    'deploy',
+    'Deploy the project to production',
+    () => {},
+    async () => {
+      try {
+        // Read backend configuration
+        const configPath = path.join(
+          projectRootPath!,
+          'positronic.config.json'
+        );
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+        if (!config.backend) {
+          throw new Error(
+            'No backend configuration found in positronic.config.json'
+          );
+        }
+
+        // Load the backend module
+        let backendModule: any;
+        const backendPackage = config.backend.package;
+
+        if (backendPackage.startsWith('file:')) {
+          const packagePath = backendPackage.replace('file:', '');
+          const localModulePath = path.join(
+            packagePath,
+            'dist',
+            'src',
+            'node-index.js'
+          );
+          backendModule = await import(localModulePath);
+        } else {
+          backendModule = await import(backendPackage);
+        }
+
+        const { DevServer } = backendModule;
+        const devServer = new DevServer() as PositronicDevServer;
+
+        // Check if backend supports deployment
+        if (!devServer.deploy) {
+          console.error(
+            `The ${config.backend.type} backend does not support deployment yet.`
+          );
+          process.exit(1);
+        }
+
+        // Deploy
+        await devServer.deploy(projectRootPath!);
+      } catch (error) {
+        console.error(
+          'Deployment failed:',
+          error instanceof Error ? error.message : String(error)
+        );
+        process.exit(1);
+      }
+    }
+  );
 }
 
 // --- List Brains Command ---

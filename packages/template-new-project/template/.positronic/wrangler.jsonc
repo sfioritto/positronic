@@ -25,7 +25,16 @@
     }
   ],
   "vars": {
-    "NODE_ENV": "development",
     "R2_BUCKET_NAME": "<%= projectName %>"
+  },
+  "env": {
+    "production": {
+      "name": "positronic-<%= projectName %>",
+      "workers_dev": false,
+      "vars": {
+        "NODE_ENV": "production",
+        "R2_BUCKET_NAME": "<%= projectName %>"
+      }
+    }
   }
 }

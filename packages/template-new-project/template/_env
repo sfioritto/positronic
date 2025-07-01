@@ -1,3 +1,6 @@
+# Development Environment
+NODE_ENV=development
+
 # Cloudflare R2 Configuration
 R2_BUCKET_NAME=<%= projectName %>
 
@@ -15,3 +18,15 @@ R2_BUCKET_NAME=<%= projectName %>
 # R2_ACCESS_KEY_ID=
 # R2_SECRET_ACCESS_KEY=
 # R2_ACCOUNT_ID=
+
+# Cloudflare Deployment Configuration
+# Required for 'px deploy' command
+#
+# To get these values:
+# 1. Log in to your Cloudflare account
+# 2. Go to My Profile > API Tokens
+# 3. Create a token with "Cloudflare Workers Scripts:Edit" permission
+# 4. Copy your Account ID from the right sidebar on any Cloudflare page
+#
+# CLOUDFLARE_API_TOKEN=
+# CLOUDFLARE_ACCOUNT_ID=

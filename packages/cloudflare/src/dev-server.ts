@@ -386,4 +386,68 @@ export class CloudflareDevServer implements PositronicDevServer {
     console.log(`Brain file ${event}: ${path.relative(projectRoot, filePath)}`);
     await regenerateManifestFile(projectRoot, srcDir);
   }
+
+  async deploy(projectRoot: string): Promise<void> {
+    const serverDir = path.join(projectRoot, '.positronic');
+
+    // Ensure .positronic directory and manifest are up to date
+    await this.setup(projectRoot);
+
+    // Load environment variables from .env file
+    const envPath = path.join(projectRoot, '.env');
+
+    // Check if .env file exists
+    if (!fs.existsSync(envPath)) {
+      throw new Error(
+        'No .env file found.\n' +
+          'Please create a .env file in your project root with your Cloudflare credentials.\n' +
+          'See the template in your project for the required variables.'
+      );
+    }
+
+    const envConfig = dotenv.parse(fs.readFileSync(envPath, 'utf8'));
+
+    // Check for required Cloudflare credentials
+    if (!envConfig.CLOUDFLARE_API_TOKEN || !envConfig.CLOUDFLARE_ACCOUNT_ID) {
+      throw new Error(
+        'Missing required Cloudflare credentials.\n' +
+          'Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to your .env file.\n' +
+          'See .env file comments for instructions on obtaining these values.'
+      );
+    }
+
+    console.log('🚀 Deploying to Cloudflare Workers (production)...');
+
+    // Deploy to production using wrangler
+    return new Promise<void>((resolve, reject) => {
+      const wranglerProcess = spawn(
+        'npx',
+        ['wrangler', 'deploy', '--env', 'production'],
+        {
+          cwd: serverDir,
+          stdio: 'inherit',
+          shell: true,
+          env: {
+            ...process.env,
+            CLOUDFLARE_API_TOKEN: envConfig.CLOUDFLARE_API_TOKEN,
+            CLOUDFLARE_ACCOUNT_ID: envConfig.CLOUDFLARE_ACCOUNT_ID,
+          },
+        }
+      );
+
+      wranglerProcess.on('error', (err) => {
+        console.error('Failed to start Wrangler deploy:', err);
+        reject(err);
+      });
+
+      wranglerProcess.on('exit', (code) => {
+        if (code === 0) {
+          console.log('✅ Deployment complete!');
+          resolve();
+        } else {
+          reject(new Error(`Wrangler deploy exited with code ${code}`));
+        }
+      });
+    });
+  }
 }
