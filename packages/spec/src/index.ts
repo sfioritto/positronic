@@ -52,7 +52,7 @@ export interface PositronicDevServer {
    * @param projectRoot The root path of the Positronic project
    * @param config Deployment configuration
    */
-  deploy?(projectRoot: string, config?: any): Promise<void>;
+  deploy(projectRoot: string, config?: any): Promise<void>;
 }
 
 export { testStatus, resources, brains, schedules } from './api.js';

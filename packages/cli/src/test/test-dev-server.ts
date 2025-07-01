@@ -42,6 +42,10 @@ export class TestDevServer implements PositronicDevServer {
     this.callLog.push(call);
   }
 
+  async deploy(projectRoot: string, config?: any): Promise<void> {
+    this.logCall('deploy', [projectRoot, config]);
+  }
+
   async setup(projectRoot: string, force?: boolean): Promise<void> {
     this.logCall('setup', [projectRoot, force]);
     // For tests, we don't need to set up .positronic directory
