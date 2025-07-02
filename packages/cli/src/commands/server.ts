@@ -3,6 +3,7 @@ import { type ChildProcess } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
 import { syncResources, generateTypes, waitUntilReady } from './helpers.js';
+import { createDevServer } from './backend.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import * as fs from 'fs';
 
@@ -26,29 +27,8 @@ export class ServerCommand {
       const { TestDevServer } = await import('../test/test-dev-server.js');
       devServer = new TestDevServer();
     } else {
-      // Read the backend configuration from positronic.config.json
-      const configPath = path.join(projectRootPath, 'positronic.config.json');
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      if (!config.backend) {
-        throw new Error(
-          'No backend configuration found in positronic.config.json'
-        );
-      }
-      const backendPackage = config.backend.package;
-      if (backendPackage.startsWith('file:')) {
-        const packagePath = backendPackage.replace('file:', '');
-        const localModulePath = path.join(
-          packagePath,
-          'dist',
-          'src',
-          'node-index.js'
-        );
-        const { DevServer } = await import(localModulePath);
-        devServer = new DevServer();
-      } else {
-        const { DevServer } = await import(backendPackage);
-        devServer = new DevServer();
-      }
+      // Use shared backend loader
+      devServer = await createDevServer(projectRootPath);
     }
 
     const brainsDir = path.join(projectRootPath, 'brains');

@@ -11,6 +11,7 @@ import { PromptCommand } from './commands/prompt.js';
 import { BrainCommand } from './commands/brain.js';
 import { ResourcesCommand } from './commands/resources.js';
 import { ScheduleCommand } from './commands/schedule.js';
+import { createDevServer, loadBackendConfig } from './commands/backend.js';
 import type { PositronicDevServer } from '@positronic/spec';
 
 function findProjectRootSync(startDir: string): string | null {
@@ -182,43 +183,16 @@ if (isLocalDevMode) {
     () => {},
     async () => {
       try {
-        // Read backend configuration
-        const configPath = path.join(
-          projectRootPath!,
-          'positronic.config.json'
-        );
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-
-        if (!config.backend) {
-          throw new Error(
-            'No backend configuration found in positronic.config.json'
-          );
-        }
-
-        // Load the backend module
-        let backendModule: any;
-        const backendPackage = config.backend.package;
-
-        if (backendPackage.startsWith('file:')) {
-          const packagePath = backendPackage.replace('file:', '');
-          const localModulePath = path.join(
-            packagePath,
-            'dist',
-            'src',
-            'node-index.js'
-          );
-          backendModule = await import(localModulePath);
-        } else {
-          backendModule = await import(backendPackage);
-        }
-
-        const { DevServer } = backendModule;
-        const devServer = new DevServer() as PositronicDevServer;
+        // Create dev server using shared backend loader
+        const devServer = await createDevServer(projectRootPath!);
 
         // Check if backend supports deployment
         if (!devServer.deploy) {
+          const config = loadBackendConfig(projectRootPath!);
           console.error(
-            `The ${config.backend.type} backend does not support deployment yet.`
+            `The ${
+              config.backend!.type
+            } backend does not support deployment yet.`
           );
           process.exit(1);
         }
