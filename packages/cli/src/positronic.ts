@@ -186,17 +186,6 @@ if (isLocalDevMode) {
         // Create dev server using shared backend loader
         const devServer = await createDevServer(projectRootPath!);
 
-        // Check if backend supports deployment
-        if (!devServer.deploy) {
-          const config = loadBackendConfig(projectRootPath!);
-          console.error(
-            `The ${
-              config.backend!.type
-            } backend does not support deployment yet.`
-          );
-          process.exit(1);
-        }
-
         // Deploy
         await devServer.deploy(projectRootPath!);
       } catch (error) {
