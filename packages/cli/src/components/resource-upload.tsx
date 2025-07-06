@@ -8,8 +8,7 @@ import * as path from 'path';
 interface ResourceUploadProps {
   filePath: string;
   customKey?: string;
-  projectRootPath: string | null;
-  isLocalDevMode: boolean;
+  projectRootPath?: string;
 }
 
 interface UploadProgress {
@@ -18,7 +17,7 @@ interface UploadProgress {
   percentage: number;
 }
 
-export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDevMode }: ResourceUploadProps) => {
+export const ResourceUpload = ({ filePath, customKey, projectRootPath }: ResourceUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [complete, setComplete] = useState(false);
@@ -89,7 +88,7 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath, isLocalDe
       setComplete(true);
 
       // Generate types after successful upload if in local dev mode
-      if (isLocalDevMode && projectRootPath) {
+      if (projectRootPath) {
         try {
           await generateTypes(projectRootPath);
         } catch (typeError) {

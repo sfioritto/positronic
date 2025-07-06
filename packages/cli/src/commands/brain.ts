@@ -56,7 +56,6 @@ export class BrainCommand {
 
   async run({ name: brainName, watch }: ArgumentsCamelCase<BrainRunArgs>) {
     const apiPath = '/brains/runs';
-
     try {
       const response = await apiClient.fetch(apiPath, {
         method: 'POST',
@@ -68,6 +67,7 @@ export class BrainCommand {
 
       if (response.status === 201) {
         const result = (await response.json()) as { brainRunId: string };
+
         if (watch) {
           this.watch({
             runId: result.brainRunId,
@@ -76,7 +76,12 @@ export class BrainCommand {
           });
           await new Promise(() => {});
         } else {
-          console.log(`Run ID: ${result.brainRunId}`);
+          // Return React element instead of calling render directly
+          return React.createElement(
+            Text,
+            null,
+            `Run ID: ${result.brainRunId}`
+          );
         }
       } else {
         const errorText = await response.text();

@@ -1,7 +1,19 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import { generateProject } from './helpers.js';
 import path from 'path';
+import React from 'react';
+import { ProjectAdd } from '../components/project-add.js';
+import { ProjectList } from '../components/project-list.js';
+import { ProjectSelect } from '../components/project-select.js';
+import { ProjectShow } from '../components/project-show.js';
 
+// Re-export types from project-config-manager for backward compatibility
+export type { Project, ProjectConfig } from './project-config-manager.js';
+// Import and re-export the class
+import { ProjectConfigManager } from './project-config-manager.js';
+export { ProjectConfigManager };
+
+// Original ProjectCommand arguments
 interface AddProjectArgs {
   name: string;
   url: string;
@@ -16,26 +28,33 @@ interface CreateProjectArgs {
 }
 
 export class ProjectCommand {
-  private isLocalDevMode: boolean;
+  private projectConfig: ProjectConfigManager;
 
-  constructor(isLocalDevMode: boolean) {
-    this.isLocalDevMode = isLocalDevMode;
+  constructor() {
+    // Instantiate ProjectConfigManager with default home directory
+    this.projectConfig = new ProjectConfigManager();
   }
 
   /**
    * Handles the 'positronic project add <name> --url <url>' command.
    * Adds a project configuration to the global store.
    */
-  add({ name, url }: ArgumentsCamelCase<AddProjectArgs>) {
-    console.log('add', name, url);
+  add({ name, url }: ArgumentsCamelCase<AddProjectArgs>): React.ReactElement {
+    return React.createElement(ProjectAdd, {
+      name,
+      url,
+      projectConfig: this.projectConfig,
+    });
   }
 
   /**
    * Handles the 'positronic project list' command.
    * Lists configured remote projects (Global Mode) or shows current local project path (Local Dev Mode).
    */
-  list() {
-    console.log('list');
+  list(): React.ReactElement {
+    return React.createElement(ProjectList, {
+      projectConfig: this.projectConfig,
+    });
   }
 
   /**
@@ -43,16 +62,21 @@ export class ProjectCommand {
    * Selects the active remote project for subsequent commands.
    * Only available in Global Mode.
    */
-  select({ name }: ArgumentsCamelCase<SelectProjectArgs>) {
-    console.log('select', name);
+  select({ name }: ArgumentsCamelCase<SelectProjectArgs>): React.ReactElement {
+    return React.createElement(ProjectSelect, {
+      name,
+      projectConfig: this.projectConfig,
+    });
   }
 
   /**
    * Handles the 'positronic project show' command.
    * Shows details of the active project (remote in Global Mode, local in Local Dev Mode).
    */
-  show() {
-    console.log('show');
+  show(): React.ReactElement {
+    return React.createElement(ProjectShow, {
+      projectConfig: this.projectConfig,
+    });
   }
 
   /**

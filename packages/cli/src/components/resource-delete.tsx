@@ -21,11 +21,10 @@ interface ResourcesResponse {
 interface ResourceDeleteProps {
   resourceKey: string;
   resourcePath: string;
-  projectRootPath: string | null;
-  isLocalDevMode: boolean;
+  projectRootPath?: string;
 }
 
-export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, isLocalDevMode }: ResourceDeleteProps) => {
+export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath }: ResourceDeleteProps) => {
   const [confirmed, setConfirmed] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [input, setInput] = useState('');
@@ -90,16 +89,15 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, isL
           setDeleted(true);
 
           // Generate types after successful deletion if in local dev mode
-          if (isLocalDevMode && projectRootPath) {
+          if (projectRootPath) {
             generateTypes(projectRootPath)
-              .catch((typeError) => {
-                // Don't fail the delete if type generation fails
+              .catch((typeError) => {              // Don't fail the delete if type generation fails
                 console.error('Failed to generate types:', typeError);
               });
           }
         });
     }
-  }, [confirmed, loading, error, deleted, deleteResource, resourceKey, isLocalDevMode, projectRootPath]);
+  }, [confirmed, loading, error, deleted, deleteResource, resourceKey, projectRootPath]);
 
   if (listError) {
     return <ErrorComponent error={listError} />;

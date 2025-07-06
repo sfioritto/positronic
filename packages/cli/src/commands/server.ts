@@ -1,40 +1,17 @@
 import * as path from 'path';
-import { type ChildProcess } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
-import { syncResources, generateTypes, waitUntilReady } from './helpers.js';
-import { createDevServer } from './backend.js';
-import type { PositronicDevServer } from '@positronic/spec';
-import * as fs from 'fs';
+import { syncResources, generateTypes } from './helpers.js';
+import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 
 export class ServerCommand {
-  constructor() {}
+  constructor(private server: PositronicDevServer) {}
 
-  async handle(argv: ArgumentsCamelCase<any>, projectRootPath: string | null) {
-    if (!projectRootPath) {
-      console.error(
-        'Error: Not inside a Positronic project. Cannot start server.'
-      );
-      console.error(
-        "Navigate to your project directory or use 'positronic project new <name>' to create one."
-      );
-      process.exit(1);
-    }
+  async handle(argv: ArgumentsCamelCase<any>) {
+    const brainsDir = path.join(this.server.projectRootDir, 'brains');
+    const resourcesDir = path.join(this.server.projectRootDir, 'resources');
 
-    // Get the appropriate dev server instance
-    let devServer: PositronicDevServer;
-    if (process.env.POSITRONIC_TEST_MODE) {
-      const { TestDevServer } = await import('../test/test-dev-server.js');
-      devServer = new TestDevServer();
-    } else {
-      // Use shared backend loader
-      devServer = await createDevServer(projectRootPath);
-    }
-
-    const brainsDir = path.join(projectRootPath, 'brains');
-    const resourcesDir = path.join(projectRootPath, 'resources');
-
-    let serverProcess: ChildProcess | null = null;
+    let serverHandle: ServerHandle | null = null;
     let watcher: FSWatcher | null = null;
 
     const cleanup = async () => {
@@ -42,26 +19,9 @@ export class ServerCommand {
         await watcher.close();
         watcher = null;
       }
-      if (serverProcess && !serverProcess.killed) {
-        const killedGracefully = serverProcess.kill('SIGTERM');
-        if (killedGracefully) {
-          // Wait a short period for potential cleanup
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          if (!serverProcess.killed) {
-            // Check if it terminated
-            console.warn(
-              '- Server did not exit after SIGTERM, sending SIGKILL.'
-            );
-            serverProcess.kill('SIGKILL');
-          }
-        } else {
-          // If SIGTERM fails immediately (e.g., process doesn't exist)
-          console.warn(
-            '- Failed to send SIGTERM to server (process might have already exited). Attempting SIGKILL.'
-          );
-          serverProcess.kill('SIGKILL'); // Force kill if SIGTERM fails
-        }
-        serverProcess = null;
+      if (serverHandle && !serverHandle.killed) {
+        serverHandle.kill();
+        serverHandle = null;
         console.log('- Server process terminated.');
       }
       console.log('Cleanup complete. Exiting.');
@@ -73,12 +33,12 @@ export class ServerCommand {
 
     try {
       // Use the dev server's setup method
-      await devServer.setup(projectRootPath, argv.force);
+      await this.server.setup(argv.force);
 
       // Use the dev server's start method
-      serverProcess = await devServer.start(projectRootPath, argv.port);
+      serverHandle = await this.server.start(argv.port);
 
-      serverProcess.on('close', (code) => {
+      serverHandle.onClose((code?: number | null) => {
         if (watcher) {
           watcher.close();
           watcher = null;
@@ -86,7 +46,7 @@ export class ServerCommand {
         process.exit(code ?? 1); // Exit with server's code or 1 if null
       });
 
-      serverProcess.on('error', (err) => {
+      serverHandle.onError((err: Error) => {
         console.error('Failed to start dev server:', err);
         if (watcher) {
           watcher.close();
@@ -95,36 +55,23 @@ export class ServerCommand {
         process.exit(1);
       });
       // Wait for the server to be ready before syncing resources
-      const isReady = await waitUntilReady(argv.port, 15000);
+      const isReady = await serverHandle.waitUntilReady(15000);
 
       if (!isReady) {
         console.error(
           '⚠️  Server startup timeout: The server is taking longer than expected to initialize.'
         );
-        console.error(
-          '\nThis often happens when you have a large number of resources that need to be loaded.'
-        );
-        console.error('\nTo resolve this, try the following:');
-        console.error(
-          '  1. Run `px resources sync` in a separate terminal to sync your resources first'
-        );
-        console.error(
-          '  2. Once the sync is complete, restart the server with `px server`'
-        );
-        console.error(
-          '\nThis will pre-populate the server with your resources and speed up initialization.'
-        );
 
         // Clean up and exit
-        if (serverProcess && !serverProcess.killed) {
-          serverProcess.kill('SIGTERM');
+        if (serverHandle && !serverHandle.killed) {
+          serverHandle.kill();
         }
         process.exit(1);
       }
 
       // Initial resource sync and type generation
       try {
-        const syncResult = await syncResources(projectRootPath);
+        const syncResult = await syncResources(this.server.projectRootDir);
         if (syncResult.errorCount > 0) {
           console.log(
             `⚠️  Resource sync completed with ${syncResult.errorCount} errors:`
@@ -137,7 +84,7 @@ export class ServerCommand {
             `✅ Synced ${syncResult.uploadCount} resources (${syncResult.skipCount} up to date, ${syncResult.deleteCount} deleted)`
           );
         }
-        await generateTypes(projectRootPath);
+        await generateTypes(this.server.projectRootDir);
       } catch (error) {
         console.error(
           '❌ Error during resource synchronization:',
@@ -169,8 +116,8 @@ export class ServerCommand {
       });
 
       const handleResourceChange = async () => {
-        await syncResources(projectRootPath);
-        await generateTypes(projectRootPath);
+        await syncResources(this.server.projectRootDir);
+        await generateTypes(this.server.projectRootDir);
       };
 
       watcher
@@ -179,8 +126,8 @@ export class ServerCommand {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
-            if (devServer.watch) {
-              await devServer.watch(projectRootPath, filePath, 'add');
+            if (this.server.watch) {
+              await this.server.watch(filePath, 'add');
             }
           }
         })
@@ -189,8 +136,8 @@ export class ServerCommand {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
-            if (devServer.watch) {
-              await devServer.watch(projectRootPath, filePath, 'change');
+            if (this.server.watch) {
+              await this.server.watch(filePath, 'change');
             }
           }
         })
@@ -199,8 +146,8 @@ export class ServerCommand {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
-            if (devServer.watch) {
-              await devServer.watch(projectRootPath, filePath, 'unlink');
+            if (this.server.watch) {
+              await this.server.watch(filePath, 'unlink');
             }
           }
         })

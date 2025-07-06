@@ -1,17 +1,13 @@
+import { render } from 'ink-testing-library';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { spawn, execSync } from 'child_process';
-import type {
-  ChildProcess,
-  ExecSyncOptions,
-  SpawnOptions,
-} from 'child_process';
 import process from 'process';
 import { fileURLToPath } from 'url';
-import fetch from 'node-fetch';
-import { waitUntilReady } from './helpers.js';
-import type { MethodCall } from '../test/test-dev-server.js';
+import type { TestServerHandle } from '../test/test-dev-server.js';
+import { TestDevServer } from '../test/test-dev-server.js';
+import { buildCli } from '../cli.js';
+import type { PositronicDevServer } from '@positronic/spec';
 
 // Resolve paths relative to the workspace root
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,39 +18,20 @@ export const cliExecutable = path.join(
 );
 export const nodeExecutable = process.execPath;
 
-export interface PxResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}
-
-export interface TestServer {
-  port: number;
-  dir: string;
-  cleanup: () => Promise<void>;
-}
-
 export async function createTestServer({
-  args = [],
-  spawnOptions = {},
   setup,
 }: {
-  args?: string[];
-  spawnOptions?: SpawnOptions;
   setup?: (dir: string) => void | Promise<void>;
-} = {}): Promise<TestServer> {
+} = {}): Promise<TestDevServer> {
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'positronic-server-test-')
   );
 
-  let serverProcess: ChildProcess | null = null;
+  let serverHandle: TestServerHandle | null = null;
 
   const cleanup = async () => {
-    if (serverProcess && !serverProcess.killed) {
-      serverProcess.kill('SIGTERM');
-      await new Promise<void>((resolve) => {
-        serverProcess!.on('close', () => resolve());
-      });
+    if (serverHandle && !serverHandle.killed) {
+      serverHandle.kill();
     }
     fs.rmSync(tempDir, { recursive: true, force: true });
   };
@@ -67,142 +44,31 @@ export async function createTestServer({
       await setup(tempDir);
     }
 
-    const port = 9000 + Math.floor(Math.random() * 1000);
+    // Create test dev server instance
+    const devServer = new TestDevServer(tempDir);
 
-    // Default spawn options
-    const defaultOptions: SpawnOptions = {
-      cwd: tempDir,
-      env: {
-        ...process.env,
-        POSITRONIC_TEST_MODE: 'true',
-        POSITRONIC_SERVER_PORT: port.toString(),
-      },
-      stdio: 'pipe',
-    };
+    // Setup the dev server
+    await devServer.setup();
 
-    const finalOptions = {
-      ...defaultOptions,
-      ...spawnOptions,
-    };
+    // Start the dev server
+    serverHandle = await devServer.start();
 
-    // Start the server
-    serverProcess = spawn(
-      nodeExecutable,
-      [cliExecutable, 'server', '--port', port.toString(), ...args],
-      finalOptions
-    );
+    const port = devServer.port;
+    // Set environment variables for test mode
+    process.env.POSITRONIC_TEST_MODE = 'true';
+    process.env.POSITRONIC_SERVER_PORT = port.toString();
 
-    const isReady = await waitUntilReady(port);
+    // Wait for server to be ready
+    const isReady = await serverHandle.waitUntilReady();
 
     if (!isReady) {
       throw new Error(`Server failed to start on port ${port}`);
     }
 
-    return {
-      port,
-      dir: tempDir,
-      cleanup,
-    };
+    return devServer;
   } catch (error) {
     await cleanup();
     throw error;
-  }
-}
-
-export function cli(server?: TestServer) {
-  return async (
-    command: string,
-    options: Partial<ExecSyncOptions> = {}
-  ): Promise<PxResult> => {
-    // Default options for execSync
-    const defaultSyncOptions: ExecSyncOptions = {
-      cwd: server?.dir || process.cwd(),
-      stdio: 'pipe',
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        POSITRONIC_TEST_MODE: 'true',
-        ...(server ? { POSITRONIC_SERVER_PORT: server.port.toString() } : {}),
-      },
-    };
-
-    const finalSyncOptions = {
-      ...defaultSyncOptions,
-      ...options,
-    };
-
-    let stdout = '';
-    let stderr = '';
-    let exitCode = 0;
-
-    try {
-      const result = execSync(
-        `${nodeExecutable} ${cliExecutable} ${command}`,
-        finalSyncOptions
-      );
-      stdout = result.toString() || '';
-    } catch (error: any) {
-      stdout = error.stdout || '';
-      stderr = error.stderr || '';
-      exitCode = error.status || 1;
-    }
-
-    return {
-      stdout,
-      stderr,
-      exitCode,
-    };
-  };
-}
-
-// Legacy functions for backward compatibility - mark as deprecated
-/**
- * @deprecated Use createTestServer() instead
- */
-export async function server({
-  args = [],
-  options = {},
-}: {
-  args?: string[];
-  options?: SpawnOptions;
-} = {}): Promise<{
-  tempDir: string;
-  serverPort: number;
-  cleanup: () => Promise<void>;
-}> {
-  const testServer = await createTestServer({ args, spawnOptions: options });
-  return {
-    tempDir: testServer.dir,
-    serverPort: testServer.port,
-    cleanup: testServer.cleanup,
-  };
-}
-
-/**
- * @deprecated Use cli() instead
- */
-export async function px(
-  command: string,
-  options: Partial<ExecSyncOptions> = {}
-): Promise<PxResult> {
-  // For backward compatibility, px creates its own server if needed
-  let server: TestServer | undefined = undefined;
-
-  if (
-    !command.startsWith('server') &&
-    !command.startsWith('new') &&
-    !command.includes('--help')
-  ) {
-    server = await createTestServer();
-  }
-
-  try {
-    const px = cli(server);
-    return await px(command, options);
-  } finally {
-    if (server) {
-      await server.cleanup();
-    }
   }
 }
 
@@ -232,15 +98,6 @@ export function createMinimalProject(dir: string, config?: any) {
   );
 }
 
-// Helper function to fetch method call logs
-export async function fetchLogs(port: number): Promise<MethodCall[]> {
-  const response = await fetch(`http://localhost:${port}/test/logs`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch logs: ${response.status}`);
-  }
-  return (await response.json()) as MethodCall[];
-}
-
 // Helper function to wait for types file to contain specific content
 export async function waitForTypesFile(
   typesPath: string,
@@ -266,22 +123,86 @@ export async function waitForTypesFile(
   return '';
 }
 
-// Helper function to wait for file changes to be detected
-export async function waitForFileChange(
-  checkFn: () => boolean | Promise<boolean>,
-  maxWaitMs = 5000
-): Promise<boolean> {
-  const startTime = Date.now();
+// Helper function to test CLI commands with ink-testing-library
+export async function testCliCommand(
+  argv: string[],
+  options: {
+    server?: PositronicDevServer;
+    configDir?: string;
+    setupEnv?: () => void;
+    cleanupEnv?: () => void;
+  } = {}
+) {
+  let capturedElement: React.ReactElement | null = null;
 
-  while (Date.now() - startTime < maxWaitMs) {
-    const result = await checkFn();
-    if (result) {
-      return true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  const mockRenderFn = (element: React.ReactElement) => {
+    capturedElement = element;
+  };
+
+  // Setup environment if provided
+  options.setupEnv?.();
+
+  // Setup project-specific environment if configDir is provided
+  if (options.configDir) {
+    process.env.POSITRONIC_CONFIG_DIR = options.configDir;
+    process.env.POSITRONIC_TEST_MODE = 'true';
   }
 
-  return false;
-}
+  try {
+    const testCli = buildCli({
+      argv,
+      server: options.server,
+      exitProcess: false,
+      render: mockRenderFn,
+    });
 
-// No more resetTestGlobals - each test manages its own server
+    await testCli.parse();
+
+    let output = '';
+    if (capturedElement) {
+      const instance = render(capturedElement);
+
+      // Wait for async operations to complete
+      // We'll check frames until we get a stable output or reach a reasonable limit
+      let lastOutput = '';
+      let stableCount = 0;
+      const maxAttempts = 10;
+
+      for (let i = 0; i < maxAttempts; i++) {
+        // Allow async operations to process
+        await new Promise((resolve) => setImmediate(resolve));
+
+        const currentOutput = instance.lastFrame() || '';
+
+        if (currentOutput === lastOutput) {
+          stableCount++;
+          if (stableCount >= 2) {
+            // Output has been stable for 2 checks, consider it done
+            output = currentOutput;
+            break;
+          }
+        } else {
+          stableCount = 0;
+        }
+
+        lastOutput = currentOutput;
+      }
+
+      // If we didn't get stable output, use the last frame
+      if (!output) {
+        output = instance.lastFrame() || '';
+      }
+    }
+
+    return { output, element: capturedElement };
+  } finally {
+    // Cleanup project-specific environment if configDir was provided
+    if (options.configDir) {
+      delete process.env.POSITRONIC_CONFIG_DIR;
+      delete process.env.POSITRONIC_TEST_MODE;
+    }
+
+    // Cleanup environment if provided
+    options.cleanupEnv?.();
+  }
+}

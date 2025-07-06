@@ -104,7 +104,7 @@ describe('CLI Integration: positronic resources types', () => {
 
       // Run the types command using cli
       const px = cli(server);
-      const result = await px('resources types');
+      const result = px('resources types');
 
       // Command should succeed
       expect(result.exitCode).toBe(0);
@@ -122,7 +122,7 @@ describe('CLI Integration: positronic resources types', () => {
       expect(content).toContain('loadText(path: string): Promise<string>');
       expect(content).toContain('loadBinary(path: string): Promise<Buffer>');
     } finally {
-      await server.cleanup();
+      await server.stop();
     }
   });
 
@@ -148,7 +148,7 @@ describe('CLI Integration: positronic resources types', () => {
     try {
       // Run the types command
       const px = cli(server);
-      const result = await px('resources types');
+      const result = px('resources types');
 
       // Command should succeed
       expect(result.exitCode).toBe(0);
@@ -208,7 +208,7 @@ describe('CLI Integration: positronic resources types', () => {
     try {
       // Run the types command
       const px = cli(server);
-      const result = await px('resources types');
+      const result = px('resources types');
 
       // Command should succeed
       expect(result.exitCode).toBe(0);

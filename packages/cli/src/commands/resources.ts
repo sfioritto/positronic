@@ -8,34 +8,21 @@ import { ResourceSync } from '../components/resource-sync.js';
 import { ResourceDelete } from '../components/resource-delete.js';
 import { ResourceUpload } from '../components/resource-upload.js';
 import { ErrorComponent } from '../components/error.js';
+import type { PositronicDevServer } from '@positronic/spec';
 
 export class ResourcesCommand {
-  constructor(
-    private isLocalDevMode: boolean,
-    private projectRootPath: string | null
-  ) {}
+  constructor(private server?: PositronicDevServer) {}
 
   async list() {
     render(React.createElement(ResourceList));
   }
 
   async sync() {
-    if (!this.isLocalDevMode || !this.projectRootPath) {
-      render(
-        React.createElement(ErrorComponent, {
-          error: {
-            title: 'Command Not Available',
-            message:
-              'sync command is only available in local development mode.',
-            details: 'Navigate to your project directory to use this command.',
-          },
-        })
-      );
-      return;
+    if (!this.server) {
+      throw new Error('This command is only available in local dev mode');
     }
-
     // Check if resources directory exists, create if it doesn't
-    const resourcesDir = path.join(this.projectRootPath, 'resources');
+    const resourcesDir = path.join(this.server.projectRootDir, 'resources');
     if (!fs.existsSync(resourcesDir)) {
       fs.mkdirSync(resourcesDir, { recursive: true });
     }
@@ -50,22 +37,11 @@ export class ResourcesCommand {
   }
 
   async types() {
-    if (!this.isLocalDevMode || !this.projectRootPath) {
-      render(
-        React.createElement(ErrorComponent, {
-          error: {
-            title: 'Command Not Available',
-            message:
-              'types command is only available in local development mode.',
-            details: 'Navigate to your project directory to use this command.',
-          },
-        })
-      );
-      return;
-    }
-
     try {
-      const typesFilePath = await generateTypes(this.projectRootPath);
+      if (!this.server) {
+        throw new Error('This command is only available in local dev mode');
+      }
+      const typesFilePath = await generateTypes(this.server.projectRootDir);
       console.log(`✅ Generated resource types at ${typesFilePath}`);
     } catch (error) {
       render(
@@ -101,28 +77,12 @@ export class ResourcesCommand {
       React.createElement(ResourceDelete, {
         resourceKey,
         resourcePath,
-        projectRootPath: this.projectRootPath,
-        isLocalDevMode: this.isLocalDevMode,
+        projectRootPath: this.server?.projectRootDir,
       })
     );
   }
 
   async clear() {
-    if (!this.isLocalDevMode) {
-      render(
-        React.createElement(ErrorComponent, {
-          error: {
-            title: 'Command Not Available',
-            message:
-              'clear command is only available in local development mode.',
-            details:
-              'This command deletes all resources and should only be used during development.',
-          },
-        })
-      );
-      return;
-    }
-
     // Import and render ResourceClear component (to be created)
     const { ResourceClear } = await import('../components/resource-clear.js');
     render(React.createElement(ResourceClear));
@@ -133,8 +93,7 @@ export class ResourcesCommand {
       React.createElement(ResourceUpload, {
         filePath,
         customKey,
-        projectRootPath: this.projectRootPath,
-        isLocalDevMode: this.isLocalDevMode,
+        projectRootPath: this.server?.projectRootDir,
       })
     );
   }

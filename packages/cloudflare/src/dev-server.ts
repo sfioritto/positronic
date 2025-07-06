@@ -5,7 +5,78 @@ import * as os from 'os';
 import { spawn, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
 import caz from 'caz';
-import type { PositronicDevServer } from '@positronic/spec';
+import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
+
+/**
+ * Implementation of ServerHandle that wraps a ChildProcess
+ */
+class ProcessServerHandle implements ServerHandle {
+  private closeCallbacks: Array<(code?: number | null) => void> = [];
+  private errorCallbacks: Array<(error: Error) => void> = [];
+  private _killed = false;
+
+  constructor(private process: ChildProcess, private port?: number) {
+    // Forward process events to registered callbacks
+    process.on('close', (code) => {
+      this.closeCallbacks.forEach((cb) => cb(code));
+    });
+
+    process.on('error', (error) => {
+      this.errorCallbacks.forEach((cb) => cb(error));
+    });
+
+    process.on('exit', () => {
+      this._killed = true;
+    });
+  }
+
+  onClose(callback: (code?: number | null) => void): void {
+    this.closeCallbacks.push(callback);
+  }
+
+  onError(callback: (error: Error) => void): void {
+    this.errorCallbacks.push(callback);
+  }
+
+  kill(signal?: string): boolean {
+    if (!this._killed && this.process && !this.process.killed) {
+      const result = this.process.kill(signal as any);
+      if (result) {
+        this._killed = true;
+      }
+      return result;
+    }
+    return false;
+  }
+
+  get killed(): boolean {
+    return this._killed || (this.process?.killed ?? true);
+  }
+
+  async waitUntilReady(maxWaitMs: number = 30000): Promise<boolean> {
+    const startTime = Date.now();
+    const port = this.port || 8787;
+
+    while (Date.now() - startTime < maxWaitMs) {
+      try {
+        const response = await fetch(`http://localhost:${port}/status`);
+        if (response.ok) {
+          const data = (await response.json()) as { ready?: boolean };
+          if (data.ready === true) {
+            return true;
+          }
+        }
+      } catch (error) {
+        // Server not ready yet, continue polling
+      }
+
+      // Wait a bit before trying again
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    return false;
+  }
+}
 
 async function generateProject(
   projectName: string,
@@ -135,7 +206,11 @@ export class CloudflareDevServer implements PositronicDevServer {
    * a way to generate the .positronic directory if it's not there, so this is the
    * simplest solution.
    */
-  async setup(projectRoot: string, force?: boolean): Promise<void> {
+
+  constructor(public projectRootDir: string) {}
+
+  async setup(force?: boolean): Promise<void> {
+    const projectRoot = this.projectRootDir;
     const serverDir = path.join(projectRoot, '.positronic');
 
     // Ensure .positronic directory exists
@@ -351,8 +426,8 @@ export class CloudflareDevServer implements PositronicDevServer {
     return changed;
   }
 
-  async start(projectRoot: string, port?: number): Promise<ChildProcess> {
-    const serverDir = path.join(projectRoot, '.positronic');
+  async start(port?: number): Promise<ServerHandle> {
+    const serverDir = path.join(this.projectRootDir, '.positronic');
 
     // Start wrangler dev server
     const wranglerArgs = ['dev', '--x-remote-bindings'];
@@ -371,14 +446,14 @@ export class CloudflareDevServer implements PositronicDevServer {
       console.error('Failed to start Wrangler dev server:', err);
     });
 
-    return wranglerProcess;
+    return new ProcessServerHandle(wranglerProcess, port);
   }
 
   async watch(
-    projectRoot: string,
     filePath: string,
     event: 'add' | 'change' | 'unlink'
   ): Promise<void> {
+    const projectRoot = this.projectRootDir;
     // Regenerate manifest when brain files change
     const serverDir = path.join(projectRoot, '.positronic');
     const srcDir = path.join(serverDir, 'src');
@@ -387,11 +462,12 @@ export class CloudflareDevServer implements PositronicDevServer {
     await regenerateManifestFile(projectRoot, srcDir);
   }
 
-  async deploy(projectRoot: string): Promise<void> {
+  async deploy(): Promise<void> {
+    const projectRoot = this.projectRootDir;
     const serverDir = path.join(projectRoot, '.positronic');
 
-    // Ensure .positronic directory and manifest are up to date
-    await this.setup(projectRoot);
+    // Ensure .positronic directory and manifest are up to date, but don't force regeneration
+    await this.setup();
 
     // Load environment variables from .env file
     const envPath = path.join(projectRoot, '.env');

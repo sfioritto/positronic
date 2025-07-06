@@ -10,7 +10,44 @@
  * Future additions will include REST API specifications and tests.
  */
 
-import type { ChildProcess } from 'child_process';
+/**
+ * Handle for managing a running development server
+ *
+ * This interface provides lifecycle management for a server instance,
+ * abstracting away the underlying implementation details (process, worker, etc.)
+ */
+export interface ServerHandle {
+  /**
+   * Register a callback to be called when the server closes
+   * @param callback Function called with exit code when server terminates
+   */
+  onClose(callback: (code?: number | null) => void): void;
+
+  /**
+   * Register a callback to be called when the server encounters an error
+   * @param callback Function called with error details
+   */
+  onError(callback: (error: Error) => void): void;
+
+  /**
+   * Stop the server
+   * @param signal Optional signal to send (e.g., 'SIGTERM', 'SIGKILL')
+   * @returns true if the kill signal was sent successfully
+   */
+  kill(signal?: string): boolean;
+
+  /**
+   * Whether the server has been killed
+   */
+  readonly killed: boolean;
+
+  /**
+   * Wait until the server is ready to accept requests
+   * @param maxWaitMs Maximum time to wait in milliseconds
+   * @returns true if server is ready, false if timeout reached
+   */
+  waitUntilReady(maxWaitMs?: number): Promise<boolean>;
+}
 
 /**
  * Development server interface for Positronic backends
@@ -19,40 +56,37 @@ import type { ChildProcess } from 'child_process';
  */
 export interface PositronicDevServer {
   /**
+   * The root path of the Positronic project
+   */
+  readonly projectRootDir: string;
+
+  /**
    * Setup the development environment (e.g., create .positronic directory)
    * This is called once when setting up a project or when --force is used
-   * @param projectRoot The root path of the Positronic project
    * @param force Force regeneration even if environment exists
    */
-  setup(projectRoot: string, force?: boolean): Promise<void>;
+  setup(force?: boolean): Promise<void>;
 
   /**
    * Start the development server
-   * @param projectRoot The root path of the Positronic project
    * @param port Optional port number
-   * @returns The child process running the server
+   * @returns A handle for managing the running server
    */
-  start(projectRoot: string, port?: number): Promise<ChildProcess>;
+  start(port?: number): Promise<ServerHandle>;
 
   /**
    * Optional: Watch for brain file changes and handle them
    * This is called by the CLI when brain files (*.ts in brains/) change
-   * @param projectRoot The root path of the Positronic project
    * @param filePath The path to the brain file that changed
    * @param event The type of change that occurred
    */
-  watch?(
-    projectRoot: string,
-    filePath: string,
-    event: 'add' | 'change' | 'unlink'
-  ): Promise<void>;
+  watch?(filePath: string, event: 'add' | 'change' | 'unlink'): Promise<void>;
 
   /**
    * Optional: Deploy to the backend's hosting service
-   * @param projectRoot The root path of the Positronic project
    * @param config Deployment configuration
    */
-  deploy(projectRoot: string, config?: any): Promise<void>;
+  deploy(config?: any): Promise<void>;
 }
 
 export { testStatus, resources, brains, schedules } from './api.js';
