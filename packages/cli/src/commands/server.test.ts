@@ -29,37 +29,22 @@ describe('CLI Integration: positronic server', () => {
     });
   });
 
-  // describe('Server lifecycle', () => {
-  //   let server: TestServer;
+  describe('Server lifecycle', () => {
+    it('should call setup() and start() methods on the dev server', async () => {
+      const server = await createTestServer();
 
-  //   beforeEach(async () => {
-  //     server = await createTestServer();
-  //   });
+      const methodCalls = server.getLogs();
 
-  //   afterEach(async () => {
-  //     await server.cleanup();
-  //   });
+      // Verify the method calls
+      const setupCall = methodCalls.find((call) => call.method === 'setup');
+      const startCall = methodCalls.find((call) => call.method === 'start');
 
-  //   it('should call setup() and start() methods on the dev server', async () => {
-  //     const methodCalls = server.handle.getLogs();
+      expect(setupCall).toBeDefined();
+      expect(setupCall!.args[0]).toBe(undefined); // force flag not set
 
-  //     // Verify the method calls
-  //     const setupCall = methodCalls.find((call) => call.method === 'setup');
-  //     const startCall = methodCalls.find((call) => call.method === 'start');
-
-  //     expect(setupCall).toBeDefined();
-  //     // Resolve symlinks before comparing paths
-  //     expect(fs.realpathSync(setupCall!.args[0])).toBe(
-  //       fs.realpathSync(server.dir)
-  //     );
-  //     expect(setupCall!.args[1]).toBe(undefined); // force flag not set
-
-  //     expect(startCall).toBeDefined();
-  //     expect(fs.realpathSync(startCall!.args[0])).toBe(
-  //       fs.realpathSync(server.dir)
-  //     );
-  //   });
-  // });
+      expect(startCall).toBeDefined();
+    });
+  });
 
   describe('Initial sync tests', () => {
     it('should sync resources after server starts', async () => {

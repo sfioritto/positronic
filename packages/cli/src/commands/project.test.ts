@@ -37,28 +37,6 @@ describe('CLI Integration: positronic server with project', () => {
     }
   });
 
-  it('should call dev server setup() and start() methods correctly', async () => {
-    // Create a test server
-    server = await createTestServer();
-
-    // Fetch the method call logs
-    const methodCalls = server.getLogs();
-
-    // Verify setup() was called
-    const setupCall = methodCalls.find(
-      (call: MethodCall) => call.method === 'setup'
-    );
-    expect(setupCall).toBeDefined();
-
-    expect(setupCall!.args[0]).toBe(undefined); // force flag
-
-    // Verify start() was called
-    const startCall = methodCalls.find(
-      (call: MethodCall) => call.method === 'start'
-    );
-    expect(startCall).toBeDefined();
-  });
-
   it('runs a brain', async () => {
     // Create a test server with a test brain
     server = await createTestServer({
