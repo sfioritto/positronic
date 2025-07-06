@@ -13,7 +13,6 @@ import {
   waitForTypesFile,
   testCliCommand,
 } from './test-utils.js';
-import type { TestDevServer } from '../test/test-dev-server.js';
 
 describe('CLI Integration: positronic server', () => {
   // describe('Project validation', () => {
@@ -65,34 +64,43 @@ describe('CLI Integration: positronic server', () => {
   // });
 
   describe('Initial sync tests', () => {
-    let server: TestDevServer;
+    it('should sync resources after server starts', async () => {
+      // Stub process.exit so cleanup doesn't terminate Jest
+      const exitSpy = jest
+        .spyOn(process, 'exit')
+        .mockImplementation(() => undefined as never);
 
-    beforeEach(async () => {
-      server = await createTestServer();
-    }, 10000);
+      const server = await createTestServer();
 
-    afterEach(async () => {
-      if (server) {
+      try {
+        // Start the CLI's server command which will sync resources
+        await testCliCommand(['server'], { server });
+
+        // Verify that the resources were synced and are available via the API
+        const response = await fetch(
+          `http://localhost:${server.port}/resources`
+        );
+        const data = (await response.json()) as {
+          resources: Array<{ key: string }>;
+          count: number;
+        };
+
+        expect(data).not.toBeNull();
+        expect(data.resources).toBeDefined();
+        expect(data.count).toBe(2); // 2 default resources from createMinimalProject
+
+        const resourceKeys = data.resources.map((r) => r.key);
+        expect(resourceKeys).toContain('test.txt');
+        expect(resourceKeys).toContain('data.json');
+
+        // Trigger the cleanup path in ServerCommand to close file watchers
+        process.emit('SIGINT');
+        await new Promise((r) => setImmediate(r));
+      } finally {
+        exitSpy.mockRestore();
         await server.stop();
       }
     });
-
-    // it('should sync resources after server starts', async () => {
-    //   // Get resources that should have been synced from createMinimalProject
-    //   const response = await fetch(`http://localhost:${server.port}/resources`);
-    //   const data = (await response.json()) as {
-    //     resources: Array<{ key: string }>;
-    //     count: number;
-    //   };
-    //   // Now verify the results
-    //   expect(data).not.toBeNull();
-    //   expect(data!.resources).toBeDefined();
-    //   expect(data!.count).toBe(2); // 2 default resources from createMinimalProject
-    //   // Verify the resources were loaded from filesystem
-    //   const resourceKeys = data!.resources.map((r) => r.key);
-    //   expect(resourceKeys).toContain('test.txt');
-    //   expect(resourceKeys).toContain('data.json');
-    // }, 10000);
 
     it('should generate types file after server starts', async () => {
       // Stub process.exit so cleanup doesn't terminate Jest
@@ -168,6 +176,6 @@ describe('CLI Integration: positronic server', () => {
         exitSpy.mockRestore();
         await server.stop();
       }
-    }, 10000);
+    });
   });
 });
