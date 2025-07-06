@@ -28,9 +28,7 @@ export function loadBackendConfig(projectRootPath: string): PositronicConfig {
 /**
  * Load the backend module based on the configuration
  */
-export async function loadBackendModule(
-  projectRootPath: string
-): Promise<{ DevServer: new () => PositronicDevServer }> {
+export async function loadBackendModule(projectRootPath: string) {
   const config = loadBackendConfig(projectRootPath);
   const backendPackage = config.backend!.package;
 
@@ -61,5 +59,5 @@ export async function createDevServer(
   projectRootPath: string
 ): Promise<PositronicDevServer> {
   const { DevServer } = await loadBackendModule(projectRootPath);
-  return new DevServer();
+  return new DevServer(projectRootPath);
 }
