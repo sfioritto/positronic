@@ -70,8 +70,6 @@ describe('CLI Integration: positronic server with project', () => {
       server,
     });
 
-    console.log('CLI output:', output);
-
     // Verify the run command connected to the server and got a run ID
     expect(output).toContain('Run ID:');
     expect(output).toContain('run-');

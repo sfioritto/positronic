@@ -22,9 +22,7 @@ export class ServerCommand {
       if (serverHandle && !serverHandle.killed) {
         serverHandle.kill();
         serverHandle = null;
-        console.log('- Server process terminated.');
       }
-      console.log('Cleanup complete. Exiting.');
       process.exit(0);
     };
 
