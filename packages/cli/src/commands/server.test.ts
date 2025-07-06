@@ -88,26 +88,6 @@ describe('CLI Integration: positronic server', () => {
     // }, 10000);
 
     it('should generate types file after server starts', async () => {
-      // TOMORROW
-      // ok, so I'm not going to create the server via the command line call for
-      // any of the other tests, this is the one set of tests in this file where
-      // we actually start it up by calling the command. so we actually need to do
-      // the testCliCommand call here.
-      // however, we need to set up the directory with the resources in order for
-      // that to work, so need to figure out how to do that.
-      //
-      // Then the other thing is I think that POSITRONIC_TEST_MODE is no longer
-      // needed, or you need to use node_env or something, because the server command
-      // isn't used for testing anymore. instead we create the test server which mocks
-      //  the backend.
-      //
-      // so something to consider is CliOptions, pass in a server instead
-      // of the projectRootPath. the server handle has that if needed and also
-      // and most of the command really need a server, not the path, so this would
-      // allow us to pass in a test server, just like we do with the render function.
-      //
-      // Also consider changint the name of the interface from server, not sure that's
-      // the right name.
       const server = await createTestServer({
         setup: (projectDir) => {
           // Create some resource files
