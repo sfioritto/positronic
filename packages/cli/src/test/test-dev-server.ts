@@ -108,43 +108,6 @@ export class TestDevServer implements PositronicDevServer {
     // Just ensure we're ready to serve
   }
 
-  private scanResourcesDirectory(): void {
-    const resourcesDir = path.join(this.projectRootDir, 'resources');
-    if (!fs.existsSync(resourcesDir)) {
-      return;
-    }
-
-    const scanDirectory = (dir: string, baseDir: string) => {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-
-        if (entry.isDirectory()) {
-          scanDirectory(fullPath, baseDir);
-        } else if (entry.isFile()) {
-          const relativePath = path.relative(baseDir, fullPath);
-          const key = relativePath.replace(/\\/g, '/');
-          const stats = fs.statSync(fullPath);
-          const fileContent = fs.readFileSync(fullPath);
-
-          const type: 'text' | 'binary' = isText(entry.name, fileContent)
-            ? 'text'
-            : 'binary';
-
-          this.resources.set(key, {
-            key,
-            type,
-            size: stats.size,
-            lastModified: stats.mtime.toISOString(),
-          });
-        }
-      }
-    };
-
-    scanDirectory(resourcesDir, resourcesDir);
-  }
-
   public getLogs(): MethodCall[] {
     return this.callLog;
   }
@@ -153,17 +116,12 @@ export class TestDevServer implements PositronicDevServer {
     this.logCall('start', [port]);
     this.port = port || 9000 + Math.floor(Math.random() * 1000);
 
-    // Pre-populate resources from filesystem
-    this.scanResourcesDirectory();
-
     // Set up nock interceptors for all endpoints
     const nockInstance = nock(`http://localhost:${this.port}`).persist();
 
     // GET /resources
     nockInstance.get('/resources').reply(200, () => {
-      // Re-scan resources before responding to ensure we have the latest
-      this.scanResourcesDirectory();
-
+      // Return the current in-memory resource list (populated by uploads)
       const resources = Array.from(this.resources.values());
       return {
         resources,
@@ -174,9 +132,33 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /resources
     nockInstance.post('/resources').reply(201, (uri, requestBody) => {
-      // For the test server, we don't actually process uploads
-      // Resources are pre-populated from the filesystem
-      // Just return success
+      // Convert request body to string for easier parsing/logging
+      const bodyString = Buffer.isBuffer(requestBody)
+        ? requestBody.toString()
+        : typeof requestBody === 'string'
+        ? requestBody
+        : JSON.stringify(requestBody);
+
+      // Attempt to extract the "key" (resource path) and "type" fields from the multipart data
+      const keyMatch = bodyString.match(/name="key"\s*\r?\n\r?\n([^\r\n]+)/);
+      const typeMatch = bodyString.match(/name="type"\s*\r?\n\r?\n([^\r\n]+)/);
+
+      const key = keyMatch ? keyMatch[1] : undefined;
+      const rtype = typeMatch ? (typeMatch[1] as 'text' | 'binary') : 'text';
+
+      if (key) {
+        this.resources.set(key, {
+          key,
+          type: rtype,
+          size: 0,
+          lastModified: new Date().toISOString(),
+        });
+      }
+
+      // Log the upload so tests can verify resource sync behavior
+      this.logCall('upload', [bodyString]);
+
+      // Success response
       return '';
     });
 

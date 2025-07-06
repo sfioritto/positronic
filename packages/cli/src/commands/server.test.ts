@@ -76,22 +76,17 @@ describe('CLI Integration: positronic server', () => {
         // Start the CLI's server command which will sync resources
         await testCliCommand(['server'], { server });
 
-        // Verify that the resources were synced and are available via the API
-        const response = await fetch(
-          `http://localhost:${server.port}/resources`
-        );
-        const data = (await response.json()) as {
-          resources: Array<{ key: string }>;
-          count: number;
-        };
+        // Verify that the CLI attempted to upload both default resources
+        const uploads = server
+          .getLogs()
+          .filter((c) => c.method === 'upload')
+          .map((c) => (typeof c.args[0] === 'string' ? c.args[0] : ''));
 
-        expect(data).not.toBeNull();
-        expect(data.resources).toBeDefined();
-        expect(data.count).toBe(2); // 2 default resources from createMinimalProject
+        expect(uploads.length).toBe(2);
 
-        const resourceKeys = data.resources.map((r) => r.key);
-        expect(resourceKeys).toContain('test.txt');
-        expect(resourceKeys).toContain('data.json');
+        // The multipart body should include the key/path for each resource
+        expect(uploads.some((b) => b.includes('test.txt'))).toBe(true);
+        expect(uploads.some((b) => b.includes('data.json'))).toBe(true);
 
         // Trigger the cleanup path in ServerCommand to close file watchers
         process.emit('SIGINT');
