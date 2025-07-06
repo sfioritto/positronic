@@ -1,6 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  jest,
+} from '@jest/globals';
 import {
   createTestServer,
   waitForTypesFile,
@@ -88,6 +95,11 @@ describe('CLI Integration: positronic server', () => {
     // }, 10000);
 
     it('should generate types file after server starts', async () => {
+      // Stub process.exit so cleanup doesn't terminate Jest
+      const exitSpy = jest
+        .spyOn(process, 'exit')
+        .mockImplementation(() => undefined as never);
+
       const server = await createTestServer({
         setup: (projectDir) => {
           // Create some resource files
@@ -148,7 +160,12 @@ describe('CLI Integration: positronic server', () => {
         expect(typesContent).toContain('config: TextResource;');
         expect(typesContent).toContain('docs: {');
         expect(typesContent).toContain('api: TextResource;');
+
+        // Trigger the cleanup path in ServerCommand to close file watchers
+        process.emit('SIGINT');
+        await new Promise((r) => setImmediate(r));
       } finally {
+        exitSpy.mockRestore();
         await server.stop();
       }
     }, 10000);
