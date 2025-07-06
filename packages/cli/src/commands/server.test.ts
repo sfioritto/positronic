@@ -15,21 +15,19 @@ import {
 } from './test-utils.js';
 
 describe('CLI Integration: positronic server', () => {
-  // describe('Project validation', () => {
-  //   it('should not have server command available outside a Positronic project', async () => {
-  //     // No server needed for this test - testing behavior without a project
-  //     try {
-  //       await testCliCommand(['server'], {
-  //         projectRootPath: null, // No project root
-  //       });
-  //       // If we get here, the command didn't fail as expected
-  //       expect(false).toBe(true); // Force failure
-  //     } catch (error: any) {
-  //       // Check that the error message indicates unknown command
-  //       expect(error.message).toContain('Unknown command: server');
-  //     }
-  //   });
-  // });
+  describe('Project validation', () => {
+    it('should not have server command available outside a Positronic project', async () => {
+      // No server needed for this test - testing behavior without a project
+      try {
+        await testCliCommand(['server']);
+        // If we get here, the command didn't fail as expected
+        expect(false).toBe(true); // Force failure
+      } catch (error: any) {
+        // Check that the error message indicates unknown command
+        expect(error.message).toContain('Unknown command: server');
+      }
+    });
+  });
 
   // describe('Server lifecycle', () => {
   //   let server: TestServer;
