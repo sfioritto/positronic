@@ -144,12 +144,12 @@ export class TestDevServer implements PositronicDevServer {
       const typeMatch = bodyString.match(/name="type"\s*\r?\n\r?\n([^\r\n]+)/);
 
       const key = keyMatch ? keyMatch[1] : undefined;
-      const rtype = typeMatch ? (typeMatch[1] as 'text' | 'binary') : 'text';
+      const type = typeMatch ? (typeMatch[1] as 'text' | 'binary') : 'text';
 
       if (key) {
         this.resources.set(key, {
           key,
-          type: rtype,
+          type,
           size: 0,
           lastModified: new Date().toISOString(),
         });
