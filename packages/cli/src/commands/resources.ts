@@ -18,10 +18,18 @@ export class ResourcesCommand {
     render(React.createElement(ResourceList));
   }
 
-  async sync() {
+  sync(): React.ReactElement {
     if (!this.server) {
-      throw new Error('This command is only available in local dev mode');
+      return React.createElement(ErrorComponent, {
+        error: {
+          title: 'Command Not Available',
+          message: 'This command is only available in local dev mode',
+          details:
+            'Please run this command from within a Positronic project directory.',
+        },
+      });
     }
+
     // Check if resources directory exists, create if it doesn't
     const resourcesDir = path.join(this.server.projectRootDir, 'resources');
     if (!fs.existsSync(resourcesDir)) {
@@ -29,12 +37,10 @@ export class ResourcesCommand {
     }
     const localResources = scanLocalResources(resourcesDir);
 
-    render(
-      React.createElement(ResourceSync, {
-        localResources,
-        resourcesDir,
-      })
-    );
+    return React.createElement(ResourceSync, {
+      localResources,
+      resourcesDir,
+    });
   }
 
   types(): React.ReactElement {

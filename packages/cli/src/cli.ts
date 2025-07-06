@@ -440,7 +440,10 @@ export function buildCli(options: CliOptions) {
             'Upload new or modified resources to the server'
           );
         },
-        () => resourcesCommand.sync()
+        () => {
+          const element = resourcesCommand.sync();
+          render(element);
+        }
       );
 
       yargsResource.command(

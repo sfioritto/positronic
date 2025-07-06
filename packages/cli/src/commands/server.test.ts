@@ -91,15 +91,11 @@ describe('CLI Integration: positronic server', () => {
 
         // Wait for types file to be generated with our resources
         const typesPath = path.join(server.projectRootDir, 'resources.d.ts');
-        const typesContent = await waitForTypesFile(
-          typesPath,
-          [
-            'readme: TextResource;',
-            'config: TextResource;',
-            'api: TextResource;',
-          ],
-          8000 // Increase timeout to 8 seconds
-        );
+        const typesContent = await waitForTypesFile(typesPath, [
+          'readme: TextResource;',
+          'config: TextResource;',
+          'api: TextResource;',
+        ]);
         // Check that the types file was generated with content
         expect(typesContent).not.toBe('');
         // Check for the module declaration

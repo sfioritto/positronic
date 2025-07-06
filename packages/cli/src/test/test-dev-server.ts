@@ -1,7 +1,4 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
-import { isText } from 'istextorbinary';
 import nock from 'nock';
 
 interface MockResource {

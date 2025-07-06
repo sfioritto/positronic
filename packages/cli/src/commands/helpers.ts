@@ -520,7 +520,7 @@ export {}; // Make this a module
 export async function generateTypes(
   projectRootPath: string,
   client: ApiClient = apiClient
-): Promise<string> {
+) {
   const typesFilePath = path.join(projectRootPath, 'resources.d.ts');
 
   // Fetch resources from the API
