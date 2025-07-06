@@ -452,7 +452,10 @@ export function buildCli(options: CliOptions) {
             'Generate a resources.d.ts file with type definitions for all resources'
           );
         },
-        () => resourcesCommand.types()
+        () => {
+          const element = resourcesCommand.types();
+          render(element);
+        }
       );
 
       yargsResource.command(

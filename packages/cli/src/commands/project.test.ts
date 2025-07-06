@@ -25,7 +25,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { describe, it, expect, afterEach } from '@jest/globals';
 import { createTestServer, testCliCommand } from './test-utils.js';
-import type { MethodCall, TestDevServer } from '../test/test-dev-server.js';
+import type { TestDevServer } from '../test/test-dev-server.js';
 import React from 'react';
 
 describe('CLI Integration: positronic server with project', () => {

@@ -3,7 +3,10 @@ import {
   createTestServer,
   testCliCommand,
   copyTestResources,
+  waitForTypesFile,
 } from './test-utils.js';
+import path from 'path';
+import fs from 'fs';
 
 describe('CLI Integration: positronic resources types', () => {
   it('should generate type definitions for resources', async () => {
@@ -14,9 +17,21 @@ describe('CLI Integration: positronic resources types', () => {
     });
 
     try {
-      const { output } = await testCliCommand(['resources', 'types'], {
+      fs.writeFileSync(
+        path.join(server.projectRootDir, 'resources', 'test.txt'),
+        'test'
+      );
+
+      await testCliCommand(['resources', 'types'], {
         server,
       });
+
+      const typesPath = path.join(server.projectRootDir, 'resources.d.ts');
+      const typesContent = await waitForTypesFile(typesPath, [
+        'test: TextResource;',
+      ]);
+
+      expect(typesContent).toContain('test: TextResource;');
     } finally {
       server.stop();
     }

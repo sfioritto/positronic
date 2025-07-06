@@ -7,6 +7,7 @@ import { ResourceList } from '../components/resource-list.js';
 import { ResourceSync } from '../components/resource-sync.js';
 import { ResourceDelete } from '../components/resource-delete.js';
 import { ResourceUpload } from '../components/resource-upload.js';
+import { ResourceTypes } from '../components/resource-types.js';
 import { ErrorComponent } from '../components/error.js';
 import type { PositronicDevServer } from '@positronic/spec';
 
@@ -36,24 +37,21 @@ export class ResourcesCommand {
     );
   }
 
-  async types() {
-    try {
-      if (!this.server) {
-        throw new Error('This command is only available in local dev mode');
-      }
-      const typesFilePath = await generateTypes(this.server.projectRootDir);
-      console.log(`✅ Generated resource types at ${typesFilePath}`);
-    } catch (error) {
-      render(
-        React.createElement(ErrorComponent, {
-          error: {
-            title: 'Type Generation Failed',
-            message: 'Failed to generate resource types.',
-            details: error instanceof Error ? error.message : String(error),
-          },
-        })
-      );
+  types(): React.ReactElement {
+    if (!this.server) {
+      return React.createElement(ErrorComponent, {
+        error: {
+          title: 'Command Not Available',
+          message: 'This command is only available in local dev mode',
+          details:
+            'Please run this command from within a Positronic project directory.',
+        },
+      });
     }
+
+    return React.createElement(ResourceTypes, {
+      projectRootDir: this.server.projectRootDir,
+    });
   }
 
   async delete(resourcePath: string) {
