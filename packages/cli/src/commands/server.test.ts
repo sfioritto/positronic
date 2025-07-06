@@ -1,17 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  jest,
-} from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   createTestServer,
   waitForTypesFile,
   testCliCommand,
+  copyTestResources,
 } from './test-utils.js';
 
 describe('CLI Integration: positronic server', () => {
@@ -88,34 +82,7 @@ describe('CLI Integration: positronic server', () => {
 
       const server = await createTestServer({
         setup: (projectDir) => {
-          // Create some resource files
-          const resourcesDir = path.join(projectDir, 'resources');
-          fs.mkdirSync(resourcesDir, { recursive: true });
-          fs.writeFileSync(path.join(resourcesDir, 'readme.md'), '# README');
-          fs.writeFileSync(
-            path.join(resourcesDir, 'config.json'),
-            '{"setting": true}'
-          );
-          // Create a subdirectory with a resource
-          const docsDir = path.join(resourcesDir, 'docs');
-          fs.mkdirSync(docsDir, { recursive: true });
-          fs.writeFileSync(path.join(docsDir, 'api.md'), '# API Documentation');
-
-          // Create data directory
-          const dataDir = path.join(resourcesDir, 'data');
-          fs.mkdirSync(dataDir, { recursive: true });
-
-          // PNG magic bytes
-          const pngHeader = Buffer.from([
-            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-          ]);
-          fs.writeFileSync(path.join(dataDir, 'logo.png'), pngHeader);
-
-          // File with spaces (should be excluded from dot notation)
-          fs.writeFileSync(
-            path.join(resourcesDir, 'file with spaces.txt'),
-            'content'
-          );
+          copyTestResources(projectDir);
         },
       });
 

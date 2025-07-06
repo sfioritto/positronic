@@ -98,6 +98,20 @@ export function createMinimalProject(dir: string, config?: any) {
   );
 }
 
+// Helper function to copy test resources from test data directory
+export function copyTestResources(targetDir: string) {
+  const testDataPath = path.join(__dirname, '../test/data/resources');
+  const targetResourcesPath = path.join(targetDir, 'resources');
+
+  // Remove existing resources directory if it exists
+  if (fs.existsSync(targetResourcesPath)) {
+    fs.rmSync(targetResourcesPath, { recursive: true, force: true });
+  }
+
+  // Copy the test data resources
+  fs.cpSync(testDataPath, targetResourcesPath, { recursive: true });
+}
+
 // Helper function to wait for types file to contain specific content
 export async function waitForTypesFile(
   typesPath: string,
