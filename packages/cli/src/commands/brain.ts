@@ -1,8 +1,7 @@
 import type { ArgumentsCamelCase } from 'yargs';
-import { EventSource } from 'eventsource';
 import { apiClient } from './helpers.js';
-import React, { useState, useEffect } from 'react';
-import { render, Text } from 'ink';
+import React from 'react';
+import { Text } from 'ink';
 import { Watch } from '../components/watch.js';
 
 interface BrainListArgs {}
@@ -69,14 +68,14 @@ export class BrainCommand {
         const result = (await response.json()) as { brainRunId: string };
 
         if (watch) {
-          this.watch({
+          // Return Watch component for CLI to render
+          return this.watch({
             runId: result.brainRunId,
             _: [],
             $0: '',
           });
-          await new Promise(() => {});
         } else {
-          // Return React element instead of calling render directly
+          // Return React element displaying the run ID
           return React.createElement(
             Text,
             null,
@@ -107,22 +106,32 @@ export class BrainCommand {
     }
   }
 
-  watch({ runId, name: brainName }: ArgumentsCamelCase<BrainWatchArgs>) {
+  watch({
+    runId,
+    name: brainName,
+  }: ArgumentsCamelCase<BrainWatchArgs>): React.ReactElement {
+    // If a specific run ID is provided, return the Watch component
     if (runId) {
       const port = process.env.POSITRONIC_SERVER_PORT || '8787';
-      const baseUrl = `http://localhost:${port}`;
-      const url = `${baseUrl}/brains/runs/${runId}/watch`;
-
-      render(React.createElement(Watch, { runId, port }));
-    } else if (brainName) {
-      // TODO: Implement logic to first fetch the latest run ID for brainName
-      // This fetch should use apiClient.fetch
-    } else {
-      console.error(
-        'Internal Error: Watch command called without --run-id or --name.'
-      );
-      process.exit(1);
+      return React.createElement(Watch, { runId, port });
     }
+
+    // If watching by brain name is requested (latest run), this is not yet implemented.
+    // For now, show a placeholder message.
+    if (brainName) {
+      return React.createElement(
+        Text,
+        null,
+        'Watching by brain name is not yet implemented.'
+      );
+    }
+
+    // Neither runId nor brainName provided – return an error element.
+    return React.createElement(
+      Text,
+      { color: 'red' as any }, // Ink Text color prop
+      'Error: You must provide either a brain run ID or a brain name.'
+    );
   }
 
   new({ name: brainName, prompt }: ArgumentsCamelCase<BrainNewArgs>) {

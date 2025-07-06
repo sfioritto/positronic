@@ -346,7 +346,12 @@ export function buildCli(options: CliOptions) {
           'Watch a specific brain run by its ID'
         );
     },
-    (argv) => brainCommand.watch(argv)
+    (argv) => {
+      const element = brainCommand.watch(argv);
+      if (element) {
+        render(element);
+      }
+    }
   );
 
   // --- Brain Commands ---
