@@ -132,12 +132,20 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /resources
     nockInstance.post('/resources').reply(201, (uri, requestBody) => {
-      // Convert request body to string for easier parsing/logging
-      const bodyString = Buffer.isBuffer(requestBody)
-        ? requestBody.toString()
+      // Convert request body to string using latin1 encoding to preserve binary data
+      let bodyString = Buffer.isBuffer(requestBody)
+        ? requestBody.toString('latin1')
         : typeof requestBody === 'string'
         ? requestBody
         : JSON.stringify(requestBody);
+
+      // Check if the body string appears to be hex-encoded (all characters are hex)
+      const isHexEncoded = /^[0-9a-fA-F]+$/.test(bodyString);
+      if (isHexEncoded) {
+        // Convert hex string back to buffer and then to latin1 string
+        const hexBuffer = Buffer.from(bodyString, 'hex');
+        bodyString = hexBuffer.toString('latin1');
+      }
 
       // Attempt to extract the "key" (resource path) and "type" fields from the multipart data
       const keyMatch = bodyString.match(/name="key"\s*\r?\n\r?\n([^\r\n]+)/);
