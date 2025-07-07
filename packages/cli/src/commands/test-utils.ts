@@ -48,48 +48,34 @@ async function createMinimalProject(
   copyTestResources(dir);
 }
 
-export async function createTestEnv(): Promise<TestDevServer> {
-  const tempDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'positronic-server-test-')
-  );
+class TestEnv {
+  private serverHandle: TestServerHandle | null = null;
+  constructor(private tempDir: string, private testServer: TestDevServer) {}
 
-  let serverHandle: TestServerHandle | null = null;
+  setup(setup: (tempDir: string) => void | Promise<void>) {
+    setup(this.tempDir);
+    return this;
+  }
 
-  const cleanup = async () => {
-    if (serverHandle && !serverHandle.killed) {
-      serverHandle.kill();
+  async start() {
+    this.serverHandle = await this.testServer.start();
+    return this.serverHandle;
+  }
+
+  cleanup() {
+    fs.rmSync(this.tempDir, { recursive: true, force: true });
+  }
+
+  async stop() {
+    if (this.serverHandle) {
+      this.serverHandle.kill();
     }
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  };
+    await this.testServer.stop();
+  }
 
-  try {
-    await createMinimalProject(tempDir);
-
-    // Create test dev server instance
-    const devServer = new TestDevServer(tempDir);
-
-    // Setup the dev server
-    await devServer.setup();
-
-    // Start the dev server
-    serverHandle = await devServer.start();
-
-    const port = devServer.port;
-    // Set environment variables for test mode
-    process.env.POSITRONIC_TEST_MODE = 'true';
-    process.env.POSITRONIC_SERVER_PORT = port.toString();
-
-    // Wait for server to be ready
-    const isReady = await serverHandle.waitUntilReady();
-
-    if (!isReady) {
-      throw new Error(`Server failed to start on port ${port}`);
-    }
-
-    return devServer;
-  } catch (error) {
-    await cleanup();
-    throw error;
+  async stopAndCleanup() {
+    await this.stop();
+    this.cleanup();
   }
 }
 
