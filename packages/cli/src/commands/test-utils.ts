@@ -172,43 +172,7 @@ export async function testCliCommand(
 
     await testCli.parse();
 
-    let output = '';
-    if (capturedElement) {
-      const instance = render(capturedElement);
-
-      // Wait for async operations to complete
-      // We'll check frames until we get a stable output or reach a reasonable limit
-      let lastOutput = '';
-      let stableCount = 0;
-      const maxAttempts = 10;
-
-      for (let i = 0; i < maxAttempts; i++) {
-        // Allow async operations to process
-        await new Promise((resolve) => setImmediate(resolve));
-
-        const currentOutput = instance.lastFrame() || '';
-
-        if (currentOutput === lastOutput) {
-          stableCount++;
-          if (stableCount >= 2) {
-            // Output has been stable for 2 checks, consider it done
-            output = currentOutput;
-            break;
-          }
-        } else {
-          stableCount = 0;
-        }
-
-        lastOutput = currentOutput;
-      }
-
-      // If we didn't get stable output, use the last frame
-      if (!output) {
-        output = instance.lastFrame() || '';
-      }
-    }
-
-    return { output, element: capturedElement };
+    return capturedElement;
   } finally {
     // Cleanup project-specific environment if configDir was provided
     if (options.configDir) {
