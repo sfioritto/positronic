@@ -2,12 +2,51 @@ import { render } from 'ink-testing-library';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { fileURLToPath } from 'url';
 import process from 'process';
 import type { TestServerHandle } from '../test/test-dev-server.js';
 import { TestDevServer } from '../test/test-dev-server.js';
 import { buildCli } from '../cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import caz from 'caz';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Singleton cache for the template to avoid repeated npm installs
+let cachedTemplatePath: string | null = null;
+
+async function getCachedTemplate(): Promise<string> {
+  if (!cachedTemplatePath) {
+    // Create cache only once per test run
+    const devPath = path.resolve(__dirname, '../../../');
+    const originalTemplate = path.resolve(devPath, 'template-new-project');
+
+    // First, copy template to temp location so caz can mess with that copy
+    const tempCopyDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'positronic-template-copy-')
+    );
+    fs.cpSync(originalTemplate, tempCopyDir, { recursive: true });
+
+    // Now generate the actual cached template in another temp directory
+    cachedTemplatePath = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'positronic-cached-template-')
+    );
+
+    // Run caz once to generate a clean template
+    await caz.default(tempCopyDir, cachedTemplatePath, {
+      name: 'test-project',
+      backend: 'none',
+      install: false,
+      force: true,
+    });
+
+    // Clean up the temp copy directory
+    fs.rmSync(tempCopyDir, { recursive: true, force: true });
+  }
+
+  return cachedTemplatePath;
+}
 
 // Helper function to copy test resources from test data directory
 function copyTestResources(targetDir: string) {
@@ -24,35 +63,27 @@ function copyTestResources(targetDir: string) {
 }
 
 // Helper function to create a minimal Positronic project structure
-async function createMinimalProject(
-  dir: string,
-  projectName: string = 'test-project'
-) {
-  // Determine template path - use local development path if available
-  const devPath = process.env.POSITRONIC_LOCAL_PATH;
-  let templatePath = '@positronic/template-new-project';
+async function createMinimalProject(dir: string) {
+  // Get or create the cached template
+  const cachedTemplate = await getCachedTemplate();
 
-  if (devPath) {
-    templatePath = path.resolve(devPath, 'packages', 'template-new-project');
-  }
-
-  // Generate project using caz with 'none' backend (core only)
-  await caz.default(templatePath, dir, {
-    name: projectName,
-    backend: 'none',
-    install: false,
-    force: true,
-  });
-
-  // Copy some test resources that can be used for testing
+  // Copy the cached template to the target directory
+  fs.cpSync(cachedTemplate, dir, { recursive: true });
   copyTestResources(dir);
+  // Update positronic.config.json with the correct project name if it exists
+  const configPath = path.join(dir, 'positronic.config.json');
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    config.name = 'test-project';
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  }
 }
 
 class TestEnv {
   private serverHandle: TestServerHandle | null = null;
-  constructor(private testServer: TestDevServer) {}
+  constructor(public server: TestDevServer) {}
   get projectRootDir() {
-    return this.testServer.projectRootDir;
+    return this.server.projectRootDir;
   }
 
   setup(setup: (tempDir: string) => void | Promise<void>) {
@@ -64,13 +95,13 @@ class TestEnv {
     if (this.serverHandle) {
       throw new Error('Server already started');
     }
-    this.serverHandle = await this.testServer.start();
+    this.serverHandle = await this.server.start();
     return (argv: string[]) => {
       if (!this.serverHandle) {
         throw new Error('Server not started');
       }
       return px(argv, {
-        server: this.testServer,
+        server: this.server,
       });
     };
   }
@@ -85,7 +116,7 @@ class TestEnv {
     }
     this.serverHandle.kill();
     this.serverHandle = null;
-    await this.testServer.stop();
+    await this.server.stop();
   }
 
   async stopAndCleanup() {
