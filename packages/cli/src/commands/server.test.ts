@@ -43,16 +43,20 @@ describe('CLI Integration: positronic server', () => {
       const { server } = env;
       await px(['server'], { server });
 
-      const methodCalls = server.getLogs();
+      try {
+        const methodCalls = server.getLogs();
+        // Verify the method calls
+        const setupCall = methodCalls.find((call) => call.method === 'setup');
+        const startCall = methodCalls.find((call) => call.method === 'start');
 
-      // Verify the method calls
-      const setupCall = methodCalls.find((call) => call.method === 'setup');
-      const startCall = methodCalls.find((call) => call.method === 'start');
+        expect(setupCall).toBeDefined();
+        expect(setupCall!.args[0]).toBe(false); // force flag not set
 
-      expect(setupCall).toBeDefined();
-      expect(setupCall!.args[0]).toBe(false); // force flag not set
-
-      expect(startCall).toBeDefined();
+        expect(startCall).toBeDefined();
+      } finally {
+        process.emit('SIGINT');
+        await new Promise((r) => setImmediate(r));
+      }
     });
   });
 
@@ -88,49 +92,37 @@ describe('CLI Integration: positronic server', () => {
       }
     });
 
-    // it('should generate types file after server starts', async () => {
-    //   // Stub process.exit so cleanup doesn't terminate Jest
-    //   const exitSpy = jest
-    //     .spyOn(process, 'exit')
-    //     .mockImplementation(() => undefined as never);
+    it('should generate types file after server starts', async () => {
+      // Stub process.exit so cleanup doesn't terminate Jest
+      const { server } = env;
+      await px(['server'], { server });
 
-    //   const server = await createTestEnv({
-    //     setup: (projectDir) => {
-    //       copyTestResources(projectDir);
-    //     },
-    //   });
-
-    //   try {
-    //     await px(['server'], { server });
-
-    //     // Wait for types file to be generated with our resources
-    //     const typesPath = path.join(server.projectRootDir, 'resources.d.ts');
-    //     const typesContent = await waitForTypesFile(typesPath, [
-    //       'readme: TextResource;',
-    //       'config: TextResource;',
-    //       'api: TextResource;',
-    //     ]);
-    //     // Check that the types file was generated with content
-    //     expect(typesContent).not.toBe('');
-    //     // Check for the module declaration
-    //     expect(typesContent).toContain("declare module '@positronic/core'");
-    //     // Check for resource type definitions
-    //     expect(typesContent).toContain('interface TextResource');
-    //     expect(typesContent).toContain('interface BinaryResource');
-    //     expect(typesContent).toContain('interface Resources');
-    //     // Check for the specific resources we created
-    //     expect(typesContent).toContain('readme: TextResource;');
-    //     expect(typesContent).toContain('config: TextResource;');
-    //     expect(typesContent).toContain('docs: {');
-    //     expect(typesContent).toContain('api: TextResource;');
-
-    //     // Trigger the cleanup path in ServerCommand to close file watchers
-    //     process.emit('SIGINT');
-    //     await new Promise((r) => setImmediate(r));
-    //   } finally {
-    //     exitSpy.mockRestore();
-    //     await server.stop();
-    //   }
-    // });
+      try {
+        // Wait for types file to be generated with our resources
+        const typesPath = path.join(server.projectRootDir, 'resources.d.ts');
+        const typesContent = await waitForTypesFile(typesPath, [
+          'readme: TextResource;',
+          'config: TextResource;',
+          'api: TextResource;',
+        ]);
+        // Check that the types file was generated with content
+        expect(typesContent).not.toBe('');
+        // Check for the module declaration
+        expect(typesContent).toContain("declare module '@positronic/core'");
+        // Check for resource type definitions
+        expect(typesContent).toContain('interface TextResource');
+        expect(typesContent).toContain('interface BinaryResource');
+        expect(typesContent).toContain('interface Resources');
+        // Check for the specific resources we created
+        expect(typesContent).toContain('readme: TextResource;');
+        expect(typesContent).toContain('config: TextResource;');
+        expect(typesContent).toContain('docs: {');
+        expect(typesContent).toContain('api: TextResource;');
+      } finally {
+        // Trigger the cleanup path in ServerCommand to close file watchers
+        process.emit('SIGINT');
+        await new Promise((r) => setImmediate(r));
+      }
+    });
   });
 });
