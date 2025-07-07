@@ -11,8 +11,9 @@ import fs from 'fs';
 describe('CLI Integration: positronic resources types', () => {
   it('should generate type definitions for resources', async () => {
     const env = await createTestEnv();
+    const { server } = env;
     const px = env.setup(copyTestResources).start();
-    // .start() returns px
+
     try {
       const isReady = px(['resources', 'sync']).waitFor(/sync summary/i);
       expect(isReady).toBe(true);

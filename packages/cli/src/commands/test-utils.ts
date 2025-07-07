@@ -79,7 +79,7 @@ async function createMinimalProject(dir: string) {
   }
 }
 
-class TestEnv {
+export class TestEnv {
   private serverHandle: TestServerHandle | null = null;
   constructor(public server: TestDevServer) {}
   get projectRootDir() {
