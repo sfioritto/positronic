@@ -171,21 +171,21 @@ export async function px(
   } = {}
 ) {
   let capturedElement: React.ReactElement | null = null;
-
+  const { configDir, server } = options;
   const mockRenderFn = (element: React.ReactElement) => {
     capturedElement = element;
   };
 
   // Setup project-specific environment if configDir is provided
-  if (options.configDir) {
-    process.env.POSITRONIC_CONFIG_DIR = options.configDir;
+  if (configDir) {
+    process.env.POSITRONIC_CONFIG_DIR = configDir;
     process.env.POSITRONIC_TEST_MODE = 'true';
   }
 
   try {
     const testCli = buildCli({
       argv,
-      server: options.server,
+      server,
       exitProcess: false,
       render: mockRenderFn,
     });
@@ -195,7 +195,7 @@ export async function px(
     return capturedElement;
   } finally {
     // Cleanup project-specific environment if configDir was provided
-    if (options.configDir) {
+    if (configDir) {
       delete process.env.POSITRONIC_CONFIG_DIR;
       delete process.env.POSITRONIC_TEST_MODE;
     }

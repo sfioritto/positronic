@@ -172,14 +172,12 @@ export async function syncResources(
   onProgress?: SyncProgressCallback
 ): Promise<SyncResult> {
   const resourcesDir = path.join(projectRootPath, 'resources');
-
   // Ensure resources directory exists
   if (!fs.existsSync(resourcesDir)) {
     fs.mkdirSync(resourcesDir, { recursive: true });
   }
 
   const localResources = scanLocalResources(resourcesDir);
-
   // Fetch server resources
   const response = await client.fetch('/resources');
   if (!response.ok) {
@@ -188,7 +186,6 @@ export async function syncResources(
       `Failed to fetch resources: ${response.status} ${errorText}`
     );
   }
-
   const data = (await response.json()) as ResourcesListResponse;
   const serverResourceMap = new Map(data.resources.map((r) => [r.key, r]));
 
@@ -200,7 +197,6 @@ export async function syncResources(
   let errorCount = 0;
   let deleteCount = 0;
   const errors: Array<{ file: string; message: string }> = [];
-
   // First, handle uploads and updates
   for (const resource of localResources) {
     // Report progress for checking
