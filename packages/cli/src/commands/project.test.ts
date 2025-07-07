@@ -24,7 +24,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { describe, it, expect, afterEach } from '@jest/globals';
-import { createTestEnv, testCliCommand } from './test-utils.js';
+import { createTestEnv, px } from './test-utils.js';
 import type { TestDevServer } from '../test/test-dev-server.js';
 import React from 'react';
 
@@ -66,7 +66,7 @@ describe('CLI Integration: positronic server with project', () => {
       },
     });
 
-    const element = await testCliCommand(['run', 'test-brain'], {
+    const element = await px(['run', 'test-brain'], {
       server,
     });
 
@@ -91,7 +91,7 @@ describe('CLI Integration: project commands', () => {
     configDir = path.join(tempDir, '.positronic');
 
     // Create px wrapper that captures configDir
-    px = (argv: string[]) => testCliCommand(argv, { configDir });
+    px = (argv: string[]) => px(argv, { configDir });
   });
 
   afterEach(() => {

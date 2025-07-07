@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   createTestEnv,
-  testCliCommand,
+  px,
   copyTestResources,
   waitForTypesFile,
 } from './test-utils.js';
@@ -10,19 +10,14 @@ import fs from 'fs';
 
 describe('CLI Integration: positronic resources types', () => {
   it('should generate type definitions for resources', async () => {
-    const server = await createTestEnv();
-    const px = server.setup(copyTestResources).start();
+    const env = await createTestEnv();
+    const px = env.setup(copyTestResources).start();
     // .start() returns px
     try {
-      fs.writeFileSync(
-        path.join(server.projectRootDir, 'resources', 'resourcesTest.txt'),
-        'test'
-      );
-
       const isReady = px(['resources', 'sync']).waitFor(/sync summary/i);
       expect(isReady).toBe(true);
 
-      const { output } = await testCliCommand(['resources', 'sync'], {
+      const { output } = await px(['resources', 'sync'], {
         server,
       });
 

@@ -4,7 +4,7 @@ import { describe, it, expect, jest } from '@jest/globals';
 import {
   createTestEnv,
   waitForTypesFile,
-  testCliCommand,
+  px,
   copyTestResources,
 } from './test-utils.js';
 
@@ -13,7 +13,7 @@ describe('CLI Integration: positronic server', () => {
     it('should not have server command available outside a Positronic project', async () => {
       // No server needed for this test - testing behavior without a project
       try {
-        await testCliCommand(['server']);
+        await px(['server']);
         // If we get here, the command didn't fail as expected
         expect(false).toBe(true); // Force failure
       } catch (error: any) {
@@ -51,7 +51,7 @@ describe('CLI Integration: positronic server', () => {
 
       try {
         // Start the CLI's server command which will sync resources
-        await testCliCommand(['server'], { server });
+        await px(['server'], { server });
 
         // Verify that the CLI attempted to upload both default resources
         const uploads = server
@@ -87,7 +87,7 @@ describe('CLI Integration: positronic server', () => {
       });
 
       try {
-        await testCliCommand(['server'], { server });
+        await px(['server'], { server });
 
         // Wait for types file to be generated with our resources
         const typesPath = path.join(server.projectRootDir, 'resources.d.ts');

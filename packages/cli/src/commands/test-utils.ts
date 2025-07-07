@@ -50,26 +50,41 @@ async function createMinimalProject(
 
 class TestEnv {
   private serverHandle: TestServerHandle | null = null;
-  constructor(private tempDir: string, private testServer: TestDevServer) {}
+  constructor(private testServer: TestDevServer) {}
+  get projectRootDir() {
+    return this.testServer.projectRootDir;
+  }
 
   setup(setup: (tempDir: string) => void | Promise<void>) {
-    setup(this.tempDir);
+    setup(this.projectRootDir);
     return this;
   }
 
   async start() {
+    if (this.serverHandle) {
+      throw new Error('Server already started');
+    }
     this.serverHandle = await this.testServer.start();
-    return this.serverHandle;
+    return (argv: string[]) => {
+      if (!this.serverHandle) {
+        throw new Error('Server not started');
+      }
+      return px(argv, {
+        server: this.testServer,
+      });
+    };
   }
 
   cleanup() {
-    fs.rmSync(this.tempDir, { recursive: true, force: true });
+    fs.rmSync(this.projectRootDir, { recursive: true, force: true });
   }
 
   async stop() {
-    if (this.serverHandle) {
-      this.serverHandle.kill();
+    if (!this.serverHandle) {
+      throw new Error('Server not started');
     }
+    this.serverHandle.kill();
+    this.serverHandle = null;
     await this.testServer.stop();
   }
 
@@ -77,6 +92,18 @@ class TestEnv {
     await this.stop();
     this.cleanup();
   }
+}
+
+export async function createTestEnv(): Promise<TestEnv> {
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'positronic-server-test-')
+  );
+  await createMinimalProject(tempDir);
+
+  // Create test dev server instance
+  const devServer = new TestDevServer(tempDir);
+
+  return new TestEnv(devServer);
 }
 
 // Helper function to wait for types file to contain specific content
@@ -105,13 +132,11 @@ export async function waitForTypesFile(
 }
 
 // Helper function to test CLI commands with ink-testing-library
-export async function testCliCommand(
+export async function px(
   argv: string[],
   options: {
     server?: PositronicDevServer;
     configDir?: string;
-    setupEnv?: () => void;
-    cleanupEnv?: () => void;
   } = {}
 ) {
   let capturedElement: React.ReactElement | null = null;
@@ -119,9 +144,6 @@ export async function testCliCommand(
   const mockRenderFn = (element: React.ReactElement) => {
     capturedElement = element;
   };
-
-  // Setup environment if provided
-  options.setupEnv?.();
 
   // Setup project-specific environment if configDir is provided
   if (options.configDir) {
@@ -146,8 +168,5 @@ export async function testCliCommand(
       delete process.env.POSITRONIC_CONFIG_DIR;
       delete process.env.POSITRONIC_TEST_MODE;
     }
-
-    // Cleanup environment if provided
-    options.cleanupEnv?.();
   }
 }
