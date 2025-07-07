@@ -43,6 +43,9 @@ async function createMinimalProject(
     install: false,
     force: true,
   });
+
+  // Copy some test resources that can be used for testing
+  copyTestResources(dir);
 }
 
 export async function createTestEnv(): Promise<TestDevServer> {
