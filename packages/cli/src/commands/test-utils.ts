@@ -18,7 +18,7 @@ export const cliExecutable = path.join(
 );
 export const nodeExecutable = process.execPath;
 
-export async function createTestServer({
+export async function createTestEnv({
   setup,
 }: {
   setup?: (dir: string) => void | Promise<void>;

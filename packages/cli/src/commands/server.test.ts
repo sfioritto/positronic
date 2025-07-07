@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { describe, it, expect, jest } from '@jest/globals';
 import {
-  createTestServer,
+  createTestEnv,
   waitForTypesFile,
   testCliCommand,
   copyTestResources,
@@ -25,7 +25,7 @@ describe('CLI Integration: positronic server', () => {
 
   describe('Server lifecycle', () => {
     it('should call setup() and start() methods on the dev server', async () => {
-      const server = await createTestServer();
+      const server = await createTestEnv();
 
       const methodCalls = server.getLogs();
 
@@ -47,7 +47,7 @@ describe('CLI Integration: positronic server', () => {
         .spyOn(process, 'exit')
         .mockImplementation(() => undefined as never);
 
-      const server = await createTestServer();
+      const server = await createTestEnv();
 
       try {
         // Start the CLI's server command which will sync resources
@@ -80,7 +80,7 @@ describe('CLI Integration: positronic server', () => {
         .spyOn(process, 'exit')
         .mockImplementation(() => undefined as never);
 
-      const server = await createTestServer({
+      const server = await createTestEnv({
         setup: (projectDir) => {
           copyTestResources(projectDir);
         },
