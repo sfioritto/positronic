@@ -3,26 +3,38 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import process from 'process';
-import { fileURLToPath } from 'url';
 import type { TestServerHandle } from '../test/test-dev-server.js';
 import { TestDevServer } from '../test/test-dev-server.js';
 import { buildCli } from '../cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
 
-// Resolve paths relative to the workspace root
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const workspaceRoot = path.resolve(__dirname, '../../../../');
-export const cliExecutable = path.join(
-  workspaceRoot,
-  'packages/cli/dist/src/positronic.js'
-);
-export const nodeExecutable = process.execPath;
+// Helper function to create a minimal Positronic project structure
+function createMinimalProject(dir: string, config?: any) {
+  const defaultConfig = {
+    name: 'test-project',
+    version: '1.0.0',
+  };
 
-export async function createTestEnv({
-  setup,
-}: {
-  setup?: (dir: string) => void | Promise<void>;
-} = {}): Promise<TestDevServer> {
+  fs.writeFileSync(
+    path.join(dir, 'positronic.config.json'),
+    JSON.stringify({ ...defaultConfig, ...config }, null, 2)
+  );
+
+  fs.mkdirSync(path.join(dir, 'brains'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'resources'), { recursive: true });
+
+  // Create default resources
+  fs.writeFileSync(
+    path.join(dir, 'resources', 'test.txt'),
+    'Default test resource'
+  );
+  fs.writeFileSync(
+    path.join(dir, 'resources', 'data.json'),
+    '{"default": true}'
+  );
+}
+
+export async function createTestEnv(): Promise<TestDevServer> {
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'positronic-server-test-')
   );
@@ -70,32 +82,6 @@ export async function createTestEnv({
     await cleanup();
     throw error;
   }
-}
-
-// Helper function to create a minimal Positronic project structure
-export function createMinimalProject(dir: string, config?: any) {
-  const defaultConfig = {
-    name: 'test-project',
-    version: '1.0.0',
-  };
-
-  fs.writeFileSync(
-    path.join(dir, 'positronic.config.json'),
-    JSON.stringify({ ...defaultConfig, ...config }, null, 2)
-  );
-
-  fs.mkdirSync(path.join(dir, 'brains'), { recursive: true });
-  fs.mkdirSync(path.join(dir, 'resources'), { recursive: true });
-
-  // Create default resources
-  fs.writeFileSync(
-    path.join(dir, 'resources', 'test.txt'),
-    'Default test resource'
-  );
-  fs.writeFileSync(
-    path.join(dir, 'resources', 'data.json'),
-    '{"default": true}'
-  );
 }
 
 // Helper function to copy test resources from test data directory
