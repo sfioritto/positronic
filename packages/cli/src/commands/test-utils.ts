@@ -7,31 +7,42 @@ import type { TestServerHandle } from '../test/test-dev-server.js';
 import { TestDevServer } from '../test/test-dev-server.js';
 import { buildCli } from '../cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
+import caz from 'caz';
+
+// Helper function to copy test resources from test data directory
+function copyTestResources(targetDir: string) {
+  const testDataPath = path.join(__dirname, '../test/data/resources');
+  const targetResourcesPath = path.join(targetDir, 'resources');
+
+  // Remove existing resources directory if it exists
+  if (fs.existsSync(targetResourcesPath)) {
+    fs.rmSync(targetResourcesPath, { recursive: true, force: true });
+  }
+
+  // Copy the test data resources
+  fs.cpSync(testDataPath, targetResourcesPath, { recursive: true });
+}
 
 // Helper function to create a minimal Positronic project structure
-function createMinimalProject(dir: string, config?: any) {
-  const defaultConfig = {
-    name: 'test-project',
-    version: '1.0.0',
-  };
+async function createMinimalProject(
+  dir: string,
+  projectName: string = 'test-project'
+) {
+  // Determine template path - use local development path if available
+  const devPath = process.env.POSITRONIC_LOCAL_PATH;
+  let templatePath = '@positronic/template-new-project';
 
-  fs.writeFileSync(
-    path.join(dir, 'positronic.config.json'),
-    JSON.stringify({ ...defaultConfig, ...config }, null, 2)
-  );
+  if (devPath) {
+    templatePath = path.resolve(devPath, 'packages', 'template-new-project');
+  }
 
-  fs.mkdirSync(path.join(dir, 'brains'), { recursive: true });
-  fs.mkdirSync(path.join(dir, 'resources'), { recursive: true });
-
-  // Create default resources
-  fs.writeFileSync(
-    path.join(dir, 'resources', 'test.txt'),
-    'Default test resource'
-  );
-  fs.writeFileSync(
-    path.join(dir, 'resources', 'data.json'),
-    '{"default": true}'
-  );
+  // Generate project using caz with 'none' backend (core only)
+  await caz.default(templatePath, dir, {
+    name: projectName,
+    backend: 'none',
+    install: false,
+    force: true,
+  });
 }
 
 export async function createTestEnv(): Promise<TestDevServer> {
@@ -49,12 +60,7 @@ export async function createTestEnv(): Promise<TestDevServer> {
   };
 
   try {
-    createMinimalProject(tempDir);
-
-    // Run setup callback if provided
-    if (setup) {
-      await setup(tempDir);
-    }
+    await createMinimalProject(tempDir);
 
     // Create test dev server instance
     const devServer = new TestDevServer(tempDir);
@@ -82,20 +88,6 @@ export async function createTestEnv(): Promise<TestDevServer> {
     await cleanup();
     throw error;
   }
-}
-
-// Helper function to copy test resources from test data directory
-export function copyTestResources(targetDir: string) {
-  const testDataPath = path.join(__dirname, '../test/data/resources');
-  const targetResourcesPath = path.join(targetDir, 'resources');
-
-  // Remove existing resources directory if it exists
-  if (fs.existsSync(targetResourcesPath)) {
-    fs.rmSync(targetResourcesPath, { recursive: true, force: true });
-  }
-
-  // Copy the test data resources
-  fs.cpSync(testDataPath, targetResourcesPath, { recursive: true });
 }
 
 // Helper function to wait for types file to contain specific content
