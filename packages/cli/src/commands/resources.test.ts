@@ -102,52 +102,66 @@ describe('CLI Integration: positronic resources types', () => {
     }
   });
 
-  // it('should handle resources with special characters', async () => {
-  //   const server = await createTestServer({
-  //     setup: (dir: string) => {
-  //       // Create resources directory
-  //       const resourcesDir = path.join(dir, 'resources');
-  //       fs.mkdirSync(resourcesDir, { recursive: true });
+  it('should handle resources with special characters', async () => {
+    const env = await createTestEnv();
 
-  //       // Create files with special characters
-  //       fs.writeFileSync(path.join(resourcesDir, 'valid_file.txt'), 'content');
-  //       fs.writeFileSync(path.join(resourcesDir, '$special.txt'), 'content'); // Valid JS identifier
-  //       fs.writeFileSync(path.join(resourcesDir, '_underscore.txt'), 'content'); // Valid JS identifier
-  //       fs.writeFileSync(path.join(resourcesDir, '123invalid.txt'), 'content'); // Invalid - starts with number
-  //       fs.writeFileSync(
-  //         path.join(resourcesDir, 'special-chars!@#.txt'),
-  //         'content'
-  //       ); // Invalid
-  //     },
-  //   });
+    // Setup files with special characters
+    env.setup((dir: string) => {
+      // Create resources directory
+      const resourcesDir = path.join(dir, 'resources');
 
-  //   try {
-  //     // Run the types command
-  //     const px = cli(server);
-  //     const result = px('resources types');
+      // Remove existing resources directory if it exists
+      if (fs.existsSync(resourcesDir)) {
+        fs.rmSync(resourcesDir, { recursive: true, force: true });
+      }
 
-  //     // Command should succeed
-  //     expect(result.exitCode).toBe(0);
+      // Create fresh resources directory
+      fs.mkdirSync(resourcesDir, { recursive: true });
 
-  //     // Check if the types file was generated
-  //     const typesPath = path.join(server.dir, 'resources.d.ts');
-  //     expect(fs.existsSync(typesPath)).toBe(true);
+      // Create files with special characters
+      fs.writeFileSync(path.join(resourcesDir, 'valid_file.txt'), 'content');
+      fs.writeFileSync(path.join(resourcesDir, '$special.txt'), 'content'); // Valid JS identifier
+      fs.writeFileSync(path.join(resourcesDir, '_underscore.txt'), 'content'); // Valid JS identifier
+      fs.writeFileSync(path.join(resourcesDir, '123invalid.txt'), 'content'); // Invalid - starts with number
+      fs.writeFileSync(
+        path.join(resourcesDir, 'special-chars!@#.txt'),
+        'content'
+      ); // Invalid
+    });
 
-  //     // Verify the generated content
-  //     const content = fs.readFileSync(typesPath, 'utf-8');
+    const px = await env.start();
 
-  //     // Check valid identifiers are included
-  //     expect(content).toContain('valid_file: TextResource;');
-  //     expect(content).toContain('$special: TextResource;');
-  //     expect(content).toContain('_underscore: TextResource;');
+    try {
+      // Run the sync command first (types are generated as part of sync)
+      const { waitForOutput, waitForTypesFile } = await px([
+        'resources',
+        'sync',
+      ]);
+      const isOutputRendered = await waitForOutput(/sync summary/i);
+      expect(isOutputRendered).toBe(true);
 
-  //     // Check invalid identifiers are excluded
-  //     expect(content).not.toContain('123invalid');
-  //     expect(content).not.toContain('special-chars');
-  //   } finally {
-  //     await server.cleanup();
-  //   }
-  // });
+      // Wait for types file to be generated
+      const typesContent = await waitForTypesFile([
+        'valid_file: TextResource;',
+        '$special: TextResource;',
+        '_underscore: TextResource;',
+      ]);
+
+      // Verify the generated content
+      expect(typesContent).toBeDefined();
+
+      // Check valid identifiers are included
+      expect(typesContent).toContain('valid_file: TextResource;');
+      expect(typesContent).toContain('$special: TextResource;');
+      expect(typesContent).toContain('_underscore: TextResource;');
+
+      // Check invalid identifiers are excluded
+      expect(typesContent).not.toContain('123invalid');
+      expect(typesContent).not.toContain('special-chars');
+    } finally {
+      await env.stopAndCleanup();
+    }
+  });
 
   // it('should correctly identify text vs binary files', async () => {
   //   const server = await createTestServer({
