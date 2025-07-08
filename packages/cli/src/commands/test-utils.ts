@@ -123,6 +123,10 @@ export class TestEnv {
             await new Promise((resolve) => setTimeout(resolve, 10));
             tries++;
           }
+          console.error(
+            'waitForOutput failed, last frame:',
+            instance!.lastFrame()
+          );
           return false;
         },
         waitForTypesFile: async (types: string | string[]) => {

@@ -53,43 +53,45 @@ describe('CLI Integration: positronic resources types', () => {
     }
   });
 
-  // it('should handle empty resources directory', async () => {
-  //   const server = await createTestServer();
+  it('should handle empty resources directory', async () => {
+    const env = await createTestEnv();
+    const px = await env.start();
+    try {
+      // Remove the default resources created by createMinimalProject
+      const resourcesDir = path.join(env.projectRootDir, 'resources');
 
-  //   try {
-  //     // Remove the default resources created by createMinimalProject
-  //     const resourcesDir = path.join(server.dir, 'resources');
-  //     const defaultFiles = fs.readdirSync(resourcesDir);
-  //     for (const file of defaultFiles) {
-  //       fs.unlinkSync(path.join(resourcesDir, file));
-  //     }
+      // Remove all contents recursively and recreate empty directory
+      fs.rmSync(resourcesDir, { recursive: true, force: true });
+      fs.mkdirSync(resourcesDir);
 
-  //     // Verify directory is empty
-  //     expect(fs.readdirSync(resourcesDir).length).toBe(0);
+      // Verify directory is empty
+      expect(fs.readdirSync(resourcesDir).length).toBe(0);
 
-  //     // Run the types command using cli
-  //     const px = cli(server);
-  //     const result = px('resources types');
+      // Run the types command using cli
+      const { waitForOutput, waitForTypesFile } = await px([
+        'resources',
+        'sync',
+      ]);
+      const isOutputRendered = await waitForOutput(/no files found/i);
+      expect(isOutputRendered).toBe(true);
+      const typesContent = await waitForTypesFile(
+        'loadText(path: string): Promise<string>;'
+      );
 
-  //     // Command should succeed
-  //     expect(result.exitCode).toBe(0);
+      // Check if the types file was generated
+      expect(typesContent).toBeDefined();
 
-  //     // Check if the types file was generated
-  //     const typesPath = path.join(server.dir, 'resources.d.ts');
-  //     expect(fs.existsSync(typesPath)).toBe(true);
-
-  //     // Read and verify the generated content
-  //     const content = fs.readFileSync(typesPath, 'utf-8');
-
-  //     // Should still have the basic structure
-  //     expect(content).toContain("declare module '@positronic/core'");
-  //     expect(content).toContain('interface Resources');
-  //     expect(content).toContain('loadText(path: string): Promise<string>');
-  //     expect(content).toContain('loadBinary(path: string): Promise<Buffer>');
-  //   } finally {
-  //     await server.stop();
-  //   }
-  // });
+      // Should still have the basic structure
+      expect(typesContent).toContain("declare module '@positronic/core'");
+      expect(typesContent).toContain('interface Resources');
+      expect(typesContent).toContain('loadText(path: string): Promise<string>');
+      expect(typesContent).toContain(
+        'loadBinary(path: string): Promise<Buffer>'
+      );
+    } finally {
+      await env.stopAndCleanup();
+    }
+  });
 
   // it('should handle resources with special characters', async () => {
   //   const server = await createTestServer({
