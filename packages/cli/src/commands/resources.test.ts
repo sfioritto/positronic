@@ -163,65 +163,84 @@ describe('CLI Integration: positronic resources types', () => {
     }
   });
 
-  // it('should correctly identify text vs binary files', async () => {
-  //   const server = await createTestServer({
-  //     setup: (dir: string) => {
-  //       // Create resources directory
-  //       const resourcesDir = path.join(dir, 'resources');
-  //       fs.mkdirSync(resourcesDir, { recursive: true });
+  it('should correctly identify text vs binary files', async () => {
+    const env = await createTestEnv();
 
-  //       // Create various file types
-  //       fs.writeFileSync(path.join(resourcesDir, 'text.txt'), 'text');
-  //       fs.writeFileSync(path.join(resourcesDir, 'script.js'), 'code');
-  //       fs.writeFileSync(path.join(resourcesDir, 'config.json'), '{}');
-  //       fs.writeFileSync(path.join(resourcesDir, 'styles.css'), 'css');
+    // Setup files with various types
+    env.setup((dir: string) => {
+      // Create resources directory
+      const resourcesDir = path.join(dir, 'resources');
 
-  //       // Create actual binary content for binary files
-  //       // JPEG magic bytes
-  //       const jpegHeader = Buffer.from([
-  //         0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
-  //       ]);
-  //       fs.writeFileSync(path.join(resourcesDir, 'image.jpg'), jpegHeader);
+      // Remove existing resources directory if it exists
+      if (fs.existsSync(resourcesDir)) {
+        fs.rmSync(resourcesDir, { recursive: true, force: true });
+      }
 
-  //       // Random binary data
-  //       const binaryData = Buffer.from([
-  //         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
-  //       ]);
-  //       fs.writeFileSync(path.join(resourcesDir, 'binary.bin'), binaryData);
+      // Create fresh resources directory
+      fs.mkdirSync(resourcesDir, { recursive: true });
 
-  //       // PDF magic bytes
-  //       const pdfHeader = Buffer.from('%PDF-1.4\n%âÌÊÓ\n');
-  //       fs.writeFileSync(path.join(resourcesDir, 'document.pdf'), pdfHeader);
-  //     },
-  //   });
+      // Create various file types
+      fs.writeFileSync(path.join(resourcesDir, 'text.txt'), 'text');
+      fs.writeFileSync(path.join(resourcesDir, 'script.js'), 'code');
+      fs.writeFileSync(path.join(resourcesDir, 'config.json'), '{}');
+      fs.writeFileSync(path.join(resourcesDir, 'styles.css'), 'css');
 
-  //   try {
-  //     // Run the types command
-  //     const px = cli(server);
-  //     const result = px('resources types');
+      // Create actual binary content for binary files
+      // JPEG magic bytes
+      const jpegHeader = Buffer.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+      ]);
+      fs.writeFileSync(path.join(resourcesDir, 'image.jpg'), jpegHeader);
 
-  //     // Command should succeed
-  //     expect(result.exitCode).toBe(0);
+      // Random binary data
+      const binaryData = Buffer.from([
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+      ]);
+      fs.writeFileSync(path.join(resourcesDir, 'binary.bin'), binaryData);
 
-  //     // Check if the types file was generated
-  //     const typesPath = path.join(server.dir, 'resources.d.ts');
-  //     expect(fs.existsSync(typesPath)).toBe(true);
+      // PDF magic bytes
+      const pdfHeader = Buffer.from('%PDF-1.4\n%âÌÊÓ\n');
+      fs.writeFileSync(path.join(resourcesDir, 'document.pdf'), pdfHeader);
+    });
 
-  //     // Verify the generated content
-  //     const content = fs.readFileSync(typesPath, 'utf-8');
+    const px = await env.start();
 
-  //     // Check text resources
-  //     expect(content).toContain('text: TextResource;');
-  //     expect(content).toContain('script: TextResource;');
-  //     expect(content).toContain('config: TextResource;');
-  //     expect(content).toContain('styles: TextResource;');
+    try {
+      // Run the sync command first (types are generated as part of sync)
+      const { waitForOutput, waitForTypesFile } = await px([
+        'resources',
+        'sync',
+      ]);
 
-  //     // Check binary resources
-  //     expect(content).toContain('image: BinaryResource;');
-  //     expect(content).toContain('binary: BinaryResource;');
-  //     expect(content).toContain('document: BinaryResource;');
-  //   } finally {
-  //     await server.cleanup();
-  //   }
-  // });
+      const isOutputRendered = await waitForOutput(/sync summary/i);
+      expect(isOutputRendered).toBe(true);
+
+      // Wait for types file to be generated with expected content
+      const typesContent = await waitForTypesFile([
+        'text: TextResource;',
+        'script: TextResource;',
+        'config: TextResource;',
+        'styles: TextResource;',
+        'image: BinaryResource;',
+        'binary: BinaryResource;',
+        'document: BinaryResource;',
+      ]);
+
+      // Verify the generated content
+      expect(typesContent).toBeDefined();
+
+      // Check text resources
+      expect(typesContent).toContain('text: TextResource;');
+      expect(typesContent).toContain('script: TextResource;');
+      expect(typesContent).toContain('config: TextResource;');
+      expect(typesContent).toContain('styles: TextResource;');
+
+      // Check binary resources
+      expect(typesContent).toContain('image: BinaryResource;');
+      expect(typesContent).toContain('binary: BinaryResource;');
+      expect(typesContent).toContain('document: BinaryResource;');
+    } finally {
+      await env.stopAndCleanup();
+    }
+  });
 });
