@@ -1,37 +1,55 @@
 import { describe, it, expect } from '@jest/globals';
-import {
-  createTestEnv,
-  px,
-  copyTestResources,
-  waitForTypesFile,
-} from './test-utils.js';
+import { createTestEnv, px, waitForTypesFile } from './test-utils.js';
 import path from 'path';
 import fs from 'fs';
 
 describe('CLI Integration: positronic resources types', () => {
   it('should generate type definitions for resources', async () => {
     const env = await createTestEnv();
-    const { server } = env;
-    const px = env.setup(copyTestResources).start();
-
+    const px = await env.start();
     try {
-      const isReady = px(['resources', 'sync']).waitFor(/sync summary/i);
-      expect(isReady).toBe(true);
+      const { waitForOutput, waitForTypesFile } = await px([
+        'resources',
+        'sync',
+      ]);
+      const isOutputRendered = await waitForOutput(/sync summary/i);
+      const typesContent = await waitForTypesFile('config: TextResource;');
+      expect(isOutputRendered).toBe(true);
+      const normalizeWhitespace = (str: string) =>
+        str.replace(/\s+/g, ' ').trim();
 
-      const { output } = await px(['resources', 'sync'], {
-        server,
-      });
+      const expectedContent = `declare module '@positronic/core' {
+        interface TextResource {
+          load(): Promise<string>;
+        }
+        interface BinaryResource {
+          load(): Promise<Buffer>;
+        }
+        interface Resources {
+          // Method signatures for loading resources by path
+          loadText(path: string): Promise<string>;
+          loadBinary(path: string): Promise<Buffer>;
+          // Resource properties accessible via dot notation
+          config: TextResource;
+          data: {
+            config: TextResource;
+            logo: BinaryResource;
+          };
+          docs: {
+            api: TextResource;
+            readme: TextResource;
+          };
+          example: TextResource;
+          readme: TextResource;
+          test: TextResource;
+        }
+      }`;
 
-      const typesPath = path.join(server.projectRootDir, 'resources.d.ts');
-      const typesContent = await waitForTypesFile(
-        typesPath,
-        'test: TextResource;'
+      expect(normalizeWhitespace(typesContent)).toContain(
+        normalizeWhitespace(expectedContent)
       );
-
-      // Ensure the types file was generated and contains our test resource
-      expect(typesContent).toContain('resourcesTest: TextResource;');
     } finally {
-      server.stop();
+      await env.stopAndCleanup();
     }
   });
 

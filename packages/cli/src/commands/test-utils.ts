@@ -1,3 +1,4 @@
+import React from 'react';
 import { render } from 'ink-testing-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -96,13 +97,39 @@ export class TestEnv {
       throw new Error('Server already started');
     }
     this.serverHandle = await this.server.start();
-    return (argv: string[]) => {
+    return async (argv: string[]) => {
       if (!this.serverHandle) {
         throw new Error('Server not started');
       }
-      return px(argv, {
+      const instance = await px(argv, {
         server: this.server,
       });
+      return {
+        waitForOutput: async (regex?: RegExp) => {
+          if (!instance && !regex) {
+            return true;
+          }
+          if (!instance && regex) {
+            return false;
+          }
+
+          const maxTries = 10;
+          let tries = 0;
+          while (tries < maxTries) {
+            const lastFrame = instance!.lastFrame() ?? '';
+            if (regex!.test(lastFrame)) {
+              return true;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            tries++;
+          }
+          return false;
+        },
+        waitForTypesFile: async (types: string | string[]) => {
+          const typesPath = path.join(this.projectRootDir, 'resources.d.ts');
+          return waitForTypesFile(typesPath, types, 1000);
+        },
+      };
     };
   }
 
@@ -169,11 +196,12 @@ export async function px(
     server?: PositronicDevServer;
     configDir?: string;
   } = {}
-) {
-  let capturedElement: React.ReactElement | null = null;
+): Promise<ReturnType<typeof render> | null> {
+  let capturedElement: ReturnType<typeof render> | null = null;
   const { configDir, server } = options;
   const mockRenderFn = (element: React.ReactElement) => {
-    capturedElement = element;
+    capturedElement = render(element);
+    return capturedElement;
   };
 
   // Setup project-specific environment if configDir is provided
