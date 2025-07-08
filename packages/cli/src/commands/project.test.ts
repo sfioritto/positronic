@@ -24,55 +24,54 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { describe, it, expect, afterEach } from '@jest/globals';
-import { createTestEnv, px } from './test-utils.js';
+import { createTestEnv, px as pxTest } from './test-utils.js';
 import type { TestDevServer } from '../test/test-dev-server.js';
 import React from 'react';
 
 describe('CLI Integration: positronic server with project', () => {
-  let server: TestDevServer | undefined;
-
-  afterEach(async () => {
-    if (server) {
-      await server.stop();
-    }
-  });
-
   it('runs a brain', async () => {
-    // Create a test server with a test brain
-    server = await createTestEnv({
-      setup: (dir: string) => {
-        const brainsDir = path.join(dir, 'brains');
-        fs.mkdirSync(brainsDir, { recursive: true });
+    const env = await createTestEnv();
 
-        // Create a simple test brain
-        fs.writeFileSync(
-          path.join(brainsDir, 'test-brain.ts'),
-          `
-          export default function testBrain() {
-            return {
-              title: 'Test Brain',
-              steps: [
-                {
-                  title: 'Test Step',
-                  run: async () => {
-                    return { success: true };
-                  }
+    // Setup test brain
+    env.setup((dir: string) => {
+      const brainsDir = path.join(dir, 'brains');
+      fs.mkdirSync(brainsDir, { recursive: true });
+
+      // Create a simple test brain
+      fs.writeFileSync(
+        path.join(brainsDir, 'test-brain.ts'),
+        `
+        export default function testBrain() {
+          return {
+            title: 'Test Brain',
+            steps: [
+              {
+                title: 'Test Step',
+                run: async () => {
+                  return { success: true };
                 }
-              ]
-            };
-          }
-          `
-        );
-      },
+              }
+            ]
+          };
+        }
+        `
+      );
     });
 
-    const element = await px(['run', 'test-brain'], {
-      server,
-    });
+    const px = await env.start();
 
-    // Verify the run command connected to the server and got a run ID
-    expect(output).toContain('Run ID:');
-    expect(output).toContain('run-');
+    try {
+      const { waitForOutput } = await px(['run', 'test-brain']);
+
+      // Verify the run command connected to the server and got a run ID
+      const outputContainsRunId = await waitForOutput(/Run ID:/);
+      const outputContainsRunPrefix = await waitForOutput(/run-/);
+
+      expect(outputContainsRunId).toBe(true);
+      expect(outputContainsRunPrefix).toBe(true);
+    } finally {
+      await env.stopAndCleanup();
+    }
   });
 });
 
@@ -91,7 +90,7 @@ describe('CLI Integration: project commands', () => {
     configDir = path.join(tempDir, '.positronic');
 
     // Create px wrapper that captures configDir
-    px = (argv: string[]) => px(argv, { configDir });
+    px = (argv: string[]) => pxTest(argv, { configDir });
   });
 
   afterEach(() => {
