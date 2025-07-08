@@ -426,7 +426,10 @@ export function buildCli(options: CliOptions) {
             'List all resources in the active project'
           );
         },
-        () => resourcesCommand.list()
+        () => {
+          const element = resourcesCommand.list();
+          render(element);
+        }
       );
 
       // Command available ONLY in Local Dev Mode

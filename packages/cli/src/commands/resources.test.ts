@@ -56,6 +56,7 @@ describe('CLI Integration: positronic resources types', () => {
   it('should handle empty resources directory', async () => {
     const env = await createTestEnv();
     const px = await env.start();
+
     try {
       // Remove the default resources created by createMinimalProject
       const resourcesDir = path.join(env.projectRootDir, 'resources');
@@ -67,14 +68,13 @@ describe('CLI Integration: positronic resources types', () => {
       // Verify directory is empty
       expect(fs.readdirSync(resourcesDir).length).toBe(0);
 
-      // Run the types command using cli
-      const { waitForOutput, waitForTypesFile } = await px([
-        'resources',
-        'sync',
-      ]);
-      const isOutputRendered = await waitForOutput(/no files found/i);
+      // Run the sync command using cli
+      const syncElement = await px(['resources', 'sync']);
+      const isOutputRendered = await syncElement.waitForOutput(
+        /no files found in the resources directory/i
+      );
       expect(isOutputRendered).toBe(true);
-      const typesContent = await waitForTypesFile(
+      const typesContent = await syncElement.waitForTypesFile(
         'loadText(path: string): Promise<string>;'
       );
 
@@ -88,6 +88,15 @@ describe('CLI Integration: positronic resources types', () => {
       expect(typesContent).toContain(
         'loadBinary(path: string): Promise<Buffer>'
       );
+
+      // Run the list command
+      const listElement = await px(['resources', 'list']);
+
+      const resourceListOutput = await listElement.waitForOutput(
+        /no resources found in the project/i
+      );
+
+      expect(resourceListOutput).toBe(true);
     } finally {
       await env.stopAndCleanup();
     }

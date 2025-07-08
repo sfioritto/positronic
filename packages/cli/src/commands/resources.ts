@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ReactElement } from 'react';
 import { render } from 'ink';
 import { scanLocalResources, generateTypes } from './helpers.js';
 import * as fs from 'fs';
@@ -14,11 +14,11 @@ import type { PositronicDevServer } from '@positronic/spec';
 export class ResourcesCommand {
   constructor(private server?: PositronicDevServer) {}
 
-  async list() {
-    render(React.createElement(ResourceList));
+  list(): ReactElement {
+    return React.createElement(ResourceList);
   }
 
-  sync(): React.ReactElement {
+  sync(): ReactElement {
     if (!this.server) {
       return React.createElement(ErrorComponent, {
         error: {
@@ -43,7 +43,7 @@ export class ResourcesCommand {
     });
   }
 
-  types(): React.ReactElement {
+  types(): ReactElement {
     if (!this.server) {
       return React.createElement(ErrorComponent, {
         error: {
