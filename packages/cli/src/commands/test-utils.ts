@@ -276,7 +276,6 @@ async function runCli(
   // Setup project-specific environment if configDir is provided
   if (configDir) {
     process.env.POSITRONIC_CONFIG_DIR = configDir;
-    process.env.POSITRONIC_TEST_MODE = 'true';
   }
 
   try {
@@ -294,7 +293,6 @@ async function runCli(
     // Cleanup project-specific environment if configDir was provided
     if (configDir) {
       delete process.env.POSITRONIC_CONFIG_DIR;
-      delete process.env.POSITRONIC_TEST_MODE;
     }
   }
 }
