@@ -77,6 +77,17 @@ export async function generateProject(
       };
     }
 
+    // In test or CI environments, skip interactive prompts and dependency installation
+    if (process.env.NODE_ENV === 'test') {
+      cazOptions = {
+        ...cazOptions,
+        backend: 'none',
+        install: false,
+        // pm is irrelevant when install is false, but adding for completeness
+        pm: 'npm',
+      };
+    }
+
     await caz.default(newProjectTemplatePath, projectDir, {
       ...cazOptions,
       force: false,

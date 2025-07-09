@@ -23,7 +23,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { describe, it, expect, afterEach } from '@jest/globals';
+import { describe, it, expect, afterEach, jest } from '@jest/globals';
 import { createTestEnv, px } from './test-utils.js';
 
 describe('CLI Integration: positronic server with project', () => {
@@ -337,6 +337,56 @@ describe('CLI Integration: project commands', () => {
       ({ instance } = await px(['project', 'list'], { configDir }));
       output = instance.lastFrame() || '';
       expect(output).toMatch(/second/i);
+    });
+  });
+
+  describe('CLI Integration: project new', () => {
+    let tmpRoot: string;
+    let originalLocalPath: string | undefined;
+
+    beforeEach(() => {
+      // Set POSITRONIC_LOCAL_PATH to use local template instead of npm
+      originalLocalPath = process.env.POSITRONIC_LOCAL_PATH;
+      process.env.POSITRONIC_LOCAL_PATH = path.resolve('.');
+    });
+
+    afterEach(() => {
+      // Restore original environment
+      if (originalLocalPath) {
+        process.env.POSITRONIC_LOCAL_PATH = originalLocalPath;
+      } else {
+        delete process.env.POSITRONIC_LOCAL_PATH;
+      }
+
+      if (tmpRoot && fs.existsSync(tmpRoot)) {
+        fs.rmSync(tmpRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('should create a new project directory and output success message', async () => {
+      tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-new-test-'));
+      const projectDir = path.join(tmpRoot, 'my-new-project');
+
+      const { waitForOutput, instance } = await px([
+        'project',
+        'new',
+        projectDir,
+      ]);
+
+      // Wait for success text from the UI component
+      const isReady = await waitForOutput(/project created successfully/i, 200);
+      expect(isReady).toBe(true);
+
+      // Validate CLI output contains the project name
+      const output = instance.lastFrame() || '';
+      expect(output.toLowerCase()).toContain('my-new-project');
+
+      // Ensure project directory and essential files exist
+      expect(fs.existsSync(projectDir)).toBe(true);
+      expect(
+        fs.existsSync(path.join(projectDir, 'positronic.config.json'))
+      ).toBe(true);
+      expect(fs.existsSync(path.join(projectDir, 'package.json'))).toBe(true);
     });
   });
 });

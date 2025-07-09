@@ -57,7 +57,10 @@ export function buildCli(options: CliOptions) {
               demandOption: true,
             });
           },
-          (argv) => projectCommand.create(argv)
+          (argv) => {
+            const element = projectCommand.create(argv as any);
+            render(element);
+          }
         );
       }
 
@@ -139,14 +142,16 @@ export function buildCli(options: CliOptions) {
     cli = cli.command(
       'new <name>',
       'Alias for `project new`. Create a new Positronic project directory.\n',
-      (yargsNewAlias) => {
+      ((yargsNewAlias: any) => {
         return yargsNewAlias.positional('name', {
           describe: 'Name of the new project directory to create',
           type: 'string',
           demandOption: true,
         });
-      },
-      (argv) => projectCommand.create(argv as any)
+      }) as any,
+      (argv) => {
+        projectCommand.create(argv as any);
+      }
     );
   }
 
@@ -361,8 +366,8 @@ export function buildCli(options: CliOptions) {
       yargsBrain.command(
         'new <name>',
         'Create a new brain in the current project',
-        (yargsNew) => {
-          return yargsNew
+        ((yargsNewAlias: any) => {
+          return yargsNewAlias
             .positional('name', {
               describe: 'Name of the new brain',
               type: 'string',
@@ -381,8 +386,10 @@ export function buildCli(options: CliOptions) {
               '$0 brain new my-brain -p "Create a brain for data processing"',
               'Create a brain using a prompt'
             );
-        },
-        (argv) => brainCommand.new(argv)
+        }) as any,
+        (argv) => {
+          brainCommand.new(argv as any);
+        }
       );
     }
     return yargsBrain;
@@ -393,7 +400,7 @@ export function buildCli(options: CliOptions) {
     cli = cli.command(
       'new <name>',
       'Alias for `brain new`. Create a new brain in the current project.\n',
-      (yargsNewAlias) => {
+      ((yargsNewAlias: any) => {
         return yargsNewAlias
           .positional('name', {
             describe: 'Name of the new brain to create',
@@ -405,8 +412,10 @@ export function buildCli(options: CliOptions) {
             type: 'string',
             alias: 'p',
           });
-      },
-      (argv) => brainCommand.new(argv)
+      }) as any,
+      (argv) => {
+        brainCommand.new(argv as any);
+      }
     );
   }
 

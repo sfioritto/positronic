@@ -35,12 +35,14 @@ async function getCachedTemplate(): Promise<string> {
     );
 
     // Run caz once to generate a clean template
-    await caz.default(tempCopyDir, cachedTemplatePath, {
+    const cazOptions = {
       name: 'test-project',
       backend: 'none',
       install: false,
       force: true,
-    });
+    };
+
+    await caz.default(tempCopyDir, cachedTemplatePath, cazOptions);
 
     // Clean up the temp copy directory
     fs.rmSync(tempCopyDir, { recursive: true, force: true });
@@ -165,7 +167,7 @@ export async function waitForTypesFile(
 }
 
 interface PxResult {
-  waitForOutput: (regex?: RegExp) => Promise<boolean>;
+  waitForOutput: (regex?: RegExp, maxTries?: number) => Promise<boolean>;
   waitForTypesFile: (types: string | string[]) => Promise<string>;
   instance: {
     lastFrame: () => string | undefined;
@@ -204,7 +206,7 @@ export async function px(
   // const { lastFrame, rerender, unmount, frames, stdin, stdout, stderr } = instance!;
 
   return {
-    waitForOutput: async (regex?: RegExp) => {
+    waitForOutput: async (regex?: RegExp, maxTries = 10) => {
       if (!instance && !regex) {
         return true;
       }
@@ -213,7 +215,6 @@ export async function px(
         return false;
       }
 
-      const maxTries = 10;
       let tries = 0;
       while (tries < maxTries) {
         const lastFrame = instance!.lastFrame() ?? '';

@@ -113,6 +113,11 @@ module.exports = {
       ctx.config.install = false;
     }
 
+    // Disable git initialization in test environments
+    if (process.env.NODE_ENV === 'test') {
+      ctx.config.init = false;
+    }
+
     ctx.answers.projectName = ctx.answers.name;
   },
   prepare: async ctx => {
