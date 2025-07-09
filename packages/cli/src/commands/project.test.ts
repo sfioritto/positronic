@@ -27,6 +27,7 @@ import { describe, it, expect, afterEach } from '@jest/globals';
 import { createTestEnv, px as pxTest } from './test-utils.js';
 import type { TestDevServer } from '../test/test-dev-server.js';
 import React from 'react';
+import type { render } from 'ink-testing-library';
 
 describe('CLI Integration: positronic server with project', () => {
   it('runs a brain', async () => {
@@ -78,9 +79,7 @@ describe('CLI Integration: positronic server with project', () => {
 describe('CLI Integration: project commands', () => {
   let tempDir: string;
   let configDir: string;
-  let px: (
-    argv: string[]
-  ) => Promise<{ output: string; element: React.ReactElement | null }>;
+  let px: (argv: string[]) => Promise<ReturnType<typeof render> | null>;
 
   beforeEach(() => {
     // Create a temp directory for testing
@@ -90,7 +89,16 @@ describe('CLI Integration: project commands', () => {
     configDir = path.join(tempDir, '.positronic');
 
     // Create px wrapper that captures configDir
-    px = (argv: string[]) => pxTest(argv, { configDir });
+    px = async (argv: string[]) => {
+      const instance = await pxTest(argv, { configDir });
+
+      // Wait a bit for async rendering to complete
+      if (instance) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      return instance;
+    };
   });
 
   afterEach(() => {
@@ -100,13 +108,14 @@ describe('CLI Integration: project commands', () => {
 
   describe('project add', () => {
     it('should add a new project successfully', async () => {
-      const { output } = await px([
+      const instance = await px([
         'project',
         'add',
         'My App',
         '--url',
         'https://my-app.positronic.sh',
       ]);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('added');
       expect(output).toMatch(/my app/i);
@@ -133,37 +142,40 @@ describe('CLI Integration: project commands', () => {
       ]);
 
       // Try to add duplicate
-      const { output } = await px([
+      const instance = await px([
         'project',
         'add',
         'My App',
         '--url',
         'https://other.positronic.sh',
       ]);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('already exists');
     });
 
     it('should reject invalid URLs', async () => {
-      const { output } = await px([
+      const instance = await px([
         'project',
         'add',
         'My App',
         '--url',
         'not-a-valid-url',
       ]);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('invalid');
     });
 
     it('should handle project names with spaces', async () => {
-      const { output } = await px([
+      const instance = await px([
         'project',
         'add',
         'My Production App',
         '--url',
         'https://prod.positronic.sh',
       ]);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('added');
       expect(output).toMatch(/my production app/i);
@@ -177,7 +189,8 @@ describe('CLI Integration: project commands', () => {
 
   describe('project list', () => {
     it('should show empty state when no projects configured', async () => {
-      const { output } = await px(['project', 'list']);
+      const instance = await px(['project', 'list']);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('no projects');
     });
@@ -200,7 +213,8 @@ describe('CLI Integration: project commands', () => {
       ]);
       await px(['project', 'select', 'Project Two']);
 
-      const { output } = await px(['project', 'list']);
+      const instance = await px(['project', 'list']);
+      const output = instance?.lastFrame() || '';
 
       expect(output).toMatch(/project one/i);
       expect(output).toMatch(/project two/i);
@@ -234,7 +248,8 @@ describe('CLI Integration: project commands', () => {
     });
 
     it('should select a project by name', async () => {
-      const { output } = await px(['project', 'select', 'Project Beta']);
+      const instance = await px(['project', 'select', 'Project Beta']);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toMatch(/switched|selected/);
       expect(output).toMatch(/project beta/i);
@@ -247,14 +262,16 @@ describe('CLI Integration: project commands', () => {
     });
 
     it('should show error for non-existent project', async () => {
-      const { output } = await px(['project', 'select', 'Non Existent']);
+      const instance = await px(['project', 'select', 'Non Existent']);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('not found');
       expect(output).toMatch(/project alpha/i);
     });
 
     it('should show interactive selection when no name provided', async () => {
-      const { output } = await px(['project', 'select']);
+      const instance = await px(['project', 'select']);
+      const output = instance?.lastFrame() || '';
 
       // In test environment, raw mode isn't supported so it shows a non-interactive list
       expect(output).toMatch(/project alpha/i);
@@ -265,7 +282,8 @@ describe('CLI Integration: project commands', () => {
 
   describe('project show', () => {
     it('should show no project selected when empty', async () => {
-      const { output } = await px(['project', 'show']);
+      const instance = await px(['project', 'show']);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('no project');
     });
@@ -279,7 +297,8 @@ describe('CLI Integration: project commands', () => {
         'https://current.positronic.sh',
       ]);
 
-      const { output } = await px(['project', 'show']);
+      const instance = await px(['project', 'show']);
+      const output = instance?.lastFrame() || '';
 
       expect(output).toMatch(/my current project/i);
       expect(output).toContain('https://current.positronic.sh');
@@ -308,7 +327,8 @@ describe('CLI Integration: project commands', () => {
         'https://three.positronic.sh',
       ]);
 
-      const { output } = await px(['project', 'show']);
+      const instance = await px(['project', 'show']);
+      const output = instance?.lastFrame() || '';
 
       expect(output.toLowerCase()).toContain('2 other');
     });
@@ -332,18 +352,21 @@ describe('CLI Integration: project commands', () => {
         'https://second.positronic.sh',
       ]);
 
-      let { output } = await px(['project', 'show']);
+      let instance = await px(['project', 'show']);
+      let output = instance?.lastFrame() || '';
       expect(output).toMatch(/first/i);
 
       // Switch projects
       await px(['project', 'select', 'Second']);
 
       // Verify switch worked
-      ({ output } = await px(['project', 'show']));
+      instance = await px(['project', 'show']);
+      output = instance?.lastFrame() || '';
       expect(output).toMatch(/second/i);
 
       // List should show second project
-      ({ output } = await px(['project', 'list']));
+      instance = await px(['project', 'list']);
+      output = instance?.lastFrame() || '';
       expect(output).toMatch(/second/i);
     });
   });
