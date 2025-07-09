@@ -192,16 +192,14 @@ export async function px(
     server?: PositronicDevServer;
     projectRootDir?: string;
     configDir?: string;
-  }
+  } = {}
 ): Promise<PxResult> {
   const { server, projectRootDir, configDir } = options;
   let instance: ReturnType<typeof render> | null = null;
-  if (server) {
-    instance = await runCli(argv, {
-      server,
-      configDir,
-    });
-  }
+  instance = await runCli(argv, {
+    server,
+    configDir,
+  });
 
   // const { lastFrame, rerender, unmount, frames, stdin, stdout, stderr } = instance!;
 
@@ -211,6 +209,7 @@ export async function px(
         return true;
       }
       if (!instance && regex) {
+        console.error('waitForOutput failed, instance is null');
         return false;
       }
 
