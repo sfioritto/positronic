@@ -1,11 +1,10 @@
 import type { ArgumentsCamelCase } from 'yargs';
-import { generateProject } from './helpers.js';
-import path from 'path';
 import React from 'react';
 import { ProjectAdd } from '../components/project-add.js';
 import { ProjectList } from '../components/project-list.js';
 import { ProjectSelect } from '../components/project-select.js';
 import { ProjectShow } from '../components/project-show.js';
+import { ProjectCreate } from '../components/project-create.js';
 
 // Re-export types from project-config-manager for backward compatibility
 export type { Project, ProjectConfig } from './project-config-manager.js';
@@ -84,23 +83,11 @@ export class ProjectCommand {
    * Creates a new project directory structure and populates it with template files.
    * Also sets up the .positronic server environment.
    */
-  async create({
+  create({
     name: projectPathArg,
-  }: ArgumentsCamelCase<CreateProjectArgs>) {
-    const projectDir = path.resolve(projectPathArg);
-    const projectName = path.basename(projectDir);
-    await generateProject(projectName, projectDir);
-    console.log(
-      `\nProject '${projectName}' created successfully at ${projectDir}.`
-    );
-    console.log(`\nNext steps:`);
-    console.log(`\ncd ${projectDir}`);
-    console.log(
-      `\nInstall dependencies if you didn't choose to during setup (e.g., npm install)`
-    );
-    console.log(`\nRun the development server: px s or positronic server`);
-    console.log(
-      `\nOpen a new terminal in '${projectName}' and run a brain: px run example --watch`
-    );
+  }: ArgumentsCamelCase<CreateProjectArgs>): React.ReactElement {
+    return React.createElement(ProjectCreate, {
+      projectPathArg,
+    });
   }
 }
