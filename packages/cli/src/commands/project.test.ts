@@ -24,10 +24,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { describe, it, expect, afterEach } from '@jest/globals';
-import { createTestEnv, px as pxTest } from './test-utils.js';
-import type { TestDevServer } from '../test/test-dev-server.js';
-import React from 'react';
-import type { render } from 'ink-testing-library';
+import { createTestEnv, px } from './test-utils.js';
 
 describe('CLI Integration: positronic server with project', () => {
   it('runs a brain', async () => {
@@ -79,7 +76,6 @@ describe('CLI Integration: positronic server with project', () => {
 describe('CLI Integration: project commands', () => {
   let tempDir: string;
   let configDir: string;
-  let px: (argv: string[]) => Promise<ReturnType<typeof render> | null>;
 
   beforeEach(() => {
     // Create a temp directory for testing
@@ -87,18 +83,6 @@ describe('CLI Integration: project commands', () => {
       path.join(os.tmpdir(), 'positronic-project-test-')
     );
     configDir = path.join(tempDir, '.positronic');
-
-    // Create px wrapper that captures configDir
-    px = async (argv: string[]) => {
-      const instance = await pxTest(argv, { configDir });
-
-      // Wait a bit for async rendering to complete
-      if (instance) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-
-      return instance;
-    };
   });
 
   afterEach(() => {
@@ -108,16 +92,19 @@ describe('CLI Integration: project commands', () => {
 
   describe('project add', () => {
     it('should add a new project successfully', async () => {
-      const instance = await px([
-        'project',
-        'add',
-        'My App',
-        '--url',
-        'https://my-app.positronic.sh',
-      ]);
-      const output = instance?.lastFrame() || '';
+      const { waitForOutput, instance } = await px(
+        ['project', 'add', 'My App', '--url', 'https://my-app.positronic.sh'],
+        { configDir }
+      );
 
-      expect(output.toLowerCase()).toContain('added');
+      const isReady = await waitForOutput(/added/i);
+      expect(isReady).toBe(true);
+
+      if (!instance) {
+        throw new Error('Instance is null');
+      }
+      const output = instance.lastFrame();
+      expect(output?.toLowerCase()).toContain('added');
       expect(output).toMatch(/my app/i);
       expect(output).toContain('https://my-app.positronic.sh');
 

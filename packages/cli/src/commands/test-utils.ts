@@ -101,39 +101,10 @@ export class TestEnv {
       if (!this.serverHandle) {
         throw new Error('Server not started');
       }
-      const instance = await px(argv, {
+      return px(argv, {
         server: this.server,
+        projectRootDir: this.projectRootDir,
       });
-      return {
-        waitForOutput: async (regex?: RegExp) => {
-          if (!instance && !regex) {
-            return true;
-          }
-          if (!instance && regex) {
-            return false;
-          }
-
-          const maxTries = 10;
-          let tries = 0;
-          while (tries < maxTries) {
-            const lastFrame = instance!.lastFrame() ?? '';
-            if (regex!.test(lastFrame)) {
-              return true;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 10));
-            tries++;
-          }
-          console.error(
-            'waitForOutput failed, last frame:',
-            instance!.lastFrame()
-          );
-          return false;
-        },
-        waitForTypesFile: async (types: string | string[]) => {
-          const typesPath = path.join(this.projectRootDir, 'resources.d.ts');
-          return waitForTypesFile(typesPath, types, 1000);
-        },
-      };
     };
   }
 
@@ -193,8 +164,103 @@ export async function waitForTypesFile(
   return '';
 }
 
-// Helper function to test CLI commands with ink-testing-library
+interface PxResult {
+  waitForOutput: (regex?: RegExp) => Promise<boolean>;
+  waitForTypesFile: (types: string | string[]) => Promise<string>;
+  instance: {
+    lastFrame: () => string | undefined;
+    rerender: (element: React.ReactElement) => void;
+    unmount: () => void;
+    frames: string[];
+    stdin: {
+      write: (data: string) => void;
+    };
+    stdout: {
+      lastFrame: () => string | undefined;
+      frames: string[];
+    };
+    stderr: {
+      lastFrame: () => string | undefined;
+      frames: string[];
+    };
+  };
+}
+
 export async function px(
+  argv: string[],
+  options: {
+    server?: PositronicDevServer;
+    projectRootDir?: string;
+    configDir?: string;
+  }
+): Promise<PxResult> {
+  const { server, projectRootDir, configDir } = options;
+  let instance: ReturnType<typeof render> | null = null;
+  if (server) {
+    instance = await runCli(argv, {
+      server,
+      configDir,
+    });
+  }
+
+  // const { lastFrame, rerender, unmount, frames, stdin, stdout, stderr } = instance!;
+
+  return {
+    waitForOutput: async (regex?: RegExp) => {
+      if (!instance && !regex) {
+        return true;
+      }
+      if (!instance && regex) {
+        return false;
+      }
+
+      const maxTries = 10;
+      let tries = 0;
+      while (tries < maxTries) {
+        const lastFrame = instance!.lastFrame() ?? '';
+        if (regex!.test(lastFrame)) {
+          return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        tries++;
+      }
+      console.error('waitForOutput failed, last frame:', instance!.lastFrame());
+      return false;
+    },
+    waitForTypesFile: async (types: string | string[]) => {
+      if (projectRootDir) {
+        const typesPath = path.join(projectRootDir, 'resources.d.ts');
+        return waitForTypesFile(typesPath, types, 1000);
+      }
+      console.warn(
+        "waitForTypesFile didn't wait for anything, projectRootDir is not set"
+      );
+      return '';
+    },
+    instance: instance
+      ? {
+          lastFrame: instance.lastFrame,
+          rerender: instance.rerender,
+          unmount: instance.unmount,
+          frames: instance.frames,
+          stdin: instance.stdin,
+          stdout: instance.stdout,
+          stderr: instance.stderr,
+        }
+      : {
+          lastFrame: () => undefined,
+          rerender: () => {},
+          unmount: () => {},
+          frames: [],
+          stdin: { write: () => {} },
+          stdout: { lastFrame: () => undefined, frames: [] },
+          stderr: { lastFrame: () => undefined, frames: [] },
+        },
+  };
+}
+
+// Helper function to test CLI commands with ink-testing-library
+async function runCli(
   argv: string[],
   options: {
     server?: PositronicDevServer;
