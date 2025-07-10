@@ -191,8 +191,52 @@ export class TestDevServer implements PositronicDevServer {
     // POST /brains/runs
     nockInstance.post('/brains/runs').reply(201, () => {
       const brainRunId = `run-${Date.now()}`;
+      this.logCall('createBrainRun', [brainRunId]);
       return { brainRunId };
     });
+
+    // GET /brains/runs/:runId/watch (SSE endpoint)
+    nockInstance.get(/^\/brains\/runs\/(.+)\/watch$/).reply(
+      200,
+      function (uri) {
+        const match = uri.match(/^\/brains\/runs\/(.+)\/watch$/);
+        if (match) {
+          const runId = match[1];
+          // Return a mock SSE stream
+          const mockEvents = [
+            `data: ${JSON.stringify({
+              type: 'BRAIN_START',
+              brainTitle: 'test-brain',
+              runId,
+              timestamp: Date.now(),
+            })}\n\n`,
+            `data: ${JSON.stringify({
+              type: 'STEP_STATUS',
+              steps: [
+                {
+                  id: 'step-1',
+                  title: 'Test Step 1',
+                  status: 'RUNNING',
+                  timestamp: Date.now(),
+                },
+              ],
+            })}\n\n`,
+            `data: ${JSON.stringify({
+              type: 'BRAIN_COMPLETE',
+              runId,
+              timestamp: Date.now(),
+            })}\n\n`,
+          ];
+          return mockEvents.join('');
+        }
+        return 'data: {"type":"ERROR","error":{"message":"Invalid run ID"}}\n\n';
+      },
+      {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      }
+    );
 
     this.nockScope = nockInstance;
 
