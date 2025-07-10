@@ -58,7 +58,7 @@ export function buildCli(options: CliOptions) {
             });
           },
           (argv) => {
-            const element = projectCommand.create(argv as any);
+            const element = projectCommand.create(argv);
             render(element);
           }
         );
@@ -142,15 +142,16 @@ export function buildCli(options: CliOptions) {
     cli = cli.command(
       'new <name>',
       'Alias for `project new`. Create a new Positronic project directory.\n',
-      ((yargsNewAlias: any) => {
+      (yargsNewAlias) => {
         return yargsNewAlias.positional('name', {
           describe: 'Name of the new project directory to create',
           type: 'string',
           demandOption: true,
         });
-      }) as any,
+      },
       (argv) => {
-        projectCommand.create(argv as any);
+        const element = projectCommand.create(argv);
+        render(element);
       }
     );
   }
