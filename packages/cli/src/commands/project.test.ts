@@ -309,6 +309,116 @@ describe('CLI Integration: project commands', () => {
     });
   });
 
+  describe('project rm', () => {
+    beforeEach(async () => {
+      // Add some projects for removal tests
+      await px(
+        ['project', 'add', 'Project A', '--url', 'https://a.positronic.sh'],
+        { configDir }
+      );
+      await px(
+        ['project', 'add', 'Project B', '--url', 'https://b.positronic.sh'],
+        { configDir }
+      );
+      await px(
+        ['project', 'add', 'Project C', '--url', 'https://c.positronic.sh'],
+        { configDir }
+      );
+    });
+
+    it('should remove a project successfully', async () => {
+      const { waitForOutput, instance } = await px(
+        ['project', 'rm', 'Project B'],
+        {
+          configDir,
+        }
+      );
+
+      const isReady = await waitForOutput(/removed successfully/i);
+      expect(isReady).toBe(true);
+
+      const output = instance.lastFrame() || '';
+      expect(output).toMatch(/project b/i);
+
+      // Verify project was removed from config
+      const config = JSON.parse(
+        fs.readFileSync(path.join(configDir, 'config.json'), 'utf-8')
+      );
+      expect(config.projects).toHaveLength(2);
+      expect(
+        config.projects.find((p: any) => p.name === 'Project B')
+      ).toBeUndefined();
+    });
+
+    it('should handle removing the current project', async () => {
+      // Select Project B as current
+      await px(['project', 'select', 'Project B'], { configDir });
+
+      // Remove the current project
+      const { waitForOutput, instance } = await px(
+        ['project', 'rm', 'Project B'],
+        {
+          configDir,
+        }
+      );
+
+      const isReady = await waitForOutput(/removed successfully/i);
+      expect(isReady).toBe(true);
+
+      const output = instance.lastFrame() || '';
+      expect(output).toMatch(/project b/i);
+
+      // Verify current project was switched to another project
+      const config = JSON.parse(
+        fs.readFileSync(path.join(configDir, 'config.json'), 'utf-8')
+      );
+      expect(config.currentProject).not.toBe('Project B');
+      expect(config.currentProject).toBeTruthy(); // Should be either Project A or Project C
+    });
+
+    it('should handle removing the last project', async () => {
+      // Remove all but one project
+      await px(['project', 'rm', 'Project A'], { configDir });
+      await px(['project', 'rm', 'Project B'], { configDir });
+
+      // Remove the last project
+      const { waitForOutput, instance } = await px(
+        ['project', 'rm', 'Project C'],
+        {
+          configDir,
+        }
+      );
+
+      const isReady = await waitForOutput(/removed successfully/i);
+      expect(isReady).toBe(true);
+
+      const output = instance.lastFrame() || '';
+      expect(output.toLowerCase()).toMatch(/no active project/);
+
+      // Verify no projects remain and current project is null
+      const config = JSON.parse(
+        fs.readFileSync(path.join(configDir, 'config.json'), 'utf-8')
+      );
+      expect(config.projects).toHaveLength(0);
+      expect(config.currentProject).toBeNull();
+    });
+
+    it('should show error for non-existent project', async () => {
+      const { waitForOutput, instance } = await px(
+        ['project', 'rm', 'Non Existent'],
+        {
+          configDir,
+        }
+      );
+
+      const isReady = await waitForOutput(/failed to remove/i);
+      expect(isReady).toBe(true);
+
+      const output = instance.lastFrame() || '';
+      expect(output.toLowerCase()).toMatch(/not found/);
+    });
+  });
+
   describe('project command interactions', () => {
     it('should maintain state across commands', async () => {
       // Add multiple projects

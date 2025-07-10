@@ -128,9 +128,29 @@ export function buildCli(options: CliOptions) {
             render(element);
           }
         )
+        .command(
+          'rm <name>',
+          'Remove a project from your list of projects',
+          (yargsRm) => {
+            return yargsRm
+              .positional('name', {
+                describe: 'Name of the project to remove',
+                type: 'string',
+                demandOption: true,
+              })
+              .example(
+                '$0 project rm my-project',
+                'Remove a project configuration'
+              );
+          },
+          (argv) => {
+            const element = projectCommand.remove(argv);
+            render(element);
+          }
+        )
         .demandCommand(
           1,
-          'You need to specify a project command (add, select, list, show) in Local Dev Mode.'
+          'You need to specify a project command (add, select, list, show, rm) in Local Dev Mode.'
         );
 
       return yargsProject;

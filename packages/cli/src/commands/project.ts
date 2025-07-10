@@ -5,6 +5,7 @@ import { ProjectList } from '../components/project-list.js';
 import { ProjectSelect } from '../components/project-select.js';
 import { ProjectShow } from '../components/project-show.js';
 import { ProjectCreate } from '../components/project-create.js';
+import { ProjectRemove } from '../components/project-remove.js';
 
 // Re-export types from project-config-manager for backward compatibility
 export type { Project, ProjectConfig } from './project-config-manager.js';
@@ -23,6 +24,10 @@ interface SelectProjectArgs {
 }
 
 interface CreateProjectArgs {
+  name: string;
+}
+
+interface RemoveProjectArgs {
   name: string;
 }
 
@@ -74,6 +79,17 @@ export class ProjectCommand {
    */
   show(): React.ReactElement {
     return React.createElement(ProjectShow, {
+      projectConfig: this.projectConfig,
+    });
+  }
+
+  /**
+   * Handles the 'positronic project rm <name>' command.
+   * Removes a project configuration from the global store.
+   */
+  remove({ name }: ArgumentsCamelCase<RemoveProjectArgs>): React.ReactElement {
+    return React.createElement(ProjectRemove, {
+      name,
       projectConfig: this.projectConfig,
     });
   }
