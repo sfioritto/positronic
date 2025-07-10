@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { createTestEnv } from './test-utils.js';
+import nock from 'nock';
 
 describe('CLI Integration: positronic brain commands', () => {
   describe('brain run command', () => {
@@ -43,6 +44,150 @@ describe('CLI Integration: positronic brain commands', () => {
           /Connecting to watch service|Brain: test-brain/
         );
         expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle API server error responses', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Clear all existing nock interceptors to avoid conflicts
+        nock.cleanAll();
+
+        // Mock the server to return a 500 error
+        const port = env.server.port;
+        nock(`http://localhost:${port}`)
+          .post('/brains/runs')
+          .reply(500, 'Internal Server Error');
+
+        // Mock process.exit to prevent test from exiting
+        const originalExit = process.exit;
+        let exitCalled = false;
+        process.exit = ((code?: number) => {
+          exitCalled = true;
+          throw new Error(`process.exit called with code ${code}`);
+        }) as any;
+
+        try {
+          await expect(px(['run', 'test-brain'])).rejects.toThrow(
+            'process.exit called with code 1'
+          );
+          expect(exitCalled).toBe(true);
+        } finally {
+          process.exit = originalExit;
+        }
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle network connection errors (ECONNREFUSED)', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Clear all existing nock interceptors to avoid conflicts
+        nock.cleanAll();
+
+        // Mock a connection refused error
+        const port = env.server.port;
+        nock(`http://localhost:${port}`).post('/brains/runs').replyWithError({
+          message: 'connect ECONNREFUSED',
+          code: 'ECONNREFUSED',
+        });
+
+        // Mock process.exit to prevent test from exiting
+        const originalExit = process.exit;
+        let exitCalled = false;
+        process.exit = ((code?: number) => {
+          exitCalled = true;
+          throw new Error(`process.exit called with code ${code}`);
+        }) as any;
+
+        try {
+          await expect(px(['run', 'test-brain'])).rejects.toThrow(
+            'process.exit called with code 1'
+          );
+          expect(exitCalled).toBe(true);
+        } finally {
+          process.exit = originalExit;
+        }
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle other network errors', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Clear all existing nock interceptors to avoid conflicts
+        nock.cleanAll();
+
+        // Mock a different network error (without ECONNREFUSED code)
+        const port = env.server.port;
+        nock(`http://localhost:${port}`)
+          .post('/brains/runs')
+          .replyWithError({
+            message: 'Network timeout error occurred',
+            code: 'TIMEOUT',
+          });
+
+        // Mock process.exit to prevent test from exiting
+        const originalExit = process.exit;
+        let exitCalled = false;
+        process.exit = ((code?: number) => {
+          exitCalled = true;
+          throw new Error(`process.exit called with code ${code}`);
+        }) as any;
+
+        try {
+          await expect(px(['run', 'test-brain'])).rejects.toThrow(
+            'process.exit called with code 1'
+          );
+          expect(exitCalled).toBe(true);
+        } finally {
+          process.exit = originalExit;
+        }
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle network errors with specific error message', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Clear all existing nock interceptors to avoid conflicts
+        nock.cleanAll();
+
+        // Mock a network error with a specific message (not ECONNREFUSED)
+        const port = env.server.port;
+        nock(`http://localhost:${port}`)
+          .post('/brains/runs')
+          .replyWithError(new Error('DNS resolution failed'));
+
+        // Mock process.exit to prevent test from exiting
+        const originalExit = process.exit;
+        let exitCalled = false;
+        process.exit = ((code?: number) => {
+          exitCalled = true;
+          throw new Error(`process.exit called with code ${code}`);
+        }) as any;
+
+        try {
+          await expect(px(['run', 'test-brain'])).rejects.toThrow(
+            'process.exit called with code 1'
+          );
+          expect(exitCalled).toBe(true);
+        } finally {
+          process.exit = originalExit;
+        }
       } finally {
         await env.stopAndCleanup();
       }
