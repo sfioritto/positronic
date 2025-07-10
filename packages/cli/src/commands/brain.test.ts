@@ -114,6 +114,184 @@ describe('CLI Integration: positronic brain commands', () => {
     });
   });
 
+  describe('brain list command', () => {
+    it('should show not yet implemented message', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['list']);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('brain history command', () => {
+    it('should show not yet implemented message', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['history', 'test-brain']);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show not yet implemented message with custom limit', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'history',
+          'test-brain',
+          '--limit',
+          '20',
+        ]);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('brain show command', () => {
+    it('should show not yet implemented message', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['show', 'test-brain']);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('brain rerun command', () => {
+    it('should show not yet implemented message', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['rerun', 'test-brain']);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show not yet implemented message with run ID', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['rerun', 'test-brain', 'run-123']);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show not yet implemented message with step range', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'rerun',
+          'test-brain',
+          '--starts-at',
+          '3',
+          '--stops-after',
+          '5',
+        ]);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('brain new command', () => {
+    it('should show not yet implemented message', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['brain', 'new', 'my-brain']);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show not yet implemented message with prompt', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'brain',
+          'new',
+          'my-brain',
+          '--prompt',
+          'Create a brain',
+        ]);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show not yet implemented message using new alias', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['new', 'my-brain']);
+        const isOutputRendered = await waitForOutput(
+          /This command is not yet implemented/
+        );
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
   describe('error handling', () => {
     it('should handle missing brain name for run command', async () => {
       const env = await createTestEnv();

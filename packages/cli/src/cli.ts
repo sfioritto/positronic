@@ -225,7 +225,10 @@ export function buildCli(options: CliOptions) {
     'list',
     'List all brains in the active project\n',
     () => {},
-    (argv) => brainCommand.list(argv)
+    (argv) => {
+      const element = brainCommand.list(argv);
+      render(element);
+    }
   );
 
   // --- Brain History Command ---
@@ -247,7 +250,10 @@ export function buildCli(options: CliOptions) {
         .example('$0 history my-brain', 'List recent runs for my-brain')
         .example('$0 history my-brain --limit=20', 'List more recent runs');
     },
-    (argv) => brainCommand.history(argv)
+    (argv) => {
+      const element = brainCommand.history(argv);
+      render(element);
+    }
   );
 
   // --- Show Brain Command ---
@@ -261,7 +267,10 @@ export function buildCli(options: CliOptions) {
         demandOption: true,
       });
     },
-    (argv) => brainCommand.show(argv)
+    (argv) => {
+      const element = brainCommand.show(argv);
+      render(element);
+    }
   );
 
   // --- Rerun Brain Command ---
@@ -305,7 +314,10 @@ export function buildCli(options: CliOptions) {
           'Rerun steps 3 through 5'
         );
     },
-    (argv) => brainCommand.rerun(argv)
+    (argv) => {
+      const element = brainCommand.rerun(argv);
+      render(element);
+    }
   );
 
   // --- Run Brain Command ---
@@ -409,7 +421,8 @@ export function buildCli(options: CliOptions) {
             );
         }) as any,
         (argv) => {
-          brainCommand.new(argv as any);
+          const element = brainCommand.new(argv as any);
+          render(element);
         }
       );
     }
@@ -435,7 +448,8 @@ export function buildCli(options: CliOptions) {
           });
       }) as any,
       (argv) => {
-        brainCommand.new(argv as any);
+        const element = brainCommand.new(argv as any);
+        render(element);
       }
     );
   }

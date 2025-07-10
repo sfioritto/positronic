@@ -3,6 +3,11 @@ import { apiClient } from './helpers.js';
 import React from 'react';
 import { Text } from 'ink';
 import { Watch } from '../components/watch.js';
+import { BrainList } from '../components/brain-list.js';
+import { BrainHistory } from '../components/brain-history.js';
+import { BrainShow } from '../components/brain-show.js';
+import { BrainRerun } from '../components/brain-rerun.js';
+import { BrainNew } from '../components/brain-new.js';
 
 interface BrainListArgs {}
 interface BrainHistoryArgs {
@@ -32,16 +37,21 @@ interface BrainNewArgs {
 }
 
 export class BrainCommand {
-  list(argv: ArgumentsCamelCase<BrainListArgs>) {
-    // Implement brain list logic (local or remote)
+  list(argv: ArgumentsCamelCase<BrainListArgs>): React.ReactElement {
+    return React.createElement(BrainList);
   }
 
-  history({ name: brainName, limit }: ArgumentsCamelCase<BrainHistoryArgs>) {
-    // Implement brain history logic (API call)
+  history({
+    name: brainName,
+    limit,
+  }: ArgumentsCamelCase<BrainHistoryArgs>): React.ReactElement {
+    return React.createElement(BrainHistory, { brainName, limit });
   }
 
-  show({ name: brainName }: ArgumentsCamelCase<BrainShowArgs>) {
-    // Implement brain show logic (API call)
+  show({
+    name: brainName,
+  }: ArgumentsCamelCase<BrainShowArgs>): React.ReactElement {
+    return React.createElement(BrainShow, { brainName });
   }
 
   rerun({
@@ -49,8 +59,13 @@ export class BrainCommand {
     runId,
     startsAt,
     stopsAfter,
-  }: ArgumentsCamelCase<BrainRerunArgs>) {
-    // Implement brain rerun logic (API call)
+  }: ArgumentsCamelCase<BrainRerunArgs>): React.ReactElement {
+    return React.createElement(BrainRerun, {
+      brainName,
+      runId,
+      startsAt,
+      stopsAfter,
+    });
   }
 
   async run({ name: brainName, watch }: ArgumentsCamelCase<BrainRunArgs>) {
@@ -134,7 +149,10 @@ export class BrainCommand {
     );
   }
 
-  new({ name: brainName, prompt }: ArgumentsCamelCase<BrainNewArgs>) {
-    // Implement brain creation logic
+  new({
+    name: brainName,
+    prompt,
+  }: ArgumentsCamelCase<BrainNewArgs>): React.ReactElement {
+    return React.createElement(BrainNew, { brainName, prompt });
   }
 }
