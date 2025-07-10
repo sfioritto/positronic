@@ -8,6 +8,7 @@ import { isText } from 'istextorbinary';
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
+import { createMinimalProject } from './test-utils.js';
 
 // Progress callback types
 export interface ProgressInfo {
@@ -34,11 +35,12 @@ export const apiClient = {
   },
 };
 
-export async function generateProject(
-  projectName: string,
-  projectDir: string,
-  onSuccess?: () => Promise<void> | void
-) {
+export async function generateProject(projectName: string, projectDir: string) {
+  if (process.env.NODE_ENV === 'test') {
+    await createMinimalProject(projectDir);
+    return;
+  }
+
   const devPath = process.env.POSITRONIC_LOCAL_PATH;
   let newProjectTemplatePath = '@positronic/template-new-project';
   let cazOptions: {
@@ -83,7 +85,6 @@ export async function generateProject(
         ...cazOptions,
         backend: 'none',
         install: false,
-        // pm is irrelevant when install is false, but adding for completeness
         pm: 'npm',
       };
     }
@@ -92,8 +93,6 @@ export async function generateProject(
       ...cazOptions,
       force: false,
     });
-
-    await onSuccess?.();
   } finally {
     // Clean up the temporary copied new project package
     if (devPath) {

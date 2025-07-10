@@ -2,19 +2,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { PositronicDevServer } from '@positronic/spec';
 
-export interface BackendConfig {
+interface BackendConfig {
   type: string;
   package: string;
 }
 
-export interface PositronicConfig {
+interface PositronicConfig {
   backend?: BackendConfig;
 }
 
 /**
  * Load the backend configuration from positronic.config.json
  */
-export function loadBackendConfig(projectRootPath: string): PositronicConfig {
+function loadBackendConfig(projectRootPath: string): PositronicConfig {
   const configPath = path.join(projectRootPath, 'positronic.config.json');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
@@ -28,7 +28,7 @@ export function loadBackendConfig(projectRootPath: string): PositronicConfig {
 /**
  * Load the backend module based on the configuration
  */
-export async function loadBackendModule(projectRootPath: string) {
+async function loadBackendModule(projectRootPath: string) {
   const config = loadBackendConfig(projectRootPath);
   const backendPackage = config.backend!.package;
 

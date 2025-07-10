@@ -42,7 +42,26 @@ async function getCachedTemplate(): Promise<string> {
       force: true,
     };
 
-    await caz.default(tempCopyDir, cachedTemplatePath, cazOptions);
+    // Temporarily hijack all output streams to suppress caz output
+    const originalStdoutWrite = process.stdout.write;
+    const originalStderrWrite = process.stderr.write;
+    const originalConsoleLog = console.log;
+    const originalConsoleError = console.error;
+
+    process.stdout.write = () => true;
+    process.stderr.write = () => true;
+    console.log = () => {};
+    console.error = () => {};
+
+    try {
+      await caz.default(tempCopyDir, cachedTemplatePath, cazOptions);
+    } finally {
+      // Restore original output streams
+      process.stdout.write = originalStdoutWrite;
+      process.stderr.write = originalStderrWrite;
+      console.log = originalConsoleLog;
+      console.error = originalConsoleError;
+    }
 
     // Clean up the temp copy directory
     fs.rmSync(tempCopyDir, { recursive: true, force: true });
@@ -66,7 +85,7 @@ function copyTestResources(targetDir: string) {
 }
 
 // Helper function to create a minimal Positronic project structure
-async function createMinimalProject(dir: string) {
+export async function createMinimalProject(dir: string) {
   // Get or create the cached template
   const cachedTemplate = await getCachedTemplate();
 
