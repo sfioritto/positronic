@@ -19,14 +19,14 @@ export const ResourceClear = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [input, setInput] = useState('');
-  const { stdin, setRawMode } = useStdin();
+  const { stdin, setRawMode, isRawModeSupported } = useStdin();
   const { exit } = useApp();
 
   const { data: resourcesData, loading: listLoading, error: listError } = useApiGet<ResourcesResponse>('/resources');
   const { execute: deleteResources, loading: deleteLoading, error: deleteError } = useApiDelete('resources');
 
   useEffect(() => {
-    if (stdin && !confirmed && !deleted && resourcesData && resourcesData.count > 0) {
+    if (stdin && isRawModeSupported && !confirmed && !deleted && resourcesData && resourcesData.count > 0) {
       setRawMode(true);
 
       const handleData = (data: Buffer) => {
@@ -54,7 +54,7 @@ export const ResourceClear = () => {
         setRawMode(false);
       };
     }
-  }, [stdin, setRawMode, confirmed, deleted, input, exit, resourcesData]);
+  }, [stdin, setRawMode, isRawModeSupported, confirmed, deleted, input, exit, resourcesData]);
 
   useEffect(() => {
     if (confirmed && !deleteLoading && !deleteError && !deleted) {
@@ -97,7 +97,11 @@ export const ResourceClear = () => {
           <Text>This action will delete {resourcesData?.count || 0} resource(s).</Text>
           <Text dimColor>This cannot be undone.</Text>
         </Box>
-        <Text>Type "yes" to confirm deletion: {input}</Text>
+        {isRawModeSupported ? (
+          <Text>Type "yes" to confirm deletion: {input}</Text>
+        ) : (
+          <Text dimColor>Interactive mode not available in test environment</Text>
+        )}
       </Box>
     );
   }

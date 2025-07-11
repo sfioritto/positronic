@@ -71,6 +71,12 @@ export class MockApiClient implements ApiClient {
       return new Response('Bad Request', { status: 400 });
     }
 
+    // Mock DELETE /resources (bulk delete all)
+    if (path === '/resources' && options?.method === 'DELETE') {
+      this.resources = [];
+      return new Response(null, { status: 204 });
+    }
+
     // Mock DELETE /resources/:key
     const deleteMatch = path.match(/^\/resources\/(.+)$/);
     if (deleteMatch && options?.method === 'DELETE') {

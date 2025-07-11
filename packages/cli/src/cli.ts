@@ -517,7 +517,12 @@ export function buildCli(options: CliOptions) {
             'Delete all resources from the server'
           );
         },
-        () => resourcesCommand.clear()
+        async () => {
+          const element = await resourcesCommand.clear();
+          if (element) {
+            render(element);
+          }
+        }
       );
 
       // Upload/delete command available in both dev and production modes
@@ -560,12 +565,15 @@ export function buildCli(options: CliOptions) {
         },
         (argv) => {
           if (argv.delete) {
-            return resourcesCommand.delete(argv.file as string);
+            const element = resourcesCommand.delete(argv.file as string);
+            render(element);
+          } else {
+            const element = resourcesCommand.upload(
+              argv.file as string,
+              argv.key as string | undefined
+            );
+            render(element);
           }
-          return resourcesCommand.upload(
-            argv.file as string,
-            argv.key as string | undefined
-          );
         }
       );
 

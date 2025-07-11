@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test:*)",
+      "Bash(npm run test:noisy:*)",
+      "Bash(npm run build:workspaces:*)",
+      "Bash(npx tsc:*)"
+    ],
+    "deny": []
+  }
+}

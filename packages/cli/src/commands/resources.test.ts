@@ -243,4 +243,63 @@ describe('CLI Integration: positronic resources types', () => {
       await env.stopAndCleanup();
     }
   });
+
+  describe('resources clear command', () => {
+    it('should handle empty resources gracefully', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+      
+      try {
+        // TestDevServer starts with empty resources by default
+        const { waitForOutput, instance } = await px(['resources', 'clear']);
+        const isOutputRendered = await waitForOutput(/No resources to delete/, 20);
+        
+        if (!isOutputRendered) {
+          console.log('Last frame:', instance.lastFrame());
+        }
+        
+        expect(isOutputRendered).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show warning for non-empty resources', async () => {
+      const env = await createTestEnv();
+      
+      // Add some mock resources to the test server
+      env.server.addResource({
+        key: 'test.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString()
+      });
+      env.server.addResource({
+        key: 'data/config.json',
+        type: 'text',
+        size: 200,
+        lastModified: new Date().toISOString()
+      });
+      
+      const px = await env.start();
+      
+      try {
+        const { waitForOutput } = await px(['resources', 'clear']);
+        
+        // Should show danger warning
+        const isWarningShown = await waitForOutput(/DANGER: This will permanently delete ALL resources!/);
+        expect(isWarningShown).toBe(true);
+        
+        // Should show resource count (2 resources)
+        const isCountShown = await waitForOutput(/This action will delete 2 resource\(s\)/);
+        expect(isCountShown).toBe(true);
+        
+        // Should show the confirmation prompt
+        const isConfirmPromptShown = await waitForOutput(/Type "yes" to confirm deletion:/);
+        expect(isConfirmPromptShown).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
 });

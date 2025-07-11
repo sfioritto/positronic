@@ -1,5 +1,4 @@
 import React, { ReactElement } from 'react';
-import { render } from 'ink';
 import { scanLocalResources, generateTypes } from './helpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -60,45 +59,38 @@ export class ResourcesCommand {
     });
   }
 
-  async delete(resourcePath: string) {
+  delete(resourcePath: string): ReactElement {
     if (!resourcePath) {
-      render(
-        React.createElement(ErrorComponent, {
-          error: {
-            title: 'Missing Resource Path',
-            message: 'Please provide a resource path to delete.',
-            details: 'Usage: positronic resources delete <path>',
-          },
-        })
-      );
-      return;
+      return React.createElement(ErrorComponent, {
+        error: {
+          title: 'Missing Resource Path',
+          message: 'Please provide a resource path to delete.',
+          details: 'Usage: positronic resources delete <path>',
+        },
+      });
     }
 
     // The resourcePath should be relative to the resources directory
     const resourceKey = resourcePath;
 
-    render(
-      React.createElement(ResourceDelete, {
-        resourceKey,
-        resourcePath,
-        projectRootPath: this.server?.projectRootDir,
-      })
-    );
+    return React.createElement(ResourceDelete, {
+      resourceKey,
+      resourcePath,
+      projectRootPath: this.server?.projectRootDir,
+    });
   }
 
   async clear() {
-    // Import and render ResourceClear component (to be created)
+    // Import and render ResourceClear component
     const { ResourceClear } = await import('../components/resource-clear.js');
-    render(React.createElement(ResourceClear));
+    return React.createElement(ResourceClear);
   }
 
-  async upload(filePath: string, customKey?: string) {
-    render(
-      React.createElement(ResourceUpload, {
-        filePath,
-        customKey,
-        projectRootPath: this.server?.projectRootDir,
-      })
-    );
+  upload(filePath: string, customKey?: string): ReactElement {
+    return React.createElement(ResourceUpload, {
+      filePath,
+      customKey,
+      projectRootPath: this.server?.projectRootDir,
+    });
   }
 }

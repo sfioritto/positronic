@@ -170,6 +170,13 @@ export class TestDevServer implements PositronicDevServer {
       return '';
     });
 
+    // DELETE /resources (bulk delete all)
+    nockInstance.delete('/resources').reply(204, () => {
+      this.resources.clear();
+      this.logCall('deleteAllResources', []);
+      return '';
+    });
+
     // DELETE /resources/:key
     nockInstance.delete(/^\/resources\/(.+)$/).reply((uri) => {
       const match = uri.match(/^\/resources\/(.+)$/);
