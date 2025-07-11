@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useStdin, useApp } from 'ink';
+import { Box, Text, useApp, useInput } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet, useApiDelete } from '../hooks/useApi.js';
 
@@ -18,43 +18,27 @@ interface ResourcesResponse {
 export const ResourceClear = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [deleted, setDeleted] = useState(false);
-  const [input, setInput] = useState('');
-  const { stdin, setRawMode, isRawModeSupported } = useStdin();
+  const [selectedOption, setSelectedOption] = useState<'cancel' | 'delete'>('cancel');
   const { exit } = useApp();
 
   const { data: resourcesData, loading: listLoading, error: listError } = useApiGet<ResourcesResponse>('/resources');
   const { execute: deleteResources, loading: deleteLoading, error: deleteError } = useApiDelete('resources');
 
-  useEffect(() => {
-    if (stdin && isRawModeSupported && !confirmed && !deleted && resourcesData && resourcesData.count > 0) {
-      setRawMode(true);
-
-      const handleData = (data: Buffer) => {
-        const char = data.toString();
-
-        if (char === '\r' || char === '\n') {
-          if (input.toLowerCase() === 'yes') {
-            setConfirmed(true);
-          } else {
-            exit();
-          }
-        } else if (char === '\u0003') { // Ctrl+C
-          exit();
-        } else if (char === '\u007F' || char === '\b') { // Backspace
-          setInput(prev => prev.slice(0, -1));
+  useInput((input, key) => {
+    if (!confirmed && !deleted && resourcesData && resourcesData.count > 0) {
+      if (key.upArrow || key.downArrow) {
+        setSelectedOption(prev => prev === 'cancel' ? 'delete' : 'cancel');
+      } else if (key.return) {
+        if (selectedOption === 'delete') {
+          setConfirmed(true);
         } else {
-          setInput(prev => prev + char);
+          exit();
         }
-      };
-
-      stdin.on('data', handleData);
-
-      return () => {
-        stdin.off('data', handleData);
-        setRawMode(false);
-      };
+      } else if (key.escape || (key.ctrl && input === 'c')) {
+        exit();
+      }
     }
-  }, [stdin, setRawMode, isRawModeSupported, confirmed, deleted, input, exit, resourcesData]);
+  });
 
   useEffect(() => {
     if (confirmed && !deleteLoading && !deleteError && !deleted) {
@@ -64,6 +48,17 @@ export const ResourceClear = () => {
         })
     }
   }, [confirmed, deleteLoading, deleteError, deleted, deleteResources]);
+
+  useEffect(() => {
+    if (deleted) {
+      // Exit after showing success message for a moment
+      const timer = setTimeout(() => {
+        exit();
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [deleted, exit]);
 
   if (listError) {
     return <ErrorComponent error={listError} />;
@@ -97,11 +92,17 @@ export const ResourceClear = () => {
           <Text>This action will delete {resourcesData?.count || 0} resource(s).</Text>
           <Text dimColor>This cannot be undone.</Text>
         </Box>
-        {isRawModeSupported ? (
-          <Text>Type "yes" to confirm deletion: {input}</Text>
-        ) : (
-          <Text dimColor>Interactive mode not available in test environment</Text>
-        )}
+        <Box marginTop={1} flexDirection="column">
+          <Text>Use arrow keys to select, Enter to confirm:</Text>
+          <Box marginTop={1} flexDirection="column">
+            <Text color={selectedOption === 'cancel' ? 'green' : undefined}>
+              {selectedOption === 'cancel' ? '▶ ' : '  '}Cancel (keep resources)
+            </Text>
+            <Text color={selectedOption === 'delete' ? 'red' : undefined}>
+              {selectedOption === 'delete' ? '▶ ' : '  '}Delete all resources
+            </Text>
+          </Box>
+        </Box>
       </Box>
     );
   }

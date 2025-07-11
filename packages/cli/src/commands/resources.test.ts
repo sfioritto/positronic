@@ -297,15 +297,69 @@ describe('CLI Integration: positronic resources types', () => {
         );
         expect(isCountShown).toBe(true);
 
-        // Should show the confirmation prompt
-        const isConfirmPromptShown = await waitForOutput(
-          /Type "yes" to confirm deletion:/
+        // Should show the selection prompt
+        const isPromptShown = await waitForOutput(
+          /Use arrow keys to select, Enter to confirm:/
         );
-        expect(isConfirmPromptShown).toBe(true);
+        expect(isPromptShown).toBe(true);
+
+        // Should show cancel option as selected by default
+        const isCancelSelected = await waitForOutput(
+          /▶ Cancel \(keep resources\)/
+        );
+        expect(isCancelSelected).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
     });
 
+    it('should navigate between options with arrow keys', async () => {
+      const env = await createTestEnv();
+
+      // Add a mock resource so we get the confirmation prompt
+      env.server.addResource({
+        key: 'test.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['resources', 'clear']);
+
+        // Wait for the prompt to appear
+        await waitForOutput(/Use arrow keys to select, Enter to confirm:/);
+
+        // Verify cancel is selected by default
+        const isCancelSelected = await waitForOutput(
+          /▶ Cancel \(keep resources\)/
+        );
+        expect(isCancelSelected).toBe(true);
+
+        // Press down arrow
+        instance.stdin.write('\u001B[B');
+
+        // Should show delete option as selected
+        const isDeleteSelected = await waitForOutput(
+          /▶ Delete all resources/,
+          30
+        );
+        expect(isDeleteSelected).toBe(true);
+
+        // Press up arrow to go back
+        instance.stdin.write('\u001B[A');
+
+        // Should show cancel option as selected again
+        const isCancelSelectedAgain = await waitForOutput(
+          /▶ Cancel \(keep resources\)/,
+          30
+        );
+        expect(isCancelSelectedAgain).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
   });
 });
