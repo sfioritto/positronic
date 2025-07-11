@@ -4,8 +4,20 @@
       "Bash(npm test:*)",
       "Bash(npm run test:noisy:*)",
       "Bash(npm run build:workspaces:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "type": "command",
+        "command": "/Users/seanfioritto/projects/positronic/bin/claude-notify.sh"
+      }
+    ]
   }
 }
