@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ResourceList } from '../components/resource-list.js';
 import { ResourceSync } from '../components/resource-sync.js';
+import { ResourceClear } from '../components/resource-clear.js';
 import { ResourceDelete } from '../components/resource-delete.js';
 import { ResourceUpload } from '../components/resource-upload.js';
 import { ResourceTypes } from '../components/resource-types.js';
@@ -82,7 +83,6 @@ export class ResourcesCommand {
 
   async clear() {
     // Import and render ResourceClear component
-    const { ResourceClear } = await import('../components/resource-clear.js');
     return React.createElement(ResourceClear);
   }
 

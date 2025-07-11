@@ -15,6 +15,7 @@ Positronic is an AI-powered framework for building and running "brains" - statef
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test:all` - Run all tests including integration tests (requires API keys)
 - `npm run format` - Format code with Prettier
+- **Important**: Run `npm run build:workspaces` frequently to ensure TypeScript compilation succeeds, in addition to running tests
 
 ### Build and Clean
 - `npm run build:workspaces` - Build all workspace packages
@@ -62,6 +63,10 @@ The project uses npm workspaces with the following packages:
 - TypeScript with strict mode enabled
 - All packages use ESM modules
 - Type definitions are auto-generated for resources in each project
+
+### Coding Preferences
+- Place all imports at the top of the file - avoid inline dynamic imports (`await import(...)`) except in rare cases
+- Follow existing patterns in the codebase
 
 ### Testing
 - Jest is the test framework
