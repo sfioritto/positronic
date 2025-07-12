@@ -1,6 +1,5 @@
-/** @type {import('ts-jest').JestConfigWithTsJest} */
+/** @type {import('jest').Config} */
 const config = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts', '.tsx', '.jsx'],
   moduleNameMapper: {
@@ -9,13 +8,7 @@ const config = {
     '^@positronic/(.*)$': '<rootDir>/packages/$1/src',
   },
   transform: {
-    '^.+\\.(ts|tsx)$': [
-      'ts-jest',
-      {
-        useESM: true,
-        tsconfig: '<rootDir>/tsconfig.test.json',
-      },
-    ],
+    '^.+\\.(t|j)sx?$': '@swc/jest',
   },
   transformIgnorePatterns: [
     '/node_modules/(?!(ink|ansi-styles|kleur|strip-ansi)/)',
