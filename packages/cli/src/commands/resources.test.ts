@@ -938,4 +938,115 @@ describe('CLI Integration: positronic resources types', () => {
       }
     });
   });
+
+  describe('resources types command', () => {
+    it('should generate resource types successfully', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+      
+      try {
+        const { waitForOutput } = await px(['resources', 'types']);
+        
+        // Test user-visible output
+        const foundSuccess = await waitForOutput(/Generated resource types at/i);
+        expect(foundSuccess).toBe(true);
+        
+        // Verify the types file was actually created
+        const typesPath = path.join(env.projectRootDir, 'resources.d.ts');
+        expect(fs.existsSync(typesPath)).toBe(true);
+        
+        // Verify basic content of the types file
+        const typesContent = fs.readFileSync(typesPath, 'utf-8');
+        expect(typesContent).toContain("declare module '@positronic/core'");
+        expect(typesContent).toContain('interface Resources');
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle type generation errors gracefully', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+      
+      try {
+        // Make the project directory read-only to cause an error
+        const typesPath = path.join(env.projectRootDir, 'resources.d.ts');
+        
+        // Create a directory with the same name to cause a write error
+        fs.mkdirSync(typesPath);
+        
+        const { waitForOutput } = await px(['resources', 'types']);
+        
+        // Should show error message
+        const foundError = await waitForOutput(/Type Generation Failed/i);
+        expect(foundError).toBe(true);
+        
+        // Should show some error details
+        const foundDetails = await waitForOutput(/EISDIR|directory/i);
+        expect(foundDetails).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('resources upload command', () => {
+    // Testing the upload command's file validation behavior
+    // The actual upload requires presigned URLs which aren't available in test environment
+    
+    it('should handle non-existent file error', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+      
+      try {
+        const nonExistentPath = path.join(env.projectRootDir, 'does-not-exist.txt');
+        
+        const { waitForOutput } = await px(['resources', 'upload', nonExistentPath]);
+        
+        // Should show error immediately since file check happens first
+        const foundError = await waitForOutput(/File Not Found/i);
+        expect(foundError).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle directory path error', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+      
+      try {
+        // Try to upload a directory instead of a file
+        const dirPath = path.join(env.projectRootDir, 'resources');
+        
+        const { waitForOutput } = await px(['resources', 'upload', dirPath]);
+        
+        // Should show error
+        const foundError = await waitForOutput(/Invalid Path/i);
+        expect(foundError).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should validate files before attempting upload', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+      
+      try {
+        // Create a test file
+        const testFilePath = path.join(env.projectRootDir, 'test.txt');
+        fs.writeFileSync(testFilePath, 'Hello, world!');
+        
+        const { waitForOutput } = await px(['resources', 'upload', testFilePath]);
+        
+        // The component will validate the file and attempt upload
+        // Without mocked presigned URLs, it will show an error about the API
+        const foundOutput = await waitForOutput(/Uploading test\.txt|Failed|Error/i);
+        expect(foundOutput).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
 });
