@@ -90,3 +90,9 @@ The project uses npm workspaces with the following packages:
 ## Development Workflow
 
 - Run `npm build:workspaces` and then `npm run test` from the top of this mono repo every time you change a file and addresses errors and test failures as needed
+
+## Testing Memories
+
+- **IMPORTANT**: If you run tests within test-project in the cloudflare package, those tests are run using vitest. Always add a --run option otherwise the test will never return and it will just wait for changes to files. Add --run otherwise you will never see the output of the tests.
+
+```
