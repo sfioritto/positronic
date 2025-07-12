@@ -90,9 +90,18 @@ interface MockSchedule {
   nextRunAt?: number;
 }
 
+interface MockBrain {
+  name: string;
+  title: string;
+  description: string;
+  createdAt: number;
+  lastModified: number;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
+  private brains: Map<string, MockBrain> = new Map();
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
@@ -432,6 +441,16 @@ export class TestDevServer implements PositronicDevServer {
       }
     );
 
+    // GET /brains
+    nockInstance.get('/brains').reply(200, () => {
+      const brains = Array.from(this.brains.values());
+      this.logCall('getBrains', []);
+      return {
+        brains,
+        count: brains.length,
+      };
+    });
+
     // GET /brains/schedules
     nockInstance.get('/brains/schedules').reply(200, () => {
       const schedules = Array.from(this.schedules.values());
@@ -521,6 +540,19 @@ export class TestDevServer implements PositronicDevServer {
 
   getSchedules(): MockSchedule[] {
     return Array.from(this.schedules.values());
+  }
+
+  // Brain helper methods
+  addBrain(brain: MockBrain) {
+    this.brains.set(brain.name, brain);
+  }
+
+  clearBrains() {
+    this.brains.clear();
+  }
+
+  getBrains(): MockBrain[] {
+    return Array.from(this.brains.values());
   }
 
   stop() {
