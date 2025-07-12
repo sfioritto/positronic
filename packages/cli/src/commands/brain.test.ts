@@ -306,16 +306,80 @@ describe('CLI Integration: positronic brain commands', () => {
   });
 
   describe('brain list command', () => {
-    it('should show not yet implemented message', async () => {
+    it('should list brains when no brains exist', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px(['list']);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        
+        // Wait for the empty state message
+        const foundEmpty = await waitForOutput(/No brains found/i, 30);
+        expect(foundEmpty).toBe(true);
+        
+        // Verify API call was made
+        const calls = env.server.getLogs();
+        const listCall = calls.find(c => c.method === 'getBrains');
+        expect(listCall).toBeDefined();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should list brains when brains exist', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add test brains before starting
+      server.addBrain({
+        name: 'daily-report',
+        title: 'Daily Report Generator',
+        description: 'Generates daily reports from various data sources',
+        createdAt: Date.now() - 86400000,
+        lastModified: Date.now() - 3600000,
+      });
+      
+      server.addBrain({
+        name: 'data-processor',
+        title: 'Data Processing Pipeline',
+        description: 'Processes incoming data and transforms it',
+        createdAt: Date.now() - 172800000,
+        lastModified: Date.now() - 7200000,
+      });
+      
+      const px = await env.start();
+      
+      try {
+        const { waitForOutput, instance } = await px(['list']);
+        
+        // Wait for brains to appear
+        const foundBrains = await waitForOutput(/daily-report/i, 30);
+        expect(foundBrains).toBe(true);
+        
+        // Check that all data is shown
+        const output = instance.lastFrame() || '';
+        expect(output).toContain('daily-report');
+        expect(output).toContain('Daily Report Generator');
+        expect(output).toContain('data-processor');
+        expect(output).toContain('Data Processing Pipeline');
+        
+        // Verify API call
+        const calls = server.getLogs();
+        const listCall = calls.find(c => c.method === 'getBrains');
+        expect(listCall).toBeDefined();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle API errors gracefully', async () => {
+      const env = await createTestEnv();
+      // Don't start the server to simulate connection error
+      const { waitForOutput } = await px(['list'], { server: env.server });
+
+      try {
+        const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
+        expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
