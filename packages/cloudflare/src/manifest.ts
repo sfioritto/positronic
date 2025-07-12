@@ -2,6 +2,7 @@ import type { Brain } from '@positronic/core';
 
 interface BrainImportStrategy {
   import(name: string): Promise<Brain | undefined>;
+  list(): string[];
 }
 
 class StaticManifestStrategy implements BrainImportStrategy {
@@ -9,6 +10,10 @@ class StaticManifestStrategy implements BrainImportStrategy {
 
   async import(name: string): Promise<Brain | undefined> {
     return this.manifest[name];
+  }
+
+  list(): string[] {
+    return Object.keys(this.manifest);
   }
 }
 
@@ -23,6 +28,13 @@ class DynamicImportStrategy implements BrainImportStrategy {
       console.error(`Failed to import brain ${name}:`, e);
       return undefined;
     }
+  }
+
+  list(): string[] {
+    // For dynamic imports, we can't easily list files at runtime in a worker environment
+    // This would need to be handled differently, perhaps by generating a list at build time
+    console.warn('DynamicImportStrategy.list() is not implemented - returning empty array');
+    return [];
   }
 }
 
@@ -49,5 +61,9 @@ export class PositronicManifest {
 
   async import(name: string): Promise<Brain | undefined> {
     return this.importStrategy.import(name);
+  }
+
+  list(): string[] {
+    return this.importStrategy.list();
   }
 }

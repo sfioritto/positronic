@@ -7,20 +7,12 @@ interface Brain {
   name: string;
   title: string;
   description: string;
-  createdAt: number;
-  lastModified: number;
 }
 
 interface BrainsResponse {
   brains: Brain[];
   count: number;
 }
-
-// Helper to format dates consistently
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
 
 // Helper to truncate text to fit column width
 const truncate = (text: string, maxWidth: number): string => {
@@ -61,15 +53,14 @@ export const BrainList = () => {
     );
   }
 
-  // Sort brains by last modified date (newest first)
-  const sortedBrains = [...data.brains].sort((a, b) => b.lastModified - a.lastModified);
+  // Sort brains alphabetically by name
+  const sortedBrains = [...data.brains].sort((a, b) => a.name.localeCompare(b.name));
 
   // Define column widths
   const columns = {
-    name: { header: 'Name', width: 20 },
-    title: { header: 'Title', width: 30 },
-    description: { header: 'Description', width: 40 },
-    modified: { header: 'Last Modified', width: 20 },
+    name: { header: 'Name', width: 25 },
+    title: { header: 'Title', width: 35 },
+    description: { header: 'Description', width: 50 },
   };
 
   // Calculate total width for separator
@@ -89,8 +80,6 @@ export const BrainList = () => {
           <Text bold color="cyan">{padRight(columns.title.header, columns.title.width)}</Text>
           <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.description.header, columns.description.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.modified.header, columns.modified.width)}</Text>
         </Box>
 
         {/* Separator */}
@@ -107,8 +96,6 @@ export const BrainList = () => {
               <Text>{padRight(truncate(brain.title, columns.title.width), columns.title.width)}</Text>
               <Text>  </Text>
               <Text dimColor>{padRight(truncate(brain.description, columns.description.width), columns.description.width)}</Text>
-              <Text>  </Text>
-              <Text dimColor>{padRight(truncate(formatDate(brain.lastModified), columns.modified.width), columns.modified.width)}</Text>
             </Box>
           );
         })}
