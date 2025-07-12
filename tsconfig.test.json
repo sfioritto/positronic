@@ -1,14 +1,16 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
     "jsx": "react-jsx",
     "types": ["jest", "node"]
   },
   "include": [
-    "packages/**/*.ts",
-    "packages/**/*.tsx",
     "packages/**/*.test.ts",
-    "packages/**/*.test.tsx"
+    "packages/**/*.test.tsx",
+    "packages/**/*.spec.ts",
+    "packages/**/*.spec.tsx"
   ],
   "exclude": [
     "node_modules",
