@@ -244,6 +244,265 @@ describe('CLI Integration: positronic resources types', () => {
     }
   });
 
+  describe('resources list command', () => {
+    it('should handle empty resources', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['resources', 'list']);
+        const found = await waitForOutput(/No resources found in the project/);
+        expect(found).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should display resources with tree structure', async () => {
+      const env = await createTestEnv();
+
+      // Add resources with nested structure
+      env.server.addResource({
+        key: 'readme.txt',
+        type: 'text',
+        size: 1024,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+      env.server.addResource({
+        key: 'data/config.json',
+        type: 'text',
+        size: 2048,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+      env.server.addResource({
+        key: 'data/users/admin.json',
+        type: 'text',
+        size: 512,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+      env.server.addResource({
+        key: 'images/logo.png',
+        type: 'binary',
+        size: 10240,
+        lastModified: new Date().toISOString(),
+        local: false,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['resources', 'list']);
+
+        // Check tree structure is displayed
+        const foundTree = await waitForOutput(/resources/);
+        expect(foundTree).toBe(true);
+
+        // Check for files in root
+        const foundReadme = await waitForOutput(/readme\.txt/);
+        expect(foundReadme).toBe(true);
+
+        // Check for nested directories
+        const foundData = await waitForOutput(/data/);
+        expect(foundData).toBe(true);
+        
+        const foundConfig = await waitForOutput(/config\.json/);
+        expect(foundConfig).toBe(true);
+
+        // Check for deeply nested
+        const foundUsers = await waitForOutput(/users/);
+        expect(foundUsers).toBe(true);
+        
+        const foundAdmin = await waitForOutput(/admin\.json/);
+        expect(foundAdmin).toBe(true);
+
+        // Check for images directory
+        const foundImages = await waitForOutput(/images/);
+        expect(foundImages).toBe(true);
+        
+        const foundLogo = await waitForOutput(/logo\.png/);
+        expect(foundLogo).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should display file sizes with correct formatting', async () => {
+      const env = await createTestEnv();
+
+      // Add resources with various sizes
+      env.server.addResource({
+        key: 'small.txt',
+        type: 'text',
+        size: 500, // 500 bytes
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+      env.server.addResource({
+        key: 'medium.txt',
+        type: 'text',
+        size: 1536, // 1.5 KB
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+      env.server.addResource({
+        key: 'large.bin',
+        type: 'binary',
+        size: 1048576, // 1 MB
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+      env.server.addResource({
+        key: 'huge.bin',
+        type: 'binary',
+        size: 10485760, // 10 MB
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['resources', 'list']);
+
+        // Check size formatting
+        const foundSmall = await waitForOutput(/small\.txt.*500 B/);
+        expect(foundSmall).toBe(true);
+
+        const foundMedium = await waitForOutput(/medium\.txt.*1\.5 KB/);
+        expect(foundMedium).toBe(true);
+
+        const foundLarge = await waitForOutput(/large\.bin.*1\.0 MB/);
+        expect(foundLarge).toBe(true);
+
+        const foundHuge = await waitForOutput(/huge\.bin.*10\.0 MB/);
+        expect(foundHuge).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should indicate local vs remote resources', async () => {
+      const env = await createTestEnv();
+
+      // Add mix of local and remote resources
+      env.server.addResource({
+        key: 'local-file.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+      env.server.addResource({
+        key: 'remote-file.txt',
+        type: 'text',
+        size: 200,
+        lastModified: new Date().toISOString(),
+        local: false,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['resources', 'list']);
+
+        // Check both files are listed
+        const foundLocal = await waitForOutput(/local-file\.txt/);
+        expect(foundLocal).toBe(true);
+
+        const foundRemote = await waitForOutput(/remote-file\.txt/);
+        expect(foundRemote).toBe(true);
+        
+        // Remote resources should have arrow indicator
+        const foundArrow = await waitForOutput(/↗/);
+        expect(foundArrow).toBe(true);
+        
+        // Should show legend for uploaded resources
+        const foundLegend = await waitForOutput(/uploaded resource \(not in local filesystem\)/);
+        expect(foundLegend).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show loading state', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Stop server to simulate slow loading
+        env.server.stop();
+        
+        const { waitForOutput, instance } = await px(['resources', 'list']);
+        
+        // Should show loading message initially
+        const foundLoading = await waitForOutput(/Loading resources\.\.\./);
+        expect(foundLoading).toBe(true);
+        
+        // Should eventually show error when server is down
+        const foundError = await waitForOutput(/Error connecting/);
+        expect(foundError).toBe(true);
+      } finally {
+        // Cleanup without stopping server (already stopped)
+        await env.cleanupTempDir?.() || await env.cleanup?.();
+      }
+    });
+
+    it('should display resource count summary', async () => {
+      const env = await createTestEnv();
+
+      // Add multiple resources
+      for (let i = 1; i <= 5; i++) {
+        env.server.addResource({
+          key: `file${i}.txt`,
+          type: 'text',
+          size: 100 * i,
+          lastModified: new Date().toISOString(),
+          local: i % 2 === 0, // Even numbers are local
+        });
+      }
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['resources', 'list']);
+
+        // Should show count in format "Found X resources:"
+        const foundCount = await waitForOutput(/Found 5 resources:/);
+        expect(foundCount).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show single resource properly', async () => {
+      const env = await createTestEnv();
+
+      // Add a single resource to test singular form
+      env.server.addResource({
+        key: 'single.txt',
+        type: 'text',
+        size: 42,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['resources', 'list']);
+
+        // Should show "Found 1 resource:" (singular)
+        const foundCount = await waitForOutput(/Found 1 resource:/);
+        expect(foundCount).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
   describe('resources clear command', () => {
     it('should handle empty resources gracefully', async () => {
       const env = await createTestEnv();
