@@ -78,8 +78,18 @@ class MockServerHandle implements TestServerHandle {
   }
 }
 
+interface MockSchedule {
+  id: string;
+  brainName: string;
+  cronExpression: string;
+  enabled: boolean;
+  createdAt: number;
+  nextRunAt?: number;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
+  private schedules: Map<string, MockSchedule> = new Map();
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
@@ -196,8 +206,19 @@ export class TestDevServer implements PositronicDevServer {
     });
 
     // POST /brains/runs
-    nockInstance.post('/brains/runs').reply(201, () => {
-      const brainRunId = `run-${Date.now()}`;
+    nockInstance.post('/brains/runs').reply(201, (uri, requestBody) => {
+      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      let brainRunId = `run-${Date.now()}`;
+      
+      // Return specific runIds for specific test scenarios
+      if (body.brainName === 'error-brain') {
+        brainRunId = 'test-error-brain';
+      } else if (body.brainName === 'restart-brain') {
+        brainRunId = 'test-restart-brain';
+      } else if (body.brainName === 'multi-status-brain') {
+        brainRunId = 'test-multi-status';
+      }
+      
       this.logCall('createBrainRun', [brainRunId]);
       return { brainRunId };
     });
@@ -209,32 +230,186 @@ export class TestDevServer implements PositronicDevServer {
         const match = uri.match(/^\/brains\/runs\/(.+)\/watch$/);
         if (match) {
           const runId = match[1];
-          // Return a mock SSE stream
-          const mockEvents = [
-            `data: ${JSON.stringify({
-              type: 'BRAIN_START',
-              brainTitle: 'test-brain',
-              runId,
-              timestamp: Date.now(),
-            })}\n\n`,
-            `data: ${JSON.stringify({
-              type: 'STEP_STATUS',
-              steps: [
-                {
-                  id: 'step-1',
-                  title: 'Test Step 1',
-                  status: 'RUNNING',
-                  timestamp: Date.now(),
+          
+          // Different scenarios based on runId
+          if (runId === 'test-error-brain') {
+            // Error scenario
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Error Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'brain:error',
+                brainRunId: runId,
+                brainTitle: 'Error Brain',
+                options: {},
+                status: 'error',
+                error: {
+                  name: 'TestError',
+                  message: 'Something went wrong in the brain',
+                  stack: 'Error: Something went wrong\n    at test.js:1:1',
                 },
-              ],
-            })}\n\n`,
-            `data: ${JSON.stringify({
-              type: 'BRAIN_COMPLETE',
-              runId,
-              timestamp: Date.now(),
-            })}\n\n`,
-          ];
-          return mockEvents.join('');
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-restart-brain') {
+            // Restart scenario
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:restart',
+                brainTitle: 'Restarted Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  {
+                    id: 'restart-step-1',
+                    title: 'Restart Step',
+                    status: 'pending',
+                  },
+                ],
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-multi-status') {
+            // Multiple step statuses
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Multi Status Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'step-1', title: 'Complete Step', status: 'complete' },
+                  { id: 'step-2', title: 'Error Step', status: 'error' },
+                  { id: 'step-3', title: 'Running Step', status: 'running' },
+                  { id: 'step-4', title: 'Pending Step', status: 'pending' },
+                ],
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-complete-flow') {
+            // Full flow from start to complete
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Complete Flow Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'step-1', title: 'First Step', status: 'complete' },
+                  { id: 'step-2', title: 'Second Step', status: 'complete' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'brain:complete',
+                brainRunId: runId,
+                brainTitle: 'Complete Flow Brain',
+                options: {},
+                status: 'complete',
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-brain-error') {
+            // Brain error scenario
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Error Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'brain:error',
+                brainRunId: runId,
+                brainTitle: 'Error Brain',
+                error: {
+                  name: 'BrainExecutionError',
+                  message: 'Something went wrong during brain execution',
+                  stack: 'Error: Something went wrong during brain execution\n    at BrainRunner.run',
+                },
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-malformed-event') {
+            // Send malformed JSON
+            return 'data: {invalid json here}\n\n';
+          } else if (runId === 'test-no-steps') {
+            // Brain with no steps initially
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'No Steps Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [],
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-connection-error') {
+            // Simulate connection error by returning error
+            throw new Error('ECONNREFUSED');
+          } else {
+            // Default scenario
+            const mockEvents = [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'test-brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  {
+                    id: 'step-1',
+                    title: 'Test Step 1',
+                    status: 'running',
+                  },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'brain:complete',
+                brainRunId: runId,
+                brainTitle: 'test-brain',
+                options: {},
+                status: 'complete',
+              })}\n\n`,
+            ];
+            return mockEvents.join('');
+          }
         }
         return 'data: {"type":"ERROR","error":{"message":"Invalid run ID"}}\n\n';
       },
@@ -244,6 +419,52 @@ export class TestDevServer implements PositronicDevServer {
         Connection: 'keep-alive',
       }
     );
+
+    // GET /brains/schedules
+    nockInstance.get('/brains/schedules').reply(200, () => {
+      const schedules = Array.from(this.schedules.values());
+      this.logCall('getSchedules', []);
+      return {
+        schedules,
+        count: schedules.length,
+      };
+    });
+
+    // POST /brains/schedules
+    nockInstance.post('/brains/schedules').reply(201, (uri, requestBody) => {
+      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      const scheduleId = `schedule-${Date.now()}`;
+      const schedule: MockSchedule = {
+        id: scheduleId,
+        brainName: body.brainName,
+        cronExpression: body.cronExpression,
+        enabled: true,
+        createdAt: Date.now(),
+        nextRunAt: Date.now() + 3600000, // 1 hour from now
+      };
+      this.schedules.set(scheduleId, schedule);
+      this.logCall('createSchedule', [body]);
+      return schedule;
+    });
+
+    // DELETE /brains/schedules/:id
+    nockInstance.delete(/^\/brains\/schedules\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/brains\/schedules\/(.+)$/);
+      if (match) {
+        const scheduleId = decodeURIComponent(match[1]);
+        if (this.schedules.has(scheduleId)) {
+          this.schedules.delete(scheduleId);
+          this.logCall('deleteSchedule', [scheduleId]);
+          return [204, ''];
+        } else {
+          return [
+            404,
+            JSON.stringify({ error: `Schedule "${scheduleId}" not found` }),
+          ];
+        }
+      }
+      return [404, 'Not Found'];
+    });
 
     this.nockScope = nockInstance;
 
@@ -275,6 +496,19 @@ export class TestDevServer implements PositronicDevServer {
 
   getResources(): MockResource[] {
     return Array.from(this.resources.values());
+  }
+
+  // Schedule helper methods
+  addSchedule(schedule: MockSchedule) {
+    this.schedules.set(schedule.id, schedule);
+  }
+
+  clearSchedules() {
+    this.schedules.clear();
+  }
+
+  getSchedules(): MockSchedule[] {
+    return Array.from(this.schedules.values());
   }
 
   stop() {

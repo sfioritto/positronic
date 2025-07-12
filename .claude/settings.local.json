@@ -8,16 +8,12 @@
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(ls:*)",
       "Bash(find:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run tsc:*)",
+      "Bash(npm run build:*)",
+      "WebFetch(domain:kentcdodds.com)"
     ],
     "deny": []
-  },
-  "hooks": {
-    "Notification": [
-      {
-        "type": "command",
-        "command": "/Users/seanfioritto/projects/positronic/bin/claude-notify.sh"
-      }
-    ]
   }
 }

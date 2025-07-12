@@ -49,6 +49,7 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
+
     it('should handle API server error responses', async () => {
       const env = await createTestEnv();
       const px = await env.start();
@@ -257,6 +258,36 @@ describe('CLI Integration: positronic brain commands', () => {
         await env.stopAndCleanup();
       }
     });
+
+
+    it('should display all step statuses correctly', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'watch',
+          '--run-id',
+          'test-multi-status',
+        ]);
+        
+        // Check for all different step statuses
+        const foundComplete = await waitForOutput(/✔.*Complete Step/);
+        expect(foundComplete).toBe(true);
+        
+        const foundError = await waitForOutput(/•.*Error Step/);
+        expect(foundError).toBe(true);
+        
+        const foundRunning = await waitForOutput(/•.*Running Step/);
+        expect(foundRunning).toBe(true);
+        
+        const foundPending = await waitForOutput(/•.*Pending Step/);
+        expect(foundPending).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
   });
 
   describe('brain list command', () => {

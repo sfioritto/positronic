@@ -640,19 +640,21 @@ export function buildCli(options: CliOptions) {
         });
 
       // Handle top-level list/delete options
-      yargsSchedule.middleware(async (argv) => {
+      yargsSchedule.middleware((argv) => {
         // If -l flag is used, call list command
         if (argv.list) {
-          await scheduleCommand.list({ brain: argv.brain } as any);
+          const element = scheduleCommand.list({ brain: argv.brain } as any);
+          render(element);
           // Exit after completion to prevent further command processing
           process.exit(0);
         }
         // If -d flag is used, call delete command
         if (argv.delete) {
-          await scheduleCommand.delete({
+          const element = scheduleCommand.delete({
             scheduleId: argv.delete as string,
             force: argv.force,
           } as any);
+          render(element);
           // Exit after completion to prevent further command processing
           process.exit(0);
         }
@@ -695,7 +697,10 @@ export function buildCli(options: CliOptions) {
                 'Run weekly-report every Monday at 9am'
               );
           },
-          (argv) => scheduleCommand.create(argv)
+          (argv) => {
+            const element = scheduleCommand.create(argv);
+            render(element);
+          }
         )
         .command(
           'runs',
@@ -728,7 +733,10 @@ export function buildCli(options: CliOptions) {
                 'List last 50 failed scheduled runs'
               );
           },
-          (argv) => scheduleCommand.runs(argv as any)
+          (argv) => {
+            const element = scheduleCommand.runs(argv as any);
+            render(element);
+          }
         );
 
       return yargsSchedule;

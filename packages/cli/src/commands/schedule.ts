@@ -1,9 +1,9 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import React from 'react';
-import { render } from 'ink';
 import { ScheduleCreate } from '../components/schedule-create.js';
 import { ScheduleList } from '../components/schedule-list.js';
 import { ScheduleDelete } from '../components/schedule-delete.js';
+import { ScheduleRuns } from '../components/schedule-runs.js';
 
 interface ScheduleCreateArgs {
   brainName: string;
@@ -28,47 +28,38 @@ interface ScheduleRunsArgs {
 export class ScheduleCommand {
   constructor() {}
 
-  async create({
+  create({
     brainName,
     cronExpression,
-  }: ArgumentsCamelCase<ScheduleCreateArgs>) {
-    const { waitUntilExit } = render(
-      React.createElement(ScheduleCreate, {
-        brainName,
-        cronExpression,
-      })
-    );
-
-    await waitUntilExit();
+  }: ArgumentsCamelCase<ScheduleCreateArgs>): React.ReactElement {
+    return React.createElement(ScheduleCreate, {
+      brainName,
+      cronExpression,
+    });
   }
 
-  async list({ brain }: ArgumentsCamelCase<ScheduleListArgs>) {
-    const { waitUntilExit } = render(
-      React.createElement(ScheduleList, {
-        brainFilter: brain,
-      })
-    );
-
-    await waitUntilExit();
+  list({ brain }: ArgumentsCamelCase<ScheduleListArgs>): React.ReactElement {
+    return React.createElement(ScheduleList, {
+      brainFilter: brain,
+    });
   }
 
-  async delete({ scheduleId, force }: ArgumentsCamelCase<ScheduleDeleteArgs>) {
-    const { waitUntilExit } = render(
-      React.createElement(ScheduleDelete, {
-        scheduleId,
-        force,
-      })
-    );
-
-    await waitUntilExit();
+  delete({ scheduleId, force }: ArgumentsCamelCase<ScheduleDeleteArgs>): React.ReactElement {
+    return React.createElement(ScheduleDelete, {
+      scheduleId,
+      force,
+    });
   }
 
-  async runs({
+  runs({
     scheduleId,
     limit,
     status,
-  }: ArgumentsCamelCase<ScheduleRunsArgs>) {
-    // TODO: Implement runs
-    console.log('TODO: List scheduled runs', scheduleId, limit, status);
+  }: ArgumentsCamelCase<ScheduleRunsArgs>): React.ReactElement {
+    return React.createElement(ScheduleRuns, {
+      scheduleId,
+      limit,
+      status,
+    });
   }
 }
