@@ -228,4 +228,43 @@ describe('BrainRunner', () => {
     expect(mockAdapter.dispatch).toHaveBeenCalledTimes(mockAdapter2.dispatch.mock.calls.length);
     expect(mockAdapter2.dispatch).toHaveBeenCalledTimes(mockAdapter3.dispatch.mock.calls.length);
   });
+
+  it('should replace client with withClient method', async () => {
+    const originalClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: jest.fn(),
+    };
+    const newClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: jest.fn(),
+    };
+
+    // Configure the new client's response
+    newClient.generateObject.mockResolvedValue({ result: 'from new client' });
+
+    const runner = new BrainRunner({
+      adapters: [],
+      client: originalClient,
+    });
+
+    // Replace the client
+    const updatedRunner = runner.withClient(newClient);
+
+    const testBrain = brain('Test Brain')
+      .step('Generate', async ({ client }) => {
+        const response = await client.generateObject({ 
+          prompt: 'test prompt',
+          schema: { type: 'object' }
+        });
+        return { generated: response.result };
+      });
+
+    const result = await updatedRunner.run(testBrain);
+
+    // Verify new client was used, not the original
+    expect(originalClient.generateObject).not.toHaveBeenCalled();
+    expect(newClient.generateObject).toHaveBeenCalledWith({
+      prompt: 'test prompt',
+      schema: { type: 'object' }
+    });
+    expect(result.generated).toBe('from new client');
+  });
 });
