@@ -185,4 +185,47 @@ describe('BrainRunner', () => {
     expect(textContent).toBe('content of myTextFile');
     expect(binaryContent?.toString()).toBe('content of myBinaryFile');
   });
+
+  it('should chain adapters with withAdapters method', async () => {
+    const mockAdapter2: jest.Mocked<Adapter> = {
+      dispatch: jest.fn(),
+    };
+    const mockAdapter3: jest.Mocked<Adapter> = {
+      dispatch: jest.fn(),
+    };
+
+    const runner = new BrainRunner({
+      adapters: [mockAdapter],
+      client: mockClient,
+    });
+
+    // Chain additional adapters
+    const updatedRunner = runner.withAdapters([mockAdapter2, mockAdapter3]);
+
+    const testBrain = brain('Test Brain')
+      .step('Step 1', () => ({ value: 1 }));
+
+    await updatedRunner.run(testBrain);
+
+    // Verify all adapters received events
+    expect(mockAdapter.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BRAIN_EVENTS.START,
+      })
+    );
+    expect(mockAdapter2.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BRAIN_EVENTS.START,
+      })
+    );
+    expect(mockAdapter3.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BRAIN_EVENTS.START,
+      })
+    );
+
+    // Verify all adapters received the same number of events
+    expect(mockAdapter.dispatch).toHaveBeenCalledTimes(mockAdapter2.dispatch.mock.calls.length);
+    expect(mockAdapter2.dispatch).toHaveBeenCalledTimes(mockAdapter3.dispatch.mock.calls.length);
+  });
 });
