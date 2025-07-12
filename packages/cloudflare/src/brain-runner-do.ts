@@ -15,6 +15,10 @@ export function setManifest(generatedManifest: PositronicManifest) {
   manifest = generatedManifest;
 }
 
+export function getManifest(): PositronicManifest | null {
+  return manifest;
+}
+
 let brainRunner: BrainRunner | null = null;
 export function setBrainRunner(runner: BrainRunner) {
   brainRunner = runner;

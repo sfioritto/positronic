@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AwsClient } from 'aws4fetch';
 import { parseCronExpression } from 'cron-schedule';
 import type { BrainRunnerDO } from './brain-runner-do.js';
+import { getManifest } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
 import type { R2Bucket, R2Object } from '@cloudflare/workers-types';
@@ -82,6 +83,38 @@ app.get('/brains/watch', async (context: Context) => {
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
   const response = await monitorStub.fetch(new Request(`http://do/watch`));
   return response;
+});
+
+app.get('/brains', async (context: Context) => {
+  const manifest = getManifest();
+  
+  if (!manifest) {
+    return context.json({ error: 'Manifest not initialized' }, 500);
+  }
+
+  const brainNames = manifest.list();
+  const brains = await Promise.all(
+    brainNames.map(async (name) => {
+      const brain = await manifest.import(name);
+      if (!brain) {
+        return null;
+      }
+      
+      return {
+        name,
+        title: brain.title,
+        description: `${brain.title} brain`, // Default description since property is private
+      };
+    })
+  );
+
+  // Filter out any null entries
+  const validBrains = brains.filter(brain => brain !== null);
+
+  return context.json({
+    brains: validBrains,
+    count: validBrains.length,
+  });
 });
 
 app.get('/resources', async (context: Context) => {

@@ -567,9 +567,7 @@ export const brains = {
           !brain.title ||
           typeof brain.title !== 'string' ||
           !brain.description ||
-          typeof brain.description !== 'string' ||
-          typeof brain.createdAt !== 'number' ||
-          typeof brain.lastModified !== 'number'
+          typeof brain.description !== 'string'
         ) {
           console.error(
             `Brain missing required fields or has invalid types: ${JSON.stringify(brain)}`
