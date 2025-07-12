@@ -180,7 +180,8 @@ describe('Helper Functions Unit Tests', () => {
       badClient.fetch = async (path, options) => {
         if (
           options?.method === 'POST' &&
-          options.body?.get('key') === 'error.txt'
+          options.body instanceof FormData &&
+          options.body.get('key') === 'error.txt'
         ) {
           throw new Error('Upload failed');
         }
@@ -474,7 +475,7 @@ describe('Helper Functions Unit Tests', () => {
     it('should handle API errors gracefully', async () => {
       // Create a client that returns an error
       const errorClient = createMockApiClient();
-      errorClient.fetch = async (path: string, options?: any) => {
+      errorClient.fetch = async (path: string, options?: RequestInit) => {
         return new Response('Internal Server Error', { status: 500 });
       };
 

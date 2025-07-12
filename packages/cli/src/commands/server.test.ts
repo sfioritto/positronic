@@ -134,7 +134,7 @@ describe('CLI Integration: positronic server', () => {
       const originalStart = server.start.bind(server);
       let errorCallback: ((error: Error) => void) | undefined;
       
-      server.start = jest.fn().mockImplementation(async (port?: number) => {
+      server.start = jest.fn<Promise<TestServerHandle>, [number?]>().mockImplementation(async (port?: number) => {
         const handle = await originalStart(port);
         
         // Intercept the onError callback
@@ -155,7 +155,7 @@ describe('CLI Integration: positronic server', () => {
       });
 
       // Use a console spy to capture error output
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       try {
         await px(['server'], { server });
@@ -181,16 +181,16 @@ describe('CLI Integration: positronic server', () => {
       
       // Mock the server handle to simulate timeout
       const originalStart = server.start.bind(server);
-      server.start = jest.fn().mockImplementation(async (port?: number) => {
+      server.start = jest.fn<Promise<TestServerHandle>, [number?]>().mockImplementation(async (port?: number) => {
         const handle = await originalStart(port);
         
         // Override waitUntilReady to always return false (timeout)
-        handle.waitUntilReady = jest.fn().mockResolvedValue(false);
+        handle.waitUntilReady = jest.fn<Promise<boolean>, [number?]>().mockResolvedValue(false);
         
         return handle;
       });
 
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       try {
         await px(['server'], { server });
@@ -214,7 +214,7 @@ describe('CLI Integration: positronic server', () => {
 
     it('should handle resource sync with successful upload count', async () => {
       const { server } = env;
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
       try {
         await px(['server'], { server });
@@ -297,7 +297,7 @@ describe('CLI Integration: positronic server', () => {
       const originalStart = server.start.bind(server);
       let closeCallback: ((code?: number | null) => void) | undefined;
       
-      server.start = jest.fn().mockImplementation(async (port?: number) => {
+      server.start = jest.fn<Promise<TestServerHandle>, [number?]>().mockImplementation(async (port?: number) => {
         const handle = await originalStart(port);
         
         // Intercept the onClose callback

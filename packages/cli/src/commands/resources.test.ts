@@ -448,7 +448,7 @@ describe('CLI Integration: positronic resources types', () => {
         expect(foundError).toBe(true);
       } finally {
         // Cleanup without stopping server (already stopped)
-        (await env.cleanupTempDir?.()) || (await env.cleanup?.());
+        env.cleanup();
       }
     });
 
@@ -815,7 +815,7 @@ describe('CLI Integration: positronic resources types', () => {
         expect(foundError).toBe(true);
       } finally {
         // Cleanup without stopping server (already stopped)
-        (await env.cleanupTempDir?.()) || (await env.cleanup?.());
+        env.cleanup();
       }
     });
   });

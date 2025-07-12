@@ -6,6 +6,7 @@ interface MockResource {
   type: 'text' | 'binary';
   size: number;
   lastModified: string;
+  local?: boolean;
 }
 
 export interface MethodCall {
