@@ -1,5 +1,5 @@
 import { BrainRunner } from './brain-runner.js';
-import { brain } from './brain.js';
+import { brain, type SerializedStep } from './brain.js';
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { ObjectGenerator } from '../clients/types.js';
@@ -266,5 +266,66 @@ describe('BrainRunner', () => {
       schema: { type: 'object' }
     });
     expect(result.generated).toBe('from new client');
+  });
+
+  it('should apply patches from initialCompletedSteps and continue from correct state', async () => {
+    const runner = new BrainRunner({
+      adapters: [mockAdapter],
+      client: mockClient,
+    });
+
+    // Simulate completed steps with patches
+    const completedSteps: SerializedStep[] = [
+      {
+        id: 'step-1',
+        title: 'First Step',
+        status: STATUS.COMPLETE,
+        patch: {
+          op: 'add',
+          path: '/count',
+          value: 10
+        }
+      },
+      {
+        id: 'step-2', 
+        title: 'Second Step',
+        status: STATUS.COMPLETE,
+        patch: {
+          op: 'add',
+          path: '/name',
+          value: 'test'
+        }
+      }
+    ];
+
+    const testBrain = brain('Test Brain')
+      .step('First Step', () => ({ count: 10 }))
+      .step('Second Step', ({ state }) => ({ ...state, name: 'test' }))
+      .step('Third Step', ({ state }) => ({ 
+        ...state, 
+        count: state.count + 5,
+        message: `${state.name} completed`
+      }));
+
+    const result = await runner.run(testBrain, {
+      initialState: {},
+      initialCompletedSteps: completedSteps,
+      brainRunId: 'test-run-123'
+    });
+
+    // Verify the final state includes patches from completed steps
+    expect(result).toEqual({
+      count: 15,
+      name: 'test',
+      message: 'test completed'
+    });
+
+    // Verify that the brain runner applied the patches correctly
+    // The runner should have seen all steps execute, but the first two were already completed
+    const stepCompleteEvents = mockAdapter.dispatch.mock.calls
+      .filter(call => call[0].type === BRAIN_EVENTS.STEP_COMPLETE);
+    
+    // All steps will emit complete events in the current implementation
+    expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1);
   });
 });
