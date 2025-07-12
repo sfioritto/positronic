@@ -69,6 +69,7 @@ The project uses npm workspaces with the following packages:
 ### Coding Preferences
 - Place all imports at the top of the file - avoid inline dynamic imports (`await import(...)`) except in rare cases
 - Follow existing patterns in the codebase
+- Consider adding small delays, e.g. awaiting a promise wrapping a setTimeout,  when dealing with asynchronous code to be bad practice and a last resort.
 
 ### Testing
 - Jest is the test framework
