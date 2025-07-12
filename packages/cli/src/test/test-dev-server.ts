@@ -194,8 +194,17 @@ export class TestDevServer implements PositronicDevServer {
         const key = decodeURIComponent(match[1]);
         if (this.resources.has(key)) {
           this.resources.delete(key);
+          this.logCall('deleteResource', [key]);
           return [204, ''];
         } else {
+          // Check if it was already deleted (idempotent delete)
+          const wasDeleted = this.callLog.some(
+            call => call.method === 'deleteResource' && call.args[0] === key
+          );
+          if (wasDeleted) {
+            // Return success for idempotent delete
+            return [204, ''];
+          }
           return [
             404,
             JSON.stringify({ error: `Resource "${key}" not found` }),

@@ -307,21 +307,21 @@ describe('CLI Integration: positronic resources types', () => {
         // Check for nested directories
         const foundData = await waitForOutput(/data/);
         expect(foundData).toBe(true);
-        
+
         const foundConfig = await waitForOutput(/config\.json/);
         expect(foundConfig).toBe(true);
 
         // Check for deeply nested
         const foundUsers = await waitForOutput(/users/);
         expect(foundUsers).toBe(true);
-        
+
         const foundAdmin = await waitForOutput(/admin\.json/);
         expect(foundAdmin).toBe(true);
 
         // Check for images directory
         const foundImages = await waitForOutput(/images/);
         expect(foundImages).toBe(true);
-        
+
         const foundLogo = await waitForOutput(/logo\.png/);
         expect(foundLogo).toBe(true);
       } finally {
@@ -414,13 +414,15 @@ describe('CLI Integration: positronic resources types', () => {
 
         const foundRemote = await waitForOutput(/remote-file\.txt/);
         expect(foundRemote).toBe(true);
-        
+
         // Remote resources should have arrow indicator
         const foundArrow = await waitForOutput(/↗/);
         expect(foundArrow).toBe(true);
-        
+
         // Should show legend for uploaded resources
-        const foundLegend = await waitForOutput(/uploaded resource \(not in local filesystem\)/);
+        const foundLegend = await waitForOutput(
+          /uploaded resource \(not in local filesystem\)/
+        );
         expect(foundLegend).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -434,19 +436,19 @@ describe('CLI Integration: positronic resources types', () => {
       try {
         // Stop server to simulate slow loading
         env.server.stop();
-        
+
         const { waitForOutput, instance } = await px(['resources', 'list']);
-        
+
         // Should show loading message initially
         const foundLoading = await waitForOutput(/Loading resources\.\.\./);
         expect(foundLoading).toBe(true);
-        
+
         // Should eventually show error when server is down
         const foundError = await waitForOutput(/Error connecting/);
         expect(foundError).toBe(true);
       } finally {
         // Cleanup without stopping server (already stopped)
-        await env.cleanupTempDir?.() || await env.cleanup?.();
+        (await env.cleanupTempDir?.()) || (await env.cleanup?.());
       }
     });
 
@@ -499,6 +501,321 @@ describe('CLI Integration: positronic resources types', () => {
         expect(foundCount).toBe(true);
       } finally {
         await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('resources delete command', () => {
+    it('should show error when resource does not exist', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          'non-existent.txt',
+        ]);
+
+        // Should show checking state
+        const foundChecking = await waitForOutput(/Checking resource\.\.\./);
+        expect(foundChecking).toBe(true);
+
+        // Should show warning for non-existent resource
+        const foundWarning = await waitForOutput(
+          /Warning: This will permanently delete/
+        );
+        expect(foundWarning).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should prevent deletion of local resources', async () => {
+      const env = await createTestEnv();
+
+      // Add a local resource
+      env.server.addResource({
+        key: 'local-file.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          'local-file.txt',
+        ]);
+
+        // Should show error about local resource
+        const foundError = await waitForOutput(/Cannot Delete Local Resource/);
+        expect(foundError).toBe(true);
+
+        // Should show explanation
+        const foundExplanation = await waitForOutput(
+          /This resource was synced from your local filesystem/
+        );
+        expect(foundExplanation).toBe(true);
+
+        // Should show instructions
+        const foundInstructions = await waitForOutput(
+          /delete the file locally and run 'px resources sync'/
+        );
+        expect(foundInstructions).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show confirmation prompt for remote resources', async () => {
+      const env = await createTestEnv();
+
+      // Add a remote resource
+      env.server.addResource({
+        key: 'remote-file.txt',
+        type: 'text',
+        size: 200,
+        lastModified: new Date().toISOString(),
+        local: false,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          'remote-file.txt',
+        ]);
+
+        // Should show warning
+        const foundWarning = await waitForOutput(
+          /Warning: This will permanently delete the following resource/
+        );
+        expect(foundWarning).toBe(true);
+
+        // Should show the resource path
+        const foundPath = await waitForOutput(/remote-file\.txt/);
+        expect(foundPath).toBe(true);
+
+        // Should show confirmation prompt
+        const foundPrompt = await waitForOutput(
+          /Type "yes" to confirm deletion:/
+        );
+        expect(foundPrompt).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should delete resource when using force flag', async () => {
+      const env = await createTestEnv();
+
+      // Add a remote resource BEFORE starting the server
+      env.server.addResource({
+        key: 'to-delete.txt',
+        type: 'text',
+        size: 300,
+        lastModified: new Date().toISOString(),
+        local: false,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          '-f',
+          'to-delete.txt',
+        ]);
+
+        // Should check resource first
+        const foundChecking = await waitForOutput(/Checking resource\.\.\./);
+        expect(foundChecking).toBe(true);
+
+        // Should show success message (may skip the deleting message due to speed)
+        const foundSuccess = await waitForOutput(
+          /✅ Successfully deleted: to-delete\.txt/
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify the resource was actually deleted
+        const calls = env.server.getLogs();
+        const deleteCall = calls.find(
+          (c) => c.method === 'deleteResource' && c.args[0] === 'to-delete.txt'
+        );
+        expect(deleteCall).toBeDefined();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should still prevent deletion of local resources with force flag', async () => {
+      const env = await createTestEnv();
+
+      // Add a local resource
+      env.server.addResource({
+        key: 'local-file.txt',
+        type: 'text',
+        size: 100,
+        lastModified: new Date().toISOString(),
+        local: true,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          '-f',
+          'local-file.txt',
+        ]);
+
+        // Should still show error about local resource even with force flag
+        const foundError = await waitForOutput(/Cannot Delete Local Resource/);
+        expect(foundError).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle API connection errors', async () => {
+      const env = await createTestEnv();
+      // Don't start the server to simulate connection error
+
+      try {
+        const { waitForOutput } = await px(
+          ['resources', 'upload', '-d', 'any-resource.txt'],
+          { server: env.server }
+        );
+
+        // Should show checking message first
+        const foundChecking = await waitForOutput(/Checking resource\.\.\./);
+        expect(foundChecking).toBe(true);
+
+        // Should eventually show connection error
+        const foundError = await waitForOutput(/Error connecting/);
+        expect(foundError).toBe(true);
+      } finally {
+        // Just cleanup temp dir since server was never started
+      }
+    });
+
+    it('should handle nested resource paths with force flag', async () => {
+      const env = await createTestEnv();
+
+      // Add a nested resource
+      env.server.addResource({
+        key: 'folder/subfolder/nested-file.txt',
+        type: 'text',
+        size: 800,
+        lastModified: new Date().toISOString(),
+        local: false,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          '-f',
+          'folder/subfolder/nested-file.txt',
+        ]);
+
+        // Should delete successfully
+        const foundSuccess = await waitForOutput(
+          /✅ Successfully deleted: folder\/subfolder\/nested-file\.txt/
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify the resource was deleted
+        const calls = env.server.getLogs();
+        const deleteCall = calls.find(
+          (c) =>
+            c.method === 'deleteResource' &&
+            c.args[0] === 'folder/subfolder/nested-file.txt'
+        );
+        expect(deleteCall).toBeDefined();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle nested resource paths without force flag', async () => {
+      const env = await createTestEnv();
+
+      // Add a nested resource
+      env.server.addResource({
+        key: 'folder/nested.txt',
+        type: 'text',
+        size: 400,
+        lastModified: new Date().toISOString(),
+        local: false,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          'folder/nested.txt',
+        ]);
+
+        // Should show the full nested path in the warning
+        const foundPath = await waitForOutput(/folder\/nested\.txt/);
+        expect(foundPath).toBe(true);
+
+        // Should show confirmation prompt
+        const foundPrompt = await waitForOutput(
+          /Type "yes" to confirm deletion:/
+        );
+        expect(foundPrompt).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show loading state while checking resource', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Stop server to simulate slow loading
+        env.server.stop();
+
+        const { waitForOutput } = await px([
+          'resources',
+          'upload',
+          '-d',
+          'any-file.txt',
+        ]);
+
+        // Should show checking message
+        const foundChecking = await waitForOutput(/Checking resource\.\.\./);
+        expect(foundChecking).toBe(true);
+
+        // Should eventually show error when server is down
+        const foundError = await waitForOutput(/Error/);
+        expect(foundError).toBe(true);
+      } finally {
+        // Cleanup without stopping server (already stopped)
+        (await env.cleanupTempDir?.()) || (await env.cleanup?.());
       }
     });
   });

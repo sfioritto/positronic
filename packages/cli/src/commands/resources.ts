@@ -60,7 +60,7 @@ export class ResourcesCommand {
     });
   }
 
-  delete(resourcePath: string): ReactElement {
+  delete(resourcePath: string, force: boolean = false): ReactElement {
     if (!resourcePath) {
       return React.createElement(ErrorComponent, {
         error: {
@@ -78,6 +78,7 @@ export class ResourcesCommand {
       resourceKey,
       resourcePath,
       projectRootPath: this.server?.projectRootDir,
+      force,
     });
   }
 

@@ -22,10 +22,11 @@ interface ResourceDeleteProps {
   resourceKey: string;
   resourcePath: string;
   projectRootPath?: string;
+  force?: boolean;
 }
 
-export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath }: ResourceDeleteProps) => {
-  const [confirmed, setConfirmed] = useState(false);
+export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, force = false }: ResourceDeleteProps) => {
+  const [confirmed, setConfirmed] = useState(force); // Auto-confirm if force is true
   const [deleted, setDeleted] = useState(false);
   const [input, setInput] = useState('');
   const [isLocalResource, setIsLocalResource] = useState<boolean | null>(null);
@@ -50,7 +51,7 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath }: R
   }, [resourcesData, resourceKey]);
 
   useEffect(() => {
-    if (stdin && !confirmed && !deleted) {
+    if (stdin && !confirmed && !deleted && !force) {
       setRawMode(true);
 
       const handleData = (data: Buffer) => {
@@ -78,7 +79,7 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath }: R
         setRawMode(false);
       };
     }
-  }, [stdin, setRawMode, confirmed, deleted, input, exit]);
+  }, [stdin, setRawMode, confirmed, deleted, input, exit, force]);
 
   useEffect(() => {
     if (confirmed && !loading && !error && !deleted) {
@@ -127,7 +128,7 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath }: R
     );
   }
 
-  if (!confirmed) {
+  if (!confirmed && !force) {
     return (
       <Box flexDirection="column">
         <Text bold color="yellow">⚠️  Warning: This will permanently delete the following resource:</Text>

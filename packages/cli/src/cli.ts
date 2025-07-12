@@ -549,6 +549,12 @@ export function buildCli(options: CliOptions) {
               alias: 'd',
               default: false,
             })
+            .option('force', {
+              describe: 'Skip confirmation prompts (use with --delete)',
+              type: 'boolean',
+              alias: 'f',
+              default: false,
+            })
             .example('$0 resources upload video.mp4', 'Upload a video file')
             .example(
               '$0 resources upload /path/to/large-file.zip --key archive/backup.zip',
@@ -561,11 +567,18 @@ export function buildCli(options: CliOptions) {
             .example(
               '$0 resources upload -d archive/backup.zip',
               'Delete a resource with a nested key'
+            )
+            .example(
+              '$0 resources upload -d -f video.mp4',
+              'Delete a resource without confirmation'
             );
         },
         (argv) => {
           if (argv.delete) {
-            const element = resourcesCommand.delete(argv.file as string);
+            const element = resourcesCommand.delete(
+              argv.file as string,
+              argv.force as boolean
+            );
             render(element);
           } else {
             const element = resourcesCommand.upload(
