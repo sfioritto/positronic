@@ -527,6 +527,63 @@ export const brains = {
       return false;
     }
   },
+
+  /**
+   * Test GET /brains - List all brains
+   */
+  async list(fetch: Fetch): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/brains', {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /brains returned ${response.status}`);
+        return false;
+      }
+
+      const data = await response.json();
+
+      // Validate response structure
+      if (!Array.isArray(data.brains)) {
+        console.error(
+          `Expected brains to be an array, got ${typeof data.brains}`
+        );
+        return false;
+      }
+
+      if (typeof data.count !== 'number') {
+        console.error(`Expected count to be number, got ${typeof data.count}`);
+        return false;
+      }
+
+      // Validate each brain has required fields
+      for (const brain of data.brains) {
+        if (
+          !brain.name ||
+          typeof brain.name !== 'string' ||
+          !brain.title ||
+          typeof brain.title !== 'string' ||
+          !brain.description ||
+          typeof brain.description !== 'string' ||
+          typeof brain.createdAt !== 'number' ||
+          typeof brain.lastModified !== 'number'
+        ) {
+          console.error(
+            `Brain missing required fields or has invalid types: ${JSON.stringify(brain)}`
+          );
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /brains:`, error);
+      return false;
+    }
+  },
 };
 
 export const schedules = {
