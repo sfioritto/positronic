@@ -328,4 +328,41 @@ describe('BrainRunner', () => {
     // All steps will emit complete events in the current implementation
     expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('should stop execution after specified number of steps with endAfter parameter', async () => {
+    const runner = new BrainRunner({
+      adapters: [mockAdapter],
+      client: mockClient,
+    });
+
+    const testBrain = brain('Test Brain')
+      .step('Step 1', () => ({ step1: 'done' }))
+      .step('Step 2', ({ state }) => ({ ...state, step2: 'done' }))
+      .step('Step 3', ({ state }) => ({ ...state, step3: 'done' }))
+      .step('Step 4', ({ state }) => ({ ...state, step4: 'done' }));
+
+    // Run brain but stop after 2 steps
+    const result = await runner.run(testBrain, {
+      endAfter: 2
+    });
+
+    // Verify state only has results from first 2 steps
+    expect(result).toEqual({
+      step1: 'done',
+      step2: 'done'
+    });
+
+    // Verify only 2 step complete events were dispatched
+    const stepCompleteEvents = mockAdapter.dispatch.mock.calls
+      .filter(call => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
+      .map(call => call[0].stepTitle);
+    
+    expect(stepCompleteEvents).toEqual(['Step 1', 'Step 2']);
+
+    // Verify that COMPLETE event was NOT dispatched (brain didn't finish)
+    const completeEvents = mockAdapter.dispatch.mock.calls
+      .filter(call => call[0].type === BRAIN_EVENTS.COMPLETE);
+    
+    expect(completeEvents.length).toBe(0);
+  });
 });
