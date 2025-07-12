@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { createTestEnv } from './test-utils.js';
+import { createTestEnv, px } from './test-utils.js';
 import nock from 'nock';
 
 describe('CLI Integration: positronic brain commands', () => {
@@ -381,7 +381,7 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
         expect(foundError).toBe(true);
       } finally {
-        await env.stopAndCleanup();
+        env.cleanup();
       }
     });
   });
