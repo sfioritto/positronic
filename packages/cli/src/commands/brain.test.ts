@@ -22,12 +22,15 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['run', 'test-brain', '--watch']);
+        const { waitForOutput, instance } = await px(['run', 'test-brain', '--watch']);
         // The watch component should be rendered - first shows connecting message
         const isOutputRendered = await waitForOutput(
           /Connecting to watch service|Brain: test-brain/
         );
         expect(isOutputRendered).toBe(true);
+        
+        // Unmount the component to trigger EventSource cleanup
+        instance.unmount();
       } finally {
         await env.stopAndCleanup();
       }
@@ -38,12 +41,15 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['run', 'test-brain', '-w']);
+        const { waitForOutput, instance } = await px(['run', 'test-brain', '-w']);
         // The watch component should be rendered - first shows connecting message
         const isOutputRendered = await waitForOutput(
           /Connecting to watch service|Brain: test-brain/
         );
         expect(isOutputRendered).toBe(true);
+        
+        // Unmount the component to trigger EventSource cleanup
+        instance.unmount();
       } finally {
         await env.stopAndCleanup();
       }
@@ -201,7 +207,7 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px([
+        const { waitForOutput, instance } = await px([
           'watch',
           '--run-id',
           'test-run-123',
@@ -210,6 +216,9 @@ describe('CLI Integration: positronic brain commands', () => {
           /Connecting to watch service|Brain: test-brain/
         );
         expect(isOutputRendered).toBe(true);
+        
+        // Unmount the component to trigger EventSource cleanup
+        instance.unmount();
       } finally {
         await env.stopAndCleanup();
       }
@@ -220,11 +229,14 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['watch', '--id', 'test-run-456']);
+        const { waitForOutput, instance } = await px(['watch', '--id', 'test-run-456']);
         const isOutputRendered = await waitForOutput(
           /Connecting to watch service|Brain: test-brain/
         );
         expect(isOutputRendered).toBe(true);
+        
+        // Unmount the component to trigger EventSource cleanup
+        instance.unmount();
       } finally {
         await env.stopAndCleanup();
       }
@@ -265,7 +277,7 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px([
+        const { waitForOutput, instance } = await px([
           'watch',
           '--run-id',
           'test-multi-status',
@@ -283,6 +295,9 @@ describe('CLI Integration: positronic brain commands', () => {
         
         const foundPending = await waitForOutput(/•.*Pending Step/);
         expect(foundPending).toBe(true);
+        
+        // Unmount the component to trigger EventSource cleanup
+        instance.unmount();
       } finally {
         await env.stopAndCleanup();
       }
