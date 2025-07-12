@@ -74,7 +74,7 @@ describe('Helper Functions Unit Tests', () => {
       expect(mockClient.calls).toHaveLength(3); // 1 GET + 2 POSTs
       expect(mockClient.calls[0].path).toBe('/resources');
       expect(mockClient.calls[1].path).toBe('/resources');
-      expect(mockClient.calls[1].options.method).toBe('POST');
+      expect(mockClient.calls[1].options?.method).toBe('POST');
 
       // Verify uploaded resources
       const resources = mockClient.getResources();
@@ -329,12 +329,12 @@ describe('Helper Functions Unit Tests', () => {
       });
 
       const originalFetch = badClient.fetch;
-      badClient.fetch = async (path, options) => {
+      badClient.fetch = (async (path: string, options?: RequestInit) => {
         if (options?.method === 'DELETE') {
           return new Response('Internal Server Error', { status: 500 });
         }
         return originalFetch.call(badClient, path, options);
-      };
+      }) as typeof badClient.fetch;
 
       // Don't create the file locally so it should be deleted
 
@@ -475,9 +475,9 @@ describe('Helper Functions Unit Tests', () => {
     it('should handle API errors gracefully', async () => {
       // Create a client that returns an error
       const errorClient = createMockApiClient();
-      errorClient.fetch = async (path: string, options?: RequestInit) => {
+      errorClient.fetch = (async (path: string, options?: RequestInit) => {
         return new Response('Internal Server Error', { status: 500 });
-      };
+      }) as any;
 
       await expect(generateTypes(projectPath, errorClient)).rejects.toThrow(
         'Failed to fetch resources: 500 Internal Server Error'

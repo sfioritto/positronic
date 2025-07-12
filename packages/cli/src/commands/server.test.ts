@@ -7,6 +7,7 @@ import {
   px,
   type TestEnv,
 } from './test-utils.js';
+import type { TestServerHandle } from '../test/test-dev-server.js';
 
 describe('CLI Integration: positronic server', () => {
   let exitSpy: any;
@@ -134,7 +135,7 @@ describe('CLI Integration: positronic server', () => {
       const originalStart = server.start.bind(server);
       let errorCallback: ((error: Error) => void) | undefined;
       
-      server.start = jest.fn<Promise<TestServerHandle>, [number?]>().mockImplementation(async (port?: number) => {
+      server.start = jest.fn(async (port?: number): Promise<TestServerHandle> => {
         const handle = await originalStart(port);
         
         // Intercept the onError callback
@@ -181,11 +182,11 @@ describe('CLI Integration: positronic server', () => {
       
       // Mock the server handle to simulate timeout
       const originalStart = server.start.bind(server);
-      server.start = jest.fn<Promise<TestServerHandle>, [number?]>().mockImplementation(async (port?: number) => {
+      server.start = jest.fn(async (port?: number): Promise<TestServerHandle> => {
         const handle = await originalStart(port);
         
         // Override waitUntilReady to always return false (timeout)
-        handle.waitUntilReady = jest.fn<Promise<boolean>, [number?]>().mockResolvedValue(false);
+        handle.waitUntilReady = jest.fn<() => Promise<boolean>>().mockResolvedValue(false);
         
         return handle;
       });
@@ -230,7 +231,7 @@ describe('CLI Integration: positronic server', () => {
         expect(successLogCall).toBeDefined();
         
         // The log should show number of uploads
-        expect(successLogCall[0]).toMatch(/✅ Synced \d+ resources/);
+        expect(successLogCall![0]).toMatch(/✅ Synced \d+ resources/);
       } finally {
         process.emit('SIGINT');
         await new Promise((r) => setImmediate(r));
@@ -297,7 +298,7 @@ describe('CLI Integration: positronic server', () => {
       const originalStart = server.start.bind(server);
       let closeCallback: ((code?: number | null) => void) | undefined;
       
-      server.start = jest.fn<Promise<TestServerHandle>, [number?]>().mockImplementation(async (port?: number) => {
+      server.start = jest.fn(async (port?: number): Promise<TestServerHandle> => {
         const handle = await originalStart(port);
         
         // Intercept the onClose callback
