@@ -75,6 +75,7 @@ The project uses npm workspaces with the following packages:
 - Jest is the test framework
 - Mock implementations available for API clients and dev servers
 - Integration tests require environment variables (ANTHROPIC_API_KEY, etc.)
+- **IMPORTANT**: Before creating or updating any tests, read `/testing-philosophy.md` for our testing approach based on Kent C. Dodds' principles
 
 ### CLI Development
 - Uses React/Ink for interactive terminal UIs
