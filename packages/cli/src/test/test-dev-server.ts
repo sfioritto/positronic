@@ -35,6 +35,8 @@ export interface TestServerHandle extends ServerHandle {
  */
 class MockServerHandle implements TestServerHandle {
   private _killed = false;
+  private _errorCallback?: (error: Error) => void;
+  private _closeCallback?: (code?: number | null) => void;
 
   constructor(
     private stopFn: () => void,
@@ -44,11 +46,11 @@ class MockServerHandle implements TestServerHandle {
   ) {}
 
   onClose(callback: (code?: number | null) => void): void {
-    // No-op for tests - nock doesn't have lifecycle events
+    this._closeCallback = callback;
   }
 
   onError(callback: (error: Error) => void): void {
-    // No-op for tests - nock doesn't have lifecycle events
+    this._errorCallback = callback;
   }
 
   kill(signal?: string): boolean {
