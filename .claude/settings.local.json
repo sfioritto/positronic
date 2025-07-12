@@ -12,7 +12,9 @@
       "Bash(npm run test:*)",
       "Bash(npm run tsc:*)",
       "Bash(npm run build:*)",
-      "WebFetch(domain:kentcdodds.com)"
+      "WebFetch(domain:kentcdodds.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
