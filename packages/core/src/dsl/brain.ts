@@ -91,6 +91,17 @@ export interface SerializedStep {
 // New type for Step Status Event, omitting the patch
 export type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
 
+// Type for brain structure
+export interface BrainStructure {
+  title: string;
+  description?: string;
+  steps: Array<{
+    type: 'step' | 'brain';
+    title: string;
+    innerBrain?: BrainStructure;
+  }>;
+}
+
 type StepBlock<
   TStateIn,
   TStateOut,
@@ -167,6 +178,28 @@ export class Brain<
   private services: TServices = {} as TServices;
 
   constructor(public readonly title: string, private description?: string) {}
+
+  get structure(): BrainStructure {
+    return {
+      title: this.title,
+      description: this.description,
+      steps: this.blocks.map(block => {
+        if (block.type === 'step') {
+          return {
+            type: 'step' as const,
+            title: block.title,
+          };
+        } else {
+          // block.type === 'brain'
+          return {
+            type: 'brain' as const,
+            title: block.title,
+            innerBrain: block.innerBrain.structure,
+          };
+        }
+      }),
+    };
+  }
 
   // New method to specify default options
   withOptions(options: Partial<TOptions>): this {

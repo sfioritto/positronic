@@ -1801,3 +1801,77 @@ describe('type inference', () => {
     const _typeAssert: TypeTest = true;
   });
 });
+
+describe('brain structure', () => {
+  it('should expose brain structure with steps', () => {
+    const testBrain = brain({ title: 'Test Brain', description: 'A test brain description' })
+      .step('First step', ({ state }) => ({ ...state, step1: true }))
+      .step('Second step', ({ state }) => ({ ...state, step2: true }))
+      .step('Third step', ({ state }) => ({ ...state, step3: true }));
+
+    const structure = testBrain.structure;
+
+    expect(structure).toEqual({
+      title: 'Test Brain',
+      description: 'A test brain description',
+      steps: [
+        { type: 'step', title: 'First step' },
+        { type: 'step', title: 'Second step' },
+        { type: 'step', title: 'Third step' },
+      ],
+    });
+  });
+
+  it('should expose nested brain structure recursively', () => {
+    const innerBrain = brain({ title: 'Inner Brain', description: 'An inner brain' })
+      .step('Inner step 1', ({ state }) => ({ ...state, inner1: true }))
+      .step('Inner step 2', ({ state }) => ({ ...state, inner2: true }));
+
+    const outerBrain = brain({ title: 'Outer Brain', description: 'An outer brain' })
+      .step('Outer step 1', ({ state }) => ({ ...state, outer1: true }))
+      .brain(
+        'Run inner brain',
+        innerBrain,
+        ({ brainState }) => ({ result: brainState })
+      )
+      .step('Outer step 2', ({ state }) => ({ ...state, outer2: true }));
+
+    const structure = outerBrain.structure;
+
+    expect(structure).toEqual({
+      title: 'Outer Brain',
+      description: 'An outer brain',
+      steps: [
+        { type: 'step', title: 'Outer step 1' },
+        {
+          type: 'brain',
+          title: 'Run inner brain',
+          innerBrain: {
+            title: 'Inner Brain',
+            description: 'An inner brain',
+            steps: [
+              { type: 'step', title: 'Inner step 1' },
+              { type: 'step', title: 'Inner step 2' },
+            ],
+          },
+        },
+        { type: 'step', title: 'Outer step 2' },
+      ],
+    });
+  });
+
+  it('should handle brain without description', () => {
+    const testBrain = brain('No Description Brain')
+      .step('Only step', ({ state }) => state);
+
+    const structure = testBrain.structure;
+
+    expect(structure).toEqual({
+      title: 'No Description Brain',
+      description: undefined,
+      steps: [
+        { type: 'step', title: 'Only step' },
+      ],
+    });
+  });
+});

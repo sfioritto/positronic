@@ -94,8 +94,17 @@ interface MockBrain {
   name: string;
   title: string;
   description: string;
-  createdAt: number;
-  lastModified: number;
+  createdAt?: number;
+  lastModified?: number;
+  steps?: Array<{
+    type: 'step' | 'brain';
+    title: string;
+    innerBrain?: {
+      title: string;
+      description?: string;
+      steps: any[];
+    };
+  }>;
 }
 
 export class TestDevServer implements PositronicDevServer {
@@ -449,6 +458,24 @@ export class TestDevServer implements PositronicDevServer {
         brains,
         count: brains.length,
       };
+    });
+
+    // GET /brains/:brainName
+    nockInstance.get(/^\/brains\/(.+)$/).reply((uri) => {
+      const brainName = decodeURIComponent(uri.split('/')[2]);
+      const brain = this.brains.get(brainName);
+      this.logCall('getBrain', [brainName]);
+      
+      if (!brain) {
+        return [404, { error: `Brain '${brainName}' not found` }];
+      }
+      
+      return [200, {
+        name: brain.name,
+        title: brain.title,
+        description: brain.description || `${brain.title} brain`,
+        steps: brain.steps || [],
+      }];
     });
 
     // GET /brains/schedules

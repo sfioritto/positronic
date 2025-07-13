@@ -582,6 +582,85 @@ export const brains = {
       return false;
     }
   },
+
+  /**
+   * Test GET /brains/:brainName - Get brain structure
+   */
+  async show(fetch: Fetch, brainName: string): Promise<boolean> {
+    try {
+      const request = new Request(`http://example.com/brains/${encodeURIComponent(brainName)}`, {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /brains/${brainName} returned ${response.status}`);
+        return false;
+      }
+
+      const data = await response.json();
+
+      // Validate response structure
+      if (!data.name || typeof data.name !== 'string') {
+        console.error(
+          `Expected name to be string, got ${typeof data.name}`
+        );
+        return false;
+      }
+
+      if (!data.title || typeof data.title !== 'string') {
+        console.error(
+          `Expected title to be string, got ${typeof data.title}`
+        );
+        return false;
+      }
+
+      if (!Array.isArray(data.steps)) {
+        console.error(
+          `Expected steps to be an array, got ${typeof data.steps}`
+        );
+        return false;
+      }
+
+      // Validate each step
+      for (const step of data.steps) {
+        if (!step.type || !['step', 'brain'].includes(step.type)) {
+          console.error(`Invalid step type: ${step.type}`);
+          return false;
+        }
+
+        if (!step.title || typeof step.title !== 'string') {
+          console.error(
+            `Step missing title or has invalid type: ${JSON.stringify(step)}`
+          );
+          return false;
+        }
+
+        // If it's a brain step, validate the inner brain recursively
+        if (step.type === 'brain' && step.innerBrain) {
+          if (!step.innerBrain.title || typeof step.innerBrain.title !== 'string') {
+            console.error(
+              `Inner brain missing title: ${JSON.stringify(step.innerBrain)}`
+            );
+            return false;
+          }
+
+          if (!Array.isArray(step.innerBrain.steps)) {
+            console.error(
+              `Inner brain missing steps array: ${JSON.stringify(step.innerBrain)}`
+            );
+            return false;
+          }
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /brains/${brainName}:`, error);
+      return false;
+    }
+  },
 };
 
 export const schedules = {

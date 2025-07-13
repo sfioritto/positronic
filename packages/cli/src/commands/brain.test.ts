@@ -424,16 +424,70 @@ describe('CLI Integration: positronic brain commands', () => {
   });
 
   describe('brain show command', () => {
-    it('should show not yet implemented message', async () => {
+    it('should show brain structure when brain exists', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add a brain to the test server with structure
+      server.addBrain({
+        name: 'test-brain',
+        title: 'Test Brain',
+        description: 'A test brain for unit testing',
+        steps: [
+          {
+            type: 'step',
+            title: 'Initialize',
+          },
+          {
+            type: 'step',
+            title: 'Process Data',
+          },
+          {
+            type: 'brain',
+            title: 'Nested Analysis',
+            innerBrain: {
+              title: 'Inner Brain',
+              description: 'Performs nested analysis',
+              steps: [
+                {
+                  type: 'step',
+                  title: 'Analyze Subset',
+                },
+              ],
+            },
+          },
+        ],
+      });
+      
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px(['show', 'test-brain']);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        
+        // Check for brain title
+        const foundTitle = await waitForOutput(/Test Brain/, 30);
+        expect(foundTitle).toBe(true);
+        
+        // Check for description
+        const foundDescription = await waitForOutput(/A test brain for unit testing/, 30);
+        expect(foundDescription).toBe(true);
+        
+        // Check for steps
+        const foundSteps = await waitForOutput(/• Initialize/, 30);
+        expect(foundSteps).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show error when brain does not exist', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['show', 'non-existent-brain']);
+        const foundError = await waitForOutput(/Brain 'non-existent-brain' not found/, 30);
+        expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
