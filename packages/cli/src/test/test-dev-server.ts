@@ -582,6 +582,21 @@ export class TestDevServer implements PositronicDevServer {
       return [200, { runs }];
     });
 
+    // GET /brains/:brainName/active-runs
+    nockInstance.get(/^\/brains\/(.+)\/active-runs$/).reply((uri) => {
+      const parts = uri.split('/');
+      const brainName = decodeURIComponent(parts[2]);
+      
+      this.logCall('getBrainActiveRuns', [brainName]);
+      
+      // Filter brain runs by brain title and status RUNNING
+      const activeRuns = this.brainRuns
+        .filter(run => run.brainTitle.toLowerCase() === brainName.toLowerCase().replace(/-/g, ' ') && run.status === 'RUNNING')
+        .sort((a, b) => b.createdAt - a.createdAt);
+      
+      return [200, { runs: activeRuns }];
+    });
+
     // GET /brains/:brainName
     nockInstance.get(/^\/brains\/(.+)$/).reply((uri) => {
       const brainName = decodeURIComponent(uri.split('/')[2]);

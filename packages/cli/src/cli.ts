@@ -384,8 +384,8 @@ export function buildCli(options: CliOptions) {
           'Watch a specific brain run by its ID'
         );
     },
-    (argv) => {
-      const element = brainCommand.watch(argv);
+    async (argv) => {
+      const element = await brainCommand.watch(argv);
       if (element) {
         render(element);
       }
@@ -548,8 +548,8 @@ export function buildCli(options: CliOptions) {
               'Watch a specific brain run by its ID'
             );
         },
-        (argv) => {
-          const element = brainCommand.watch(argv);
+        async (argv) => {
+          const element = await brainCommand.watch(argv);
           if (element) {
             render(element);
           }

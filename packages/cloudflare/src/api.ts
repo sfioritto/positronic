@@ -89,6 +89,17 @@ app.get('/brains/:brainName/history', async (context: Context) => {
   return context.json({ runs });
 });
 
+app.get('/brains/:brainName/active-runs', async (context: Context) => {
+  const brainName = context.req.param('brainName');
+
+  // Get the monitor singleton instance
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+
+  const runs = await monitorStub.activeRuns(brainName);
+  return context.json({ runs });
+});
+
 app.get('/brains/watch', async (context: Context) => {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);

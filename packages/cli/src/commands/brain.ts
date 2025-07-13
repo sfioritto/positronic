@@ -126,24 +126,82 @@ export class BrainCommand {
     }
   }
 
-  watch({
+  async watch({
     runId,
     name: brainName,
-  }: ArgumentsCamelCase<BrainWatchArgs>): React.ReactElement {
+  }: ArgumentsCamelCase<BrainWatchArgs>): Promise<React.ReactElement> {
     // If a specific run ID is provided, return the Watch component
     if (runId) {
       const port = process.env.POSITRONIC_SERVER_PORT || '8787';
       return React.createElement(Watch, { runId, port });
     }
 
-    // If watching by brain name is requested (latest run), this is not yet implemented.
-    // For now, show a placeholder message.
+    // If watching by brain name is requested, look up active runs
     if (brainName) {
-      return React.createElement(
-        Text,
-        null,
-        'Watching by brain name is not yet implemented.'
-      );
+      try {
+        const apiPath = `/brains/${encodeURIComponent(brainName)}/active-runs`;
+        const response = await apiClient.fetch(apiPath, {
+          method: 'GET',
+        });
+
+        if (response.status === 200) {
+          const result = await response.json() as { runs: Array<{ brainRunId: string; brainTitle: string; status: string; createdAt: number }> };
+          
+          if (result.runs.length === 0) {
+            return React.createElement(
+              ErrorComponent,
+              {
+                error: {
+                  title: 'No Active Runs',
+                  message: `No currently running brain runs found for brain "${brainName}".`,
+                  details: `To start a new run, use: positronic run ${brainName}`
+                }
+              }
+            );
+          }
+
+          if (result.runs.length > 1) {
+            return React.createElement(
+              ErrorComponent,
+              {
+                error: {
+                  title: 'Multiple Active Runs',
+                  message: `Found ${result.runs.length} active runs for brain "${brainName}".`,
+                  details: `Please specify a specific run ID with --run-id:\n${result.runs.map(run => `  positronic watch --run-id ${run.brainRunId}`).join('\n')}`
+                }
+              }
+            );
+          }
+
+          // Exactly one active run found - watch it
+          const activeRun = result.runs[0];
+          const port = process.env.POSITRONIC_SERVER_PORT || '8787';
+          return React.createElement(Watch, { runId: activeRun.brainRunId, port });
+        } else {
+          const errorText = await response.text();
+          return React.createElement(
+            ErrorComponent,
+            {
+              error: {
+                title: 'API Error',
+                message: `Failed to get active runs for brain "${brainName}".`,
+                details: `Server returned ${response.status}: ${errorText}`
+              }
+            }
+          );
+        }
+      } catch (error: any) {
+        return React.createElement(
+          ErrorComponent,
+          {
+            error: {
+              title: 'Connection Error',
+              message: 'Error connecting to the local development server.',
+              details: `Please ensure the server is running ('positronic server' or 'px s').\n\nError details: ${error.message}`
+            }
+          }
+        );
+      }
     }
 
     // Neither runId nor brainName provided – return an error element.
