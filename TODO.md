@@ -56,3 +56,89 @@ export interface PositronicDevServer {
 3. [ ] Refactor CLI `server.ts` to use the new interface methods
 4. [ ] Remove direct calls to `syncResources` and `generateTypes` from CLI
 5. [ ] Test the refactored implementation
+
+## 2. Positronic Brain Development Issues
+
+### Issues Encountered by AI Agent Creating a Hacker News Bot
+
+#### Server Management & Output Visibility
+
+- Couldn't start and monitor the server output
+- Had to rely on user to see error messages from the server
+- No way to see real-time logs when running brains
+- **PUNT ON THIS FOR NOW**
+
+#### AI Client API Confusion
+
+- Initially tried using client.generateObject() directly in a step
+- Didn't immediately recognize to use the .prompt() step pattern
+- The Brain DSL guide showed the pattern, but didn't connect that this was THE way to use AI in Positronic
+
+#### Missing Examples of Common Patterns
+
+- No example of fetching external APIs (like Hacker News)
+- No example of filtering/processing arrays with AI
+- Would have helped to see a "real world" brain example beyond the basic ones
+
+#### Type Definitions & Interfaces
+
+- Had to guess the structure of HNArticle interface
+- Wasn't sure what methods were available on the client parameter
+- No clear documentation on what parameters are available in each step context
+
+#### Error Debugging
+
+- Error messages were cryptic (e.g., "Cannot read properties of undefined")
+- No stack trace or context about which step failed
+- Would benefit from better error messages that explain what went wrong
+
+#### Testing & Running Brains
+
+- No way to test brains in isolation
+- Had to run the full brain to see if it worked
+- No documentation on how to mock or test individual steps
+
+#### Project Structure Understanding
+
+- Wasn't immediately clear that brains go in /brains directory
+- Had to infer the export pattern from the example
+
+### Action Items
+
+#### Documentation (Critical)
+
+- [ ] Add "Common Patterns" doc with examples:
+  - Fetching from external APIs
+  - Using AI to filter/classify data
+  - Error handling patterns
+  - State management best practices
+- [ ] Make .prompt() step documentation more prominent - clarify it's the primary way to use AI in brains
+- [ ] Add type definitions or better inline docs showing:
+  - What's available in step contexts (state, client, resources, etc.)
+  - Return type expectations
+  - Available methods on each parameter
+
+#### Template Improvements
+
+- [ ] Include an example brain in the template project (keeping in mind templating error issues)
+  - Look at tests in core library for decently complicated example
+  - Consider using Hacker News bot brain as example
+  - Must use .prompt() step to demonstrate AI usage
+
+#### Process Documentation
+
+- [ ] Create a process guide for generating brains (similar to command line tools process)
+  - Multi-step process
+  - Include how to write tests
+  - Provide test examples
+
+#### Error Handling
+
+- [ ] Improve error messages to explain:
+  - Which step failed
+  - Expected vs actual data
+  - Hints about common fixes
+
+#### Future Considerations
+
+- Server output tool - Maybe a tool that lets agents see the last N lines of server output or brain execution logs (PUNTED)
