@@ -87,6 +87,24 @@ export interface PositronicDevServer {
    * @param config Deployment configuration
    */
   deploy(config?: any): Promise<void>;
+
+  /**
+   * Register a callback for log messages
+   * @param callback Function called with log messages
+   */
+  onLog(callback: (message: string) => void): void;
+
+  /**
+   * Register a callback for error messages
+   * @param callback Function called with error messages
+   */
+  onError(callback: (message: string) => void): void;
+
+  /**
+   * Register a callback for warning messages
+   * @param callback Function called with warning messages
+   */
+  onWarning(callback: (message: string) => void): void;
 }
 
 export { testStatus, resources, brains, schedules } from './api.js';

@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
 import { syncResources, generateTypes } from './helpers.js';
@@ -13,6 +14,39 @@ export class ServerCommand {
 
     let serverHandle: ServerHandle | null = null;
     let watcher: FSWatcher | null = null;
+    let logStream: fs.WriteStream | null = null;
+
+    // Handle log file option
+    if (argv.logFile) {
+      const logFilePath = path.resolve(argv.logFile);
+      
+      // Check if file already exists
+      if (fs.existsSync(logFilePath)) {
+        throw new Error(`Log file already exists: ${logFilePath}. Please specify a different file.`);
+      }
+
+      // Create log stream
+      logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+      // Register log callbacks
+      this.server.onLog((message) => {
+        const timestamp = new Date().toISOString();
+        logStream!.write(`[${timestamp}] [INFO] ${message}`);
+      });
+
+      this.server.onError((message) => {
+        const timestamp = new Date().toISOString();
+        logStream!.write(`[${timestamp}] [ERROR] ${message}`);
+      });
+
+      this.server.onWarning((message) => {
+        const timestamp = new Date().toISOString();
+        logStream!.write(`[${timestamp}] [WARN] ${message}`);
+      });
+
+      // Output the process ID for AI agents to track
+      console.log(process.pid);
+    }
 
     const cleanup = async () => {
       if (watcher) {
@@ -23,6 +57,13 @@ export class ServerCommand {
         serverHandle.kill();
         serverHandle = null;
       }
+      
+      // Close log stream
+      if (logStream) {
+        logStream.end();
+        logStream = null;
+      }
+      
       process.exit(0);
     };
 

@@ -207,6 +207,10 @@ export class CloudflareDevServer implements PositronicDevServer {
    * simplest solution.
    */
 
+  private logCallbacks: Array<(message: string) => void> = [];
+  private errorCallbacks: Array<(message: string) => void> = [];
+  private warningCallbacks: Array<(message: string) => void> = [];
+
   constructor(public projectRootDir: string) {}
 
   async setup(force?: boolean): Promise<void> {
@@ -438,11 +442,39 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     const wranglerProcess = spawn('npx', ['wrangler', ...wranglerArgs], {
       cwd: serverDir,
-      stdio: 'inherit',
+      stdio: ['inherit', 'pipe', 'pipe'], // stdin inherit, stdout/stderr piped
       shell: true,
     });
 
+    // Capture and forward stdout
+    wranglerProcess.stdout?.on('data', (data) => {
+      const message = data.toString();
+      
+      // Send to registered callbacks
+      this.logCallbacks.forEach(cb => cb(message));
+      
+      // Always forward to console
+      process.stdout.write(data);
+    });
+
+    // Capture and forward stderr
+    wranglerProcess.stderr?.on('data', (data) => {
+      const message = data.toString();
+      
+      // Parse for warnings vs errors
+      if (message.includes('WARNING') || message.includes('⚠')) {
+        this.warningCallbacks.forEach(cb => cb(message));
+      } else {
+        this.errorCallbacks.forEach(cb => cb(message));
+      }
+      
+      // Always forward to console
+      process.stderr.write(data);
+    });
+
     wranglerProcess.on('error', (err) => {
+      const errorMessage = `Failed to start Wrangler dev server: ${err.message}\n`;
+      this.errorCallbacks.forEach(cb => cb(errorMessage));
       console.error('Failed to start Wrangler dev server:', err);
     });
 
@@ -501,7 +533,7 @@ export class CloudflareDevServer implements PositronicDevServer {
         ['wrangler', 'deploy', '--env', 'production'],
         {
           cwd: serverDir,
-          stdio: 'inherit',
+          stdio: ['inherit', 'pipe', 'pipe'],
           shell: true,
           env: {
             ...process.env,
@@ -511,13 +543,35 @@ export class CloudflareDevServer implements PositronicDevServer {
         }
       );
 
+      // Capture and forward stdout
+      wranglerProcess.stdout?.on('data', (data) => {
+        const message = data.toString();
+        this.logCallbacks.forEach(cb => cb(message));
+        process.stdout.write(data);
+      });
+
+      // Capture and forward stderr
+      wranglerProcess.stderr?.on('data', (data) => {
+        const message = data.toString();
+        if (message.includes('WARNING') || message.includes('⚠')) {
+          this.warningCallbacks.forEach(cb => cb(message));
+        } else {
+          this.errorCallbacks.forEach(cb => cb(message));
+        }
+        process.stderr.write(data);
+      });
+
       wranglerProcess.on('error', (err) => {
+        const errorMessage = `Failed to start Wrangler deploy: ${err.message}\n`;
+        this.errorCallbacks.forEach(cb => cb(errorMessage));
         console.error('Failed to start Wrangler deploy:', err);
         reject(err);
       });
 
       wranglerProcess.on('exit', (code) => {
         if (code === 0) {
+          const successMessage = '✅ Deployment complete!\n';
+          this.logCallbacks.forEach(cb => cb(successMessage));
           console.log('✅ Deployment complete!');
           resolve();
         } else {
@@ -525,5 +579,17 @@ export class CloudflareDevServer implements PositronicDevServer {
         }
       });
     });
+  }
+
+  onLog(callback: (message: string) => void): void {
+    this.logCallbacks.push(callback);
+  }
+
+  onError(callback: (message: string) => void): void {
+    this.errorCallbacks.push(callback);
+  }
+
+  onWarning(callback: (message: string) => void): void {
+    this.warningCallbacks.push(callback);
   }
 }

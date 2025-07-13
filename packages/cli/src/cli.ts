@@ -195,6 +195,11 @@ export function buildCli(options: CliOptions) {
             describe: 'Port number for the server to listen on',
             type: 'number',
             alias: 'p',
+          })
+          .option('log-file', {
+            describe: 'File to redirect server output to (for AI agents)',
+            type: 'string',
+            alias: 'l',
           });
       },
       (argv) => serverCommand.handle(argv)
