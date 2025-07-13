@@ -260,8 +260,15 @@ export class TestDevServer implements PositronicDevServer {
     });
 
     // POST /brains/runs
-    nockInstance.post('/brains/runs').reply(201, (uri, requestBody) => {
+    nockInstance.post('/brains/runs').reply((uri, requestBody) => {
       const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      
+      // Check if brain exists (for testing brain not found scenario)
+      if (body.brainName === 'non-existent-brain') {
+        this.logCall('createBrainRun', [body.brainName]);
+        return [404, { error: `Brain '${body.brainName}' not found` }];
+      }
+      
       let brainRunId = `run-${Date.now()}`;
       
       // Return specific runIds for specific test scenarios
@@ -274,7 +281,7 @@ export class TestDevServer implements PositronicDevServer {
       }
       
       this.logCall('createBrainRun', [brainRunId]);
-      return { brainRunId };
+      return [201, { brainRunId }];
     });
 
     // GET /brains/runs/:runId/watch (SSE endpoint)

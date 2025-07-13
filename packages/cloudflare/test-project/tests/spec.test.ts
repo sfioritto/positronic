@@ -69,6 +69,11 @@ describe('Positronic Spec', () => {
       expect(typeof brainRunId).toBe('string');
     });
 
+    it('passes POST /brains/runs with non-existent brain test (404)', async () => {
+      const result = await brains.runNotFound(createFetch(), 'non-existent-brain');
+      expect(result).toBe(true);
+    });
+
     it('passes GET /brains/runs/:runId/watch test', async () => {
       // First create a brain run
       const brainRunId = await brains.run(createFetch(), 'basic-brain');

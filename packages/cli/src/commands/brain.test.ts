@@ -56,6 +56,33 @@ describe('CLI Integration: positronic brain commands', () => {
     });
 
 
+    it('should handle brain not found (404) error with helpful message', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['run', 'non-existent-brain']);
+
+        // Check for error component output
+        const foundErrorTitle = await waitForOutput(/Brain Not Found/i, 30);
+        expect(foundErrorTitle).toBe(true);
+
+        const foundErrorMessage = await waitForOutput(/Brain 'non-existent-brain' not found/i, 30);
+        expect(foundErrorMessage).toBe(true);
+
+        const foundHelpText = await waitForOutput(/brain name is spelled correctly/i, 30);
+        expect(foundHelpText).toBe(true);
+
+        // Verify the API was called
+        const calls = env.server.getLogs();
+        const runCall = calls.find(c => c.method === 'createBrainRun');
+        expect(runCall).toBeDefined();
+        expect(runCall?.args[0]).toBe('non-existent-brain');
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
     it('should handle API server error responses', async () => {
       const env = await createTestEnv();
       const px = await env.start();
@@ -511,6 +538,44 @@ describe('CLI Integration: positronic brain commands', () => {
         // Check for error message
         const foundErrorMsg = await waitForOutput(/Connection timeout/i, 30);
         expect(foundErrorMsg).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle server connection errors', async () => {
+      const env = await createTestEnv();
+      // Don't start the server to simulate connection error
+      
+      try {
+        const { waitForOutput } = await px(['history', 'test-brain'], { server: env.server });
+        
+        const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
+        expect(foundError).toBe(true);
+      } finally {
+        env.cleanup();
+      }
+    });
+
+    it('should handle API server errors', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Clear all existing nock interceptors to avoid conflicts
+        nock.cleanAll();
+
+        // Mock the server to return a 500 error
+        const port = env.server.port;
+        nock(`http://localhost:${port}`)
+          .get(/^\/brains\/(.+)\/history/)
+          .reply(500, 'Internal Server Error');
+
+        const { waitForOutput } = await px(['history', 'test-brain']);
+        
+        // The ErrorComponent will display the error
+        const foundError = await waitForOutput(/Error:|Failed|500/i, 30);
+        expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
