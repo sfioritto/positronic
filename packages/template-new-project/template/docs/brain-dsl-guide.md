@@ -50,7 +50,7 @@ Generate structured output from AI models:
 brain('AI Brain')
   .step('Setup', () => ({ topic: 'quantum computing' }))
   .prompt('Generate Article', {
-    template: (state) => `Write an article about ${state.topic}`,
+    template: (state) => `Write an article about <%= '${state.topic}' %>`,
     outputSchema: {
       schema: z.object({
         title: z.string(),
@@ -62,7 +62,7 @@ brain('AI Brain')
   })
   .step('Format', ({ state }) => ({
     ...state,
-    formatted: `# ${state.article.title}\n\n${state.article.content}`,
+    formatted: `# <%= '${state.article.title}' %>\n\n<%= '${state.article.content}' %>`,
   }));
 ```
 
@@ -160,8 +160,7 @@ const result = brain.run({
 
 For production use with adapters and state management:
 
-```typescript\
-
+```typescript
 import { BrainRunner } from '@positronic/core';
 
 const runner = new BrainRunner({
@@ -189,7 +188,7 @@ const typedBrain = brain('Typed Example')
     name: 'Test', // TypeScript knows state has 'count'
   }))
   .step('Use Both', ({ state }) => ({
-    message: `${state.name}: ${state.count}`, // Both properties available
+    message: `<%= '${state.name}' %>: <%= '${state.count}' %>`, // Both properties available
   }));
 ```
 
@@ -278,7 +277,7 @@ const completeBrain = brain({
     },
   })
   .step('Process Plan', ({ state, services }) => {
-    services.logger.log(`Generated ${state.plan.tasks.length} tasks`);
+    services.logger.log(`Generated <%= '${state.plan.tasks.length}' %> tasks`);
     return {
       ...state,
       taskCount: state.plan.tasks.length,
