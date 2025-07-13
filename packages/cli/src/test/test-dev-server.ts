@@ -460,24 +460,6 @@ export class TestDevServer implements PositronicDevServer {
       };
     });
 
-    // GET /brains/:brainName
-    nockInstance.get(/^\/brains\/(.+)$/).reply((uri) => {
-      const brainName = decodeURIComponent(uri.split('/')[2]);
-      const brain = this.brains.get(brainName);
-      this.logCall('getBrain', [brainName]);
-      
-      if (!brain) {
-        return [404, { error: `Brain '${brainName}' not found` }];
-      }
-      
-      return [200, {
-        name: brain.name,
-        title: brain.title,
-        description: brain.description || `${brain.title} brain`,
-        steps: brain.steps || [],
-      }];
-    });
-
     // GET /brains/schedules
     nockInstance.get('/brains/schedules').reply(200, () => {
       const schedules = Array.from(this.schedules.values());
@@ -522,6 +504,24 @@ export class TestDevServer implements PositronicDevServer {
         }
       }
       return [404, 'Not Found'];
+    });
+
+    // GET /brains/:brainName
+    nockInstance.get(/^\/brains\/(.+)$/).reply((uri) => {
+      const brainName = decodeURIComponent(uri.split('/')[2]);
+      const brain = this.brains.get(brainName);
+      this.logCall('getBrain', [brainName]);
+      
+      if (!brain) {
+        return [404, { error: `Brain '${brainName}' not found` }];
+      }
+      
+      return [200, {
+        name: brain.name,
+        title: brain.title,
+        description: brain.description || `${brain.title} brain`,
+        steps: brain.steps || [],
+      }];
     });
 
     this.nockScope = nockInstance;
