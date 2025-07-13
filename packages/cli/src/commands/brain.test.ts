@@ -707,58 +707,6 @@ describe('CLI Integration: positronic brain commands', () => {
     });
   });
 
-  describe('brain new command', () => {
-    it('should show not yet implemented message', async () => {
-      const env = await createTestEnv();
-      const px = await env.start();
-
-      try {
-        const { waitForOutput } = await px(['brain', 'new', 'my-brain']);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
-    it('should show not yet implemented message with prompt', async () => {
-      const env = await createTestEnv();
-      const px = await env.start();
-
-      try {
-        const { waitForOutput } = await px([
-          'brain',
-          'new',
-          'my-brain',
-          '--prompt',
-          'Create a brain',
-        ]);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
-    it('should show not yet implemented message using new alias', async () => {
-      const env = await createTestEnv();
-      const px = await env.start();
-
-      try {
-        const { waitForOutput } = await px(['new', 'my-brain']);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-  });
 
   describe('error handling', () => {
     it('should handle missing brain name for run command', async () => {
