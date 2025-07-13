@@ -369,5 +369,94 @@ describe('CLI Integration: positronic server', () => {
         await new Promise((r) => setImmediate(r));
       }
     });
+
+    it('should not register log callbacks when no log file is specified', async () => {
+      const { server } = env;
+      
+      try {
+        await px(['server'], { server });
+        
+        // Verify server started
+        const methodCalls = server.getLogs();
+        const startCall = methodCalls.find((call) => call.method === 'start');
+        expect(startCall).toBeDefined();
+        
+        // Verify callbacks were NOT registered
+        const onLogCall = methodCalls.find((call) => call.method === 'onLog');
+        const onErrorCall = methodCalls.find((call) => call.method === 'onError');
+        const onWarningCall = methodCalls.find((call) => call.method === 'onWarning');
+        
+        expect(onLogCall).toBeUndefined();
+        expect(onErrorCall).toBeUndefined();
+        expect(onWarningCall).toBeUndefined();
+      } finally {
+        process.emit('SIGINT');
+        await new Promise((r) => setImmediate(r));
+      }
+    });
+
+    it('should redirect output to log file when --log-file is specified', async () => {
+      const { server } = env;
+      const logFile = path.join(server.projectRootDir, 'test-server.log');
+      
+      try {
+        await px(['server', '--log-file', logFile], { server });
+        
+        // Give time for server startup and initial logging
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verify log file was created
+        expect(fs.existsSync(logFile)).toBe(true);
+        
+        // Verify server started successfully and callbacks were registered
+        const methodCalls = server.getLogs();
+        const startCall = methodCalls.find((call) => call.method === 'start');
+        expect(startCall).toBeDefined();
+        
+        // Verify callbacks were registered
+        const onLogCall = methodCalls.find((call) => call.method === 'onLog');
+        const onErrorCall = methodCalls.find((call) => call.method === 'onError');
+        const onWarningCall = methodCalls.find((call) => call.method === 'onWarning');
+        
+        expect(onLogCall).toBeDefined();
+        expect(onErrorCall).toBeDefined();
+        expect(onWarningCall).toBeDefined();
+        
+        // Check log file contains expected output
+        const logContent = fs.readFileSync(logFile, 'utf-8');
+        expect(logContent).toContain('[INFO]');
+        expect(logContent).toContain('Synced');
+        
+        // In real usage, the process ID is output to stdout for AI agents
+        // but in tests this may not be captured due to the testing framework
+      } finally {
+        process.emit('SIGINT');
+        await new Promise((r) => setImmediate(r));
+        
+        // Clean up log file
+        if (fs.existsSync(logFile)) {
+          fs.unlinkSync(logFile);
+        }
+      }
+    });
+
+    it('should throw error if log file already exists', async () => {
+      const { server } = env;
+      const logFile = path.join(server.projectRootDir, 'existing-server.log');
+      
+      // Create existing file
+      fs.writeFileSync(logFile, 'existing content');
+      
+      try {
+        await expect(px(['server', '--log-file', logFile], { server })).rejects.toThrow(
+          `Log file already exists: ${logFile}`
+        );
+      } finally {
+        // Clean up
+        if (fs.existsSync(logFile)) {
+          fs.unlinkSync(logFile);
+        }
+      }
+    });
   });
 });

@@ -138,6 +138,9 @@ export class TestDevServer implements PositronicDevServer {
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
+  private logCallbacks: Array<(message: string) => void> = [];
+  private errorCallbacks: Array<(message: string) => void> = [];
+  private warningCallbacks: Array<(message: string) => void> = [];
 
   constructor(public projectRootDir: string = '') {}
 
@@ -639,6 +642,12 @@ export class TestDevServer implements PositronicDevServer {
 
     this.nockScope = nockInstance;
 
+    // Simulate some initial log output after server starts
+    setTimeout(() => {
+      this.logCallbacks.forEach(cb => cb('✅ Synced 3 resources (0 up to date, 0 deleted)\n'));
+      this.logCallbacks.forEach(cb => cb('🚀 Server started on port ' + this.port + '\n'));
+    }, 100);
+
     return new MockServerHandle(
       () => {
         this.stop();
@@ -717,5 +726,20 @@ export class TestDevServer implements PositronicDevServer {
       nock.cleanAll();
       this.nockScope = null;
     }
+  }
+
+  onLog(callback: (message: string) => void): void {
+    this.logCall('onLog', ['callback registered']);
+    this.logCallbacks.push(callback);
+  }
+
+  onError(callback: (message: string) => void): void {
+    this.logCall('onError', ['callback registered']);
+    this.errorCallbacks.push(callback);
+  }
+
+  onWarning(callback: (message: string) => void): void {
+    this.logCall('onWarning', ['callback registered']);
+    this.warningCallbacks.push(callback);
   }
 }
