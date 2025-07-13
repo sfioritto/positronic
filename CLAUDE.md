@@ -6,17 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Positronic is an AI-powered framework for building and running "brains" - stateful AI workflows that can be deployed to various cloud backends. It provides a fluent DSL for defining AI workflows, resource management, and a CLI for development and deployment.
 
-## Key Commands
+## Key Commands that you should care about
 
 ### Development
 
-- `npm run dev` - Build all workspaces and run tests with notifications
-- `npm run dev:watch` - Watch mode for development (builds and tests)
-- `npm test` - Run all tests silently
-- `npm run test:watch` - Run tests in watch mode
-- `npm run test:all` - Run all tests including integration tests (requires API keys)
-- `npm run format` - Format code with Prettier
-- **Important**: Run `npm run build:workspaces` frequently to ensure TypeScript compilation succeeds, in addition to running tests
+- `npm run dev` - Build all workspaces and run tests with notifications. RUN THIS OFTEN AS YOU MAKE CHANGES.
+- `npm test` - Run all tests silently (including cloudflare tests)
+- `npm run test:noisy` - Run tests with console output (shows console.error, console.log, etc.)
+- `npm run test:all` - Run all tests including cloudflare tests (requires API keys)
+- `npm run format` - Format code with Prettier.
+
+- **Important**: Run `npm run dev` frequently to ensure the build is working and tests are passing.
 
 ### Build and Clean
 
@@ -94,5 +94,7 @@ The project uses npm workspaces with the following packages:
 ## Testing Memories
 
 - **IMPORTANT**: If you run tests within test-project in the cloudflare package, those tests are run using vitest. Always add a --run option otherwise the test will never return and it will just wait for changes to files. Add --run otherwise you will never see the output of the tests.
+
+```
 
 ```
