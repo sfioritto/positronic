@@ -767,6 +767,55 @@ export const brains = {
       return false;
     }
   },
+
+  /**
+   * Test POST /brains/runs/rerun - Rerun an existing brain run
+   */
+  async rerun(
+    fetch: Fetch, 
+    brainName: string, 
+    runId?: string, 
+    startsAt?: number, 
+    stopsAfter?: number
+  ): Promise<string | null> {
+    try {
+      const body: any = { brainName };
+      if (runId) body.runId = runId;
+      if (startsAt !== undefined) body.startsAt = startsAt;
+      if (stopsAfter !== undefined) body.stopsAfter = stopsAfter;
+
+      const request = new Request('http://example.com/brains/runs/rerun', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      const response = await fetch(request);
+
+      if (response.status !== 201) {
+        console.error(
+          `POST /brains/runs/rerun returned ${response.status}, expected 201`
+        );
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (!data.brainRunId || typeof data.brainRunId !== 'string') {
+        console.error(
+          `Expected brainRunId to be string, got ${typeof data.brainRunId}`
+        );
+        return null;
+      }
+
+      return data.brainRunId;
+    } catch (error) {
+      console.error(`Failed to test POST /brains/runs/rerun:`, error);
+      return null;
+    }
+  },
 };
 
 export const schedules = {
