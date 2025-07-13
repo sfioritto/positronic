@@ -15,57 +15,63 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Singleton cache for the template to avoid repeated npm installs
+// This is shared across all tests in a test run and should NOT be deleted
+// by individual test cleanup. It's cleaned up automatically when the process exits.
 let cachedTemplatePath: string | null = null;
 
 async function getCachedTemplate(): Promise<string> {
-  if (!cachedTemplatePath) {
-    // Create cache only once per test run
-    const devPath = path.resolve(__dirname, '../../../');
-    const originalTemplate = path.resolve(devPath, 'template-new-project');
-
-    // First, copy template to temp location so caz can mess with that copy
-    const tempCopyDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'positronic-template-copy-')
-    );
-    fs.cpSync(originalTemplate, tempCopyDir, { recursive: true });
-
-    // Now generate the actual cached template in another temp directory
-    cachedTemplatePath = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'positronic-cached-template-')
-    );
-
-    // Run caz once to generate a clean template
-    const cazOptions = {
-      name: 'test-project',
-      backend: 'none',
-      install: false,
-      force: true,
-    };
-
-    // Temporarily hijack all output streams to suppress caz output
-    const originalStdoutWrite = process.stdout.write;
-    const originalStderrWrite = process.stderr.write;
-    const originalConsoleLog = console.log;
-    const originalConsoleError = console.error;
-
-    process.stdout.write = () => true;
-    process.stderr.write = () => true;
-    console.log = () => {};
-    console.error = () => {};
-
-    try {
-      await caz.default(tempCopyDir, cachedTemplatePath, cazOptions);
-    } finally {
-      // Restore original output streams
-      process.stdout.write = originalStdoutWrite;
-      process.stderr.write = originalStderrWrite;
-      console.log = originalConsoleLog;
-      console.error = originalConsoleError;
-    }
-
-    // Clean up the temp copy directory
-    fs.rmSync(tempCopyDir, { recursive: true, force: true });
+  // Check if cached template exists and is valid
+  if (cachedTemplatePath && fs.existsSync(cachedTemplatePath)) {
+    return cachedTemplatePath;
   }
+  
+  // Create cache only once per test run
+  const devPath = path.resolve(__dirname, '../../../');
+  const originalTemplate = path.resolve(devPath, 'template-new-project');
+
+  // First, copy template to temp location so caz can mess with that copy
+  const tempCopyDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'positronic-template-copy-')
+  );
+  fs.cpSync(originalTemplate, tempCopyDir, { recursive: true });
+
+  // Now generate the actual cached template in another temp directory
+  cachedTemplatePath = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'positronic-cached-template-')
+  );
+
+  // Run caz once to generate a clean template
+  const cazOptions = {
+    name: 'test-project',
+    backend: 'none',
+    install: false,
+    claudemd: false, // Add the new claudemd option
+    force: true,
+  };
+
+  // Temporarily hijack all output streams to suppress caz output
+  const originalStdoutWrite = process.stdout.write;
+  const originalStderrWrite = process.stderr.write;
+  const originalConsoleLog = console.log;
+  const originalConsoleError = console.error;
+
+  process.stdout.write = () => true;
+  process.stderr.write = () => true;
+  console.log = () => {};
+  console.error = () => {};
+
+  try {
+    await caz.default(tempCopyDir, cachedTemplatePath, cazOptions);
+  } finally {
+    // Restore original output streams
+    process.stdout.write = originalStdoutWrite;
+    process.stderr.write = originalStderrWrite;
+    console.log = originalConsoleLog;
+    console.error = originalConsoleError;
+  }
+
+  // Clean up the temp copy directory
+  fs.rmSync(tempCopyDir, { recursive: true, force: true });
 
   return cachedTemplatePath;
 }
