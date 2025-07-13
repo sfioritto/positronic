@@ -387,22 +387,79 @@ describe('CLI Integration: positronic brain commands', () => {
   });
 
   describe('brain history command', () => {
-    it('should show not yet implemented message', async () => {
+    it('should show empty history when no runs exist', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px(['history', 'test-brain']);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        const foundMessage = await waitForOutput(/No run history found for brain: test-brain/i, 30);
+        expect(foundMessage).toBe(true);
+        
+        // Verify API call was made
+        const calls = env.server.getLogs();
+        const historyCall = calls.find(c => c.method === 'getBrainHistory');
+        expect(historyCall).toBeDefined();
+        expect(historyCall?.args[0]).toBe('test-brain');
       } finally {
         await env.stopAndCleanup();
       }
     });
 
-    it('should show not yet implemented message with custom limit', async () => {
+    it('should show brain run history when runs exist', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add some brain runs to history
+      server.addBrainRun({
+        brainRunId: 'run-123',
+        brainTitle: 'Test Brain',
+        brainDescription: 'A test brain',
+        type: 'START',
+        status: 'COMPLETE',
+        createdAt: Date.now() - 3600000, // 1 hour ago
+        startedAt: Date.now() - 3600000,
+        completedAt: Date.now() - 3540000, // 1 minute duration
+      });
+      
+      server.addBrainRun({
+        brainRunId: 'run-456',
+        brainTitle: 'Test Brain',
+        type: 'START',
+        status: 'ERROR',
+        error: { message: 'Connection failed' },
+        createdAt: Date.now() - 7200000, // 2 hours ago
+        startedAt: Date.now() - 7200000,
+      });
+      
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['history', 'test-brain']);
+        
+        // Check for header
+        const foundHeader = await waitForOutput(/Recent runs for brain "test-brain"/i, 30);
+        expect(foundHeader).toBe(true);
+        
+        // Check for run IDs
+        const foundRun1 = await waitForOutput(/run-123/i, 30);
+        expect(foundRun1).toBe(true);
+        
+        const foundRun2 = await waitForOutput(/run-456/i, 30);
+        expect(foundRun2).toBe(true);
+        
+        // Check for statuses
+        const foundComplete = await waitForOutput(/COMPLETE/i, 30);
+        expect(foundComplete).toBe(true);
+        
+        const foundError = await waitForOutput(/ERROR/i, 30);
+        expect(foundError).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should respect custom limit parameter', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
@@ -413,10 +470,47 @@ describe('CLI Integration: positronic brain commands', () => {
           '--limit',
           '20',
         ]);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        
+        // Wait for the component to render
+        await waitForOutput(/run history|Recent runs/i, 30);
+        
+        // Verify API was called with correct limit
+        const calls = env.server.getLogs();
+        const historyCall = calls.find(c => c.method === 'getBrainHistory');
+        expect(historyCall).toBeDefined();
+        expect(historyCall?.args[1]).toBe(20);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show error details for failed runs', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add a failed brain run
+      server.addBrainRun({
+        brainRunId: 'run-error',
+        brainTitle: 'Test Brain',
+        type: 'START',
+        status: 'ERROR',
+        error: 'Connection timeout',
+        createdAt: Date.now() - 1800000,
+        startedAt: Date.now() - 1800000,
+      });
+      
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['history', 'test-brain']);
+        
+        // Check for error section
+        const foundErrors = await waitForOutput(/Errors:/i, 30);
+        expect(foundErrors).toBe(true);
+        
+        // Check for error message
+        const foundErrorMsg = await waitForOutput(/Connection timeout/i, 30);
+        expect(foundErrorMsg).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }

@@ -116,11 +116,25 @@ interface MockBrain {
   }>;
 }
 
+interface MockBrainRun {
+  brainRunId: string;
+  brainTitle: string;
+  brainDescription?: string;
+  type: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETE' | 'ERROR';
+  options?: any;
+  error?: any;
+  createdAt: number;
+  startedAt?: number;
+  completedAt?: number;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
   private scheduleRuns: MockScheduleRun[] = [];
   private brains: Map<string, MockBrain> = new Map();
+  private brainRuns: MockBrainRun[] = [];
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
@@ -543,6 +557,24 @@ export class TestDevServer implements PositronicDevServer {
       return [404, 'Not Found'];
     });
 
+    // GET /brains/:brainName/history
+    nockInstance.get(/^\/brains\/(.+)\/history$/).query(true).reply((uri) => {
+      const parts = uri.split('/');
+      const brainName = decodeURIComponent(parts[2]);
+      const url = new URL(uri, 'http://example.com');
+      const limit = parseInt(url.searchParams.get('limit') || '10', 10);
+      
+      this.logCall('getBrainHistory', [brainName, limit]);
+      
+      // Filter runs by brain title
+      const runs = this.brainRuns
+        .filter(run => run.brainTitle.toLowerCase() === brainName.toLowerCase().replace(/-/g, ' '))
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, limit);
+      
+      return [200, { runs }];
+    });
+
     // GET /brains/:brainName
     nockInstance.get(/^\/brains\/(.+)$/).reply((uri) => {
       const brainName = decodeURIComponent(uri.split('/')[2]);
@@ -617,6 +649,14 @@ export class TestDevServer implements PositronicDevServer {
   // Brain helper methods
   addBrain(brain: MockBrain) {
     this.brains.set(brain.name, brain);
+  }
+
+  addBrainRun(run: MockBrainRun) {
+    this.brainRuns.push(run);
+  }
+
+  clearBrainRuns() {
+    this.brainRuns = [];
   }
 
   clearBrains() {
