@@ -34,8 +34,6 @@ Tests use Jest and are located alongside source files and must be run from the m
 
 ### Brain DSL (`src/dsl/brain.ts`)
 
-User Guide: @docs/brain-dsl-guide.md
-
 **Implementation Details:**
 
 - **Block System**: The DSL builds an internal array of `Block` objects (union type of `StepBlock` and `BrainBlock`)
