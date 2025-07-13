@@ -716,6 +716,57 @@ export const brains = {
       return false;
     }
   },
+
+  /**
+   * Test GET /brains/:brainName/active-runs - Get active/running brain runs
+   */
+  async activeRuns(fetch: Fetch, brainName: string): Promise<boolean> {
+    try {
+      const request = new Request(`http://example.com/brains/${encodeURIComponent(brainName)}/active-runs`, {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /brains/${brainName}/active-runs returned ${response.status}`);
+        return false;
+      }
+
+      const data = await response.json();
+
+      // Validate response structure
+      if (!data.runs || !Array.isArray(data.runs)) {
+        console.error(`Expected runs to be an array, got ${typeof data.runs}`);
+        return false;
+      }
+
+      // Validate each run has required fields
+      for (const run of data.runs) {
+        if (
+          !run.brainRunId ||
+          !run.brainTitle ||
+          !run.type ||
+          !run.status ||
+          typeof run.createdAt !== 'number'
+        ) {
+          console.error(`Active run missing required fields: ${JSON.stringify(run)}`);
+          return false;
+        }
+
+        // All active runs should have status 'RUNNING'
+        if (run.status !== 'RUNNING') {
+          console.error(`Expected active run status to be 'RUNNING', got ${run.status}`);
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /brains/${brainName}/active-runs:`, error);
+      return false;
+    }
+  },
 };
 
 export const schedules = {

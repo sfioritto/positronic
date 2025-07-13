@@ -269,18 +269,160 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
-    it('should show not implemented message when watching by brain name', async () => {
+    it('should watch the single active run when watching by brain name', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add a running brain run
+      server.addBrainRun({
+        brainRunId: 'run-active-123',
+        brainTitle: 'test brain',
+        type: 'START',
+        status: 'RUNNING',
+        createdAt: Date.now() - 60000, // 1 minute ago
+        startedAt: Date.now() - 60000,
+      });
+      
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-brain']);
+        
+        // Should connect to watch the active run
+        const isOutputRendered = await waitForOutput(
+          /Connecting to watch service|Brain: test-brain/
+        );
+        expect(isOutputRendered).toBe(true);
+        
+        // Verify API was called to get active runs
+        const calls = server.getLogs();
+        const activeRunsCall = calls.find(c => c.method === 'getBrainActiveRuns');
+        expect(activeRunsCall).toBeDefined();
+        expect(activeRunsCall?.args[0]).toBe('test-brain');
+        
+        // Unmount the component to trigger EventSource cleanup
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show error when no active runs found for brain name', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px(['watch', 'test-brain']);
-        const isOutputRendered = await waitForOutput(
-          /Watching by brain name is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        
+        // Should show no active runs error
+        const foundTitle = await waitForOutput(/No Active Runs/i, 30);
+        expect(foundTitle).toBe(true);
+        
+        const foundMessage = await waitForOutput(/No currently running brain runs found for brain "test-brain"/i, 30);
+        expect(foundMessage).toBe(true);
+        
+        const foundDetails = await waitForOutput(/positronic run test-brain/i, 30);
+        expect(foundDetails).toBe(true);
+        
+        // Verify API was called
+        const calls = env.server.getLogs();
+        const activeRunsCall = calls.find(c => c.method === 'getBrainActiveRuns');
+        expect(activeRunsCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
+      }
+    });
+
+    it('should show error when multiple active runs found for brain name', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add multiple running brain runs
+      server.addBrainRun({
+        brainRunId: 'run-active-1',
+        brainTitle: 'test brain',
+        type: 'START',
+        status: 'RUNNING',
+        createdAt: Date.now() - 120000, // 2 minutes ago
+        startedAt: Date.now() - 120000,
+      });
+      
+      server.addBrainRun({
+        brainRunId: 'run-active-2',
+        brainTitle: 'test brain',
+        type: 'START',
+        status: 'RUNNING',
+        createdAt: Date.now() - 60000, // 1 minute ago
+        startedAt: Date.now() - 60000,
+      });
+      
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['watch', 'test-brain']);
+        
+        // Should show multiple active runs error
+        const foundTitle = await waitForOutput(/Multiple Active Runs/i, 30);
+        expect(foundTitle).toBe(true);
+        
+        const foundMessage = await waitForOutput(/Found 2 active runs for brain "test-brain"/i, 30);
+        expect(foundMessage).toBe(true);
+        
+        const foundDetails = await waitForOutput(/positronic watch --run-id run-active-/i, 30);
+        expect(foundDetails).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle API errors when looking up active runs', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Clear all existing nock interceptors to avoid conflicts
+        nock.cleanAll();
+
+        // Mock the server to return a 500 error for active-runs endpoint
+        const port = env.server.port;
+        nock(`http://localhost:${port}`)
+          .get(/^\/brains\/(.+)\/active-runs$/)
+          .reply(500, 'Internal Server Error');
+
+        const { waitForOutput } = await px(['watch', 'test-brain']);
+        
+        // Should show API error
+        const foundTitle = await waitForOutput(/API Error/i, 30);
+        expect(foundTitle).toBe(true);
+        
+        const foundMessage = await waitForOutput(/Failed to get active runs for brain "test-brain"/i, 30);
+        expect(foundMessage).toBe(true);
+        
+        const foundDetails = await waitForOutput(/Server returned 500/i, 30);
+        expect(foundDetails).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle connection errors when looking up active runs', async () => {
+      const env = await createTestEnv();
+      // Don't start the server to simulate connection error
+
+      try {
+        const { waitForOutput } = await px(['watch', 'test-brain'], { server: env.server });
+        
+        // Should show connection error
+        const foundTitle = await waitForOutput(/Connection Error/i, 30);
+        expect(foundTitle).toBe(true);
+        
+        const foundMessage = await waitForOutput(/Error connecting to the local development server/i, 30);
+        expect(foundMessage).toBe(true);
+        
+        const foundDetails = await waitForOutput(/positronic server/i, 30);
+        expect(foundDetails).toBe(true);
+      } finally {
+        env.cleanup();
       }
     });
 

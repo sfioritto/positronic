@@ -210,6 +210,32 @@ export class MonitorDO extends DurableObject<Env> {
       )
       .toArray(); // Use renamed parameter
   }
+
+  // Get active/running brain runs for a specific brain
+  activeRuns(brainTitle: string) {
+    return this.storage
+      .exec(
+        `
+      SELECT
+        run_id as brainRunId,
+        brain_title as brainTitle,
+        brain_description as brainDescription,
+        type,
+        status,
+        options,
+        error,
+        created_at as createdAt,
+        started_at as startedAt,
+        completed_at as completedAt
+      FROM brain_runs
+      WHERE brain_title = ? AND status = ?
+      ORDER BY created_at DESC
+    `,
+        brainTitle,
+        STATUS.RUNNING
+      )
+      .toArray();
+  }
 }
 
 class EventStreamHandler {
