@@ -87,7 +87,6 @@ The project uses npm workspaces with the following packages:
 
 - testing philosophy: @docs/testing-philosophy.md
 - CLI testing guide: @docs/cli-testing-guide.md
-- Core package testing guide: @docs/core-testing-guide.md
 - Jest is the test framework
 - **IMPORTANT**: Before creating or updating any tests, always read and load a few different test suites to follow the same patterns
 
