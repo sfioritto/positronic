@@ -311,22 +311,84 @@ describe('schedule command', () => {
   });
 
   describe('schedule runs', () => {
-    it('should show not yet implemented message', async () => {
+    it('should show empty state when no runs exist', async () => {
       const env = await createTestEnv();
       const px = await env.start();
       
       try {
         const { waitForOutput } = await px(['schedule', 'runs']);
         
-        const foundMessage = await waitForOutput(/This command is not yet implemented/i);
+        const foundMessage = await waitForOutput(/No scheduled runs found/i, 30);
         expect(foundMessage).toBe(true);
+        
+        // Verify API call was made
+        const calls = env.server.getLogs();
+        const runsCall = calls.find(c => c.method === 'getScheduleRuns');
+        expect(runsCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
       }
     });
 
-    it('should show not yet implemented message with schedule ID', async () => {
+    it('should list scheduled runs when they exist', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add some scheduled runs
+      server.addScheduleRun({
+        id: 'run-1',
+        scheduleId: 'schedule-1',
+        status: 'triggered',
+        ranAt: Date.now() - 3600000, // 1 hour ago
+      });
+      
+      server.addScheduleRun({
+        id: 'run-2',
+        scheduleId: 'schedule-2',
+        status: 'failed',
+        ranAt: Date.now() - 7200000, // 2 hours ago
+        error: 'Connection timeout',
+      });
+      
+      const px = await env.start();
+      
+      try {
+        const { waitForOutput } = await px(['schedule', 'runs']);
+        
+        // Check for runs in output
+        const foundRuns = await waitForOutput(/Found 2 scheduled runs/i, 30);
+        expect(foundRuns).toBe(true);
+        
+        // Check for run IDs
+        const foundRun1 = await waitForOutput(/run-1/i, 30);
+        expect(foundRun1).toBe(true);
+        
+        const foundRun2 = await waitForOutput(/run-2/i, 30);
+        expect(foundRun2).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should filter runs by schedule ID', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add runs for different schedules
+      server.addScheduleRun({
+        id: 'run-1',
+        scheduleId: 'schedule-abc',
+        status: 'triggered',
+        ranAt: Date.now() - 3600000,
+      });
+      
+      server.addScheduleRun({
+        id: 'run-2',
+        scheduleId: 'schedule-xyz',
+        status: 'triggered',
+        ranAt: Date.now() - 7200000,
+      });
+      
       const px = await env.start();
       
       try {
@@ -334,22 +396,40 @@ describe('schedule command', () => {
           'schedule', 
           'runs', 
           '--schedule-id', 
-          'abc123'
+          'schedule-abc'
         ]);
         
-        const foundMessage = await waitForOutput(/This command is not yet implemented/i);
+        const foundMessage = await waitForOutput(/Found 1 scheduled run for schedule schedule-abc/i, 30);
         expect(foundMessage).toBe(true);
         
-        // Verify it shows the schedule ID
+        // Verify only the filtered run is shown
         const output = instance.lastFrame() || '';
-        expect(output).toContain('abc123');
+        expect(output).toContain('run-1');
+        expect(output).not.toContain('run-2');
       } finally {
         await env.stopAndCleanup();
       }
     });
 
-    it('should show not yet implemented message with filters', async () => {
+    it('should filter runs by status', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+      
+      // Add runs with different statuses
+      server.addScheduleRun({
+        id: 'run-1',
+        scheduleId: 'schedule-1',
+        status: 'triggered',
+        ranAt: Date.now() - 3600000,
+      });
+      
+      server.addScheduleRun({
+        id: 'run-2',
+        scheduleId: 'schedule-1',
+        status: 'failed',
+        ranAt: Date.now() - 7200000,
+      });
+      
       const px = await env.start();
       
       try {
@@ -357,18 +437,42 @@ describe('schedule command', () => {
           'schedule', 
           'runs', 
           '--status', 
-          'failed',
+          'failed'
+        ]);
+        
+        const foundMessage = await waitForOutput(/Found 1 scheduled run with status failed/i, 30);
+        expect(foundMessage).toBe(true);
+        
+        // Verify only failed run is shown
+        const output = instance.lastFrame() || '';
+        expect(output).toContain('run-2');
+        expect(output).not.toContain('run-1');
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should respect limit parameter', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+      
+      try {
+        const { waitForOutput } = await px([
+          'schedule', 
+          'runs', 
           '--limit',
           '50'
         ]);
         
-        const foundMessage = await waitForOutput(/This command is not yet implemented/i);
-        expect(foundMessage).toBe(true);
+        // Wait for the component to render and make the API call
+        const found = await waitForOutput(/No scheduled runs found|Found \d+ scheduled run/i, 30);
+        expect(found).toBe(true);
         
-        // Verify it shows the filters
-        const output = instance.lastFrame() || '';
-        expect(output).toContain('failed');
-        expect(output).toContain('50');
+        // Just verify the API was called with the right limit
+        const calls = env.server.getLogs();
+        const runsCall = calls.find(c => c.method === 'getScheduleRuns');
+        expect(runsCall).toBeDefined();
+        expect(runsCall?.args[0]).toContain('limit=50');
       } finally {
         await env.stopAndCleanup();
       }
