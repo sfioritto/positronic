@@ -796,37 +796,67 @@ describe('CLI Integration: positronic brain commands', () => {
   });
 
   describe('brain rerun command', () => {
-    it('should show not yet implemented message', async () => {
+    it('should successfully rerun a brain without specific run ID', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px(['rerun', 'test-brain']);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        
+        // Check for success message
+        const foundSuccess = await waitForOutput(/Brain rerun started successfully/i, 30);
+        expect(foundSuccess).toBe(true);
+        
+        // Check for new run ID
+        const foundRunId = await waitForOutput(/New run ID:.*rerun-/i, 30);
+        expect(foundRunId).toBe(true);
+        
+        // Check for descriptive text
+        const foundDescription = await waitForOutput(/Rerunning brain "test-brain"/i, 30);
+        expect(foundDescription).toBe(true);
+        
+        // Check for watch command suggestion
+        const foundWatchSuggestion = await waitForOutput(/Watch the run with: positronic watch --run-id/i, 30);
+        expect(foundWatchSuggestion).toBe(true);
+        
+        // Verify API call
+        const calls = env.server.getLogs();
+        const rerunCall = calls.find(c => c.method === 'rerunBrain');
+        expect(rerunCall).toBeDefined();
+        expect(rerunCall?.args[0]).toBe('test-brain');
+        expect(rerunCall?.args[1]).toBeUndefined(); // no runId
       } finally {
         await env.stopAndCleanup();
       }
     });
 
-    it('should show not yet implemented message with run ID', async () => {
+    it('should successfully rerun a brain with specific run ID', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px(['rerun', 'test-brain', 'run-123']);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        
+        // Check for success message
+        const foundSuccess = await waitForOutput(/Brain rerun started successfully/i, 30);
+        expect(foundSuccess).toBe(true);
+        
+        // Check for run details
+        const foundRunDetails = await waitForOutput(/from run run-123/i, 30);
+        expect(foundRunDetails).toBe(true);
+        
+        // Verify API call
+        const calls = env.server.getLogs();
+        const rerunCall = calls.find(c => c.method === 'rerunBrain');
+        expect(rerunCall).toBeDefined();
+        expect(rerunCall?.args[0]).toBe('test-brain');
+        expect(rerunCall?.args[1]).toBe('run-123');
       } finally {
         await env.stopAndCleanup();
       }
     });
 
-    it('should show not yet implemented message with step range', async () => {
+    it('should successfully rerun a brain with step range options', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
@@ -839,10 +869,116 @@ describe('CLI Integration: positronic brain commands', () => {
           '--stops-after',
           '5',
         ]);
-        const isOutputRendered = await waitForOutput(
-          /This command is not yet implemented/
-        );
-        expect(isOutputRendered).toBe(true);
+        
+        // Check for success message
+        const foundSuccess = await waitForOutput(/Brain rerun started successfully/i, 30);
+        expect(foundSuccess).toBe(true);
+        
+        // Check for step range details
+        const foundStepRange = await waitForOutput(/starting at step 3, stopping after step 5/i, 30);
+        expect(foundStepRange).toBe(true);
+        
+        // Verify API call
+        const calls = env.server.getLogs();
+        const rerunCall = calls.find(c => c.method === 'rerunBrain');
+        expect(rerunCall).toBeDefined();
+        expect(rerunCall?.args[0]).toBe('test-brain');
+        expect(rerunCall?.args[1]).toBeUndefined(); // no runId
+        expect(rerunCall?.args[2]).toBe(3); // startsAt
+        expect(rerunCall?.args[3]).toBe(5); // stopsAfter
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle brain not found error', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['rerun', 'non-existent-brain']);
+        
+        // Check for error title
+        const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
+        expect(foundErrorTitle).toBe(true);
+        
+        // Check for error message
+        const foundErrorMessage = await waitForOutput(/Brain 'non-existent-brain' not found/i, 30);
+        expect(foundErrorMessage).toBe(true);
+        
+        // Check for helpful details
+        const foundDetails = await waitForOutput(/positronic brain list/i, 30);
+        expect(foundDetails).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle run ID not found error', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['rerun', 'test-brain', 'non-existent-run']);
+        
+        // Check for error title
+        const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
+        expect(foundErrorTitle).toBe(true);
+        
+        // Check for error message
+        const foundErrorMessage = await waitForOutput(/Brain run 'non-existent-run' not found/i, 30);
+        expect(foundErrorMessage).toBe(true);
+        
+        // Check for helpful details with runId
+        const foundDetails = await waitForOutput(/positronic brain history test-brain/i, 30);
+        expect(foundDetails).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle server connection errors', async () => {
+      const env = await createTestEnv();
+      // Don't start the server to simulate connection error
+
+      try {
+        const { waitForOutput } = await px(['rerun', 'test-brain'], { server: env.server });
+        
+        // Check for error title
+        const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
+        expect(foundErrorTitle).toBe(true);
+        
+        // Check for connection error
+        const foundConnectionError = await waitForOutput(/Connection error/i, 30);
+        expect(foundConnectionError).toBe(true);
+      } finally {
+        env.cleanup();
+      }
+    });
+
+    it('should handle API server errors', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // Clear all existing nock interceptors to avoid conflicts
+        nock.cleanAll();
+
+        // Mock the server to return a 500 error
+        const port = env.server.port;
+        nock(`http://localhost:${port}`)
+          .post('/brains/runs/rerun')
+          .reply(500, 'Internal Server Error');
+
+        const { waitForOutput } = await px(['rerun', 'test-brain']);
+        
+        // Check for error title
+        const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
+        expect(foundErrorTitle).toBe(true);
+        
+        // Check for server error
+        const foundServerError = await waitForOutput(/Server returned 500/i, 30);
+        expect(foundServerError).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }

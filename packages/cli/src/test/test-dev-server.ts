@@ -284,6 +284,28 @@ export class TestDevServer implements PositronicDevServer {
       return [201, { brainRunId }];
     });
 
+    // POST /brains/runs/rerun
+    nockInstance.post('/brains/runs/rerun').reply((uri, requestBody) => {
+      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      
+      // Check if brain exists
+      if (body.brainName === 'non-existent-brain') {
+        this.logCall('rerunBrain', [body.brainName, body.runId, body.startsAt, body.stopsAfter]);
+        return [404, { error: `Brain '${body.brainName}' not found` }];
+      }
+      
+      // Check if run ID exists (if provided)
+      if (body.runId === 'non-existent-run') {
+        this.logCall('rerunBrain', [body.brainName, body.runId, body.startsAt, body.stopsAfter]);
+        return [404, { error: `Brain run '${body.runId}' not found` }];
+      }
+      
+      const newBrainRunId = `rerun-${Date.now()}`;
+      
+      this.logCall('rerunBrain', [body.brainName, body.runId, body.startsAt, body.stopsAfter]);
+      return [201, { brainRunId: newBrainRunId }];
+    });
+
     // GET /brains/runs/:runId/watch (SSE endpoint)
     nockInstance.get(/^\/brains\/runs\/(.+)\/watch$/).reply(
       200,

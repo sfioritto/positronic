@@ -68,6 +68,56 @@ app.post('/brains/runs', async (context: Context) => {
   return context.json(response, 201);
 });
 
+app.post('/brains/runs/rerun', async (context: Context) => {
+  const { brainName, runId, startsAt, stopsAfter } = await context.req.json();
+
+  if (!brainName) {
+    return context.json({ error: 'Missing brainName in request body' }, 400);
+  }
+
+  // Validate that the brain exists
+  const manifest = getManifest();
+  if (!manifest) {
+    return context.json({ error: 'Manifest not initialized' }, 500);
+  }
+
+  const brain = await manifest.import(brainName);
+  if (!brain) {
+    return context.json({ error: `Brain '${brainName}' not found` }, 404);
+  }
+
+  // If runId is provided, validate it exists
+  if (runId) {
+    const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+    const monitorStub = context.env.MONITOR_DO.get(monitorId);
+    const existingRun = await monitorStub.getLastEvent(runId);
+    
+    if (!existingRun) {
+      return context.json({ error: `Brain run '${runId}' not found` }, 404);
+    }
+  }
+
+  // Create a new brain run with rerun parameters
+  const newBrainRunId = uuidv4();
+  const namespace = context.env.BRAIN_RUNNER_DO;
+  const doId = namespace.idFromName(newBrainRunId);
+  const stub = namespace.get(doId);
+  
+  // Start the brain with rerun options
+  const rerunOptions = {
+    ...(runId && { originalRunId: runId }),
+    ...(startsAt !== undefined && { startsAt }),
+    ...(stopsAfter !== undefined && { stopsAfter }),
+  };
+  
+  await stub.start(brainName, newBrainRunId, rerunOptions);
+  
+  const response: CreateBrainRunResponse = {
+    brainRunId: newBrainRunId,
+  };
+  return context.json(response, 201);
+});
+
 app.get('/brains/runs/:runId/watch', async (context: Context) => {
   const runId = context.req.param('runId');
   const namespace = context.env.BRAIN_RUNNER_DO;
