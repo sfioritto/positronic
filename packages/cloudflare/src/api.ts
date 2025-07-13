@@ -117,6 +117,30 @@ app.get('/brains', async (context: Context) => {
   });
 });
 
+app.get('/brains/:brainName', async (context: Context) => {
+  const brainName = context.req.param('brainName');
+  const manifest = getManifest();
+  
+  if (!manifest) {
+    return context.json({ error: 'Manifest not initialized' }, 500);
+  }
+
+  const brain = await manifest.import(brainName);
+  if (!brain) {
+    return context.json({ error: `Brain '${brainName}' not found` }, 404);
+  }
+
+  // Get the brain structure
+  const structure = brain.structure;
+
+  return context.json({
+    name: brainName,
+    title: structure.title,
+    description: structure.description || `${structure.title} brain`,
+    steps: structure.steps,
+  });
+});
+
 app.get('/resources', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
 

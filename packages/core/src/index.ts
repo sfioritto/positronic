@@ -13,6 +13,7 @@ export type {
   StepStatusEvent,
   StepStartedEvent,
   StepCompletedEvent,
+  BrainStructure,
 } from './dsl/brain.js';
 export type { ObjectGenerator, Message } from './clients/types.js';
 export type { State } from './dsl/types.js';

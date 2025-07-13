@@ -58,6 +58,11 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
+    it('passes GET /brains/:brainName test', async () => {
+      const result = await brains.show(createFetch(), 'basic-brain');
+      expect(result).toBe(true);
+    });
+
     it('passes POST /brains/runs test', async () => {
       const brainRunId = await brains.run(createFetch(), 'basic-brain');
       expect(brainRunId).toBeTruthy();
