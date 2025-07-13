@@ -46,6 +46,17 @@ app.post('/brains/runs', async (context: Context) => {
     return context.json({ error: 'Missing brainName in request body' }, 400);
   }
 
+  // Validate that the brain exists before starting it
+  const manifest = getManifest();
+  if (!manifest) {
+    return context.json({ error: 'Manifest not initialized' }, 500);
+  }
+
+  const brain = await manifest.import(brainName);
+  if (!brain) {
+    return context.json({ error: `Brain '${brainName}' not found` }, 404);
+  }
+
   const brainRunId = uuidv4();
   const namespace = context.env.BRAIN_RUNNER_DO;
   const doId = namespace.idFromName(brainRunId);

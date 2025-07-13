@@ -352,6 +352,61 @@ export const brains = {
   },
 
   /**
+   * Test POST /brains/runs with non-existent brain - Should return 404
+   */
+  async runNotFound(fetch: Fetch, nonExistentBrainName: string): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ brainName: nonExistentBrainName }),
+      });
+
+      const response = await fetch(request);
+
+      if (response.status !== 404) {
+        console.error(
+          `POST /brains/runs with non-existent brain returned ${response.status}, expected 404`
+        );
+        return false;
+      }
+
+      const data = await response.json();
+
+      if (!data.error || typeof data.error !== 'string') {
+        console.error(
+          `Expected error to be string, got ${typeof data.error}`
+        );
+        return false;
+      }
+
+      // Check that the error message mentions the brain name
+      if (!data.error.includes(nonExistentBrainName)) {
+        console.error(
+          `Expected error to mention brain name '${nonExistentBrainName}', got: ${data.error}`
+        );
+        return false;
+      }
+
+      // Check that the error message follows expected format
+      const expectedPattern = new RegExp(`Brain '${nonExistentBrainName}' not found`);
+      if (!expectedPattern.test(data.error)) {
+        console.error(
+          `Expected error message to match pattern "Brain '${nonExistentBrainName}' not found", got: ${data.error}`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test POST /brains/runs with non-existent brain:`, error);
+      return false;
+    }
+  },
+
+  /**
    * Test GET /brains/runs/:runId/watch - Watch a brain run via SSE
    */
   async watch(fetch: Fetch, runId: string): Promise<boolean> {

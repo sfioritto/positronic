@@ -8,6 +8,7 @@ import { BrainHistory } from '../components/brain-history.js';
 import { BrainShow } from '../components/brain-show.js';
 import { BrainRerun } from '../components/brain-rerun.js';
 import { BrainNew } from '../components/brain-new.js';
+import { ErrorComponent } from '../components/error.js';
 
 interface BrainListArgs {}
 interface BrainHistoryArgs {
@@ -68,7 +69,7 @@ export class BrainCommand {
     });
   }
 
-  async run({ name: brainName, watch }: ArgumentsCamelCase<BrainRunArgs>) {
+  async run({ name: brainName, watch }: ArgumentsCamelCase<BrainRunArgs>): Promise<React.ReactElement> {
     const apiPath = '/brains/runs';
     try {
       const response = await apiClient.fetch(apiPath, {
@@ -97,6 +98,15 @@ export class BrainCommand {
             `Run ID: ${result.brainRunId}`
           );
         }
+      } else if (response.status === 404) {
+        // Handle brain not found with a helpful message
+        return React.createElement(ErrorComponent, {
+          error: {
+            title: 'Brain Not Found',
+            message: `Brain '${brainName}' not found.`,
+            details: 'Please check that:\n  1. The brain name is spelled correctly\n  2. The brain exists in your project\n  3. The brain has been properly defined and exported\n\nYou can list available brains with: positronic list'
+          }
+        });
       } else {
         const errorText = await response.text();
         console.error(

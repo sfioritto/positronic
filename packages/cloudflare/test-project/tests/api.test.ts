@@ -125,6 +125,23 @@ describe('Hono API Tests', () => {
     });
   });
 
+  it('POST /brains/runs with non-existent brain should return 404', async () => {
+    const testEnv = env as TestEnv;
+    const request = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brainName: 'non-existent-brain' }),
+    });
+    const context = createExecutionContext();
+    const response = await worker.fetch(request, testEnv, context);
+    await waitOnExecutionContext(context);
+    expect(response.status).toBe(404);
+    const responseBody = await response.json();
+    expect(responseBody).toEqual({
+      error: "Brain 'non-existent-brain' not found",
+    });
+  });
+
   it('Create and watch a brain run', async () => {
     const testEnv = env as TestEnv;
     const brainName = 'basic-brain';
