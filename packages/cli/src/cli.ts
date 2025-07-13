@@ -394,65 +394,175 @@ export function buildCli(options: CliOptions) {
 
   // --- Brain Commands ---
   cli = cli.command('brain', 'Manage your brains\n', (yargsBrain) => {
-    // --- New Brain Command (Local Dev Mode Only) ---
-    if (isLocalDevMode) {
-      yargsBrain.command(
-        'new <name>',
-        'Create a new brain in the current project',
-        ((yargsNewAlias: any) => {
-          return yargsNewAlias
+    yargsBrain
+      .command(
+        'list',
+        'List all brains in the active project\n',
+        () => {},
+        (argv) => {
+          const element = brainCommand.list(argv);
+          render(element);
+        }
+      )
+      .command(
+        'history <name>',
+        'List recent runs of a specific brain\n',
+        (yargsHistory) => {
+          return yargsHistory
             .positional('name', {
-              describe: 'Name of the new brain',
+              describe: 'Name of the brain',
               type: 'string',
               demandOption: true,
             })
-            .option('prompt', {
-              describe: 'Prompt to use for generating the brain',
-              type: 'string',
-              alias: 'p',
+            .option('limit', {
+              describe: 'Maximum number of runs to show',
+              type: 'number',
+              default: 10,
             })
-            .example(
-              '$0 brain new my-brain',
-              'Create a new brain in the current project directory'
-            )
-            .example(
-              '$0 brain new my-brain -p "Create a brain for data processing"',
-              'Create a brain using a prompt'
-            );
-        }) as any,
+            .example('$0 brain history my-brain', 'List recent runs for my-brain')
+            .example('$0 brain history my-brain --limit=20', 'List more recent runs');
+        },
         (argv) => {
-          const element = brainCommand.new(argv as any);
+          const element = brainCommand.history(argv);
           render(element);
         }
+      )
+      .command(
+        'show <name>',
+        'List all steps and other details for the brain\n',
+        (yargsShow) => {
+          return yargsShow.positional('name', {
+            describe: 'Name of the brain',
+            type: 'string',
+            demandOption: true,
+          });
+        },
+        (argv) => {
+          const element = brainCommand.show(argv);
+          render(element);
+        }
+      )
+      .command(
+        'rerun <name> [run-id]',
+        'Rerun an existing brain run\n',
+        (yargsRerun) => {
+          return yargsRerun
+            .positional('name', {
+              describe: 'Name of the brain',
+              type: 'string',
+              demandOption: true,
+            })
+            .positional('run-id', {
+              describe:
+                'ID of the brain run to rerun (defaults to the most recent run)',
+              type: 'string',
+            })
+            .option('starts-at', {
+              describe: 'Step number to start execution from',
+              type: 'number',
+            })
+            .alias('starts-at', 's')
+            .option('stops-after', {
+              describe: 'Step number to stop execution after',
+              type: 'number',
+            })
+            .alias('stops-after', 'e')
+            .example(
+              '$0 brain rerun my-brain',
+              'Rerun the most recent execution of my-brain'
+            )
+            .example('$0 brain rerun my-brain abc123', 'Rerun a specific brain run')
+            .example('$0 brain rerun my-brain --starts-at=3', 'Rerun from step 3')
+            .example(
+              '$0 brain rerun my-brain --stops-after=5',
+              'Rerun and stop after step 5'
+            )
+            .example(
+              '$0 brain rerun my-brain --starts-at=3 --stops-after=5',
+              'Rerun steps 3 through 5'
+            );
+        },
+        (argv) => {
+          const element = brainCommand.rerun(argv);
+          render(element);
+        }
+      )
+      .command(
+        'run <name>',
+        'Run a brain and optionally watch its execution\n',
+        (yargsRun) => {
+          return yargsRun
+            .positional('name', {
+              describe: 'Name of the brain',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('watch', {
+              describe: 'Watch the brain run immediately after starting',
+              type: 'boolean',
+              alias: 'w',
+              default: false,
+            })
+            .example('$0 brain run my-brain', 'Run a brain by name')
+            .example(
+              '$0 brain run my-brain --watch',
+              'Run a brain and watch its execution'
+            );
+        },
+        async (argv) => {
+          const element = await brainCommand.run(argv);
+          if (element) {
+            render(element);
+          }
+        }
+      )
+      .command(
+        'watch [name]',
+        'Watch a brain run: latest by name (default) or specific by ID\n',
+        (yargsWatch) => {
+          return yargsWatch
+            .positional('name', {
+              describe: 'Name of the brain to watch (watches the most recent run)',
+              type: 'string',
+            })
+            .option('run-id', {
+              describe: 'ID of the specific brain run to watch',
+              type: 'string',
+              alias: 'id',
+            })
+            .conflicts('name', 'run-id')
+            .check((argv) => {
+              if (!argv.name && !argv.runId) {
+                throw new Error(
+                  'You must provide either a brain name or a --run-id.'
+                );
+              }
+              return true;
+            })
+            .example(
+              '$0 brain watch my-brain',
+              "Watch the latest run of the brain named 'my-brain'"
+            )
+            .example(
+              '$0 brain watch --run-id abc123def',
+              'Watch a specific brain run by its ID'
+            );
+        },
+        (argv) => {
+          const element = brainCommand.watch(argv);
+          if (element) {
+            render(element);
+          }
+        }
+      )
+      .demandCommand(
+        1,
+        'You need to specify a brain command (list, history, show, rerun, run, watch).'
       );
-    }
+
     return yargsBrain;
   });
 
-  // --- Add the 'new' command alias (Local Dev Mode only) ---
-  if (isLocalDevMode) {
-    cli = cli.command(
-      'new <name>',
-      'Alias for `brain new`. Create a new brain in the current project.\n',
-      ((yargsNewAlias: any) => {
-        return yargsNewAlias
-          .positional('name', {
-            describe: 'Name of the new brain to create',
-            type: 'string',
-            demandOption: true,
-          })
-          .option('prompt', {
-            describe: 'Prompt to use for generating the brain',
-            type: 'string',
-            alias: 'p',
-          });
-      }) as any,
-      (argv) => {
-        const element = brainCommand.new(argv as any);
-        render(element);
-      }
-    );
-  }
 
   // --- Resource Management Commands ---
   cli = cli.command(

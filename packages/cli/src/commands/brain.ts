@@ -7,7 +7,6 @@ import { BrainList } from '../components/brain-list.js';
 import { BrainHistory } from '../components/brain-history.js';
 import { BrainShow } from '../components/brain-show.js';
 import { BrainRerun } from '../components/brain-rerun.js';
-import { BrainNew } from '../components/brain-new.js';
 import { ErrorComponent } from '../components/error.js';
 
 interface BrainListArgs {}
@@ -31,10 +30,6 @@ interface BrainRunArgs {
 interface BrainWatchArgs {
   runId?: string;
   name?: string;
-}
-interface BrainNewArgs {
-  name: string;
-  prompt?: string;
 }
 
 export class BrainCommand {
@@ -159,10 +154,4 @@ export class BrainCommand {
     );
   }
 
-  new({
-    name: brainName,
-    prompt,
-  }: ArgumentsCamelCase<BrainNewArgs>): React.ReactElement {
-    return React.createElement(BrainNew, { brainName, prompt });
-  }
 }
