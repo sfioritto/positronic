@@ -90,6 +90,15 @@ interface MockSchedule {
   nextRunAt?: number;
 }
 
+interface MockScheduleRun {
+  id: string;
+  scheduleId: string;
+  status: 'triggered' | 'failed';
+  ranAt: number;
+  brainRunId?: string;
+  error?: string;
+}
+
 interface MockBrain {
   name: string;
   title: string;
@@ -110,6 +119,7 @@ interface MockBrain {
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
+  private scheduleRuns: MockScheduleRun[] = [];
   private brains: Map<string, MockBrain> = new Map();
   public port: number = 0;
   private callLog: MethodCall[] = [];
@@ -487,6 +497,33 @@ export class TestDevServer implements PositronicDevServer {
       return schedule;
     });
 
+    // GET /brains/schedules/runs
+    nockInstance.get('/brains/schedules/runs').query(true).reply((uri) => {
+      const url = new URL(uri, 'http://example.com');
+      const scheduleId = url.searchParams.get('scheduleId');
+      const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+      
+      this.logCall('getScheduleRuns', [uri]);
+      
+      let runs = this.scheduleRuns;
+      
+      // Filter by scheduleId if provided
+      if (scheduleId) {
+        runs = runs.filter(run => run.scheduleId === scheduleId);
+      }
+      
+      // Sort by ranAt descending (newest first)
+      runs = runs.sort((a, b) => b.ranAt - a.ranAt);
+      
+      // Apply limit
+      runs = runs.slice(0, limit);
+      
+      return [200, {
+        runs,
+        count: runs.length,
+      }];
+    });
+
     // DELETE /brains/schedules/:id
     nockInstance.delete(/^\/brains\/schedules\/(.+)$/).reply((uri) => {
       const match = uri.match(/^\/brains\/schedules\/(.+)$/);
@@ -563,6 +600,14 @@ export class TestDevServer implements PositronicDevServer {
 
   clearSchedules() {
     this.schedules.clear();
+  }
+
+  addScheduleRun(run: MockScheduleRun) {
+    this.scheduleRuns.push(run);
+  }
+
+  clearScheduleRuns() {
+    this.scheduleRuns = [];
   }
 
   getSchedules(): MockSchedule[] {
