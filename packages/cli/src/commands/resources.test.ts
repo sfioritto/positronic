@@ -12,7 +12,7 @@ describe('CLI Integration: positronic resources types', () => {
         'resources',
         'sync',
       ]);
-      const isOutputRendered = await waitForOutput(/sync summary/i);
+      const isOutputRendered = await waitForOutput(/sync summary/i, 50);
       const typesContent = await waitForTypesFile('config: TextResource;');
       expect(isOutputRendered).toBe(true);
       const normalizeWhitespace = (str: string) =>

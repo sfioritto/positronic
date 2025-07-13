@@ -43,6 +43,12 @@ module.exports = {
         { title: 'pnpm', value: 'pnpm' },
         { title: 'yarn', value: 'yarn' }
       ]
+    },
+    {
+      name: 'claudemd',
+      type: 'confirm',
+      message: 'Initialize CLAUDE.md for AI-assisted development',
+      initial: true
     }
   ],
   setup: async ctx => {
@@ -133,6 +139,42 @@ module.exports = {
     if (envFile) {
       // Change its path to '.env' so it's correctly named in the generated project
       envFile.path = '.env';
+    }
+
+    // Remove CLAUDE.md if user chose not to include it
+    if (!ctx.answers.claudemd) {
+      ctx.files = ctx.files.filter(file => file.path !== 'CLAUDE.md');
+    }
+  },
+  complete: async ctx => {
+    // Display getting started message
+    console.log('\n✨ Project created successfully!\n');
+    console.log(`📁 Project location: ${ctx.dest}\n`);
+    
+    console.log('🚀 Getting started:\n');
+    console.log(`   cd ${ctx.answers.name}`);
+    
+    if (!ctx.answers.install) {
+      console.log(`   ${ctx.answers.pm || 'npm'} install`);
+    }
+    
+    console.log('   px server              # Start the development server');
+    console.log('   px brain list          # List available brains');
+    console.log('   px brain run example   # Run the example brain\n');
+    
+    if (ctx.answers.backend === 'cloudflare') {
+      console.log('☁️  Cloudflare deployment:\n');
+      console.log('   wrangler login         # Authenticate with Cloudflare');
+      console.log('   px deploy              # Deploy to Cloudflare Workers\n');
+    }
+    
+    console.log('📚 Resources:\n');
+    console.log('   • Documentation: https://positronic.dev');
+    console.log('   • GitHub: https://github.com/positronic-ai/positronic');
+    console.log('   • CLI Help: px --help\n');
+    
+    if (ctx.answers.claudemd) {
+      console.log('💡 Pro tip: Check out CLAUDE.md in your project for AI-assisted development guidance!\n');
     }
   }
 }
