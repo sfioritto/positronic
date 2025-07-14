@@ -105,3 +105,7 @@ This project uses only the Positronic core without a specific deployment backend
 - Documentation: https://positronic.dev
 - GitHub: https://github.com/positronic-ai/positronic
 - CLI Help: `px --help` or `px <command> --help`
+
+## Additional Tips for AI Agents
+
+@docs/tips-for-agents.md
