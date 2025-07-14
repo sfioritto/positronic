@@ -15,3 +15,5 @@ node_modules/
 
 # Mac specific
 .DS_Store
+
+dist/
