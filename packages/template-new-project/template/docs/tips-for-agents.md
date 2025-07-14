@@ -2,6 +2,10 @@
 
 This document contains helpful tips and patterns for AI agents working with Positronic projects.
 
+## TypeScript Compilation
+
+Run `npx tsc` frequently as you make changes to ensure your TypeScript code compiles correctly. This will catch type errors early and help maintain code quality.
+
 ## Running the Development Server
 
 When you need to run a development server, use the `--log-file` option to capture server output:
