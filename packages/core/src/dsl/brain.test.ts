@@ -1804,7 +1804,10 @@ describe('type inference', () => {
 
 describe('brain structure', () => {
   it('should expose brain structure with steps', () => {
-    const testBrain = brain({ title: 'Test Brain', description: 'A test brain description' })
+    const testBrain = brain({
+      title: 'Test Brain',
+      description: 'A test brain description',
+    })
       .step('First step', ({ state }) => ({ ...state, step1: true }))
       .step('Second step', ({ state }) => ({ ...state, step2: true }))
       .step('Third step', ({ state }) => ({ ...state, step3: true }));
@@ -1823,17 +1826,21 @@ describe('brain structure', () => {
   });
 
   it('should expose nested brain structure recursively', () => {
-    const innerBrain = brain({ title: 'Inner Brain', description: 'An inner brain' })
+    const innerBrain = brain({
+      title: 'Inner Brain',
+      description: 'An inner brain',
+    })
       .step('Inner step 1', ({ state }) => ({ ...state, inner1: true }))
       .step('Inner step 2', ({ state }) => ({ ...state, inner2: true }));
 
-    const outerBrain = brain({ title: 'Outer Brain', description: 'An outer brain' })
+    const outerBrain = brain({
+      title: 'Outer Brain',
+      description: 'An outer brain',
+    })
       .step('Outer step 1', ({ state }) => ({ ...state, outer1: true }))
-      .brain(
-        'Run inner brain',
-        innerBrain,
-        ({ brainState }) => ({ result: brainState })
-      )
+      .brain('Run inner brain', innerBrain, ({ brainState }) => ({
+        result: brainState,
+      }))
       .step('Outer step 2', ({ state }) => ({ ...state, outer2: true }));
 
     const structure = outerBrain.structure;
@@ -1861,17 +1868,17 @@ describe('brain structure', () => {
   });
 
   it('should handle brain without description', () => {
-    const testBrain = brain('No Description Brain')
-      .step('Only step', ({ state }) => state);
+    const testBrain = brain('No Description Brain').step(
+      'Only step',
+      ({ state }) => state
+    );
 
     const structure = testBrain.structure;
 
     expect(structure).toEqual({
       title: 'No Description Brain',
       description: undefined,
-      steps: [
-        { type: 'step', title: 'Only step' },
-      ],
+      steps: [{ type: 'step', title: 'Only step' }],
     });
   });
 });
