@@ -16,7 +16,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(npm run dev:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm run clean:workspaces:*)",
+      "Bash(npm i)"
     ],
     "deny": []
   }
