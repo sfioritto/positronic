@@ -9,11 +9,17 @@ import {
   type SerializedStepStatus,
 } from './brain.js';
 import { z } from 'zod';
-import { nextStep } from '../test-utils.js';
 import { jest } from '@jest/globals';
 import { ObjectGenerator } from '../clients/types.js';
 import { createResources, type Resources } from '../resources/resources.js';
 import type { ResourceLoader } from '../resources/resource-loader.js';
+
+// Helper function to get the next value from an AsyncIterator
+const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
+  const result = await brainRun.next();
+  if (result.done) throw new Error('Iterator is done');
+  return result.value;
+};
 
 // Define a Logger interface for testing
 interface Logger {
