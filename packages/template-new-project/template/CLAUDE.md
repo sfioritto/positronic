@@ -10,6 +10,8 @@ This is a Positronic project - an AI-powered framework for building and running 
 
 - **`/brains`** - AI workflow definitions using the Brain DSL
 - **`/resources`** - Files and documents that brains can access via the resource system
+- **`/tests`** - Test files for brains (kept separate to avoid deployment issues)
+- **`/docs`** - Documentation including brain testing guide
 - **`/runner.ts`** - The main entry point for running brains locally
 - **`/positronic.config.json`** - Project configuration
 
@@ -20,13 +22,24 @@ This is a Positronic project - an AI-powered framework for building and running 
 - `px brain run <brain-name>` - Run a brain workflow
 - `px brain list` - List all available brains
 - `px resource list` - List all available resources
-- `px server` - Start the local development server
+- `px server` - Start the local development server (runs in background)
+
+**Tip for AI Agents**: When running `px server`, it outputs a server ID and logs to a file. You should tail the log file to monitor brain execution while developing. For example:
+```bash
+# Start the server (it will show the log file path)
+px server
+
+# Then tail the log to see real-time brain execution
+tail -f .positronic/servers/<server-id>/server.log
+```
 
 ### Testing & Building
 
-- `npm test` - Run tests
+- `npm test` - Run tests (uses Jest with @positronic/core/testing utilities)
 - `npm run build` - Build the project
 - `npm run dev` - Start development mode with hot reload
+
+For testing guidance, see `/docs/brain-testing-guide.md`
 
 ## Brain DSL
 
@@ -98,7 +111,7 @@ This project uses only the Positronic core without a specific deployment backend
 1. **State Management**: Keep brain state minimal and serializable
 2. **Resource Naming**: Use descriptive names for resources (e.g., `prompt-templates/customer-support.md`)
 3. **Error Handling**: Always handle potential errors in brain steps
-4. **Testing**: Test brains with various input states
+4. **Testing**: Write tests for your brains focusing on outcomes, not implementation details (see `/docs/brain-testing-guide.md`)
 
 ## Getting Help
 
