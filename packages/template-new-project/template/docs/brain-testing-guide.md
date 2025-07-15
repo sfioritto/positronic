@@ -160,7 +160,7 @@ it('should use customer data to generate personalized content', async () => {
   // Arrange
   const customerName = 'Alice';
   mockClient.mockResponses(
-    { greeting: `Hello ${customerName}!`, tone: 'friendly' },
+    { greeting: 'Hello Alice!', tone: 'friendly' },
     { email: 'Personalized email content...' }
   );
 

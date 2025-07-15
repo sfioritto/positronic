@@ -44,27 +44,66 @@ brain('Example')
 
 ### 2. Prompt Steps
 
-Generate structured output from AI models:
+Generate structured output from AI models. Here's a complete example that shows how to chain prompts:
 
 ```typescript
-brain('AI Brain')
-  .step('Setup', () => ({ topic: 'quantum computing' }))
-  .prompt('Generate Article', {
-    template: (state) => `Write an article about <%= '${state.topic}' %>`,
+brain('AI Education Assistant')
+  .step('Initialize', ({ state }) => ({
+    ...state,
+    topic: 'artificial intelligence',
+    context: 'We are creating an educational example',
+  }))
+  .prompt('Generate explanation', {
+    template: ({ topic, context }) =>
+      <%= "`${context}. Please provide a brief, beginner-friendly explanation of ${topic}.`" %>,
     outputSchema: {
       schema: z.object({
-        title: z.string(),
-        content: z.string(),
-        keywords: z.array(z.string()),
+        explanation: z.string().describe('A clear explanation of the topic'),
+        keyPoints: z.array(z.string()).describe('3-5 key points about the topic'),
+        difficulty: z.enum(['beginner', 'intermediate', 'advanced']).describe('The difficulty level'),
       }),
-      name: 'article' as const, // Use 'as const' for type inference
+      name: 'topicExplanation' as const,
     },
   })
-  .step('Format', ({ state }) => ({
+  .step('Format output', ({ state }) => ({
     ...state,
-    formatted: `# <%= '${state.article.title}' %>\n\n<%= '${state.article.content}' %>`,
-  }));
+    formattedOutput: {
+      topic: state.topic,
+      explanation: state.topicExplanation.explanation || '',
+      summary: <%= "`This explanation covers ${state.topicExplanation.keyPoints?.length || 0} key points at a ${state.topicExplanation.difficulty || 'unknown'} level.`" %>,
+      points: state.topicExplanation.keyPoints || [],
+    },
+  }))
+  .prompt(
+    'Generate follow-up questions',
+    {
+      template: ({ formattedOutput }) =>
+        <%= "`Based on this explanation about ${formattedOutput.topic}: \"${formattedOutput.explanation}\"\n        \n        Generate 3 thoughtful follow-up questions that a student might ask.`" %>,
+      outputSchema: {
+        schema: z.object({
+          questions: z.array(z.string()).length(3).describe('Three follow-up questions'),
+        }),
+        name: 'followUpQuestions' as const,
+      },
+    },
+    // Optional: Transform the response before merging with state
+    ({ state, response }) => ({
+      ...state,
+      followUpQuestions: response.questions,
+      finalOutput: {
+        ...state.formattedOutput,
+        questions: response.questions,
+      },
+    })
+  );
 ```
+
+Key points about prompt steps:
+- The `template` function receives the current state and returns the prompt string
+- `outputSchema` defines the structure using Zod schemas
+- The `name` property determines where the response is stored in state
+- You can optionally provide a transform function as the third parameter
+- Type inference works throughout - TypeScript knows about your schema types
 
 ### 3. Nested Brains
 
@@ -188,7 +227,7 @@ const typedBrain = brain('Typed Example')
     name: 'Test', // TypeScript knows state has 'count'
   }))
   .step('Use Both', ({ state }) => ({
-    message: `<%= '${state.name}' %>: <%= '${state.count}' %>`, // Both properties available
+    message: <%= "`${state.name}: ${state.count}`" %>, // Both properties available
   }));
 ```
 
@@ -277,7 +316,7 @@ const completeBrain = brain({
     },
   })
   .step('Process Plan', ({ state, services }) => {
-    services.logger.log(`Generated <%= '${state.plan.tasks.length}' %> tasks`);
+    services.logger.log(<%= "`Generated ${state.plan.tasks.length} tasks`" %>);
     return {
       ...state,
       taskCount: state.plan.tasks.length,
