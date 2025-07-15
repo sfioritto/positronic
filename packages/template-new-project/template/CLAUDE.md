@@ -24,15 +24,6 @@ This is a Positronic project - an AI-powered framework for building and running 
 - `px resource list` - List all available resources
 - `px server` - Start the local development server (runs in background)
 
-**Tip for AI Agents**: When running `px server`, it outputs a server ID and logs to a file. You should tail the log file to monitor brain execution while developing. For example:
-```bash
-# Start the server (it will show the log file path)
-px server
-
-# Then tail the log to see real-time brain execution
-tail -f .positronic/servers/<server-id>/server.log
-```
-
 ### Testing & Building
 
 - `npm test` - Run tests (uses Jest with @positronic/core/testing utilities)
