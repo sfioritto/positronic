@@ -1,16 +1,13 @@
 import type { ObjectGenerator, Message } from './clients/types.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
-
-/**
- * Helper function to get the next value from an AsyncIterator.
- * Throws an error if the iterator is done.
- */
-export const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
-  const result = await brainRun.next();
-  if (result.done) throw new Error('Iterator is done');
-  return result.value;
-};
+import type { Adapter } from './adapters/types.js';
+import type { BrainEvent, Brain } from './dsl/brain.js';
+import type { State } from './dsl/types.js';
+import { BRAIN_EVENTS } from './dsl/constants.js';
+import { applyPatches } from './dsl/json-patch.js';
+import { BrainRunner } from './dsl/brain-runner.js';
+import type { Resources } from './resources/resources.js';
 
 /**
  * Mock implementation of ObjectGenerator for testing
@@ -44,7 +41,7 @@ export class MockObjectGenerator implements ObjectGenerator {
    * Mock multiple responses in sequence
    */
   mockResponses(...responses: any[]): void {
-    responses.forEach(response => {
+    responses.forEach((response) => {
       this.generateObjectMock.mockResolvedValueOnce(response as any);
     });
   }
@@ -142,4 +139,116 @@ export class MockObjectGenerator implements ObjectGenerator {
  */
 export function createMockClient(): MockObjectGenerator {
   return new MockObjectGenerator();
+}
+
+/**
+ * Test adapter that collects brain execution results
+ */
+class TestAdapter<TState extends State = State> implements Adapter {
+  private stepTitles: string[] = [];
+  private currentState: TState;
+  private completed = false;
+  private error: Error | null = null;
+
+  constructor(private initialState: TState) {
+    this.currentState = { ...initialState };
+  }
+
+  async dispatch(event: BrainEvent): Promise<void> {
+    switch (event.type) {
+      case BRAIN_EVENTS.STEP_COMPLETE:
+        this.stepTitles.push(event.stepTitle);
+        if (event.patch && event.patch.length > 0) {
+          this.currentState = applyPatches(this.currentState, event.patch) as TState;
+        }
+        break;
+      case BRAIN_EVENTS.COMPLETE:
+        this.completed = true;
+        break;
+      case BRAIN_EVENTS.ERROR:
+        this.error = event.error;
+        break;
+    }
+  }
+
+  getExecutedSteps(): string[] {
+    return [...this.stepTitles];
+  }
+
+  getFinalState(): TState {
+    return { ...this.currentState };
+  }
+
+  isCompleted(): boolean {
+    return this.completed;
+  }
+
+  getError(): Error | null {
+    return this.error;
+  }
+}
+
+/**
+ * Test runner options
+ */
+export interface TestRunnerOptions<TState extends State = State> {
+  client?: ObjectGenerator;
+  resources?: Resources;
+  initialState?: TState;
+}
+
+/**
+ * Result of running a brain test
+ */
+export interface TestRunResult<TState extends State = State> {
+  finalState: TState;
+  steps: string[];
+  error: Error | null;
+  completed: boolean;
+}
+
+/**
+ * Runs a brain with test utilities and returns collected data
+ */
+export async function runBrainTest<
+  TOptions extends object = {},
+  TState extends State = {}
+>(
+  brain: Brain<TOptions, TState, any>,
+  options: TestRunnerOptions<TState> & { brainOptions?: TOptions } = {}
+): Promise<TestRunResult<TState>> {
+  const {
+    client = createMockClient(),
+    resources,
+    initialState = {} as TState,
+    brainOptions,
+  } = options;
+
+  // Create test adapter
+  const testAdapter = new TestAdapter<TState>(initialState);
+
+  // Create brain runner with test adapter
+  const runner = new BrainRunner({
+    adapters: [testAdapter],
+    client,
+    resources,
+  });
+
+  try {
+    // Run the brain
+    await runner.run(brain, {
+      initialState,
+      options: brainOptions,
+    });
+  } catch (error) {
+    // Brain might throw after emitting ERROR event
+    // This is expected behavior, so we don't re-throw
+  }
+
+  return {
+    finalState: testAdapter.getFinalState(),
+    steps: testAdapter.getExecutedSteps(),
+    error: testAdapter.getError(),
+    completed: testAdapter.isCompleted(),
+  };
 }
