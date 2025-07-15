@@ -33,3 +33,6 @@ export type {
   ResourceType,
 } from './resources/resources.js';
 export { RESOURCE_TYPES } from './resources/resources.js';
+
+// Test utilities
+export { nextStep, createMockClient, MockObjectGenerator } from './test-utils.js';
