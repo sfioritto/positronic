@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import { spawn } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
 import { syncResources, generateTypes } from './helpers.js';
@@ -9,6 +10,40 @@ export class ServerCommand {
   constructor(private server: PositronicDevServer) {}
 
   async handle(argv: ArgumentsCamelCase<any>) {
+    // Handle kill option
+    if (argv.k) {
+      return this.handleKill(argv);
+    }
+
+    // Validate arguments
+    if (argv.port && argv.d && !argv.logFile) {
+      throw new Error(
+        'When using --port with -d, you must also specify --log-file'
+      );
+    }
+
+    // Check for existing PID file (skip if we're a detached child process)
+    const pidFile = this.getPidFilePath(argv.port);
+    if (!process.env.POSITRONIC_DETACHED_CHILD && fs.existsSync(pidFile)) {
+      const existingPid = parseInt(fs.readFileSync(pidFile, 'utf8').trim());
+      if (this.isProcessRunning(existingPid)) {
+        throw new Error(
+          `Server already running (PID: ${existingPid}). Stop it with: px server -k`
+        );
+      } else {
+        console.log('WARNING: Removing stale PID file');
+        fs.unlinkSync(pidFile);
+      }
+    }
+
+    // If -d flag is set, spawn a detached process
+    if (argv.d) {
+      return this.handleDetached(argv);
+    }
+
+    // Write PID file for foreground process too
+    fs.writeFileSync(pidFile, String(process.pid));
+
     const brainsDir = path.join(this.server.projectRootDir, 'brains');
     const resourcesDir = path.join(this.server.projectRootDir, 'resources');
 
@@ -16,37 +51,43 @@ export class ServerCommand {
     let watcher: FSWatcher | null = null;
     let logStream: fs.WriteStream | null = null;
 
-    // Handle log file option
-    if (argv.logFile) {
-      const logFilePath = path.resolve(argv.logFile);
-      
-      // Check if file already exists
-      if (fs.existsSync(logFilePath)) {
-        throw new Error(`Log file already exists: ${logFilePath}. Please specify a different file.`);
+    // Always create a log file (use default if not specified)
+    const logFilePath = argv.logFile
+      ? path.resolve(argv.logFile)
+      : path.join(this.server.projectRootDir, '.positronic-server.log');
+
+    // Ensure directory exists
+    const logDir = path.dirname(logFilePath);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+
+    // Create log stream (append mode)
+    logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+    // Helper function to log to both console and file
+    const logBoth = (level: string, message: string) => {
+      const timestamp = new Date().toISOString();
+      const logLine = `[${timestamp}] [${level}] ${message}\n`;
+      if (logStream && !logStream.destroyed) {
+        logStream.write(logLine);
       }
 
-      // Create log stream
-      logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+      // Also output to console (using original methods to avoid recursion)
+      if (level === 'ERROR') {
+        console.error(message);
+      } else if (level === 'WARN') {
+        console.warn(message);
+      } else {
+        console.log(message);
+      }
+    };
 
-      // Register log callbacks
-      this.server.onLog((message) => {
-        const timestamp = new Date().toISOString();
-        logStream!.write(`[${timestamp}] [INFO] ${message}`);
-      });
-
-      this.server.onError((message) => {
-        const timestamp = new Date().toISOString();
-        logStream!.write(`[${timestamp}] [ERROR] ${message}`);
-      });
-
-      this.server.onWarning((message) => {
-        const timestamp = new Date().toISOString();
-        logStream!.write(`[${timestamp}] [WARN] ${message}`);
-      });
-
-      // Output the process ID for AI agents to track
-      console.log(process.pid);
-    }
+    // Always register log callbacks to capture server logs
+    // The server is responsible for generating logs through these callbacks
+    this.server.onLog((message) => logBoth('INFO', message));
+    this.server.onError((message) => logBoth('ERROR', message));
+    this.server.onWarning((message) => logBoth('WARN', message));
 
     const cleanup = async () => {
       if (watcher) {
@@ -57,13 +98,18 @@ export class ServerCommand {
         serverHandle.kill();
         serverHandle = null;
       }
-      
+
       // Close log stream
       if (logStream) {
         logStream.end();
         logStream = null;
       }
-      
+
+      // Remove PID file
+      if (fs.existsSync(pidFile)) {
+        fs.unlinkSync(pidFile);
+      }
+
       process.exit(0);
     };
 
@@ -194,6 +240,120 @@ export class ServerCommand {
     } catch (error) {
       console.error('An error occurred during server startup:', error);
       await cleanup(); // Attempt cleanup on error
+    }
+  }
+
+  private async handleDetached(argv: ArgumentsCamelCase<any>) {
+    // Get the path to the current CLI executable
+    const cliPath = process.argv[1];
+
+    // Build the command arguments
+    const args = ['server'];
+
+    // Add optional arguments if they were provided
+    if (argv.force) args.push('--force');
+    if (argv.port) args.push('--port', String(argv.port));
+    if (argv.logFile) args.push('--log-file', argv.logFile);
+
+    // Determine output file for logs
+    const logFile =
+      argv.logFile ||
+      path.join(this.server.projectRootDir, '.positronic-server.log');
+
+    // Open log file in append mode
+    const out = fs.openSync(logFile, 'a');
+    const err = fs.openSync(logFile, 'a');
+
+    // Spawn the detached process with a special environment variable to skip PID check
+    const child = spawn(process.execPath, [cliPath, ...args], {
+      detached: true,
+      stdio: ['ignore', out, err],
+      cwd: this.server.projectRootDir,
+      env: { ...process.env, POSITRONIC_DETACHED_CHILD: 'true' },
+    });
+
+    // Write the PID to a file for later reference
+    const pidFile = this.getPidFilePath(argv.port);
+    fs.writeFileSync(pidFile, String(child.pid));
+
+    // Detach from the child process
+    child.unref();
+
+    console.log(`✅ Server started in background (PID: ${child.pid})`);
+    console.log(`   Logs: ${logFile}`);
+    console.log(`   To stop: px server -k`);
+
+    // Exit the parent process
+    process.exit(0);
+  }
+
+  private getPidFilePath(port?: number): string {
+    if (port) {
+      return path.join(
+        this.server.projectRootDir,
+        `.positronic-server-${port}.pid`
+      );
+    }
+    return path.join(this.server.projectRootDir, '.positronic-server.pid');
+  }
+
+  private isProcessRunning(pid: number): boolean {
+    try {
+      // This sends signal 0 which doesn't kill the process, just checks if it exists
+      process.kill(pid, 0);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  private async handleKill(argv: ArgumentsCamelCase<any>) {
+    const pidFile = path.join(this.server.projectRootDir, '.positronic-server.pid');
+    
+    if (!fs.existsSync(pidFile)) {
+      console.error(`❌ No default server is running`);
+      console.error(`   PID file not found: ${pidFile}`);
+      process.exit(1);
+    }
+
+    try {
+      const pid = parseInt(fs.readFileSync(pidFile, 'utf8').trim());
+      
+      if (!this.isProcessRunning(pid)) {
+        console.log('⚠️  Server process not found, removing stale PID file');
+        fs.unlinkSync(pidFile);
+        process.exit(0);
+      }
+
+      // Kill the process
+      process.kill(pid, 'SIGTERM');
+      
+      // Wait a moment to see if the process stops
+      let killed = false;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (!this.isProcessRunning(pid)) {
+          killed = true;
+          break;
+        }
+      }
+
+      if (!killed) {
+        // Force kill if SIGTERM didn't work
+        console.log('⚠️  Server did not stop gracefully, forcing shutdown');
+        process.kill(pid, 'SIGKILL');
+      }
+
+      // Clean up PID file
+      if (fs.existsSync(pidFile)) {
+        fs.unlinkSync(pidFile);
+      }
+
+      console.log(`✅ Server stopped (PID: ${pid})`);
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Failed to kill server:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
     }
   }
 }

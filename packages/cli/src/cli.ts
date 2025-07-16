@@ -200,6 +200,16 @@ export function buildCli(options: CliOptions) {
             describe: 'File to redirect server output to (for AI agents)',
             type: 'string',
             alias: 'l',
+          })
+          .option('d', {
+            describe: 'Run server in detached/background mode',
+            type: 'boolean',
+            default: false,
+          })
+          .option('k', {
+            describe: 'Kill the default background server',
+            type: 'boolean',
+            default: false,
           });
       },
       (argv) => serverCommand.handle(argv)

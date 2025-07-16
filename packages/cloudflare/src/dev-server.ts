@@ -443,7 +443,6 @@ export class CloudflareDevServer implements PositronicDevServer {
     const wranglerProcess = spawn('npx', ['wrangler', ...wranglerArgs], {
       cwd: serverDir,
       stdio: ['inherit', 'pipe', 'pipe'], // stdin inherit, stdout/stderr piped
-      shell: true,
     });
 
     // Capture and forward stdout
@@ -534,7 +533,6 @@ export class CloudflareDevServer implements PositronicDevServer {
         {
           cwd: serverDir,
           stdio: ['inherit', 'pipe', 'pipe'],
-          shell: true,
           env: {
             ...process.env,
             CLOUDFLARE_API_TOKEN: envConfig.CLOUDFLARE_API_TOKEN,

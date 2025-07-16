@@ -25,7 +25,7 @@ export type ApiClient = typeof apiClient;
 // Singleton API client instance
 export const apiClient = {
   fetch: async (apiPath: string, options?: RequestInit): Promise<Response> => {
-    const port = process.env.POSITRONIC_SERVER_PORT || '8787';
+    const port = process.env.POSITRONIC_PORT || '8787';
     const baseUrl = `http://localhost:${port}`;
     const fullUrl = `${baseUrl}${
       apiPath.startsWith('/') ? apiPath : '/' + apiPath
@@ -590,7 +590,7 @@ export async function waitUntilReady(
   port?: number,
   maxWaitMs = 5000
 ): Promise<boolean> {
-  const serverPort = port || Number(process.env.POSITRONIC_SERVER_PORT) || 8787;
+  const serverPort = port || Number(process.env.POSITRONIC_PORT) || 8787;
   const startTime = Date.now();
 
   // First wait for basic HTTP readiness

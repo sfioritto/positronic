@@ -12,19 +12,43 @@ When you need to run a development server, use the `--log-file` option to captur
 
 ### 1. Start the server with logging
 
+**Default mode (recommended for most cases):**
 ```bash
-# Start server with random port and capture output to a log file in /tmp
-PID=$(px server --port 38291 --log-file /tmp/server-38291.log &)
-
-# The command outputs the process ID as the first line
-# Store this PID for later use
+px server -d
 ```
 
-### 2. Run commands using your server port
+This starts the server on the default port (3000) with logs written to `.positronic-server.log`.
+
+**Custom port mode (when you need a specific port):**
+
+First, generate a random port between 30000 and 50000:
+```bash
+echo $((30000 + RANDOM % 20000))
+```
+
+**Remember this port number** and use it for all subsequent commands. For example, if the port is 38291:
 
 ```bash
-# Set the port environment variable for subsequent commands
-export POSITRONIC_SERVER_PORT=38291
+px server --port 38291 --log-file /tmp/server-38291.log -d
+```
+
+Note: When using `--port` with `-d`, you MUST also specify `--log-file`.
+
+The `-d` flag runs the server in detached/background mode. The server will output its process ID (PID) which you can use to stop it later.
+
+### 2. Run commands using your server
+
+**If using default port (3000):**
+```bash
+# No need to set POSITRONIC_PORT
+px brain list
+px brain run my-brain
+```
+
+**If using custom port:**
+```bash
+# Set the port environment variable for subsequent commands (using your remembered port)
+export POSITRONIC_PORT=38291
 
 # Now all px commands will use your server
 px brain list
@@ -33,27 +57,51 @@ px brain run my-brain
 
 ### 3. Check server logs when needed
 
+**Default server:**
 ```bash
 # View the entire log file
+cat .positronic-server.log
+
+# View the last 50 lines of the log file
+tail -n 50 .positronic-server.log
+```
+
+**Custom port server:**
+```bash
+# View the entire log file (using your remembered port)
 cat /tmp/server-38291.log
 
-# Follow the log file for real-time updates
-tail -f /tmp/server-38291.log
-
-# View last 50 lines
+# View the last 50 lines of the log file
 tail -n 50 /tmp/server-38291.log
 ```
 
 ### 4. Stop the server when done
 
+**Using the built-in kill option (recommended for default server):**
 ```bash
-# Use the PID you captured earlier
-kill $PID
+# Kill default server
+px server -k
+```
+
+**Manual methods:**
+```bash
+# Default server
+kill $(cat .positronic-server.pid)
+
+# Custom port server (PID file includes port number)
+kill $(cat .positronic-server-38291.pid)
+
+# Or find and kill the server process by port
+kill $(lsof -ti:38291)
 ```
 
 ### Important Notes
-- The log file must not already exist (prevents accidental overwrites)
-- Each server instance should use a unique port and log file
+- The `-d` flag runs the server in detached/background mode (similar to Docker's -d)
+- Default server: PID stored in `.positronic-server.pid`, logs in `.positronic-server.log`
+- Custom port servers: PID stored in `.positronic-server-{port}.pid`
+- When using `--port` with `-d`, you MUST also specify `--log-file`
+- Log files are always appended to (never overwritten)
+- The server will error if another server is already running on the same port
 - Always clean up by killing the server process when done
 - The log file contains timestamped entries with [INFO], [ERROR], and [WARN] prefixes
 
@@ -133,3 +181,183 @@ brain('validation-example')
 ```
 
 Most generated brains should not have try-catch blocks. Only use them when the error state is meaningful to subsequent steps in the workflow.
+
+## Creating New Brains - Test-Driven Development
+
+**IMPORTANT**: When asked to generate or create a new brain, you should ALWAYS follow this test-driven development approach. This ensures the brain works correctly and helps catch issues early.
+
+### 1. Write a Failing Test First
+
+Start by following the brain testing guide (`/docs/brain-testing-guide.md`) and write a failing test that describes the expected behavior of the brain.
+
+```typescript
+// tests/my-new-brain.test.ts
+import { describe, it, expect } from '@jest/globals';
+import { createMockClient, runBrainTest } from '@positronic/core/testing';
+import myNewBrain from '../brains/my-new-brain';
+
+describe('MyNewBrain', () => {
+  it('should process data and return expected result', async () => {
+    const mockClient = createMockClient();
+
+    // Mock any AI responses if the brain uses prompts
+    mockClient.mockResponses(
+      { processedData: 'expected output' }
+    );
+
+    const result = await runBrainTest(myNewBrain, {
+      client: mockClient,
+      initialState: { input: 'test data' }
+    });
+
+    expect(result.completed).toBe(true);
+    expect(result.finalState.output).toBe('expected output');
+  });
+});
+```
+
+### 2. Review Documentation
+
+Before implementing the brain:
+- Re-read the **Brain DSL guide** (`/docs/brain-dsl-guide.md`) to understand the DSL patterns
+- Re-read this **Tips for Agents** document if you haven't already
+- Pay special attention to type inference and error handling guidelines
+
+### 3. Start the Development Server
+
+Before implementing, start the development server in detached mode so you can actually run and test your brain:
+
+```bash
+# For most cases, just use the default:
+px server -d
+
+# Verify the server is running
+px brain list
+```
+
+If you need a custom port (e.g., when running multiple servers):
+```bash
+# 1. Generate a random port
+PORT=$(echo $((30000 + RANDOM % 20000)))
+echo "Using port: $PORT"
+
+# 2. Start the server in detached mode (--log-file is required with --port)
+px server --port $PORT --log-file /tmp/server-$PORT.log -d
+
+# 3. Set environment variable for all subsequent px commands
+export POSITRONIC_PORT=$PORT
+
+# 4. Verify the server is running
+px brain list
+```
+
+### 4. Implement Incrementally
+
+Build the brain one step at a time, testing as you go. **Actually run the brain after each change** to see if it works:
+
+```bash
+# 1. Create the brain with just the first step
+# Write minimal implementation in brains/my-new-brain.ts
+
+# 2. Run the brain to test the first step
+px brain run my-new-brain
+
+# 3. Check the server log to see execution details
+# For default server:
+tail -f .positronic-server.log
+# For custom port server:
+# tail -f /tmp/server-$PORT.log
+
+# 4. Run the test to see if it's getting closer to passing
+npm test tests/my-new-brain.test.ts
+
+# 5. Add the next step, run again, check logs
+# Repeat until the test passes
+
+# 6. When done, stop the server
+px server -k  # (for default server) or: kill $(cat .positronic-server.pid)
+```
+
+### 5. Example Workflow
+
+Here's a complete example of creating a brain that processes user feedback:
+
+```typescript
+// Step 1: Write the test first
+describe('FeedbackProcessor', () => {
+  it('should analyze feedback and generate response', async () => {
+    const mockClient = createMockClient();
+    mockClient.mockResponses(
+      { sentiment: 'positive', score: 0.8 },
+      { response: 'Thank you for your feedback!' }
+    );
+
+    const result = await runBrainTest(feedbackBrain, {
+      client: mockClient,
+      initialState: { feedback: 'Great product!' }
+    });
+
+    expect(result.completed).toBe(true);
+    expect(result.finalState.sentiment).toBe('positive');
+    expect(result.finalState.response).toBeTruthy();
+  });
+});
+
+// Step 2: Create minimal brain implementation
+import { brain } from '@positronic/core';
+import { z } from 'zod';
+
+const feedbackBrain = brain('feedback-processor')
+  .step('Initialize', ({ state }) => ({
+    ...state,
+    timestamp: Date.now()
+  }));
+
+export default feedbackBrain;
+
+// Step 3: Run and check logs, see it doesn't analyze yet
+// Step 4: Add sentiment analysis step
+  .prompt('Analyze sentiment', {
+    template: ({ feedback }) =>
+      <%= "`Analyze the sentiment of this feedback: \"${feedback}\"`" %>,
+    outputSchema: {
+      schema: z.object({
+        sentiment: z.enum(['positive', 'neutral', 'negative']),
+        score: z.number().min(0).max(1)
+      }),
+      name: 'sentimentAnalysis' as const
+    }
+  })
+
+// Step 5: Run again, check logs, test still fails (no response)
+// Step 6: Add response generation
+  .prompt('Generate response', {
+    template: ({ sentimentAnalysis, feedback }) =>
+      <%= "`Generate a brief response to this ${sentimentAnalysis.sentiment} feedback: \"${feedback}\"`" %>,
+    outputSchema: {
+      schema: z.object({
+        response: z.string()
+      }),
+      name: 'responseData' as const
+    }
+  })
+  .step('Format output', ({ state }) => ({
+    ...state,
+    sentiment: state.sentimentAnalysis.sentiment,
+    response: state.responseData.response
+  }));
+
+// Step 7: Run test - it should pass now!
+```
+
+### 6. Important Reminders
+
+- Always start with a test that describes what the brain should do
+- Start the development server in detached mode (`-d`) before implementing
+- **Actually run the brain** after each change to verify it works
+- Build incrementally - one step at a time
+- Use the server logs to debug and understand execution
+- Let TypeScript infer types - don't add explicit type annotations
+- Don't catch errors unless it's part of the workflow logic
+- Run `npx tsc` frequently to catch type errors early
+- Stop the server when done: `px server -k` (default server) or `kill $(cat .positronic-server.pid)`
