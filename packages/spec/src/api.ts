@@ -13,7 +13,7 @@ export async function testStatus(fetch: Fetch): Promise<boolean> {
       return false;
     }
 
-    const data = await response.json();
+    const data = await response.json() as { ready: boolean };
 
     if (data.ready !== true) {
       console.error(`Expected { ready: true }, got ${JSON.stringify(data)}`);
@@ -44,7 +44,17 @@ export const resources = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        resources: Array<{
+          key: string;
+          type: string;
+          size: number;
+          lastModified: string;
+          local: boolean;
+        }>;
+        truncated: boolean;
+        count: number;
+      };
 
       // Validate response structure
       if (!Array.isArray(data.resources)) {
@@ -123,7 +133,13 @@ export const resources = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        key: string;
+        type: string;
+        size: number;
+        lastModified: string;
+        local: boolean;
+      };
 
       // Validate response has required fields
       if (
@@ -204,7 +220,7 @@ export const resources = {
 
       // In production mode, this should return 403
       if (response.status === 403) {
-        const data = await response.json();
+        const data = await response.json() as { error: string };
         if (
           data.error === 'Bulk delete is only available in development mode'
         ) {
@@ -220,7 +236,7 @@ export const resources = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { deletedCount: number };
 
       if (typeof data.deletedCount !== 'number') {
         console.error(
@@ -260,7 +276,7 @@ export const resources = {
 
       // If credentials are not configured, expect 400
       if (response.status === 400) {
-        const data = await response.json();
+        const data = await response.json() as { error?: string };
         // This is acceptable - implementation may not have credentials configured
         console.log(
           'Presigned URL generation not available - this is acceptable'
@@ -275,7 +291,11 @@ export const resources = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        url: string;
+        method: string;
+        expiresIn: number;
+      };
 
       // Validate response structure (backend-agnostic)
       if (!data.url || typeof data.url !== 'string') {
@@ -335,7 +355,7 @@ export const brains = {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { brainRunId: string };
 
       if (!data.brainRunId || typeof data.brainRunId !== 'string') {
         console.error(
@@ -376,7 +396,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { error: string };
 
       if (!data.error || typeof data.error !== 'string') {
         console.error(`Expected error to be string, got ${typeof data.error}`);
@@ -503,7 +523,15 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        runs: Array<{
+          brainRunId: string;
+          brainTitle: string;
+          type: string;
+          status: string;
+          createdAt: number;
+        }>;
+      };
 
       // Validate response structure
       if (!data.runs || !Array.isArray(data.runs)) {
@@ -605,7 +633,14 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        brains: Array<{
+          name: string;
+          title: string;
+          description: string;
+        }>;
+        count: number;
+      };
 
       // Validate response structure
       if (!Array.isArray(data.brains)) {
@@ -665,7 +700,18 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        name: string;
+        title: string;
+        steps: Array<{
+          type: string;
+          title: string;
+          innerBrain?: {
+            title: string;
+            steps: any[];
+          };
+        }>;
+      };
 
       // Validate response structure
       if (!data.name || typeof data.name !== 'string') {
@@ -752,7 +798,15 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        runs: Array<{
+          brainRunId: string;
+          brainTitle: string;
+          type: string;
+          status: string;
+          createdAt: number;
+        }>;
+      };
 
       // Validate response structure
       if (!data.runs || !Array.isArray(data.runs)) {
@@ -827,7 +881,7 @@ export const brains = {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { brainRunId: string };
 
       if (!data.brainRunId || typeof data.brainRunId !== 'string') {
         console.error(
@@ -871,7 +925,13 @@ export const schedules = {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        id: string;
+        brainName: string;
+        cronExpression: string;
+        enabled: boolean;
+        createdAt: number;
+      };
 
       // Validate response structure
       if (!data.id || typeof data.id !== 'string') {
@@ -930,7 +990,16 @@ export const schedules = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        schedules: Array<{
+          id: string;
+          brainName: string;
+          cronExpression: string;
+          enabled: boolean;
+          createdAt: number;
+        }>;
+        count: number;
+      };
 
       // Validate response structure
       if (!Array.isArray(data.schedules)) {
@@ -1027,7 +1096,15 @@ export const schedules = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        runs: Array<{
+          id: string;
+          scheduleId: string;
+          status: string;
+          ranAt: number;
+        }>;
+        count: number;
+      };
 
       // Validate response structure
       if (!Array.isArray(data.runs)) {
@@ -1091,7 +1168,11 @@ export const secrets = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        name: string;
+        createdAt: string;
+        updatedAt: string;
+      };
 
       // Validate response structure
       if (!data.name || typeof data.name !== 'string') {
@@ -1141,7 +1222,14 @@ export const secrets = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        secrets: Array<{
+          name: string;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+        count: number;
+      };
 
       // Validate response structure
       if (!Array.isArray(data.secrets)) {
@@ -1235,7 +1323,7 @@ export const secrets = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { exists: boolean };
 
       // Validate response structure
       if (typeof data.exists !== 'boolean') {
@@ -1277,7 +1365,10 @@ export const secrets = {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        created: number;
+        updated: number;
+      };
 
       // Validate response structure
       if (typeof data.created !== 'number') {
