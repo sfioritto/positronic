@@ -18,7 +18,8 @@
       "Bash(npm run dev:*)",
       "Bash(grep:*)",
       "Bash(npm run clean:workspaces:*)",
-      "Bash(npm i)"
+      "Bash(npm i)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }
