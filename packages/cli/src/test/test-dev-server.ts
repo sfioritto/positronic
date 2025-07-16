@@ -129,12 +129,20 @@ interface MockBrainRun {
   completedAt?: number;
 }
 
+interface MockSecret {
+  name: string;
+  value: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
   private scheduleRuns: MockScheduleRun[] = [];
   private brains: Map<string, MockBrain> = new Map();
   private brainRuns: MockBrainRun[] = [];
+  private secrets: Map<string, MockSecret> = new Map();
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
@@ -640,6 +648,111 @@ export class TestDevServer implements PositronicDevServer {
       }];
     });
 
+    // Secret Management Endpoints
+    
+    // POST /secrets
+    nockInstance.post('/secrets').reply(201, (uri, requestBody) => {
+      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      
+      const now = new Date().toISOString();
+      const secret: MockSecret = {
+        name: body.name,
+        value: body.value,
+        createdAt: now,
+        updatedAt: now,
+      };
+      
+      this.secrets.set(body.name, secret);
+      this.logCall('createSecret', [body.name]);
+      
+      // Return without the value for security
+      return {
+        name: secret.name,
+        createdAt: secret.createdAt,
+        updatedAt: secret.updatedAt,
+      };
+    });
+
+    // GET /secrets
+    nockInstance.get('/secrets').reply(200, () => {
+      this.logCall('listSecrets', []);
+      
+      // Return secrets without values
+      const secrets = Array.from(this.secrets.values()).map(secret => ({
+        name: secret.name,
+        createdAt: secret.createdAt,
+        updatedAt: secret.updatedAt,
+      }));
+      
+      return {
+        secrets,
+        count: secrets.length,
+      };
+    });
+
+    // DELETE /secrets/:name
+    nockInstance.delete(/^\/secrets\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/secrets\/(.+)$/);
+      if (match) {
+        const secretName = decodeURIComponent(match[1]);
+        
+        if (this.secrets.has(secretName)) {
+          this.secrets.delete(secretName);
+          this.logCall('deleteSecret', [secretName]);
+          return [204, ''];
+        } else {
+          return [404, { error: `Secret "${secretName}" not found` }];
+        }
+      }
+      return [404, 'Not Found'];
+    });
+
+    // GET /secrets/:name/exists
+    nockInstance.get(/^\/secrets\/(.+)\/exists$/).reply((uri) => {
+      const match = uri.match(/^\/secrets\/(.+)\/exists$/);
+      if (match) {
+        const secretName = decodeURIComponent(match[1]);
+        const exists = this.secrets.has(secretName);
+        
+        this.logCall('secretExists', [secretName]);
+        
+        return [200, { exists }];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // POST /secrets/bulk
+    nockInstance.post('/secrets/bulk').reply(201, (uri, requestBody) => {
+      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      
+      let created = 0;
+      let updated = 0;
+      const now = new Date().toISOString();
+      
+      for (const secretData of body.secrets) {
+        const existing = this.secrets.has(secretData.name);
+        
+        const secret: MockSecret = {
+          name: secretData.name,
+          value: secretData.value,
+          createdAt: existing ? this.secrets.get(secretData.name)!.createdAt : now,
+          updatedAt: now,
+        };
+        
+        this.secrets.set(secretData.name, secret);
+        
+        if (existing) {
+          updated++;
+        } else {
+          created++;
+        }
+      }
+      
+      this.logCall('bulkCreateSecrets', [body.secrets.length]);
+      
+      return { created, updated };
+    });
+
     this.nockScope = nockInstance;
 
     // Simulate some initial log output after server starts
@@ -697,6 +810,29 @@ export class TestDevServer implements PositronicDevServer {
 
   getSchedules(): MockSchedule[] {
     return Array.from(this.schedules.values());
+  }
+
+  // Secret helper methods
+  addSecret(name: string, value: string) {
+    const now = new Date().toISOString();
+    this.secrets.set(name, {
+      name,
+      value,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  clearSecrets() {
+    this.secrets.clear();
+  }
+
+  getSecrets(): MockSecret[] {
+    return Array.from(this.secrets.values());
+  }
+
+  getSecret(name: string): MockSecret | undefined {
+    return this.secrets.get(name);
   }
 
   // Brain helper methods

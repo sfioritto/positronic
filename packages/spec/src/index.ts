@@ -107,4 +107,4 @@ export interface PositronicDevServer {
   onWarning(callback: (message: string) => void): void;
 }
 
-export { testStatus, resources, brains, schedules } from './api.js';
+export { testStatus, resources, brains, schedules, secrets } from './api.js';

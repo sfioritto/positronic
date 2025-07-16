@@ -5,6 +5,7 @@ import { ServerCommand } from './commands/server.js';
 import { BrainCommand } from './commands/brain.js';
 import { ResourcesCommand } from './commands/resources.js';
 import { ScheduleCommand } from './commands/schedule.js';
+import { SecretCommand } from './commands/secret.js';
 import type { PositronicDevServer } from '@positronic/spec';
 
 export interface CliOptions {
@@ -28,6 +29,7 @@ export function buildCli(options: CliOptions) {
   const projectCommand = new ProjectCommand();
   const brainCommand = new BrainCommand();
   const scheduleCommand = new ScheduleCommand();
+  const secretCommand = new SecretCommand();
 
   // Main CLI definition
   let cli = yargs(argv)
@@ -878,6 +880,45 @@ export function buildCli(options: CliOptions) {
         );
 
       return yargsSchedule;
+    }
+  );
+
+  // --- Secret Management Commands ---
+  cli = cli.command(
+    'secret',
+    'Manage secrets for your brains\n',
+    (yargsSecret) => {
+      yargsSecret
+        .command(
+          'create <name>',
+          'Create a new secret\n',
+          (yargsCreate) => {
+            return yargsCreate
+              .positional('name', {
+                describe: 'Name of the secret (e.g., ANTHROPIC_API_KEY)',
+                type: 'string',
+                demandOption: true,
+              })
+              .option('value', {
+                describe: 'Secret value (omit for secure input)',
+                type: 'string',
+              })
+              .example(
+                '$0 secret create ANTHROPIC_API_KEY',
+                'Create a secret with secure input'
+              )
+              .example(
+                '$0 secret create DATABASE_URL --value "postgres://..."',
+                'Create a secret with direct value (not recommended)'
+              );
+          },
+          (argv) => {
+            const element = secretCommand.create(argv);
+            render(element);
+          }
+        );
+
+      return yargsSecret;
     }
   );
 
