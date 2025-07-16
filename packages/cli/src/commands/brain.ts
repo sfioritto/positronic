@@ -132,7 +132,7 @@ export class BrainCommand {
   }: ArgumentsCamelCase<BrainWatchArgs>): Promise<React.ReactElement> {
     // If a specific run ID is provided, return the Watch component
     if (runId) {
-      const port = process.env.POSITRONIC_SERVER_PORT || '8787';
+      const port = process.env.POSITRONIC_PORT || '8787';
       return React.createElement(Watch, { runId, port });
     }
 
@@ -175,7 +175,7 @@ export class BrainCommand {
 
           // Exactly one active run found - watch it
           const activeRun = result.runs[0];
-          const port = process.env.POSITRONIC_SERVER_PORT || '8787';
+          const port = process.env.POSITRONIC_PORT || '8787';
           return React.createElement(Watch, { runId: activeRun.brainRunId, port });
         } else {
           const errorText = await response.text();

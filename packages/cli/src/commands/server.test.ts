@@ -130,46 +130,50 @@ describe('CLI Integration: positronic server', () => {
   describe('Error handling', () => {
     it('should handle server startup errors gracefully', async () => {
       const { server } = env;
-      
+
       // Mock the server to emit an error after start
       const originalStart = server.start.bind(server);
       let errorCallback: ((error: Error) => void) | undefined;
-      
-      server.start = jest.fn(async (port?: number): Promise<TestServerHandle> => {
-        const handle = await originalStart(port);
-        
-        // Intercept the onError callback
-        const originalOnError = handle.onError.bind(handle);
-        handle.onError = (callback: (error: Error) => void) => {
-          errorCallback = callback;
-          originalOnError(callback);
-        };
-        
-        // Emit error after a short delay
-        setTimeout(() => {
-          if (errorCallback) {
-            errorCallback(new Error('Mock server error'));
-          }
-        }, 10);
-        
-        return handle;
-      });
+
+      server.start = jest.fn(
+        async (port?: number): Promise<TestServerHandle> => {
+          const handle = await originalStart(port);
+
+          // Intercept the onError callback
+          const originalOnError = handle.onError.bind(handle);
+          handle.onError = (callback: (error: Error) => void) => {
+            errorCallback = callback;
+            originalOnError(callback);
+          };
+
+          // Emit error after a short delay
+          setTimeout(() => {
+            if (errorCallback) {
+              errorCallback(new Error('Mock server error'));
+            }
+          }, 10);
+
+          return handle;
+        }
+      );
 
       // Use a console spy to capture error output
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       try {
         await px(['server'], { server });
-        
+
         // Wait for error to be logged
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
         // Verify error was logged
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           'Failed to start dev server:',
           expect.any(Error)
         );
-        
+
         // Verify process.exit was called
         expect(exitSpy).toHaveBeenCalledWith(1);
       } finally {
@@ -179,34 +183,40 @@ describe('CLI Integration: positronic server', () => {
 
     it('should handle server timeout and exit appropriately', async () => {
       const { server } = env;
-      
+
       // Mock the server handle to simulate timeout
       const originalStart = server.start.bind(server);
-      server.start = jest.fn(async (port?: number): Promise<TestServerHandle> => {
-        const handle = await originalStart(port);
-        
-        // Override waitUntilReady to always return false (timeout)
-        handle.waitUntilReady = jest.fn<() => Promise<boolean>>().mockResolvedValue(false);
-        
-        return handle;
-      });
+      server.start = jest.fn(
+        async (port?: number): Promise<TestServerHandle> => {
+          const handle = await originalStart(port);
 
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+          // Override waitUntilReady to always return false (timeout)
+          handle.waitUntilReady = jest
+            .fn<() => Promise<boolean>>()
+            .mockResolvedValue(false);
+
+          return handle;
+        }
+      );
+
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       try {
         await px(['server'], { server });
-        
+
         // Verify timeout message was logged
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           '⚠️  Server startup timeout: The server is taking longer than expected to initialize.'
         );
-        
+
         // Verify process.exit was called
         expect(exitSpy).toHaveBeenCalledWith(1);
-        
+
         // Verify server was killed
         const methodCalls = server.getLogs();
-        const startCall = methodCalls.find(call => call.method === 'start');
+        const startCall = methodCalls.find((call) => call.method === 'start');
         expect(startCall).toBeDefined();
       } finally {
         consoleErrorSpy.mockRestore();
@@ -215,21 +225,23 @@ describe('CLI Integration: positronic server', () => {
 
     it('should handle resource sync with successful upload count', async () => {
       const { server } = env;
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleLogSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
 
       try {
         await px(['server'], { server });
-        
+
         // Wait for sync to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         // Verify successful sync was logged
-        const successLogCall = consoleLogSpy.mock.calls.find(call => 
-          call[0]?.includes('✅ Synced') && 
-          call[0]?.includes('resources')
+        const successLogCall = consoleLogSpy.mock.calls.find(
+          (call) =>
+            call[0]?.includes('✅ Synced') && call[0]?.includes('resources')
         );
         expect(successLogCall).toBeDefined();
-        
+
         // The log should show number of uploads
         expect(successLogCall![0]).toMatch(/✅ Synced \d+ resources/);
       } finally {
@@ -243,18 +255,18 @@ describe('CLI Integration: positronic server', () => {
   describe('File watching', () => {
     it('should set up file watching for resources and brains', async () => {
       const { server } = env;
-      
+
       // Simply verify that file watching is initiated - the integration test philosophy
       // suggests testing observable behavior rather than implementation details
       try {
         await px(['server'], { server });
-        
+
         // The fact that the server starts successfully means file watching was set up
         // We can verify this indirectly by checking that the server is running
         const methodCalls = server.getLogs();
         const startCall = methodCalls.find((call) => call.method === 'start');
         expect(startCall).toBeDefined();
-        
+
         // The server should continue running (no exit called)
         expect(exitSpy).not.toHaveBeenCalled();
       } finally {
@@ -271,19 +283,19 @@ describe('CLI Integration: positronic server', () => {
   describe('Signal handling and cleanup', () => {
     it('should exit cleanly on SIGTERM signal', async () => {
       const { server } = env;
-      
+
       try {
         await px(['server'], { server });
-        
+
         // Wait for server to be fully started
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
         // Emit SIGTERM
         process.emit('SIGTERM');
-        
+
         // Wait for cleanup
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
         // Verify process.exit was called with success code
         expect(exitSpy).toHaveBeenCalledWith(0);
       } finally {
@@ -293,37 +305,39 @@ describe('CLI Integration: positronic server', () => {
 
     it('should handle server close event', async () => {
       const { server } = env;
-      
+
       // Mock the server to emit close event
       const originalStart = server.start.bind(server);
       let closeCallback: ((code?: number | null) => void) | undefined;
-      
-      server.start = jest.fn(async (port?: number): Promise<TestServerHandle> => {
-        const handle = await originalStart(port);
-        
-        // Intercept the onClose callback
-        const originalOnClose = handle.onClose.bind(handle);
-        handle.onClose = (callback: (code?: number | null) => void) => {
-          closeCallback = callback;
-          originalOnClose(callback);
-        };
-        
-        // Emit close event after a delay
-        setTimeout(() => {
-          if (closeCallback) {
-            closeCallback(42); // Custom exit code
-          }
-        }, 100);
-        
-        return handle;
-      });
+
+      server.start = jest.fn(
+        async (port?: number): Promise<TestServerHandle> => {
+          const handle = await originalStart(port);
+
+          // Intercept the onClose callback
+          const originalOnClose = handle.onClose.bind(handle);
+          handle.onClose = (callback: (code?: number | null) => void) => {
+            closeCallback = callback;
+            originalOnClose(callback);
+          };
+
+          // Emit close event after a delay
+          setTimeout(() => {
+            if (closeCallback) {
+              closeCallback(42); // Custom exit code
+            }
+          }, 100);
+
+          return handle;
+        }
+      );
 
       try {
         await px(['server'], { server });
-        
+
         // Wait for close event
-        await new Promise(resolve => setTimeout(resolve, 150));
-        
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
         // Verify process.exit was called with server's exit code
         expect(exitSpy).toHaveBeenCalledWith(42);
       } finally {
@@ -335,14 +349,14 @@ describe('CLI Integration: positronic server', () => {
   describe('Command line arguments', () => {
     it('should pass --force flag to server setup', async () => {
       const { server } = env;
-      
+
       try {
         await px(['server', '--force'], { server });
-        
+
         // Verify setup was called with force=true
         const methodCalls = server.getLogs();
         const setupCall = methodCalls.find((call) => call.method === 'setup');
-        
+
         expect(setupCall).toBeDefined();
         expect(setupCall!.args[0]).toBe(true); // force flag is true
       } finally {
@@ -354,14 +368,14 @@ describe('CLI Integration: positronic server', () => {
     it('should pass custom port to server start', async () => {
       const { server } = env;
       const customPort = 8765;
-      
+
       try {
         await px(['server', '--port', String(customPort)], { server });
-        
+
         // Verify start was called with custom port
         const methodCalls = server.getLogs();
         const startCall = methodCalls.find((call) => call.method === 'start');
-        
+
         expect(startCall).toBeDefined();
         expect(startCall!.args[0]).toBe(customPort);
       } finally {
@@ -370,89 +384,106 @@ describe('CLI Integration: positronic server', () => {
       }
     });
 
-    it('should not register log callbacks when no log file is specified', async () => {
+    it('should always register log callbacks for server logs', async () => {
       const { server } = env;
-      
+
       try {
         await px(['server'], { server });
-        
+
         // Verify server started
         const methodCalls = server.getLogs();
         const startCall = methodCalls.find((call) => call.method === 'start');
         expect(startCall).toBeDefined();
-        
-        // Verify callbacks were NOT registered
+
+        // Verify callbacks were registered (server always manages its own logs)
         const onLogCall = methodCalls.find((call) => call.method === 'onLog');
-        const onErrorCall = methodCalls.find((call) => call.method === 'onError');
-        const onWarningCall = methodCalls.find((call) => call.method === 'onWarning');
-        
-        expect(onLogCall).toBeUndefined();
-        expect(onErrorCall).toBeUndefined();
-        expect(onWarningCall).toBeUndefined();
+        const onErrorCall = methodCalls.find(
+          (call) => call.method === 'onError'
+        );
+        const onWarningCall = methodCalls.find(
+          (call) => call.method === 'onWarning'
+        );
+
+        expect(onLogCall).toBeDefined();
+        expect(onErrorCall).toBeDefined();
+        expect(onWarningCall).toBeDefined();
       } finally {
         process.emit('SIGINT');
         await new Promise((r) => setImmediate(r));
+      }
+    });
+
+    it('should create default log file when no --log-file is specified', async () => {
+      const { server } = env;
+      const defaultLogFile = path.join(server.projectRootDir, '.positronic-server.log');
+
+      try {
+        // Ensure no existing log file
+        if (fs.existsSync(defaultLogFile)) {
+          fs.unlinkSync(defaultLogFile);
+        }
+
+        await px(['server'], { server });
+
+        // Give time for log file creation
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify default log file was created
+        expect(fs.existsSync(defaultLogFile)).toBe(true);
+      } finally {
+        process.emit('SIGINT');
+        await new Promise((r) => setImmediate(r));
+        
+        // Clean up
+        if (fs.existsSync(defaultLogFile)) {
+          fs.unlinkSync(defaultLogFile);
+        }
       }
     });
 
     it('should redirect output to log file when --log-file is specified', async () => {
       const { server } = env;
       const logFile = path.join(server.projectRootDir, 'test-server.log');
-      
+
       try {
         await px(['server', '--log-file', logFile], { server });
-        
+
         // Give time for server startup and initial logging
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         // Verify log file was created
         expect(fs.existsSync(logFile)).toBe(true);
-        
+
         // Verify server started successfully and callbacks were registered
         const methodCalls = server.getLogs();
         const startCall = methodCalls.find((call) => call.method === 'start');
         expect(startCall).toBeDefined();
-        
+
         // Verify callbacks were registered
         const onLogCall = methodCalls.find((call) => call.method === 'onLog');
-        const onErrorCall = methodCalls.find((call) => call.method === 'onError');
-        const onWarningCall = methodCalls.find((call) => call.method === 'onWarning');
-        
+        const onErrorCall = methodCalls.find(
+          (call) => call.method === 'onError'
+        );
+        const onWarningCall = methodCalls.find(
+          (call) => call.method === 'onWarning'
+        );
+
         expect(onLogCall).toBeDefined();
         expect(onErrorCall).toBeDefined();
         expect(onWarningCall).toBeDefined();
-        
+
         // Check log file contains expected output
         const logContent = fs.readFileSync(logFile, 'utf-8');
         expect(logContent).toContain('[INFO]');
         expect(logContent).toContain('Synced');
-        
+
         // In real usage, the process ID is output to stdout for AI agents
         // but in tests this may not be captured due to the testing framework
       } finally {
         process.emit('SIGINT');
         await new Promise((r) => setImmediate(r));
-        
-        // Clean up log file
-        if (fs.existsSync(logFile)) {
-          fs.unlinkSync(logFile);
-        }
-      }
-    });
 
-    it('should throw error if log file already exists', async () => {
-      const { server } = env;
-      const logFile = path.join(server.projectRootDir, 'existing-server.log');
-      
-      // Create existing file
-      fs.writeFileSync(logFile, 'existing content');
-      
-      try {
-        await expect(px(['server', '--log-file', logFile], { server })).rejects.toThrow(
-          `Log file already exists: ${logFile}`
-        );
-      } finally {
-        // Clean up
+        // Clean up log file
         if (fs.existsSync(logFile)) {
           fs.unlinkSync(logFile);
         }

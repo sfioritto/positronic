@@ -172,7 +172,7 @@ export class TestDevServer implements PositronicDevServer {
 
     this.port = port || 9000 + Math.floor(Math.random() * 1000);
 
-    process.env.POSITRONIC_SERVER_PORT = this.port.toString();
+    process.env.POSITRONIC_PORT = this.port.toString();
 
     // Set up nock interceptors for all endpoints
     const nockInstance = nock(`http://localhost:${this.port}`).persist();

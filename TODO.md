@@ -160,18 +160,19 @@ Modify the `px server` command (in local dev mode only) to support:
 
 ### Implementation Plan
 
-1. [ ] Add `--log-file` option to `px server` command (local dev mode only)
-2. [ ] When log file is specified:
+1. [x] Add `--log-file` option to `px server` command (local dev mode only)
+2. [x] When log file is specified:
    - Check if file already exists, throw error if it does (prevent overwriting)
    - Redirect all console output (stdout and stderr) to the file
    - Output the process ID when starting
-3. [ ] Update CLAUDE.md with instructions for AI agents:
+3. [x] Add `-d` flag for detached/background mode
+4. [x] Update AI agent documentation with instructions for background server usage:
    ```bash
    # Start server with random port and log file
-   PID=$(px server --port 38291 --log-file ./server-38291.log &)
+   px server --port 38291 --log-file ./server-38291.log -d
    
    # Run commands using the port
-   POSITRONIC_SERVER_PORT=38291 px brain list
+   POSITRONIC_PORT=38291 px brain list
    
    # Check logs when needed
    cat ./server-38291.log

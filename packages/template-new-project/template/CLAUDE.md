@@ -22,7 +22,7 @@ This is a Positronic project - an AI-powered framework for building and running 
 - `px brain run <brain-name>` - Run a brain workflow
 - `px brain list` - List all available brains
 - `px resource list` - List all available resources
-- `px server` - Start the local development server (runs in background)
+- `px server` - Start the local development server (add `-d` for background mode)
 
 ### Testing & Building
 
