@@ -252,12 +252,15 @@ describe('BrainRunner', () => {
     // Replace the client
     const updatedRunner = runner.withClient(newClient);
 
+    // Define schema once to ensure same reference
+    const testSchema = z.object({ result: z.string() });
+
     const testBrain = brain('Test Brain').step(
       'Generate',
       async ({ client }) => {
         const response = await client.generateObject({
           prompt: 'test prompt',
-          schema: z.object({ result: z.string() }),
+          schema: testSchema,
           schemaName: 'TestSchema',
         });
         return { generated: response.result };
@@ -270,7 +273,7 @@ describe('BrainRunner', () => {
     expect(originalClient.generateObject).not.toHaveBeenCalled();
     expect(newClient.generateObject).toHaveBeenCalledWith({
       prompt: 'test prompt',
-      schema: z.object({ result: z.string() }),
+      schema: testSchema,
       schemaName: 'TestSchema',
     });
     expect(result.generated).toBe('from new client');
