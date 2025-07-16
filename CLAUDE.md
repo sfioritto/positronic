@@ -15,6 +15,7 @@ Positronic is an AI-powered framework for building and running "brains" - statef
 - `npm run test:noisy` - Run tests with console output (shows console.error, console.log, etc.)
 - `npm run test:all` - Run all tests including cloudflare tests (requires API keys)
 - `npm run format` - Format code with Prettier.
+- `npm run typecheck` - Run TypeScript type checking for all code, tests, and the cloudflare test-project
 
 - **Important**: Run `npm run dev` frequently to ensure the build is working and tests are passing.
 
@@ -92,7 +93,8 @@ The project uses npm workspaces with the following packages:
 
 ## Development Workflow
 
-- Run `npm build:workspaces` and then `npm run test` from the top of this mono repo every time you change a file and addresses errors and test failures as needed
+- Run `npm run build:workspaces` and then `npm run test` from the top of this mono repo every time you change a file and addresses errors and test failures as needed
+- Run `npm run typecheck` to verify TypeScript types across the entire codebase
 
 ## Testing Memories
 

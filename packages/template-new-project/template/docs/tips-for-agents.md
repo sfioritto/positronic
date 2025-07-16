@@ -4,7 +4,7 @@ This document contains helpful tips and patterns for AI agents working with Posi
 
 ## TypeScript Compilation
 
-Run `npx tsc` frequently as you make changes to ensure your TypeScript code compiles correctly. This will catch type errors early and help maintain code quality.
+Run `npm run typecheck` frequently as you make changes to ensure your TypeScript code compiles correctly. This will catch type errors early and help maintain code quality.
 
 ## Running the Development Server
 
@@ -359,5 +359,5 @@ export default feedbackBrain;
 - Use the server logs to debug and understand execution
 - Let TypeScript infer types - don't add explicit type annotations
 - Don't catch errors unless it's part of the workflow logic
-- Run `npx tsc` frequently to catch type errors early
+- Run `npm run typecheck` frequently to catch type errors early
 - Stop the server when done: `px server -k` (default server) or `kill $(cat .positronic-server.pid)`
