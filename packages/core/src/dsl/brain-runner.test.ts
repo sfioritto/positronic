@@ -6,6 +6,7 @@ import { ObjectGenerator } from '../clients/types.js';
 import { Adapter } from '../adapters/types.js';
 import { createResources, type Resources } from '../resources/resources.js';
 import type { ResourceLoader } from '../resources/resource-loader.js';
+import { z } from 'zod';
 
 describe('BrainRunner', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -202,8 +203,7 @@ describe('BrainRunner', () => {
     // Chain additional adapters
     const updatedRunner = runner.withAdapters([mockAdapter2, mockAdapter3]);
 
-    const testBrain = brain('Test Brain')
-      .step('Step 1', () => ({ value: 1 }));
+    const testBrain = brain('Test Brain').step('Step 1', () => ({ value: 1 }));
 
     await updatedRunner.run(testBrain);
 
@@ -225,8 +225,12 @@ describe('BrainRunner', () => {
     );
 
     // Verify all adapters received the same number of events
-    expect(mockAdapter.dispatch).toHaveBeenCalledTimes(mockAdapter2.dispatch.mock.calls.length);
-    expect(mockAdapter2.dispatch).toHaveBeenCalledTimes(mockAdapter3.dispatch.mock.calls.length);
+    expect(mockAdapter.dispatch).toHaveBeenCalledTimes(
+      mockAdapter2.dispatch.mock.calls.length
+    );
+    expect(mockAdapter2.dispatch).toHaveBeenCalledTimes(
+      mockAdapter3.dispatch.mock.calls.length
+    );
   });
 
   it('should replace client with withClient method', async () => {
@@ -248,14 +252,17 @@ describe('BrainRunner', () => {
     // Replace the client
     const updatedRunner = runner.withClient(newClient);
 
-    const testBrain = brain('Test Brain')
-      .step('Generate', async ({ client }) => {
-        const response = await client.generateObject({ 
+    const testBrain = brain('Test Brain').step(
+      'Generate',
+      async ({ client }) => {
+        const response = await client.generateObject({
           prompt: 'test prompt',
-          schema: { type: 'object' }
+          schema: z.object({ result: z.string() }),
+          schemaName: 'TestSchema',
         });
         return { generated: response.result };
-      });
+      }
+    );
 
     const result = await updatedRunner.run(testBrain);
 
@@ -263,7 +270,8 @@ describe('BrainRunner', () => {
     expect(originalClient.generateObject).not.toHaveBeenCalled();
     expect(newClient.generateObject).toHaveBeenCalledWith({
       prompt: 'test prompt',
-      schema: { type: 'object' }
+      schema: z.object({ result: z.string() }),
+      schemaName: 'TestSchema',
     });
     expect(result.generated).toBe('from new client');
   });
@@ -280,51 +288,55 @@ describe('BrainRunner', () => {
         id: 'step-1',
         title: 'First Step',
         status: STATUS.COMPLETE,
-        patch: {
-          op: 'add',
-          path: '/count',
-          value: 10
-        }
+        patch: [
+          {
+            op: 'add',
+            path: '/count',
+            value: 10,
+          },
+        ],
       },
       {
-        id: 'step-2', 
+        id: 'step-2',
         title: 'Second Step',
         status: STATUS.COMPLETE,
-        patch: {
-          op: 'add',
-          path: '/name',
-          value: 'test'
-        }
-      }
+        patch: [
+          {
+            op: 'add',
+            path: '/name',
+            value: 'test',
+          },
+        ],
+      },
     ];
 
     const testBrain = brain('Test Brain')
       .step('First Step', () => ({ count: 10 }))
       .step('Second Step', ({ state }) => ({ ...state, name: 'test' }))
-      .step('Third Step', ({ state }) => ({ 
-        ...state, 
+      .step('Third Step', ({ state }) => ({
+        ...state,
         count: state.count + 5,
-        message: `${state.name} completed`
+        message: `${state.name} completed`,
       }));
 
     const result = await runner.run(testBrain, {
-      initialState: {},
       initialCompletedSteps: completedSteps,
-      brainRunId: 'test-run-123'
+      brainRunId: 'test-run-123',
     });
 
     // Verify the final state includes patches from completed steps
     expect(result).toEqual({
       count: 15,
       name: 'test',
-      message: 'test completed'
+      message: 'test completed',
     });
 
     // Verify that the brain runner applied the patches correctly
     // The runner should have seen all steps execute, but the first two were already completed
-    const stepCompleteEvents = mockAdapter.dispatch.mock.calls
-      .filter(call => call[0].type === BRAIN_EVENTS.STEP_COMPLETE);
-    
+    const stepCompleteEvents = mockAdapter.dispatch.mock.calls.filter(
+      (call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE
+    );
+
     // All steps will emit complete events in the current implementation
     expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1);
   });
@@ -343,26 +355,27 @@ describe('BrainRunner', () => {
 
     // Run brain but stop after 2 steps
     const result = await runner.run(testBrain, {
-      endAfter: 2
+      endAfter: 2,
     });
 
     // Verify state only has results from first 2 steps
     expect(result).toEqual({
       step1: 'done',
-      step2: 'done'
+      step2: 'done',
     });
 
     // Verify only 2 step complete events were dispatched
     const stepCompleteEvents = mockAdapter.dispatch.mock.calls
-      .filter(call => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
-      .map(call => call[0].stepTitle);
-    
+      .filter((call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
+      .map((call) => (call[0] as any).stepTitle);
+
     expect(stepCompleteEvents).toEqual(['Step 1', 'Step 2']);
 
     // Verify that COMPLETE event was NOT dispatched (brain didn't finish)
-    const completeEvents = mockAdapter.dispatch.mock.calls
-      .filter(call => call[0].type === BRAIN_EVENTS.COMPLETE);
-    
+    const completeEvents = mockAdapter.dispatch.mock.calls.filter(
+      (call) => call[0].type === BRAIN_EVENTS.COMPLETE
+    );
+
     expect(completeEvents.length).toBe(0);
   });
 });

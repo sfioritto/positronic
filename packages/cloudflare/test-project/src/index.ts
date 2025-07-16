@@ -10,7 +10,7 @@ import { ScheduleDO } from '../../src/schedule-do';
 import { PositronicManifest } from '../../src/manifest.js';
 import { runner } from './runner';
 
-const basicBrain = brain('basic-brain', 'A basic brain for testing')
+const basicBrain = brain({ title: 'basic-brain', description: 'A basic brain for testing' })
   .step('First step', ({ state }) => ({
     ...state,
     hello: 'Hello',
@@ -24,7 +24,7 @@ const basicBrain = brain('basic-brain', 'A basic brain for testing')
     message: `${state.hello}, ${state.world}`,
   }));
 
-const delayedBrain = brain('delayed-brain', 'A brain that includes delays')
+const delayedBrain = brain({ title: 'delayed-brain', description: 'A brain that includes delays' })
   .step('Start Delay', async ({ state }) => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     return { ...state, status_after_sleep: 'awake' };
@@ -34,7 +34,7 @@ const delayedBrain = brain('delayed-brain', 'A brain that includes delays')
     final_message: 'Done after delay',
   }));
 
-const resourceBrain = brain('resource-brain', 'A brain that loads resources')
+const resourceBrain = brain({ title: 'resource-brain', description: 'A brain that loads resources' })
   .step('Load text resource', async ({ state, resources }) => ({
     ...state,
     text: await (resources['testResource.txt'] as any).loadText(),
