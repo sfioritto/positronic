@@ -34,7 +34,20 @@
       "vars": {
         "NODE_ENV": "production",
         "R2_BUCKET_NAME": "<%= projectName %>"
-      }
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "BRAIN_RUNNER_DO", "class_name": "BrainRunnerDO" },
+          { "name": "MONITOR_DO", "class_name": "MonitorDO" },
+          { "name": "SCHEDULE_DO", "class_name": "ScheduleDO" }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "RESOURCES_BUCKET",
+          "bucket_name": "<%= projectName %>"
+        }
+      ]
     }
   }
 }
