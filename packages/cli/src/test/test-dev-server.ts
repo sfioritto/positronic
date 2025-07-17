@@ -878,4 +878,35 @@ export class TestDevServer implements PositronicDevServer {
     this.logCall('onWarning', ['callback registered']);
     this.warningCallbacks.push(callback);
   }
+
+  async listSecrets(): Promise<Array<{ name: string; createdAt?: Date; updatedAt?: Date }>> {
+    this.logCall('listSecrets', []);
+    return Array.from(this.secrets.values()).map(secret => ({
+      name: secret.name,
+      createdAt: new Date(secret.createdAt),
+      updatedAt: new Date(secret.updatedAt)
+    }));
+  }
+
+  async setSecret(name: string, value: string): Promise<void> {
+    this.logCall('setSecret', [name, value]);
+    const now = new Date().toISOString();
+    const existing = this.secrets.get(name);
+    
+    this.secrets.set(name, {
+      name,
+      value,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    });
+  }
+
+  async deleteSecret(name: string): Promise<boolean> {
+    this.logCall('deleteSecret', [name]);
+    if (this.secrets.has(name)) {
+      this.secrets.delete(name);
+      return true;
+    }
+    return false;
+  }
 }

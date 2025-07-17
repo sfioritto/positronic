@@ -29,7 +29,7 @@ export function buildCli(options: CliOptions) {
   const projectCommand = new ProjectCommand();
   const brainCommand = new BrainCommand();
   const scheduleCommand = new ScheduleCommand();
-  const secretCommand = new SecretCommand();
+  const secretCommand = new SecretCommand(server);
 
   // Main CLI definition
   let cli = yargs(argv)
@@ -890,6 +890,15 @@ export function buildCli(options: CliOptions) {
     (yargsSecret) => {
       yargsSecret
         .command(
+          'list',
+          'List all secrets\n',
+          {},
+          () => {
+            const element = secretCommand.list();
+            render(element);
+          }
+        )
+        .command(
           'create <name>',
           'Create a new secret\n',
           (yargsCreate) => {
@@ -916,7 +925,28 @@ export function buildCli(options: CliOptions) {
             const element = secretCommand.create(argv);
             render(element);
           }
-        );
+        )
+        .command(
+          'delete <name>',
+          'Delete a secret\n',
+          (yargsDelete) => {
+            return yargsDelete
+              .positional('name', {
+                describe: 'Name of the secret to delete',
+                type: 'string',
+                demandOption: true,
+              })
+              .example(
+                '$0 secret delete ANTHROPIC_API_KEY',
+                'Delete a secret'
+              );
+          },
+          (argv) => {
+            const element = secretCommand.delete(argv);
+            render(element);
+          }
+        )
+        .demandCommand(1, 'You need to specify a subcommand');
 
       return yargsSecret;
     }
