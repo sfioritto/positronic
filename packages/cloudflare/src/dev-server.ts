@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fsPromises from 'fs/promises';
 import * as fs from 'fs';
 import * as os from 'os';
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, exec, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
 import caz from 'caz';
 import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
@@ -500,26 +500,14 @@ export class CloudflareDevServer implements PositronicDevServer {
     // Ensure .positronic directory and manifest are up to date, but don't force regeneration
     await this.setup();
 
-    // Load environment variables from .env file
-    const envPath = path.join(projectRoot, '.env');
-
-    // Check if .env file exists
-    if (!fs.existsSync(envPath)) {
-      throw new Error(
-        'No .env file found.\n' +
-          'Please create a .env file in your project root with your Cloudflare credentials.\n' +
-          'See the template in your project for the required variables.'
-      );
-    }
-
-    const envConfig = dotenv.parse(fs.readFileSync(envPath, 'utf8'));
-
-    // Check for required Cloudflare credentials
-    if (!envConfig.CLOUDFLARE_API_TOKEN || !envConfig.CLOUDFLARE_ACCOUNT_ID) {
+    // Check for required Cloudflare credentials in environment variables
+    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
       throw new Error(
         'Missing required Cloudflare credentials.\n' +
-          'Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to your .env file.\n' +
-          'See .env file comments for instructions on obtaining these values.'
+          'Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.\n' +
+          'For example:\n' +
+          '  export CLOUDFLARE_API_TOKEN=your-api-token\n' +
+          '  export CLOUDFLARE_ACCOUNT_ID=your-account-id'
       );
     }
 
@@ -535,8 +523,8 @@ export class CloudflareDevServer implements PositronicDevServer {
           stdio: ['inherit', 'pipe', 'pipe'],
           env: {
             ...process.env,
-            CLOUDFLARE_API_TOKEN: envConfig.CLOUDFLARE_API_TOKEN,
-            CLOUDFLARE_ACCOUNT_ID: envConfig.CLOUDFLARE_ACCOUNT_ID,
+            CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+            CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
           },
         }
       );
@@ -589,5 +577,111 @@ export class CloudflareDevServer implements PositronicDevServer {
 
   onWarning(callback: (message: string) => void): void {
     this.warningCallbacks.push(callback);
+  }
+
+  async listSecrets(): Promise<Array<{ name: string; createdAt?: Date; updatedAt?: Date }>> {
+    const serverDir = path.join(this.projectRootDir, '.positronic');
+
+    // Get auth from environment variables
+    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
+      throw new Error('Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.');
+    }
+
+    return new Promise((resolve, reject) => {
+      const child = spawn('npx', ['wrangler', 'secret', 'list'], {
+        cwd: serverDir,
+        env: {
+          ...process.env,
+          CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+          CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+        },
+        stdio: 'inherit', // Pass through all output directly to the terminal
+      });
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          // Don't wrap the error - wrangler already printed it
+          reject(new Error(''));
+        } else {
+          // Return empty array - output was already printed
+          resolve([]);
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+  }
+
+  async setSecret(name: string, value: string): Promise<void> {
+    const serverDir = path.join(this.projectRootDir, '.positronic');
+
+    // Get auth from environment variables
+    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
+      throw new Error('Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.');
+    }
+
+    return new Promise((resolve, reject) => {
+      const child = spawn('npx', ['wrangler', 'secret', 'put', name], {
+        cwd: serverDir,
+        env: {
+          ...process.env,
+          CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+          CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+        },
+        stdio: ['pipe', 'inherit', 'inherit'], // stdin pipe, stdout/stderr inherit
+      });
+
+      child.stdin.write(value);
+      child.stdin.end();
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          // Don't wrap the error - wrangler already printed it
+          reject(new Error(''));
+        } else {
+          resolve();
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+  }
+
+  async deleteSecret(name: string): Promise<boolean> {
+    const serverDir = path.join(this.projectRootDir, '.positronic');
+
+    // Get auth from environment variables
+    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
+      throw new Error('Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.');
+    }
+
+    return new Promise((resolve, reject) => {
+      const child = spawn('npx', ['wrangler', 'secret', 'delete', name], {
+        cwd: serverDir,
+        env: {
+          ...process.env,
+          CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+          CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+        },
+        stdio: 'inherit', // Pass through all output directly to the terminal
+      });
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          // Don't wrap the error - wrangler already printed it
+          reject(new Error(''));
+        } else {
+          resolve(true);
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
   }
 }

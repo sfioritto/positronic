@@ -105,6 +105,26 @@ export interface PositronicDevServer {
    * @param callback Function called with warning messages
    */
   onWarning(callback: (message: string) => void): void;
+
+  /**
+   * List all secrets for the current environment
+   * @returns Array of secret names with optional metadata
+   */
+  listSecrets?(): Promise<Array<{ name: string; createdAt?: Date; updatedAt?: Date }>>;
+
+  /**
+   * Set or update a secret
+   * @param name Secret name (must be valid environment variable name)
+   * @param value Secret value
+   */
+  setSecret?(name: string, value: string): Promise<void>;
+
+  /**
+   * Delete a secret
+   * @param name Secret name
+   * @returns true if deleted, false if not found
+   */
+  deleteSecret?(name: string): Promise<boolean>;
 }
 
 export { testStatus, resources, brains, schedules, secrets } from './api.js';
