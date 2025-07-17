@@ -28,7 +28,7 @@ export const SecretDelete = ({ name, server }: SecretDeleteProps) => {
         await server.deleteSecret(name);
         exit();
       } catch (err) {
-        // Error was already printed by wrangler
+        // Error was already printed by backend
         exit();
       }
     };
@@ -36,6 +36,6 @@ export const SecretDelete = ({ name, server }: SecretDeleteProps) => {
     deleteSecret();
   }, [name, server, exit]);
 
-  // This won't be shown because wrangler output is printed directly
+  // This won't be shown because backend output is printed directly
   return null;
 };

@@ -620,7 +620,7 @@ export class CloudflareDevServer implements PositronicDevServer {
 
       child.on('close', (code) => {
         if (code !== 0) {
-          // Don't wrap the error - wrangler already printed it
+          // Don't wrap the error - backend CLI already printed it
           reject(new Error(''));
         } else {
           // Return empty array - output was already printed
@@ -663,7 +663,7 @@ export class CloudflareDevServer implements PositronicDevServer {
 
       child.on('close', (code) => {
         if (code !== 0) {
-          // Don't wrap the error - wrangler already printed it
+          // Don't wrap the error - backend CLI already printed it
           reject(new Error(''));
         } else {
           resolve();
@@ -702,7 +702,7 @@ export class CloudflareDevServer implements PositronicDevServer {
 
       child.on('close', (code) => {
         if (code !== 0) {
-          // Don't wrap the error - wrangler already printed it
+          // Don't wrap the error - backend CLI already printed it
           reject(new Error(''));
         } else {
           resolve(true);
