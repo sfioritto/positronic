@@ -25,7 +25,7 @@ export const SecretCreate = ({ name, value: providedValue, server }: SecretCreat
         return;
       }
 
-      // If no value provided, wrangler will prompt for it
+      // If no value provided, backend will prompt for it
       if (!providedValue) {
         console.error('Please provide a value using --value flag');
         exit();
@@ -36,7 +36,7 @@ export const SecretCreate = ({ name, value: providedValue, server }: SecretCreat
         await server.setSecret(name, providedValue);
         exit();
       } catch (err) {
-        // Error was already printed by wrangler
+        // Error was already printed by backend
         exit();
       }
     };
@@ -44,6 +44,6 @@ export const SecretCreate = ({ name, value: providedValue, server }: SecretCreat
     createSecret();
   }, [name, providedValue, server, exit]);
 
-  // This won't be shown because wrangler output is printed directly
+  // This won't be shown because backend output is printed directly
   return null;
 };
