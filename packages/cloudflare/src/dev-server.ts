@@ -253,8 +253,18 @@ export class CloudflareDevServer implements PositronicDevServer {
         tempDir = fs.mkdtempSync(
           path.join(os.tmpdir(), 'positronic-server-setup-')
         );
-        const tempProjectName = 'temp-positronic-gen';
-        await generateProject(tempProjectName, tempDir, async () => {
+
+        // Read the actual project name from the config file
+        const configPath = path.join(projectRoot, 'positronic.config.json');
+        const configContent = await fsPromises.readFile(configPath, 'utf-8');
+        const config = JSON.parse(configContent);
+        const projectName = config.projectName;
+
+        if (!projectName) {
+          throw new Error('Project name not found in positronic.config.json');
+        }
+
+        await generateProject(projectName, tempDir, async () => {
           const sourcePositronicDir = path.join(tempDir!, '.positronic');
           const targetPositronicDir = serverDir;
 
@@ -448,10 +458,10 @@ export class CloudflareDevServer implements PositronicDevServer {
     // Capture and forward stdout
     wranglerProcess.stdout?.on('data', (data) => {
       const message = data.toString();
-      
+
       // Send to registered callbacks
-      this.logCallbacks.forEach(cb => cb(message));
-      
+      this.logCallbacks.forEach((cb) => cb(message));
+
       // Always forward to console
       process.stdout.write(data);
     });
@@ -459,21 +469,21 @@ export class CloudflareDevServer implements PositronicDevServer {
     // Capture and forward stderr
     wranglerProcess.stderr?.on('data', (data) => {
       const message = data.toString();
-      
+
       // Parse for warnings vs errors
       if (message.includes('WARNING') || message.includes('⚠')) {
-        this.warningCallbacks.forEach(cb => cb(message));
+        this.warningCallbacks.forEach((cb) => cb(message));
       } else {
-        this.errorCallbacks.forEach(cb => cb(message));
+        this.errorCallbacks.forEach((cb) => cb(message));
       }
-      
+
       // Always forward to console
       process.stderr.write(data);
     });
 
     wranglerProcess.on('error', (err) => {
       const errorMessage = `Failed to start Wrangler dev server: ${err.message}\n`;
-      this.errorCallbacks.forEach(cb => cb(errorMessage));
+      this.errorCallbacks.forEach((cb) => cb(errorMessage));
       console.error('Failed to start Wrangler dev server:', err);
     });
 
@@ -501,7 +511,10 @@ export class CloudflareDevServer implements PositronicDevServer {
     await this.setup();
 
     // Check for required Cloudflare credentials in environment variables
-    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
+    if (
+      !process.env.CLOUDFLARE_API_TOKEN ||
+      !process.env.CLOUDFLARE_ACCOUNT_ID
+    ) {
       throw new Error(
         'Missing required Cloudflare credentials.\n' +
           'Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.\n' +
@@ -532,7 +545,7 @@ export class CloudflareDevServer implements PositronicDevServer {
       // Capture and forward stdout
       wranglerProcess.stdout?.on('data', (data) => {
         const message = data.toString();
-        this.logCallbacks.forEach(cb => cb(message));
+        this.logCallbacks.forEach((cb) => cb(message));
         process.stdout.write(data);
       });
 
@@ -540,16 +553,16 @@ export class CloudflareDevServer implements PositronicDevServer {
       wranglerProcess.stderr?.on('data', (data) => {
         const message = data.toString();
         if (message.includes('WARNING') || message.includes('⚠')) {
-          this.warningCallbacks.forEach(cb => cb(message));
+          this.warningCallbacks.forEach((cb) => cb(message));
         } else {
-          this.errorCallbacks.forEach(cb => cb(message));
+          this.errorCallbacks.forEach((cb) => cb(message));
         }
         process.stderr.write(data);
       });
 
       wranglerProcess.on('error', (err) => {
         const errorMessage = `Failed to start Wrangler deploy: ${err.message}\n`;
-        this.errorCallbacks.forEach(cb => cb(errorMessage));
+        this.errorCallbacks.forEach((cb) => cb(errorMessage));
         console.error('Failed to start Wrangler deploy:', err);
         reject(err);
       });
@@ -557,7 +570,7 @@ export class CloudflareDevServer implements PositronicDevServer {
       wranglerProcess.on('exit', (code) => {
         if (code === 0) {
           const successMessage = '✅ Deployment complete!\n';
-          this.logCallbacks.forEach(cb => cb(successMessage));
+          this.logCallbacks.forEach((cb) => cb(successMessage));
           console.log('✅ Deployment complete!');
           resolve();
         } else {
@@ -579,12 +592,19 @@ export class CloudflareDevServer implements PositronicDevServer {
     this.warningCallbacks.push(callback);
   }
 
-  async listSecrets(): Promise<Array<{ name: string; createdAt?: Date; updatedAt?: Date }>> {
+  async listSecrets(): Promise<
+    Array<{ name: string; createdAt?: Date; updatedAt?: Date }>
+  > {
     const serverDir = path.join(this.projectRootDir, '.positronic');
 
     // Get auth from environment variables
-    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
-      throw new Error('Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.');
+    if (
+      !process.env.CLOUDFLARE_API_TOKEN ||
+      !process.env.CLOUDFLARE_ACCOUNT_ID
+    ) {
+      throw new Error(
+        'Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.'
+      );
     }
 
     return new Promise((resolve, reject) => {
@@ -618,8 +638,13 @@ export class CloudflareDevServer implements PositronicDevServer {
     const serverDir = path.join(this.projectRootDir, '.positronic');
 
     // Get auth from environment variables
-    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
-      throw new Error('Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.');
+    if (
+      !process.env.CLOUDFLARE_API_TOKEN ||
+      !process.env.CLOUDFLARE_ACCOUNT_ID
+    ) {
+      throw new Error(
+        'Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.'
+      );
     }
 
     return new Promise((resolve, reject) => {
@@ -655,8 +680,13 @@ export class CloudflareDevServer implements PositronicDevServer {
     const serverDir = path.join(this.projectRootDir, '.positronic');
 
     // Get auth from environment variables
-    if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
-      throw new Error('Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.');
+    if (
+      !process.env.CLOUDFLARE_API_TOKEN ||
+      !process.env.CLOUDFLARE_ACCOUNT_ID
+    ) {
+      throw new Error(
+        'Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.'
+      );
     }
 
     return new Promise((resolve, reject) => {
