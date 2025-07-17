@@ -19,7 +19,8 @@
       "Bash(grep:*)",
       "Bash(npm run clean:workspaces:*)",
       "Bash(npm i)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": []
   }
