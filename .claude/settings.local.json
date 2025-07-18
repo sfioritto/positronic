@@ -20,7 +20,8 @@
       "Bash(npm run clean:workspaces:*)",
       "Bash(npm i)",
       "Bash(npm run:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "WebFetch(domain:developers.cloudflare.com)"
     ],
     "deny": []
   }
