@@ -4,6 +4,7 @@ import type { PositronicDevServer } from '@positronic/spec';
 import { SecretCreate } from '../components/secret-create.js';
 import { SecretList } from '../components/secret-list.js';
 import { SecretDelete } from '../components/secret-delete.js';
+import { SecretSync } from '../components/secret-sync.js';
 
 interface SecretCreateArgs {
   name: string;
@@ -12,6 +13,11 @@ interface SecretCreateArgs {
 
 interface SecretDeleteArgs {
   name: string;
+}
+
+interface SecretSyncArgs {
+  file?: string;
+  dryRun?: boolean;
 }
 
 export class SecretCommand {
@@ -34,5 +40,16 @@ export class SecretCommand {
 
   delete({ name }: ArgumentsCamelCase<SecretDeleteArgs>): React.ReactElement {
     return React.createElement(SecretDelete, { name, server: this.server });
+  }
+
+  sync({
+    file,
+    dryRun,
+  }: ArgumentsCamelCase<SecretSyncArgs>): React.ReactElement {
+    return React.createElement(SecretSync, { 
+      file, 
+      dryRun,
+      server: this.server
+    });
   }
 }

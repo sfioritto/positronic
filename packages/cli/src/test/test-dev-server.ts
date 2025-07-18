@@ -1,5 +1,7 @@
 import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 import nock from 'nock';
+import { parse } from 'dotenv';
+import fs from 'fs';
 
 interface MockResource {
   key: string;
@@ -255,7 +257,7 @@ export class TestDevServer implements PositronicDevServer {
         } else {
           // Check if it was already deleted (idempotent delete)
           const wasDeleted = this.callLog.some(
-            call => call.method === 'deleteResource' && call.args[0] === key
+            (call) => call.method === 'deleteResource' && call.args[0] === key
           );
           if (wasDeleted) {
             // Return success for idempotent delete
@@ -272,16 +274,17 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /brains/runs
     nockInstance.post('/brains/runs').reply((uri, requestBody) => {
-      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
-      
+      const body =
+        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+
       // Check if brain exists (for testing brain not found scenario)
       if (body.brainName === 'non-existent-brain') {
         this.logCall('createBrainRun', [body.brainName]);
         return [404, { error: `Brain '${body.brainName}' not found` }];
       }
-      
+
       let brainRunId = `run-${Date.now()}`;
-      
+
       // Return specific runIds for specific test scenarios
       if (body.brainName === 'error-brain') {
         brainRunId = 'test-error-brain';
@@ -290,30 +293,46 @@ export class TestDevServer implements PositronicDevServer {
       } else if (body.brainName === 'multi-status-brain') {
         brainRunId = 'test-multi-status';
       }
-      
+
       this.logCall('createBrainRun', [brainRunId]);
       return [201, { brainRunId }];
     });
 
     // POST /brains/runs/rerun
     nockInstance.post('/brains/runs/rerun').reply((uri, requestBody) => {
-      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
-      
+      const body =
+        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+
       // Check if brain exists
       if (body.brainName === 'non-existent-brain') {
-        this.logCall('rerunBrain', [body.brainName, body.runId, body.startsAt, body.stopsAfter]);
+        this.logCall('rerunBrain', [
+          body.brainName,
+          body.runId,
+          body.startsAt,
+          body.stopsAfter,
+        ]);
         return [404, { error: `Brain '${body.brainName}' not found` }];
       }
-      
+
       // Check if run ID exists (if provided)
       if (body.runId === 'non-existent-run') {
-        this.logCall('rerunBrain', [body.brainName, body.runId, body.startsAt, body.stopsAfter]);
+        this.logCall('rerunBrain', [
+          body.brainName,
+          body.runId,
+          body.startsAt,
+          body.stopsAfter,
+        ]);
         return [404, { error: `Brain run '${body.runId}' not found` }];
       }
-      
+
       const newBrainRunId = `rerun-${Date.now()}`;
-      
-      this.logCall('rerunBrain', [body.brainName, body.runId, body.startsAt, body.stopsAfter]);
+
+      this.logCall('rerunBrain', [
+        body.brainName,
+        body.runId,
+        body.startsAt,
+        body.stopsAfter,
+      ]);
       return [201, { brainRunId: newBrainRunId }];
     });
 
@@ -324,7 +343,7 @@ export class TestDevServer implements PositronicDevServer {
         const match = uri.match(/^\/brains\/runs\/(.+)\/watch$/);
         if (match) {
           const runId = match[1];
-          
+
           // Different scenarios based on runId
           if (runId === 'test-error-brain') {
             // Error scenario
@@ -443,7 +462,8 @@ export class TestDevServer implements PositronicDevServer {
                 error: {
                   name: 'BrainExecutionError',
                   message: 'Something went wrong during brain execution',
-                  stack: 'Error: Something went wrong during brain execution\n    at BrainRunner.run',
+                  stack:
+                    'Error: Something went wrong during brain execution\n    at BrainRunner.run',
                 },
               })}\n\n`,
             ].join('');
@@ -536,7 +556,8 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /brains/schedules
     nockInstance.post('/brains/schedules').reply(201, (uri, requestBody) => {
-      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      const body =
+        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
       const scheduleId = `schedule-${Date.now()}`;
       const schedule: MockSchedule = {
         id: scheduleId,
@@ -552,31 +573,37 @@ export class TestDevServer implements PositronicDevServer {
     });
 
     // GET /brains/schedules/runs
-    nockInstance.get('/brains/schedules/runs').query(true).reply((uri) => {
-      const url = new URL(uri, 'http://example.com');
-      const scheduleId = url.searchParams.get('scheduleId');
-      const limit = parseInt(url.searchParams.get('limit') || '100', 10);
-      
-      this.logCall('getScheduleRuns', [uri]);
-      
-      let runs = this.scheduleRuns;
-      
-      // Filter by scheduleId if provided
-      if (scheduleId) {
-        runs = runs.filter(run => run.scheduleId === scheduleId);
-      }
-      
-      // Sort by ranAt descending (newest first)
-      runs = runs.sort((a, b) => b.ranAt - a.ranAt);
-      
-      // Apply limit
-      runs = runs.slice(0, limit);
-      
-      return [200, {
-        runs,
-        count: runs.length,
-      }];
-    });
+    nockInstance
+      .get('/brains/schedules/runs')
+      .query(true)
+      .reply((uri) => {
+        const url = new URL(uri, 'http://example.com');
+        const scheduleId = url.searchParams.get('scheduleId');
+        const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+
+        this.logCall('getScheduleRuns', [uri]);
+
+        let runs = this.scheduleRuns;
+
+        // Filter by scheduleId if provided
+        if (scheduleId) {
+          runs = runs.filter((run) => run.scheduleId === scheduleId);
+        }
+
+        // Sort by ranAt descending (newest first)
+        runs = runs.sort((a, b) => b.ranAt - a.ranAt);
+
+        // Apply limit
+        runs = runs.slice(0, limit);
+
+        return [
+          200,
+          {
+            runs,
+            count: runs.length,
+          },
+        ];
+      });
 
     // DELETE /brains/schedules/:id
     nockInstance.delete(/^\/brains\/schedules\/(.+)$/).reply((uri) => {
@@ -598,35 +625,47 @@ export class TestDevServer implements PositronicDevServer {
     });
 
     // GET /brains/:brainName/history
-    nockInstance.get(/^\/brains\/(.+)\/history$/).query(true).reply((uri) => {
-      const parts = uri.split('/');
-      const brainName = decodeURIComponent(parts[2]);
-      const url = new URL(uri, 'http://example.com');
-      const limit = parseInt(url.searchParams.get('limit') || '10', 10);
-      
-      this.logCall('getBrainHistory', [brainName, limit]);
-      
-      // Filter runs by brain title
-      const runs = this.brainRuns
-        .filter(run => run.brainTitle.toLowerCase() === brainName.toLowerCase().replace(/-/g, ' '))
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, limit);
-      
-      return [200, { runs }];
-    });
+    nockInstance
+      .get(/^\/brains\/(.+)\/history$/)
+      .query(true)
+      .reply((uri) => {
+        const parts = uri.split('/');
+        const brainName = decodeURIComponent(parts[2]);
+        const url = new URL(uri, 'http://example.com');
+        const limit = parseInt(url.searchParams.get('limit') || '10', 10);
+
+        this.logCall('getBrainHistory', [brainName, limit]);
+
+        // Filter runs by brain title
+        const runs = this.brainRuns
+          .filter(
+            (run) =>
+              run.brainTitle.toLowerCase() ===
+              brainName.toLowerCase().replace(/-/g, ' ')
+          )
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .slice(0, limit);
+
+        return [200, { runs }];
+      });
 
     // GET /brains/:brainName/active-runs
     nockInstance.get(/^\/brains\/(.+)\/active-runs$/).reply((uri) => {
       const parts = uri.split('/');
       const brainName = decodeURIComponent(parts[2]);
-      
+
       this.logCall('getBrainActiveRuns', [brainName]);
-      
+
       // Filter brain runs by brain title and status RUNNING
       const activeRuns = this.brainRuns
-        .filter(run => run.brainTitle.toLowerCase() === brainName.toLowerCase().replace(/-/g, ' ') && run.status === 'RUNNING')
+        .filter(
+          (run) =>
+            run.brainTitle.toLowerCase() ===
+              brainName.toLowerCase().replace(/-/g, ' ') &&
+            run.status === 'RUNNING'
+        )
         .sort((a, b) => b.createdAt - a.createdAt);
-      
+
       return [200, { runs: activeRuns }];
     });
 
@@ -635,25 +674,29 @@ export class TestDevServer implements PositronicDevServer {
       const brainName = decodeURIComponent(uri.split('/')[2]);
       const brain = this.brains.get(brainName);
       this.logCall('getBrain', [brainName]);
-      
+
       if (!brain) {
         return [404, { error: `Brain '${brainName}' not found` }];
       }
-      
-      return [200, {
-        name: brain.name,
-        title: brain.title,
-        description: brain.description || `${brain.title} brain`,
-        steps: brain.steps || [],
-      }];
+
+      return [
+        200,
+        {
+          name: brain.name,
+          title: brain.title,
+          description: brain.description || `${brain.title} brain`,
+          steps: brain.steps || [],
+        },
+      ];
     });
 
     // Secret Management Endpoints
-    
+
     // POST /secrets
     nockInstance.post('/secrets').reply(201, (uri, requestBody) => {
-      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
-      
+      const body =
+        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+
       const now = new Date().toISOString();
       const secret: MockSecret = {
         name: body.name,
@@ -661,10 +704,10 @@ export class TestDevServer implements PositronicDevServer {
         createdAt: now,
         updatedAt: now,
       };
-      
+
       this.secrets.set(body.name, secret);
       this.logCall('createSecret', [body.name]);
-      
+
       // Return without the value for security
       return {
         name: secret.name,
@@ -676,14 +719,14 @@ export class TestDevServer implements PositronicDevServer {
     // GET /secrets
     nockInstance.get('/secrets').reply(200, () => {
       this.logCall('listSecrets', []);
-      
+
       // Return secrets without values
-      const secrets = Array.from(this.secrets.values()).map(secret => ({
+      const secrets = Array.from(this.secrets.values()).map((secret) => ({
         name: secret.name,
         createdAt: secret.createdAt,
         updatedAt: secret.updatedAt,
       }));
-      
+
       return {
         secrets,
         count: secrets.length,
@@ -695,7 +738,7 @@ export class TestDevServer implements PositronicDevServer {
       const match = uri.match(/^\/secrets\/(.+)$/);
       if (match) {
         const secretName = decodeURIComponent(match[1]);
-        
+
         if (this.secrets.has(secretName)) {
           this.secrets.delete(secretName);
           this.logCall('deleteSecret', [secretName]);
@@ -713,9 +756,9 @@ export class TestDevServer implements PositronicDevServer {
       if (match) {
         const secretName = decodeURIComponent(match[1]);
         const exists = this.secrets.has(secretName);
-        
+
         this.logCall('secretExists', [secretName]);
-        
+
         return [200, { exists }];
       }
       return [404, 'Not Found'];
@@ -723,33 +766,36 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /secrets/bulk
     nockInstance.post('/secrets/bulk').reply(201, (uri, requestBody) => {
-      const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
-      
+      const body =
+        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+
       let created = 0;
       let updated = 0;
       const now = new Date().toISOString();
-      
+
       for (const secretData of body.secrets) {
         const existing = this.secrets.has(secretData.name);
-        
+
         const secret: MockSecret = {
           name: secretData.name,
           value: secretData.value,
-          createdAt: existing ? this.secrets.get(secretData.name)!.createdAt : now,
+          createdAt: existing
+            ? this.secrets.get(secretData.name)!.createdAt
+            : now,
           updatedAt: now,
         };
-        
+
         this.secrets.set(secretData.name, secret);
-        
+
         if (existing) {
           updated++;
         } else {
           created++;
         }
       }
-      
+
       this.logCall('bulkCreateSecrets', [body.secrets.length]);
-      
+
       return { created, updated };
     });
 
@@ -757,8 +803,12 @@ export class TestDevServer implements PositronicDevServer {
 
     // Simulate some initial log output after server starts
     setTimeout(() => {
-      this.logCallbacks.forEach(cb => cb('✅ Synced 3 resources (0 up to date, 0 deleted)\n'));
-      this.logCallbacks.forEach(cb => cb('🚀 Server started on port ' + this.port + '\n'));
+      this.logCallbacks.forEach((cb) =>
+        cb('✅ Synced 3 resources (0 up to date, 0 deleted)\n')
+      );
+      this.logCallbacks.forEach((cb) =>
+        cb('🚀 Server started on port ' + this.port + '\n')
+      );
     }, 100);
 
     return new MockServerHandle(
@@ -879,12 +929,14 @@ export class TestDevServer implements PositronicDevServer {
     this.warningCallbacks.push(callback);
   }
 
-  async listSecrets(): Promise<Array<{ name: string; createdAt?: Date; updatedAt?: Date }>> {
+  async listSecrets(): Promise<
+    Array<{ name: string; createdAt?: Date; updatedAt?: Date }>
+  > {
     this.logCall('listSecrets', []);
-    return Array.from(this.secrets.values()).map(secret => ({
+    return Array.from(this.secrets.values()).map((secret) => ({
       name: secret.name,
       createdAt: new Date(secret.createdAt),
-      updatedAt: new Date(secret.updatedAt)
+      updatedAt: new Date(secret.updatedAt),
     }));
   }
 
@@ -892,12 +944,12 @@ export class TestDevServer implements PositronicDevServer {
     this.logCall('setSecret', [name, value]);
     const now = new Date().toISOString();
     const existing = this.secrets.get(name);
-    
+
     this.secrets.set(name, {
       name,
       value,
       createdAt: existing?.createdAt || now,
-      updatedAt: now
+      updatedAt: now,
     });
   }
 
@@ -908,5 +960,68 @@ export class TestDevServer implements PositronicDevServer {
       return true;
     }
     return false;
+  }
+
+  async syncSecrets(
+    filePath: string,
+    dryRun?: boolean
+  ): Promise<{
+    created: number;
+    updated: number;
+    errors?: string[];
+    preview?: Array<{ name: string; value: string }>;
+  }> {
+    this.logCall('syncSecrets', [filePath, dryRun]);
+
+    try {
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File not found: ${filePath}`);
+      }
+
+      const envContent = fs.readFileSync(filePath, 'utf8');
+      const parsed = parse(envContent);
+
+      const secretsArray = Object.entries(parsed).map(([name, value]) => ({
+        name,
+        value,
+      }));
+
+      if (secretsArray.length === 0) {
+        throw new Error('No secrets found in the file');
+      }
+
+      if (dryRun) {
+        return {
+          created: 0,
+          updated: 0,
+          preview: secretsArray,
+        };
+      }
+
+      let created = 0;
+      let updated = 0;
+      const now = new Date().toISOString();
+
+      for (const { name, value } of secretsArray) {
+        const existing = this.secrets.has(name);
+
+        this.secrets.set(name, {
+          name,
+          value,
+          createdAt: existing ? this.secrets.get(name)!.createdAt : now,
+          updatedAt: now,
+        });
+
+        if (existing) {
+          updated++;
+        } else {
+          created++;
+        }
+      }
+
+      return { created, updated };
+    } catch (error) {
+      throw error;
+    }
   }
 }

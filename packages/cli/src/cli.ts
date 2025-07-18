@@ -946,6 +946,40 @@ export function buildCli(options: CliOptions) {
             render(element);
           }
         )
+        .command(
+          'sync',
+          'Sync secrets from a .env file\n',
+          (yargsSync) => {
+            return yargsSync
+              .option('file', {
+                describe: 'Path to the .env file',
+                type: 'string',
+                default: '.env',
+                alias: 'f',
+              })
+              .option('dry-run', {
+                describe: 'Show what would be synced without actually syncing',
+                type: 'boolean',
+                default: false,
+              })
+              .example(
+                '$0 secret sync',
+                'Sync secrets from .env file'
+              )
+              .example(
+                '$0 secret sync --file .env.secrets',
+                'Sync secrets from a specific file'
+              )
+              .example(
+                '$0 secret sync --dry-run',
+                'Preview what secrets would be synced'
+              );
+          },
+          (argv) => {
+            const element = secretCommand.sync(argv);
+            render(element);
+          }
+        )
         .demandCommand(1, 'You need to specify a subcommand');
 
       return yargsSecret;
