@@ -125,6 +125,19 @@ export interface PositronicDevServer {
    * @returns true if deleted, false if not found
    */
   deleteSecret?(name: string): Promise<boolean>;
+
+  /**
+   * Sync secrets from a .env file
+   * @param filePath Path to the .env file
+   * @param dryRun If true, only preview what would be synced
+   * @returns Result of the sync operation
+   */
+  syncSecrets?(filePath: string, dryRun?: boolean): Promise<{
+    created: number;
+    updated: number;
+    errors?: string[];
+    preview?: Array<{ name: string; value: string }>;
+  }>;
 }
 
 export { testStatus, resources, brains, schedules, secrets } from './api.js';
