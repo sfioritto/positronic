@@ -962,64 +962,40 @@ export class TestDevServer implements PositronicDevServer {
     return false;
   }
 
-  async syncSecrets(
-    filePath: string,
-    dryRun?: boolean
-  ): Promise<{
-    created: number;
-    updated: number;
-    errors?: string[];
-    preview?: Array<{ name: string; value: string }>;
-  }> {
-    this.logCall('syncSecrets', [filePath, dryRun]);
+  async bulkSecrets(filePath: string): Promise<void> {
+    this.logCall('bulkSecrets', [filePath]);
 
     try {
+      // Read and parse the .env file
       if (!fs.existsSync(filePath)) {
         throw new Error(`File not found: ${filePath}`);
       }
 
       const envContent = fs.readFileSync(filePath, 'utf8');
-      const parsed = parse(envContent);
+      const secrets = parse(envContent);
 
-      const secretsArray = Object.entries(parsed).map(([name, value]) => ({
-        name,
-        value,
-      }));
+      const secretsArray = Object.entries(secrets);
 
       if (secretsArray.length === 0) {
-        throw new Error('No secrets found in the file');
+        throw new Error('No secrets found in the .env file');
       }
 
-      if (dryRun) {
-        return {
-          created: 0,
-          updated: 0,
-          preview: secretsArray,
-        };
-      }
-
-      let created = 0;
-      let updated = 0;
+      // Simulate the bulk upload - just store them
       const now = new Date().toISOString();
-
-      for (const { name, value } of secretsArray) {
+      for (const [name, value] of secretsArray) {
         const existing = this.secrets.has(name);
-
         this.secrets.set(name, {
           name,
           value,
           createdAt: existing ? this.secrets.get(name)!.createdAt : now,
           updatedAt: now,
         });
-
-        if (existing) {
-          updated++;
-        } else {
-          created++;
-        }
       }
 
-      return { created, updated };
+      // Simulate console output
+      this.logCallbacks.forEach((cb) =>
+        cb(`✨ Successfully uploaded ${secretsArray.length} secrets\n`)
+      );
     } catch (error) {
       throw error;
     }
