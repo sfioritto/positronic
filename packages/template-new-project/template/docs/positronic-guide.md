@@ -7,8 +7,9 @@ This guide covers project-level patterns and best practices for Positronic appli
 A typical Positronic project has the following structure:
 
 ```
-├── brains/           # Brain definitions
-├── resources/        # Files accessible to brains
+├── brain.ts         # Project brain wrapper
+├── brains/          # Brain definitions
+├── resources/       # Files accessible to brains
 ├── tests/           # Test files
 ├── docs/            # Documentation
 ├── runner.ts        # Local runner for development
@@ -17,7 +18,7 @@ A typical Positronic project has the following structure:
 
 ## The Project Brain Pattern
 
-Every Positronic project includes a `brain.ts` file in the `brains/` folder. This file exports a custom `brain` function that wraps the core Positronic brain function.
+Every Positronic project includes a `brain.ts` file in the root directory. This file exports a custom `brain` function that wraps the core Positronic brain function.
 
 ### Why Use a Project Brain?
 
@@ -29,11 +30,11 @@ The project brain pattern provides a single place to:
 
 ### Basic Usage
 
-All brains in your project should import from `./brain.js` instead of `@positronic/core`:
+All brains in your project should import from `../brain.js` instead of `@positronic/core`:
 
 ```typescript
-// ✅ DO THIS
-import { brain } from './brain.js';
+// ✅ DO THIS (from a file in the brains/ directory)
+import { brain } from '../brain.js';
 
 // ❌ NOT THIS
 import { brain } from '@positronic/core';
@@ -41,7 +42,7 @@ import { brain } from '@positronic/core';
 
 ### Configuring Services
 
-To add project-wide services, modify the `brains/brain.ts` file:
+To add project-wide services, modify the `brain.ts` file in the root directory:
 
 ```typescript
 import { brain as coreBrain, type Brain } from '@positronic/core';
@@ -88,7 +89,7 @@ export function brain<
 Now all brains automatically have access to these services:
 
 ```typescript
-import { brain } from './brain.js';
+import { brain } from '../brain.js';
 
 export default brain('User Processor')
   .step('Load User', async ({ logger, database }) => {
@@ -157,7 +158,7 @@ CLOUDFLARE_API_TOKEN=your-api-token<% } %>
 
 ## Best Practices
 
-1. **Services**: Configure once in `brains/brain.ts`, use everywhere
+1. **Services**: Configure once in `brain.ts`, use everywhere
 2. **Resources**: Use for content that non-developers should be able to edit
 3. **Secrets**: Never commit API keys; use environment variables
 4. **Organization**: Group related brains in folders as your project grows
@@ -169,7 +170,7 @@ CLOUDFLARE_API_TOKEN=your-api-token<% } %>
 ### Logging and Monitoring
 
 ```typescript
-// In brains/brain.ts
+// In brain.ts
 interface ProjectServices {
   metrics: {
     track: (event: string, properties?: any) => void;
@@ -197,7 +198,7 @@ export default brain('Analytics Brain')
 ### API Integration
 
 ```typescript
-// In brains/brain.ts
+// In brain.ts
 interface ProjectServices {
   api: {
     get: (path: string) => Promise<any>;

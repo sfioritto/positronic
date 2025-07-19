@@ -6,12 +6,12 @@ This guide explains how to use the Positronic Brain DSL to create AI-powered wor
 
 The Brain DSL provides a fluent, type-safe API for building stateful AI workflows. Brains are composed of steps that transform state, with full TypeScript type inference throughout the chain.
 
-**Note**: This project uses a custom brain function. Always import `brain` from `./brain.js`, not from `@positronic/core`. See the [Positronic Guide](./positronic-guide.md) for details.
+**Note**: This project uses a custom brain function. Always import `brain` from `../brain.js`, not from `@positronic/core`. See positronic-guide.md for details.
 
 ## Basic Brain Structure
 
 ```typescript
-import { brain } from './brain.js';
+import { brain } from '../brain.js';
 import { z } from 'zod';
 
 const myBrain = brain('My First Brain')
@@ -261,10 +261,10 @@ const analysisBrain = brain('Data Analysis')
   .step('Save Results', async ({ state, api, cache, metrics }) => {
     // Save to cache for next time
     await cache.set('analysis_result', state.analysis);
-    
+
     // Submit to API
     await api.submitResult(state.analysis);
-    
+
     // Track completion
     state.endTimer(); // End the timer
     metrics.track('analysis_complete', {
@@ -272,7 +272,7 @@ const analysisBrain = brain('Data Analysis')
       confidence: state.analysis.confidence,
       from_cache: state.fromCache
     });
-    
+
     return state;
   });
 ```
@@ -517,14 +517,6 @@ export default brain('HN Article Filter')
   }));
 ```
 
-### Benefits of This Approach
-
-1. **Separation of Concerns**: Prompt logic is isolated from brain flow
-2. **Reusability**: Prompts can be shared between different brains
-3. **Testability**: Prompts can be unit tested independently
-4. **Type Safety**: Explicit types ensure correct state shape
-5. **Resource Management**: Complex prompts often load templates from resources
-
 ### When to Extract Prompts
 
 Extract prompts to separate files when:
@@ -534,21 +526,10 @@ Extract prompts to separate files when:
 - The prompt might be reused in other brains
 - You want to test the prompt logic separately
 
-## Best Practices
-
-1. **Immutable State Updates**: Always return new state objects
-2. **Type Safety**: Use `as const` for schema names in prompt steps
-3. **Error Handling**: Handle errors via events, not try/catch
-4. **Services**: Inject services for side effects (logging, database, etc.)
-5. **Composition**: Break complex workflows into smaller, reusable brains
-6. **Testing**: Mock the client and collect all events before assertions
-7. **Prompt Organization**: Extract complex prompts (more than a sentence or two) to separate files
-8. **Resource Templates**: Use resources for prompt templates that can be edited without changing code
-
 ## Complete Example
 
 ```typescript
-import { brain } from './brain.js';
+import { brain } from '../brain.js';
 import { BrainRunner } from '@positronic/core';
 import { z } from 'zod';
 
@@ -566,7 +547,7 @@ const completeBrain = brain({
   description: 'Demonstrates all Brain DSL features',
 })
   .withOptions({ temperature: 0.7 })
-  .withServices<Services>({ 
+  .withServices<Services>({
     logger: console,
     analytics: {
       track: (event, props) => console.log('Track:', event, props)
@@ -590,7 +571,7 @@ const completeBrain = brain({
       }),
       name: 'plan' as const,
     },
-  }, 
+  },
   // Services available in reduce function too
   ({ state, response, logger }) => {
     logger.log(<%= "`Plan generated with ${response.tasks.length} tasks`" %>);

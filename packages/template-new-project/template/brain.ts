@@ -42,9 +42,9 @@ import { brain as coreBrain, type Brain } from '@positronic/core';
  * }
  * ```
  * 
- * Then in your brain files:
+ * Then in your brain files (in the brains/ directory):
  * ```typescript
- * import { brain } from './brain.js';
+ * import { brain } from '../brain.js';
  * 
  * export default brain('My Brain')
  *   .step('Use Services', async ({ logger, api }) => {
