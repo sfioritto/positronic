@@ -110,6 +110,11 @@ This project uses only the Positronic core without a specific deployment backend
 - GitHub: https://github.com/positronic-ai/positronic
 - CLI Help: `px --help` or `px <command> --help`
 
+## Project-Level Patterns
+
+For project structure, the project brain pattern, and other Positronic conventions, see:
+@docs/positronic-guide.md
+
 ## Additional Tips for AI Agents
 
 @docs/tips-for-agents.md
