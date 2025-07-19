@@ -6,10 +6,12 @@ This guide explains how to use the Positronic Brain DSL to create AI-powered wor
 
 The Brain DSL provides a fluent, type-safe API for building stateful AI workflows. Brains are composed of steps that transform state, with full TypeScript type inference throughout the chain.
 
+**Note**: This project uses a custom brain function. Always import `brain` from `./brain.js`, not from `@positronic/core`. See the [Positronic Guide](./positronic-guide.md) for details.
+
 ## Basic Brain Structure
 
 ```typescript
-import { brain } from '@positronic/core';
+import { brain } from './brain.js';
 import { z } from 'zod';
 
 const myBrain = brain('My First Brain')
@@ -497,7 +499,7 @@ export const aiFilterPrompt = {
 };
 
 // brains/hn-bot/brain.ts
-import { brain } from '@positronic/core';
+import { brain } from '../brain.js';
 import { aiFilterPrompt } from './ai-filter-prompt.js';
 
 export default brain('HN Article Filter')
@@ -546,7 +548,8 @@ Extract prompts to separate files when:
 ## Complete Example
 
 ```typescript
-import { brain, BrainRunner } from '@positronic/core';
+import { brain } from './brain.js';
+import { BrainRunner } from '@positronic/core';
 import { z } from 'zod';
 
 // Define services

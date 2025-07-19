@@ -1,4 +1,4 @@
-import { brain } from '@positronic/core';
+import { brain } from './brain.js';
 
 const exampleBrain = brain('example')
   .step('Start', ({ state }) => ({

@@ -182,6 +182,68 @@ brain('validation-example')
 
 Most generated brains should not have try-catch blocks. Only use them when the error state is meaningful to subsequent steps in the workflow.
 
+## Service Organization
+
+When implementing services for the project brain, consider creating a `services/` directory at the root of your project to keep service implementations organized and reusable:
+
+```
+services/
+├── gmail.js         # Gmail API integration
+├── slack.js         # Slack notifications
+├── database.js      # Database client
+└── analytics.js     # Analytics tracking
+```
+
+Then in your `brains/brain.ts`:
+
+```typescript
+import gmail from '../services/gmail.js';
+import slack from '../services/slack.js';
+import database from '../services/database.js';
+import analytics from '../services/analytics.js';
+
+export function brain<
+  TOptions extends object = object,
+  TState extends object = object
+>(
+  brainConfig: string | { title: string; description?: string }
+) {
+  return coreBrain(brainConfig)
+    .withServices({
+      gmail,
+      slack,
+      database,
+      analytics
+    });
+}
+```
+
+This keeps your service implementations separate from your brain logic and makes them easier to test and maintain.
+
+## Important: ESM Module Imports
+
+This project uses ES modules (ESM). **Always include the `.js` extension in your imports**, even when importing TypeScript files:
+
+```typescript
+// ✅ CORRECT - Include .js extension
+import { brain } from './brain.js';
+import { analyzeData } from '../utils/analyzer.js';
+import gmail from '../services/gmail.js';
+
+// ❌ WRONG - Missing .js extension
+import { brain } from './brain';
+import { analyzeData } from '../utils/analyzer';
+import gmail from '../services/gmail';
+```
+
+This applies to all imports in:
+- Brain files
+- Service files
+- Test files
+- Any other TypeScript/JavaScript files
+
+The `.js` extension is required for ESM compatibility, even though the source files are `.ts`.
+
 ## Creating New Brains - Test-Driven Development
 
 **IMPORTANT**: When asked to generate or create a new brain, you should ALWAYS follow this test-driven development approach. This ensures the brain works correctly and helps catch issues early.
