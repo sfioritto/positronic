@@ -438,6 +438,97 @@ describe('brain creation', () => {
       );
     });
 
+    it('should pass resources to prompt template function', async () => {
+      const testBrain = brain('Resource Prompt Template Test').prompt(
+        'Generate Summary',
+        {
+          template: async (state, resources) => {
+            const templateContent = await (resources.myFile as any).loadText();
+            return `Generate a summary for: ${templateContent}`;
+          },
+          outputSchema: {
+            schema: z.object({ summary: z.string() }),
+            name: 'promptResult' as const,
+          },
+        }
+      );
+
+      mockGenerateObject.mockResolvedValue({ summary: 'Test summary' });
+
+      const run = testBrain.run({
+        client: mockClient,
+        resources: mockResources,
+      });
+
+      let finalState: any = {};
+      for await (const event of run) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Verify resource was loaded in template
+      expect(mockResourceLoad).toHaveBeenCalledWith('myFile', 'text');
+
+      // Verify the generated prompt included the resource content
+      expect(mockGenerateObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: 'Generate a summary for: mock myFile text content',
+        })
+      );
+
+      // Verify final state
+      expect(finalState).toEqual({
+        promptResult: { summary: 'Test summary' },
+      });
+    });
+
+    it('templates can use state', async () => {
+      const testBrain = brain('State Template Test')
+        .step('Set Data', () => ({ existingData: 'legacy data' }))
+        .prompt('Analyze Data', {
+          template: (state) => {
+            return `Analyze this: ${state.existingData}`;
+          },
+          outputSchema: {
+            schema: z.object({ analysis: z.string() }),
+            name: 'promptResult' as const,
+          },
+        });
+
+      mockGenerateObject.mockResolvedValue({
+        analysis: 'Analysis result',
+      });
+
+      const run = testBrain.run({
+        client: mockClient,
+        resources: mockResources,
+      });
+
+      let finalState: any = {};
+      for await (const event of run) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Verify the prompt was generated correctly
+      expect(mockGenerateObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: 'Analyze this: legacy data',
+        })
+      );
+
+      // Verify final state
+      expect(finalState).toEqual({
+        existingData: 'legacy data',
+        promptResult: { analysis: 'Analysis result' },
+      });
+
+      // Verify no resources were loaded (since template didn't use them)
+      expect(mockResourceLoad).not.toHaveBeenCalled();
+    });
+
     it('should make resources available in a nested brain step', async () => {
       let nestedLoadedText: string | undefined;
 
