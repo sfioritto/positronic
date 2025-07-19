@@ -714,4 +714,63 @@ export class CloudflareDevServer implements PositronicDevServer {
       });
     });
   }
+
+  async bulkSecrets(filePath: string): Promise<void> {
+    const serverDir = path.join(this.projectRootDir, '.positronic');
+
+    // Check auth credentials
+    if (
+      !process.env.CLOUDFLARE_API_TOKEN ||
+      !process.env.CLOUDFLARE_ACCOUNT_ID
+    ) {
+      throw new Error(
+        'Missing Cloudflare credentials. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.'
+      );
+    }
+
+    // Read and parse the .env file
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+
+    const envContent = fs.readFileSync(filePath, 'utf8');
+    const secrets = dotenv.parse(envContent);
+
+    if (Object.keys(secrets).length === 0) {
+      throw new Error('No secrets found in the .env file');
+    }
+
+    // Convert to JSON format that wrangler expects
+    const jsonContent = JSON.stringify(secrets);
+
+    return new Promise((resolve, reject) => {
+      // Use wrangler secret:bulk command
+      const child = spawn('npx', ['wrangler', 'secret:bulk'], {
+        cwd: serverDir,
+        env: {
+          ...process.env,
+          CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+          CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+        },
+        stdio: ['pipe', 'inherit', 'inherit'], // stdin pipe, stdout/stderr inherit
+      });
+
+      // Write JSON to stdin
+      child.stdin.write(jsonContent);
+      child.stdin.end();
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          // Don't wrap the error - backend CLI already printed it
+          reject(new Error(''));
+        } else {
+          resolve();
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+  }
 }

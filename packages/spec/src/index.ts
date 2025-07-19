@@ -127,17 +127,10 @@ export interface PositronicDevServer {
   deleteSecret?(name: string): Promise<boolean>;
 
   /**
-   * Sync secrets from a .env file
+   * Bulk upload secrets from a .env file to the backend.
    * @param filePath Path to the .env file
-   * @param dryRun If true, only preview what would be synced
-   * @returns Result of the sync operation
    */
-  syncSecrets?(filePath: string, dryRun?: boolean): Promise<{
-    created: number;
-    updated: number;
-    errors?: string[];
-    preview?: Array<{ name: string; value: string }>;
-  }>;
+  bulkSecrets(filePath: string): Promise<void>;
 }
 
 export { testStatus, resources, brains, schedules, secrets } from './api.js';

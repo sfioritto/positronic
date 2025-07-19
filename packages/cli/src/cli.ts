@@ -947,36 +947,25 @@ export function buildCli(options: CliOptions) {
           }
         )
         .command(
-          'sync',
-          'Sync secrets from a .env file\n',
-          (yargsSync) => {
-            return yargsSync
-              .option('file', {
-                describe: 'Path to the .env file',
+          'bulk [file]',
+          'Bulk upload secrets from a .env file\n',
+          (yargsBulk) => {
+            return yargsBulk
+              .positional('file', {
+                describe: 'Path to the .env file (defaults to .env in project root)',
                 type: 'string',
-                default: '.env',
-                alias: 'f',
-              })
-              .option('dry-run', {
-                describe: 'Show what would be synced without actually syncing',
-                type: 'boolean',
-                default: false,
               })
               .example(
-                '$0 secret sync',
-                'Sync secrets from .env file'
+                '$0 secret bulk',
+                'Upload secrets from .env file in project root'
               )
               .example(
-                '$0 secret sync --file .env.secrets',
-                'Sync secrets from a specific file'
-              )
-              .example(
-                '$0 secret sync --dry-run',
-                'Preview what secrets would be synced'
+                '$0 secret bulk .env.production',
+                'Upload secrets from a specific .env file'
               );
           },
           (argv) => {
-            const element = secretCommand.sync(argv);
+            const element = secretCommand.bulk(argv);
             render(element);
           }
         )
