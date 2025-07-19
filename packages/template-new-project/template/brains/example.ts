@@ -1,4 +1,4 @@
-import { brain } from './brain.js';
+import { brain } from '../brain.js';
 
 const exampleBrain = brain('example')
   .step('Start', ({ state }) => ({

@@ -194,13 +194,13 @@ services/
 └── analytics.js     # Analytics tracking
 ```
 
-Then in your `brains/brain.ts`:
+Then in your `brain.ts` (at the project root):
 
 ```typescript
-import gmail from '../services/gmail.js';
-import slack from '../services/slack.js';
-import database from '../services/database.js';
-import analytics from '../services/analytics.js';
+import gmail from './services/gmail.js';
+import slack from './services/slack.js';
+import database from './services/database.js';
+import analytics from './services/analytics.js';
 
 export function brain<
   TOptions extends object = object,
@@ -226,12 +226,12 @@ This project uses ES modules (ESM). **Always include the `.js` extension in your
 
 ```typescript
 // ✅ CORRECT - Include .js extension
-import { brain } from './brain.js';
+import { brain } from '../brain.js';  // From a file in brains/ directory
 import { analyzeData } from '../utils/analyzer.js';
 import gmail from '../services/gmail.js';
 
 // ❌ WRONG - Missing .js extension
-import { brain } from './brain';
+import { brain } from '../brain';
 import { analyzeData } from '../utils/analyzer';
 import gmail from '../services/gmail';
 ```
