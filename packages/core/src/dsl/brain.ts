@@ -286,7 +286,7 @@ export class Brain<
   >(
     title: string,
     config: {
-      template: (state: TState) => string;
+      template: (state: TState, resources: Resources) => string | Promise<string>;
       outputSchema: {
         schema: TSchema;
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
@@ -316,7 +316,7 @@ export class Brain<
         const { template, outputSchema, client: stepClient } = config;
         const { schema, name: schemaName } = outputSchema;
         const client = stepClient ?? runClient;
-        const prompt = template(state);
+        const prompt = await template(state, resources);
         const response = await client.generateObject({
           schema,
           schemaName,
