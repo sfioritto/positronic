@@ -155,7 +155,9 @@ const configuredBrain = brain('My Brain')
 
 ### Service Injection
 
-Inject custom services available in all steps:
+The `withServices` method provides dependency injection for your brains, making external services available throughout the workflow while maintaining testability.
+
+#### Basic Usage
 
 ```typescript
 interface MyServices {
@@ -165,12 +167,157 @@ interface MyServices {
 
 const brainWithServices = brain('Service Brain')
   .withServices<MyServices>({ logger, database })
-  .step('Log and Save', async ({ state, services }) => {
-    services.logger.info('Processing state');
-    await services.database.save(state);
+  .step('Log and Save', async ({ state, logger, database }) => {
+    logger.info('Processing state');
+    await database.save(state);
     return state;
   });
 ```
+
+#### Where Services Are Available
+
+Services are destructured alongside other parameters in:
+
+1. **Step Actions**:
+```typescript
+.step('Process', ({ state, logger, database }) => {
+  logger.info('Step executing');
+  return state;
+})
+```
+
+2. **Prompt Reduce Functions**:
+```typescript
+.prompt('Generate', {
+  template: (state) => 'Generate something',
+  outputSchema: { schema, name: 'result' as const }
+}, async ({ state, response, logger, database }) => {
+  logger.info('Saving AI response');
+  await database.save({ ...state, result: response });
+  return state;
+})
+```
+
+3. **Nested Brain Reducers**:
+```typescript
+.brain('Run Sub-Brain', subBrain, ({ state, brainState, logger }) => {
+  logger.info('Sub-brain completed');
+  return { ...state, subResult: brainState };
+})
+```
+
+#### Real-World Example
+
+```typescript
+// Define service interfaces
+interface Services {
+  api: {
+    fetchData: (id: string) => Promise<Data>;
+    submitResult: (result: any) => Promise<void>;
+  };
+  cache: {
+    get: (key: string) => Promise<any>;
+    set: (key: string, value: any) => Promise<void>;
+  };
+  metrics: {
+    track: (event: string, properties?: any) => void;
+    time: (label: string) => () => void;
+  };
+}
+
+// Create a brain with multiple services
+const analysisBrain = brain('Data Analysis')
+  .withServices<Services>({
+    api: apiClient,
+    cache: redisClient,
+    metrics: analyticsClient
+  })
+  .step('Start Timing', ({ metrics }) => {
+    const endTimer = metrics.time('analysis_duration');
+    return { startTime: Date.now(), endTimer };
+  })
+  .step('Check Cache', async ({ state, cache, metrics }) => {
+    const cached = await cache.get('analysis_result');
+    metrics.track('cache_check', { hit: !!cached });
+    return { ...state, cached, fromCache: !!cached };
+  })
+  .step('Fetch If Needed', async ({ state, api }) => {
+    if (state.fromCache) return state;
+    const data = await api.fetchData('latest');
+    return { ...state, data };
+  })
+  .prompt('Analyze Data', {
+    template: ({ data }) => <%= "`Analyze this data: ${JSON.stringify(data)}`" %>,
+    outputSchema: {
+      schema: z.object({
+        insights: z.array(z.string()),
+        confidence: z.number()
+      }),
+      name: 'analysis' as const
+    }
+  })
+  .step('Save Results', async ({ state, api, cache, metrics }) => {
+    // Save to cache for next time
+    await cache.set('analysis_result', state.analysis);
+    
+    // Submit to API
+    await api.submitResult(state.analysis);
+    
+    // Track completion
+    state.endTimer(); // End the timer
+    metrics.track('analysis_complete', {
+      insights_count: state.analysis.insights.length,
+      confidence: state.analysis.confidence,
+      from_cache: state.fromCache
+    });
+    
+    return state;
+  });
+```
+
+#### Testing with Services
+
+Services make testing easier by allowing you to inject mocks:
+
+```typescript
+// In your test file
+import { createMockClient, runBrainTest } from '@positronic/core/testing';
+
+const mockLogger = {
+  info: jest.fn(),
+  error: jest.fn()
+};
+
+const mockDatabase = {
+  save: jest.fn().mockResolvedValue(undefined),
+  find: jest.fn().mockResolvedValue({ id: '123', name: 'Test' })
+};
+
+const testBrain = brain('Test Brain')
+  .withServices({ logger: mockLogger, database: mockDatabase })
+  .step('Do Something', async ({ logger, database }) => {
+    logger.info('Fetching data');
+    const data = await database.find('123');
+    return { data };
+  });
+
+// Run test
+const result = await runBrainTest(testBrain, {
+  client: createMockClient()
+});
+
+// Verify service calls
+expect(mockLogger.info).toHaveBeenCalledWith('Fetching data');
+expect(mockDatabase.find).toHaveBeenCalledWith('123');
+expect(result.finalState.data).toEqual({ id: '123', name: 'Test' });
+```
+
+#### Important Notes
+
+- Call `withServices` before defining any steps
+- Services are typed - TypeScript knows exactly which services are available
+- Services are not serialized - they're for side effects and external interactions
+- Each brain instance maintains its own service references
 
 ## Running Brains
 
@@ -405,6 +552,9 @@ import { z } from 'zod';
 // Define services
 interface Services {
   logger: Logger;
+  analytics: {
+    track: (event: string, properties?: any) => void;
+  };
 }
 
 // Create brain with all features
@@ -413,13 +563,23 @@ const completeBrain = brain({
   description: 'Demonstrates all Brain DSL features',
 })
   .withOptions({ temperature: 0.7 })
-  .withServices<Services>({ logger: console })
-  .step('Initialize', ({ services }) => {
-    services.logger.log('Starting workflow');
+  .withServices<Services>({ 
+    logger: console,
+    analytics: {
+      track: (event, props) => console.log('Track:', event, props)
+    }
+  })
+  .step('Initialize', ({ logger, analytics }) => {
+    logger.log('Starting workflow');
+    analytics.track('brain_started');
     return { startTime: Date.now() };
   })
   .prompt('Generate Plan', {
-    template: (state) => 'Create a project plan',
+    template: async (state, resources) => {
+      // Load a template from resources
+      const template = await resources.templates.projectPlan.loadText();
+      return template.replace('{{context}}', 'software project');
+    },
     outputSchema: {
       schema: z.object({
         tasks: z.array(z.string()),
@@ -427,9 +587,18 @@ const completeBrain = brain({
       }),
       name: 'plan' as const,
     },
+  }, 
+  // Services available in reduce function too
+  ({ state, response, logger }) => {
+    logger.log(<%= "`Plan generated with ${response.tasks.length} tasks`" %>);
+    return { ...state, plan: response };
   })
-  .step('Process Plan', ({ state, services }) => {
-    services.logger.log(<%= "`Generated ${state.plan.tasks.length} tasks`" %>);
+  .step('Process Plan', ({ state, logger, analytics }) => {
+    logger.log(<%= "`Processing ${state.plan.tasks.length} tasks`" %>);
+    analytics.track('plan_processed', {
+      task_count: state.plan.tasks.length,
+      duration: state.plan.duration
+    });
     return {
       ...state,
       taskCount: state.plan.tasks.length,
