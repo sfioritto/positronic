@@ -73,14 +73,8 @@ export class ServerCommand {
         logStream.write(logLine);
       }
 
-      // Also output to console (using original methods to avoid recursion)
-      if (level === 'ERROR') {
-        console.error(message);
-      } else if (level === 'WARN') {
-        console.warn(message);
-      } else {
-        console.log(message);
-      }
+      // Console output is handled by the dev server's direct forwarding
+      // to avoid duplication
     };
 
     // Always register log callbacks to capture server logs
