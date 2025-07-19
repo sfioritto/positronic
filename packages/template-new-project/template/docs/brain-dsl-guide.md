@@ -99,7 +99,8 @@ brain('AI Education Assistant')
 ```
 
 Key points about prompt steps:
-- The `template` function receives the current state and returns the prompt string
+- The `template` function receives the current state and resources, returning the prompt string
+- Templates can be async to load resources: `async (state, resources) => { ... }`
 - `outputSchema` defines the structure using Zod schemas
 - The `name` property determines where the response is stored in state
 - You can optionally provide a transform function as the third parameter
@@ -274,6 +275,116 @@ brain('Resource Example').step('Load Data', async ({ resources }) => {
 });
 ```
 
+Resources are also available in prompt templates:
+
+```typescript
+brain('Template Example').prompt('Generate Content', {
+  template: async (state, resources) => {
+    const template = await resources.prompts.customerSupport.loadText();
+    return template.replace('{{issue}}', state.issue);
+  },
+  outputSchema: {
+    schema: z.object({ response: z.string() }),
+    name: 'supportResponse' as const,
+  },
+});
+```
+
+## Organizing Complex Prompts
+
+When prompts become more than a sentence or two, extract them into separate files for better maintainability:
+
+### File Structure
+
+For complex brains, organize your code into folders:
+
+```
+brains/
+├── hn-bot/
+│   ├── brain.ts           # Main brain definition
+│   └── ai-filter-prompt.ts # Complex prompt configuration
+└── simple-bot.ts          # Simple brains can stay as single files
+```
+
+### Extracting Prompts
+
+When you extract a prompt to a separate file, you'll need to explicitly specify the state type:
+
+```typescript
+// brains/hn-bot/ai-filter-prompt.ts
+import { z } from 'zod';
+import type { Resources } from '@positronic/core';
+
+// Define the state type that this prompt expects, only what the prompt needs
+interface FilterPromptState {
+  articles: Array<{
+    title: string;
+    url: string;
+    score: number;
+  }>;
+  userPreferences?: string;
+}
+
+// Export the prompt configuration
+export const aiFilterPrompt = {
+  template: async (state: FilterPromptState, resources: Resources) => {
+    // Load a prompt template from resources
+    const template = await resources.prompts.hnFilter.loadText();
+
+    // Build the prompt with state data
+    const articleList = state.articles
+      .map((a, i) => <%= "`${i + 1}. ${a.title} (score: ${a.score})`" %>)
+      .join('\n');
+
+    return template
+      .replace('{{articleList}}', articleList)
+      .replace('{{preferences}}', state.userPreferences || 'No specific preferences');
+  },
+  outputSchema: {
+    schema: z.object({
+      selectedArticles: z.array(z.number()).describe('Indices of selected articles'),
+      reasoning: z.string().describe('Brief explanation of selections'),
+    }),
+    name: 'filterResults' as const,
+  },
+};
+
+// brains/hn-bot/brain.ts
+import { brain } from '@positronic/core';
+import { aiFilterPrompt } from './ai-filter-prompt.js';
+
+export default brain('HN Article Filter')
+  .step('Fetch Articles', async ({ state }) => {
+    // Fetch Hacker News articles
+    const articles = await fetchHNArticles();
+    return { articles };
+  })
+  .prompt('Filter Articles', aiFilterPrompt)
+  .step('Format Results', ({ state }) => ({
+    selectedArticles: state.filterResults.selectedArticles.map(
+      i => state.articles[i]
+    ),
+    reasoning: state.filterResults.reasoning,
+  }));
+```
+
+### Benefits of This Approach
+
+1. **Separation of Concerns**: Prompt logic is isolated from brain flow
+2. **Reusability**: Prompts can be shared between different brains
+3. **Testability**: Prompts can be unit tested independently
+4. **Type Safety**: Explicit types ensure correct state shape
+5. **Resource Management**: Complex prompts often load templates from resources
+
+### When to Extract Prompts
+
+Extract prompts to separate files when:
+- The template is more than 2-3 lines
+- The prompt uses complex logic or formatting
+- You need to load resources or templates
+- The prompt might be reused in other brains
+- You want to test the prompt logic separately
+
 ## Best Practices
 
 1. **Immutable State Updates**: Always return new state objects
@@ -282,6 +393,8 @@ brain('Resource Example').step('Load Data', async ({ resources }) => {
 4. **Services**: Inject services for side effects (logging, database, etc.)
 5. **Composition**: Break complex workflows into smaller, reusable brains
 6. **Testing**: Mock the client and collect all events before assertions
+7. **Prompt Organization**: Extract complex prompts (more than a sentence or two) to separate files
+8. **Resource Templates**: Use resources for prompt templates that can be edited without changing code
 
 ## Complete Example
 
