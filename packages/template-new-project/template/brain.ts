@@ -1,4 +1,4 @@
-import { brain as coreBrain, type Brain } from '@positronic/core';
+import { brain as coreBrain, type BrainFunction } from '@positronic/core';
 
 /**
  * Base brain factory for this project.
@@ -23,10 +23,8 @@ import { brain as coreBrain, type Brain } from '@positronic/core';
  *   };
  * }
  * 
- * export function brain<TOptions extends object = object, TState extends object = object>(
- *   brainConfig: string | { title: string; description?: string }
- * ) {
- *   return coreBrain<TOptions, TState, ProjectServices>(brainConfig)
+ * export const brain: BrainFunction = (brainConfig) => {
+ *   return coreBrain(brainConfig)
  *     .withServices({
  *       logger: {
  *         info: (msg) => console.log(`[INFO] ${msg}`),
@@ -54,13 +52,8 @@ import { brain as coreBrain, type Brain } from '@positronic/core';
  *   });
  * ```
  */
-export function brain<
-  TOptions extends object = object,
-  TState extends object = object
->(
-  brainConfig: string | { title: string; description?: string }
-): Brain<TOptions, TState, object> {
+export const brain: BrainFunction = (brainConfig) => {
   // For now, just return the core brain without any services.
   // Update this function to add your project-wide services.
-  return coreBrain<TOptions, TState, object>(brainConfig);
-}
+  return coreBrain(brainConfig);
+};
