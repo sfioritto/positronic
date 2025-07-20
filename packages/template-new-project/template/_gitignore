@@ -20,3 +20,5 @@ dist/
 
 # Test coverage
 coverage/
+
+.positronic-server.log
