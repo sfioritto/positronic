@@ -1,6 +1,9 @@
 {
   "name": "@positronic/client-anthropic",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Anthropic client for Positronic",
   "type": "module",
   "main": "dist/src/index.js",

@@ -1,6 +1,9 @@
 {
   "name": "@positronic/shell",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Shell implementations for Positronic",
   "type": "module",
   "main": "dist/src/index.js",
