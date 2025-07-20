@@ -7,6 +7,9 @@ import { ResourcesCommand } from './commands/resources.js';
 import { ScheduleCommand } from './commands/schedule.js';
 import { SecretCommand } from './commands/secret.js';
 import type { PositronicDevServer } from '@positronic/spec';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 export interface CliOptions {
   argv?: string[];
@@ -25,6 +28,19 @@ export function buildCli(options: CliOptions) {
 
   const isLocalDevMode = server !== undefined;
 
+  // Get version from package.json
+  let version = 'TEST'; // Default version for test environment where package.json path differs
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packageJsonPath = join(__dirname, '..', '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    version = packageJson.version;
+  } catch (error) {
+    // In test environment, the relative path to package.json is different
+    // so we use 'TEST' as the version to avoid breaking tests
+  }
+
   // Instantiate command classes, passing the determined mode and path
   const projectCommand = new ProjectCommand();
   const brainCommand = new BrainCommand();
@@ -35,7 +51,7 @@ export function buildCli(options: CliOptions) {
   let cli = yargs(argv)
     .scriptName('positronic')
     .usage('Usage: $0 <command> [options]')
-    .version()
+    .version(version)
     .alias('v', 'version')
     .help('h')
     .alias('h', 'help')
