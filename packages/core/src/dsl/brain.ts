@@ -102,6 +102,17 @@ export interface BrainStructure {
   }>;
 }
 
+// Type for the brain function
+export interface BrainFunction {
+  <
+    TOptions extends object = object,
+    TState extends State = object,
+    TServices extends object = object
+  >(
+    brainConfig: string | { title: string; description?: string }
+  ): Brain<TOptions, TState, TServices>;
+}
+
 type StepBlock<
   TStateIn,
   TStateOut,
