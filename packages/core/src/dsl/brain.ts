@@ -103,7 +103,7 @@ export interface BrainStructure {
 }
 
 // Type for the brain function
-export interface BrainFunction {
+export interface BrainFactory {
   <
     TOptions extends object = object,
     TState extends State = object,
@@ -194,7 +194,7 @@ export class Brain<
     return {
       title: this.title,
       description: this.description,
-      steps: this.blocks.map(block => {
+      steps: this.blocks.map((block) => {
         if (block.type === 'step') {
           return {
             type: 'step' as const,
@@ -297,7 +297,10 @@ export class Brain<
   >(
     title: string,
     config: {
-      template: (state: TState, resources: Resources) => string | Promise<string>;
+      template: (
+        state: TState,
+        resources: Resources
+      ) => string | Promise<string>;
       outputSchema: {
         schema: TSchema;
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
@@ -714,7 +717,7 @@ class BrainEventStream<
 const brainNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const brainNames = new Set<string>();
-export function brain<
+export const brain: BrainFactory = function <
   TOptions extends object = object,
   TState extends State = object,
   TServices extends object = object
@@ -732,6 +735,6 @@ export function brain<
     brainNames.add(title);
   }
   return new Brain<TOptions, TState, TServices>(title, description);
-}
+};
 
 const clone = <T>(value: T): T => structuredClone(value);
