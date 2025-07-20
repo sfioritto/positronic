@@ -69,8 +69,8 @@ export function brain<
   return coreBrain<TOptions, TState, ProjectServices>(brainConfig)
     .withServices({
       logger: {
-        info: (msg) => console.log(`[${new Date().toISOString()}] INFO: ${msg}`),
-        error: (msg) => console.error(`[${new Date().toISOString()}] ERROR: ${msg}`)
+        info: (msg) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),
+        error: (msg) => console.error(`[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`)
       },
       database: {
         get: async (key) => {
@@ -209,16 +209,16 @@ interface ProjectServices {
 // Configure with base URL and auth
 const api = {
   get: async (path: string) => {
-    const response = await fetch(`https://api.example.com${path}`, {
-      headers: { 'Authorization': `Bearer ${process.env.API_KEY}` }
+    const response = await fetch(`https://api.example.com<%= '${path}' %>`, {
+      headers: { 'Authorization': `Bearer <%= '${process.env.API_KEY}' %>` }
     });
     return response.json();
   },
   post: async (path: string, data: any) => {
-    const response = await fetch(`https://api.example.com${path}`, {
+    const response = await fetch(`https://api.example.com<%= '${path}' %>`, {
       method: 'POST',
       headers: { 
-        'Authorization': `Bearer ${process.env.API_KEY}`,
+        'Authorization': `Bearer <%= '${process.env.API_KEY}' %>`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)

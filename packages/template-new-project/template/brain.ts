@@ -27,12 +27,12 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  *   return coreBrain(brainConfig)
  *     .withServices({
  *       logger: {
- *         info: (msg) => console.log(`[INFO] ${msg}`),
- *         error: (msg) => console.error(`[ERROR] ${msg}`)
+ *         info: (msg) => console.log(`[INFO] <%= '${msg}' %>`),
+ *         error: (msg) => console.error(`[ERROR] <%= '${msg}' %>`)
  *       },
  *       api: {
  *         fetch: async (endpoint) => {
- *           const response = await fetch(`https://api.example.com${endpoint}`);
+ *           const response = await fetch(`https://api.example.com<%= '${endpoint}' %>`);
  *           return response.json();
  *         }
  *       }
