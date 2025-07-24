@@ -12,6 +12,11 @@
   },
   "author": "",
   "license": "MIT",
+  "files": [
+    "index.js",
+    "package.json",
+    "template"
+  ],
   "devDependencies": {
     "caz": "^2.0.0"
   }

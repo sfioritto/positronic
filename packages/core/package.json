@@ -9,6 +9,10 @@
   "main": "dist/src/index.js",
   "types": "dist/types/index.d.ts",
   "license": "MIT",
+  "files": [
+    "dist",
+    "package.json"
+  ],
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
