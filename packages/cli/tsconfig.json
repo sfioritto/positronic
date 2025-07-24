@@ -6,6 +6,6 @@
     "declarationDir": "./dist/types",
     "jsx": "react-jsx"
   },
-  "include": ["**/*"],
+  "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

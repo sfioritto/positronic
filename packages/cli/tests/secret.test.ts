@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { createTestEnv, px } from './test-utils.js';
+import { createTestEnv } from './test-utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

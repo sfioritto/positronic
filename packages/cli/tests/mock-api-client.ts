@@ -1,4 +1,4 @@
-import type { ApiClient } from '../commands/helpers.js';
+import type { ApiClient } from '../src/commands/helpers.js';
 
 interface MockResource {
   key: string;

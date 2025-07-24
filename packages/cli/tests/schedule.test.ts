@@ -9,8 +9,6 @@ import {
   afterEach,
 } from '@jest/globals';
 import { createTestEnv, px, type TestEnv } from './test-utils.js';
-import { ScheduleCommand } from './schedule.js';
-import { TestDevServer } from '../tests/test-dev-server.js';
 
 describe('schedule command', () => {
   describe('schedule create', () => {
