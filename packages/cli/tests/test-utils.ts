@@ -27,7 +27,7 @@ async function getCachedTemplate(): Promise<string> {
 
   // Create cache only once per test run
   const devPath = path.resolve(__dirname, '../../../');
-  const originalTemplate = path.resolve(devPath, 'template-new-project');
+  const originalTemplate = path.resolve(devPath, 'packages/template-new-project');
 
   // First, copy template to temp location so caz can mess with that copy
   const tempCopyDir = fs.mkdtempSync(
@@ -78,7 +78,7 @@ async function getCachedTemplate(): Promise<string> {
 
 // Helper function to copy test resources from test data directory
 function copyTestResources(targetDir: string) {
-  const testDataPath = path.join(__dirname, '../../tests/data/resources');
+  const testDataPath = path.join(__dirname, './data/resources');
   const targetResourcesPath = path.join(targetDir, 'resources');
 
   // Remove existing resources directory if it exists
