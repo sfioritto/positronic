@@ -5,8 +5,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { fileURLToPath } from 'url';
 import process from 'process';
-import type { TestServerHandle } from '../test/test-dev-server.js';
-import { TestDevServer } from '../test/test-dev-server.js';
+import type { TestServerHandle } from '../tests/test-dev-server.js';
+import { TestDevServer } from '../tests/test-dev-server.js';
 import { buildCli } from '../cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import caz from 'caz';
@@ -24,7 +24,7 @@ async function getCachedTemplate(): Promise<string> {
   if (cachedTemplatePath && fs.existsSync(cachedTemplatePath)) {
     return cachedTemplatePath;
   }
-  
+
   // Create cache only once per test run
   const devPath = path.resolve(__dirname, '../../../');
   const originalTemplate = path.resolve(devPath, 'template-new-project');
@@ -78,7 +78,7 @@ async function getCachedTemplate(): Promise<string> {
 
 // Helper function to copy test resources from test data directory
 function copyTestResources(targetDir: string) {
-  const testDataPath = path.join(__dirname, '../test/data/resources');
+  const testDataPath = path.join(__dirname, '../tests/data/resources');
   const targetResourcesPath = path.join(targetDir, 'resources');
 
   // Remove existing resources directory if it exists

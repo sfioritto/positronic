@@ -7,7 +7,7 @@ import {
   px,
   type TestEnv,
 } from './test-utils.js';
-import type { TestServerHandle } from '../test/test-dev-server.js';
+import type { TestServerHandle } from '../tests/test-dev-server.js';
 
 describe('CLI Integration: positronic server', () => {
   let exitSpy: any;
@@ -415,7 +415,10 @@ describe('CLI Integration: positronic server', () => {
 
     it('should create default log file when no --log-file is specified', async () => {
       const { server } = env;
-      const defaultLogFile = path.join(server.projectRootDir, '.positronic-server.log');
+      const defaultLogFile = path.join(
+        server.projectRootDir,
+        '.positronic-server.log'
+      );
 
       try {
         // Ensure no existing log file
@@ -433,7 +436,7 @@ describe('CLI Integration: positronic server', () => {
       } finally {
         process.emit('SIGINT');
         await new Promise((r) => setImmediate(r));
-        
+
         // Clean up
         if (fs.existsSync(defaultLogFile)) {
           fs.unlinkSync(defaultLogFile);

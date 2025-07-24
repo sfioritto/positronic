@@ -4,7 +4,7 @@ import * as os from 'os';
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Response } from 'node-fetch';
 import { syncResources, generateTypes } from './helpers.js';
-import { createMockApiClient } from '../test/mock-api-client.js';
+import { createMockApiClient } from '../tests/mock-api-client.js';
 
 describe('Helper Functions Unit Tests', () => {
   let tempDir: string;
