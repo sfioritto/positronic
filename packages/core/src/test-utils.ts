@@ -159,7 +159,10 @@ class TestAdapter<TState extends State = State> implements Adapter {
       case BRAIN_EVENTS.STEP_COMPLETE:
         this.stepTitles.push(event.stepTitle);
         if (event.patch && event.patch.length > 0) {
-          this.currentState = applyPatches(this.currentState, event.patch) as TState;
+          this.currentState = applyPatches(
+            this.currentState,
+            event.patch
+          ) as TState;
         }
         break;
       case BRAIN_EVENTS.COMPLETE:

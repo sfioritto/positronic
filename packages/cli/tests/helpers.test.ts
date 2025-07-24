@@ -3,8 +3,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Response } from 'node-fetch';
-import { syncResources, generateTypes } from './helpers.js';
-import { createMockApiClient } from '../tests/mock-api-client.js';
+import { syncResources, generateTypes } from '../src/commands/helpers.js';
+import { createMockApiClient } from './mock-api-client.js';
 
 describe('Helper Functions Unit Tests', () => {
   let tempDir: string;

@@ -7,7 +7,7 @@ import {
   px,
   type TestEnv,
 } from './test-utils.js';
-import type { TestServerHandle } from '../tests/test-dev-server.js';
+import type { TestServerHandle } from './test-dev-server.js';
 
 describe('CLI Integration: positronic server', () => {
   let exitSpy: any;
