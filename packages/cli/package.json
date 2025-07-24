@@ -11,6 +11,10 @@
     "positronic": "./dist/src/positronic.js",
     "px": "./dist/src/positronic.js"
   },
+  "files": [
+    "dist",
+    "package.json"
+  ],
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",

@@ -9,6 +9,10 @@
   "main": "dist/src/index.js",
   "types": "dist/types/index.ts",
   "license": "MIT",
+  "files": [
+    "dist",
+    "package.json"
+  ],
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
