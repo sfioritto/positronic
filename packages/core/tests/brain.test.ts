@@ -1,18 +1,18 @@
-import { BRAIN_EVENTS, STATUS } from './constants.js';
-import { applyPatches, type JsonPatch } from './json-patch.js';
-import { State } from './types.js';
+import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
+import { applyPatches, type JsonPatch } from '../src/dsl/json-patch.js';
+import { State } from '../src/dsl/types.js';
 import {
   brain,
   type BrainEvent,
   type BrainErrorEvent,
   type SerializedStep,
   type SerializedStepStatus,
-} from './brain.js';
+} from '../src/dsl/brain.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
-import { ObjectGenerator } from '../clients/types.js';
-import { createResources, type Resources } from '../resources/resources.js';
-import type { ResourceLoader } from '../resources/resource-loader.js';
+import { ObjectGenerator } from '../src/clients/types.js';
+import { createResources, type Resources } from '../src/resources/resources.js';
+import type { ResourceLoader } from '../src/resources/resource-loader.js';
 
 // Helper function to get the next value from an AsyncIterator
 const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {

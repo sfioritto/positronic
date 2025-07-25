@@ -1,13 +1,13 @@
-import type { ObjectGenerator, Message } from './clients/types.js';
+import type { ObjectGenerator, Message } from '../src/clients/types.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
-import type { Adapter } from './adapters/types.js';
-import type { BrainEvent, Brain } from './dsl/brain.js';
-import type { State } from './dsl/types.js';
-import { BRAIN_EVENTS } from './dsl/constants.js';
-import { applyPatches } from './dsl/json-patch.js';
-import { BrainRunner } from './dsl/brain-runner.js';
-import type { Resources } from './resources/resources.js';
+import type { Adapter } from '../src/adapters/types.js';
+import type { BrainEvent, Brain } from '../src/dsl/brain.js';
+import type { State } from '../src/dsl/types.js';
+import { BRAIN_EVENTS } from '../src/dsl/constants.js';
+import { applyPatches } from '../src/dsl/json-patch.js';
+import { BrainRunner } from '../src/dsl/brain-runner.js';
+import type { Resources } from '../src/resources/resources.js';
 
 /**
  * Mock implementation of ObjectGenerator for testing

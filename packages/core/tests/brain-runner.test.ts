@@ -1,11 +1,11 @@
-import { BrainRunner } from './brain-runner.js';
-import { brain, type SerializedStep } from './brain.js';
-import { BRAIN_EVENTS, STATUS } from './constants.js';
+import { BrainRunner } from '../src/dsl/brain-runner.js';
+import { brain, type SerializedStep } from '../src/dsl/brain.js';
+import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ObjectGenerator } from '../clients/types.js';
-import { Adapter } from '../adapters/types.js';
-import { createResources, type Resources } from '../resources/resources.js';
-import type { ResourceLoader } from '../resources/resource-loader.js';
+import { ObjectGenerator } from '../src/clients/types.js';
+import { Adapter } from '../src/adapters/types.js';
+import { createResources, type Resources } from '../src/resources/resources.js';
+import type { ResourceLoader } from '../src/resources/resource-loader.js';
 import { z } from 'zod';
 
 describe('BrainRunner', () => {
