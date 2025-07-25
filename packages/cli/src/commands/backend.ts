@@ -45,8 +45,16 @@ async function loadBackendModule(projectRootPath: string) {
     );
     backendModule = await import(localModulePath);
   } else {
-    // Load from npm package
-    backendModule = await import(backendPackage);
+    // Load from npm package - resolve from project's node_modules
+    const backendPath = path.join(
+      projectRootPath,
+      'node_modules',
+      backendPackage,
+      'dist',
+      'src',
+      'node-index.js'
+    );
+    backendModule = await import(backendPath);
   }
 
   return backendModule;
