@@ -24,7 +24,8 @@
       "WebFetch(domain:developers.cloudflare.com)",
       "Bash(npm pack:*)",
       "Bash(readlink:*)",
-      "Bash(npm version:*)"
+      "Bash(npm version:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }
