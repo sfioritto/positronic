@@ -53,9 +53,9 @@ module.exports = {
   ],
   setup: async ctx => {
     const devRootPath = process.env.POSITRONIC_LOCAL_PATH;
-    let coreVersion = '^0.0.3';
-    let cloudflareVersion = '^0.0.3';
-    let clientVercelVersion = '^0.0.3';
+    let coreVersion = '^0.0.5';
+    let cloudflareVersion = '^0.0.5';
+    let clientVercelVersion = '^0.0.5';
 
     // Map backend selection to package names
     const backendPackageMap = {
@@ -150,29 +150,29 @@ module.exports = {
     // Display getting started message
     console.log('\n✨ Project created successfully!\n');
     console.log(`📁 Project location: ${ctx.dest}\n`);
-    
+
     console.log('🚀 Getting started:\n');
     console.log(`   cd ${ctx.answers.name}`);
-    
+
     if (!ctx.answers.install) {
       console.log(`   ${ctx.answers.pm || 'npm'} install`);
     }
-    
+
     console.log('   px server              # Start the development server');
     console.log('   px brain list          # List available brains');
     console.log('   px brain run example   # Run the example brain\n');
-    
+
     if (ctx.answers.backend === 'cloudflare') {
       console.log('☁️  Cloudflare deployment:\n');
       console.log('   wrangler login         # Authenticate with Cloudflare');
       console.log('   px deploy              # Deploy to Cloudflare Workers\n');
     }
-    
+
     console.log('📚 Resources:\n');
     console.log('   • Documentation: https://positronic.dev');
     console.log('   • GitHub: https://github.com/positronic-ai/positronic');
     console.log('   • CLI Help: px --help\n');
-    
+
     if (ctx.answers.claudemd) {
       console.log('💡 Pro tip: Check out CLAUDE.md in your project for AI-assisted development guidance!\n');
     }
