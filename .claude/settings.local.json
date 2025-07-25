@@ -25,7 +25,8 @@
       "Bash(npm pack:*)",
       "Bash(readlink:*)",
       "Bash(npm version:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git tag:*)"
     ],
     "deny": []
   }
