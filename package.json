@@ -9,7 +9,7 @@
     "test": "npm run test:noisy -- --silent",
     "test:coverage": "npm run test -- --coverage",
     "test:watch": "npm run test:all --watch",
-    "test:all": "npm run test && cd packages/cloudflare/test-project && npm run test -- --run",
+    "test:all": "npm run test && cd packages/cloudflare/test-project && npm run test",
     "dev": "npm run build:workspaces && npm run test:all || /usr/local/bin/terminal-notifier -title \"Positronic\" -message \"Build/Test failed\"",
     "dev:watch": "nodemon --exec 'npm run dev'",
     "clean:workspaces": "npm run clean --workspaces && rm -rf node_modules",
