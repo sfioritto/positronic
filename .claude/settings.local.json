@@ -22,7 +22,9 @@
       "Bash(npm run:*)",
       "Bash(npm run typecheck:*)",
       "WebFetch(domain:developers.cloudflare.com)",
-      "Bash(npm pack:*)"
+      "Bash(npm pack:*)",
+      "Bash(readlink:*)",
+      "Bash(npm version:*)"
     ],
     "deny": []
   }
