@@ -1,6 +1,6 @@
 {
   "name": "@positronic/client-anthropic",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publishConfig": {
     "access": "public"
   },
