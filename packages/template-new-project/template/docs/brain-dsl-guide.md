@@ -8,6 +8,28 @@ The Brain DSL provides a fluent, type-safe API for building stateful AI workflow
 
 **Note**: This project uses a custom brain function. Always import `brain` from `../brain.js`, not from `@positronic/core`. See positronic-guide.md for details.
 
+### Type Parameters
+
+The brain function accepts three optional type parameters:
+
+```typescript
+brain<TOptions, TState, TServices>(config)
+```
+
+- `TOptions`: The type of runtime options (defaults to `{}`)
+- `TState`: The initial state type (usually inferred from first step)
+- `TServices`: The type of injected services (defaults to `{}`)
+
+Most commonly, you'll only specify the options type:
+
+```typescript
+// Just options type
+brain<MyOptions>('My Brain')
+
+// All three types (rare - usually let TypeScript infer state)
+brain<MyOptions, MyInitialState, MyServices>('My Brain')
+```
+
 ## Basic Brain Structure
 
 ```typescript
@@ -142,17 +164,158 @@ Each step receives these parameters:
 
 ## Configuration Methods
 
-### Default Options
+### Brain Options
 
-Set default options for all brain runs:
+Options provide runtime configuration for your brains, allowing different behavior without changing code. They're perfect for settings like API endpoints, feature flags, output preferences, or channel identifiers.
+
+#### Typing Options
+
+There are two ways to type your brain's options:
+
+**Method 1: Using Type Parameters** (when you need typed options but don't want defaults)
+
+```typescript
+interface NotificationOptions {
+  slackChannel: string;
+  priority: 'low' | 'normal' | 'high';
+  includeTimestamp: boolean;
+}
+
+// Pass the options type as the first type parameter
+const notificationBrain = brain<NotificationOptions>('Notification Brain')
+  .step('Send Alert', async ({ state, options, slack }) => {
+    // TypeScript knows the exact shape of options
+    const message = options.includeTimestamp 
+      ? `[${new Date().toISOString()}] ${state.alert}`
+      : state.alert;
+    
+    await slack.post(options.slackChannel, {
+      text: message,
+      priority: options.priority  // Type-safe: must be 'low' | 'normal' | 'high'
+    });
+    
+    return state;
+  });
+```
+
+**Method 2: Using `.withOptions()`** (when you want to provide defaults)
 
 ```typescript
 const configuredBrain = brain('My Brain')
-  .withOptions({ debug: true, temperature: 0.7 })
+  .withOptions({ 
+    debug: false, 
+    temperature: 0.7,
+    slackChannel: '#general' 
+  })
   .step('Process', ({ state, options }) => {
+    // TypeScript infers options type from withOptions
     if (options.debug) console.log('Processing...');
     return state;
+  })
+  .step('Notify', async ({ state, options, slack }) => {
+    await slack.post(options.slackChannel, 'Process complete!');
+    return state;
   });
+```
+
+The type parameter approach is particularly useful when:
+- Options are required (no sensible defaults)
+- You want strict typing without providing defaults
+- You're building a library of reusable brains
+
+#### Passing Options from Command Line
+
+Override default options when running brains from the CLI using the `-o` or `--options` flag:
+
+```bash
+# Single option
+px brain run my-brain -o debug=true
+
+# Multiple options
+px brain run my-brain -o slackChannel=#alerts -o temperature=0.9 -o verbose=true
+
+# Options with spaces or special characters (use quotes)
+px brain run my-brain -o "webhook=https://example.com/api?key=value"
+```
+
+Options are passed as simple key=value pairs and are available as strings in your brain.
+
+#### Options vs Services vs Initial State
+
+Understanding when to use each:
+
+- **Options**: Runtime configuration (channels, endpoints, feature flags)
+  - Set defaults with `.withOptions()`
+  - Override from CLI with `-o key=value`
+  - Don't change during execution
+  - Examples: `slackChannel`, `apiEndpoint`, `debugMode`
+
+- **Services**: External dependencies and side effects (clients, loggers, databases)
+  - Configure once with `.withServices()`
+  - Available in all steps
+  - Not serializable
+  - Examples: `slackClient`, `database`, `logger`
+
+- **Initial State**: Starting data for a specific run
+  - Pass to `brain.run()` or set via CLI/API
+  - Changes throughout execution
+  - Must be serializable
+  - Examples: `userId`, `orderData`, `inputText`
+
+#### Real-World Example
+
+```typescript
+// Define a brain that uses options for configuration
+const notificationBrain = brain('Smart Notifier')
+  .withOptions({
+    channel: '#general',
+    priority: 'normal',
+    includeDetails: false
+  })
+  .withServices({ 
+    slack: slackClient,
+    email: emailClient 
+  })
+  .step('Process Alert', ({ state, options }) => ({
+    ...state,
+    formattedMessage: options.includeDetails 
+      ? <%= "`Alert: ${state.message} - Details: ${state.details}`" %>
+      : <%= "`Alert: ${state.message}`" %>,
+    isPriority: options.priority === 'high'
+  }))
+  .step('Send Notification', async ({ state, options, slack, email }) => {
+    // Use options to control behavior
+    if (state.isPriority) {
+      // High priority goes to email too
+      await email.send('admin@example.com', state.formattedMessage);
+    }
+    
+    // Always send to Slack channel from options
+    await slack.post(options.channel, state.formattedMessage);
+    
+    return { ...state, notified: true };
+  });
+
+// Run with custom options from CLI:
+// px brain run smart-notifier -o channel=#urgent -o priority=high -o includeDetails=true
+```
+
+#### Testing with Options
+
+```typescript
+// In your tests
+const result = await runBrainTest(notificationBrain, {
+  client: mockClient,
+  initialState: { message: 'System down', details: 'Database unreachable' },
+  options: { 
+    channel: '#test-channel',
+    priority: 'high',
+    includeDetails: true
+  }
+});
+
+expect(mockSlack.post).toHaveBeenCalledWith('#test-channel', expect.any(String));
+expect(mockEmail.send).toHaveBeenCalled(); // High priority triggers email
 ```
 
 ### Service Injection

@@ -11,7 +11,7 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  * 2. Create service instances
  * 3. Call .withServices() on the brain before returning it
  * 
- * Example:
+ * Example with services and options:
  * ```typescript
  * interface ProjectServices {
  *   logger: {
@@ -45,12 +45,22 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  * import { brain } from '../brain.js';
  * 
  * export default brain('My Brain')
- *   .step('Use Services', async ({ logger, api }) => {
- *     logger.info('Fetching data...');
- *     const data = await api.fetch('/users');
+ *   .withOptions({
+ *     environment: 'production',
+ *     verbose: false
+ *   })
+ *   .step('Use Services', async ({ state, options, logger, api }) => {
+ *     if (options.verbose === 'true') {
+ *       logger.info('Fetching data...');
+ *     }
+ *     const endpoint = options.environment === 'dev' ? '/users/test' : '/users';
+ *     const data = await api.fetch(endpoint);
  *     return { users: data };
  *   });
  * ```
+ * 
+ * Run with custom options from CLI:
+ * px brain run my-brain -o environment=dev -o verbose=true
  */
 export const brain: BrainFunction = (brainConfig) => {
   // For now, just return the core brain without any services.

@@ -220,6 +220,42 @@ export function brain<
 
 This keeps your service implementations separate from your brain logic and makes them easier to test and maintain.
 
+## Brain Options Usage
+
+When creating brains that need runtime configuration, use the options pattern:
+
+```typescript
+// Good example - configurable brain
+const alertBrain = brain('Alert System')
+  .withOptions({
+    slackChannel: '#general',
+    emailEnabled: false,
+    alertThreshold: 5
+  })
+  .step('Check Threshold', ({ state, options }) => ({
+    ...state,
+    shouldAlert: state.errorCount > parseInt(options.alertThreshold)
+  }))
+  .step('Send Alerts', async ({ state, options, slack }) => {
+    if (!state.shouldAlert) return state;
+    
+    await slack.post(options.slackChannel, state.message);
+    
+    if (options.emailEnabled === 'true') {
+      // Note: CLI options come as strings
+      await email.send('admin@example.com', state.message);
+    }
+    
+    return { ...state, alerted: true };
+  });
+```
+
+Remember:
+- Options from CLI are always strings (even numbers and booleans)
+- Use `.withOptions()` to set sensible defaults
+- Options are for configuration, not data
+- Document available options in comments above the brain
+
 ## Important: ESM Module Imports
 
 This project uses ES modules (ESM). **Always include the `.js` extension in your imports**, even when importing TypeScript files:
