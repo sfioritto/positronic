@@ -8,26 +8,29 @@ The Brain DSL provides a fluent, type-safe API for building stateful AI workflow
 
 **Note**: This project uses a custom brain function. Always import `brain` from `../brain.js`, not from `@positronic/core`. See positronic-guide.md for details.
 
-### Type Parameters
+### Type Safety and Options
 
-The brain function accepts three optional type parameters:
+The brain function provides full type safety through its fluent API. State types are automatically inferred as you build your brain, and options can be validated at runtime using schemas.
 
-```typescript
-brain<TOptions, TState, TServices>(config)
-```
-
-- `TOptions`: The type of runtime options (defaults to `{}`)
-- `TState`: The initial state type (usually inferred from first step)
-- `TServices`: The type of injected services (defaults to `{}`)
-
-Most commonly, you'll only specify the options type:
+For runtime options validation, use the `withOptionsSchema` method with a Zod schema:
 
 ```typescript
-// Just options type
-brain<MyOptions>('My Brain')
+import { z } from 'zod';
 
-// All three types (rare - usually let TypeScript infer state)
-brain<MyOptions, MyInitialState, MyServices>('My Brain')
+const optionsSchema = z.object({
+  environment: z.enum(['dev', 'staging', 'prod']),
+  verbose: z.boolean().default(false)
+});
+
+const myBrain = brain('My Brain')
+  .withOptionsSchema(optionsSchema)
+  .step('Process', ({ options }) => {
+    // options is fully typed based on the schema
+    if (options.verbose) {
+      console.log('Running in', options.environment);
+    }
+    return { status: 'complete' };
+  });
 ```
 
 ## Basic Brain Structure
@@ -172,21 +175,23 @@ Options provide runtime configuration for your brains, allowing different behavi
 
 #### Typing Options
 
-There are two ways to type your brain's options:
-
-**Method 1: Using Type Parameters** (when you need typed options but don't want defaults)
+To use options in your brain, define a Zod schema with `withOptionsSchema`:
 
 ```typescript
-interface NotificationOptions {
-  slackChannel: string;
-  priority: 'low' | 'normal' | 'high';
-  includeTimestamp: boolean;
-}
+import { z } from 'zod';
 
-// Pass the options type as the first type parameter
-const notificationBrain = brain<NotificationOptions>('Notification Brain')
+// Define your options schema
+const notificationSchema = z.object({
+  slackChannel: z.string(),
+  priority: z.enum(['low', 'normal', 'high']),
+  includeTimestamp: z.boolean().default(true)
+});
+
+// Use withOptionsSchema to add runtime validation
+const notificationBrain = brain('Notification Brain')
+  .withOptionsSchema(notificationSchema)
   .step('Send Alert', async ({ state, options, slack }) => {
-    // TypeScript knows the exact shape of options
+    // TypeScript knows the exact shape of options from the schema
     const message = options.includeTimestamp 
       ? `[<%= '${new Date().toISOString()}' %>] <%= '${state.alert}' %>`
       : state.alert;
@@ -200,10 +205,11 @@ const notificationBrain = brain<NotificationOptions>('Notification Brain')
   });
 ```
 
-The type parameter approach is particularly useful when:
-- Options are required (no sensible defaults)
-- You want strict typing without providing defaults
-- You're building a library of reusable brains
+The schema approach provides:
+- Runtime validation of options
+- Automatic TypeScript type inference
+- Clear error messages for invalid options
+- Support for default values in the schema
 
 #### Passing Options from Command Line
 
@@ -247,13 +253,14 @@ Understanding when to use each:
 
 ```typescript
 // Define a brain that uses options for configuration
-interface NotificationOptions {
-  channel: string;
-  priority: string;
-  includeDetails: string;
-}
+const notificationSchema = z.object({
+  channel: z.string(),
+  priority: z.string().default('normal'),
+  includeDetails: z.string().default('false')
+});
 
-const notificationBrain = brain<NotificationOptions>('Smart Notifier')
+const notificationBrain = brain('Smart Notifier')
+  .withOptionsSchema(notificationSchema)
   .withServices({ 
     slack: slackClient,
     email: emailClient 

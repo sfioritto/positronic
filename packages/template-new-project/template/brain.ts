@@ -1,4 +1,4 @@
-import { brain as coreBrain, type BrainFunction } from '@positronic/core';
+import { brain as coreBrain, type BrainFactory } from '@positronic/core';
 
 /**
  * Base brain factory for this project.
@@ -11,7 +11,7 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  * 2. Create service instances
  * 3. Call .withServices() on the brain before returning it
  * 
- * Example with services and options:
+ * Example with services:
  * ```typescript
  * interface ProjectServices {
  *   logger: {
@@ -23,7 +23,7 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  *   };
  * }
  * 
- * export const brain: BrainFunction = (brainConfig) => {
+ * export const brain: BrainFactory = (brainConfig) => {
  *   return coreBrain(brainConfig)
  *     .withServices({
  *       logger: {
@@ -43,13 +43,15 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  * Then in your brain files (in the brains/ directory):
  * ```typescript
  * import { brain } from '../brain.js';
+ * import { z } from 'zod';
  * 
- * interface MyOptions {
- *   environment: string;
- *   verbose: string;
- * }
+ * const optionsSchema = z.object({
+ *   environment: z.string().default('prod'),
+ *   verbose: z.string().default('false')
+ * });
  * 
- * export default brain<MyOptions>('My Brain')
+ * export default brain('My Brain')
+ *   .withOptionsSchema(optionsSchema)
  *   .step('Use Services', async ({ state, options, logger, api }) => {
  *     if (options.verbose === 'true') {
  *       logger.info('Fetching data...');
@@ -63,7 +65,7 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  * Run with custom options from CLI:
  * px brain run my-brain -o environment=dev -o verbose=true
  */
-export const brain: BrainFunction = (brainConfig) => {
+export const brain: BrainFactory = (brainConfig) => {
   // For now, just return the core brain without any services.
   // Update this function to add your project-wide services.
   return coreBrain(brainConfig);

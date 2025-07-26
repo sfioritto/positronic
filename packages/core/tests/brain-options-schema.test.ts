@@ -89,6 +89,19 @@ describe('Brain withOptionsSchema', () => {
   });
 
   describe('Error handling', () => {
+    it('should throw error when options are passed without schema', async () => {
+      const myBrain = brain('test').step('Process', ({ state }) => state);
+
+      await expect(async () => {
+        await collectAllEvents(
+          myBrain.run({
+            client: mockClient,
+            options: { some: 'options' },
+          })
+        );
+      }).rejects.toThrow("Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.");
+    });
+
     it('should throw error for invalid options when schema is defined', async () => {
       const schema = z.object({
         required: z.string(),
@@ -214,9 +227,9 @@ describe('Brain withOptionsSchema', () => {
     });
   });
 
-  describe('Type parameter compatibility', () => {
-    it('should still work with type parameter approach', async () => {
-      // This is the existing pattern that should continue to work
+  describe('Breaking change: Type parameters no longer allow options', () => {
+    it('should throw error when using type parameter approach with options', async () => {
+      // This pattern no longer works - must use withOptionsSchema
       type MyOptions = {
         name: string;
         count: number;
@@ -226,15 +239,14 @@ describe('Brain withOptionsSchema', () => {
         message: `${options.name} has count ${options.count}`,
       }));
 
-      const events = await collectAllEvents(
-        myBrain.run({
-          client: mockClient,
-          options: { name: 'Test', count: 42 },
-        })
-      );
-
-      const completeEvent = events.find(e => e.type === BRAIN_EVENTS.COMPLETE);
-      expect(completeEvent).toBeDefined();
+      await expect(async () => {
+        await collectAllEvents(
+          myBrain.run({
+            client: mockClient,
+            options: { name: 'Test', count: 42 },
+          })
+        );
+      }).rejects.toThrow("Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.");
     });
   });
 });
