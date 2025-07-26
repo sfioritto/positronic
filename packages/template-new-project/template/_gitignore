@@ -22,5 +22,6 @@ dist/
 coverage/
 
 .positronic-server.log
+.positronic-server.pid
 
 resources.d.ts
