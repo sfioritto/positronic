@@ -2,7 +2,7 @@ import { BRAIN_EVENTS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { Adapter } from '../adapters/types.js';
 import type { SerializedStep, Brain } from './brain.js';
-import type { State } from './types.js';
+import type { State, JsonObject } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 
@@ -37,7 +37,7 @@ export class BrainRunner {
     });
   }
 
-  async run<TOptions extends object = {}, TState extends State = {}>(
+  async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     {
       initialState = {} as TState,

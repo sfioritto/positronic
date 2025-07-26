@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator } from '../clients/types.js';
-import type { State, JsonPatch } from './types.js';
+import type { State, JsonPatch, JsonObject } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
@@ -14,33 +14,33 @@ export type SerializedError = {
 
 // New Event Type System
 // Base event interface with only type and options
-interface BaseEvent<TOptions extends object = object> {
+interface BaseEvent<TOptions extends JsonObject = JsonObject> {
   type: (typeof BRAIN_EVENTS)[keyof typeof BRAIN_EVENTS];
   options: TOptions;
   brainRunId: string;
 }
 
 // 1. Brain Events (all include brain title/description)
-interface BrainBaseEvent<TOptions extends object = object>
+interface BrainBaseEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   brainTitle: string;
   brainDescription?: string;
 }
 
-export interface BrainStartEvent<TOptions extends object = object>
+export interface BrainStartEvent<TOptions extends JsonObject = JsonObject>
   extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.START | typeof BRAIN_EVENTS.RESTART;
   initialState: State;
   status: typeof STATUS.RUNNING;
 }
 
-export interface BrainCompleteEvent<TOptions extends object = object>
+export interface BrainCompleteEvent<TOptions extends JsonObject = JsonObject>
   extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.COMPLETE;
   status: typeof STATUS.COMPLETE;
 }
 
-export interface BrainErrorEvent<TOptions extends object = object>
+export interface BrainErrorEvent<TOptions extends JsonObject = JsonObject>
   extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.ERROR;
   status: typeof STATUS.ERROR;
@@ -48,14 +48,14 @@ export interface BrainErrorEvent<TOptions extends object = object>
 }
 
 // 2. Step Status Event (just steps array and base event properties)
-export interface StepStatusEvent<TOptions extends object = object>
+export interface StepStatusEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.STEP_STATUS;
   steps: SerializedStepStatus[];
 }
 
 // 3. Step Events (include step-specific properties)
-export interface StepStartedEvent<TOptions extends object = object>
+export interface StepStartedEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.STEP_START;
   status: typeof STATUS.RUNNING;
@@ -63,7 +63,7 @@ export interface StepStartedEvent<TOptions extends object = object>
   stepId: string;
 }
 
-export interface StepCompletedEvent<TOptions extends object = object>
+export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.STEP_COMPLETE;
   status: typeof STATUS.RUNNING;
@@ -73,7 +73,7 @@ export interface StepCompletedEvent<TOptions extends object = object>
 }
 
 // Union type of all possible events
-export type BrainEvent<TOptions extends object = object> =
+export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
   | BrainCompleteEvent<TOptions>
   | BrainErrorEvent<TOptions>
@@ -105,7 +105,7 @@ export interface BrainStructure {
 // Type for the brain function
 export interface BrainFactory {
   <
-    TOptions extends object = object,
+    TOptions extends JsonObject = JsonObject,
     TState extends State = object,
     TServices extends object = object
   >(
@@ -116,7 +116,7 @@ export interface BrainFactory {
 type StepBlock<
   TStateIn,
   TStateOut,
-  TOptions extends object = object,
+  TOptions extends JsonObject = JsonObject,
   TServices extends object = object
 > = {
   type: 'step';
@@ -135,7 +135,7 @@ type BrainBlock<
   TOuterState,
   TInnerState extends State,
   TNewState,
-  TOptions extends object = object,
+  TOptions extends JsonObject = JsonObject,
   TServices extends object = object
 > = {
   type: 'brain';
@@ -152,26 +152,26 @@ type BrainBlock<
 type Block<
   TStateIn,
   TStateOut,
-  TOptions extends object = object,
+  TOptions extends JsonObject = JsonObject,
   TServices extends object = object
 > =
   | StepBlock<TStateIn, TStateOut, TOptions, TServices>
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
-interface BaseRunParams<TOptions extends object = object> {
+interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   client: ObjectGenerator;
   resources?: Resources;
   options?: TOptions;
 }
 
-export interface InitialRunParams<TOptions extends object = object>
+export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
   extends BaseRunParams<TOptions> {
   initialState?: State;
   initialCompletedSteps?: never;
   brainRunId?: string;
 }
 
-export interface RerunParams<TOptions extends object = object>
+export interface RerunParams<TOptions extends JsonObject = JsonObject>
   extends BaseRunParams<TOptions> {
   initialState: State;
   initialCompletedSteps: SerializedStep[];
@@ -179,7 +179,7 @@ export interface RerunParams<TOptions extends object = object>
 }
 
 export class Brain<
-  TOptions extends object = object,
+  TOptions extends JsonObject = JsonObject,
   TState extends State = object,
   TServices extends object = object
 > {
@@ -442,7 +442,7 @@ class Step {
 }
 
 class BrainEventStream<
-  TOptions extends object = object,
+  TOptions extends JsonObject = JsonObject,
   TState extends State = object,
   TServices extends object = object
 > {
@@ -718,7 +718,7 @@ const brainNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const brainNames = new Set<string>();
 export const brain: BrainFactory = function <
-  TOptions extends object = object,
+  TOptions extends JsonObject = JsonObject,
   TState extends State = object,
   TServices extends object = object
 >(brainConfig: string | { title: string; description?: string }) {
