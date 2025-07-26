@@ -127,7 +127,17 @@ See `/docs/brain-testing-guide.md` for detailed testing guidance.
 
 1. **Start the development server**: `px server -d`
 2. **Create or modify brains**: Always import from `./brain.js`
-3. **Test locally**: `px brain run <brain-name>`
+3. **Test locally**: 
+   ```bash
+   # Basic run
+   px brain run <brain-name>
+   
+   # Run with options
+   px brain run <brain-name> -o channel=#dev -o debug=true
+   
+   # Watch execution in real-time
+   px brain run <brain-name> --watch
+   ```
 4. **Run tests**: `npm test`
 5. **Deploy**: Backend-specific commands (e.g., `px deploy` for Cloudflare)
 
