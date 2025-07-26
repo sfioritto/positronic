@@ -255,8 +255,8 @@ Start by following the brain testing guide (`/docs/brain-testing-guide.md`) and 
 ```typescript
 // tests/my-new-brain.test.ts
 import { describe, it, expect } from '@jest/globals';
-import { createMockClient, runBrainTest } from '@positronic/core/testing';
-import myNewBrain from '../brains/my-new-brain';
+import { createMockClient, runBrainTest } from './test-utils.js';
+import myNewBrain from '../brains/my-new-brain.js';
 
 describe('MyNewBrain', () => {
   it('should process data and return expected result', async () => {
