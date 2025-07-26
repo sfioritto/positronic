@@ -186,7 +186,7 @@ const notificationBrain = brain<NotificationOptions>('Notification Brain')
   .step('Send Alert', async ({ state, options, slack }) => {
     // TypeScript knows the exact shape of options
     const message = options.includeTimestamp 
-      ? `[${new Date().toISOString()}] ${state.alert}`
+      ? `[<%= '${new Date().toISOString()}' %>] <%= '${state.alert}' %>`
       : state.alert;
     
     await slack.post(options.slackChannel, {
@@ -279,8 +279,8 @@ const notificationBrain = brain('Smart Notifier')
   .step('Process Alert', ({ state, options }) => ({
     ...state,
     formattedMessage: options.includeDetails 
-      ? <%= "`Alert: ${state.message} - Details: ${state.details}`" %>
-      : <%= "`Alert: ${state.message}`" %>,
+      ? `Alert: <%= '${state.message}' %> - Details: <%= '${state.details}' %>`
+      : `Alert: <%= '${state.message}' %>`,
     isPriority: options.priority === 'high'
   }))
   .step('Send Notification', async ({ state, options, slack, email }) => {
