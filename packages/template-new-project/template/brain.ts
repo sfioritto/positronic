@@ -44,11 +44,12 @@ import { brain as coreBrain, type BrainFunction } from '@positronic/core';
  * ```typescript
  * import { brain } from '../brain.js';
  * 
- * export default brain('My Brain')
- *   .withOptions({
- *     environment: 'production',
- *     verbose: false
- *   })
+ * interface MyOptions {
+ *   environment: string;
+ *   verbose: string;
+ * }
+ * 
+ * export default brain<MyOptions>('My Brain')
  *   .step('Use Services', async ({ state, options, logger, api }) => {
  *     if (options.verbose === 'true') {
  *       logger.info('Fetching data...');

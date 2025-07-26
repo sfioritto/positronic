@@ -79,7 +79,7 @@ brain('AI Education Assistant')
   }))
   .prompt('Generate explanation', {
     template: ({ topic, context }) =>
-      <%= "`${context}. Please provide a brief, beginner-friendly explanation of ${topic}.`" %>,
+      `<%= '${context}' %>. Please provide a brief, beginner-friendly explanation of <%= '${topic}' %>.`,
     outputSchema: {
       schema: z.object({
         explanation: z.string().describe('A clear explanation of the topic'),
@@ -94,7 +94,7 @@ brain('AI Education Assistant')
     formattedOutput: {
       topic: state.topic,
       explanation: state.topicExplanation.explanation || '',
-      summary: <%= "`This explanation covers ${state.topicExplanation.keyPoints?.length || 0} key points at a ${state.topicExplanation.difficulty || 'unknown'} level.`" %>,
+      summary: `This explanation covers <%= '${state.topicExplanation.keyPoints?.length || 0}' %> key points at a <%= '${state.topicExplanation.difficulty || \'unknown\'}' %> level.`,
       points: state.topicExplanation.keyPoints || [],
     },
   }))
@@ -102,7 +102,9 @@ brain('AI Education Assistant')
     'Generate follow-up questions',
     {
       template: ({ formattedOutput }) =>
-        <%= "`Based on this explanation about ${formattedOutput.topic}: \"${formattedOutput.explanation}\"\n        \n        Generate 3 thoughtful follow-up questions that a student might ask.`" %>,
+        `Based on this explanation about <%= '${formattedOutput.topic}' %>: "<%= '${formattedOutput.explanation}' %>"
+        
+        Generate 3 thoughtful follow-up questions that a student might ask.`,
       outputSchema: {
         schema: z.object({
           questions: z.array(z.string()).length(3).describe('Three follow-up questions'),
@@ -198,26 +200,6 @@ const notificationBrain = brain<NotificationOptions>('Notification Brain')
   });
 ```
 
-**Method 2: Using `.withOptions()`** (when you want to provide defaults)
-
-```typescript
-const configuredBrain = brain('My Brain')
-  .withOptions({ 
-    debug: false, 
-    temperature: 0.7,
-    slackChannel: '#general' 
-  })
-  .step('Process', ({ state, options }) => {
-    // TypeScript infers options type from withOptions
-    if (options.debug) console.log('Processing...');
-    return state;
-  })
-  .step('Notify', async ({ state, options, slack }) => {
-    await slack.post(options.slackChannel, 'Process complete!');
-    return state;
-  });
-```
-
 The type parameter approach is particularly useful when:
 - Options are required (no sensible defaults)
 - You want strict typing without providing defaults
@@ -245,7 +227,6 @@ Options are passed as simple key=value pairs and are available as strings in you
 Understanding when to use each:
 
 - **Options**: Runtime configuration (channels, endpoints, feature flags)
-  - Set defaults with `.withOptions()`
   - Override from CLI with `-o key=value`
   - Don't change during execution
   - Examples: `slackChannel`, `apiEndpoint`, `debugMode`
@@ -266,19 +247,20 @@ Understanding when to use each:
 
 ```typescript
 // Define a brain that uses options for configuration
-const notificationBrain = brain('Smart Notifier')
-  .withOptions({
-    channel: '#general',
-    priority: 'normal',
-    includeDetails: false
-  })
+interface NotificationOptions {
+  channel: string;
+  priority: string;
+  includeDetails: string;
+}
+
+const notificationBrain = brain<NotificationOptions>('Smart Notifier')
   .withServices({ 
     slack: slackClient,
     email: emailClient 
   })
   .step('Process Alert', ({ state, options }) => ({
     ...state,
-    formattedMessage: options.includeDetails 
+    formattedMessage: options.includeDetails === 'true'
       ? `Alert: <%= '${state.message}' %> - Details: <%= '${state.details}' %>`
       : `Alert: <%= '${state.message}' %>`,
     isPriority: options.priority === 'high'
@@ -412,7 +394,7 @@ const analysisBrain = brain('Data Analysis')
     return { ...state, data };
   })
   .prompt('Analyze Data', {
-    template: ({ data }) => <%= "`Analyze this data: ${JSON.stringify(data)}`" %>,
+    template: ({ data }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
     outputSchema: {
       schema: z.object({
         insights: z.array(z.string()),
@@ -540,7 +522,7 @@ const typedBrain = brain('Typed Example')
     name: 'Test', // TypeScript knows state has 'count'
   }))
   .step('Use Both', ({ state }) => ({
-    message: <%= "`${state.name}: ${state.count}`" %>, // Both properties available
+    message: `<%= '${state.name}' %>: <%= '${state.count}' %>`, // Both properties available
   }));
 ```
 
@@ -645,7 +627,7 @@ export const aiFilterPrompt = {
 
     // Build the prompt with state data
     const articleList = state.articles
-      .map((a, i) => <%= "`${i + 1}. ${a.title} (score: ${a.score})`" %>)
+      .map((a, i) => `<%= '${i + 1}' %>. <%= '${a.title}' %> (score: <%= '${a.score}' %>)`)
       .join('\n');
 
     return template
@@ -709,7 +691,6 @@ const completeBrain = brain({
   title: 'Complete Example',
   description: 'Demonstrates all Brain DSL features',
 })
-  .withOptions({ temperature: 0.7 })
   .withServices<Services>({
     logger: console,
     analytics: {
@@ -737,11 +718,11 @@ const completeBrain = brain({
   },
   // Services available in reduce function too
   ({ state, response, logger }) => {
-    logger.log(<%= "`Plan generated with ${response.tasks.length} tasks`" %>);
+    logger.log(`Plan generated with <%= '${response.tasks.length}' %> tasks`);
     return { ...state, plan: response };
   })
   .step('Process Plan', ({ state, logger, analytics }) => {
-    logger.log(<%= "`Processing ${state.plan.tasks.length} tasks`" %>);
+    logger.log(`Processing <%= '${state.plan.tasks.length}' %> tasks`);
     analytics.track('plan_processed', {
       task_count: state.plan.tasks.length,
       duration: state.plan.duration

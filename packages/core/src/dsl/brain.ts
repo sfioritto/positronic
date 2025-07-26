@@ -185,7 +185,6 @@ export class Brain<
 > {
   private blocks: Block<any, any, TOptions, TServices>[] = [];
   public type: 'brain' = 'brain';
-  private defaultOptions: Partial<TOptions> = {};
   private services: TServices = {} as TServices;
 
   constructor(public readonly title: string, private description?: string) {}
@@ -212,11 +211,6 @@ export class Brain<
     };
   }
 
-  // New method to specify default options
-  withOptions(options: Partial<TOptions>): this {
-    this.defaultOptions = { ...this.defaultOptions, ...options };
-    return this;
-  }
 
   // New method to add services
   withServices<TNewServices extends object>(
@@ -226,9 +220,6 @@ export class Brain<
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
-
-    // Copy default options
-    nextBrain.withOptions(this.defaultOptions);
 
     // Set services
     nextBrain.services = services;
@@ -367,18 +358,12 @@ export class Brain<
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const { title, description, blocks } = this;
 
-    // Merge default options with provided options
-    const mergedOptions = {
-      ...this.defaultOptions,
-      ...(params.options || {}),
-    } as TOptions;
-
     const stream = new BrainEventStream({
       title,
       description,
       blocks,
       ...params,
-      options: mergedOptions,
+      options: params.options || ({} as TOptions),
       services: this.services,
     });
 
@@ -400,9 +385,6 @@ export class Brain<
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
-
-    // Copy default options to the next brain
-    nextBrain.withOptions(this.defaultOptions);
 
     // Copy services to the next brain
     nextBrain.services = this.services;
