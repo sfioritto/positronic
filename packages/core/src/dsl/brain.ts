@@ -186,6 +186,7 @@ export class Brain<
   private blocks: Block<any, any, TOptions, TServices>[] = [];
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
+  private optionsSchema?: z.ZodSchema<any>;
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -223,6 +224,22 @@ export class Brain<
 
     // Set services
     nextBrain.services = services;
+    // Copy optionsSchema to maintain it through the chain
+    nextBrain.optionsSchema = this.optionsSchema;
+
+    return nextBrain;
+  }
+
+  withOptionsSchema<TSchema extends z.ZodSchema>(
+    schema: TSchema
+  ): Brain<z.infer<TSchema>, TState, TServices> {
+    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+
+    nextBrain.optionsSchema = schema;
+    nextBrain.services = this.services;
 
     return nextBrain;
   }
@@ -358,12 +375,23 @@ export class Brain<
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const { title, description, blocks } = this;
 
+    // Validate options if schema is defined
+    let validatedOptions: TOptions;
+    if (this.optionsSchema) {
+      // Just call parse - Zod handles defaults automatically
+      validatedOptions = this.optionsSchema.parse(params.options || {}) as TOptions;
+    } else {
+      // If no schema is defined, allow options to pass through
+      // This maintains backward compatibility with type parameter approach
+      validatedOptions = (params.options || {}) as TOptions;
+    }
+
     const stream = new BrainEventStream({
       title,
       description,
       blocks,
       ...params,
-      options: params.options || ({} as TOptions),
+      options: validatedOptions,
       services: this.services,
     });
 
@@ -388,6 +416,8 @@ export class Brain<
 
     // Copy services to the next brain
     nextBrain.services = this.services;
+    // Copy optionsSchema to the next brain
+    nextBrain.optionsSchema = this.optionsSchema;
 
     return nextBrain;
   }
