@@ -60,13 +60,10 @@ interface ProjectServices {
 }
 
 // Export the wrapped brain function
-export function brain<
-  TOptions extends object = object,
-  TState extends object = object
->(
+export function brain(
   brainConfig: string | { title: string; description?: string }
-): Brain<TOptions, TState, ProjectServices> {
-  return coreBrain<TOptions, TState, ProjectServices>(brainConfig)
+) {
+  return coreBrain(brainConfig)
     .withServices({
       logger: {
         info: (msg) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),

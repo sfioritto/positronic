@@ -381,7 +381,7 @@ describe('brain creation', () => {
       let reduceContent: string | undefined;
 
       const testBrain = brain<
-        { myOption: string },
+        {},
         {
           promptResult?: any;
           reducedResult?: string;
@@ -417,7 +417,6 @@ describe('brain creation', () => {
       const run = testBrain.run({
         client: mockClient,
         resources: mockResources,
-        options: { myOption: 'test' },
       });
       let finalState: any = {};
       const allPatches: JsonPatch[] = [];
@@ -1408,13 +1407,19 @@ describe('nested brains', () => {
 
 describe('brain options', () => {
   it('should pass options through to brain events', async () => {
-    const testBrain = brain<{ testOption: string }>('Options Brain').step(
-      'Simple step',
-      ({ state, options }) => ({
-        value: 1,
-        passedOption: options.testOption,
-      })
-    );
+    const optionsSchema = z.object({
+      testOption: z.string(),
+    });
+    
+    const testBrain = brain('Options Brain')
+      .withOptionsSchema(optionsSchema)
+      .step(
+        'Simple step',
+        ({ state, options }) => ({
+          value: 1,
+          passedOption: options.testOption,
+        })
+      );
 
     const brainOptions = {
       testOption: 'test-value',
@@ -1539,16 +1544,23 @@ describe('services support', () => {
 describe('type inference', () => {
   it('should correctly infer complex brain state types', async () => {
     // Create an inner brain that uses the shared options type
-    const innerBrain = brain<{ features: string[] }>('Inner Type Test').step(
-      'Process features',
-      ({ options }) => ({
-        processedValue: options.features.includes('fast') ? 100 : 42,
-        featureCount: options.features.length,
-      })
-    );
+    const optionsSchema = z.object({
+      features: z.array(z.string()),
+    });
+    
+    const innerBrain = brain('Inner Type Test')
+      .withOptionsSchema(optionsSchema)
+      .step(
+        'Process features',
+        ({ options }) => ({
+          processedValue: options.features.includes('fast') ? 100 : 42,
+          featureCount: options.features.length,
+        })
+      );
 
     // Create a complex brain using multiple features
-    const complexBrain = brain<{ features: string[] }>('Complex Type Test')
+    const complexBrain = brain('Complex Type Test')
+      .withOptionsSchema(optionsSchema)
       .step('First step', ({ options }) => ({
         initialFeatures: options.features,
         value: 42,

@@ -202,10 +202,7 @@ import slack from './services/slack.js';
 import database from './services/database.js';
 import analytics from './services/analytics.js';
 
-export function brain<
-  TOptions extends object = object,
-  TState extends object = object
->(
+export function brain(
   brainConfig: string | { title: string; description?: string }
 ) {
   return coreBrain(brainConfig)
@@ -222,17 +219,20 @@ This keeps your service implementations separate from your brain logic and makes
 
 ## Brain Options Usage
 
-When creating brains that need runtime configuration, use the options pattern:
+When creating brains that need runtime configuration, use the options schema pattern:
 
 ```typescript
-// Good example - configurable brain
-interface AlertOptions {
-  slackChannel: string;
-  emailEnabled: string;
-  alertThreshold: string;
-}
+import { z } from 'zod';
 
-const alertBrain = brain<AlertOptions>('Alert System')
+// Good example - configurable brain with validated options
+const alertSchema = z.object({
+  slackChannel: z.string(),
+  emailEnabled: z.string().default('false'),
+  alertThreshold: z.string().default('10')
+});
+
+const alertBrain = brain('Alert System')
+  .withOptionsSchema(alertSchema)
   .step('Check Threshold', ({ state, options }) => ({
     ...state,
     shouldAlert: state.errorCount > parseInt(options.alertThreshold)

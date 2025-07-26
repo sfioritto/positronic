@@ -381,9 +381,11 @@ export class Brain<
       // Just call parse - Zod handles defaults automatically
       validatedOptions = this.optionsSchema.parse(params.options || {}) as TOptions;
     } else {
-      // If no schema is defined, allow options to pass through
-      // This maintains backward compatibility with type parameter approach
-      validatedOptions = (params.options || {}) as TOptions;
+      // If no schema is defined but options are provided, throw error
+      if (params.options && Object.keys(params.options).length > 0) {
+        throw new Error(`Brain '${this.title}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`);
+      }
+      validatedOptions = {} as TOptions;
     }
 
     const stream = new BrainEventStream({

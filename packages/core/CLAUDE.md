@@ -38,12 +38,8 @@ Tests use Jest and are located alongside source files and must be run from the m
 
 - **Block System**: The DSL builds an internal array of `Block` objects (union type of `StepBlock` and `BrainBlock`)
 - **Type Chain**: Each method returns `this.nextBrain<TNewState>()` which creates a new Brain instance with updated state type
-- **State Type Inference**: Uses TypeScript generics to thread state types through the chain:
-  ```typescript
-  class Brain<TOptions, TState, TServices> {
-    step<TNewState>(...): Brain<TOptions, TNewState, TServices>
-  }
-  ```
+- **State Type Inference**: Uses TypeScript generics to thread state types through the chain
+- **Options Validation**: `withOptionsSchema()` method provides runtime validation via Zod schemas
 - **Brain Name Uniqueness**: Enforced at runtime via global `brainNames` Set (disabled in tests)
 - **Services Pattern**: Services are stored in a private field and passed through the chain via `nextBrain()`
 - **Default Options**: Merged with runtime options in the `run()` method
@@ -122,8 +118,7 @@ See the comprehensive testing guide: @docs/core-testing-guide.md
 
 - **Module System**: Pure ESM with `.js` extensions in imports (even for `.ts` files)
 - **Type Exports**: Separate type declarations in `dist/types` via `tsc`
-- **Generic Threading**: Brain class uses 3 generic parameters: `<TOptions, TState, TServices>`
-- **Type Inference Chain**: Each step method returns `Brain<TOptions, TNewState, TServices>`
+- **Type Inference Chain**: Each step method updates state type while preserving options and services types
 - **Zod Integration**: Exported as peer dependency to avoid version conflicts
 - **Type Guards**: `isResourceEntry()` for discriminating union types in resources
 
@@ -134,7 +129,7 @@ See the comprehensive testing guide: @docs/core-testing-guide.md
 - **Lazy Resource Loading**: `ResourceLoader.load()` only called when `loadText()`/`loadBinary()` invoked
 - **Event Correlation**: All events include `brainRunId` (generated via `uuid.v4()` if not provided)
 - **Patch Optimization**: `createPatch()` produces minimal diffs - empty patches for identical states
-- **Options**: Runtime options must match the brain's type parameter for options
+- **Options**: Runtime options are validated against Zod schema if provided via `withOptionsSchema()`
 - **Services Timing**: `.withServices()` must be called before steps - services stored in private field
 - **Step ID Generation**: Each step gets UUID via `Step` constructor for tracking
 - **Error Serialization**: Errors converted to `SerializedError` with name/message/stack
