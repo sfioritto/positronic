@@ -55,6 +55,112 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
+    it('should run a brain with options', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'run', 
+          'test-brain', 
+          '-o', 
+          'channel=#general',
+          '-o',
+          'debug=true'
+        ]);
+        
+        const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
+        expect(isOutputRendered).toBe(true);
+        
+        // Verify API was called with options
+        const calls = env.server.getLogs();
+        const runCall = calls.find(c => c.method === 'createBrainRun');
+        expect(runCall).toBeDefined();
+        expect(runCall?.args[0]).toBe('test-brain');
+        expect(runCall?.args[1]).toEqual({
+          channel: '#general',
+          debug: 'true'
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should run a brain with options using long flag', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'run', 
+          'test-brain', 
+          '--options', 
+          'environment=production',
+          '--options',
+          'rate=100'
+        ]);
+        
+        const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
+        expect(isOutputRendered).toBe(true);
+        
+        // Verify API was called with options
+        const calls = env.server.getLogs();
+        const runCall = calls.find(c => c.method === 'createBrainRun');
+        expect(runCall).toBeDefined();
+        expect(runCall?.args[0]).toBe('test-brain');
+        expect(runCall?.args[1]).toEqual({
+          environment: 'production',
+          rate: '100'
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle invalid option format', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        // This will throw an error during yargs coercion
+        await expect(px([
+          'run', 
+          'test-brain', 
+          '-o', 
+          'invalid-no-equals'
+        ])).rejects.toThrow(/Invalid option format: "invalid-no-equals"/);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should handle options with values containing equals signs', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'run', 
+          'test-brain', 
+          '-o', 
+          'webhook=https://example.com/api?key=value&foo=bar'
+        ]);
+        
+        const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
+        expect(isOutputRendered).toBe(true);
+        
+        // Verify API was called with correct URL value
+        const calls = env.server.getLogs();
+        const runCall = calls.find(c => c.method === 'createBrainRun');
+        expect(runCall).toBeDefined();
+        expect(runCall?.args[1]).toEqual({
+          webhook: 'https://example.com/api?key=value&foo=bar'
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
 
     it('should handle brain not found (404) error with helpful message', async () => {
       const env = await createTestEnv();

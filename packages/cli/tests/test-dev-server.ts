@@ -294,7 +294,7 @@ export class TestDevServer implements PositronicDevServer {
         brainRunId = 'test-multi-status';
       }
 
-      this.logCall('createBrainRun', [brainRunId]);
+      this.logCall('createBrainRun', [body.brainName, body.options]);
       return [201, { brainRunId }];
     });
 

@@ -26,6 +26,7 @@ interface BrainRerunArgs {
 interface BrainRunArgs {
   name: string;
   watch?: boolean;
+  options?: Record<string, string>;
 }
 interface BrainWatchArgs {
   runId?: string;
@@ -64,15 +65,19 @@ export class BrainCommand {
     });
   }
 
-  async run({ name: brainName, watch }: ArgumentsCamelCase<BrainRunArgs>): Promise<React.ReactElement> {
+  async run({ name: brainName, watch, options }: ArgumentsCamelCase<BrainRunArgs>): Promise<React.ReactElement> {
     const apiPath = '/brains/runs';
+    
     try {
       const response = await apiClient.fetch(apiPath, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ brainName }),
+        body: JSON.stringify({ 
+          brainName,
+          options 
+        }),
       });
 
       if (response.status === 201) {

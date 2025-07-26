@@ -1,5 +1,6 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import React from 'react';
 import { ProjectCommand } from './commands/project.js';
 import { ServerCommand } from './commands/server.js';
 import { BrainCommand } from './commands/brain.js';
@@ -16,6 +17,24 @@ export interface CliOptions {
   server?: PositronicDevServer;
   exitProcess?: boolean;
   render: (element: React.ReactElement) => any;
+}
+
+// Helper function to parse key=value options
+function parseKeyValueOptions(opts: string[] | undefined): Record<string, string> | undefined {
+  if (!opts || opts.length === 0) return undefined;
+  
+  const parsed: Record<string, string> = {};
+  for (const opt of opts) {
+    const [key, ...valueParts] = opt.split('=');
+    const value = valueParts.join('=');
+    
+    if (!key || !value) {
+      throw new Error(`Invalid option format: "${opt}". Options must be in key=value format.`);
+    }
+    
+    parsed[key] = value;
+  }
+  return parsed;
 }
 
 export function buildCli(options: CliOptions) {
@@ -370,10 +389,21 @@ export function buildCli(options: CliOptions) {
           alias: 'w',
           default: false,
         })
+        .option('options', {
+          describe: 'Options to pass to the brain (key=value format)',
+          type: 'array',
+          alias: 'o',
+          string: true,
+          coerce: parseKeyValueOptions
+        })
         .example('$0 run my-brain', 'Run a brain by name')
         .example(
           '$0 run my-brain --watch',
           'Run a brain and watch its execution'
+        )
+        .example(
+          '$0 run my-brain -o channel=#general -o debug=true',
+          'Run a brain with options'
         );
     },
     async (argv) => {
@@ -536,10 +566,21 @@ export function buildCli(options: CliOptions) {
               alias: 'w',
               default: false,
             })
+            .option('options', {
+              describe: 'Options to pass to the brain (key=value format)',
+              type: 'array',
+              alias: 'o',
+              string: true,
+              coerce: parseKeyValueOptions
+            })
             .example('$0 brain run my-brain', 'Run a brain by name')
             .example(
               '$0 brain run my-brain --watch',
               'Run a brain and watch its execution'
+            )
+            .example(
+              '$0 brain run my-brain -o channel=#general -o debug=true',
+              'Run a brain with options'
             );
         },
         async (argv) => {
