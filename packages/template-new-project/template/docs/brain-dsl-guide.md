@@ -283,7 +283,7 @@ Services make testing easier by allowing you to inject mocks:
 
 ```typescript
 // In your test file
-import { createMockClient, runBrainTest } from '@positronic/core/testing';
+import { createMockClient, runBrainTest } from '../tests/test-utils.js';
 
 const mockLogger = {
   info: jest.fn(),

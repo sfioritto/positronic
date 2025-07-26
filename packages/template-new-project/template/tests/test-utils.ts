@@ -1,7 +1,6 @@
-import type { ObjectGenerator } from './clients/types.js';
-import type { BrainEvent } from './dsl/brain.js';
-import { BRAIN_EVENTS } from './dsl/constants.js';
-import { applyPatches } from './dsl/json-patch.js';
+import type { ObjectGenerator } from '@positronic/core';
+import type { BrainEvent } from '@positronic/core';
+import { BRAIN_EVENTS, applyPatches } from '@positronic/core';
 
 export interface MockClient extends ObjectGenerator {
   mockResponses: (...responses: any[]) => void;

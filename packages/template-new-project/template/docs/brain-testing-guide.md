@@ -1,6 +1,14 @@
 # Brain Testing Guide
 
-This guide explains how to test Positronic brains using the testing utilities provided by `@positronic/core`.
+This guide explains how to test Positronic brains using the testing utilities in the `tests/test-utils.ts` file.
+
+## Test Organization
+
+All test files should be placed in the `tests/` directory at the root of your project. This keeps tests separate from your brain implementations and prevents them from being deployed with your application.
+
+Test files should follow the naming convention `<brain-name>.test.ts`. For example:
+- Brain file: `brains/customer-support.ts`
+- Test file: `tests/customer-support.test.ts`
 
 ## Testing Philosophy
 
@@ -16,8 +24,8 @@ Testing brains is about verifying they produce the correct outputs given specifi
 ## Quick Start
 
 ```typescript
-import { createMockClient, runBrainTest } from '@positronic/core';
-import yourBrain from './your-brain.js';
+import { createMockClient, runBrainTest } from '../tests/test-utils.js';
+import yourBrain from '../brains/your-brain.js';
 
 describe('your-brain', () => {
   it('should process user data and generate a report', async () => {

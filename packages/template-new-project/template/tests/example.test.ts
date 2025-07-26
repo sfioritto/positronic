@@ -1,4 +1,4 @@
-import { createMockClient, runBrainTest } from '@positronic/core/testing';
+import { createMockClient, runBrainTest } from './test-utils.js';
 import exampleBrain from '../brains/example.js';
 
 describe('example brain', () => {
