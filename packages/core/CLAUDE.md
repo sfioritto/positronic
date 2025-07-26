@@ -134,7 +134,7 @@ See the comprehensive testing guide: @docs/core-testing-guide.md
 - **Lazy Resource Loading**: `ResourceLoader.load()` only called when `loadText()`/`loadBinary()` invoked
 - **Event Correlation**: All events include `brainRunId` (generated via `uuid.v4()` if not provided)
 - **Patch Optimization**: `createPatch()` produces minimal diffs - empty patches for identical states
-- **Options Merging**: Runtime options override default options set via `.withOptions()`
+- **Options**: Runtime options must match the brain's type parameter for options
 - **Services Timing**: `.withServices()` must be called before steps - services stored in private field
 - **Step ID Generation**: Each step gets UUID via `Step` constructor for tracking
 - **Error Serialization**: Errors converted to `SerializedError` with name/message/stack

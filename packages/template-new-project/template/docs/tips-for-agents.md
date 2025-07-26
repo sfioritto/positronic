@@ -226,12 +226,13 @@ When creating brains that need runtime configuration, use the options pattern:
 
 ```typescript
 // Good example - configurable brain
-const alertBrain = brain('Alert System')
-  .withOptions({
-    slackChannel: '#general',
-    emailEnabled: false,
-    alertThreshold: 5
-  })
+interface AlertOptions {
+  slackChannel: string;
+  emailEnabled: string;
+  alertThreshold: string;
+}
+
+const alertBrain = brain<AlertOptions>('Alert System')
   .step('Check Threshold', ({ state, options }) => ({
     ...state,
     shouldAlert: state.errorCount > parseInt(options.alertThreshold)
@@ -252,7 +253,6 @@ const alertBrain = brain('Alert System')
 
 Remember:
 - Options from CLI are always strings (even numbers and booleans)
-- Use `.withOptions()` to set sensible defaults
 - Options are for configuration, not data
 - Document available options in comments above the brain
 
@@ -417,7 +417,7 @@ export default feedbackBrain;
 // Step 4: Add sentiment analysis step
   .prompt('Analyze sentiment', {
     template: ({ feedback }) =>
-      <%= "`Analyze the sentiment of this feedback: \"${feedback}\"`" %>,
+      <%= '\`Analyze the sentiment of this feedback: "${feedback}"\`' %>,
     outputSchema: {
       schema: z.object({
         sentiment: z.enum(['positive', 'neutral', 'negative']),
@@ -431,7 +431,7 @@ export default feedbackBrain;
 // Step 6: Add response generation
   .prompt('Generate response', {
     template: ({ sentimentAnalysis, feedback }) =>
-      <%= "`Generate a brief response to this ${sentimentAnalysis.sentiment} feedback: \"${feedback}\"`" %>,
+      <%= '\`Generate a brief response to this ${sentimentAnalysis.sentiment} feedback: "${feedback}"\`' %>,
     outputSchema: {
       schema: z.object({
         response: z.string()
