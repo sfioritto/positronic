@@ -15,9 +15,13 @@
     "clean:workspaces": "npm run clean --workspaces && rm -rf node_modules",
     "build:workspaces": "npm run build --workspaces",
     "build:watch": "nodemon --exec 'npm run build:workspaces || /usr/local/bin/terminal-notifier -title \"Positronic Build\" -message \"Build failed\"'",
-    "typecheck": "tsc --noEmit && (cd packages/cloudflare/test-project && npm run typecheck)"
+    "typecheck": "tsc --noEmit && (cd packages/cloudflare/test-project && npm run typecheck)",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.5",
     "@cloudflare/workers-types": "^4.20250430.0",
     "@jest/globals": "^29.7.0",
     "@swc/cli": "^0.6.0",

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [
+    [
+      "@positronic/core",
+      "@positronic/spec",
+      "@positronic/cli",
+      "@positronic/cloudflare",
+      "@positronic/shell",
+      "@positronic/client-anthropic", 
+      "@positronic/client-vercel",
+      "@positronic/template-new-project"
+    ]
+  ],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}
