@@ -22,7 +22,7 @@ export const BrainRerun = ({ brainName, runId, startsAt, stopsAfter }: BrainReru
   useEffect(() => {
     const rerunBrain = async () => {
       try {
-        const body: any = { brainName };
+        const body: any = { brainTitle: brainName };
         if (runId) body.runId = runId;
         if (startsAt !== undefined) body.startsAt = startsAt;
         if (stopsAfter !== undefined) body.stopsAfter = stopsAfter;

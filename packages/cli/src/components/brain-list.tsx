@@ -4,7 +4,7 @@ import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
 
 interface Brain {
-  name: string;
+  filename: string;
   title: string;
   description: string;
 }
@@ -53,12 +53,12 @@ export const BrainList = () => {
     );
   }
 
-  // Sort brains alphabetically by name
-  const sortedBrains = [...data.brains].sort((a, b) => a.name.localeCompare(b.name));
+  // Sort brains alphabetically by filename
+  const sortedBrains = [...data.brains].sort((a, b) => a.filename.localeCompare(b.filename));
 
   // Define column widths
   const columns = {
-    name: { header: 'Name', width: 25 },
+    filename: { header: 'Filename', width: 25 },
     title: { header: 'Title', width: 35 },
     description: { header: 'Description', width: 50 },
   };
@@ -75,7 +75,7 @@ export const BrainList = () => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.name.header, columns.name.width)}</Text>
+          <Text bold color="cyan">{padRight(columns.filename.header, columns.filename.width)}</Text>
           <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.title.header, columns.title.width)}</Text>
           <Text>  </Text>
@@ -90,8 +90,8 @@ export const BrainList = () => {
         {/* Data rows */}
         {sortedBrains.map((brain) => {
           return (
-            <Box key={brain.name}>
-              <Text>{padRight(truncate(brain.name, columns.name.width), columns.name.width)}</Text>
+            <Box key={brain.filename}>
+              <Text>{padRight(truncate(brain.filename, columns.filename.width), columns.filename.width)}</Text>
               <Text>  </Text>
               <Text>{padRight(truncate(brain.title, columns.title.width), columns.title.width)}</Text>
               <Text>  </Text>

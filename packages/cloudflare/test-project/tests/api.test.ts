@@ -112,7 +112,7 @@ describe('Hono API Tests', () => {
     const request = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}), // Empty body, check for missing brainName
+      body: JSON.stringify({}), // Empty body, check for missing brainTitle
     });
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
@@ -121,7 +121,7 @@ describe('Hono API Tests', () => {
     expect(response.status).toBe(400);
     const responseBody = await response.json();
     expect(responseBody).toEqual({
-      error: 'Missing brainName in request body',
+      error: 'Missing brainTitle in request body',
     });
   });
 
@@ -130,7 +130,7 @@ describe('Hono API Tests', () => {
     const request = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainName: 'non-existent-brain' }),
+      body: JSON.stringify({ brainTitle: 'non-existent-brain' }),
     });
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
@@ -150,7 +150,7 @@ describe('Hono API Tests', () => {
     const request = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainName }),
+      body: JSON.stringify({ brainTitle: brainName }),
     });
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
@@ -186,7 +186,7 @@ describe('Hono API Tests', () => {
       (e): e is BrainStartEvent => e.type === BRAIN_EVENTS.START
     );
     expect(startEvent).toBeDefined();
-    expect(startEvent?.brainTitle).toBe(brainName);
+    expect(startEvent?.brainTitle).toBe('basic-brain');
     expect(startEvent?.status).toBe(STATUS.RUNNING);
 
     // Check for complete event
@@ -225,7 +225,7 @@ describe('Hono API Tests', () => {
     const createRequest = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainName }),
+      body: JSON.stringify({ brainTitle: brainName }),
     });
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
@@ -267,7 +267,7 @@ describe('Hono API Tests', () => {
       (e): e is BrainStartEvent => e.type === BRAIN_EVENTS.START
     );
     expect(startEvent).toBeDefined();
-    expect(startEvent?.brainTitle).toBe(brainName);
+    expect(startEvent?.brainTitle).toBe('delayed-brain');
     expect(startEvent?.status).toBe(STATUS.RUNNING);
 
     // Check for step start/complete events for the delayed step
@@ -312,7 +312,7 @@ describe('Hono API Tests', () => {
     const createRequest = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainName }),
+      body: JSON.stringify({ brainTitle: brainName }),
     });
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
@@ -361,7 +361,7 @@ describe('Hono API Tests', () => {
     const createRequest = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainName }),
+      body: JSON.stringify({ brainTitle: brainName }),
     });
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
@@ -405,7 +405,7 @@ describe('Hono API Tests', () => {
       const createRequest = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainName }),
+        body: JSON.stringify({ brainTitle: brainName }),
       });
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
@@ -493,7 +493,7 @@ describe('Hono API Tests', () => {
       const createRequest = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainName }),
+        body: JSON.stringify({ brainTitle: brainName }),
       });
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
@@ -629,7 +629,7 @@ describe('Hono API Tests', () => {
     const createRequest = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainName }),
+      body: JSON.stringify({ brainTitle: brainName }),
     });
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
@@ -764,7 +764,7 @@ describe('Hono API Tests', () => {
       const request = new Request('http://example.com/brains/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainName, cronExpression }),
+        body: JSON.stringify({ brainTitle: brainName, cronExpression }),
       });
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
@@ -773,14 +773,14 @@ describe('Hono API Tests', () => {
       expect(response.status).toBe(201);
       const responseBody = await response.json<{
         id: string;
-        brainName: string;
+        brainTitle: string;
         cronExpression: string;
         enabled: boolean;
         createdAt: number;
       }>();
 
       expect(responseBody.id).toBeDefined();
-      expect(responseBody.brainName).toBe(brainName);
+      expect(responseBody.brainTitle).toBe(brainName);
       expect(responseBody.cronExpression).toBe(cronExpression);
       expect(responseBody.enabled).toBe(true);
       expect(responseBody.createdAt).toBeDefined();
@@ -795,7 +795,7 @@ describe('Hono API Tests', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            brainName: `brain-${i}`,
+            brainTitle: `brain-${i}`,
             cronExpression: `${i} * * * *`,
           }),
         });
@@ -818,7 +818,7 @@ describe('Hono API Tests', () => {
       const responseBody = await listResponse.json<{
         schedules: Array<{
           id: string;
-          brainName: string;
+          brainTitle: string;
           cronExpression: string;
           enabled: boolean;
           createdAt: number;
@@ -838,7 +838,7 @@ describe('Hono API Tests', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brainName: 'delete-brain',
+          brainTitle: 'delete-brain',
           cronExpression: '0 0 * * *',
         }),
       });
@@ -939,7 +939,7 @@ describe('Hono API Tests', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brainName: 'invalid-cron-brain',
+          brainTitle: 'invalid-cron-brain',
           cronExpression: 'invalid cron',
         }),
       });
@@ -961,7 +961,7 @@ describe('Hono API Tests', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brainName,
+          brainTitle: brainName,
           cronExpression: '0 9 * * *', // 9am daily
         }),
       });
@@ -975,7 +975,7 @@ describe('Hono API Tests', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brainName,
+          brainTitle: brainName,
           cronExpression: '0 17 * * *', // 5pm daily
         }),
       });
@@ -995,10 +995,10 @@ describe('Hono API Tests', () => {
       await waitOnExecutionContext(listContext);
 
       const { schedules } = await listResponse.json<{
-        schedules: Array<{ brainName: string }>;
+        schedules: Array<{ brainTitle: string }>;
       }>();
 
-      const multiSchedules = schedules.filter((s) => s.brainName === brainName);
+      const multiSchedules = schedules.filter((s) => s.brainTitle === brainName);
       expect(multiSchedules.length).toBe(2);
     });
   });

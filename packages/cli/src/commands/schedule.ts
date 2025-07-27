@@ -6,7 +6,7 @@ import { ScheduleDelete } from '../components/schedule-delete.js';
 import { ScheduleRuns } from '../components/schedule-runs.js';
 
 interface ScheduleCreateArgs {
-  brainName: string;
+  brainFilename: string;
   cronExpression: string;
 }
 
@@ -29,11 +29,11 @@ export class ScheduleCommand {
   constructor() {}
 
   create({
-    brainName,
+    brainFilename,
     cronExpression,
   }: ArgumentsCamelCase<ScheduleCreateArgs>): React.ReactElement {
     return React.createElement(ScheduleCreate, {
-      brainName,
+      brainFilename,
       cronExpression,
     });
   }

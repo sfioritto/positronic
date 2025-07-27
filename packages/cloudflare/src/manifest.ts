@@ -1,15 +1,15 @@
 import type { Brain } from '@positronic/core';
 
 interface BrainImportStrategy {
-  import(name: string): Promise<Brain | undefined>;
+  import(filename: string): Promise<Brain | undefined>;
   list(): string[];
 }
 
 class StaticManifestStrategy implements BrainImportStrategy {
   constructor(private manifest: Record<string, Brain>) {}
 
-  async import(name: string): Promise<Brain | undefined> {
-    return this.manifest[name];
+  async import(filename: string): Promise<Brain | undefined> {
+    return this.manifest[filename];
   }
 
   list(): string[] {
@@ -20,12 +20,12 @@ class StaticManifestStrategy implements BrainImportStrategy {
 class DynamicImportStrategy implements BrainImportStrategy {
   constructor(private brainsDir: string) {}
 
-  async import(name: string): Promise<Brain | undefined> {
+  async import(filename: string): Promise<Brain | undefined> {
     try {
-      const module = await import(`${this.brainsDir}/${name}.ts`);
+      const module = await import(`${this.brainsDir}/${filename}.ts`);
       return module.default;
     } catch (e) {
-      console.error(`Failed to import brain ${name}:`, e);
+      console.error(`Failed to import brain ${filename}:`, e);
       return undefined;
     }
   }
@@ -59,8 +59,8 @@ export class PositronicManifest {
       : new DynamicImportStrategy(options.brainsDir!);
   }
 
-  async import(name: string): Promise<Brain | undefined> {
-    return this.importStrategy.import(name);
+  async import(filename: string): Promise<Brain | undefined> {
+    return this.importStrategy.import(filename);
   }
 
   list(): string[] {

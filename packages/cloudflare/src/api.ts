@@ -22,7 +22,7 @@ type Bindings = {
 };
 
 type CreateBrainRunRequest = {
-  brainName: string;
+  brainTitle: string;
   options?: Record<string, string>;
 };
 
@@ -41,10 +41,10 @@ type R2Resource = Omit<ResourceEntry, 'path'> & {
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.post('/brains/runs', async (context: Context) => {
-  const { brainName, options } = await context.req.json<CreateBrainRunRequest>();
+  const { brainTitle, options } = await context.req.json<CreateBrainRunRequest>();
 
-  if (!brainName) {
-    return context.json({ error: 'Missing brainName in request body' }, 400);
+  if (!brainTitle) {
+    return context.json({ error: 'Missing brainTitle in request body' }, 400);
   }
 
   // Validate that the brain exists before starting it
@@ -53,9 +53,12 @@ app.post('/brains/runs', async (context: Context) => {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  const brain = await manifest.import(brainName);
+  // TODO: manifest.import expects a filename, but we're passing a title
+  // This needs to be resolved - either by looking up filename from title
+  // or by changing the API to accept filename
+  const brain = await manifest.import(brainTitle);
   if (!brain) {
-    return context.json({ error: `Brain '${brainName}' not found` }, 404);
+    return context.json({ error: `Brain '${brainTitle}' not found` }, 404);
   }
 
   const brainRunId = uuidv4();
@@ -65,7 +68,7 @@ app.post('/brains/runs', async (context: Context) => {
   
   // Pass options to the brain runner if provided
   const initialData = options ? { options } : undefined;
-  await stub.start(brainName, brainRunId, initialData);
+  await stub.start(brainTitle, brainRunId, initialData);
   
   const response: CreateBrainRunResponse = {
     brainRunId,
@@ -74,10 +77,10 @@ app.post('/brains/runs', async (context: Context) => {
 });
 
 app.post('/brains/runs/rerun', async (context: Context) => {
-  const { brainName, runId, startsAt, stopsAfter } = await context.req.json();
+  const { brainTitle, runId, startsAt, stopsAfter } = await context.req.json();
 
-  if (!brainName) {
-    return context.json({ error: 'Missing brainName in request body' }, 400);
+  if (!brainTitle) {
+    return context.json({ error: 'Missing brainTitle in request body' }, 400);
   }
 
   // Validate that the brain exists
@@ -86,9 +89,10 @@ app.post('/brains/runs/rerun', async (context: Context) => {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  const brain = await manifest.import(brainName);
+  // TODO: manifest.import expects a filename, but we're passing a title
+  const brain = await manifest.import(brainTitle);
   if (!brain) {
-    return context.json({ error: `Brain '${brainName}' not found` }, 404);
+    return context.json({ error: `Brain '${brainTitle}' not found` }, 404);
   }
 
   // If runId is provided, validate it exists
@@ -115,7 +119,7 @@ app.post('/brains/runs/rerun', async (context: Context) => {
     ...(stopsAfter !== undefined && { stopsAfter }),
   };
   
-  await stub.start(brainName, newBrainRunId, rerunOptions);
+  await stub.start(brainTitle, newBrainRunId, rerunOptions);
   
   const response: CreateBrainRunResponse = {
     brainRunId: newBrainRunId,
@@ -132,26 +136,26 @@ app.get('/brains/runs/:runId/watch', async (context: Context) => {
   return response;
 });
 
-app.get('/brains/:brainName/history', async (context: Context) => {
-  const brainName = context.req.param('brainName');
+app.get('/brains/:brainTitle/history', async (context: Context) => {
+  const brainTitle = context.req.param('brainTitle');
   const limit = Number(context.req.query('limit') || '10');
 
   // Get the monitor singleton instance
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
 
-  const runs = await monitorStub.history(brainName, limit);
+  const runs = await monitorStub.history(brainTitle, limit);
   return context.json({ runs });
 });
 
-app.get('/brains/:brainName/active-runs', async (context: Context) => {
-  const brainName = context.req.param('brainName');
+app.get('/brains/:brainTitle/active-runs', async (context: Context) => {
+  const brainTitle = context.req.param('brainTitle');
 
   // Get the monitor singleton instance
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
 
-  const runs = await monitorStub.activeRuns(brainName);
+  const runs = await monitorStub.activeRuns(brainTitle);
   return context.json({ runs });
 });
 
@@ -169,18 +173,19 @@ app.get('/brains', async (context: Context) => {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  const brainNames = manifest.list();
+  const brainFilenames = manifest.list();
   const brains = await Promise.all(
-    brainNames.map(async (name) => {
-      const brain = await manifest.import(name);
+    brainFilenames.map(async (filename) => {
+      const brain = await manifest.import(filename);
       if (!brain) {
         return null;
       }
       
+      const structure = brain.structure;
       return {
-        name,
-        title: brain.title,
-        description: `${brain.title} brain`, // Default description since property is private
+        filename,
+        title: structure.title,
+        description: structure.description || `${structure.title} brain`,
       };
     })
   );
@@ -200,10 +205,10 @@ app.get('/brains', async (context: Context) => {
 app.post('/brains/schedules', async (context: Context) => {
   try {
     const body = await context.req.json();
-    const { brainName, cronExpression } = body;
+    const { brainTitle, cronExpression } = body;
 
-    if (!brainName) {
-      return context.json({ error: 'Missing required field "brainName"' }, 400);
+    if (!brainTitle) {
+      return context.json({ error: 'Missing required field "brainTitle"' }, 400);
     }
     if (!cronExpression) {
       return context.json(
@@ -227,7 +232,7 @@ app.post('/brains/schedules', async (context: Context) => {
     const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId);
 
     const schedule = await scheduleStub.createSchedule(
-      brainName,
+      brainTitle,
       cronExpression
     );
     return context.json(schedule, 201);
@@ -275,24 +280,24 @@ app.delete('/brains/schedules/:scheduleId', async (context: Context) => {
   return new Response(null, { status: 204 });
 });
 
-app.get('/brains/:brainName', async (context: Context) => {
-  const brainName = context.req.param('brainName');
+app.get('/brains/:brainTitle', async (context: Context) => {
+  const brainTitle = context.req.param('brainTitle');
   const manifest = getManifest();
   
   if (!manifest) {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  const brain = await manifest.import(brainName);
+  // TODO: manifest.import expects a filename, but we're passing a title
+  const brain = await manifest.import(brainTitle);
   if (!brain) {
-    return context.json({ error: `Brain '${brainName}' not found` }, 404);
+    return context.json({ error: `Brain '${brainTitle}' not found` }, 404);
   }
 
   // Get the brain structure
   const structure = brain.structure;
 
   return context.json({
-    name: brainName,
     title: structure.title,
     description: structure.description || `${structure.title} brain`,
     steps: structure.steps,

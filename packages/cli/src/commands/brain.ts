@@ -11,26 +11,26 @@ import { ErrorComponent } from '../components/error.js';
 
 interface BrainListArgs {}
 interface BrainHistoryArgs {
-  name: string;
+  filename: string;
   limit: number;
 }
 interface BrainShowArgs {
-  name: string;
+  filename: string;
 }
 interface BrainRerunArgs {
-  name: string;
+  filename: string;
   runId?: string;
   startsAt?: number;
   stopsAfter?: number;
 }
 interface BrainRunArgs {
-  name: string;
+  filename: string;
   watch?: boolean;
   options?: Record<string, string>;
 }
 interface BrainWatchArgs {
   runId?: string;
-  name?: string;
+  filename?: string;
 }
 
 export class BrainCommand {
@@ -39,33 +39,33 @@ export class BrainCommand {
   }
 
   history({
-    name: brainName,
+    filename: brainFilename,
     limit,
   }: ArgumentsCamelCase<BrainHistoryArgs>): React.ReactElement {
-    return React.createElement(BrainHistory, { brainName, limit });
+    return React.createElement(BrainHistory, { brainName: brainFilename, limit });
   }
 
   show({
-    name: brainName,
+    filename: brainFilename,
   }: ArgumentsCamelCase<BrainShowArgs>): React.ReactElement {
-    return React.createElement(BrainShow, { brainName });
+    return React.createElement(BrainShow, { brainName: brainFilename });
   }
 
   rerun({
-    name: brainName,
+    filename: brainFilename,
     runId,
     startsAt,
     stopsAfter,
   }: ArgumentsCamelCase<BrainRerunArgs>): React.ReactElement {
     return React.createElement(BrainRerun, {
-      brainName,
+      brainName: brainFilename,
       runId,
       startsAt,
       stopsAfter,
     });
   }
 
-  async run({ name: brainName, watch, options }: ArgumentsCamelCase<BrainRunArgs>): Promise<React.ReactElement> {
+  async run({ filename: brainFilename, watch, options }: ArgumentsCamelCase<BrainRunArgs>): Promise<React.ReactElement> {
     const apiPath = '/brains/runs';
     
     try {
@@ -75,7 +75,7 @@ export class BrainCommand {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          brainName,
+          brainTitle: brainFilename,
           options 
         }),
       });
@@ -103,7 +103,7 @@ export class BrainCommand {
         return React.createElement(ErrorComponent, {
           error: {
             title: 'Brain Not Found',
-            message: `Brain '${brainName}' not found.`,
+            message: `Brain '${brainFilename}' not found.`,
             details: 'Please check that:\n  1. The brain name is spelled correctly\n  2. The brain exists in your project\n  3. The brain has been properly defined and exported\n\nYou can list available brains with: positronic list'
           }
         });
@@ -133,7 +133,7 @@ export class BrainCommand {
 
   async watch({
     runId,
-    name: brainName,
+    filename: brainFilename,
   }: ArgumentsCamelCase<BrainWatchArgs>): Promise<React.ReactElement> {
     // If a specific run ID is provided, return the Watch component
     if (runId) {
@@ -141,10 +141,10 @@ export class BrainCommand {
       return React.createElement(Watch, { runId, port });
     }
 
-    // If watching by brain name is requested, look up active runs
-    if (brainName) {
+    // If watching by brain filename is requested, look up active runs
+    if (brainFilename) {
       try {
-        const apiPath = `/brains/${encodeURIComponent(brainName)}/active-runs`;
+        const apiPath = `/brains/${encodeURIComponent(brainFilename)}/active-runs`;
         const response = await apiClient.fetch(apiPath, {
           method: 'GET',
         });
@@ -158,8 +158,8 @@ export class BrainCommand {
               {
                 error: {
                   title: 'No Active Runs',
-                  message: `No currently running brain runs found for brain "${brainName}".`,
-                  details: `To start a new run, use: positronic run ${brainName}`
+                  message: `No currently running brain runs found for brain "${brainFilename}".`,
+                  details: `To start a new run, use: positronic run ${brainFilename}`
                 }
               }
             );
@@ -171,7 +171,7 @@ export class BrainCommand {
               {
                 error: {
                   title: 'Multiple Active Runs',
-                  message: `Found ${result.runs.length} active runs for brain "${brainName}".`,
+                  message: `Found ${result.runs.length} active runs for brain "${brainFilename}".`,
                   details: `Please specify a specific run ID with --run-id:\n${result.runs.map(run => `  positronic watch --run-id ${run.brainRunId}`).join('\n')}`
                 }
               }
@@ -189,7 +189,7 @@ export class BrainCommand {
             {
               error: {
                 title: 'API Error',
-                message: `Failed to get active runs for brain "${brainName}".`,
+                message: `Failed to get active runs for brain "${brainFilename}".`,
                 details: `Server returned ${response.status}: ${errorText}`
               }
             }

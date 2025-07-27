@@ -12,7 +12,7 @@ export interface Env {
 
 interface Schedule {
   id: string;
-  brainName: string;
+  brainTitle: string;
   cronExpression: string;
   enabled: boolean;
   createdAt: number;
@@ -42,7 +42,7 @@ export class ScheduleDO extends DurableObject<Env> {
     this.storage.exec(`
       CREATE TABLE IF NOT EXISTS schedules (
         id TEXT PRIMARY KEY,
-        brain_name TEXT NOT NULL,
+        brain_title TEXT NOT NULL,
         cron_expression TEXT NOT NULL,
         enabled INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL,
@@ -50,7 +50,7 @@ export class ScheduleDO extends DurableObject<Env> {
       );
 
       CREATE INDEX IF NOT EXISTS idx_schedules_brain
-      ON schedules(brain_name);
+      ON schedules(brain_title);
 
       CREATE INDEX IF NOT EXISTS idx_schedules_enabled
       ON schedules(enabled);
@@ -72,7 +72,7 @@ export class ScheduleDO extends DurableObject<Env> {
   }
 
   async createSchedule(
-    brainName: string,
+    brainTitle: string,
     cronExpression: string
   ): Promise<Schedule> {
     const id = uuidv4();
@@ -89,10 +89,10 @@ export class ScheduleDO extends DurableObject<Env> {
     const nextRunAt = this.calculateNextRunTime(cron, createdAt);
 
     this.storage.exec(
-      `INSERT INTO schedules (id, brain_name, cron_expression, enabled, created_at, next_run_at)
+      `INSERT INTO schedules (id, brain_title, cron_expression, enabled, created_at, next_run_at)
        VALUES (?, ?, ?, 1, ?, ?)`,
       id,
-      brainName,
+      brainTitle,
       cronExpression,
       createdAt,
       nextRunAt
@@ -100,7 +100,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
     return {
       id,
-      brainName,
+      brainTitle,
       cronExpression,
       enabled: true,
       createdAt,
@@ -111,7 +111,7 @@ export class ScheduleDO extends DurableObject<Env> {
   async getSchedule(scheduleId: string): Promise<Schedule | null> {
     const results = this.storage
       .exec(
-        `SELECT id, brain_name, cron_expression, enabled, created_at, next_run_at
+        `SELECT id, brain_title, cron_expression, enabled, created_at, next_run_at
          FROM schedules WHERE id = ?`,
         scheduleId
       )
@@ -125,7 +125,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
     return {
       id: result.id as string,
-      brainName: result.brain_name as string,
+      brainTitle: result.brain_title as string,
       cronExpression: result.cron_expression as string,
       enabled: result.enabled === 1,
       createdAt: result.created_at as number,
@@ -159,14 +159,14 @@ export class ScheduleDO extends DurableObject<Env> {
 
     const schedules = this.storage
       .exec(
-        `SELECT id, brain_name, cron_expression, enabled, created_at, next_run_at
+        `SELECT id, brain_title, cron_expression, enabled, created_at, next_run_at
          FROM schedules
          ORDER BY created_at DESC`
       )
       .toArray()
       .map((row) => ({
         id: row.id as string,
-        brainName: row.brain_name as string,
+        brainTitle: row.brain_title as string,
         cronExpression: row.cron_expression as string,
         enabled: row.enabled === 1,
         createdAt: row.created_at as number,
@@ -237,7 +237,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
       const dueSchedules = this.storage
         .exec(
-          `SELECT id, brain_name, cron_expression
+          `SELECT id, brain_title, cron_expression
            FROM schedules
            WHERE enabled = 1 AND next_run_at <= ?`,
           now
@@ -247,12 +247,12 @@ export class ScheduleDO extends DurableObject<Env> {
       // Process each due schedule
       for (const schedule of dueSchedules) {
         const scheduleId = schedule.id as string;
-        const brainName = schedule.brain_name as string;
+        const brainTitle = schedule.brain_title as string;
         const cronExpression = schedule.cron_expression as string;
 
         try {
           // Trigger the brain run
-          const brainRunId = await this.triggerBrainRun(brainName);
+          const brainRunId = await this.triggerBrainRun(brainTitle);
 
           // Record successful run
           this.storage.exec(
@@ -275,7 +275,7 @@ export class ScheduleDO extends DurableObject<Env> {
           );
 
           console.error(
-            `[ScheduleDO] Failed to trigger brain ${brainName}:`,
+            `[ScheduleDO] Failed to trigger brain ${brainTitle}:`,
             error
           );
         }
@@ -301,15 +301,15 @@ export class ScheduleDO extends DurableObject<Env> {
     }
   }
 
-  private async triggerBrainRun(brainName: string): Promise<string> {
+  private async triggerBrainRun(brainTitle: string): Promise<string> {
     const brainRunId = uuidv4();
     const namespace = this.env.BRAIN_RUNNER_DO;
     const doId = namespace.idFromName(brainRunId);
     const stub = namespace.get(doId);
     console.log(
-      `[ScheduleDO] Triggering brain run ${brainName} with id ${brainRunId}`
+      `[ScheduleDO] Triggering brain run ${brainTitle} with id ${brainRunId}`
     );
-    await stub.start(brainName, brainRunId);
+    await stub.start(brainTitle, brainRunId);
 
     return brainRunId;
   }

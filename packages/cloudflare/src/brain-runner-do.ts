@@ -172,7 +172,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
   }
 
   async start(
-    brainName: string,
+    brainTitle: string,
     brainRunId: string,
     initialData?: Record<string, any>
   ) {
@@ -182,13 +182,16 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('Runtime manifest not initialized');
     }
 
-    const brainToRun = await manifest.import(brainName);
+    // TODO: manifest.import expects a filename, but we're passing a title
+    // This needs to be resolved - either by looking up filename from title
+    // or by changing the API to accept filename
+    const brainToRun = await manifest.import(brainTitle);
     if (!brainToRun) {
       console.error(
-        `[DO ${brainRunId}] Brain ${brainName} not found in manifest.`
+        `[DO ${brainRunId}] Brain ${brainTitle} not found in manifest.`
       );
       console.error(JSON.stringify(manifest, null, 2));
-      throw new Error(`Brain ${brainName} not found`);
+      throw new Error(`Brain ${brainTitle} not found`);
     }
 
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);

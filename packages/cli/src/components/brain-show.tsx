@@ -14,7 +14,6 @@ interface BrainStep {
 }
 
 interface BrainDetails {
-  name: string;
   title: string;
   description?: string;
   steps: BrainStep[];

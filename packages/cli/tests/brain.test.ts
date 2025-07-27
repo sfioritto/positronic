@@ -539,7 +539,7 @@ describe('CLI Integration: positronic brain commands', () => {
       try {
         // This will throw an error during yargs validation
         await expect(px(['watch'])).rejects.toThrow(
-          'You must provide either a brain name or a --run-id'
+          'You must provide either a brain filename or a --run-id'
         );
       } finally {
         await env.stopAndCleanup();
@@ -607,7 +607,7 @@ describe('CLI Integration: positronic brain commands', () => {
       
       // Add test brains before starting
       server.addBrain({
-        name: 'daily-report',
+        filename: 'daily-report',
         title: 'Daily Report Generator',
         description: 'Generates daily reports from various data sources',
         createdAt: Date.now() - 86400000,
@@ -615,7 +615,7 @@ describe('CLI Integration: positronic brain commands', () => {
       });
       
       server.addBrain({
-        name: 'data-processor',
+        filename: 'data-processor',
         title: 'Data Processing Pipeline',
         description: 'Processes incoming data and transforms it',
         createdAt: Date.now() - 172800000,
@@ -837,7 +837,7 @@ describe('CLI Integration: positronic brain commands', () => {
       
       // Add a brain to the test server with structure
       server.addBrain({
-        name: 'test-brain',
+        filename: 'test-brain',
         title: 'Test Brain',
         description: 'A test brain for unit testing',
         steps: [

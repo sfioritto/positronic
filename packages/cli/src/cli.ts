@@ -285,12 +285,12 @@ export function buildCli(options: CliOptions) {
 
   // --- Brain History Command ---
   cli = cli.command(
-    'history <name>',
+    'history <filename>',
     'List recent runs of a specific brain\n',
     (yargsHistory) => {
       return yargsHistory
-        .positional('name', {
-          describe: 'Name of the brain',
+        .positional('filename', {
+          describe: 'Filename of the brain',
           type: 'string',
           demandOption: true,
         })
@@ -310,11 +310,11 @@ export function buildCli(options: CliOptions) {
 
   // --- Show Brain Command ---
   cli = cli.command(
-    'show <name>',
+    'show <filename>',
     'List all steps and other details for the brain\n',
     (yargsShow) => {
-      return yargsShow.positional('name', {
-        describe: 'Name of the brain',
+      return yargsShow.positional('filename', {
+        describe: 'Filename of the brain',
         type: 'string',
         demandOption: true,
       });
@@ -327,12 +327,12 @@ export function buildCli(options: CliOptions) {
 
   // --- Rerun Brain Command ---
   cli = cli.command(
-    'rerun <name> [run-id]',
+    'rerun <filename> [run-id]',
     'Rerun an existing brain run\n',
     (yargsRerun) => {
       return yargsRerun
-        .positional('name', {
-          describe: 'Name of the brain',
+        .positional('filename', {
+          describe: 'Filename of the brain',
           type: 'string',
           demandOption: true,
         })
@@ -374,12 +374,12 @@ export function buildCli(options: CliOptions) {
 
   // --- Run Brain Command ---
   cli = cli.command(
-    'run <name>',
+    'run <filename>',
     'Run a brain and optionally watch its execution\n',
     (yargsRun) => {
       return yargsRun
-        .positional('name', {
-          describe: 'Name of the brain',
+        .positional('filename', {
+          describe: 'Filename of the brain',
           type: 'string',
           demandOption: true,
         })
@@ -416,12 +416,12 @@ export function buildCli(options: CliOptions) {
 
   // --- Watch Brain Run Command ---
   cli = cli.command(
-    'watch [name]',
-    'Watch a brain run: latest by name (default) or specific by ID\n',
+    'watch [filename]',
+    'Watch a brain run: latest by filename (default) or specific by ID\n',
     (yargsWatch) => {
       return yargsWatch
-        .positional('name', {
-          describe: 'Name of the brain to watch (watches the most recent run)',
+        .positional('filename', {
+          describe: 'Filename of the brain to watch (watches the most recent run)',
           type: 'string',
         })
         .option('run-id', {
@@ -429,11 +429,11 @@ export function buildCli(options: CliOptions) {
           type: 'string',
           alias: 'id',
         })
-        .conflicts('name', 'run-id')
+        .conflicts('filename', 'run-id')
         .check((argv) => {
-          if (!argv.name && !argv.runId) {
+          if (!argv.filename && !argv.runId) {
             throw new Error(
-              'You must provide either a brain name or a --run-id.'
+              'You must provide either a brain filename or a --run-id.'
             );
           }
           return true;
@@ -468,12 +468,12 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'history <name>',
+        'history <filename>',
         'List recent runs of a specific brain\n',
         (yargsHistory) => {
           return yargsHistory
-            .positional('name', {
-              describe: 'Name of the brain',
+            .positional('filename', {
+              describe: 'Filename of the brain',
               type: 'string',
               demandOption: true,
             })
@@ -491,11 +491,11 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'show <name>',
+        'show <filename>',
         'List all steps and other details for the brain\n',
         (yargsShow) => {
-          return yargsShow.positional('name', {
-            describe: 'Name of the brain',
+          return yargsShow.positional('filename', {
+            describe: 'Filename of the brain',
             type: 'string',
             demandOption: true,
           });
@@ -506,12 +506,12 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'rerun <name> [run-id]',
+        'rerun <filename> [run-id]',
         'Rerun an existing brain run\n',
         (yargsRerun) => {
           return yargsRerun
-            .positional('name', {
-              describe: 'Name of the brain',
+            .positional('filename', {
+              describe: 'Filename of the brain',
               type: 'string',
               demandOption: true,
             })
@@ -551,12 +551,12 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'run <name>',
+        'run <filename>',
         'Run a brain and optionally watch its execution\n',
         (yargsRun) => {
           return yargsRun
-            .positional('name', {
-              describe: 'Name of the brain',
+            .positional('filename', {
+              describe: 'Filename of the brain',
               type: 'string',
               demandOption: true,
             })
@@ -591,12 +591,12 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'watch [name]',
-        'Watch a brain run: latest by name (default) or specific by ID\n',
+        'watch [filename]',
+        'Watch a brain run: latest by filename (default) or specific by ID\n',
         (yargsWatch) => {
           return yargsWatch
-            .positional('name', {
-              describe: 'Name of the brain to watch (watches the most recent run)',
+            .positional('filename', {
+              describe: 'Filename of the brain to watch (watches the most recent run)',
               type: 'string',
             })
             .option('run-id', {
@@ -604,11 +604,11 @@ export function buildCli(options: CliOptions) {
               type: 'string',
               alias: 'id',
             })
-            .conflicts('name', 'run-id')
+            .conflicts('filename', 'run-id')
             .check((argv) => {
-              if (!argv.name && !argv.runId) {
+              if (!argv.filename && !argv.runId) {
                 throw new Error(
-                  'You must provide either a brain name or a --run-id.'
+                  'You must provide either a brain filename or a --run-id.'
                 );
               }
               return true;
@@ -860,14 +860,14 @@ export function buildCli(options: CliOptions) {
       yargsSchedule
         .command(
           [
-            'create <brain-name> <cron-expression>',
-            'c <brain-name> <cron-expression>',
+            'create <brain-filename> <cron-expression>',
+            'c <brain-filename> <cron-expression>',
           ],
           'Create a new schedule for a brain\n',
           (yargsCreate) => {
             return yargsCreate
-              .positional('brain-name', {
-                describe: 'Name of the brain to schedule',
+              .positional('brain-filename', {
+                describe: 'Filename of the brain to schedule',
                 type: 'string',
                 demandOption: true,
               })

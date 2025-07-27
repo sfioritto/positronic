@@ -4,12 +4,15 @@ import { brain, BRAIN_EVENTS } from '../src/index.js';
 import type { ObjectGenerator, BrainEvent } from '../src/index.js';
 
 describe('Brain withOptionsSchema', () => {
+  const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  mockGenerateObject.mockResolvedValue({ result: 'test' } as any);
+  
   const mockClient: ObjectGenerator = {
-    generateObject: jest.fn().mockResolvedValue({ result: 'test' }),
+    generateObject: mockGenerateObject,
   };
 
   // Helper to collect all events
-  async function collectAllEvents<T>(
+  async function collectAllEvents<T extends Record<string, any> = Record<string, any>>(
     generator: AsyncGenerator<BrainEvent<T>>
   ): Promise<BrainEvent<T>[]> {
     const events: BrainEvent<T>[] = [];
@@ -191,7 +194,7 @@ describe('Brain withOptionsSchema', () => {
           client: mockClient,
           options: {
             user: { name: 'Bob', email: 'bob@example.com' },
-            settings: { theme: 'dark' },
+            settings: { theme: 'dark', notifications: true },
           },
         })
       );
@@ -218,7 +221,7 @@ describe('Brain withOptionsSchema', () => {
       const events = await collectAllEvents(
         myBrain.run({
           client: mockClient,
-          options: { required: 'test' },
+          options: { required: 'test' } as z.infer<typeof schema>,
         })
       );
 

@@ -336,9 +336,9 @@ export const brains = {
   /**
    * Test POST /brains/runs - Create a new brain run
    */
-  async run(fetch: Fetch, brainName: string, options?: Record<string, string>): Promise<string | null> {
+  async run(fetch: Fetch, brainTitle: string, options?: Record<string, string>): Promise<string | null> {
     try {
-      const body: any = { brainName };
+      const body: any = { brainTitle };
       if (options && Object.keys(options).length > 0) {
         body.options = options;
       }
@@ -381,7 +381,7 @@ export const brains = {
    */
   async runWithOptions(
     fetch: Fetch,
-    brainName: string,
+    brainTitle: string,
     options: Record<string, string>
   ): Promise<string | null> {
     try {
@@ -390,7 +390,7 @@ export const brains = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ brainName, options }),
+        body: JSON.stringify({ brainTitle, options }),
       });
 
       const response = await fetch(request);
@@ -423,7 +423,7 @@ export const brains = {
    */
   async runNotFound(
     fetch: Fetch,
-    nonExistentBrainName: string
+    nonExistentBrainTitle: string
   ): Promise<boolean> {
     try {
       const request = new Request('http://example.com/brains/runs', {
@@ -431,7 +431,7 @@ export const brains = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ brainName: nonExistentBrainName }),
+        body: JSON.stringify({ brainTitle: nonExistentBrainTitle }),
       });
 
       const response = await fetch(request);
@@ -450,21 +450,21 @@ export const brains = {
         return false;
       }
 
-      // Check that the error message mentions the brain name
-      if (!data.error.includes(nonExistentBrainName)) {
+      // Check that the error message mentions the brain title
+      if (!data.error.includes(nonExistentBrainTitle)) {
         console.error(
-          `Expected error to mention brain name '${nonExistentBrainName}', got: ${data.error}`
+          `Expected error to mention brain title '${nonExistentBrainTitle}', got: ${data.error}`
         );
         return false;
       }
 
       // Check that the error message follows expected format
       const expectedPattern = new RegExp(
-        `Brain '${nonExistentBrainName}' not found`
+        `Brain '${nonExistentBrainTitle}' not found`
       );
       if (!expectedPattern.test(data.error)) {
         console.error(
-          `Expected error message to match pattern "Brain '${nonExistentBrainName}' not found", got: ${data.error}`
+          `Expected error message to match pattern "Brain '${nonExistentBrainTitle}' not found", got: ${data.error}`
         );
         return false;
       }
@@ -542,16 +542,16 @@ export const brains = {
   },
 
   /**
-   * Test GET /brains/:brainName/history - Get history of brain runs
+   * Test GET /brains/:brainTitle/history - Get history of brain runs
    */
   async history(
     fetch: Fetch,
-    brainName: string,
+    brainTitle: string,
     limit?: number
   ): Promise<boolean> {
     try {
       const url = new URL(
-        'http://example.com/brains/' + brainName + '/history'
+        'http://example.com/brains/' + brainTitle + '/history'
       );
       if (limit !== undefined) {
         url.searchParams.set('limit', limit.toString());
@@ -565,7 +565,7 @@ export const brains = {
 
       if (!response.ok) {
         console.error(
-          `GET /brains/${brainName}/history returned ${response.status}`
+          `GET /brains/${brainTitle}/history returned ${response.status}`
         );
         return false;
       }
@@ -602,7 +602,7 @@ export const brains = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test GET /brains/${brainName}/history:`, error);
+      console.error(`Failed to test GET /brains/${brainTitle}/history:`, error);
       return false;
     }
   },
@@ -682,7 +682,7 @@ export const brains = {
 
       const data = await response.json() as {
         brains: Array<{
-          name: string;
+          filename: string;
           title: string;
           description: string;
         }>;
@@ -705,8 +705,8 @@ export const brains = {
       // Validate each brain has required fields
       for (const brain of data.brains) {
         if (
-          !brain.name ||
-          typeof brain.name !== 'string' ||
+          !brain.filename ||
+          typeof brain.filename !== 'string' ||
           !brain.title ||
           typeof brain.title !== 'string' ||
           !brain.description ||
@@ -729,12 +729,12 @@ export const brains = {
   },
 
   /**
-   * Test GET /brains/:brainName - Get brain structure
+   * Test GET /brains/:brainTitle - Get brain structure
    */
-  async show(fetch: Fetch, brainName: string): Promise<boolean> {
+  async show(fetch: Fetch, brainTitle: string): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/brains/${encodeURIComponent(brainName)}`,
+        `http://example.com/brains/${encodeURIComponent(brainTitle)}`,
         {
           method: 'GET',
         }
@@ -743,12 +743,11 @@ export const brains = {
       const response = await fetch(request);
 
       if (!response.ok) {
-        console.error(`GET /brains/${brainName} returned ${response.status}`);
+        console.error(`GET /brains/${brainTitle} returned ${response.status}`);
         return false;
       }
 
       const data = await response.json() as {
-        name: string;
         title: string;
         steps: Array<{
           type: string;
@@ -761,11 +760,6 @@ export const brains = {
       };
 
       // Validate response structure
-      if (!data.name || typeof data.name !== 'string') {
-        console.error(`Expected name to be string, got ${typeof data.name}`);
-        return false;
-      }
-
       if (!data.title || typeof data.title !== 'string') {
         console.error(`Expected title to be string, got ${typeof data.title}`);
         return false;
@@ -817,19 +811,19 @@ export const brains = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test GET /brains/${brainName}:`, error);
+      console.error(`Failed to test GET /brains/${brainTitle}:`, error);
       return false;
     }
   },
 
   /**
-   * Test GET /brains/:brainName/active-runs - Get active/running brain runs
+   * Test GET /brains/:brainTitle/active-runs - Get active/running brain runs
    */
-  async activeRuns(fetch: Fetch, brainName: string): Promise<boolean> {
+  async activeRuns(fetch: Fetch, brainTitle: string): Promise<boolean> {
     try {
       const request = new Request(
         `http://example.com/brains/${encodeURIComponent(
-          brainName
+          brainTitle
         )}/active-runs`,
         {
           method: 'GET',
@@ -840,7 +834,7 @@ export const brains = {
 
       if (!response.ok) {
         console.error(
-          `GET /brains/${brainName}/active-runs returned ${response.status}`
+          `GET /brains/${brainTitle}/active-runs returned ${response.status}`
         );
         return false;
       }
@@ -888,7 +882,7 @@ export const brains = {
       return true;
     } catch (error) {
       console.error(
-        `Failed to test GET /brains/${brainName}/active-runs:`,
+        `Failed to test GET /brains/${brainTitle}/active-runs:`,
         error
       );
       return false;
@@ -900,13 +894,13 @@ export const brains = {
    */
   async rerun(
     fetch: Fetch,
-    brainName: string,
+    brainTitle: string,
     runId?: string,
     startsAt?: number,
     stopsAfter?: number
   ): Promise<string | null> {
     try {
-      const body: any = { brainName };
+      const body: any = { brainTitle };
       if (runId) body.runId = runId;
       if (startsAt !== undefined) body.startsAt = startsAt;
       if (stopsAfter !== undefined) body.stopsAfter = stopsAfter;
@@ -951,7 +945,7 @@ export const schedules = {
    */
   async create(
     fetch: Fetch,
-    brainName: string,
+    brainTitle: string,
     cronExpression: string
   ): Promise<string | null> {
     try {
@@ -960,7 +954,7 @@ export const schedules = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ brainName, cronExpression }),
+        body: JSON.stringify({ brainTitle, cronExpression }),
       });
 
       const response = await fetch(request);
@@ -974,7 +968,7 @@ export const schedules = {
 
       const data = await response.json() as {
         id: string;
-        brainName: string;
+        brainTitle: string;
         cronExpression: string;
         enabled: boolean;
         createdAt: number;
@@ -986,9 +980,9 @@ export const schedules = {
         return null;
       }
 
-      if (data.brainName !== brainName) {
+      if (data.brainTitle !== brainTitle) {
         console.error(
-          `Expected brainName to be '${brainName}', got ${data.brainName}`
+          `Expected brainTitle to be '${brainTitle}', got ${data.brainTitle}`
         );
         return null;
       }
@@ -1040,7 +1034,7 @@ export const schedules = {
       const data = await response.json() as {
         schedules: Array<{
           id: string;
-          brainName: string;
+          brainTitle: string;
           cronExpression: string;
           enabled: boolean;
           createdAt: number;
@@ -1065,7 +1059,7 @@ export const schedules = {
       for (const schedule of data.schedules) {
         if (
           !schedule.id ||
-          !schedule.brainName ||
+          !schedule.brainTitle ||
           !schedule.cronExpression ||
           typeof schedule.enabled !== 'boolean' ||
           typeof schedule.createdAt !== 'number'
