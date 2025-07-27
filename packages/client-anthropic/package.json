@@ -1,6 +1,6 @@
 {
   "name": "@positronic/client-anthropic",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "publishConfig": {
     "access": "public"
   },
@@ -20,7 +20,7 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
-    "@positronic/core": "^0.0.10",
+    "@positronic/core": "^0.0.11",
     "@instructor-ai/instructor": "^1.5.0",
     "llm-polyglot": "^2.4.0",
     "dotenv": "^16.4.7",
