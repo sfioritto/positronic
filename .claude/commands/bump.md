@@ -40,32 +40,45 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
 
 1. [ ] Check git working directory is clean (`git status --porcelain`)
 2. [ ] Verify on main branch (`git branch --show-current`)
-3. [ ] Create a changeset for patch bump:
+3. [ ] Get the last published version tag (`git describe --tags --abbrev=0`)
+4. [ ] Analyze changes since last release:
+   - Run `git log --oneline [last-tag]..HEAD` to see commit messages
+   - Run `git diff --stat [last-tag]..HEAD` to see changed files
+   - Run `git diff [last-tag]..HEAD -- '*.md' '*.json' '*.ts' '*.tsx' '*.js'` to see actual code changes
+   - Based on the logs and diffs, create a meaningful changelog message that summarizes:
+     * Key features added
+     * Bugs fixed
+     * Dependencies updated
+     * Breaking changes (if any)
+     * Other improvements
+5. [ ] Create a changeset file with the custom message:
    ```bash
-   echo "---" > .changeset/bump-patch.md
-   echo '"@positronic/core": patch' >> .changeset/bump-patch.md
-   echo '"@positronic/spec": patch' >> .changeset/bump-patch.md
-   echo '"@positronic/cli": patch' >> .changeset/bump-patch.md
-   echo '"@positronic/cloudflare": patch' >> .changeset/bump-patch.md
-   echo '"@positronic/shell": patch' >> .changeset/bump-patch.md
-   echo '"@positronic/client-anthropic": patch' >> .changeset/bump-patch.md
-   echo '"@positronic/client-vercel": patch' >> .changeset/bump-patch.md
-   echo '"@positronic/template-new-project": patch' >> .changeset/bump-patch.md
-   echo "---" >> .changeset/bump-patch.md
-   echo "" >> .changeset/bump-patch.md
-   echo "Bump all packages to next patch version" >> .changeset/bump-patch.md
+   cat > .changeset/bump-patch.md << 'EOF'
+   ---
+   "@positronic/core": patch
+   "@positronic/spec": patch
+   "@positronic/cli": patch
+   "@positronic/cloudflare": patch
+   "@positronic/shell": patch
+   "@positronic/client-anthropic": patch
+   "@positronic/client-vercel": patch
+   "@positronic/template-new-project": patch
+   ---
+
+   [INSERT YOUR CUSTOM CHANGELOG MESSAGE HERE]
+   EOF
    ```
-4. [ ] Run `npx changeset version` to update versions and dependencies
-5. [ ] Get the new version number from any package.json (e.g., `grep '"version"' packages/core/package.json`)
-6. [ ] Update hardcoded versions in `packages/template-new-project/index.js` (lines 56-58) to match the new version
-7. [ ] Run `npm run clean:workspaces` to clean all build artifacts
-8. [ ] Run `npm install` to reinstall all dependencies fresh
-9. [ ] Run `npm run dev` to build all packages and run all tests
-10. [ ] Verify tests pass (if tests fail, STOP and fix issues)
-11. [ ] Stage all changes (`git add -A`)
-12. [ ] Create commit (`git commit -m "Bump to v{version}"`)
-13. [ ] Run `npx changeset publish` to create tags and publish all packages
-14. [ ] Push commit and tags (`git push origin main --tags`)
+6. [ ] Run `npx changeset version` to update versions and dependencies
+7. [ ] Get the new version number from any package.json (e.g., `grep '"version"' packages/core/package.json`)
+8. [ ] Update hardcoded versions in `packages/template-new-project/index.js` (lines 56-58) to match the new version
+9. [ ] Run `npm run clean:workspaces` to clean all build artifacts
+10. [ ] Run `npm install` to reinstall all dependencies fresh
+11. [ ] Run `npm run dev` to build all packages and run all tests
+12. [ ] Verify tests pass (if tests fail, STOP and fix issues)
+13. [ ] Stage all changes (`git add -A`)
+14. [ ] Create commit (`git commit -m "Bump to v{version}"`)
+15. [ ] Run `npx changeset publish` to create tags and publish all packages
+16. [ ] Push commit and tags (`git push origin main --tags`)
 
 ## Important Notes
 
