@@ -150,7 +150,6 @@ async function regenerateManifestFile(
 
   let importStatements = `import type { Brain } from '@positronic/core';\n`;
   let manifestEntries = '';
-  let metadataEntries = '';
 
   const brainsDirExists = await fsPromises
     .access(brainsDir)
@@ -168,32 +167,22 @@ async function regenerateManifestFile(
       const importAlias = `brain_${brainName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 
       importStatements += `import * as ${importAlias} from '${importPath}';\n`;
-      manifestEntries += `  ${JSON.stringify(
-        brainName
-      )}: ${importAlias}.default as Brain,\n`;
       
-      // Create metadata entry - title and description will be extracted at runtime
-      metadataEntries += `  ${JSON.stringify(brainName)}: {\n`;
-      metadataEntries += `    filename: ${JSON.stringify(brainName)},\n`;
-      metadataEntries += `    path: ${JSON.stringify(`brains/${file}`)},\n`;
-      metadataEntries += `    brain: ${importAlias}.default as Brain,\n`;
-      metadataEntries += `  },\n`;
+      // Create manifest entry with metadata
+      manifestEntries += `  ${JSON.stringify(brainName)}: {\n`;
+      manifestEntries += `    filename: ${JSON.stringify(brainName)},\n`;
+      manifestEntries += `    path: ${JSON.stringify(`brains/${file}`)},\n`;
+      manifestEntries += `    brain: ${importAlias}.default as Brain,\n`;
+      manifestEntries += `  },\n`;
     }
   }
 
   const manifestContent = `// This file is generated automatically. Do not edit directly.
 ${importStatements}
-export const staticManifest: Record<string, Brain> = {
+import type { BrainMetadata } from '@positronic/cloudflare';
+
+export const manifest: Record<string, BrainMetadata> = {
 ${manifestEntries}};
-
-export interface BrainMetadata {
-  filename: string;
-  path: string;
-  brain: Brain;
-}
-
-export const enhancedManifest: Record<string, BrainMetadata> = {
-${metadataEntries}};
 `;
 
   const runnerContent = await fsPromises.readFile(runnerPath, 'utf-8');

@@ -10,32 +10,18 @@ interface BrainImportStrategy {
 }
 
 class StaticManifestStrategy implements BrainImportStrategy {
-  private resolver?: BrainResolver;
+  private resolver: BrainResolver;
   
-  constructor(
-    private manifest: Record<string, Brain>,
-    private enhancedManifest?: Record<string, BrainMetadata>
-  ) {
-    if (enhancedManifest) {
-      this.resolver = new BrainResolver(enhancedManifest);
-    }
+  constructor(private manifest: Record<string, BrainMetadata>) {
+    this.resolver = new BrainResolver(manifest);
   }
 
   async import(filename: string): Promise<Brain | undefined> {
-    return this.manifest[filename];
+    return this.manifest[filename]?.brain;
   }
   
   resolve(identifier: string): ResolutionResult {
-    if (this.resolver) {
-      return this.resolver.resolve(identifier);
-    }
-    
-    // Fallback for legacy manifest without metadata
-    const brain = this.manifest[identifier];
-    if (brain) {
-      return { matchType: 'exact', brain };
-    }
-    return { matchType: 'none' };
+    return this.resolver.resolve(identifier);
   }
 
   list(): string[] {
@@ -75,21 +61,20 @@ export class PositronicManifest {
   private importStrategy: BrainImportStrategy;
 
   constructor(options: {
-    staticManifest?: Record<string, Brain>;
-    enhancedManifest?: Record<string, BrainMetadata>;
+    manifest?: Record<string, BrainMetadata>;
     brainsDir?: string;
   }) {
-    if (options.staticManifest && options.brainsDir) {
+    if (options.manifest && options.brainsDir) {
       throw new Error(
-        'Cannot provide both staticManifest and brainsDir - choose one import strategy'
+        'Cannot provide both manifest and brainsDir - choose one import strategy'
       );
     }
-    if (!options.staticManifest && !options.brainsDir) {
-      throw new Error('Must provide either staticManifest or brainsDir');
+    if (!options.manifest && !options.brainsDir) {
+      throw new Error('Must provide either manifest or brainsDir');
     }
 
-    this.importStrategy = options.staticManifest
-      ? new StaticManifestStrategy(options.staticManifest, options.enhancedManifest)
+    this.importStrategy = options.manifest
+      ? new StaticManifestStrategy(options.manifest)
       : new DynamicImportStrategy(options.brainsDir!);
   }
 

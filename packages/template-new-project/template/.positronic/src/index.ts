@@ -9,11 +9,11 @@ import {
 } from "@positronic/cloudflare";
 // Import the generated manifest - NOTE the .js extension for runtime compatibility
 // @ts-expect-error - _manifest.js is generated during template processing
-import { staticManifest } from "./_manifest.js";
+import { manifest as brainManifest } from "./_manifest.js";
 import { runner } from "./runner.js";
 // Configure the manifest to use the statically generated list
 const manifest = new PositronicManifest({
-  staticManifest,
+  manifest: brainManifest,
 });
 
 setManifest(manifest);
