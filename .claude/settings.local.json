@@ -27,7 +27,8 @@
       "Bash(npm version:*)",
       "Bash(npm install:*)",
       "Bash(git tag:*)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(git describe:*)"
     ],
     "deny": []
   }
