@@ -1,5 +1,17 @@
 # @positronic/core
 
+## 0.0.17
+
+### Patch Changes
+
+- Fix .positronic directory regeneration to use local template
+
+  - Fixed issue where regenerating the `.positronic` folder after deletion would attempt to pull from npm instead of using the local template when `POSITRONIC_LOCAL_PATH` is set
+  - Updated `generateProject` in cloudflare dev-server to match the behavior from CLI helpers
+  - Now always resolves template location (from local path or installed package) and copies to temp directory before running caz
+  - Ensures consistent behavior for both initial project generation and `.positronic` folder regeneration
+    EOF < /dev/null
+
 ## 0.0.16
 
 ### Patch Changes
