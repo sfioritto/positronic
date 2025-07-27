@@ -23,6 +23,7 @@ type Bindings = {
 
 type CreateBrainRunRequest = {
   brainName: string;
+  options?: Record<string, string>;
 };
 
 type CreateBrainRunResponse = {
@@ -40,7 +41,7 @@ type R2Resource = Omit<ResourceEntry, 'path'> & {
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.post('/brains/runs', async (context: Context) => {
-  const { brainName } = await context.req.json<CreateBrainRunRequest>();
+  const { brainName, options } = await context.req.json<CreateBrainRunRequest>();
 
   if (!brainName) {
     return context.json({ error: 'Missing brainName in request body' }, 400);
@@ -61,7 +62,11 @@ app.post('/brains/runs', async (context: Context) => {
   const namespace = context.env.BRAIN_RUNNER_DO;
   const doId = namespace.idFromName(brainRunId);
   const stub = namespace.get(doId);
-  await stub.start(brainName, brainRunId);
+  
+  // Pass options to the brain runner if provided
+  const initialData = options ? { options } : undefined;
+  await stub.start(brainName, brainRunId, initialData);
+  
   const response: CreateBrainRunResponse = {
     brainRunId,
   };
