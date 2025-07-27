@@ -85,7 +85,7 @@ class MockServerHandle implements TestServerHandle {
 
 interface MockSchedule {
   id: string;
-  brainName: string;
+  brainTitle: string;
   cronExpression: string;
   enabled: boolean;
   createdAt: number;
@@ -102,7 +102,7 @@ interface MockScheduleRun {
 }
 
 interface MockBrain {
-  name: string;
+  filename: string;
   title: string;
   description: string;
   createdAt?: number;
@@ -278,23 +278,23 @@ export class TestDevServer implements PositronicDevServer {
         typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
 
       // Check if brain exists (for testing brain not found scenario)
-      if (body.brainName === 'non-existent-brain') {
-        this.logCall('createBrainRun', [body.brainName]);
-        return [404, { error: `Brain '${body.brainName}' not found` }];
+      if (body.brainTitle === 'non-existent-brain') {
+        this.logCall('createBrainRun', [body.brainTitle]);
+        return [404, { error: `Brain '${body.brainTitle}' not found` }];
       }
 
       let brainRunId = `run-${Date.now()}`;
 
       // Return specific runIds for specific test scenarios
-      if (body.brainName === 'error-brain') {
+      if (body.brainTitle === 'error-brain') {
         brainRunId = 'test-error-brain';
-      } else if (body.brainName === 'restart-brain') {
+      } else if (body.brainTitle === 'restart-brain') {
         brainRunId = 'test-restart-brain';
-      } else if (body.brainName === 'multi-status-brain') {
+      } else if (body.brainTitle === 'multi-status-brain') {
         brainRunId = 'test-multi-status';
       }
 
-      this.logCall('createBrainRun', [body.brainName, body.options]);
+      this.logCall('createBrainRun', [body.brainTitle, body.options]);
       return [201, { brainRunId }];
     });
 
@@ -304,20 +304,20 @@ export class TestDevServer implements PositronicDevServer {
         typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
 
       // Check if brain exists
-      if (body.brainName === 'non-existent-brain') {
+      if (body.brainTitle === 'non-existent-brain') {
         this.logCall('rerunBrain', [
-          body.brainName,
+          body.brainTitle,
           body.runId,
           body.startsAt,
           body.stopsAfter,
         ]);
-        return [404, { error: `Brain '${body.brainName}' not found` }];
+        return [404, { error: `Brain '${body.brainTitle}' not found` }];
       }
 
       // Check if run ID exists (if provided)
       if (body.runId === 'non-existent-run') {
         this.logCall('rerunBrain', [
-          body.brainName,
+          body.brainTitle,
           body.runId,
           body.startsAt,
           body.stopsAfter,
@@ -328,7 +328,7 @@ export class TestDevServer implements PositronicDevServer {
       const newBrainRunId = `rerun-${Date.now()}`;
 
       this.logCall('rerunBrain', [
-        body.brainName,
+        body.brainTitle,
         body.runId,
         body.startsAt,
         body.stopsAfter,
@@ -561,7 +561,7 @@ export class TestDevServer implements PositronicDevServer {
       const scheduleId = `schedule-${Date.now()}`;
       const schedule: MockSchedule = {
         id: scheduleId,
-        brainName: body.brainName,
+        brainTitle: body.brainTitle,
         cronExpression: body.cronExpression,
         enabled: true,
         createdAt: Date.now(),
@@ -682,7 +682,7 @@ export class TestDevServer implements PositronicDevServer {
       return [
         200,
         {
-          name: brain.name,
+          filename: brain.filename,
           title: brain.title,
           description: brain.description || `${brain.title} brain`,
           steps: brain.steps || [],
@@ -887,7 +887,7 @@ export class TestDevServer implements PositronicDevServer {
 
   // Brain helper methods
   addBrain(brain: MockBrain) {
-    this.brains.set(brain.name, brain);
+    this.brains.set(brain.filename, brain);
   }
 
   addBrainRun(run: MockBrainRun) {

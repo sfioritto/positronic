@@ -742,7 +742,7 @@ export const brain: BrainFactory = function <
     typeof brainConfig === 'string' ? undefined : brainConfig.description;
   if (brainNamesAreUnique && brainNames.has(title)) {
     throw new Error(
-      `Brain with name "${title}" already exists. Brain names must be unique.`
+      `Brain with title "${title}" already exists. Brain titles must be unique.`
     );
   }
   if (brainNamesAreUnique) {

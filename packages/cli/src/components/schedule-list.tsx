@@ -9,7 +9,7 @@ interface ScheduleListProps {
 
 interface Schedule {
   id: string;
-  brainName: string;
+  brainTitle: string;
   cronExpression: string;
   enabled: boolean;
   createdAt: number;
@@ -89,7 +89,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
 
   // Filter schedules if brain filter is provided
   const filteredSchedules = brainFilter
-    ? data.schedules.filter(s => s.brainName === brainFilter)
+    ? data.schedules.filter(s => s.brainTitle === brainFilter)
     : data.schedules;
 
   if (brainFilter && filteredSchedules.length === 0) {
@@ -110,7 +110,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
 
   // Define column widths
   const columns = {
-    brainName: { header: 'Brain Name', width: 20 },
+    brainTitle: { header: 'Brain Title', width: 20 },
     schedule: { header: 'Schedule', width: 15 },
     status: { header: 'Status', width: 10 },
     nextRun: { header: 'Next Run', width: 12 },
@@ -133,7 +133,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.brainName.header, columns.brainName.width)}</Text>
+          <Text bold color="cyan">{padRight(columns.brainTitle.header, columns.brainTitle.width)}</Text>
           <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.schedule.header, columns.schedule.width)}</Text>
           <Text>  </Text>
@@ -159,7 +159,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
 
           return (
             <Box key={schedule.id}>
-              <Text>{padRight(truncate(schedule.brainName, columns.brainName.width), columns.brainName.width)}</Text>
+              <Text>{padRight(truncate(schedule.brainTitle, columns.brainTitle.width), columns.brainTitle.width)}</Text>
               <Text>  </Text>
               <Text>{padRight(truncate(schedule.cronExpression, columns.schedule.width), columns.schedule.width)}</Text>
               <Text>  </Text>

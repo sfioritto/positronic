@@ -43,7 +43,7 @@ describe('schedule command', () => {
         );
         expect(createCall).toBeDefined();
         expect(createCall!.args[0]).toEqual({
-          brainName: 'test-brain',
+          brainTitle: 'test-brain',
           cronExpression: '0 3 * * *',
         });
       } finally {
@@ -114,7 +114,7 @@ describe('schedule command', () => {
       // Add test schedules
       server.addSchedule({
         id: 'schedule-1',
-        brainName: 'daily-report',
+        brainTitle: 'daily-report',
         cronExpression: '0 9 * * *',
         enabled: true,
         createdAt: Date.now() - 86400000, // 1 day ago
@@ -122,7 +122,7 @@ describe('schedule command', () => {
       });
       server.addSchedule({
         id: 'schedule-2',
-        brainName: 'hourly-sync',
+        brainTitle: 'hourly-sync',
         cronExpression: '0 * * * *',
         enabled: true,
         createdAt: Date.now() - 172800000, // 2 days ago
@@ -164,7 +164,7 @@ describe('schedule command', () => {
       // Add test schedules
       server.addSchedule({
         id: 'schedule-1',
-        brainName: 'daily-report',
+        brainTitle: 'daily-report',
         cronExpression: '0 9 * * *',
         enabled: true,
         createdAt: Date.now(),
@@ -172,7 +172,7 @@ describe('schedule command', () => {
       });
       server.addSchedule({
         id: 'schedule-2',
-        brainName: 'hourly-sync',
+        brainTitle: 'hourly-sync',
         cronExpression: '0 * * * *',
         enabled: true,
         createdAt: Date.now(),
@@ -253,7 +253,7 @@ describe('schedule command', () => {
       // Add a schedule to delete
       server.addSchedule({
         id: 'schedule-to-delete',
-        brainName: 'test-brain',
+        brainTitle: 'test-brain',
         cronExpression: '0 * * * *',
         enabled: true,
         createdAt: Date.now(),
