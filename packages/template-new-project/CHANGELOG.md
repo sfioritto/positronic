@@ -1,5 +1,15 @@
 # @positronic/template-new-project
 
+## 0.0.14
+
+### Patch Changes
+
+- Fix cloudflare dev server to use default port 8787
+
+  - Ensures wrangler dev server always uses port 8787 when no port is specified
+  - Prevents CLI commands like `px list` and `px brain list` from hanging when connecting to the server
+  - Aligns server port behavior with CLI expectations for better developer experience
+
 ## 0.0.13
 
 ### Patch Changes
