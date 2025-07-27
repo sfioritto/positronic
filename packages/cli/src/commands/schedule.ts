@@ -33,7 +33,7 @@ export class ScheduleCommand {
     cronExpression,
   }: ArgumentsCamelCase<ScheduleCreateArgs>): React.ReactElement {
     return React.createElement(ScheduleCreate, {
-      brainFilename,
+      identifier: brainFilename,
       cronExpression,
     });
   }

@@ -4,7 +4,7 @@ import { ErrorComponent } from './error.js';
 import { useApiPost } from '../hooks/useApi.js';
 
 interface ScheduleCreateProps {
-  brainFilename: string;
+  identifier: string;
   cronExpression: string;
 }
 
@@ -17,7 +17,7 @@ interface CreateScheduleResponse {
   nextRunAt?: number;
 }
 
-export const ScheduleCreate = ({ brainFilename, cronExpression }: ScheduleCreateProps) => {
+export const ScheduleCreate = ({ identifier, cronExpression }: ScheduleCreateProps) => {
   const [created, setCreated] = useState(false);
   const [schedule, setSchedule] = useState<CreateScheduleResponse | null>(null);
 
@@ -30,7 +30,7 @@ export const ScheduleCreate = ({ brainFilename, cronExpression }: ScheduleCreate
   useEffect(() => {
     const createSchedule = async () => {
       try {
-        const body = JSON.stringify({ identifier: brainFilename, cronExpression });
+        const body = JSON.stringify({ identifier, cronExpression });
         const result = await execute(body);
         setSchedule(result);
         setCreated(true);

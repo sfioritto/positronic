@@ -4,7 +4,7 @@ import { apiClient } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
 
 interface BrainRerunProps {
-  brainName: string;
+  identifier: string;
   runId?: string;
   startsAt?: number;
   stopsAfter?: number;
@@ -14,7 +14,7 @@ interface BrainRerunResponse {
   brainRunId: string;
 }
 
-export const BrainRerun = ({ brainName, runId, startsAt, stopsAfter }: BrainRerunProps) => {
+export const BrainRerun = ({ identifier, runId, startsAt, stopsAfter }: BrainRerunProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newRunId, setNewRunId] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export const BrainRerun = ({ brainName, runId, startsAt, stopsAfter }: BrainReru
   useEffect(() => {
     const rerunBrain = async () => {
       try {
-        const body: any = { identifier: brainName };
+        const body: any = { identifier };
         if (runId) body.runId = runId;
         if (startsAt !== undefined) body.startsAt = startsAt;
         if (stopsAfter !== undefined) body.stopsAfter = stopsAfter;
@@ -53,7 +53,7 @@ export const BrainRerun = ({ brainName, runId, startsAt, stopsAfter }: BrainReru
     };
 
     rerunBrain();
-  }, [brainName, runId, startsAt, stopsAfter]);
+  }, [identifier, runId, startsAt, stopsAfter]);
 
   if (isLoading) {
     return (
@@ -65,8 +65,8 @@ export const BrainRerun = ({ brainName, runId, startsAt, stopsAfter }: BrainReru
 
   if (error) {
     const errorDetails = runId 
-      ? `Make sure the brain "${brainName}" and run ID "${runId}" exist.\nYou can list brain history with: positronic brain history ${brainName}`
-      : `Make sure the brain "${brainName}" exists.\nYou can list available brains with: positronic brain list`;
+      ? `Make sure the brain "${identifier}" and run ID "${runId}" exist.\nYou can list brain history with: positronic brain history ${identifier}`
+      : `Make sure the brain "${identifier}" exists.\nYou can list available brains with: positronic brain list`;
 
     return (
       <ErrorComponent
@@ -92,7 +92,7 @@ export const BrainRerun = ({ brainName, runId, startsAt, stopsAfter }: BrainReru
           New run ID: <Text bold>{newRunId}</Text>
         </Text>
         <Text dimColor>
-          Rerunning brain "{brainName}"{runDetails}{rangeDetails}
+          Rerunning brain "{identifier}"{runDetails}{rangeDetails}
         </Text>
         <Box marginTop={1}>
           <Text dimColor>

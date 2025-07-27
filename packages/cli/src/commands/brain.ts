@@ -39,33 +39,33 @@ export class BrainCommand {
   }
 
   history({
-    filename: brainFilename,
+    filename,
     limit,
   }: ArgumentsCamelCase<BrainHistoryArgs>): React.ReactElement {
-    return React.createElement(BrainHistory, { brainName: brainFilename, limit });
+    return React.createElement(BrainHistory, { brainName: filename, limit });
   }
 
   show({
-    filename: brainFilename,
+    filename,
   }: ArgumentsCamelCase<BrainShowArgs>): React.ReactElement {
-    return React.createElement(BrainShow, { brainName: brainFilename });
+    return React.createElement(BrainShow, { brainName: filename });
   }
 
   rerun({
-    filename: brainFilename,
+    filename,
     runId,
     startsAt,
     stopsAfter,
   }: ArgumentsCamelCase<BrainRerunArgs>): React.ReactElement {
     return React.createElement(BrainRerun, {
-      brainName: brainFilename,
+      identifier: filename,
       runId,
       startsAt,
       stopsAfter,
     });
   }
 
-  async run({ filename: brainFilename, watch, options }: ArgumentsCamelCase<BrainRunArgs>): Promise<React.ReactElement> {
+  async run({ filename, watch, options }: ArgumentsCamelCase<BrainRunArgs>): Promise<React.ReactElement> {
     const apiPath = '/brains/runs';
     
     try {
@@ -75,7 +75,7 @@ export class BrainCommand {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          identifier: brainFilename,
+          identifier: filename,
           options 
         }),
       });
@@ -103,7 +103,7 @@ export class BrainCommand {
         return React.createElement(ErrorComponent, {
           error: {
             title: 'Brain Not Found',
-            message: `Brain '${brainFilename}' not found.`,
+            message: `Brain '${filename}' not found.`,
             details: 'Please check that:\n  1. The brain name is spelled correctly\n  2. The brain exists in your project\n  3. The brain has been properly defined and exported\n\nYou can list available brains with: positronic list'
           }
         });
@@ -133,7 +133,7 @@ export class BrainCommand {
 
   async watch({
     runId,
-    filename: brainFilename,
+    filename,
   }: ArgumentsCamelCase<BrainWatchArgs>): Promise<React.ReactElement> {
     // If a specific run ID is provided, return the Watch component
     if (runId) {
@@ -142,9 +142,9 @@ export class BrainCommand {
     }
 
     // If watching by brain filename is requested, look up active runs
-    if (brainFilename) {
+    if (filename) {
       try {
-        const apiPath = `/brains/${encodeURIComponent(brainFilename)}/active-runs`;
+        const apiPath = `/brains/${encodeURIComponent(filename)}/active-runs`;
         const response = await apiClient.fetch(apiPath, {
           method: 'GET',
         });
@@ -158,8 +158,8 @@ export class BrainCommand {
               {
                 error: {
                   title: 'No Active Runs',
-                  message: `No currently running brain runs found for brain "${brainFilename}".`,
-                  details: `To start a new run, use: positronic run ${brainFilename}`
+                  message: `No currently running brain runs found for brain "${filename}".`,
+                  details: `To start a new run, use: positronic run ${filename}`
                 }
               }
             );
@@ -171,7 +171,7 @@ export class BrainCommand {
               {
                 error: {
                   title: 'Multiple Active Runs',
-                  message: `Found ${result.runs.length} active runs for brain "${brainFilename}".`,
+                  message: `Found ${result.runs.length} active runs for brain "${filename}".`,
                   details: `Please specify a specific run ID with --run-id:\n${result.runs.map(run => `  positronic watch --run-id ${run.brainRunId}`).join('\n')}`
                 }
               }
@@ -189,7 +189,7 @@ export class BrainCommand {
             {
               error: {
                 title: 'API Error',
-                message: `Failed to get active runs for brain "${brainFilename}".`,
+                message: `Failed to get active runs for brain "${filename}".`,
                 details: `Server returned ${response.status}: ${errorText}`
               }
             }
