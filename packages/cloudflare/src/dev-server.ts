@@ -5,6 +5,7 @@ import * as os from 'os';
 import { spawn, exec, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
 import caz from 'caz';
+import { createRequire } from 'module';
 import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 
 /**
@@ -92,6 +93,8 @@ async function generateProject(
     pm?: string;
   } = { name: projectName };
 
+  let templateSourcePath: string;
+
   try {
     if (devPath) {
       // Copying templates, why you ask?
@@ -102,25 +105,37 @@ async function generateProject(
       // monorepo which then causes the tests to fail. Also any time I was generating a new
       // project it was a pain to have to run npm install over and over again just
       // to get back to a good state.
-      const originalNewProjectPkg = path.resolve(
+      templateSourcePath = path.resolve(
         devPath,
         'packages',
         'template-new-project'
       );
-      const copiedNewProjectPkg = fs.mkdtempSync(
-        path.join(os.tmpdir(), 'positronic-newproj-')
-      );
-      fs.cpSync(originalNewProjectPkg, copiedNewProjectPkg, {
-        recursive: true,
-      });
-      newProjectTemplatePath = copiedNewProjectPkg;
-      cazOptions = {
-        name: projectName,
-        backend: 'cloudflare',
-        install: true,
-        pm: 'npm',
-      };
+    } else {
+      // Resolve the installed template package location
+      const require = createRequire(import.meta.url);
+      const templatePackageJsonPath = require.resolve('@positronic/template-new-project/package.json');
+      templateSourcePath = path.dirname(templatePackageJsonPath);
     }
+
+    // Always copy to a temporary directory to avoid CAZ modifying our source
+    // CAZ only supports local paths, GitHub repos, or ZIP URLs - not npm package names
+    // Additionally, CAZ runs 'npm install --production' in the template directory,
+    // which would modify our installed node_modules if we passed the path directly
+    const copiedNewProjectPkg = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'positronic-newproj-')
+    );
+    fs.cpSync(templateSourcePath, copiedNewProjectPkg, {
+      recursive: true,
+    });
+    newProjectTemplatePath = copiedNewProjectPkg;
+    
+    // Set CAZ options for cloudflare backend
+    cazOptions = {
+      name: projectName,
+      backend: 'cloudflare',
+      install: true,
+      pm: 'npm',
+    };
 
     await caz.default(newProjectTemplatePath, projectDir, {
       ...cazOptions,
@@ -130,13 +145,11 @@ async function generateProject(
     await onSuccess?.();
   } finally {
     // Clean up the temporary copied new project package
-    if (devPath) {
-      fs.rmSync(newProjectTemplatePath, {
-        recursive: true,
-        force: true,
-        maxRetries: 3,
-      });
-    }
+    fs.rmSync(newProjectTemplatePath, {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+    });
   }
 }
 
