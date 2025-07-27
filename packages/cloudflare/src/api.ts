@@ -41,10 +41,14 @@ type R2Resource = Omit<ResourceEntry, 'path'> & {
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.post('/brains/runs', async (context: Context) => {
-  const { brainTitle, options } = await context.req.json<CreateBrainRunRequest>();
+  const requestBody = await context.req.json<CreateBrainRunRequest & { identifier?: string }>();
+  const { options } = requestBody;
+  
+  // Support both identifier and brainTitle for backward compatibility
+  const identifier = requestBody.identifier || requestBody.brainTitle;
 
-  if (!brainTitle) {
-    return context.json({ error: 'Missing brainTitle in request body' }, 400);
+  if (!identifier) {
+    return context.json({ error: 'Missing identifier or brainTitle in request body' }, 400);
   }
 
   // Validate that the brain exists before starting it
@@ -53,13 +57,22 @@ app.post('/brains/runs', async (context: Context) => {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  // TODO: manifest.import expects a filename, but we're passing a title
-  // This needs to be resolved - either by looking up filename from title
-  // or by changing the API to accept filename
-  const brain = await manifest.import(brainTitle);
-  if (!brain) {
-    return context.json({ error: `Brain '${brainTitle}' not found` }, 404);
+  // Resolve the identifier to find the brain
+  const resolution = manifest.resolve(identifier);
+  
+  if (resolution.matchType === 'none') {
+    return context.json({ error: `Brain '${identifier}' not found` }, 404);
   }
+  
+  if (resolution.matchType === 'multiple') {
+    return context.json({
+      error: 'Multiple brains match the identifier',
+      matchType: 'multiple',
+      candidates: resolution.candidates
+    }, 409);
+  }
+  
+  const brain = resolution.brain!;
 
   const brainRunId = uuidv4();
   const namespace = context.env.BRAIN_RUNNER_DO;
@@ -68,6 +81,8 @@ app.post('/brains/runs', async (context: Context) => {
   
   // Pass options to the brain runner if provided
   const initialData = options ? { options } : undefined;
+  // Get the actual brain title from the resolved brain
+  const brainTitle = (brain as any).title || identifier;
   await stub.start(brainTitle, brainRunId, initialData);
   
   const response: CreateBrainRunResponse = {
@@ -77,10 +92,14 @@ app.post('/brains/runs', async (context: Context) => {
 });
 
 app.post('/brains/runs/rerun', async (context: Context) => {
-  const { brainTitle, runId, startsAt, stopsAfter } = await context.req.json();
+  const requestBody = await context.req.json<any>();
+  const { runId, startsAt, stopsAfter } = requestBody;
+  
+  // Support both identifier and brainTitle for backward compatibility
+  const identifier = requestBody.identifier || requestBody.brainTitle;
 
-  if (!brainTitle) {
-    return context.json({ error: 'Missing brainTitle in request body' }, 400);
+  if (!identifier) {
+    return context.json({ error: 'Missing identifier or brainTitle in request body' }, 400);
   }
 
   // Validate that the brain exists
@@ -89,11 +108,22 @@ app.post('/brains/runs/rerun', async (context: Context) => {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  // TODO: manifest.import expects a filename, but we're passing a title
-  const brain = await manifest.import(brainTitle);
-  if (!brain) {
-    return context.json({ error: `Brain '${brainTitle}' not found` }, 404);
+  // Resolve the identifier to find the brain
+  const resolution = manifest.resolve(identifier);
+  
+  if (resolution.matchType === 'none') {
+    return context.json({ error: `Brain '${identifier}' not found` }, 404);
   }
+  
+  if (resolution.matchType === 'multiple') {
+    return context.json({
+      error: 'Multiple brains match the identifier',
+      matchType: 'multiple',
+      candidates: resolution.candidates
+    }, 409);
+  }
+  
+  const brain = resolution.brain!;
 
   // If runId is provided, validate it exists
   if (runId) {
@@ -119,6 +149,8 @@ app.post('/brains/runs/rerun', async (context: Context) => {
     ...(stopsAfter !== undefined && { stopsAfter }),
   };
   
+  // Get the actual brain title from the resolved brain
+  const brainTitle = (brain as any).title || identifier;
   await stub.start(brainTitle, newBrainRunId, rerunOptions);
   
   const response: CreateBrainRunResponse = {
@@ -136,9 +168,32 @@ app.get('/brains/runs/:runId/watch', async (context: Context) => {
   return response;
 });
 
-app.get('/brains/:brainTitle/history', async (context: Context) => {
-  const brainTitle = context.req.param('brainTitle');
+app.get('/brains/:identifier/history', async (context: Context) => {
+  const identifier = context.req.param('identifier');
   const limit = Number(context.req.query('limit') || '10');
+  
+  // Resolve the identifier to get the actual brain title
+  const manifest = getManifest();
+  if (!manifest) {
+    return context.json({ error: 'Manifest not initialized' }, 500);
+  }
+  
+  const resolution = manifest.resolve(identifier);
+  if (resolution.matchType === 'none') {
+    return context.json({ error: `Brain '${identifier}' not found` }, 404);
+  }
+  
+  if (resolution.matchType === 'multiple') {
+    return context.json({
+      error: 'Multiple brains match the identifier',
+      matchType: 'multiple',
+      candidates: resolution.candidates
+    }, 300);
+  }
+  
+  // Get the actual brain title
+  const brain = resolution.brain!;
+  const brainTitle = (brain as any).title || identifier;
 
   // Get the monitor singleton instance
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
@@ -148,8 +203,31 @@ app.get('/brains/:brainTitle/history', async (context: Context) => {
   return context.json({ runs });
 });
 
-app.get('/brains/:brainTitle/active-runs', async (context: Context) => {
-  const brainTitle = context.req.param('brainTitle');
+app.get('/brains/:identifier/active-runs', async (context: Context) => {
+  const identifier = context.req.param('identifier');
+  
+  // Resolve the identifier to get the actual brain title
+  const manifest = getManifest();
+  if (!manifest) {
+    return context.json({ error: 'Manifest not initialized' }, 500);
+  }
+  
+  const resolution = manifest.resolve(identifier);
+  if (resolution.matchType === 'none') {
+    return context.json({ error: `Brain '${identifier}' not found` }, 404);
+  }
+  
+  if (resolution.matchType === 'multiple') {
+    return context.json({
+      error: 'Multiple brains match the identifier',
+      matchType: 'multiple',
+      candidates: resolution.candidates
+    }, 300);
+  }
+  
+  // Get the actual brain title
+  const brain = resolution.brain!;
+  const brainTitle = (brain as any).title || identifier;
 
   // Get the monitor singleton instance
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
@@ -205,10 +283,13 @@ app.get('/brains', async (context: Context) => {
 app.post('/brains/schedules', async (context: Context) => {
   try {
     const body = await context.req.json();
-    const { brainTitle, cronExpression } = body;
+    const { cronExpression } = body;
+    
+    // Support both identifier and brainTitle for backward compatibility
+    const identifier = body.identifier || body.brainTitle;
 
-    if (!brainTitle) {
-      return context.json({ error: 'Missing required field "brainTitle"' }, 400);
+    if (!identifier) {
+      return context.json({ error: 'Missing required field "identifier" or "brainTitle"' }, 400);
     }
     if (!cronExpression) {
       return context.json(
@@ -226,6 +307,29 @@ app.post('/brains/schedules', async (context: Context) => {
         400
       );
     }
+
+    // Resolve the identifier to get the actual brain title
+    const manifest = getManifest();
+    if (!manifest) {
+      return context.json({ error: 'Manifest not initialized' }, 500);
+    }
+    
+    const resolution = manifest.resolve(identifier);
+    if (resolution.matchType === 'none') {
+      return context.json({ error: `Brain '${identifier}' not found` }, 404);
+    }
+    
+    if (resolution.matchType === 'multiple') {
+      return context.json({
+        error: 'Multiple brains match the identifier',
+        matchType: 'multiple',
+        candidates: resolution.candidates
+      }, 409);
+    }
+    
+    // Get the actual brain title
+    const brain = resolution.brain!;
+    const brainTitle = (brain as any).title || identifier;
 
     // Get the schedule singleton instance
     const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
@@ -280,19 +384,30 @@ app.delete('/brains/schedules/:scheduleId', async (context: Context) => {
   return new Response(null, { status: 204 });
 });
 
-app.get('/brains/:brainTitle', async (context: Context) => {
-  const brainTitle = context.req.param('brainTitle');
+app.get('/brains/:identifier', async (context: Context) => {
+  const identifier = context.req.param('identifier');
   const manifest = getManifest();
   
   if (!manifest) {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  // TODO: manifest.import expects a filename, but we're passing a title
-  const brain = await manifest.import(brainTitle);
-  if (!brain) {
-    return context.json({ error: `Brain '${brainTitle}' not found` }, 404);
+  // Resolve the identifier to find the brain
+  const resolution = manifest.resolve(identifier);
+  
+  if (resolution.matchType === 'none') {
+    return context.json({ error: `Brain '${identifier}' not found` }, 404);
   }
+  
+  if (resolution.matchType === 'multiple') {
+    return context.json({
+      error: 'Multiple brains match the identifier',
+      matchType: 'multiple',
+      candidates: resolution.candidates
+    }, 300);
+  }
+  
+  const brain = resolution.brain!;
 
   // Get the brain structure
   const structure = brain.structure;

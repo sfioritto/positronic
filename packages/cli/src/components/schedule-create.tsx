@@ -30,7 +30,7 @@ export const ScheduleCreate = ({ brainFilename, cronExpression }: ScheduleCreate
   useEffect(() => {
     const createSchedule = async () => {
       try {
-        const body = JSON.stringify({ brainTitle: brainFilename, cronExpression });
+        const body = JSON.stringify({ identifier: brainFilename, cronExpression });
         const result = await execute(body);
         setSchedule(result);
         setCreated(true);

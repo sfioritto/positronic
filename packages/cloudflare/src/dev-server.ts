@@ -150,6 +150,7 @@ async function regenerateManifestFile(
 
   let importStatements = `import type { Brain } from '@positronic/core';\n`;
   let manifestEntries = '';
+  let metadataEntries = '';
 
   const brainsDirExists = await fsPromises
     .access(brainsDir)
@@ -170,10 +171,29 @@ async function regenerateManifestFile(
       manifestEntries += `  ${JSON.stringify(
         brainName
       )}: ${importAlias}.default as Brain,\n`;
+      
+      // Create metadata entry - title and description will be extracted at runtime
+      metadataEntries += `  ${JSON.stringify(brainName)}: {\n`;
+      metadataEntries += `    filename: ${JSON.stringify(brainName)},\n`;
+      metadataEntries += `    path: ${JSON.stringify(`brains/${file}`)},\n`;
+      metadataEntries += `    brain: ${importAlias}.default as Brain,\n`;
+      metadataEntries += `  },\n`;
     }
   }
 
-  const manifestContent = `// This file is generated automatically. Do not edit directly.\n${importStatements}\nexport const staticManifest: Record<string, Brain> = {\n${manifestEntries}};
+  const manifestContent = `// This file is generated automatically. Do not edit directly.
+${importStatements}
+export const staticManifest: Record<string, Brain> = {
+${manifestEntries}};
+
+export interface BrainMetadata {
+  filename: string;
+  path: string;
+  brain: Brain;
+}
+
+export const enhancedManifest: Record<string, BrainMetadata> = {
+${metadataEntries}};
 `;
 
   const runnerContent = await fsPromises.readFile(runnerPath, 'utf-8');

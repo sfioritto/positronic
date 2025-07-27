@@ -1,15 +1,41 @@
 import type { Brain } from '@positronic/core';
+import { BrainResolver, type BrainMetadata, type ResolutionResult } from './brain-resolver.js';
+
+export type { BrainMetadata, ResolutionResult } from './brain-resolver.js';
 
 interface BrainImportStrategy {
   import(filename: string): Promise<Brain | undefined>;
+  resolve(identifier: string): ResolutionResult;
   list(): string[];
 }
 
 class StaticManifestStrategy implements BrainImportStrategy {
-  constructor(private manifest: Record<string, Brain>) {}
+  private resolver?: BrainResolver;
+  
+  constructor(
+    private manifest: Record<string, Brain>,
+    private enhancedManifest?: Record<string, BrainMetadata>
+  ) {
+    if (enhancedManifest) {
+      this.resolver = new BrainResolver(enhancedManifest);
+    }
+  }
 
   async import(filename: string): Promise<Brain | undefined> {
     return this.manifest[filename];
+  }
+  
+  resolve(identifier: string): ResolutionResult {
+    if (this.resolver) {
+      return this.resolver.resolve(identifier);
+    }
+    
+    // Fallback for legacy manifest without metadata
+    const brain = this.manifest[identifier];
+    if (brain) {
+      return { matchType: 'exact', brain };
+    }
+    return { matchType: 'none' };
   }
 
   list(): string[] {
@@ -29,6 +55,13 @@ class DynamicImportStrategy implements BrainImportStrategy {
       return undefined;
     }
   }
+  
+  resolve(identifier: string): ResolutionResult {
+    // For dynamic imports, we can only do simple filename matching
+    return this.import(identifier).then(brain => 
+      brain ? { matchType: 'exact' as const, brain } : { matchType: 'none' as const }
+    ) as any; // Type assertion needed due to async
+  }
 
   list(): string[] {
     // For dynamic imports, we can't easily list files at runtime in a worker environment
@@ -43,6 +76,7 @@ export class PositronicManifest {
 
   constructor(options: {
     staticManifest?: Record<string, Brain>;
+    enhancedManifest?: Record<string, BrainMetadata>;
     brainsDir?: string;
   }) {
     if (options.staticManifest && options.brainsDir) {
@@ -55,12 +89,16 @@ export class PositronicManifest {
     }
 
     this.importStrategy = options.staticManifest
-      ? new StaticManifestStrategy(options.staticManifest)
+      ? new StaticManifestStrategy(options.staticManifest, options.enhancedManifest)
       : new DynamicImportStrategy(options.brainsDir!);
   }
 
   async import(filename: string): Promise<Brain | undefined> {
     return this.importStrategy.import(filename);
+  }
+  
+  resolve(identifier: string): ResolutionResult {
+    return this.importStrategy.resolve(identifier);
   }
 
   list(): string[] {

@@ -277,24 +277,27 @@ export class TestDevServer implements PositronicDevServer {
       const body =
         typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
 
+      // Support both identifier and brainTitle for backward compatibility
+      const identifier = body.identifier || body.brainTitle;
+
       // Check if brain exists (for testing brain not found scenario)
-      if (body.brainTitle === 'non-existent-brain') {
-        this.logCall('createBrainRun', [body.brainTitle]);
-        return [404, { error: `Brain '${body.brainTitle}' not found` }];
+      if (identifier === 'non-existent-brain') {
+        this.logCall('createBrainRun', [identifier]);
+        return [404, { error: `Brain '${identifier}' not found` }];
       }
 
       let brainRunId = `run-${Date.now()}`;
 
       // Return specific runIds for specific test scenarios
-      if (body.brainTitle === 'error-brain') {
+      if (identifier === 'error-brain') {
         brainRunId = 'test-error-brain';
-      } else if (body.brainTitle === 'restart-brain') {
+      } else if (identifier === 'restart-brain') {
         brainRunId = 'test-restart-brain';
-      } else if (body.brainTitle === 'multi-status-brain') {
+      } else if (identifier === 'multi-status-brain') {
         brainRunId = 'test-multi-status';
       }
 
-      this.logCall('createBrainRun', [body.brainTitle, body.options]);
+      this.logCall('createBrainRun', [identifier, body.options]);
       return [201, { brainRunId }];
     });
 
@@ -303,15 +306,18 @@ export class TestDevServer implements PositronicDevServer {
       const body =
         typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
 
+      // Support both identifier and brainTitle for backward compatibility
+      const identifier = body.identifier || body.brainTitle;
+
       // Check if brain exists
-      if (body.brainTitle === 'non-existent-brain') {
+      if (identifier === 'non-existent-brain') {
         this.logCall('rerunBrain', [
-          body.brainTitle,
+          identifier,
           body.runId,
           body.startsAt,
           body.stopsAfter,
         ]);
-        return [404, { error: `Brain '${body.brainTitle}' not found` }];
+        return [404, { error: `Brain '${identifier}' not found` }];
       }
 
       // Check if run ID exists (if provided)
@@ -328,7 +334,7 @@ export class TestDevServer implements PositronicDevServer {
       const newBrainRunId = `rerun-${Date.now()}`;
 
       this.logCall('rerunBrain', [
-        body.brainTitle,
+        identifier,
         body.runId,
         body.startsAt,
         body.stopsAfter,
@@ -558,10 +564,14 @@ export class TestDevServer implements PositronicDevServer {
     nockInstance.post('/brains/schedules').reply(201, (uri, requestBody) => {
       const body =
         typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+      
+      // Support both identifier and brainTitle for backward compatibility
+      const brainTitle = body.brainTitle || body.identifier;
+      
       const scheduleId = `schedule-${Date.now()}`;
       const schedule: MockSchedule = {
         id: scheduleId,
-        brainTitle: body.brainTitle,
+        brainTitle: brainTitle,
         cronExpression: body.cronExpression,
         enabled: true,
         createdAt: Date.now(),
@@ -624,24 +634,24 @@ export class TestDevServer implements PositronicDevServer {
       return [404, 'Not Found'];
     });
 
-    // GET /brains/:brainName/history
+    // GET /brains/:identifier/history
     nockInstance
       .get(/^\/brains\/(.+)\/history$/)
       .query(true)
       .reply((uri) => {
         const parts = uri.split('/');
-        const brainName = decodeURIComponent(parts[2]);
+        const identifier = decodeURIComponent(parts[2]);
         const url = new URL(uri, 'http://example.com');
         const limit = parseInt(url.searchParams.get('limit') || '10', 10);
 
-        this.logCall('getBrainHistory', [brainName, limit]);
+        this.logCall('getBrainHistory', [identifier, limit]);
 
         // Filter runs by brain title
         const runs = this.brainRuns
           .filter(
             (run) =>
               run.brainTitle.toLowerCase() ===
-              brainName.toLowerCase().replace(/-/g, ' ')
+              identifier.toLowerCase().replace(/-/g, ' ')
           )
           .sort((a, b) => b.createdAt - a.createdAt)
           .slice(0, limit);
@@ -649,19 +659,19 @@ export class TestDevServer implements PositronicDevServer {
         return [200, { runs }];
       });
 
-    // GET /brains/:brainName/active-runs
+    // GET /brains/:identifier/active-runs
     nockInstance.get(/^\/brains\/(.+)\/active-runs$/).reply((uri) => {
       const parts = uri.split('/');
-      const brainName = decodeURIComponent(parts[2]);
+      const identifier = decodeURIComponent(parts[2]);
 
-      this.logCall('getBrainActiveRuns', [brainName]);
+      this.logCall('getBrainActiveRuns', [identifier]);
 
       // Filter brain runs by brain title and status RUNNING
       const activeRuns = this.brainRuns
         .filter(
           (run) =>
             run.brainTitle.toLowerCase() ===
-              brainName.toLowerCase().replace(/-/g, ' ') &&
+              identifier.toLowerCase().replace(/-/g, ' ') &&
             run.status === 'RUNNING'
         )
         .sort((a, b) => b.createdAt - a.createdAt);
@@ -669,14 +679,14 @@ export class TestDevServer implements PositronicDevServer {
       return [200, { runs: activeRuns }];
     });
 
-    // GET /brains/:brainName
+    // GET /brains/:identifier
     nockInstance.get(/^\/brains\/(.+)$/).reply((uri) => {
-      const brainName = decodeURIComponent(uri.split('/')[2]);
-      const brain = this.brains.get(brainName);
-      this.logCall('getBrain', [brainName]);
+      const identifier = decodeURIComponent(uri.split('/')[2]);
+      const brain = this.brains.get(identifier);
+      this.logCall('getBrain', [identifier]);
 
       if (!brain) {
-        return [404, { error: `Brain '${brainName}' not found` }];
+        return [404, { error: `Brain '${identifier}' not found` }];
       }
 
       return [
