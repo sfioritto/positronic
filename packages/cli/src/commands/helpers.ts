@@ -8,6 +8,7 @@ import { isText } from 'istextorbinary';
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
+import { createRequire } from 'module';
 
 // Progress callback types
 export interface ProgressInfo {
@@ -45,6 +46,8 @@ export async function generateProject(projectName: string, projectDir: string) {
     claudemd?: boolean;
   } = { name: projectName };
 
+  let templateSourcePath: string;
+
   try {
     if (devPath) {
       // Copying templates, why you ask?
@@ -55,18 +58,32 @@ export async function generateProject(projectName: string, projectDir: string) {
       // monorepo which then causes the tests to fail. Also ny time I was generating a new
       // project it was a pain to have to run npm install over and over again just
       // to get back to a good state.
-      const originalNewProjectPkg = path.resolve(
+      templateSourcePath = path.resolve(
         devPath,
         'packages',
         'template-new-project'
       );
-      const copiedNewProjectPkg = fs.mkdtempSync(
-        path.join(os.tmpdir(), 'positronic-newproj-')
-      );
-      fs.cpSync(originalNewProjectPkg, copiedNewProjectPkg, {
-        recursive: true,
-      });
-      newProjectTemplatePath = copiedNewProjectPkg;
+    } else {
+      // Resolve the installed template package location
+      const require = createRequire(import.meta.url);
+      const templatePackageJsonPath = require.resolve('@positronic/template-new-project/package.json');
+      templateSourcePath = path.dirname(templatePackageJsonPath);
+    }
+
+    // Always copy to a temporary directory to avoid CAZ modifying our source
+    // CAZ only supports local paths, GitHub repos, or ZIP URLs - not npm package names
+    // Additionally, CAZ runs 'npm install --production' in the template directory,
+    // which would modify our installed node_modules if we passed the path directly
+    const copiedNewProjectPkg = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'positronic-newproj-')
+    );
+    fs.cpSync(templateSourcePath, copiedNewProjectPkg, {
+      recursive: true,
+    });
+    newProjectTemplatePath = copiedNewProjectPkg;
+    
+    // Set CAZ options for both local dev and installed package scenarios
+    if (devPath || !process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
       cazOptions = {
         name: projectName,
         install: true,
