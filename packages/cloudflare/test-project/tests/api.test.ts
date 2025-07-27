@@ -758,13 +758,13 @@ describe('Hono API Tests', () => {
   describe('Brain Schedules API Tests', () => {
     it('POST /brains/schedules creates a new schedule', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'basic-brain';
+      const identifier = 'basic-brain';
       const cronExpression = '0 3 * * *'; // Daily at 3am
 
       const request = new Request('http://example.com/brains/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName, cronExpression }),
+        body: JSON.stringify({ brainTitle: identifier, cronExpression }),
       });
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
@@ -780,7 +780,7 @@ describe('Hono API Tests', () => {
       }>();
 
       expect(responseBody.id).toBeDefined();
-      expect(responseBody.brainTitle).toBe(brainName);
+      expect(responseBody.brainTitle).toBe(identifier);
       expect(responseBody.cronExpression).toBe(cronExpression);
       expect(responseBody.enabled).toBe(true);
       expect(responseBody.createdAt).toBeDefined();
@@ -955,14 +955,14 @@ describe('Hono API Tests', () => {
 
     it('POST /brains/schedules allows multiple schedules per brain', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'basic-brain';
+      const identifier = 'basic-brain';
 
       // Create first schedule
       const request1 = new Request('http://example.com/brains/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brainTitle: brainName,
+          brainTitle: identifier,
           cronExpression: '0 9 * * *', // 9am daily
         }),
       });
@@ -976,7 +976,7 @@ describe('Hono API Tests', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brainTitle: brainName,
+          brainTitle: identifier,
           cronExpression: '0 17 * * *', // 5pm daily
         }),
       });
