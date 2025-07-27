@@ -1,6 +1,7 @@
 import type { ObjectGenerator } from '@positronic/core';
 import type { BrainEvent } from '@positronic/core';
 import { BRAIN_EVENTS, applyPatches } from '@positronic/core';
+import { jest } from '@jest/globals';
 
 export interface MockClient extends ObjectGenerator {
   mockResponses: (...responses: any[]) => void;
@@ -38,26 +39,37 @@ export interface BrainTestResult<TState> {
   events: BrainEvent<any>[];
 }
 
-export async function runBrainTest<TOptions extends object, TState extends object>(
+export async function runBrainTest<
+  TOptions extends object = object,
+  TState extends object = object,
+  TServices extends object = object
+>(
   brain: any,
-  options?: {
+  params?: {
     client?: ObjectGenerator;
     initialState?: Partial<TState>;
     resources?: any;
+    options?: TOptions;
+    services?: TServices;
   }
 ): Promise<BrainTestResult<TState>> {
   const events: BrainEvent<any>[] = [];
-  let finalState: any = options?.initialState || {};
+  let finalState: any = params?.initialState || {};
   let error: Error | null = null;
   let completed = false;
 
   try {
     const runOptions = {
-      ...options,
-      state: options?.initialState,
+      client: params?.client,
+      initialState: params?.initialState,
+      resources: params?.resources,
+      options: params?.options,
     };
 
-    for await (const event of brain.run(runOptions)) {
+    // If brain has services, we need to apply them first
+    const brainToRun = params?.services ? brain.withServices(params.services) : brain;
+
+    for await (const event of brainToRun.run(runOptions)) {
       events.push(event);
 
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
