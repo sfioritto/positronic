@@ -43,7 +43,7 @@ describe('schedule command', () => {
         );
         expect(createCall).toBeDefined();
         expect(createCall!.args[0]).toEqual({
-          brainTitle: 'test-brain',
+          identifier: 'test-brain',
           cronExpression: '0 3 * * *',
         });
       } finally {

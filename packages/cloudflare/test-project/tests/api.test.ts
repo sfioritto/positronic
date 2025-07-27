@@ -121,7 +121,7 @@ describe('Hono API Tests', () => {
     expect(response.status).toBe(400);
     const responseBody = await response.json();
     expect(responseBody).toEqual({
-      error: 'Missing brainTitle in request body',
+      error: 'Missing identifier or brainTitle in request body',
     });
   });
 
@@ -790,12 +790,13 @@ describe('Hono API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a few schedules first
-      for (let i = 0; i < 3; i++) {
+      const brainNames = ['basic-brain', 'delayed-brain', 'resource-brain'];
+      for (let i = 0; i < brainNames.length; i++) {
         const request = new Request('http://example.com/brains/schedules', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            brainTitle: `brain-${i}`,
+            brainTitle: brainNames[i],
             cronExpression: `${i} * * * *`,
           }),
         });
@@ -838,7 +839,7 @@ describe('Hono API Tests', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brainTitle: 'delete-brain',
+          brainTitle: 'options-brain',
           cronExpression: '0 0 * * *',
         }),
       });
@@ -954,7 +955,7 @@ describe('Hono API Tests', () => {
 
     it('POST /brains/schedules allows multiple schedules per brain', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'multi-schedule-brain';
+      const brainName = 'basic-brain';
 
       // Create first schedule
       const request1 = new Request('http://example.com/brains/schedules', {

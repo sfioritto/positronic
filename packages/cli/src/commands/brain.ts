@@ -75,7 +75,7 @@ export class BrainCommand {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          brainTitle: brainFilename,
+          identifier: brainFilename,
           options 
         }),
       });
