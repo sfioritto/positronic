@@ -71,6 +71,17 @@ const optionsBrain = brain({ title: 'options-brain', description: 'A brain that 
     message: `Running in ${state.environment} environment${state.debugMode ? ' with debug mode' : ''}`,
   }));
 
+// Brain with title different from filename to test resolution
+const titleTestBrain = brain({ title: 'Brain with Custom Title', description: 'Tests title vs filename resolution' })
+  .step('First', ({ state }) => ({
+    ...state,
+    status: 'started',
+  }))
+  .step('Second', ({ state }) => ({
+    ...state,
+    status: 'completed',
+  }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -91,6 +102,11 @@ const brainManifest = {
     filename: 'options-brain',
     path: 'brains/options-brain.ts',
     brain: optionsBrain,
+  },
+  'title-test-brain': {
+    filename: 'title-test-brain',
+    path: 'brains/title-test-brain.ts',
+    brain: titleTestBrain,
   },
 };
 

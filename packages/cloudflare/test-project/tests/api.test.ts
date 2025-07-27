@@ -1003,4 +1003,100 @@ describe('Hono API Tests', () => {
       expect(multiSchedules.length).toBe(2);
     });
   });
+
+  describe('Brain title vs filename resolution', () => {
+    it('should handle brain run creation with brain title (not filename)', async () => {
+      const testEnv = env as TestEnv;
+      
+      // Create brain run using the brain's title instead of filename
+      const request = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'Brain with Custom Title' }),
+      });
+      
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      expect(response.status).toBe(201);
+      
+      const responseBody = await response.json<{ brainRunId: string }>();
+      const brainRunId = responseBody.brainRunId;
+      await waitOnExecutionContext(context);
+      
+      // Watch the brain run to ensure it executes properly
+      const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+      const watchRequest = new Request(watchUrl);
+      const watchContext = createExecutionContext();
+      const watchResponse = await worker.fetch(
+        watchRequest,
+        testEnv,
+        watchContext
+      );
+      
+      expect(watchResponse.status).toBe(200);
+      
+      if (!watchResponse.body) {
+        throw new Error('Watch response body is null');
+      }
+      
+      // Read all events from the SSE stream
+      const allEvents = await readSseStream(watchResponse.body);
+      
+      // Should have received completion event
+      const completeEvent = allEvents.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent.status).toBe(STATUS.COMPLETE);
+      
+      await waitOnExecutionContext(watchContext);
+    });
+
+    it('should handle brain run creation with filename', async () => {
+      const testEnv = env as TestEnv;
+      
+      // Create brain run using the filename
+      const request = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'title-test-brain' }),
+      });
+      
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      expect(response.status).toBe(201);
+      
+      const responseBody = await response.json<{ brainRunId: string }>();
+      const brainRunId = responseBody.brainRunId;
+      await waitOnExecutionContext(context);
+      
+      // Watch the brain run to ensure it executes properly
+      const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+      const watchRequest = new Request(watchUrl);
+      const watchContext = createExecutionContext();
+      const watchResponse = await worker.fetch(
+        watchRequest,
+        testEnv,
+        watchContext
+      );
+      
+      expect(watchResponse.status).toBe(200);
+      
+      if (!watchResponse.body) {
+        throw new Error('Watch response body is null');
+      }
+      
+      // Read all events from the SSE stream
+      const allEvents = await readSseStream(watchResponse.body);
+      
+      // Should have received completion event
+      const completeEvent = allEvents.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent.status).toBe(STATUS.COMPLETE);
+      
+      await waitOnExecutionContext(watchContext);
+    });
+  });
 });

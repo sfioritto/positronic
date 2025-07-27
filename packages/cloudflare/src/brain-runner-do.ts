@@ -182,16 +182,27 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('Runtime manifest not initialized');
     }
 
-    // TODO: manifest.import expects a filename, but we're passing a title
-    // This needs to be resolved - either by looking up filename from title
-    // or by changing the API to accept filename
-    const brainToRun = await manifest.import(brainTitle);
-    if (!brainToRun) {
+    // Resolve the brain using the title/identifier
+    const resolution = manifest.resolve(brainTitle);
+    if (resolution.matchType === 'none') {
       console.error(
         `[DO ${brainRunId}] Brain ${brainTitle} not found in manifest.`
       );
       console.error(JSON.stringify(manifest, null, 2));
       throw new Error(`Brain ${brainTitle} not found`);
+    }
+    
+    if (resolution.matchType === 'multiple') {
+      console.error(
+        `[DO ${brainRunId}] Multiple brains match identifier ${brainTitle}`,
+        resolution.candidates
+      );
+      throw new Error(`Multiple brains match identifier ${brainTitle}`);
+    }
+    
+    const brainToRun = resolution.brain;
+    if (!brainToRun) {
+      throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
     }
 
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
