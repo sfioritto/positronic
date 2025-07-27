@@ -1,5 +1,19 @@
 # @positronic/client-vercel
 
+## 0.0.15
+
+### Patch Changes
+
+- Add runtime options support for brain runs
+
+  - Add ability to pass runtime options when creating brain runs via POST /brains/runs
+  - Update Cloudflare implementation to support options parameter
+  - Add spec tests for brain runs with options
+  - Add example brain demonstrating runtime options usage
+
+- Updated dependencies
+  - @positronic/core@0.0.15
+
 ## 0.0.14
 
 ### Patch Changes
