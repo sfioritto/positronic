@@ -1,5 +1,18 @@
 # @positronic/template-new-project
 
+## 0.0.16
+
+### Patch Changes
+
+- Refactor brain identification system
+
+  - Removed ambiguous "brain name" concept - brains are now identified by title, filename, or partial matches
+  - Added flexible BrainResolver that supports multiple identification methods while maintaining backward compatibility
+  - Enhanced manifest structure to store rich metadata for better brain resolution
+  - Updated all CLI commands to use consistent `filename` parameter (though any identifier works)
+  - API now accepts generic `identifier` parameter with proper disambiguation when multiple matches found
+  - Fixed test utilities to work with options and services
+
 ## 0.0.15
 
 ### Patch Changes
