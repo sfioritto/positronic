@@ -71,14 +71,7 @@ const optionsBrain = brain({ title: 'options-brain', description: 'A brain that 
     message: `Running in ${state.environment} environment${state.debugMode ? ' with debug mode' : ''}`,
   }));
 
-const staticManifest = {
-  'basic-brain': basicBrain,
-  'delayed-brain': delayedBrain,
-  'resource-brain': resourceBrain,
-  'options-brain': optionsBrain,
-};
-
-const enhancedManifest = {
+const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
     path: 'brains/basic-brain.ts',
@@ -102,8 +95,7 @@ const enhancedManifest = {
 };
 
 const manifest = new PositronicManifest({
-  staticManifest,
-  enhancedManifest,
+  manifest: brainManifest,
 });
 
 setManifest(manifest);

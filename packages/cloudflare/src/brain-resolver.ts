@@ -26,12 +26,11 @@ export class BrainResolver {
     // Pre-cache brain titles and descriptions
     for (const [filename, metadata] of Object.entries(enhancedManifest)) {
       const brain = metadata.brain;
-      // Access brain configuration to get title and description
-      // Note: This assumes the brain object has a way to access its config
-      // In practice, we might need to access the brain's internal state
+      // Access brain structure to get title and description
+      const structure = brain.structure;
       this.metadataCache.set(filename, {
-        title: (brain as any).title || filename,
-        description: (brain as any).description,
+        title: structure.title || filename,
+        description: structure.description,
       });
     }
   }

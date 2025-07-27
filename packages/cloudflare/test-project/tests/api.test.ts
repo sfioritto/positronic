@@ -999,7 +999,7 @@ describe('Hono API Tests', () => {
         schedules: Array<{ brainTitle: string }>;
       }>();
 
-      const multiSchedules = schedules.filter((s) => s.brainTitle === brainName);
+      const multiSchedules = schedules.filter((s) => s.brainTitle === 'basic-brain');
       expect(multiSchedules.length).toBe(2);
     });
   });
