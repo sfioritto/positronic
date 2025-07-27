@@ -446,9 +446,9 @@ export class CloudflareDevServer implements PositronicDevServer {
     // Start wrangler dev server
     const wranglerArgs = ['dev', '--x-remote-bindings'];
 
-    if (port) {
-      wranglerArgs.push('--port', String(port));
-    }
+    // Always specify a port - use 8787 as default if not provided
+    const serverPort = port || 8787;
+    wranglerArgs.push('--port', String(serverPort));
 
     const wranglerProcess = spawn('npx', ['wrangler', ...wranglerArgs], {
       cwd: serverDir,
@@ -487,7 +487,7 @@ export class CloudflareDevServer implements PositronicDevServer {
       console.error('Failed to start Wrangler dev server:', err);
     });
 
-    return new ProcessServerHandle(wranglerProcess, port);
+    return new ProcessServerHandle(wranglerProcess, serverPort);
   }
 
   async watch(
