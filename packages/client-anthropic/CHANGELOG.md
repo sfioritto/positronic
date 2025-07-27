@@ -1,5 +1,24 @@
 # @positronic/client-anthropic
 
+## 0.0.13
+
+### Patch Changes
+
+- ### Improvements
+
+  - **CLI**: Fixed template resolution for CAZ to work correctly in non-local calls
+  - **CLI**: Improved new project template handling to support both local development and installed package scenarios
+  - **Build**: Updated release process to create a single version tag instead of individual package tags
+
+  ### Internal
+
+  - Added WebFetch permission for npmjs.com in local settings
+  - Enhanced template path resolution using createRequire for better package location discovery
+    EOF < /dev/null
+
+- Updated dependencies
+  - @positronic/core@0.0.13
+
 ## 0.0.12
 
 ### Patch Changes
