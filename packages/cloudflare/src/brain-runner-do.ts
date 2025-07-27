@@ -214,6 +214,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
       runnerWithResources = brainRunner.withResources(r2Resources);
     }
 
+    // Extract options from initialData if present
+    const options = initialData?.options;
+    const initialState = initialData && !initialData.options ? initialData : {};
+
     runnerWithResources
       .withAdapters([
         sqliteAdapter,
@@ -222,8 +226,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
         scheduleAdapter,
       ])
       .run(brainToRun, {
-        initialState: initialData || {},
+        initialState,
         brainRunId,
+        ...(options && { options }),
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner run failed:`, err);

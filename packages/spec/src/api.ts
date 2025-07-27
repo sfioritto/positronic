@@ -336,14 +336,19 @@ export const brains = {
   /**
    * Test POST /brains/runs - Create a new brain run
    */
-  async run(fetch: Fetch, brainName: string): Promise<string | null> {
+  async run(fetch: Fetch, brainName: string, options?: Record<string, string>): Promise<string | null> {
     try {
+      const body: any = { brainName };
+      if (options && Object.keys(options).length > 0) {
+        body.options = options;
+      }
+
       const request = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ brainName }),
+        body: JSON.stringify(body),
       });
 
       const response = await fetch(request);
@@ -367,6 +372,48 @@ export const brains = {
       return data.brainRunId;
     } catch (error) {
       console.error(`Failed to test POST /brains/runs:`, error);
+      return null;
+    }
+  },
+
+  /**
+   * Test POST /brains/runs with options - Create a brain run with runtime options
+   */
+  async runWithOptions(
+    fetch: Fetch,
+    brainName: string,
+    options: Record<string, string>
+  ): Promise<string | null> {
+    try {
+      const request = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ brainName, options }),
+      });
+
+      const response = await fetch(request);
+
+      if (response.status !== 201) {
+        console.error(
+          `POST /brains/runs with options returned ${response.status}, expected 201`
+        );
+        return null;
+      }
+
+      const data = await response.json() as { brainRunId: string };
+
+      if (!data.brainRunId || typeof data.brainRunId !== 'string') {
+        console.error(
+          `Expected brainRunId to be string, got ${typeof data.brainRunId}`
+        );
+        return null;
+      }
+
+      return data.brainRunId;
+    } catch (error) {
+      console.error(`Failed to test POST /brains/runs with options:`, error);
       return null;
     }
   },

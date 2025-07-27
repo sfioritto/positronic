@@ -1,4 +1,5 @@
 import { brain } from '@positronic/core';
+import { z } from 'zod';
 import app from '../../src/api';
 import {
   setManifest,
@@ -52,11 +53,30 @@ const resourceBrain = brain({ title: 'resource-brain', description: 'A brain tha
     ].loadText(),
   }));
 
+// Brain that uses runtime options
+const optionsBrain = brain({ title: 'options-brain', description: 'A brain that uses runtime options' })
+  .withOptionsSchema(
+    z.object({
+      environment: z.string().default('development'),
+      debug: z.string().optional(),
+    })
+  )
+  .step('Process options', ({ state, options }) => ({
+    ...state,
+    environment: options.environment,
+    debugMode: options.debug === 'true',
+  }))
+  .step('Use options', ({ state }) => ({
+    ...state,
+    message: `Running in ${state.environment} environment${state.debugMode ? ' with debug mode' : ''}`,
+  }));
+
 const manifest = new PositronicManifest({
   staticManifest: {
     'basic-brain': basicBrain,
     'delayed-brain': delayedBrain,
     'resource-brain': resourceBrain,
+    'options-brain': optionsBrain,
   },
 });
 
