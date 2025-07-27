@@ -77,8 +77,9 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
 12. [ ] Verify tests pass (if tests fail, STOP and fix issues)
 13. [ ] Stage all changes (`git add -A`)
 14. [ ] Create commit (`git commit -m "Bump to v{version}"`)
-15. [ ] Run `npx changeset publish` to create tags and publish all packages
-16. [ ] Push commit and tags (`git push origin main --tags`)
+15. [ ] Run `npx changeset publish --no-git-tag` to publish all packages without creating individual package tags
+16. [ ] Create a single version tag (`git tag v{version}`)
+17. [ ] Push commit and tag (`git push origin main --tags`)
 
 ## Important Notes
 
