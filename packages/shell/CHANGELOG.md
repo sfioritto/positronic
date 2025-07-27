@@ -1,5 +1,17 @@
 # @positronic/shell
 
+## 0.0.18
+
+### Patch Changes
+
+- Fix brain resolution to support titles different from filenames
+
+  - Fixed critical bug where brain runs would fail when using brain titles that differ from their filenames
+  - Changed brain runner to use manifest.resolve() instead of manifest.import() for proper identifier resolution
+  - Added comprehensive tests for brain title vs filename resolution
+  - Ensures the CLI's permissive identifier principle works correctly - users can use either brain titles or filenames
+    EOF < /dev/null
+
 ## 0.0.17
 
 ### Patch Changes
