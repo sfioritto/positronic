@@ -168,6 +168,40 @@ app.get('/brains/runs/:runId/watch', async (context: Context) => {
   return response;
 });
 
+app.delete('/brains/runs/:runId', async (context: Context) => {
+  const runId = context.req.param('runId');
+  
+  // First check if the run exists in the monitor
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+  const existingRun = await monitorStub.getLastEvent(runId);
+  
+  if (!existingRun) {
+    return context.json({ error: `Brain run '${runId}' not found` }, 404);
+  }
+  
+  // Now try to kill it
+  const namespace = context.env.BRAIN_RUNNER_DO;
+  const doId = namespace.idFromName(runId);
+  const stub = namespace.get(doId);
+  
+  try {
+    // Call the kill method on the Durable Object
+    const result = await stub.kill();
+    
+    if (!result.success) {
+      // Brain run is not active or already completed
+      return context.json({ error: result.message }, 409);
+    }
+    
+    // Return 204 No Content on success
+    return new Response(null, { status: 204 });
+  } catch (error: any) {
+    console.error(`Error killing brain run ${runId}:`, error);
+    return context.json({ error: 'Failed to kill brain run' }, 500);
+  }
+});
+
 app.get('/brains/:identifier/history', async (context: Context) => {
   const identifier = context.req.param('identifier');
   const limit = Number(context.req.query('limit') || '10');

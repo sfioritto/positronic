@@ -7,6 +7,7 @@ import { BrainList } from '../components/brain-list.js';
 import { BrainHistory } from '../components/brain-history.js';
 import { BrainShow } from '../components/brain-show.js';
 import { BrainRerun } from '../components/brain-rerun.js';
+import { BrainKill } from '../components/brain-kill.js';
 import { ErrorComponent } from '../components/error.js';
 
 interface BrainListArgs {}
@@ -31,6 +32,10 @@ interface BrainRunArgs {
 interface BrainWatchArgs {
   runId?: string;
   filename?: string;
+}
+interface BrainKillArgs {
+  runId: string;
+  force: boolean;
 }
 
 export class BrainCommand {
@@ -215,6 +220,13 @@ export class BrainCommand {
       { color: 'red' as any }, // Ink Text color prop
       'Error: You must provide either a brain run ID or a brain name.'
     );
+  }
+
+  kill({
+    runId,
+    force,
+  }: ArgumentsCamelCase<BrainKillArgs>): React.ReactElement {
+    return React.createElement(BrainKill, { runId, force });
   }
 
 }

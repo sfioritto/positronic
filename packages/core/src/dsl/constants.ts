@@ -6,6 +6,7 @@ export const BRAIN_EVENTS = {
   STEP_STATUS: 'step:status',
   ERROR: 'brain:error',
   COMPLETE: 'brain:complete',
+  CANCELLED: 'brain:cancelled',
 } as const;
 
 export const STATUS = {
@@ -13,4 +14,5 @@ export const STATUS = {
   RUNNING: 'running',
   COMPLETE: 'complete',
   ERROR: 'error',
+  CANCELLED: 'cancelled',
 } as const;
