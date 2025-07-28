@@ -47,6 +47,12 @@ export interface BrainErrorEvent<TOptions extends JsonObject = JsonObject>
   error: SerializedError;
 }
 
+export interface BrainCancelledEvent<TOptions extends JsonObject = JsonObject>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.CANCELLED;
+  status: typeof STATUS.CANCELLED;
+}
+
 // 2. Step Status Event (just steps array and base event properties)
 export interface StepStatusEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
@@ -77,6 +83,7 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
   | BrainCompleteEvent<TOptions>
   | BrainErrorEvent<TOptions>
+  | BrainCancelledEvent<TOptions>
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>;

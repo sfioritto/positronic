@@ -1062,6 +1062,30 @@ export const brains = {
       return null;
     }
   },
+  /**
+   * Test DELETE /brains/runs/:runId - Kill/cancel a running brain run
+   */
+  async kill(fetch: Fetch, runId: string): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/brains/runs/${runId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await fetch(request);
+      if (response.status !== 204) {
+        console.error(
+          `DELETE /brains/runs/${runId} returned ${response.status}, expected 204`
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error(`Failed to test DELETE /brains/runs/${runId}:`, error);
+      return false;
+    }
+  },
 };
 
 export const schedules = {

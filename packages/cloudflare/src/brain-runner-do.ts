@@ -89,6 +89,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private brainRunId: string;
   private eventStreamAdapter = new EventStreamAdapter();
+  private abortController: AbortController | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -171,6 +172,15 @@ export class BrainRunnerDO extends DurableObject<Env> {
     return resources;
   }
 
+  async kill(): Promise<{ success: boolean; message: string }> {
+    if (this.abortController && !this.abortController.signal.aborted) {
+      this.abortController.abort();
+      return { success: true, message: 'Brain run kill signal sent' };
+    } else {
+      return { success: false, message: 'Brain run is not active or already completed' };
+    }
+  }
+
   async start(
     brainTitle: string,
     brainRunId: string,
@@ -232,6 +242,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const options = initialData?.options;
     const initialState = initialData && !initialData.options ? initialData : {};
 
+    // Create abort controller for this run
+    this.abortController = new AbortController();
+
     runnerWithResources
       .withAdapters([
         sqliteAdapter,
@@ -243,9 +256,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
         initialState,
         brainRunId,
         ...(options && { options }),
+        signal: this.abortController.signal,
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner run failed:`, err);
+      })
+      .finally(() => {
+        // Clean up abort controller when run completes
+        this.abortController = null;
       });
   }
 

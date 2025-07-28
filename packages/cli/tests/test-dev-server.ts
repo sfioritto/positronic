@@ -149,6 +149,7 @@ export class TestDevServer implements PositronicDevServer {
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
   private logCallbacks: Array<(message: string) => void> = [];
+  private killBrainRunErrors: Map<string, number> = new Map();
   private errorCallbacks: Array<(message: string) => void> = [];
   private warningCallbacks: Array<(message: string) => void> = [];
 
@@ -340,6 +341,32 @@ export class TestDevServer implements PositronicDevServer {
         body.stopsAfter,
       ]);
       return [201, { brainRunId: newBrainRunId }];
+    });
+
+    // DELETE /brains/runs/:runId
+    nockInstance.delete(/^\/brains\/runs\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/brains\/runs\/(.+)$/);
+      if (match) {
+        const runId = decodeURIComponent(match[1]);
+        
+        // Check for configured error responses
+        if (this.killBrainRunErrors.has(runId)) {
+          const errorCode = this.killBrainRunErrors.get(runId)!;
+          this.logCall('killBrainRun', [runId]);
+          
+          if (errorCode === 404) {
+            return [404, { error: `Brain run '${runId}' not found` }];
+          } else if (errorCode === 409) {
+            return [409, { error: 'Brain run is not active' }];
+          }
+          return [errorCode, { error: `Error ${errorCode}` }];
+        }
+        
+        // Success case
+        this.logCall('killBrainRun', [runId]);
+        return [204, ''];
+      }
+      return [404, { error: 'Invalid brain run ID' }];
     });
 
     // GET /brains/runs/:runId/watch (SSE endpoint)
@@ -893,6 +920,14 @@ export class TestDevServer implements PositronicDevServer {
 
   getSecret(name: string): MockSecret | undefined {
     return this.secrets.get(name);
+  }
+
+  setKillBrainRunError(runId: string, statusCode: number) {
+    this.killBrainRunErrors.set(runId, statusCode);
+  }
+
+  clearKillBrainRunErrors() {
+    this.killBrainRunErrors.clear();
   }
 
   // Brain helper methods

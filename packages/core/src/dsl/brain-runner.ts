@@ -1,4 +1,4 @@
-import { BRAIN_EVENTS } from './constants.js';
+import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { Adapter } from '../adapters/types.js';
 import type { SerializedStep, Brain } from './brain.js';
@@ -45,12 +45,14 @@ export class BrainRunner {
       initialCompletedSteps,
       brainRunId,
       endAfter,
+      signal,
     }: {
       initialState?: TState;
       options?: TOptions;
       initialCompletedSteps?: SerializedStep[] | never;
       brainRunId?: string | never;
       endAfter?: number;
+      signal?: AbortSignal;
     } = {}
   ): Promise<TState> {
     const { adapters, client, resources } = this.options;
@@ -87,23 +89,55 @@ export class BrainRunner {
             resources: resources ?? {},
           });
 
-    for await (const event of brainRun) {
-      // Dispatch event to all adapters
-      await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
-
-      // Update current state when steps complete
-      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-        if (event.patch) {
-          currentState = applyPatches(currentState, [event.patch]) as TState;
-        }
-
-        // Check if we should stop after this step
-        if (endAfter && stepNumber >= endAfter) {
+    try {
+      for await (const event of brainRun) {
+        // Check if we've been cancelled
+        if (signal?.aborted) {
+          // Emit a cancelled event
+          const cancelledEvent = {
+            type: BRAIN_EVENTS.CANCELLED,
+            status: STATUS.CANCELLED,
+            brainTitle: brain.title,
+            brainDescription: brain.structure.description,
+            brainRunId: brainRunId || event.brainRunId,
+            options: event.options,
+          } as const;
+          await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
           return currentState;
         }
 
-        stepNumber++;
+        // Dispatch event to all adapters
+        await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
+
+        // Update current state when steps complete
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          if (event.patch) {
+            currentState = applyPatches(currentState, [event.patch]) as TState;
+          }
+
+          // Check if we should stop after this step
+          if (endAfter && stepNumber >= endAfter) {
+            return currentState;
+          }
+
+          stepNumber++;
+        }
       }
+    } catch (error) {
+      // If aborted while awaiting, check signal and emit cancelled event
+      if (signal?.aborted) {
+        const cancelledEvent = {
+          type: BRAIN_EVENTS.CANCELLED,
+          status: STATUS.CANCELLED,
+          brainTitle: brain.title,
+          brainDescription: brain.structure.description,
+          brainRunId: brainRunId || '',
+          options: options || ({} as TOptions),
+        } as const;
+        await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
+        return currentState;
+      }
+      throw error;
     }
 
     return currentState;

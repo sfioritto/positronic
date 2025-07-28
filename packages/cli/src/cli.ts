@@ -629,9 +629,39 @@ export function buildCli(options: CliOptions) {
           }
         }
       )
+      .command(
+        'kill <run-id>',
+        'Kill a running brain\n',
+        (yargsKill) => {
+          return yargsKill
+            .positional('run-id', {
+              describe: 'ID of the brain run to kill',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('force', {
+              describe: 'Skip confirmation prompt',
+              type: 'boolean',
+              alias: 'f',
+              default: false,
+            })
+            .example(
+              '$0 brain kill abc123def',
+              'Kill a running brain by its run ID'
+            )
+            .example(
+              '$0 brain kill abc123def --force',
+              'Kill a brain without confirmation'
+            );
+        },
+        (argv) => {
+          const element = brainCommand.kill(argv);
+          render(element);
+        }
+      )
       .demandCommand(
         1,
-        'You need to specify a brain command (list, history, show, rerun, run, watch).'
+        'You need to specify a brain command (list, history, show, rerun, run, watch, kill).'
       );
 
     return yargsBrain;

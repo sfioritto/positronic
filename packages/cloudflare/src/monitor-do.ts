@@ -42,7 +42,8 @@ export class MonitorDO extends DurableObject<Env> {
       event.type === BRAIN_EVENTS.START ||
       event.type === BRAIN_EVENTS.RESTART ||
       event.type === BRAIN_EVENTS.COMPLETE ||
-      event.type === BRAIN_EVENTS.ERROR
+      event.type === BRAIN_EVENTS.ERROR ||
+      event.type === BRAIN_EVENTS.CANCELLED
     ) {
       const currentTime = Date.now();
       const startTime =
@@ -51,7 +52,8 @@ export class MonitorDO extends DurableObject<Env> {
           : null;
       const completeTime =
         event.type === BRAIN_EVENTS.COMPLETE ||
-        event.type === BRAIN_EVENTS.ERROR
+        event.type === BRAIN_EVENTS.ERROR ||
+        event.type === BRAIN_EVENTS.CANCELLED
           ? currentTime
           : null;
       const error =
@@ -172,14 +174,16 @@ export class MonitorDO extends DurableObject<Env> {
 
   // No changes needed for getLastEvent, uses run_id
   getLastEvent(brainRunId: string) {
-    return this.storage
+    const results = this.storage
       .exec(
         `
       SELECT * FROM brain_runs WHERE run_id = ?
     `,
         brainRunId
       )
-      .one();
+      .toArray();
+    
+    return results.length > 0 ? results[0] : null;
   }
 
   // Update history method parameter and query
