@@ -1,5 +1,22 @@
 # @positronic/cloudflare
 
+## 0.0.19
+
+### Patch Changes
+
+- Add brain kill command to terminate running brain processes
+
+  - New `px brain kill <run-id>` command with optional `--force` flag
+  - Interactive confirmation prompt (bypass with --force)
+  - Graceful handling of already completed or non-existent brain runs
+  - Full test coverage across CLI, spec, and backend implementations
+    EOF < /dev/null
+
+- Updated dependencies
+  - @positronic/core@0.0.19
+  - @positronic/spec@0.0.19
+  - @positronic/template-new-project@0.0.19
+
 ## 0.0.18
 
 ### Patch Changes
