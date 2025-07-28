@@ -91,6 +91,7 @@ async function generateProject(
     backend?: string;
     install?: boolean;
     pm?: string;
+    claudemd?: boolean;
   } = { name: projectName };
 
   let templateSourcePath: string;
@@ -135,6 +136,7 @@ async function generateProject(
       backend: 'cloudflare',
       install: true,
       pm: 'npm',
+      claudemd: false, // Don't prompt for CLAUDE.md when regenerating .positronic directory
     };
 
     await caz.default(newProjectTemplatePath, projectDir, {
