@@ -22,6 +22,10 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/cli" },
-    { "path": "./packages/client-anthropic" }
+    { "path": "./packages/client-anthropic" },
+    { "path": "./packages/client-vercel" },
+    { "path": "./packages/cloudflare" },
+    { "path": "./packages/shell" },
+    { "path": "./packages/spec" }
   ]
 }
