@@ -260,6 +260,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner run failed:`, err);
+        throw err; // Re-throw to ensure proper error propagation
       })
       .finally(() => {
         // Clean up abort controller when run completes
