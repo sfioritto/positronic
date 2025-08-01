@@ -120,6 +120,14 @@ export interface BrainFactory {
   ): Brain<TOptions, TState, TServices>;
 }
 
+type WebhookAction<TStateOut> = {
+  state: TStateOut;
+  wait: {
+    type: string;
+    info: JsonObject;
+  };
+};
+
 // Reusable step action types
 type StepActionParams<
   TState,
@@ -139,7 +147,11 @@ type StepAction<
   TServices extends object = object
 > = (
   params: StepActionParams<TStateIn, TOptions, TServices>
-) => TStateOut | Promise<TStateOut>;
+) =>
+  | TStateOut
+  | Promise<TStateOut>
+  | WebhookAction<TStateOut>
+  | Promise<WebhookAction<TStateOut>>;
 
 type StepBlock<
   TStateIn,
