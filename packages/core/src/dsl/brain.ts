@@ -120,6 +120,27 @@ export interface BrainFactory {
   ): Brain<TOptions, TState, TServices>;
 }
 
+// Reusable step action types
+type StepActionParams<
+  TState,
+  TOptions extends JsonObject = JsonObject,
+  TServices extends object = object
+> = {
+  state: TState;
+  options: TOptions;
+  client: ObjectGenerator;
+  resources: Resources;
+} & TServices;
+
+type StepAction<
+  TStateIn,
+  TStateOut,
+  TOptions extends JsonObject = JsonObject,
+  TServices extends object = object
+> = (
+  params: StepActionParams<TStateIn, TOptions, TServices>
+) => TStateOut | Promise<TStateOut>;
+
 type StepBlock<
   TStateIn,
   TStateOut,
@@ -128,14 +149,7 @@ type StepBlock<
 > = {
   type: 'step';
   title: string;
-  action: (
-    params: {
-      state: TStateIn;
-      options: TOptions;
-      client: ObjectGenerator;
-      resources: Resources;
-    } & TServices
-  ) => TStateOut | Promise<TStateOut>;
+  action: StepAction<TStateIn, TStateOut, TOptions, TServices>;
 };
 
 type BrainBlock<
@@ -219,7 +233,6 @@ export class Brain<
     };
   }
 
-
   // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
@@ -253,14 +266,7 @@ export class Brain<
 
   step<TNewState extends State>(
     title: string,
-    action: (
-      params: {
-        state: TState;
-        options: TOptions;
-        client: ObjectGenerator;
-        resources: Resources;
-      } & TServices
-    ) => TNewState | Promise<TNewState>
+    action: StepAction<TState, TNewState, TOptions, TServices>
   ) {
     const stepBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
       type: 'step',
@@ -386,11 +392,15 @@ export class Brain<
     let validatedOptions: TOptions;
     if (this.optionsSchema) {
       // Just call parse - Zod handles defaults automatically
-      validatedOptions = this.optionsSchema.parse(params.options || {}) as TOptions;
+      validatedOptions = this.optionsSchema.parse(
+        params.options || {}
+      ) as TOptions;
     } else {
       // If no schema is defined but options are provided, throw error
       if (params.options && Object.keys(params.options).length > 0) {
-        throw new Error(`Brain '${this.title}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`);
+        throw new Error(
+          `Brain '${this.title}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`
+        );
       }
       validatedOptions = {} as TOptions;
     }
