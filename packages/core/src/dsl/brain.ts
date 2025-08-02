@@ -5,6 +5,7 @@ import type { State, JsonPatch, JsonObject } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
+import type { Webhook } from './webhook.js';
 
 export type SerializedError = {
   name: string;
@@ -120,14 +121,6 @@ export interface BrainFactory {
   ): Brain<TOptions, TState, TServices>;
 }
 
-type WebhookAction<TStateOut> = {
-  state: TStateOut;
-  wait: {
-    type: string;
-    info: JsonObject;
-  };
-};
-
 // Reusable step action types
 type StepActionParams<
   TState,
@@ -150,8 +143,8 @@ type StepAction<
 ) =>
   | TStateOut
   | Promise<TStateOut>
-  | WebhookAction<TStateOut>
-  | Promise<WebhookAction<TStateOut>>;
+  | { state: TStateOut; webhook: Webhook }
+  | Promise<{ state: TStateOut; webhook: Webhook }>;
 
 type StepBlock<
   TStateIn,
@@ -724,13 +717,29 @@ class BrainEventStream<
       const prevState = this.currentState;
 
       // Execute regular step
-      this.currentState = await block.action({
+      const result = await block.action({
         state: this.currentState,
         options: this.options ?? ({} as TOptions),
         client: this.client,
         resources: this.resources,
         ...this.services,
       });
+
+      // Check if result has webhook property
+      if (
+        result &&
+        typeof result === 'object' &&
+        'state' in result &&
+        'webhook' in result
+      ) {
+        // Handle webhook result
+        this.currentState = result.state;
+        // TODO: Handle webhook - this will need to be implemented based on requirements
+      } else {
+        // Handle regular state result
+        this.currentState = result as TState;
+      }
+
       yield* this.completeStep(step, prevState);
     }
   }

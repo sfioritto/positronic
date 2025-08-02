@@ -18,6 +18,7 @@ export type {
 } from './dsl/brain.js';
 export type { ObjectGenerator, Message } from './clients/types.js';
 export type { State } from './dsl/types.js';
+export type { Webhook } from './dsl/webhook.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer
