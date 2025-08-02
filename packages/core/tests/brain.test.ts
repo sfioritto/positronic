@@ -13,6 +13,7 @@ import { jest } from '@jest/globals';
 import { ObjectGenerator } from '../src/clients/types.js';
 import { createResources, type Resources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
+import type { Webhook } from '../src/dsl/webhook.js';
 
 // Helper function to get the next value from an AsyncIterator
 const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
@@ -88,6 +89,43 @@ describe('brain creation', () => {
   beforeEach(() => {
     mockGenerateObject.mockClear();
     mockResourceLoad.mockClear();
+  });
+
+  class TestWebhook implements Webhook {
+    name = 'test-webhook';
+    schema = z.object({ userResponse: z.string() });
+    meta = {
+      channelID: 'channel-id',
+    };
+  }
+
+  it('should create a brain with a webhook', async () => {
+    const testBrain = brain('test brain')
+      .step('First step', () => {
+        return { count: 1 };
+      })
+      .step('Second step', ({ state }) => ({
+        state,
+        webhook: new TestWebhook(),
+      }))
+      .step('Third step', ({ state }) => ({
+        ...state,
+        third: 'third',
+      }));
+
+    const brainRun = testBrain.run({
+      client: mockClient,
+    });
+    let finalState = {};
+    for await (const event of brainRun) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+    expect(finalState).toEqual({
+      count: 1,
+      third: 'third',
+    });
   });
 
   it('should create a brain with steps and run through them', async () => {
@@ -1410,16 +1448,13 @@ describe('brain options', () => {
     const optionsSchema = z.object({
       testOption: z.string(),
     });
-    
+
     const testBrain = brain('Options Brain')
       .withOptionsSchema(optionsSchema)
-      .step(
-        'Simple step',
-        ({ state, options }) => ({
-          value: 1,
-          passedOption: options.testOption,
-        })
-      );
+      .step('Simple step', ({ state, options }) => ({
+        value: 1,
+        passedOption: options.testOption,
+      }));
 
     const brainOptions = {
       testOption: 'test-value',
@@ -1547,16 +1582,13 @@ describe('type inference', () => {
     const optionsSchema = z.object({
       features: z.array(z.string()),
     });
-    
+
     const innerBrain = brain('Inner Type Test')
       .withOptionsSchema(optionsSchema)
-      .step(
-        'Process features',
-        ({ options }) => ({
-          processedValue: options.features.includes('fast') ? 100 : 42,
-          featureCount: options.features.length,
-        })
-      );
+      .step('Process features', ({ options }) => ({
+        processedValue: options.features.includes('fast') ? 100 : 42,
+        featureCount: options.features.length,
+      }));
 
     // Create a complex brain using multiple features
     const complexBrain = brain('Complex Type Test')
