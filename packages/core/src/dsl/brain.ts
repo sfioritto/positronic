@@ -5,12 +5,35 @@ import type { State, JsonPatch, JsonObject } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
+import type { Webhook } from './webhook.js';
 
 export type SerializedError = {
   name: string;
   message: string;
   stack?: string;
 };
+
+// Shared interface for step action functions
+export type StepAction<
+  TStateIn,
+  TStateOut,
+  TOptions extends JsonObject = JsonObject,
+  TServices extends object = object,
+  TResponseIn extends JsonObject | undefined = undefined,
+  TResponseOut extends JsonObject | undefined = undefined
+> = (
+  params: {
+    state: TStateIn;
+    options: TOptions;
+    client: ObjectGenerator;
+    resources: Resources;
+    response?: TResponseIn;
+  } & TServices
+) =>
+  | TStateOut
+  | Promise<TStateOut>
+  | { state: TStateOut; webhook: Webhook<TResponseOut> }
+  | Promise<{ state: TStateOut; webhook: Webhook<TResponseOut> }>;
 
 // New Event Type System
 // Base event interface with only type and options
@@ -124,18 +147,20 @@ type StepBlock<
   TStateIn,
   TStateOut,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object
+  TServices extends object = object,
+  TResponseIn extends JsonObject | undefined = undefined,
+  TResponseOut extends JsonObject | undefined = undefined
 > = {
   type: 'step';
   title: string;
-  action: (
-    params: {
-      state: TStateIn;
-      options: TOptions;
-      client: ObjectGenerator;
-      resources: Resources;
-    } & TServices
-  ) => TStateOut | Promise<TStateOut>;
+  action: StepAction<
+    TStateIn,
+    TStateOut,
+    TOptions,
+    TServices,
+    TResponseIn,
+    TResponseOut
+  >;
 };
 
 type BrainBlock<
@@ -160,9 +185,18 @@ type Block<
   TStateIn,
   TStateOut,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object
+  TServices extends object = object,
+  TResponseIn extends JsonObject | undefined = undefined,
+  TResponseOut extends JsonObject | undefined = undefined
 > =
-  | StepBlock<TStateIn, TStateOut, TOptions, TServices>
+  | StepBlock<
+      TStateIn,
+      TStateOut,
+      TOptions,
+      TServices,
+      TResponseIn,
+      TResponseOut
+    >
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
 interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
@@ -188,9 +222,10 @@ export interface RerunParams<TOptions extends JsonObject = JsonObject>
 export class Brain<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
-  TServices extends object = object
+  TServices extends object = object,
+  TResponse extends JsonObject | undefined = undefined
 > {
-  private blocks: Block<any, any, TOptions, TServices>[] = [];
+  private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
   private optionsSchema?: z.ZodSchema<any>;
@@ -218,7 +253,6 @@ export class Brain<
       }),
     };
   }
-
 
   // New method to add services
   withServices<TNewServices extends object>(
@@ -251,24 +285,35 @@ export class Brain<
     return nextBrain;
   }
 
-  step<TNewState extends State>(
+  // when I look at this I think "Huh, the action function here, i just need to specify the return type"
+  step<
+    TNewState extends State,
+    TResponseOut extends JsonObject | undefined = undefined
+  >(
     title: string,
-    action: (
-      params: {
-        state: TState;
-        options: TOptions;
-        client: ObjectGenerator;
-        resources: Resources;
-      } & TServices
-    ) => TNewState | Promise<TNewState>
+    action: StepAction<
+      TState,
+      TNewState,
+      TOptions,
+      TServices,
+      TResponse,
+      TResponseOut
+    >
   ) {
-    const stepBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
+    const stepBlock: StepBlock<
+      TState,
+      TNewState,
+      TOptions,
+      TServices,
+      TResponse,
+      TResponseOut
+    > = {
       type: 'step',
       title,
       action,
     };
     this.blocks.push(stepBlock);
-    return this.nextBrain<TNewState>();
+    return this.nextBrain<TNewState, TResponseOut>();
   }
 
   brain<TInnerState extends State, TNewState extends State>(
@@ -332,7 +377,14 @@ export class Brain<
       } & TServices
     ) => TNewState | Promise<TNewState>
   ) {
-    const promptBlock: StepBlock<TState, TNewState, TOptions, TServices> = {
+    const promptBlock: StepBlock<
+      TState,
+      TNewState,
+      TOptions,
+      TServices,
+      TResponse,
+      undefined
+    > = {
       type: 'step',
       title,
       action: async ({
@@ -386,11 +438,15 @@ export class Brain<
     let validatedOptions: TOptions;
     if (this.optionsSchema) {
       // Just call parse - Zod handles defaults automatically
-      validatedOptions = this.optionsSchema.parse(params.options || {}) as TOptions;
+      validatedOptions = this.optionsSchema.parse(
+        params.options || {}
+      ) as TOptions;
     } else {
       // If no schema is defined but options are provided, throw error
       if (params.options && Object.keys(params.options).length > 0) {
-        throw new Error(`Brain '${this.title}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`);
+        throw new Error(
+          `Brain '${this.title}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`
+        );
       }
       validatedOptions = {} as TOptions;
     }
@@ -407,18 +463,19 @@ export class Brain<
     yield* stream.next();
   }
 
-  private withBlocks(blocks: Block<any, any, TOptions, TServices>[]): this {
+  private withBlocks(
+    blocks: Block<any, any, TOptions, TServices, any, any>[]
+  ): this {
     this.blocks = blocks;
     return this;
   }
 
-  private nextBrain<TNewState extends State>(): Brain<
-    TOptions,
-    TNewState,
-    TServices
-  > {
+  private nextBrain<
+    TNewState extends State,
+    TResponse extends JsonObject | undefined = undefined
+  >(): Brain<TOptions, TNewState, TServices, TResponse> {
     // Pass default options to the next brain
-    const nextBrain = new Brain<TOptions, TNewState, TServices>(
+    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -437,7 +494,7 @@ class Step {
   private patch?: JsonPatch;
   private status: (typeof STATUS)[keyof typeof STATUS] = STATUS.PENDING;
 
-  constructor(public block: Block<any, any, any, any>, id?: string) {
+  constructor(public block: Block<any, any, any, any, any, any>, id?: string) {
     this.id = id || uuidv4();
   }
 
@@ -478,12 +535,13 @@ class BrainEventStream<
   private options: TOptions;
   private services: TServices;
   private resources: Resources;
+  private currentResponse: JsonObject | undefined = undefined;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices>[];
+      blocks: Block<any, any, TOptions, TServices, any, any>[];
       services: TServices;
     }
   ) {
@@ -660,7 +718,7 @@ class BrainEventStream<
   }
 
   private async *executeStep(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as Block<any, any, TOptions, TServices>;
+    const block = step.block as Block<any, any, TOptions, TServices, any, any>;
 
     if (block.type === 'brain') {
       const initialState =
@@ -707,6 +765,7 @@ class BrainEventStream<
         options: this.options ?? ({} as TOptions),
         client: this.client,
         resources: this.resources,
+        response: undefined,
         ...this.services,
       });
       yield* this.completeStep(step, prevState);
