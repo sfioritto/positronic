@@ -392,6 +392,7 @@ export class Brain<
         client: runClient,
         options,
         resources,
+        response: webhookResponse,
         ...services
       }) => {
         const { template, outputSchema, client: stepClient } = config;
