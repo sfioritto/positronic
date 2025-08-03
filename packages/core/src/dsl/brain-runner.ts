@@ -46,6 +46,7 @@ export class BrainRunner {
       brainRunId,
       endAfter,
       signal,
+      response,
     }: {
       initialState?: TState;
       options?: TOptions;
@@ -53,6 +54,7 @@ export class BrainRunner {
       brainRunId?: string | never;
       endAfter?: number;
       signal?: AbortSignal;
+      response?: JsonObject;
     } = {}
   ): Promise<TState> {
     const { adapters, client, resources } = this.options;
@@ -80,6 +82,7 @@ export class BrainRunner {
             options,
             client,
             resources: resources ?? {},
+            response,
           })
         : brain.run({
             initialState,
