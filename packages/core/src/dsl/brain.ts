@@ -27,7 +27,7 @@ export type StepAction<
     options: TOptions;
     client: ObjectGenerator;
     resources: Resources;
-    response?: TResponseIn;
+    response: TResponseIn;
   } & TServices
 ) =>
   | TStateOut
