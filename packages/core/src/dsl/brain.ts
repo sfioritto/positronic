@@ -101,6 +101,17 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
   patch: JsonPatch;
 }
 
+// 4. Webhook Event
+export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.WEBHOOK;
+  webhook: {
+    name: string;
+    meta: JsonObject;
+  };
+  state: State;
+}
+
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -109,7 +120,8 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainCancelledEvent<TOptions>
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
-  | StepCompletedEvent<TOptions>;
+  | StepCompletedEvent<TOptions>
+  | WebhookEvent<TOptions>;
 
 export interface SerializedStep {
   title: string;
@@ -537,6 +549,7 @@ class BrainEventStream<
   private services: TServices;
   private resources: Resources;
   private currentResponse: JsonObject | undefined = undefined;
+  private webhookEncountered: boolean = false;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -662,6 +675,11 @@ class BrainEventStream<
         // all events from inner brains if any
         yield* this.executeStep(step);
 
+        // If a webhook was encountered, stop processing
+        if (this.webhookEncountered) {
+          return;
+        }
+
         // Step Status Event
         yield {
           type: BRAIN_EVENTS.STEP_STATUS,
@@ -761,15 +779,31 @@ class BrainEventStream<
       const prevState = this.currentState;
 
       // Execute regular step
-      this.currentState = await block.action({
+      const result = await block.action({
         state: this.currentState,
         options: this.options ?? ({} as TOptions),
         client: this.client,
         resources: this.resources,
-        response: undefined,
+        response: this.currentResponse,
         ...this.services,
       });
+
+      this.currentState = result.webhook ? result.state : result;
       yield* this.completeStep(step, prevState);
+
+      if (result && typeof result === 'object' && 'webhook' in result) {
+        yield {
+          type: BRAIN_EVENTS.WEBHOOK,
+          webhook: {
+            name: result.webhook.name,
+            meta: result.webhook.meta,
+          },
+          state: this.currentState,
+          options: this.options,
+          brainRunId: this.brainRunId,
+        };
+        this.webhookEncountered = true;
+      }
     }
   }
 

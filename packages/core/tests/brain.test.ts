@@ -11,8 +11,9 @@ import {
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import { ObjectGenerator } from '../src/clients/types.js';
-import { createResources, type Resources } from '../src/resources/resources.js';
+import { createResources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
+import type { Webhook } from '../src/dsl/webhook.js';
 
 // Helper function to get the next value from an AsyncIterator
 const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
@@ -232,6 +233,86 @@ describe('brain creation', () => {
         brainDescription: undefined,
       })
     );
+  });
+
+  it('should emit webhook event and stop execution when step returns webhook', async () => {
+    // Define a test webhook
+    class TestWebhook implements Webhook<{ userResponse: string }> {
+      name = 'test-webhook';
+      schema = z.object({ userResponse: z.string() });
+      meta = {
+        channelId: 'test-channel',
+        message: 'Please respond',
+      };
+    }
+
+    const testBrain = brain('webhook test brain')
+      .step('First step', () => {
+        return { count: 1 };
+      })
+      .step('Webhook step', ({ state }) => ({
+        state,
+        webhook: new TestWebhook(),
+      }))
+      .step('Third step', ({ state }) => ({
+        ...state,
+        processed: true,
+      }));
+
+    const events = [];
+    for await (const event of testBrain.run({ client: mockClient })) {
+      events.push(event);
+    }
+
+    // Find the webhook event
+    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
+    expect(webhookEvent).toBeDefined();
+    expect(webhookEvent).toEqual(
+      expect.objectContaining({
+        type: BRAIN_EVENTS.WEBHOOK,
+        webhook: {
+          name: 'test-webhook',
+          meta: {
+            channelId: 'test-channel',
+            message: 'Please respond',
+          },
+        },
+        state: { count: 1 },
+        brainRunId: expect.any(String),
+        options: {},
+      })
+    );
+
+    // Verify that first two steps completed (including webhook step)
+    const stepCompleteEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
+    );
+    expect(stepCompleteEvents).toHaveLength(2);
+    expect(stepCompleteEvents[0].stepTitle).toBe('First step');
+    expect(stepCompleteEvents[1].stepTitle).toBe('Webhook step');
+
+    // The webhook step should have an empty patch since state didn't change
+    expect(stepCompleteEvents[1].patch).toEqual([]);
+
+    // Verify webhook event comes after webhook step completion
+    const webhookStepCompleteIndex = events.findIndex(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE && e.stepTitle === 'Webhook step'
+    );
+    const webhookEventIndex = events.findIndex(
+      (e) => e.type === BRAIN_EVENTS.WEBHOOK
+    );
+    expect(webhookEventIndex).toBeGreaterThan(webhookStepCompleteIndex);
+
+    // Verify third step was never started
+    const thirdStepStart = events.find(
+      (e) => e.type === BRAIN_EVENTS.STEP_START && e.stepTitle === 'Third step'
+    );
+    expect(thirdStepStart).toBeUndefined();
+
+    // Verify brain didn't complete
+    const completeEvent = events.find((e) => e.type === BRAIN_EVENTS.COMPLETE);
+    expect(completeEvent).toBeUndefined();
   });
 
   it('should create a brain with a name and description when passed an object', async () => {
@@ -1410,16 +1491,13 @@ describe('brain options', () => {
     const optionsSchema = z.object({
       testOption: z.string(),
     });
-    
+
     const testBrain = brain('Options Brain')
       .withOptionsSchema(optionsSchema)
-      .step(
-        'Simple step',
-        ({ state, options }) => ({
-          value: 1,
-          passedOption: options.testOption,
-        })
-      );
+      .step('Simple step', ({ state, options }) => ({
+        value: 1,
+        passedOption: options.testOption,
+      }));
 
     const brainOptions = {
       testOption: 'test-value',
@@ -1547,16 +1625,13 @@ describe('type inference', () => {
     const optionsSchema = z.object({
       features: z.array(z.string()),
     });
-    
+
     const innerBrain = brain('Inner Type Test')
       .withOptionsSchema(optionsSchema)
-      .step(
-        'Process features',
-        ({ options }) => ({
-          processedValue: options.features.includes('fast') ? 100 : 42,
-          featureCount: options.features.length,
-        })
-      );
+      .step('Process features', ({ options }) => ({
+        processedValue: options.features.includes('fast') ? 100 : 42,
+        featureCount: options.features.length,
+      }));
 
     // Create a complex brain using multiple features
     const complexBrain = brain('Complex Type Test')

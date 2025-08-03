@@ -7,6 +7,7 @@ export const BRAIN_EVENTS = {
   ERROR: 'brain:error',
   COMPLETE: 'brain:complete',
   CANCELLED: 'brain:cancelled',
+  WEBHOOK: 'brain:webhook',
 } as const;
 
 export const STATUS = {
