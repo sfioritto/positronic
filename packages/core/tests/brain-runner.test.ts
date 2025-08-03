@@ -454,4 +454,90 @@ describe('BrainRunner', () => {
     );
     expect(completeEvents.length).toBe(0);
   });
+
+  it('should restart brain with webhook response', async () => {
+    // Define a test webhook
+    class TestWebhook implements Webhook<{ userInput: string }> {
+      name = 'user-input-webhook';
+      schema = z.object({ userInput: z.string() });
+      meta = {
+        channel: 'slack',
+        prompt: 'Please provide input'
+      };
+    }
+
+    const runner = new BrainRunner({
+      adapters: [mockAdapter],
+      client: mockClient,
+    });
+
+    const testBrain = brain('Webhook Restart Brain')
+      .step('Initial Step', () => ({ count: 1 }))
+      .step('Webhook Step', ({ state }) => ({
+        state: { ...state, webhookSent: true },
+        webhook: new TestWebhook(),
+      }))
+      .step('Process Response', ({ state, response }) => ({
+        ...state,
+        userResponse: response?.userInput || 'no response',
+        processed: true,
+      }));
+
+    // First run - should stop at webhook
+    const firstRunState = await runner.run(testBrain);
+    
+    expect(firstRunState).toEqual({ 
+      count: 1, 
+      webhookSent: true 
+    });
+
+    // Get the completed steps from the first run
+    const stepCompleteEvents = mockAdapter.dispatch.mock.calls
+      .filter((call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
+      .map((call) => call[0] as any);
+
+    const completedSteps: SerializedStep[] = stepCompleteEvents.map((event) => ({
+      id: event.stepId,
+      title: event.stepTitle,
+      status: STATUS.COMPLETE,
+      patch: event.patch,
+    }));
+
+    // Get the brain run ID from the first run
+    const startEvent = mockAdapter.dispatch.mock.calls.find(
+      (call) => call[0].type === BRAIN_EVENTS.START
+    );
+    const brainRunId = (startEvent![0] as any).brainRunId;
+
+    // Clear mock calls for clarity
+    mockAdapter.dispatch.mockClear();
+
+    // Restart with webhook response
+    const finalState = await runner.run(testBrain, {
+      initialState: firstRunState,
+      initialCompletedSteps: completedSteps,
+      brainRunId,
+      response: { userInput: 'Hello from webhook!' },
+    });
+
+    expect(finalState).toEqual({
+      count: 1,
+      webhookSent: true,
+      userResponse: 'Hello from webhook!',
+      processed: true,
+    });
+
+    // Verify only the Process Response step ran in the restart
+    const restartStepCompleteEvents = mockAdapter.dispatch.mock.calls
+      .filter((call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
+      .map((call) => (call[0] as any).stepTitle);
+
+    expect(restartStepCompleteEvents).toEqual(['Process Response']);
+
+    // Verify the brain completed this time
+    const completeEvents = mockAdapter.dispatch.mock.calls.filter(
+      (call) => call[0].type === BRAIN_EVENTS.COMPLETE
+    );
+    expect(completeEvents.length).toBe(1);
+  });
 });

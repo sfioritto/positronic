@@ -229,6 +229,7 @@ export interface RerunParams<TOptions extends JsonObject = JsonObject>
   initialState: State;
   initialCompletedSteps: SerializedStep[];
   brainRunId: string;
+  response?: JsonObject;
 }
 
 export class Brain<
@@ -569,7 +570,13 @@ class BrainEventStream<
       client,
       services,
       resources = {} as Resources,
-    } = params;
+      response,
+    } = params as RerunParams<TOptions> & {
+      title: string;
+      description?: string;
+      blocks: Block<any, any, TOptions, TServices, any, any>[];
+      services: TServices;
+    };
 
     this.initialState = initialState as TState;
     this.title = title;
@@ -601,6 +608,11 @@ class BrainEventStream<
 
     // Use provided ID if available, otherwise generate one
     this.brainRunId = providedBrainRunId ?? uuidv4();
+    
+    // Set initial response if provided (for webhook restarts)
+    if (response) {
+      this.currentResponse = response;
+    }
   }
 
   async *next(): AsyncGenerator<BrainEvent<TOptions>> {
