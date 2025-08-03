@@ -549,7 +549,6 @@ class BrainEventStream<
   private services: TServices;
   private resources: Resources;
   private currentResponse: JsonObject | undefined = undefined;
-  private webhookEncountered: boolean = false;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -675,11 +674,6 @@ class BrainEventStream<
         // all events from inner brains if any
         yield* this.executeStep(step);
 
-        // If a webhook was encountered, stop processing
-        if (this.webhookEncountered) {
-          return;
-        }
-
         // Step Status Event
         yield {
           type: BRAIN_EVENTS.STEP_STATUS,
@@ -802,7 +796,6 @@ class BrainEventStream<
           options: this.options,
           brainRunId: this.brainRunId,
         };
-        this.webhookEncountered = true;
       }
     }
   }

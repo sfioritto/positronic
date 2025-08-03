@@ -122,6 +122,11 @@ export class BrainRunner {
 
           stepNumber++;
         }
+
+        // Stop execution when webhook event is encountered
+        if (event.type === BRAIN_EVENTS.WEBHOOK) {
+          return currentState;
+        }
       }
     } catch (error) {
       // If aborted while awaiting, check signal and emit cancelled event

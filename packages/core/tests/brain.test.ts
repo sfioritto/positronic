@@ -283,11 +283,10 @@ describe('brain creation', () => {
       })
     );
 
-    // Verify that first two steps completed (including webhook step)
+    // Verify that all steps completed when running brain directly
     const stepCompleteEvents = events.filter(
       (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
     );
-    expect(stepCompleteEvents).toHaveLength(2);
     expect(stepCompleteEvents[0].stepTitle).toBe('First step');
     expect(stepCompleteEvents[1].stepTitle).toBe('Webhook step');
 
@@ -304,15 +303,20 @@ describe('brain creation', () => {
     );
     expect(webhookEventIndex).toBeGreaterThan(webhookStepCompleteIndex);
 
-    // Verify third step was never started
+    // When running brain directly (not through runner), all steps execute
+    // The third step should have started and completed
     const thirdStepStart = events.find(
       (e) => e.type === BRAIN_EVENTS.STEP_START && e.stepTitle === 'Third step'
     );
-    expect(thirdStepStart).toBeUndefined();
+    expect(thirdStepStart).toBeDefined();
 
-    // Verify brain didn't complete
+    // Verify brain completes normally
     const completeEvent = events.find((e) => e.type === BRAIN_EVENTS.COMPLETE);
-    expect(completeEvent).toBeUndefined();
+    expect(completeEvent).toBeDefined();
+    
+    // All three steps should have completed
+    expect(stepCompleteEvents).toHaveLength(3);
+    expect(stepCompleteEvents[2].stepTitle).toBe('Third step');
   });
 
   it('should create a brain with a name and description when passed an object', async () => {

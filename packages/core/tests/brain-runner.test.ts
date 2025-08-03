@@ -6,6 +6,7 @@ import { ObjectGenerator } from '../src/clients/types.js';
 import { Adapter } from '../src/adapters/types.js';
 import { createResources, type Resources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
+import type { Webhook } from '../src/dsl/webhook.js';
 import { z } from 'zod';
 
 describe('BrainRunner', () => {
@@ -379,6 +380,78 @@ describe('BrainRunner', () => {
       (call) => call[0].type === BRAIN_EVENTS.COMPLETE
     );
 
+    expect(completeEvents.length).toBe(0);
+  });
+
+  it('should stop execution when webhook event is encountered', async () => {
+    // Define a test webhook
+    class TestWebhook implements Webhook<{ response: string }> {
+      name = 'test-webhook';
+      schema = z.object({ response: z.string() });
+      meta = {
+        channel: 'test-channel',
+        prompt: 'Please respond'
+      };
+    }
+
+    const runner = new BrainRunner({
+      adapters: [mockAdapter],
+      client: mockClient,
+    });
+
+    const testBrain = brain('Webhook Test Brain')
+      .step('First Step', () => ({ count: 1 }))
+      .step('Webhook Step', ({ state }) => ({
+        state,
+        webhook: new TestWebhook(),
+      }))
+      .step('Third Step', ({ state }) => ({
+        ...state,
+        processed: true,
+      }));
+
+    const result = await runner.run(testBrain);
+
+    // Verify the final state only includes changes up to webhook step
+    expect(result).toEqual({ count: 1 });
+
+    // Verify webhook event was dispatched
+    const webhookEvents = mockAdapter.dispatch.mock.calls.filter(
+      (call) => call[0].type === BRAIN_EVENTS.WEBHOOK
+    );
+    expect(webhookEvents.length).toBe(1);
+    expect(webhookEvents[0][0]).toEqual(
+      expect.objectContaining({
+        type: BRAIN_EVENTS.WEBHOOK,
+        webhook: {
+          name: 'test-webhook',
+          meta: {
+            channel: 'test-channel',
+            prompt: 'Please respond'
+          }
+        },
+        state: { count: 1 }
+      })
+    );
+
+    // Verify only first two steps completed
+    const stepCompleteEvents = mockAdapter.dispatch.mock.calls
+      .filter((call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
+      .map((call) => (call[0] as any).stepTitle);
+
+    expect(stepCompleteEvents).toEqual(['First Step', 'Webhook Step']);
+
+    // Verify third step was never started
+    const stepStartEvents = mockAdapter.dispatch.mock.calls
+      .filter((call) => call[0].type === BRAIN_EVENTS.STEP_START)
+      .map((call) => (call[0] as any).stepTitle);
+
+    expect(stepStartEvents).not.toContain('Third Step');
+
+    // Verify brain didn't complete
+    const completeEvents = mockAdapter.dispatch.mock.calls.filter(
+      (call) => call[0].type === BRAIN_EVENTS.COMPLETE
+    );
     expect(completeEvents.length).toBe(0);
   });
 });
