@@ -130,7 +130,9 @@ export default class GitHubWebhook extends Webhook {
 
 ### Loop Integration
 
-Loops can use webhooks through a special tool:
+Loops support two webhook patterns:
+
+#### 1. Explicit Waiting via Tool
 
 ```typescript
 brain('support-agent')
@@ -138,21 +140,31 @@ brain('support-agent')
     tools: [
       {
         name: 'wait_for_response',
-        description: 'Wait for customer response on any channel',
+        description: 'Stop and wait for customer response',
         parameters: z.object({
-          channels: z.array(z.enum(['slack', 'twilio', 'email'])),
+          reason: z.string(),
+          webhooks: z.object({
+            slack: z.string().optional(),
+            twilio: z.string().optional(),
+            email: z.string().optional(),
+          })
         }),
-        execute: async ({ channels }, { state }) => {
+        execute: async ({ reason, webhooks }) => {
+          // Return same format as step returns
+          const webhookConfig: any = {};
+          if (webhooks.slack) {
+            webhookConfig.slack = SlackWebhook.respondsTo(webhooks.slack);
+          }
+          if (webhooks.twilio) {
+            webhookConfig.twilio = TwilioWebhook.respondsTo(webhooks.twilio);
+          }
+          if (webhooks.email) {
+            webhookConfig.email = EmailWebhook.respondsTo(webhooks.email);
+          }
+          
           return {
-            _wait: true, // Special flag
-            webhooks: {
-              ...(channels.includes('slack') && {
-                slack: SlackWebhook.respondsTo(state.slackThreadId)
-              }),
-              ...(channels.includes('twilio') && {
-                twilio: TwilioWebhook.respondsTo(state.phoneNumber)
-              }),
-            }
+            state: { waitingReason: reason },
+            webhook: webhookConfig
           };
         }
       }
@@ -163,6 +175,34 @@ brain('support-agent')
       }
       return 'Help the customer...';
     }
+  });
+```
+
+#### 2. Persistent Webhooks (Messages Between Iterations)
+
+```typescript
+brain('chat-assistant')
+  .withOptionsSchema(z.object({
+    sessionId: z.string(),
+  }))
+  .loop('Chat', {
+    // Always listening, can inject messages anytime
+    persistentWebhooks: ({ options }) => ({
+      chat: ChatWebhook.respondsTo(options.sessionId)
+    }),
+    
+    tools: [searchWeb, calculate],
+    
+    prompt: ({ messages }) => {
+      // messages includes both tool responses and webhook messages
+      const lastMessage = messages[messages.length - 1];
+      return lastMessage?.content || 'Waiting for user...';
+    },
+    
+    onMessage: ({ message, state }) => ({
+      ...state,
+      history: [...state.history, message]
+    })
   });
 ```
 
@@ -220,6 +260,8 @@ Similar to resources, the CLI:
 
 ## Implementation Flow
 
+### Basic Webhook Flow
+
 1. **Webhook Registration**: When a brain returns webhook objects, the framework registers `(webhook_name, identifier, brain_run_id)` tuples
 
 2. **Request Routing**: Incoming requests to `/webhooks/{name}` are routed to the appropriate webhook handler
@@ -231,6 +273,58 @@ Similar to resources, the CLI:
    - If `brain` is returned: Start new brain run with response as initial state
 
 5. **Cleanup**: When brains complete or error, webhook registrations are removed
+
+### Loop Implementation Details
+
+#### Events and State Management
+
+Loops will emit their own events similar to steps:
+- `LOOP_START` - When loop begins
+- `LOOP_ITERATION` - Each iteration with patches
+- `LOOP_COMPLETE` - When loop exits
+- `LOOP_MESSAGE` - When persistent webhook delivers a message
+
+Each loop iteration creates patches, allowing full state reconstruction.
+
+#### Webhook Differentiation
+
+To handle both explicit waits and persistent webhooks:
+
+1. **Explicit Wait (Tool-triggered)**:
+   - Tool returns webhook configuration
+   - Loop emits `WEBHOOK` event, pausing execution
+   - Webhook response resumes loop with response in context
+
+2. **Persistent Webhooks**:
+   - Registered when loop starts with a special flag
+   - Adapter listens for these continuously
+   - Messages delivered via generator's `send()` method
+   - Loop checks for injected messages before each iteration
+
+```typescript
+// In the loop execution
+async *executeLoop() {
+  // Register persistent webhooks
+  for (const [name, webhook] of Object.entries(persistentWebhooks)) {
+    await registerWebhook(webhook, brainRunId, { persistent: true });
+  }
+  
+  while (condition) {
+    // Check for injected messages
+    const injectedMessage = yield; // Can receive value via generator.send()
+    if (injectedMessage) {
+      yield { type: 'LOOP_MESSAGE', message: injectedMessage };
+      state = onMessage({ message: injectedMessage, state });
+    }
+    
+    // Normal iteration...
+  }
+}
+```
+
+The adapter differentiates by checking the registration type:
+- Persistent webhooks → Use `generator.send(message)`
+- Explicit wait webhooks → Resume brain run normally
 
 ## Benefits
 
