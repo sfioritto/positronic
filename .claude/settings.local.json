@@ -30,7 +30,8 @@
       "WebFetch(domain:www.npmjs.com)",
       "Bash(git describe:*)",
       "Bash(npx changeset:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "WebFetch(domain:docs.github.com)"
     ],
     "deny": []
   }
