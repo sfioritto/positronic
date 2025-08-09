@@ -106,23 +106,22 @@ export default class GitHubWebhook extends Webhook {
   async handler(request: Request) {
     const body = await request.json();
     
-    if (body.action === 'opened' && body.pull_request) {
-      // Start a new brain run instead of resuming
-      return {
-        brain: 'pr-review', // Brain name to start
-        response: {
-          action: body.action,
-          prNumber: body.pull_request.number,
-          repository: body.repository.full_name,
-          author: body.pull_request.user.login,
-        }
-      };
-    }
-    
-    // Otherwise handle as resume
+    // Handler can return both brain and identifier
+    // Framework will:
+    // 1. Start new brain if no matching identifier found
+    // 2. Resume existing brain if identifier matches
+    // 3. Always pass response as initial state or resume data
     return {
-      identifier: `${body.repository.full_name}#${body.pull_request.number}`,
-      response: { /* ... */ }
+      brain: 'pr-review' as const, // TypeScript validates via generated types
+      identifier: body.pull_request ? 
+        `${body.repository.full_name}#${body.pull_request.number}` : 
+        undefined,
+      response: {
+        action: body.action,
+        prNumber: body.pull_request?.number,
+        repository: body.repository.full_name,
+        author: body.pull_request?.user.login || body.sender.login,
+      }
     };
   }
 }
@@ -230,6 +229,16 @@ While brains use a builder pattern due to their complex chaining and type infere
 - No complex type chaining between methods
 - Clear, simple interface that's easy to test
 
+### Why Enforce Unique Slugs?
+
+Each webhook class must have a unique slug for its URL path:
+- Ensures predictable 1:1 mapping between URLs and handlers
+- Avoids routing ambiguity - `/webhooks/slack` maps to exactly one handler
+- Enables compile-time validation during type generation
+- Matches standard webhook patterns (one endpoint per integration)
+
+The CLI will error during type generation if duplicate slugs are detected.
+
 ### Why Static Response Schema?
 
 The response schema is defined as a static property because:
@@ -251,12 +260,93 @@ This separation allows:
 - Clean mapping between incoming events and waiting brain runs
 - Flexibility for webhooks to handle both resume and cold-start scenarios
 
+### Why Allow Both `brain` and `identifier` Together?
+
+Real-world webhooks often need to handle both patterns with the same logic:
+
+**Example: Slack DM Bot**
+- `@bot help` in a channel → Start new 'help-request' brain
+- User responds in existing thread → Resume waiting brain
+- Direct message to bot → Start new 'dm-conversation' brain per user
+- Follow-up DM from same user → Resume that user's conversation brain
+
+```typescript
+// One webhook class handles all Slack events
+async handler(request: Request) {
+  const event = await request.json();
+  
+  if (event.type === 'app_mention') {
+    // New mention - start fresh brain
+    return {
+      brain: 'help-request' as const,
+      response: { message: event.text, channel: event.channel }
+    };
+  } else if (event.type === 'message' && event.thread_ts) {
+    // Thread reply - resume if brain waiting, otherwise start new
+    return {
+      brain: 'thread-handler' as const,
+      identifier: event.thread_ts,
+      response: { message: event.text, user: event.user }
+    };
+  } else if (event.type === 'message' && event.channel_type === 'im') {
+    // DM - one continuous brain per user
+    return {
+      brain: 'dm-conversation' as const,
+      identifier: `dm-${event.user}`,
+      response: { message: event.text, user: event.user }
+    };
+  }
+}
+```
+
+This pattern is common across many services (GitHub PRs, support tickets, chat systems) where the same webhook endpoint handles both new and ongoing interactions.
+
 ### Type Safety Through Code Generation
 
-Similar to resources, the CLI:
-1. Watches the `webhooks/` directory
-2. Generates a `webhooks.d.ts` file with exports
-3. Provides compile-time errors if webhooks are removed but still referenced
+The CLI watches both `webhooks/` and `brains/` directories to generate type definitions:
+
+**Generated webhooks.d.ts**:
+```typescript
+// Auto-generated webhook exports
+declare module '@positronic/webhooks' {
+  import type { default as SlackWebhookClass } from './webhooks/slack.js';
+  import type { default as TwilioWebhookClass } from './webhooks/twilio.js';
+  import type { default as GitHubWebhookClass } from './webhooks/github.js';
+  
+  export const SlackWebhook: typeof SlackWebhookClass;
+  export const TwilioWebhook: typeof TwilioWebhookClass;
+  export const GitHubWebhook: typeof GitHubWebhookClass;
+}
+
+// Available brain names for type checking
+declare module '@positronic/core' {
+  interface AvailableBrains {
+    'customer-feedback': true;
+    'pr-review': true;
+    'chat-assistant': true;
+    'support-agent': true;
+  }
+  
+  // This allows webhook handlers to use validated brain names
+  export type BrainName = keyof AvailableBrains;
+}
+```
+
+This provides:
+1. Import safety - Can't import webhooks that don't exist
+2. Brain name validation - Can't reference non-existent brains in handlers
+3. Compile-time errors when files are deleted but still referenced
+4. Consistent with the resources pattern developers already know
+
+**Build-time validation**:
+```bash
+$ px webhooks list
+Error: Duplicate webhook slug detected!
+  - webhooks/slack.ts uses slug 'slack'
+  - webhooks/slack-events.ts uses slug 'slack'
+  
+Each webhook must have a unique slug for its URL path.
+```
 
 ## Implementation Flow
 
