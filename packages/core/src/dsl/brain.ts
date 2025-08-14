@@ -32,8 +32,8 @@ export type StepAction<
 ) =>
   | TStateOut
   | Promise<TStateOut>
-  | { state: TStateOut; webhook: Webhook<TResponseOut> }
-  | Promise<{ state: TStateOut; webhook: Webhook<TResponseOut> }>;
+  | { state: TStateOut; webhooks: Webhook<TResponseOut>[] }
+  | Promise<{ state: TStateOut; webhooks: Webhook<TResponseOut>[] }>;
 
 // New Event Type System
 // Base event interface with only type and options
@@ -105,10 +105,7 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
 export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK;
-  webhook: {
-    name: string;
-    meta: JsonObject;
-  };
+  webhooks: Webhook<JsonObject | undefined>;
   state: State;
 }
 
@@ -298,7 +295,6 @@ export class Brain<
     return nextBrain;
   }
 
-  // when I look at this I think "Huh, the action function here, i just need to specify the return type"
   step<
     TNewState extends State,
     TResponseOut extends JsonObject | undefined = undefined
@@ -608,7 +604,7 @@ class BrainEventStream<
 
     // Use provided ID if available, otherwise generate one
     this.brainRunId = providedBrainRunId ?? uuidv4();
-    
+
     // Set initial response if provided (for webhook restarts)
     if (response) {
       this.currentResponse = response;
@@ -794,16 +790,13 @@ class BrainEventStream<
         ...this.services,
       });
 
-      this.currentState = result.webhook ? result.state : result;
+      this.currentState = result.webhooks ? result.state : result;
       yield* this.completeStep(step, prevState);
 
-      if (result && typeof result === 'object' && 'webhook' in result) {
+      if (result && typeof result === 'object' && 'webhooks' in result) {
         yield {
           type: BRAIN_EVENTS.WEBHOOK,
-          webhook: {
-            name: result.webhook.name,
-            meta: result.webhook.meta,
-          },
+          webhooks: result.webhooks,
           state: this.currentState,
           options: this.options,
           brainRunId: this.brainRunId,
