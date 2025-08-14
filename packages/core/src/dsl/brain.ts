@@ -5,7 +5,7 @@ import type { State, JsonPatch, JsonObject } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
-import type { Webhook } from './webhook.js';
+import type { WebhookResult, ExtractWebhookResponses } from './webhook.js';
 
 export type SerializedError = {
   name: string;
@@ -20,7 +20,7 @@ export type StepAction<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TResponseOut extends JsonObject | undefined = undefined
+  TWebhooks extends readonly any[] = readonly []
 > = (
   params: {
     state: TStateIn;
@@ -32,8 +32,8 @@ export type StepAction<
 ) =>
   | TStateOut
   | Promise<TStateOut>
-  | { state: TStateOut; webhooks: Webhook<TResponseOut>[] }
-  | Promise<{ state: TStateOut; webhooks: Webhook<TResponseOut>[] }>;
+  | { state: TStateOut; webhooks: TWebhooks }
+  | Promise<{ state: TStateOut; webhooks: TWebhooks }>;
 
 // New Event Type System
 // Base event interface with only type and options
@@ -105,7 +105,7 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
 export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK;
-  webhooks: Webhook<JsonObject | undefined>;
+  webhooks: WebhookResult<any>[];
   state: State;
 }
 
@@ -158,7 +158,7 @@ type StepBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TResponseOut extends JsonObject | undefined = undefined
+  TWebhooks extends readonly any[] = readonly []
 > = {
   type: 'step';
   title: string;
@@ -168,7 +168,7 @@ type StepBlock<
     TOptions,
     TServices,
     TResponseIn,
-    TResponseOut
+    TWebhooks
   >;
 };
 
@@ -196,7 +196,7 @@ type Block<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TResponseOut extends JsonObject | undefined = undefined
+  TWebhooks extends readonly any[] = readonly []
 > =
   | StepBlock<
       TStateIn,
@@ -204,7 +204,7 @@ type Block<
       TOptions,
       TServices,
       TResponseIn,
-      TResponseOut
+      TWebhooks
     >
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>;
 
@@ -267,8 +267,8 @@ export class Brain<
   // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
-  ): Brain<TOptions, TState, TNewServices> {
-    const nextBrain = new Brain<TOptions, TState, TNewServices>(
+  ): Brain<TOptions, TState, TNewServices, TResponse> {
+    const nextBrain = new Brain<TOptions, TState, TNewServices, TResponse>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -283,8 +283,8 @@ export class Brain<
 
   withOptionsSchema<TSchema extends z.ZodSchema>(
     schema: TSchema
-  ): Brain<z.infer<TSchema>, TState, TServices> {
-    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices>(
+  ): Brain<z.infer<TSchema>, TState, TServices, TResponse> {
+    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices, TResponse>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -297,32 +297,47 @@ export class Brain<
 
   step<
     TNewState extends State,
-    TResponseOut extends JsonObject | undefined = undefined
+    TWebhooks extends readonly any[] = readonly []
   >(
     title: string,
-    action: StepAction<
-      TState,
-      TNewState,
-      TOptions,
-      TServices,
-      TResponse,
-      TResponseOut
-    >
-  ) {
+    action: (
+      params: {
+        state: TState;
+        options: TOptions;
+        client: ObjectGenerator;
+        resources: Resources;
+        response: TResponse;
+      } & TServices
+    ) => 
+      | TNewState 
+      | Promise<TNewState>
+      | { state: TNewState; webhooks: TWebhooks }
+      | Promise<{ state: TNewState; webhooks: TWebhooks }>
+  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWebhooks>> {
     const stepBlock: StepBlock<
       TState,
       TNewState,
       TOptions,
       TServices,
       TResponse,
-      TResponseOut
+      TWebhooks
     > = {
       type: 'step',
       title,
-      action,
+      action: action as any,
     };
     this.blocks.push(stepBlock);
-    return this.nextBrain<TNewState, TResponseOut>();
+    
+    // Create next brain with inferred response type
+    const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWebhooks>>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+    
+    nextBrain.services = this.services;
+    nextBrain.optionsSchema = this.optionsSchema;
+    
+    return nextBrain;
   }
 
   brain<TInnerState extends State, TNewState extends State>(
@@ -392,7 +407,7 @@ export class Brain<
       TOptions,
       TServices,
       TResponse,
-      undefined
+      readonly []
     > = {
       type: 'step',
       title,
@@ -497,6 +512,7 @@ export class Brain<
 
     return nextBrain;
   }
+
 }
 
 class Step {
@@ -790,7 +806,7 @@ class BrainEventStream<
         ...this.services,
       });
 
-      this.currentState = result.webhooks ? result.state : result;
+      this.currentState = result && typeof result === 'object' && 'webhooks' in result ? result.state : result;
       yield* this.completeStep(step, prevState);
 
       if (result && typeof result === 'object' && 'webhooks' in result) {

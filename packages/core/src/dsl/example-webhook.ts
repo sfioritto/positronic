@@ -1,9 +1,9 @@
 import { brain } from './brain.js';
 import { z } from 'zod';
-import { Webhook } from './webhook.js';
 
 // Example webhook class matching the design document
-const slackWebhook: Webhook = (identifier: string) => {
+// Don't type as Webhook - let TypeScript infer to preserve schema types
+const slackWebhook = (identifier: string) => {
   return {
     slug: 'slack-webhook',
     schema: z.object({
@@ -11,10 +11,10 @@ const slackWebhook: Webhook = (identifier: string) => {
       threadId: z.string(),
     }),
     identifier,
-  };
+  } as const;
 };
 
-const emailWebhook: Webhook = (identifier: string) => {
+const emailWebhook = (identifier: string) => {
   return {
     identifier,
     schema: z.object({
@@ -23,13 +23,13 @@ const emailWebhook: Webhook = (identifier: string) => {
       from: z.string(),
     }),
     slug: 'email-webhook',
-  };
+  } as const;
 };
 
 const myBrain = brain('My Brain')
   .step('My Step', ({ state }) => {
     return {
-      state,
+      state: { cool: 'thing', ...state },
       webhooks: [slackWebhook('thread-123'), emailWebhook('email-456')],
     };
   })
