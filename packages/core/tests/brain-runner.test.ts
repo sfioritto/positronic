@@ -385,14 +385,11 @@ describe('BrainRunner', () => {
 
   it('should stop execution when webhook event is encountered', async () => {
     // Define a test webhook
-    class TestWebhook implements Webhook<{ response: string }> {
-      name = 'test-webhook';
-      schema = z.object({ response: z.string() });
-      meta = {
-        channel: 'test-channel',
-        prompt: 'Please respond'
-      };
-    }
+    const testWebhook = (identifier: string) => ({
+      slug: 'test-webhook',
+      identifier,
+      schema: z.object({ response: z.string() }),
+    });
 
     const runner = new BrainRunner({
       adapters: [mockAdapter],
@@ -403,7 +400,7 @@ describe('BrainRunner', () => {
       .step('First Step', () => ({ count: 1 }))
       .step('Webhook Step', ({ state }) => ({
         state,
-        webhook: new TestWebhook(),
+        webhooks: [testWebhook('test-id')],
       }))
       .step('Third Step', ({ state }) => ({
         ...state,
@@ -423,13 +420,13 @@ describe('BrainRunner', () => {
     expect(webhookEvents[0][0]).toEqual(
       expect.objectContaining({
         type: BRAIN_EVENTS.WEBHOOK,
-        webhook: {
-          name: 'test-webhook',
-          meta: {
-            channel: 'test-channel',
-            prompt: 'Please respond'
+        webhooks: [
+          {
+            slug: 'test-webhook',
+            identifier: 'test-id',
+            schema: expect.any(Object),
           }
-        },
+        ],
         state: { count: 1 }
       })
     );
@@ -457,14 +454,11 @@ describe('BrainRunner', () => {
 
   it('should restart brain with webhook response', async () => {
     // Define a test webhook
-    class TestWebhook implements Webhook<{ userInput: string }> {
-      name = 'user-input-webhook';
-      schema = z.object({ userInput: z.string() });
-      meta = {
-        channel: 'slack',
-        prompt: 'Please provide input'
-      };
-    }
+    const userInputWebhook = (identifier: string) => ({
+      slug: 'user-input-webhook',
+      identifier,
+      schema: z.object({ userInput: z.string() }),
+    });
 
     const runner = new BrainRunner({
       adapters: [mockAdapter],
@@ -475,7 +469,7 @@ describe('BrainRunner', () => {
       .step('Initial Step', () => ({ count: 1 }))
       .step('Webhook Step', ({ state }) => ({
         state: { ...state, webhookSent: true },
-        webhook: new TestWebhook(),
+        webhooks: [userInputWebhook('user-id')],
       }))
       .step('Process Response', ({ state, response }) => ({
         ...state,

@@ -237,14 +237,11 @@ describe('brain creation', () => {
 
   it('should emit webhook event and stop execution when step returns webhook', async () => {
     // Define a test webhook
-    class TestWebhook implements Webhook<{ userResponse: string }> {
-      name = 'test-webhook';
-      schema = z.object({ userResponse: z.string() });
-      meta = {
-        channelId: 'test-channel',
-        message: 'Please respond',
-      };
-    }
+    const testWebhook = (identifier: string) => ({
+      slug: 'test-webhook',
+      identifier,
+      schema: z.object({ userResponse: z.string() }),
+    });
 
     const testBrain = brain('webhook test brain')
       .step('First step', () => {
@@ -252,7 +249,7 @@ describe('brain creation', () => {
       })
       .step('Webhook step', ({ state }) => ({
         state,
-        webhook: new TestWebhook(),
+        webhooks: [testWebhook('test-id')],
       }))
       .step('Third step', ({ state }) => ({
         ...state,
@@ -270,13 +267,13 @@ describe('brain creation', () => {
     expect(webhookEvent).toEqual(
       expect.objectContaining({
         type: BRAIN_EVENTS.WEBHOOK,
-        webhook: {
-          name: 'test-webhook',
-          meta: {
-            channelId: 'test-channel',
-            message: 'Please respond',
-          },
-        },
+        webhooks: [
+          {
+            slug: 'test-webhook',
+            identifier: 'test-id',
+            schema: expect.any(Object),
+          }
+        ],
         state: { count: 1 },
         brainRunId: expect.any(String),
         options: {},
