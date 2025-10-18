@@ -24,6 +24,15 @@ export function setBrainRunner(runner: BrainRunner) {
   brainRunner = runner;
 }
 
+let webhookManifest: Record<string, any> | null = null;
+export function setWebhookManifest(manifest: Record<string, any>) {
+  webhookManifest = manifest;
+}
+
+export function getWebhookManifest(): Record<string, any> | null {
+  return webhookManifest;
+}
+
 export interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;

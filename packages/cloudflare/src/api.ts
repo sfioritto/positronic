@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AwsClient } from 'aws4fetch';
 import { parseCronExpression } from 'cron-schedule';
 import type { BrainRunnerDO } from './brain-runner-do.js';
-import { getManifest } from './brain-runner-do.js';
+import { getManifest, getWebhookManifest } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
 import type { R2Bucket, R2Object } from '@cloudflare/workers-types';
@@ -731,6 +731,59 @@ app.post('/resources/presigned-link', async (context: Context) => {
       },
       500
     );
+  }
+});
+
+// Webhook endpoints
+
+// List all webhooks
+app.get('/webhooks', async (context: Context) => {
+  const webhookManifest = getWebhookManifest();
+
+  if (!webhookManifest) {
+    return context.json({ webhooks: [], count: 0 });
+  }
+
+  const webhooks = Object.entries(webhookManifest).map(([slug, webhook]: [string, any]) => ({
+    slug,
+    description: webhook.description,
+  }));
+
+  return context.json({
+    webhooks,
+    count: webhooks.length,
+  });
+});
+
+// Receive incoming webhook from external service
+app.post('/webhooks/:slug', async (context: Context) => {
+  const slug = context.req.param('slug');
+  const webhookManifest = getWebhookManifest();
+
+  if (!webhookManifest) {
+    return context.json({ error: 'Webhook manifest not initialized' }, 500);
+  }
+
+  const webhook = webhookManifest[slug];
+
+  if (!webhook) {
+    return context.json({ error: `Webhook '${slug}' not found` }, 404);
+  }
+
+  try {
+    // Call the webhook handler to process the incoming request
+    const result = await webhook.handler(context.req.raw);
+
+    // TODO: Implement brain resume/start logic based on result.identifier
+    // For now, just return a success response indicating we received the webhook
+    return context.json({
+      received: true,
+      action: 'queued',
+      identifier: result.identifier,
+    });
+  } catch (error) {
+    console.error(`Error receiving webhook ${slug}:`, error);
+    return context.json({ error: 'Failed to process webhook' }, 500);
   }
 });
 

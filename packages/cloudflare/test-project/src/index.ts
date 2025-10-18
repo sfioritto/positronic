@@ -1,10 +1,11 @@
-import { brain } from '@positronic/core';
+import { brain, createWebhook } from '@positronic/core';
 import { z } from 'zod';
 import app from '../../src/api';
 import {
   setManifest,
   BrainRunnerDO,
   setBrainRunner,
+  setWebhookManifest,
 } from '../../src/brain-runner-do';
 import { MonitorDO } from '../../src/monitor-do';
 import { ScheduleDO } from '../../src/schedule-do';
@@ -82,6 +83,58 @@ const titleTestBrain = brain({ title: 'Brain with Custom Title', description: 'T
     status: 'completed',
   }));
 
+// Test webhooks
+const testWebhook = createWebhook(
+  'test-webhook',
+  z.object({
+    message: z.string(),
+    userId: z.string(),
+  }),
+  async (request: Request) => {
+    const body = await request.json();
+    return {
+      identifier: body.threadId || body.userId,
+      response: {
+        message: body.text || body.message,
+        userId: body.user || body.userId,
+      },
+    };
+  }
+);
+
+const notificationWebhook = createWebhook(
+  'notification',
+  z.object({
+    type: z.string(),
+    data: z.string(),
+    timestamp: z.number(),
+  }),
+  async (request: Request) => {
+    const body = await request.json();
+    return {
+      identifier: body.notificationId,
+      response: {
+        type: body.type,
+        data: body.data,
+        timestamp: Date.now(),
+      },
+    };
+  }
+);
+
+// Brain that uses webhooks
+const webhookBrain = brain({ title: 'webhook-brain', description: 'A brain that waits for webhooks' })
+  .step('Send message and wait', ({ state }) => ({
+    state: { ...state, waiting: true },
+    waitFor: [testWebhook('test-thread-123')],
+  }))
+  .step('Process response', ({ state, response }) => ({
+    ...state,
+    waiting: false,
+    receivedMessage: response.message,
+    receivedUserId: response.userId,
+  }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -108,14 +161,26 @@ const brainManifest = {
     path: 'brains/title-test-brain.ts',
     brain: titleTestBrain,
   },
+  'webhook-brain': {
+    filename: 'webhook-brain',
+    path: 'brains/webhook-brain.ts',
+    brain: webhookBrain,
+  },
 };
 
 const manifest = new PositronicManifest({
   manifest: brainManifest,
 });
 
+// Webhook manifest for discovery
+export const webhookManifest = {
+  'test-webhook': testWebhook,
+  'notification': notificationWebhook,
+};
+
 setManifest(manifest);
 setBrainRunner(runner);
+setWebhookManifest(webhookManifest);
 
 export default {
   fetch: app.fetch,

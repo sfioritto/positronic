@@ -1658,9 +1658,9 @@ export const webhooks = {
   },
 
   /**
-   * Test POST /webhooks/:slug - Trigger a webhook
+   * Test POST /webhooks/:slug - Receive an incoming webhook from an external service
    */
-  async trigger(
+  async receive(
     fetch: Fetch,
     slug: string,
     payload: any

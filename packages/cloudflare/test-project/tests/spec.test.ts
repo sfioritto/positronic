@@ -5,7 +5,7 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import worker from '../src/index';
-import { testStatus, resources, brains, schedules } from '@positronic/spec';
+import { testStatus, resources, brains, schedules, webhooks } from '@positronic/spec';
 
 describe('Positronic Spec', () => {
   // Helper function to create fetch wrapper for Cloudflare workers
@@ -139,6 +139,27 @@ describe('Positronic Spec', () => {
 
     it('passes GET /brains/schedules/runs test', async () => {
       const result = await schedules.runs(createFetch());
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('Webhooks', () => {
+    it('passes GET /webhooks test', async () => {
+      const result = await webhooks.list(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /webhooks/:slug test', async () => {
+      const result = await webhooks.receive(createFetch(), 'test-webhook', {
+        text: 'Hello from test',
+        user: 'test-user',
+        threadId: 'test-thread-123',
+      });
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /webhooks/:slug with non-existent webhook test (404)', async () => {
+      const result = await webhooks.notFound(createFetch(), 'non-existent-webhook');
       expect(result).toBe(true);
     });
   });
