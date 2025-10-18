@@ -5,7 +5,7 @@ import type { State, JsonPatch, JsonObject } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
-import type { WebhookResult, ExtractWebhookResponses } from './webhook.js';
+import type { WebhookRegistration, ExtractWebhookResponses } from './webhook.js';
 
 export type SerializedError = {
   name: string;
@@ -20,7 +20,7 @@ export type StepAction<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWebhooks extends readonly any[] = readonly []
+  TWaitFor extends readonly any[] = readonly []
 > = (
   params: {
     state: TStateIn;
@@ -32,8 +32,8 @@ export type StepAction<
 ) =>
   | TStateOut
   | Promise<TStateOut>
-  | { state: TStateOut; webhooks: TWebhooks }
-  | Promise<{ state: TStateOut; webhooks: TWebhooks }>;
+  | { state: TStateOut; waitFor: TWaitFor }
+  | Promise<{ state: TStateOut; waitFor: TWaitFor }>;
 
 // New Event Type System
 // Base event interface with only type and options
@@ -105,7 +105,7 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
 export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK;
-  webhooks: WebhookResult<any>[];
+  waitFor: WebhookRegistration<any>[];
   state: State;
 }
 
@@ -297,7 +297,7 @@ export class Brain<
 
   step<
     TNewState extends State,
-    TWebhooks extends readonly any[] = readonly []
+    TWaitFor extends readonly any[] = readonly []
   >(
     title: string,
     action: (
@@ -311,16 +311,16 @@ export class Brain<
     ) => 
       | TNewState 
       | Promise<TNewState>
-      | { state: TNewState; webhooks: TWebhooks }
-      | Promise<{ state: TNewState; webhooks: TWebhooks }>
-  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWebhooks>> {
+      | { state: TNewState; waitFor: TWaitFor }
+      | Promise<{ state: TNewState; waitFor: TWaitFor }>
+  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>> {
     const stepBlock: StepBlock<
       TState,
       TNewState,
       TOptions,
       TServices,
       TResponse,
-      TWebhooks
+      TWaitFor
     > = {
       type: 'step',
       title,
@@ -329,7 +329,7 @@ export class Brain<
     this.blocks.push(stepBlock);
     
     // Create next brain with inferred response type
-    const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWebhooks>>(
+    const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -806,13 +806,13 @@ class BrainEventStream<
         ...this.services,
       });
 
-      this.currentState = result && typeof result === 'object' && 'webhooks' in result ? result.state : result;
+      this.currentState = result && typeof result === 'object' && 'waitFor' in result ? result.state : result;
       yield* this.completeStep(step, prevState);
 
-      if (result && typeof result === 'object' && 'webhooks' in result) {
+      if (result && typeof result === 'object' && 'waitFor' in result) {
         yield {
           type: BRAIN_EVENTS.WEBHOOK,
-          webhooks: result.webhooks,
+          waitFor: result.waitFor,
           state: this.currentState,
           options: this.options,
           brainRunId: this.brainRunId,

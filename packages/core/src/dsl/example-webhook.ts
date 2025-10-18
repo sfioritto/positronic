@@ -1,36 +1,51 @@
 import { brain } from './brain.js';
 import { z } from 'zod';
+import { createWebhook } from './webhook.js';
 
-// Example webhook class matching the design document
-// Don't type as Webhook - let TypeScript infer to preserve schema types
-const slackWebhook = (identifier: string) => {
-  return {
-    slug: 'slack-webhook',
-    schema: z.object({
-      message: z.string(),
-      threadId: z.string(),
-    }),
-    identifier,
-  } as const;
-};
+// Example webhooks using createWebhook factory
+export const slackWebhook = createWebhook(
+  'slack',
+  z.object({
+    message: z.string(),
+    threadId: z.string(),
+  }),
+  async (request) => {
+    const body = await request.json() as any;
+    return {
+      identifier: body.thread_ts,
+      response: {
+        message: body.text,
+        threadId: body.thread_ts,
+      }
+    };
+  }
+);
 
-const emailWebhook = (identifier: string) => {
-  return {
-    identifier,
-    schema: z.object({
-      subject: z.string(),
-      body: z.string(),
-      from: z.string(),
-    }),
-    slug: 'email-webhook',
-  } as const;
-};
+export const emailWebhook = createWebhook(
+  'email',
+  z.object({
+    subject: z.string(),
+    body: z.string(),
+    from: z.string(),
+  }),
+  async (request) => {
+    const body = await request.json() as any;
+    return {
+      identifier: body.messageId,
+      response: {
+        subject: body.subject,
+        body: body.body,
+        from: body.from,
+      }
+    };
+  }
+);
 
 const myBrain = brain('My Brain')
   .step('My Step', ({ state }) => {
     return {
       state: { cool: 'thing', ...state },
-      webhooks: [slackWebhook('thread-123'), emailWebhook('email-456')],
+      waitFor: [slackWebhook('thread-123'), emailWebhook('email-456')],
     };
   })
   .step('My Step 2', ({ state, response }) => {
@@ -40,8 +55,8 @@ const myBrain = brain('My Brain')
         return { ...state, slackMessage: 'slack' };
       } else if ('subject' in response) {
         // Handle Email webhook response
-        // const subject = response.subject;
-        return { ...state, emailSubject: 'email' };
+        const subject = response.subject; // This should work if type inference is correct
+        return { ...state, emailSubject: subject };
       }
     }
     return state;
