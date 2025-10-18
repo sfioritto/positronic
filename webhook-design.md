@@ -110,7 +110,7 @@ export const githubWebhook = createWebhook(
     // 2. Resume existing brain if identifier matches
     // 3. Always pass response as initial state or resume data
     return {
-      brain: 'pr-review' as const, // PLANNED: TypeScript validates via generated types
+      brain: 'pr-review' as const, // PLANNED: Not yet implemented
       identifier: body.pull_request ?
         `${body.repository.full_name}#${body.pull_request.number}` :
         undefined,
@@ -215,10 +215,9 @@ The `waitFor` field accepts an array rather than a named object:
 Each webhook must have a unique slug for its URL path:
 - Ensures predictable 1:1 mapping between URLs and handlers
 - Avoids routing ambiguity - `/webhooks/slack` maps to exactly one handler
-- Enables compile-time validation during type generation (planned)
 - Matches standard webhook patterns (one endpoint per integration)
 
-The CLI will error during type generation if duplicate slugs are detected (planned feature).
+The backend will error at runtime if duplicate slugs are detected.
 
 ### Why Separate `identifier` and `response`?
 
@@ -275,51 +274,6 @@ export const slackWebhook = createWebhook(
 ```
 
 This pattern is common across many services (GitHub PRs, support tickets, chat systems) where the same webhook endpoint handles both new and ongoing interactions.
-
-### Type Safety Through Code Generation
-
-> **Note**: Auto-generation of webhook types is planned for future implementation. This section describes the planned design.
-
-The CLI watches both `webhooks/` and `brains/` directories to generate type definitions:
-
-**Generated webhooks.d.ts**:
-```typescript
-// Auto-generated webhook exports
-declare module '@positronic/webhooks' {
-  export { slackWebhook } from './webhooks/slack.js';
-  export { twilioWebhook } from './webhooks/twilio.js';
-  export { githubWebhook } from './webhooks/github.js';
-}
-
-// Available brain names for type checking
-declare module '@positronic/core' {
-  interface AvailableBrains {
-    'customer-feedback': true;
-    'pr-review': true;
-    'chat-assistant': true;
-    'support-agent': true;
-  }
-
-  // This allows webhook handlers to use validated brain names
-  export type BrainName = keyof AvailableBrains;
-}
-```
-
-This provides:
-1. Import safety - Can't import webhooks that don't exist
-2. Brain name validation - Can't reference non-existent brains in handlers
-3. Compile-time errors when files are deleted but still referenced
-4. Consistent with the resources pattern developers already know
-
-**Build-time validation**:
-```bash
-$ px webhooks list
-Error: Duplicate webhook slug detected!
-  - webhooks/slack.ts uses slug 'slack'
-  - webhooks/slack-events.ts uses slug 'slack'
-  
-Each webhook must have a unique slug for its URL path.
-```
 
 ## Implementation Flow
 
