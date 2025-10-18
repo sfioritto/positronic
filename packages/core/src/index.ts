@@ -28,6 +28,8 @@ export { z } from 'zod';
 
 export type { ResourceLoader } from './resources/resource-loader.js';
 export { createResources, type Resources } from './resources/resources.js';
+export { createWebhook } from './dsl/webhook.js';
+export type { WebhookFunction, WebhookRegistration } from './dsl/webhook.js';
 export type {
   Manifest as ResourceManifest,
   Entry as ResourceEntry,

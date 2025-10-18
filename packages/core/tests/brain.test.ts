@@ -13,7 +13,7 @@ import { jest } from '@jest/globals';
 import { ObjectGenerator } from '../src/clients/types.js';
 import { createResources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
-import type { Webhook } from '../src/dsl/webhook.js';
+import { createWebhook } from '../src/index.js';
 
 // Helper function to get the next value from an AsyncIterator
 const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
@@ -237,11 +237,14 @@ describe('brain creation', () => {
 
   it('should emit webhook event and stop execution when step returns webhook', async () => {
     // Define a test webhook
-    const testWebhook = (identifier: string) => ({
-      slug: 'test-webhook',
-      identifier,
-      schema: z.object({ userResponse: z.string() }),
-    });
+    const testWebhook = createWebhook(
+      'test-webhook',
+      z.object({ userResponse: z.string() }),
+      async (request: Request) => ({
+        identifier: 'test-id',
+        response: { userResponse: 'test' }
+      })
+    );
 
     const testBrain = brain('webhook test brain')
       .step('First step', () => {
@@ -249,7 +252,7 @@ describe('brain creation', () => {
       })
       .step('Webhook step', ({ state }) => ({
         state,
-        webhooks: [testWebhook('test-id')],
+        waitFor: [testWebhook('test-id')],
       }))
       .step('Third step', ({ state }) => ({
         ...state,
@@ -267,7 +270,7 @@ describe('brain creation', () => {
     expect(webhookEvent).toEqual(
       expect.objectContaining({
         type: BRAIN_EVENTS.WEBHOOK,
-        webhooks: [
+        waitFor: [
           {
             slug: 'test-webhook',
             identifier: 'test-id',
