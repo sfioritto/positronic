@@ -34,6 +34,20 @@ export class MonitorDO extends DurableObject<Env> {
 
       CREATE INDEX IF NOT EXISTS idx_brain_time -- Renamed index
       ON brain_runs(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS webhook_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT NOT NULL,
+        identifier TEXT NOT NULL,
+        brain_run_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_webhook_lookup
+      ON webhook_registrations(slug, identifier);
+
+      CREATE INDEX IF NOT EXISTS idx_webhook_brain_run
+      ON webhook_registrations(brain_run_id);
     `);
   }
 
@@ -83,6 +97,15 @@ export class MonitorDO extends DurableObject<Env> {
         startTime,
         completeTime
       );
+
+      // Clean up webhook registrations when brain terminates
+      if (
+        event.type === BRAIN_EVENTS.COMPLETE ||
+        event.type === BRAIN_EVENTS.ERROR ||
+        event.type === BRAIN_EVENTS.CANCELLED
+      ) {
+        this.clearWebhookRegistrations(event.brainRunId);
+      }
 
       this.broadcastRunningBrains();
     }
@@ -172,7 +195,6 @@ export class MonitorDO extends DurableObject<Env> {
     return new Response('Not found', { status: 404 });
   }
 
-  // No changes needed for getLastEvent, uses run_id
   getLastEvent(brainRunId: string) {
     const results = this.storage
       .exec(
@@ -182,7 +204,7 @@ export class MonitorDO extends DurableObject<Env> {
         brainRunId
       )
       .toArray();
-    
+
     return results.length > 0 ? results[0] : null;
   }
 
@@ -239,6 +261,58 @@ export class MonitorDO extends DurableObject<Env> {
         STATUS.RUNNING
       )
       .toArray();
+  }
+
+  /**
+   * Register a webhook to wait for
+   * Called when a brain emits a WEBHOOK event
+   */
+  registerWebhook(slug: string, identifier: string, brainRunId: string) {
+    this.storage.exec(
+      `
+      INSERT INTO webhook_registrations (slug, identifier, brain_run_id, created_at)
+      VALUES (?, ?, ?, ?)
+    `,
+      slug,
+      identifier,
+      brainRunId,
+      Date.now()
+    );
+  }
+
+  /**
+   * Find a brain waiting for this webhook
+   * Returns the brain_run_id if found, null otherwise
+   */
+  findWaitingBrain(slug: string, identifier: string): string | null {
+    const results = this.storage
+      .exec(
+        `
+      SELECT brain_run_id as brainRunId
+      FROM webhook_registrations
+      WHERE slug = ? AND identifier = ?
+      LIMIT 1
+    `,
+        slug,
+        identifier
+      )
+      .toArray();
+
+    return results.length > 0 ? (results[0] as any).brainRunId : null;
+  }
+
+  /**
+   * Clear all webhook registrations for a brain run
+   * Called when brain completes, errors, or is cancelled
+   */
+  clearWebhookRegistrations(brainRunId: string) {
+    this.storage.exec(
+      `
+      DELETE FROM webhook_registrations
+      WHERE brain_run_id = ?
+    `,
+      brainRunId
+    );
   }
 }
 

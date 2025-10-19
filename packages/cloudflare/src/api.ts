@@ -774,8 +774,29 @@ app.post('/webhooks/:slug', async (context: Context) => {
     // Call the webhook handler to process the incoming request
     const result = await webhook.handler(context.req.raw);
 
-    // TODO: Implement brain resume/start logic based on result.identifier
-    // For now, just return a success response indicating we received the webhook
+    // Check if there's a brain waiting for this webhook
+    const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+    const monitorStub = context.env.MONITOR_DO.get(monitorId);
+    const brainRunId = await monitorStub.findWaitingBrain(slug, result.identifier);
+
+    if (brainRunId) {
+      // Found a brain waiting for this webhook - resume it
+      const namespace = context.env.BRAIN_RUNNER_DO;
+      const doId = namespace.idFromName(brainRunId);
+      const stub = namespace.get(doId);
+
+      // Resume the brain with the webhook response
+      await stub.resume(brainRunId, result.response);
+
+      return context.json({
+        received: true,
+        action: 'resumed',
+        identifier: result.identifier,
+        brainRunId,
+      });
+    }
+
+    // No brain waiting for this webhook
     return context.json({
       received: true,
       action: 'queued',

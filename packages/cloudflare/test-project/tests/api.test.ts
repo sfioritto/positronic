@@ -391,8 +391,8 @@ describe('Hono API Tests', () => {
 
     // The last event should be a brain complete event
     expect(lastEvent).toBeDefined();
-    expect(lastEvent.type).toBe(BRAIN_EVENTS.COMPLETE);
-    expect(lastEvent.status).toBe(STATUS.COMPLETE);
+    expect(lastEvent?.type).toBe(BRAIN_EVENTS.COMPLETE);
+    expect(lastEvent?.status).toBe(STATUS.COMPLETE);
   });
 
   it('Watches brain run as it runs', async () => {
@@ -999,7 +999,9 @@ describe('Hono API Tests', () => {
         schedules: Array<{ brainTitle: string }>;
       }>();
 
-      const multiSchedules = schedules.filter((s) => s.brainTitle === 'basic-brain');
+      const multiSchedules = schedules.filter(
+        (s) => s.brainTitle === 'basic-brain'
+      );
       expect(multiSchedules.length).toBe(2);
     });
   });
@@ -1007,22 +1009,22 @@ describe('Hono API Tests', () => {
   describe('Brain title vs filename resolution', () => {
     it('should handle brain run creation with brain title (not filename)', async () => {
       const testEnv = env as TestEnv;
-      
+
       // Create brain run using the brain's title instead of filename
       const request = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'Brain with Custom Title' }),
       });
-      
+
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
       expect(response.status).toBe(201);
-      
+
       const responseBody = await response.json<{ brainRunId: string }>();
       const brainRunId = responseBody.brainRunId;
       await waitOnExecutionContext(context);
-      
+
       // Watch the brain run to ensure it executes properly
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
       const watchRequest = new Request(watchUrl);
@@ -1032,44 +1034,44 @@ describe('Hono API Tests', () => {
         testEnv,
         watchContext
       );
-      
+
       expect(watchResponse.status).toBe(200);
-      
+
       if (!watchResponse.body) {
         throw new Error('Watch response body is null');
       }
-      
+
       // Read all events from the SSE stream
       const allEvents = await readSseStream(watchResponse.body);
-      
+
       // Should have received completion event
       const completeEvent = allEvents.find(
         (e) => e.type === BRAIN_EVENTS.COMPLETE
       );
       expect(completeEvent).toBeDefined();
-      expect(completeEvent.status).toBe(STATUS.COMPLETE);
-      
+      expect(completeEvent?.status).toBe(STATUS.COMPLETE);
+
       await waitOnExecutionContext(watchContext);
     });
 
     it('should handle brain run creation with filename', async () => {
       const testEnv = env as TestEnv;
-      
+
       // Create brain run using the filename
       const request = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'title-test-brain' }),
       });
-      
+
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
       expect(response.status).toBe(201);
-      
+
       const responseBody = await response.json<{ brainRunId: string }>();
       const brainRunId = responseBody.brainRunId;
       await waitOnExecutionContext(context);
-      
+
       // Watch the brain run to ensure it executes properly
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
       const watchRequest = new Request(watchUrl);
@@ -1079,24 +1081,185 @@ describe('Hono API Tests', () => {
         testEnv,
         watchContext
       );
-      
+
       expect(watchResponse.status).toBe(200);
-      
+
       if (!watchResponse.body) {
         throw new Error('Watch response body is null');
       }
-      
+
       // Read all events from the SSE stream
       const allEvents = await readSseStream(watchResponse.body);
-      
+
       // Should have received completion event
       const completeEvent = allEvents.find(
         (e) => e.type === BRAIN_EVENTS.COMPLETE
       );
       expect(completeEvent).toBeDefined();
-      expect(completeEvent.status).toBe(STATUS.COMPLETE);
-      
+      expect(completeEvent?.status).toBe(STATUS.COMPLETE);
+
       await waitOnExecutionContext(watchContext);
+    });
+  });
+
+  describe('Webhook Brain Resumption', () => {
+    it('should pause brain on webhook and resume when webhook is received', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'webhook-brain';
+      const webhookIdentifier = 'test-thread-123';
+
+      // Step 1: Start the webhook-brain
+      const createRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      expect(createResponse.status).toBe(201);
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
+      await waitOnExecutionContext(createContext);
+
+      // Step 2: Watch the brain - it should pause with WEBHOOK event
+      const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+      const watchRequest = new Request(watchUrl);
+      const watchContext = createExecutionContext();
+      const watchResponse = await worker.fetch(
+        watchRequest,
+        testEnv,
+        watchContext
+      );
+
+      expect(watchResponse.status).toBe(200);
+      if (!watchResponse.body) {
+        throw new Error('Watch response body is null');
+      }
+
+      // Read events until we get the WEBHOOK event (brain pauses)
+      const reader = watchResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const events: BrainEvent[] = [];
+      let foundWebhookEvent = false;
+
+      while (!foundWebhookEvent) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        let eventEndIndex;
+        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+          const message = buffer.substring(0, eventEndIndex);
+          buffer = buffer.substring(eventEndIndex + 2);
+
+          if (message.startsWith('data:')) {
+            const event = parseSseEvent(message);
+            if (event) {
+              events.push(event);
+              if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                foundWebhookEvent = true;
+                reader.cancel();
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Step 3: Verify we got the WEBHOOK event and brain paused
+      expect(foundWebhookEvent).toBe(true);
+      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
+      expect(webhookEvent).toBeDefined();
+      expect(webhookEvent?.waitFor).toBeDefined();
+      expect(webhookEvent?.waitFor.length).toBeGreaterThan(0);
+
+      // Should NOT have a COMPLETE event yet
+      const prematureComplete = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(prematureComplete).toBeUndefined();
+
+      await waitOnExecutionContext(watchContext);
+
+      // Step 4: Trigger the webhook with matching identifier
+      const webhookRequest = new Request(
+        'http://example.com/webhooks/test-webhook',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: 'Response from webhook',
+            user: 'test-user-456',
+            threadId: webhookIdentifier,
+          }),
+        }
+      );
+      const webhookContext = createExecutionContext();
+      const webhookResponse = await worker.fetch(
+        webhookRequest,
+        testEnv,
+        webhookContext
+      );
+
+      expect(webhookResponse.status).toBe(200);
+      const webhookResult = await webhookResponse.json<{
+        received: boolean;
+        action: string;
+        identifier?: string;
+      }>();
+      expect(webhookResult.received).toBe(true);
+      expect(webhookResult.action).toBe('resumed'); // Should resume the waiting brain
+      await waitOnExecutionContext(webhookContext);
+
+      // Step 5: Watch the brain again - it should now complete
+      const resumeWatchRequest = new Request(watchUrl);
+      const resumeWatchContext = createExecutionContext();
+      const resumeWatchResponse = await worker.fetch(
+        resumeWatchRequest,
+        testEnv,
+        resumeWatchContext
+      );
+
+      if (!resumeWatchResponse.body) {
+        throw new Error('Resume watch response body is null');
+      }
+
+      const resumeEvents = await readSseStream(resumeWatchResponse.body);
+      await waitOnExecutionContext(resumeWatchContext);
+
+      // Step 6: Verify brain completed with webhook response data
+      const completeEvent = resumeEvents.find(
+        (e): e is BrainCompleteEvent => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent?.status).toBe(STATUS.COMPLETE);
+
+      // Verify the final step processed the webhook response
+      const finalStepComplete = resumeEvents.find(
+        (e): e is StepCompletedEvent =>
+          e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+          e.stepTitle === 'Process response'
+      );
+      expect(finalStepComplete).toBeDefined();
+
+      // Check that the patch includes the webhook response data
+      const patch = finalStepComplete?.patch;
+      expect(patch).toBeDefined();
+      const receivedMessageOp = patch?.find(
+        (op) => op.op === 'add' && op.path === '/receivedMessage'
+      );
+      expect(receivedMessageOp?.value).toBe('Response from webhook');
+
+      const receivedUserIdOp = patch?.find(
+        (op) => op.op === 'add' && op.path === '/receivedUserId'
+      );
+      expect(receivedUserIdOp?.value).toBe('test-user-456');
     });
   });
 });
