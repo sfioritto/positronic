@@ -274,7 +274,6 @@ describe('brain creation', () => {
           {
             slug: 'test-webhook',
             identifier: 'test-id',
-            schema: expect.any(Object),
           }
         ],
         state: { count: 1 },

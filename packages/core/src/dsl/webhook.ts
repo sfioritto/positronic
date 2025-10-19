@@ -7,6 +7,12 @@ export type WebhookRegistration<TSchema extends z.ZodSchema = z.ZodSchema> = {
   schema: TSchema;
 };
 
+// Serializable version for events (no Zod schema)
+export type SerializedWebhookRegistration = {
+  slug: string;
+  identifier: string;
+};
+
 // Type for the webhook function with handler attached
 export interface WebhookFunction<TSchema extends z.ZodSchema = z.ZodSchema> {
   (identifier: string): WebhookRegistration<TSchema>;

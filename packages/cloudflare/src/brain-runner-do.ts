@@ -1,8 +1,9 @@
-import { BrainRunner, type Resources } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
+import { WebhookAdapter } from './webhook-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
 import { PositronicManifest } from './manifest.js';
@@ -226,12 +227,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
-    const monitorAdapter = new MonitorAdapter(
-      this.env.MONITOR_DO.get(this.env.MONITOR_DO.idFromName('singleton'))
+    const monitorDOStub = this.env.MONITOR_DO.get(
+      this.env.MONITOR_DO.idFromName('singleton')
     );
+    const monitorAdapter = new MonitorAdapter(monitorDOStub);
     const scheduleAdapter = new ScheduleAdapter(
       this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
     );
+    const webhookAdapter = new WebhookAdapter(monitorDOStub);
 
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
@@ -260,6 +263,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         eventStreamAdapter,
         monitorAdapter,
         scheduleAdapter,
+        webhookAdapter,
       ])
       .run(brainToRun, {
         initialState,
@@ -273,6 +277,127 @@ export class BrainRunnerDO extends DurableObject<Env> {
       })
       .finally(() => {
         // Clean up abort controller when run completes
+        this.abortController = null;
+      });
+  }
+
+  async resume(
+    brainRunId: string,
+    webhookResponse: Record<string, any>
+  ) {
+    const { sql } = this;
+
+    if (!manifest) {
+      throw new Error('Runtime manifest not initialized');
+    }
+
+    // Get the initial state and brain title by loading the START or RESTART event
+    const startEventResult = sql
+      .exec<{ serialized_event: string }>(
+        `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
+        BRAIN_EVENTS.START,
+        BRAIN_EVENTS.RESTART
+      )
+      .toArray();
+
+    if (startEventResult.length === 0) {
+      throw new Error(`No START or RESTART event found for brain run ${brainRunId}`);
+    }
+
+    const startEvent = JSON.parse(startEventResult[0].serialized_event);
+    const brainTitle = startEvent.brainTitle;
+    const initialState = startEvent.initialState || {};
+
+    if (!brainTitle) {
+      throw new Error(`Brain title not found in START/RESTART event for brain run ${brainRunId}`);
+    }
+
+    // Resolve the brain using the title
+    const resolution = manifest.resolve(brainTitle);
+    if (resolution.matchType === 'none') {
+      console.error(
+        `[DO ${brainRunId}] Brain ${brainTitle} not found in manifest.`
+      );
+      throw new Error(`Brain ${brainTitle} not found`);
+    }
+
+    if (resolution.matchType === 'multiple') {
+      console.error(
+        `[DO ${brainRunId}] Multiple brains match identifier ${brainTitle}`,
+        resolution.candidates
+      );
+      throw new Error(`Multiple brains match identifier ${brainTitle}`);
+    }
+
+    const brainToRun = resolution.brain;
+    if (!brainToRun) {
+      throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
+    }
+
+    // Load completed steps from SQLite
+    const eventsResult = sql
+      .exec<{ serialized_event: string }>(
+        `SELECT serialized_event FROM brain_events WHERE event_type = ? ORDER BY event_id ASC`,
+        BRAIN_EVENTS.STEP_COMPLETE
+      )
+      .toArray();
+
+    const initialCompletedSteps = eventsResult.map((row) => {
+      const event = JSON.parse(row.serialized_event);
+      return {
+        id: event.stepId,
+        title: event.stepTitle,
+        status: STATUS.COMPLETE,
+        patch: event.patch,
+      };
+    });
+
+    const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
+    const { eventStreamAdapter } = this;
+    const monitorDOStub = this.env.MONITOR_DO.get(
+      this.env.MONITOR_DO.idFromName('singleton')
+    );
+    const monitorAdapter = new MonitorAdapter(monitorDOStub);
+    const scheduleAdapter = new ScheduleAdapter(
+      this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
+    );
+    const webhookAdapter = new WebhookAdapter(monitorDOStub);
+
+    if (!brainRunner) {
+      throw new Error('BrainRunner not initialized');
+    }
+
+    // Load resources from R2
+    const r2Resources = await this.loadResourcesFromR2();
+    let runnerWithResources = brainRunner;
+
+    if (r2Resources) {
+      runnerWithResources = brainRunner.withResources(r2Resources);
+    }
+
+    // Create abort controller for this run
+    this.abortController = new AbortController();
+
+    runnerWithResources
+      .withAdapters([
+        sqliteAdapter,
+        eventStreamAdapter,
+        monitorAdapter,
+        scheduleAdapter,
+        webhookAdapter,
+      ])
+      .run(brainToRun, {
+        initialState,
+        initialCompletedSteps,
+        brainRunId,
+        response: webhookResponse,
+        signal: this.abortController.signal,
+      })
+      .catch((err: any) => {
+        console.error(`[DO ${brainRunId}] BrainRunner resume failed:`, err);
+        throw err;
+      })
+      .finally(() => {
         this.abortController = null;
       });
   }

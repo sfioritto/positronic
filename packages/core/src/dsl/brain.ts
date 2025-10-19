@@ -5,7 +5,7 @@ import type { State, JsonPatch, JsonObject } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
-import type { WebhookRegistration, ExtractWebhookResponses } from './webhook.js';
+import type { WebhookRegistration, ExtractWebhookResponses, SerializedWebhookRegistration } from './webhook.js';
 
 export type SerializedError = {
   name: string;
@@ -105,7 +105,7 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
 export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK;
-  waitFor: WebhookRegistration<any>[];
+  waitFor: SerializedWebhookRegistration[];
   state: State;
 }
 
@@ -810,9 +810,17 @@ class BrainEventStream<
       yield* this.completeStep(step, prevState);
 
       if (result && typeof result === 'object' && 'waitFor' in result) {
+        // Serialize webhook registrations (remove Zod schemas for event serializability)
+        const serializedWaitFor: SerializedWebhookRegistration[] = result.waitFor.map(
+          (registration: WebhookRegistration) => ({
+            slug: registration.slug,
+            identifier: registration.identifier,
+          })
+        );
+
         yield {
           type: BRAIN_EVENTS.WEBHOOK,
-          waitFor: result.waitFor,
+          waitFor: serializedWaitFor,
           state: this.currentState,
           options: this.options,
           brainRunId: this.brainRunId,
