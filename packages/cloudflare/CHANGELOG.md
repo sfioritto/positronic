@@ -1,5 +1,35 @@
 # @positronic/cloudflare
 
+## 0.0.20
+
+### Patch Changes
+
+- Add webhook/waitFor functionality to enable brains to pause execution and wait for external events. This release includes:
+
+  - **New waitFor API**: Brains can now pause and wait for webhook responses with type-safe schemas
+  - **Webhook integration**: Full webhook support with identifier-based matching to resume paused brains
+  - **Cloudflare backend support**: Complete implementation including webhook endpoints, brain pause/resume, and event monitoring
+  - **Type inference**: Automatic TypeScript type inference for webhook responses in brain steps
+  - **Comprehensive testing**: Added extensive test coverage for webhook flows and integration scenarios
+  - **API specs**: New webhook-related spec tests for backend implementations
+
+  Breaking changes: None
+
+  Bug fixes:
+
+  - Fixed TypeScript configuration to eliminate Cloudflare package errors
+  - Fixed Claude.md prompt during .positronic directory regeneration
+  - Fixed error handling to properly rethrow errors in webhook events
+
+  Dependencies:
+
+  - Added GitHub to WebFetch whitelist for documentation access
+
+- Updated dependencies
+  - @positronic/core@0.0.20
+  - @positronic/spec@0.0.20
+  - @positronic/template-new-project@0.0.20
+
 ## 0.0.19
 
 ### Patch Changes
