@@ -1261,5 +1261,34 @@ describe('Hono API Tests', () => {
       );
       expect(receivedUserIdOp?.value).toBe('test-user-456');
     });
+
+    it('should handle webhook verification challenge', async () => {
+      const testEnv = env as TestEnv;
+      const challengeString = 'verification-challenge-xyz123';
+
+      // Send a verification request to the webhook endpoint
+      const webhookRequest = new Request(
+        'http://example.com/webhooks/test-webhook',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'url_verification',
+            challenge: challengeString,
+          }),
+        }
+      );
+      const webhookContext = createExecutionContext();
+      const webhookResponse = await worker.fetch(
+        webhookRequest,
+        testEnv,
+        webhookContext
+      );
+
+      expect(webhookResponse.status).toBe(200);
+      const result = await webhookResponse.json<{ challenge: string }>();
+      expect(result.challenge).toBe(challengeString);
+      await waitOnExecutionContext(webhookContext);
+    });
   });
 });

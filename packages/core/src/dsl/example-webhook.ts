@@ -12,6 +12,7 @@ export const slackWebhook = createWebhook(
   async (request) => {
     const body = await request.json() as any;
     return {
+      type: 'webhook' as const,
       identifier: body.thread_ts,
       response: {
         message: body.text,
@@ -31,6 +32,7 @@ export const emailWebhook = createWebhook(
   async (request) => {
     const body = await request.json() as any;
     return {
+      type: 'webhook' as const,
       identifier: body.messageId,
       response: {
         subject: body.subject,

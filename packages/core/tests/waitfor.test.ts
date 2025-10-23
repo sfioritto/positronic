@@ -31,9 +31,17 @@ describe('webhook type inference', () => {
 
     // Create a brain that uses these webhooks
     const myBrain = brain('Test Brain')
+      .step('Step 0', () => {
+        return {
+          initial: 'value',
+        };
+      })
       .step('Step 1', ({ state }) => {
         return {
-          state: { initial: 'value' },
+          state: {
+            ...state,
+            step1: 'value',
+          },
           waitFor: [webhook1('id1'), webhook2('id2')],
         };
       })
