@@ -92,7 +92,18 @@ const testWebhook = createWebhook(
   }),
   async (request: Request) => {
     const body = await request.json();
+
+    // Handle verification challenge (for testing verification flow)
+    if (body.type === 'url_verification') {
+      return {
+        type: 'verification' as const,
+        challenge: body.challenge,
+      };
+    }
+
+    // Normal webhook handling
     return {
+      type: 'webhook' as const,
       identifier: body.threadId || body.userId,
       response: {
         message: body.text || body.message,
@@ -112,6 +123,7 @@ const notificationWebhook = createWebhook(
   async (request: Request) => {
     const body = await request.json();
     return {
+      type: 'webhook' as const,
       identifier: body.notificationId,
       response: {
         type: body.type,

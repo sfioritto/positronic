@@ -13,13 +13,22 @@ export type SerializedWebhookRegistration = {
   identifier: string;
 };
 
+// Type for the webhook handler return value (discriminated union)
+export type WebhookHandlerResult<TSchema extends z.ZodSchema = z.ZodSchema> =
+  | {
+      type: 'verification';
+      challenge: string;
+    }
+  | {
+      type: 'webhook';
+      identifier: string;
+      response: z.infer<TSchema>;
+    };
+
 // Type for the webhook function with handler attached
 export interface WebhookFunction<TSchema extends z.ZodSchema = z.ZodSchema> {
   (identifier: string): WebhookRegistration<TSchema>;
-  handler: (request: Request) => Promise<{
-    identifier: string;
-    response: z.infer<TSchema>;
-  }>;
+  handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>;
   slug: string;
   schema: TSchema;
 }
@@ -28,10 +37,7 @@ export interface WebhookFunction<TSchema extends z.ZodSchema = z.ZodSchema> {
 export function createWebhook<TSchema extends z.ZodSchema>(
   slug: string,
   schema: TSchema,
-  handler: (request: Request) => Promise<{
-    identifier: string;
-    response: z.infer<TSchema>;
-  }>
+  handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>
 ): WebhookFunction<TSchema> {
   // Create the registration function
   const webhookFn = (identifier: string): WebhookRegistration<TSchema> => ({

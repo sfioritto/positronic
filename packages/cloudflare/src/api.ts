@@ -774,7 +774,12 @@ app.post('/webhooks/:slug', async (context: Context) => {
     // Call the webhook handler to process the incoming request
     const result = await webhook.handler(context.req.raw);
 
-    // Check if there's a brain waiting for this webhook
+    // Handle verification challenge (for Slack, Stripe, GitHub, Discord)
+    if (result.type === 'verification') {
+      return context.json({ challenge: result.challenge });
+    }
+
+    // Normal webhook processing - check if there's a brain waiting
     const monitorId = context.env.MONITOR_DO.idFromName('singleton');
     const monitorStub = context.env.MONITOR_DO.get(monitorId);
     const brainRunId = await monitorStub.findWaitingBrain(slug, result.identifier);

@@ -33,6 +33,7 @@ export const slackWebhook = createWebhook(
 
     // Return identifier for resuming brains OR brain name for cold starts
     return {
+      type: 'webhook' as const,
       identifier: body.thread_ts, // Used to match waiting brain runs
       response: {
         message: body.text,
@@ -46,6 +47,48 @@ export const slackWebhook = createWebhook(
 ```
 
 > **Note**: The `description` field is planned for future implementation to provide human-readable webhook documentation in CLI commands.
+
+### Webhook Verification
+
+Many webhook providers (Slack, Stripe, GitHub, Discord) require URL verification before accepting your webhook endpoint. Webhook handlers use a discriminated union to handle both verification and normal webhook events:
+
+```typescript
+export const slackWebhook = createWebhook(
+  'slack',
+  z.object({
+    message: z.string(),
+    userId: z.string(),
+  }),
+  async (request: Request) => {
+    const body = await request.json();
+
+    // Handle Slack's URL verification challenge
+    if (body.type === 'url_verification') {
+      return {
+        type: 'verification' as const,
+        challenge: body.challenge
+      };
+    }
+
+    // Normal event handling
+    return {
+      type: 'webhook' as const,
+      identifier: body.event.thread_ts,
+      response: {
+        message: body.event.text,
+        userId: body.event.user,
+      }
+    };
+  }
+);
+```
+
+**Return Types:**
+
+- **`type: 'verification'`** - Returns `{ "challenge": "..." }` as JSON, satisfying webhook verification protocols
+- **`type: 'webhook'`** - Processes the webhook and either resumes a waiting brain or queues the event
+
+When a `verification` response is returned, the webhook framework immediately responds with the challenge and does not attempt to resume or start any brain.
 
 ### Using Webhooks in Brains
 
@@ -104,16 +147,11 @@ export const githubWebhook = createWebhook(
   async (request: Request) => {
     const body = await request.json();
 
-    // Handler can return both brain and identifier
-    // Framework will:
-    // 1. Start new brain if no matching identifier found
-    // 2. Resume existing brain if identifier matches
-    // 3. Always pass response as initial state or resume data
+    // PLANNED: Future support for cold-starting brains from webhooks
+    // For now, webhooks can only resume waiting brains
     return {
-      brain: 'pr-review' as const, // PLANNED: Not yet implemented
-      identifier: body.pull_request ?
-        `${body.repository.full_name}#${body.pull_request.number}` :
-        undefined,
+      type: 'webhook' as const,
+      identifier: `${body.repository.full_name}#${body.pull_request.number}`,
       response: {
         action: body.action,
         prNumber: body.pull_request?.number,
@@ -226,18 +264,29 @@ This separation allows:
 - Clean mapping between incoming events and waiting brain runs
 - Flexibility for webhooks to handle both resume and cold-start scenarios
 
-### Why Allow Both `brain` and `identifier` Together?
+### Cold-Starting Brains from Webhooks (Future)
 
-Real-world webhooks often need to handle both patterns with the same logic:
+> **Note**: This feature is planned but not yet implemented. The current discriminated union only supports `verification` and `webhook` types.
 
-**Example: Slack DM Bot**
+When implemented, a third return type will allow cold-starting brains from webhooks:
+
+```typescript
+type WebhookHandlerResult<T> =
+  | { type: 'verification'; challenge: string }
+  | { type: 'webhook'; identifier: string; response: T }
+  | { type: 'start-brain'; brain: string; identifier?: string; response: T } // PLANNED
+```
+
+Real-world webhooks often need to handle both resume and cold-start patterns:
+
+**Example: Slack DM Bot (Planned)**
 - `@bot help` in a channel → Start new 'help-request' brain
 - User responds in existing thread → Resume waiting brain
 - Direct message to bot → Start new 'dm-conversation' brain per user
 - Follow-up DM from same user → Resume that user's conversation brain
 
 ```typescript
-// One webhook handles all Slack events
+// PLANNED: One webhook handles all Slack events
 export const slackWebhook = createWebhook(
   'slack',
   z.object({
@@ -251,21 +300,23 @@ export const slackWebhook = createWebhook(
     if (event.type === 'app_mention') {
       // New mention - start fresh brain
       return {
-        brain: 'help-request' as const,
+        type: 'start-brain' as const, // PLANNED
+        brain: 'help-request',
         response: { message: event.text, channel: event.channel, user: event.user }
       };
     } else if (event.type === 'message' && event.thread_ts) {
-      // Thread reply - resume if brain waiting, otherwise start new
+      // Thread reply - resume if brain waiting
       return {
-        brain: 'thread-handler' as const,
+        type: 'webhook' as const,
         identifier: event.thread_ts,
         response: { message: event.text, user: event.user }
       };
     } else if (event.type === 'message' && event.channel_type === 'im') {
-      // DM - one continuous brain per user
+      // DM - resume existing or start new
       return {
-        brain: 'dm-conversation' as const,
-        identifier: `dm-${event.user}`,
+        type: 'start-brain' as const, // PLANNED
+        brain: 'dm-conversation',
+        identifier: `dm-${event.user}`, // Resume if exists, otherwise start new
         response: { message: event.text, user: event.user }
       };
     }
