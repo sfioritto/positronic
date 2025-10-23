@@ -1,5 +1,25 @@
 # @positronic/client-anthropic
 
+## 0.0.21
+
+### Patch Changes
+
+- Add webhook verification support using discriminated union pattern.
+
+  **Key Changes:**
+
+  - Webhook handlers now return a discriminated union with `type: 'verification' | 'webhook'`
+  - Simplifies URL verification for Slack, Stripe, GitHub, Discord and other webhook providers
+  - Removes need for dummy values when returning verification challenges
+  - Cleaner, more type-safe API with explicit intent for each return path
+  - Updated webhook-design.md with comprehensive examples and future `start-brain` type
+
+  **Breaking Change:**
+  Webhook handlers must now return `{ type: 'webhook', identifier, response }` instead of `{ identifier, response }`. Verification responses use `{ type: 'verification', challenge }`.
+
+- Updated dependencies
+  - @positronic/core@0.0.21
+
 ## 0.0.20
 
 ### Patch Changes
