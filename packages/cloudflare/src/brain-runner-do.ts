@@ -138,12 +138,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       const r2Object = await bucket.head(object.key);
 
       if (!r2Object || !r2Object.customMetadata?.type) {
-        console.warn(
-          `[DO ${this.brainRunId}] Skipping resource ${object.key} - ` +
-            `missing metadata.type (found: ${JSON.stringify(
-              r2Object?.customMetadata || {}
-            )})`
-        );
+        // Skip non-resource objects (e.g., pages, or other data stored in the bucket)
         continue;
       }
 
