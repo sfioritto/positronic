@@ -1,5 +1,17 @@
 # @positronic/shell
 
+## 0.0.25
+
+### Patch Changes
+
+- Make page slugs optional in PagesService
+
+  - `pages.create(html, options?)` now auto-generates a unique slug when none is provided
+  - Each brain run gets its own unique page when using auto-generated slugs
+  - Explicit slugs (`pages.create(slug, html, options?)`) still work and will overwrite existing pages
+  - Auto-generated slugs use format `page-{brainRunId-prefix}-{random}` for uniqueness
+  - Added comprehensive tests for optional slug behavior
+
 ## 0.0.24
 
 ### Patch Changes
