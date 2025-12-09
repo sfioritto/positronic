@@ -1,5 +1,11 @@
 # @positronic/spec
 
+## 0.0.23
+
+### Patch Changes
+
+- Update Vercel AI SDK peer dependency to v5.0.0
+
 ## 0.0.22
 
 ### Patch Changes

@@ -37,16 +37,29 @@ export class VercelClient implements ObjectGenerator {
       coreMessages.push({ role: 'user', content: prompt });
     }
 
-    const { object } = await generateObject({
-      model: this.model,
-      schema,
-      schemaName,
-      schemaDescription,
-      messages: coreMessages.length > 0 ? coreMessages : undefined,
-      prompt: coreMessages.length === 0 && prompt ? prompt : undefined,
-      mode: 'auto',
-    });
-
-    return object as z.infer<T>;
+    // AI SDK v5 requires either messages or prompt, but not both as undefined
+    // If we have messages built up, use them; otherwise use the prompt directly
+    if (coreMessages.length > 0) {
+      const { object } = await generateObject({
+        model: this.model,
+        schema,
+        schemaName,
+        schemaDescription,
+        messages: coreMessages,
+        mode: 'auto',
+      });
+      return object as z.infer<T>;
+    } else {
+      // Fallback to prompt-only mode (should rarely happen, but provides a default)
+      const { object } = await generateObject({
+        model: this.model,
+        schema,
+        schemaName,
+        schemaDescription,
+        prompt: prompt || '',
+        mode: 'auto',
+      });
+      return object as z.infer<T>;
+    }
   }
 }
