@@ -169,21 +169,7 @@ describe('Pages API Tests', () => {
     it('POST /pages validates required fields', async () => {
       const testEnv = env as TestEnv;
 
-      // Missing slug
-      const request1 = new Request('http://example.com/pages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          html: '<html></html>',
-          brainRunId: 'test',
-        }),
-      });
-      const context1 = createExecutionContext();
-      const response1 = await worker.fetch(request1, testEnv, context1);
-      await waitOnExecutionContext(context1);
-      expect(response1.status).toBe(400);
-      const error1 = await response1.json<{ error: string }>();
-      expect(error1.error).toContain('slug');
+      // Note: slug is now optional - if not provided, one is auto-generated
 
       // Missing html
       const request2 = new Request('http://example.com/pages', {
@@ -475,6 +461,227 @@ describe('Pages API Tests', () => {
       await waitOnExecutionContext(getContext);
 
       expect(getResponse.status).toBe(404);
+    });
+  });
+
+  describe('Optional Slug Behavior', () => {
+    it('POST /pages without slug generates a unique slug', async () => {
+      const testEnv = env as TestEnv;
+
+      const request = new Request('http://example.com/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html: '<html><body>Auto-generated slug page</body></html>',
+          brainRunId: 'test-brain-run-auto',
+        }),
+      });
+
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(201);
+      const body = await response.json<{
+        slug: string;
+        url: string;
+        brainRunId: string;
+      }>();
+
+      // Should have generated a slug
+      expect(body.slug).toBeDefined();
+      expect(body.slug.length).toBeGreaterThan(0);
+      expect(body.url).toContain(`/pages/${body.slug}`);
+    });
+
+    it('POST /pages without slug generates unique slugs for each call', async () => {
+      const testEnv = env as TestEnv;
+      const slugs: string[] = [];
+
+      // Create 3 pages without slugs
+      for (let i = 0; i < 3; i++) {
+        const request = new Request('http://example.com/pages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            html: `<html><body>Page ${i}</body></html>`,
+            brainRunId: `test-brain-run-${i}`,
+          }),
+        });
+
+        const context = createExecutionContext();
+        const response = await worker.fetch(request, testEnv, context);
+        await waitOnExecutionContext(context);
+
+        expect(response.status).toBe(201);
+        const body = await response.json<{ slug: string }>();
+        slugs.push(body.slug);
+      }
+
+      // All slugs should be unique
+      const uniqueSlugs = new Set(slugs);
+      expect(uniqueSlugs.size).toBe(3);
+    });
+
+    it('POST /pages with explicit slug reuses same page (overwrites)', async () => {
+      const testEnv = env as TestEnv;
+      const slug = 'shared-page';
+
+      // First call creates the page
+      const request1 = new Request('http://example.com/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          html: '<html><body>First version</body></html>',
+          brainRunId: 'brain-run-1',
+        }),
+      });
+
+      const context1 = createExecutionContext();
+      const response1 = await worker.fetch(request1, testEnv, context1);
+      await waitOnExecutionContext(context1);
+
+      expect(response1.status).toBe(201);
+      const body1 = await response1.json<{ slug: string; createdAt: string }>();
+      expect(body1.slug).toBe(slug);
+      const firstCreatedAt = body1.createdAt;
+
+      // Second call with same slug overwrites
+      const request2 = new Request('http://example.com/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          html: '<html><body>Second version</body></html>',
+          brainRunId: 'brain-run-2',
+        }),
+      });
+
+      const context2 = createExecutionContext();
+      const response2 = await worker.fetch(request2, testEnv, context2);
+      await waitOnExecutionContext(context2);
+
+      expect(response2.status).toBe(201);
+      const body2 = await response2.json<{ slug: string; brainRunId: string }>();
+      expect(body2.slug).toBe(slug);
+      // brainRunId should be updated to the new one
+      expect(body2.brainRunId).toBe('brain-run-2');
+
+      // Verify only one page exists with this slug and has new content
+      const getRequest = new Request(`http://example.com/pages/${slug}`);
+      const getContext = createExecutionContext();
+      const getResponse = await worker.fetch(getRequest, testEnv, getContext);
+      await waitOnExecutionContext(getContext);
+
+      expect(getResponse.status).toBe(200);
+      const content = await getResponse.text();
+      expect(content).toBe('<html><body>Second version</body></html>');
+    });
+
+    it('Brain with no slug creates unique page each run', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'auto-slug-brain';
+
+      // Run the brain twice and collect the page slugs
+      const slugs: string[] = [];
+
+      for (let i = 0; i < 2; i++) {
+        const createRequest = new Request('http://example.com/brains/runs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        });
+        const createContext = createExecutionContext();
+        const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+        expect(createResponse.status).toBe(201);
+        const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+        await waitOnExecutionContext(createContext);
+
+        // Watch the brain run
+        const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+        const watchRequest = new Request(watchUrl);
+        const watchContext = createExecutionContext();
+        const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+
+        if (!watchResponse.body) {
+          throw new Error('Watch response body is null');
+        }
+
+        const allEvents = await readSseStream(watchResponse.body);
+        await waitOnExecutionContext(watchContext);
+
+        // Find the step that created the page and extract the slug
+        const stepCompleteEvents = allEvents.filter(
+          (e): e is StepCompletedEvent => e.type === BRAIN_EVENTS.STEP_COMPLETE
+        );
+        const createStep = stepCompleteEvents.find(e => e.stepTitle === 'Create page without slug');
+        expect(createStep).toBeDefined();
+        const patch = createStep!.patch;
+        const slugOp = patch.find((op: any) => op.path === '/pageSlug');
+        expect(slugOp).toBeDefined();
+        slugs.push(slugOp!.value as string);
+      }
+
+      // Each run should have created a unique page
+      expect(slugs[0]).not.toBe(slugs[1]);
+    });
+
+    it('Brain with explicit slug reuses same page across runs', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'fixed-slug-brain';
+
+      // Run the brain twice
+      for (let i = 0; i < 2; i++) {
+        const createRequest = new Request('http://example.com/brains/runs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        });
+        const createContext = createExecutionContext();
+        const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+        expect(createResponse.status).toBe(201);
+        const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+        await waitOnExecutionContext(createContext);
+
+        // Watch the brain run
+        const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+        const watchRequest = new Request(watchUrl);
+        const watchContext = createExecutionContext();
+        const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+
+        if (!watchResponse.body) {
+          throw new Error('Watch response body is null');
+        }
+
+        const allEvents = await readSseStream(watchResponse.body);
+        await waitOnExecutionContext(watchContext);
+
+        // Verify completion
+        const completeEvent = allEvents.find(
+          (e): e is BrainCompleteEvent => e.type === BRAIN_EVENTS.COMPLETE
+        );
+        expect(completeEvent).toBeDefined();
+      }
+
+      // Verify only one page exists with the fixed slug
+      const metaRequest = new Request('http://example.com/pages/fixed-slug-page/meta');
+      const metaContext = createExecutionContext();
+      const metaResponse = await worker.fetch(metaRequest, testEnv, metaContext);
+      await waitOnExecutionContext(metaContext);
+
+      expect(metaResponse.status).toBe(200);
+      const meta = await metaResponse.json<{ slug: string }>();
+      expect(meta.slug).toBe('fixed-slug-page');
+
+      // Verify content is from the second run (overwrote first)
+      const getRequest = new Request('http://example.com/pages/fixed-slug-page');
+      const getContext = createExecutionContext();
+      const getResponse = await worker.fetch(getRequest, testEnv, getContext);
+      await waitOnExecutionContext(getContext);
+
+      const content = await getResponse.text();
+      expect(content).toContain('Run 2');
     });
   });
 
