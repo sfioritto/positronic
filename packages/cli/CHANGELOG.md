@@ -1,5 +1,21 @@
 # @positronic/cli
 
+## 0.0.24
+
+### Patch Changes
+
+- Add Cloudflare pages service implementation
+
+  - Implement `createPagesService()` function for Cloudflare backend that provides CRUD operations for dynamic HTML pages stored in R2
+  - Add pages service integration to brain-runner-do, allowing brains to create, read, update, and check page existence
+  - Support persistent pages with optional TTL settings
+  - Add comprehensive test suite for pages API endpoints and brain integration
+
+- Updated dependencies
+  - @positronic/core@0.0.24
+  - @positronic/spec@0.0.24
+  - @positronic/template-new-project@0.0.24
+
 ## 0.0.23
 
 ### Patch Changes
