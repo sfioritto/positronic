@@ -20,7 +20,7 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "peerDependencies": {
-    "ai": "^4.3.4"
+    "ai": "^5.0.0"
   },
   "dependencies": {
     "@positronic/core": "^0.0.22",
