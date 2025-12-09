@@ -1,5 +1,20 @@
 # @positronic/client-vercel
 
+## 0.0.22
+
+### Patch Changes
+
+- Add pages feature for persistent UI components
+
+  - New pages feature allows brains to create pages that can submit forms to webhooks or persist beyond a brain run
+  - Pages can be managed via CLI commands (`px pages list`, `px pages delete`)
+  - Core DSL extended with page creation and management capabilities
+  - Cloudflare backend support for page storage and retrieval via Monitor Durable Object
+  - Spec API tests for page endpoints
+
+- Updated dependencies
+  - @positronic/core@0.0.22
+
 ## 0.0.21
 
 ### Patch Changes
