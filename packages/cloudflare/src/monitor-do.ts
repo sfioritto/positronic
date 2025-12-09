@@ -48,6 +48,20 @@ export class MonitorDO extends DurableObject<Env> {
 
       CREATE INDEX IF NOT EXISTS idx_webhook_brain_run
       ON webhook_registrations(brain_run_id);
+
+      CREATE TABLE IF NOT EXISTS page_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT NOT NULL UNIQUE,
+        brain_run_id TEXT NOT NULL,
+        persist INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_page_brain_run
+      ON page_registrations(brain_run_id);
+
+      CREATE INDEX IF NOT EXISTS idx_page_persist
+      ON page_registrations(persist);
     `);
   }
 
@@ -98,13 +112,15 @@ export class MonitorDO extends DurableObject<Env> {
         completeTime
       );
 
-      // Clean up webhook registrations when brain terminates
+      // Clean up registrations when brain terminates
       if (
         event.type === BRAIN_EVENTS.COMPLETE ||
         event.type === BRAIN_EVENTS.ERROR ||
         event.type === BRAIN_EVENTS.CANCELLED
       ) {
         this.clearWebhookRegistrations(event.brainRunId);
+        // Note: Non-persistent page cleanup is handled by PageAdapter which has access to R2
+        // We just track pages here, actual R2 deletion happens in the adapter
       }
 
       this.broadcastRunningBrains();
@@ -310,6 +326,72 @@ export class MonitorDO extends DurableObject<Env> {
       `
       DELETE FROM webhook_registrations
       WHERE brain_run_id = ?
+    `,
+      brainRunId
+    );
+  }
+
+  /**
+   * Register a page for tracking
+   * Called when a page is created via the API
+   */
+  registerPage(slug: string, brainRunId: string, persist: boolean) {
+    this.storage.exec(
+      `
+      INSERT INTO page_registrations (slug, brain_run_id, persist, created_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(slug) DO UPDATE SET
+        brain_run_id = excluded.brain_run_id,
+        persist = excluded.persist
+    `,
+      slug,
+      brainRunId,
+      persist ? 1 : 0,
+      Date.now()
+    );
+  }
+
+  /**
+   * Unregister a page (when deleted via API)
+   */
+  unregisterPage(slug: string) {
+    this.storage.exec(
+      `
+      DELETE FROM page_registrations
+      WHERE slug = ?
+    `,
+      slug
+    );
+  }
+
+  /**
+   * Get all non-persistent page slugs for a brain run
+   * Used by PageAdapter to clean up pages when brain terminates
+   */
+  getNonPersistentPagesForRun(brainRunId: string): string[] {
+    const results = this.storage
+      .exec(
+        `
+      SELECT slug
+      FROM page_registrations
+      WHERE brain_run_id = ? AND persist = 0
+    `,
+        brainRunId
+      )
+      .toArray();
+
+    return results.map((r: any) => r.slug);
+  }
+
+  /**
+   * Clear all page registrations for a brain run
+   * Called after pages are cleaned up
+   */
+  clearPageRegistrations(brainRunId: string) {
+    this.storage.exec(
+      `
+      DELETE FROM page_registrations
+      WHERE brain_run_id = ? AND persist = 0
     `,
       brainRunId
     );

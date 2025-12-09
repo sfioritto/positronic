@@ -6,6 +6,7 @@ import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
 import type { WebhookRegistration, ExtractWebhookResponses, SerializedWebhookRegistration } from './webhook.js';
+import type { PagesService } from './pages.js';
 
 export type SerializedError = {
   name: string;
@@ -28,6 +29,7 @@ export type StepAction<
     client: ObjectGenerator;
     resources: Resources;
     response: TResponseIn;
+    pages?: PagesService;
   } & TServices
 ) =>
   | TStateOut
@@ -212,6 +214,7 @@ interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   client: ObjectGenerator;
   resources?: Resources;
   options?: TOptions;
+  pages?: PagesService;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
@@ -307,9 +310,10 @@ export class Brain<
         client: ObjectGenerator;
         resources: Resources;
         response: TResponse;
+        pages?: PagesService;
       } & TServices
-    ) => 
-      | TNewState 
+    ) =>
+      | TNewState
       | Promise<TNewState>
       | { state: TNewState; waitFor: TWaitFor }
       | Promise<{ state: TNewState; waitFor: TWaitFor }>
@@ -561,6 +565,7 @@ class BrainEventStream<
   private options: TOptions;
   private services: TServices;
   private resources: Resources;
+  private pages?: PagesService;
   private currentResponse: JsonObject | undefined = undefined;
 
   constructor(
@@ -582,6 +587,7 @@ class BrainEventStream<
       client,
       services,
       resources = {} as Resources,
+      pages,
       response,
     } = params as RerunParams<TOptions> & {
       title: string;
@@ -597,6 +603,7 @@ class BrainEventStream<
     this.options = options;
     this.services = services;
     this.resources = resources;
+    this.pages = pages;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -803,6 +810,7 @@ class BrainEventStream<
         client: this.client,
         resources: this.resources,
         response: this.currentResponse,
+        pages: this.pages,
         ...this.services,
       });
 

@@ -7,6 +7,7 @@ import { BrainCommand } from './commands/brain.js';
 import { ResourcesCommand } from './commands/resources.js';
 import { ScheduleCommand } from './commands/schedule.js';
 import { SecretCommand } from './commands/secret.js';
+import { PagesCommand } from './commands/pages.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -65,6 +66,7 @@ export function buildCli(options: CliOptions) {
   const brainCommand = new BrainCommand();
   const scheduleCommand = new ScheduleCommand();
   const secretCommand = new SecretCommand(server);
+  const pagesCommand = new PagesCommand();
 
   // Main CLI definition
   let cli = yargs(argv)
@@ -967,6 +969,54 @@ export function buildCli(options: CliOptions) {
         );
 
       return yargsSchedule;
+    }
+  );
+
+  // --- Pages Management Commands ---
+  cli = cli.command(
+    'pages',
+    'Manage pages created by brains\n',
+    (yargsPages) => {
+      yargsPages
+        .command(
+          'list',
+          'List all pages\n',
+          {},
+          (argv) => {
+            const element = pagesCommand.list(argv);
+            render(element);
+          }
+        )
+        .command(
+          'delete <slug>',
+          'Delete a page by slug\n',
+          (yargsDelete) => {
+            return yargsDelete
+              .positional('slug', {
+                describe: 'Slug of the page to delete',
+                type: 'string',
+                demandOption: true,
+              })
+              .option('force', {
+                describe: 'Skip confirmation prompt',
+                type: 'boolean',
+                alias: 'f',
+                default: false,
+              })
+              .example('$0 pages delete my-page', 'Delete a page by slug')
+              .example(
+                '$0 pages delete my-page --force',
+                'Delete without confirmation'
+              );
+          },
+          (argv) => {
+            const element = pagesCommand.delete(argv);
+            render(element);
+          }
+        )
+        .demandCommand(1, 'You need to specify a subcommand');
+
+      return yargsPages;
     }
   );
 

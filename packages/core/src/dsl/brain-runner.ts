@@ -5,6 +5,7 @@ import type { SerializedStep, Brain } from './brain.js';
 import type { State, JsonObject } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
+import type { PagesService } from './pages.js';
 
 export class BrainRunner {
   constructor(
@@ -12,6 +13,7 @@ export class BrainRunner {
       adapters: Adapter[];
       client: ObjectGenerator;
       resources?: Resources;
+      pages?: PagesService;
     }
   ) {}
 
@@ -37,6 +39,13 @@ export class BrainRunner {
     });
   }
 
+  withPages(pages: PagesService): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      pages,
+    });
+  }
+
   async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     {
@@ -57,7 +66,7 @@ export class BrainRunner {
       response?: JsonObject;
     } = {}
   ): Promise<TState> {
-    const { adapters, client, resources } = this.options;
+    const { adapters, client, resources, pages } = this.options;
 
     let currentState = initialState ?? ({} as TState);
     let stepNumber = 1;
@@ -82,6 +91,7 @@ export class BrainRunner {
             options,
             client,
             resources: resources ?? {},
+            pages,
             response,
           })
         : brain.run({
@@ -90,6 +100,7 @@ export class BrainRunner {
             client,
             brainRunId,
             resources: resources ?? {},
+            pages,
           });
 
     try {

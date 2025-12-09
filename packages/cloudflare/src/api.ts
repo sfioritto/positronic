@@ -813,5 +813,305 @@ app.post('/webhooks/:slug', async (context: Context) => {
   }
 });
 
+// Pages endpoints
+
+// Type for page metadata stored in R2
+type PageMetadata = {
+  slug: string;
+  brainRunId: string;
+  persist: boolean;
+  ttl?: number;
+  createdAt: string;
+};
+
+// Create a new page
+app.post('/pages', async (context: Context) => {
+  try {
+    const body = await context.req.json();
+    const { slug, html, brainRunId, persist = false, ttl } = body;
+
+    if (!slug) {
+      return context.json({ error: 'Missing required field "slug"' }, 400);
+    }
+    if (!html) {
+      return context.json({ error: 'Missing required field "html"' }, 400);
+    }
+    if (!brainRunId) {
+      return context.json({ error: 'Missing required field "brainRunId"' }, 400);
+    }
+
+    // Validate slug format (alphanumeric, hyphens, underscores only)
+    if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
+      return context.json(
+        { error: 'Slug must contain only alphanumeric characters, hyphens, and underscores' },
+        400
+      );
+    }
+
+    const bucket = context.env.RESOURCES_BUCKET;
+    const key = `pages/${slug}.html`;
+    const createdAt = new Date().toISOString();
+
+    // Store HTML with metadata
+    const metadata: PageMetadata = {
+      slug,
+      brainRunId,
+      persist: persist === true,
+      createdAt,
+      ...(ttl !== undefined && { ttl: Number(ttl) }),
+    };
+
+    await bucket.put(key, html, {
+      httpMetadata: {
+        contentType: 'text/html; charset=utf-8',
+      },
+      customMetadata: {
+        slug,
+        brainRunId,
+        persist: persist === true ? 'true' : 'false',
+        createdAt,
+        ...(ttl !== undefined && { ttl: String(ttl) }),
+      },
+    });
+
+    // Register the page with MonitorDO for cleanup tracking
+    const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+    const monitorStub = context.env.MONITOR_DO.get(monitorId);
+    await monitorStub.registerPage(slug, brainRunId, persist === true);
+
+    // Build the public URL for this page
+    const url = new URL(context.req.url);
+    const pageUrl = `${url.protocol}//${url.host}/pages/${slug}`;
+
+    return context.json(
+      {
+        slug,
+        url: pageUrl,
+        brainRunId,
+        persist: persist === true,
+        ...(ttl !== undefined && { ttl: Number(ttl) }),
+        createdAt,
+      },
+      201
+    );
+  } catch (error) {
+    console.error('Error creating page:', error);
+    return context.json(
+      {
+        error: `Failed to create page: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
+  }
+});
+
+// List all pages
+app.get('/pages', async (context: Context) => {
+  const bucket = context.env.RESOURCES_BUCKET;
+
+  try {
+    const listed = await bucket.list({ prefix: 'pages/' });
+
+    const pages = await Promise.all(
+      listed.objects.map(async (object: R2Object) => {
+        const r2Object = await bucket.head(object.key);
+
+        if (!r2Object) {
+          return null;
+        }
+
+        const metadata = r2Object.customMetadata || {};
+        const slug = metadata.slug || object.key.replace('pages/', '').replace('.html', '');
+
+        // Build the public URL
+        const url = new URL(context.req.url);
+        const pageUrl = `${url.protocol}//${url.host}/pages/${slug}`;
+
+        return {
+          slug,
+          url: pageUrl,
+          brainRunId: metadata.brainRunId || '',
+          persist: metadata.persist === 'true',
+          ...(metadata.ttl && { ttl: Number(metadata.ttl) }),
+          createdAt: metadata.createdAt || object.uploaded.toISOString(),
+          size: object.size,
+        };
+      })
+    );
+
+    // Filter out any null entries
+    const validPages = pages.filter((page) => page !== null);
+
+    return context.json({
+      pages: validPages,
+      count: validPages.length,
+    });
+  } catch (error) {
+    console.error('Error listing pages:', error);
+    return context.json(
+      {
+        error: `Failed to list pages: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
+  }
+});
+
+// Get page metadata (without content)
+app.get('/pages/:slug/meta', async (context: Context) => {
+  const slug = context.req.param('slug');
+  const bucket = context.env.RESOURCES_BUCKET;
+  const key = `pages/${slug}.html`;
+
+  try {
+    const r2Object = await bucket.head(key);
+
+    if (!r2Object) {
+      return context.json({ error: 'Page not found' }, 404);
+    }
+
+    const metadata = r2Object.customMetadata || {};
+
+    return context.json({
+      slug: metadata.slug || slug,
+      brainRunId: metadata.brainRunId || '',
+      persist: metadata.persist === 'true',
+      ...(metadata.ttl && { ttl: Number(metadata.ttl) }),
+      createdAt: metadata.createdAt || r2Object.uploaded.toISOString(),
+      size: r2Object.size,
+    });
+  } catch (error) {
+    console.error(`Error getting page metadata for ${slug}:`, error);
+    return context.json(
+      {
+        error: `Failed to get page metadata: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
+  }
+});
+
+// Get page HTML content
+app.get('/pages/:slug', async (context: Context) => {
+  const slug = context.req.param('slug');
+  const bucket = context.env.RESOURCES_BUCKET;
+  const key = `pages/${slug}.html`;
+
+  try {
+    const r2Object = await bucket.get(key);
+
+    if (!r2Object) {
+      return context.json({ error: 'Page not found' }, 404);
+    }
+
+    const html = await r2Object.text();
+
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+      },
+    });
+  } catch (error) {
+    console.error(`Error getting page ${slug}:`, error);
+    return context.json(
+      {
+        error: `Failed to get page: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
+  }
+});
+
+// Update page HTML content
+app.put('/pages/:slug', async (context: Context) => {
+  const slug = context.req.param('slug');
+  const bucket = context.env.RESOURCES_BUCKET;
+  const key = `pages/${slug}.html`;
+
+  try {
+    // Check if page exists and get its metadata
+    const existingObject = await bucket.head(key);
+
+    if (!existingObject) {
+      return context.json({ error: 'Page not found' }, 404);
+    }
+
+    const body = await context.req.json();
+    const { html } = body;
+
+    if (!html) {
+      return context.json({ error: 'Missing required field "html"' }, 400);
+    }
+
+    // Preserve existing metadata
+    const existingMetadata = existingObject.customMetadata || {};
+
+    // Update with new HTML, preserving metadata
+    await bucket.put(key, html, {
+      httpMetadata: {
+        contentType: 'text/html; charset=utf-8',
+      },
+      customMetadata: existingMetadata,
+    });
+
+    // Build the public URL
+    const url = new URL(context.req.url);
+    const pageUrl = `${url.protocol}//${url.host}/pages/${slug}`;
+
+    return context.json({
+      slug,
+      url: pageUrl,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error(`Error updating page ${slug}:`, error);
+    return context.json(
+      {
+        error: `Failed to update page: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
+  }
+});
+
+// Delete a page
+app.delete('/pages/:slug', async (context: Context) => {
+  const slug = context.req.param('slug');
+  const bucket = context.env.RESOURCES_BUCKET;
+  const key = `pages/${slug}.html`;
+
+  try {
+    // R2 delete is idempotent - no error if object doesn't exist
+    await bucket.delete(key);
+
+    // Also remove from MonitorDO tracking
+    const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+    const monitorStub = context.env.MONITOR_DO.get(monitorId);
+    await monitorStub.unregisterPage(slug);
+
+    return new Response(null, { status: 204 });
+  } catch (error) {
+    console.error(`Error deleting page ${slug}:`, error);
+    return context.json(
+      {
+        error: `Failed to delete page: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      },
+      500
+    );
+  }
+});
 
 export default app;
