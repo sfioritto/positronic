@@ -193,6 +193,33 @@ const persistentPageBrain = brain({ title: 'persistent-page-brain', description:
     };
   });
 
+// Brain that creates a page without providing a slug (auto-generated)
+const autoSlugBrain = brain({ title: 'auto-slug-brain', description: 'A brain that creates pages without explicit slugs' })
+  .step('Create page without slug', async ({ state, pages }) => {
+    // No slug provided - should auto-generate a unique one
+    const page = await pages!.create('<html><body>Auto-generated slug page</body></html>');
+    return {
+      ...state,
+      pageSlug: page.slug,
+      pageUrl: page.url,
+    };
+  });
+
+// Brain that creates a page with a fixed slug (reuses same page across runs)
+let fixedSlugRunCount = 0;
+const fixedSlugBrain = brain({ title: 'fixed-slug-brain', description: 'A brain that creates pages with explicit slugs' })
+  .step('Create page with fixed slug', async ({ state, pages }) => {
+    fixedSlugRunCount++;
+    // Explicit slug provided - will overwrite if exists
+    const page = await pages!.create('fixed-slug-page', `<html><body>Run ${fixedSlugRunCount}</body></html>`);
+    return {
+      ...state,
+      pageSlug: page.slug,
+      pageUrl: page.url,
+      runNumber: fixedSlugRunCount,
+    };
+  });
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -233,6 +260,16 @@ const brainManifest = {
     filename: 'persistent-page-brain',
     path: 'brains/persistent-page-brain.ts',
     brain: persistentPageBrain,
+  },
+  'auto-slug-brain': {
+    filename: 'auto-slug-brain',
+    path: 'brains/auto-slug-brain.ts',
+    brain: autoSlugBrain,
+  },
+  'fixed-slug-brain': {
+    filename: 'fixed-slug-brain',
+    path: 'brains/fixed-slug-brain.ts',
+    brain: fixedSlugBrain,
   },
 };
 

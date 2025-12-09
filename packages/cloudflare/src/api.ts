@@ -824,15 +824,22 @@ type PageMetadata = {
   createdAt: string;
 };
 
+/**
+ * Generates a unique slug for pages that don't provide one.
+ * Uses brainRunId prefix + random suffix for uniqueness.
+ */
+function generateUniqueSlug(brainRunId: string): string {
+  const shortId = brainRunId.slice(0, 8);
+  const random = Math.random().toString(36).substring(2, 10);
+  return `page-${shortId}-${random}`;
+}
+
 // Create a new page
 app.post('/pages', async (context: Context) => {
   try {
     const body = await context.req.json();
-    const { slug, html, brainRunId, persist = false, ttl } = body;
+    let { slug, html, brainRunId, persist = false, ttl } = body;
 
-    if (!slug) {
-      return context.json({ error: 'Missing required field "slug"' }, 400);
-    }
     if (!html) {
       return context.json({ error: 'Missing required field "html"' }, 400);
     }
@@ -840,12 +847,17 @@ app.post('/pages', async (context: Context) => {
       return context.json({ error: 'Missing required field "brainRunId"' }, 400);
     }
 
-    // Validate slug format (alphanumeric, hyphens, underscores only)
-    if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
-      return context.json(
-        { error: 'Slug must contain only alphanumeric characters, hyphens, and underscores' },
-        400
-      );
+    // Generate slug if not provided
+    if (!slug) {
+      slug = generateUniqueSlug(brainRunId);
+    } else {
+      // Validate slug format (alphanumeric, hyphens, underscores only)
+      if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
+        return context.json(
+          { error: 'Slug must contain only alphanumeric characters, hyphens, and underscores' },
+          400
+        );
+      }
     }
 
     const bucket = context.env.RESOURCES_BUCKET;

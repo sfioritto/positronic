@@ -31,7 +31,19 @@ export interface PageCreateOptions {
  */
 export interface PagesService {
   /**
-   * Create or update a page with the given HTML content.
+   * Create a page with auto-generated unique slug.
+   * Use this when each brain run should have its own page.
+   *
+   * @param html - The HTML content to store
+   * @param options - Optional settings (persist, ttl)
+   * @returns Page metadata including the public URL
+   */
+  create(html: string, options?: PageCreateOptions): Promise<Page>;
+
+  /**
+   * Create or update a page with an explicit slug.
+   * Use this when you want to reuse the same page across brain runs.
+   * If a page with this slug exists, it will be overwritten.
    *
    * @param slug - User-provided identifier for the page (used in URL)
    * @param html - The HTML content to store

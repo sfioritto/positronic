@@ -3,6 +3,16 @@ import type { R2Bucket } from '@cloudflare/workers-types';
 import type { MonitorDO } from './monitor-do.js';
 
 /**
+ * Generates a unique slug for pages that don't provide one.
+ * Uses brainRunId prefix + random suffix for uniqueness.
+ */
+function generateUniqueSlug(brainRunId: string): string {
+  const shortId = brainRunId.slice(0, 8);
+  const random = Math.random().toString(36).substring(2, 10);
+  return `page-${shortId}-${random}`;
+}
+
+/**
  * Creates a PagesService implementation that works directly with R2 and MonitorDO.
  *
  * @param brainRunId - The current brain run ID (used for page registration/cleanup)
@@ -16,44 +26,66 @@ export function createPagesService(
   monitorStub: DurableObjectStub<MonitorDO>,
   baseUrl: string
 ): PagesService {
-  return {
-    async create(
-      slug: string,
-      html: string,
-      options?: PageCreateOptions
-    ): Promise<Page> {
-      const key = `pages/${slug}.html`;
-      const createdAt = new Date().toISOString();
-      const persist = options?.persist ?? false;
+  // Implementation function that handles both overloads
+  async function createPage(
+    slugOrHtml: string,
+    htmlOrOptions?: string | PageCreateOptions,
+    maybeOptions?: PageCreateOptions
+  ): Promise<Page> {
+    let slug: string;
+    let html: string;
+    let options: PageCreateOptions | undefined;
 
-      // Store HTML with metadata in R2
-      await bucket.put(key, html, {
-        httpMetadata: {
-          contentType: 'text/html; charset=utf-8',
-        },
-        customMetadata: {
-          slug,
-          brainRunId,
-          persist: persist ? 'true' : 'false',
-          createdAt,
-          ...(options?.ttl !== undefined && { ttl: String(options.ttl) }),
-        },
-      });
+    // Detect which overload was used:
+    // - create(html, options?) - htmlOrOptions is undefined or PageCreateOptions
+    // - create(slug, html, options?) - htmlOrOptions is string (the html)
+    if (typeof htmlOrOptions === 'string') {
+      // Called as create(slug, html, options?)
+      slug = slugOrHtml;
+      html = htmlOrOptions;
+      options = maybeOptions;
+    } else {
+      // Called as create(html, options?)
+      slug = generateUniqueSlug(brainRunId);
+      html = slugOrHtml;
+      options = htmlOrOptions;
+    }
 
-      // Register the page with MonitorDO for cleanup tracking
-      await monitorStub.registerPage(slug, brainRunId, persist);
+    const key = `pages/${slug}.html`;
+    const createdAt = new Date().toISOString();
+    const persist = options?.persist ?? false;
 
-      const url = `${baseUrl}/pages/${slug}`;
-
-      return {
+    // Store HTML with metadata in R2
+    await bucket.put(key, html, {
+      httpMetadata: {
+        contentType: 'text/html; charset=utf-8',
+      },
+      customMetadata: {
         slug,
-        url,
         brainRunId,
-        persist,
-        ...(options?.ttl !== undefined && { ttl: options.ttl }),
+        persist: persist ? 'true' : 'false',
         createdAt,
-      };
-    },
+        ...(options?.ttl !== undefined && { ttl: String(options.ttl) }),
+      },
+    });
+
+    // Register the page with MonitorDO for cleanup tracking
+    await monitorStub.registerPage(slug, brainRunId, persist);
+
+    const url = `${baseUrl}/pages/${slug}`;
+
+    return {
+      slug,
+      url,
+      brainRunId,
+      persist,
+      ...(options?.ttl !== undefined && { ttl: options.ttl }),
+      createdAt,
+    };
+  }
+
+  return {
+    create: createPage as PagesService['create'],
 
     async get(slug: string): Promise<string | null> {
       const key = `pages/${slug}.html`;
