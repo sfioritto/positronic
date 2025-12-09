@@ -4,6 +4,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Adapter, BrainEvent } from '@positronic/core';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import { WebhookAdapter } from './webhook-adapter.js';
+import { PageAdapter } from './page-adapter.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
 import { PositronicManifest } from './manifest.js';
@@ -235,6 +236,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
     );
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
+    const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
@@ -264,6 +266,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         monitorAdapter,
         scheduleAdapter,
         webhookAdapter,
+        pageAdapter,
       ])
       .run(brainToRun, {
         initialState,
@@ -362,6 +365,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
     );
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
+    const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
@@ -385,6 +389,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         monitorAdapter,
         scheduleAdapter,
         webhookAdapter,
+        pageAdapter,
       ])
       .run(brainToRun, {
         initialState,

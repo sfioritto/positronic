@@ -138,6 +138,16 @@ interface MockSecret {
   updatedAt: string;
 }
 
+interface MockPage {
+  slug: string;
+  url: string;
+  brainRunId: string;
+  persist: boolean;
+  ttl?: number;
+  createdAt: string;
+  size: number;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
@@ -145,6 +155,7 @@ export class TestDevServer implements PositronicDevServer {
   private brains: Map<string, MockBrain> = new Map();
   private brainRuns: MockBrainRun[] = [];
   private secrets: Map<string, MockSecret> = new Map();
+  private pages: Map<string, MockPage> = new Map();
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
@@ -836,6 +847,35 @@ export class TestDevServer implements PositronicDevServer {
       return { created, updated };
     });
 
+    // Pages Management Endpoints
+
+    // GET /pages
+    nockInstance.get('/pages').reply(200, () => {
+      this.logCall('getPages', []);
+      const pages = Array.from(this.pages.values());
+      return {
+        pages,
+        count: pages.length,
+      };
+    });
+
+    // DELETE /pages/:slug
+    nockInstance.delete(/^\/pages\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/pages\/(.+)$/);
+      if (match) {
+        const slug = decodeURIComponent(match[1]);
+
+        if (this.pages.has(slug)) {
+          this.pages.delete(slug);
+          this.logCall('deletePage', [slug]);
+          return [204, ''];
+        } else {
+          return [404, { error: `Page "${slug}" not found` }];
+        }
+      }
+      return [404, 'Not Found'];
+    });
+
     this.nockScope = nockInstance;
 
     // Simulate some initial log output after server starts
@@ -920,6 +960,23 @@ export class TestDevServer implements PositronicDevServer {
 
   getSecret(name: string): MockSecret | undefined {
     return this.secrets.get(name);
+  }
+
+  // Page helper methods
+  addPage(page: MockPage) {
+    this.pages.set(page.slug, page);
+  }
+
+  clearPages() {
+    this.pages.clear();
+  }
+
+  getPages(): MockPage[] {
+    return Array.from(this.pages.values());
+  }
+
+  getPage(slug: string): MockPage | undefined {
+    return this.pages.get(slug);
   }
 
   setKillBrainRunError(runId: string, statusCode: number) {
