@@ -5,6 +5,7 @@ import type { Adapter, BrainEvent } from '@positronic/core';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import { WebhookAdapter } from './webhook-adapter.js';
 import { PageAdapter } from './page-adapter.js';
+import { createPagesService } from './pages-service.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
 import { PositronicManifest } from './manifest.js';
@@ -40,6 +41,7 @@ export interface Env {
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   RESOURCES_BUCKET: R2Bucket;
+  WORKER_URL?: string; // Base URL for the worker (e.g., "https://myapp.workers.dev")
 }
 
 class EventStreamAdapter implements Adapter {
@@ -238,6 +240,15 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
     const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
+    // Create pages service for brain to use
+    const baseUrl = this.env.WORKER_URL || 'http://localhost:3000';
+    const pagesService = createPagesService(
+      brainRunId,
+      this.env.RESOURCES_BUCKET,
+      monitorDOStub,
+      baseUrl
+    );
+
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
     }
@@ -251,6 +262,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     if (r2Resources) {
       runnerWithResources = brainRunner.withResources(r2Resources);
     }
+
+    // Add pages service
+    runnerWithResources = runnerWithResources.withPages(pagesService);
 
     // Extract options from initialData if present
     const options = initialData?.options;
@@ -367,6 +381,15 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
     const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
+    // Create pages service for brain to use
+    const baseUrl = this.env.WORKER_URL || 'http://localhost:3000';
+    const pagesService = createPagesService(
+      brainRunId,
+      this.env.RESOURCES_BUCKET,
+      monitorDOStub,
+      baseUrl
+    );
+
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
     }
@@ -378,6 +401,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     if (r2Resources) {
       runnerWithResources = brainRunner.withResources(r2Resources);
     }
+
+    // Add pages service
+    runnerWithResources = runnerWithResources.withPages(pagesService);
 
     // Create abort controller for this run
     this.abortController = new AbortController();

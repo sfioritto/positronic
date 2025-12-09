@@ -147,6 +147,52 @@ const webhookBrain = brain({ title: 'webhook-brain', description: 'A brain that 
     receivedUserId: response.userId,
   }));
 
+// Brain that uses the pages service
+const pagesBrain = brain({ title: 'pages-brain', description: 'A brain that creates and manages pages' })
+  .step('Create page', async ({ state, pages }) => {
+    const page = await pages!.create('test-page', '<html><body><h1>Hello World</h1></body></html>');
+    return {
+      ...state,
+      pageSlug: page.slug,
+      pageUrl: page.url,
+      pageCreated: true,
+    };
+  })
+  .step('Check page exists', async ({ state, pages }) => {
+    const exists = await pages!.exists(state.pageSlug);
+    return {
+      ...state,
+      pageExists: exists !== null,
+    };
+  })
+  .step('Get page content', async ({ state, pages }) => {
+    const html = await pages!.get(state.pageSlug);
+    return {
+      ...state,
+      pageContent: html,
+    };
+  })
+  .step('Update page', async ({ state, pages }) => {
+    const updated = await pages!.update(state.pageSlug, '<html><body><h1>Updated!</h1></body></html>');
+    return {
+      ...state,
+      pageUpdated: true,
+      updatedAt: updated.createdAt,
+    };
+  });
+
+// Brain that creates a persistent page
+const persistentPageBrain = brain({ title: 'persistent-page-brain', description: 'A brain that creates a persistent page' })
+  .step('Create persistent page', async ({ state, pages }) => {
+    const page = await pages!.create('persistent-test', '<html><body>Persistent</body></html>', { persist: true });
+    return {
+      ...state,
+      pageSlug: page.slug,
+      pageUrl: page.url,
+      persist: page.persist,
+    };
+  });
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -177,6 +223,16 @@ const brainManifest = {
     filename: 'webhook-brain',
     path: 'brains/webhook-brain.ts',
     brain: webhookBrain,
+  },
+  'pages-brain': {
+    filename: 'pages-brain',
+    path: 'brains/pages-brain.ts',
+    brain: pagesBrain,
+  },
+  'persistent-page-brain': {
+    filename: 'persistent-page-brain',
+    path: 'brains/persistent-page-brain.ts',
+    brain: persistentPageBrain,
   },
 };
 
