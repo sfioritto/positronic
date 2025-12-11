@@ -806,6 +806,15 @@ describe('error handling', () => {
         type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
+      // Inner brain step retries once before failing
+      expect.objectContaining({
+        type: BRAIN_EVENTS.STEP_RETRY,
+        stepTitle: 'Throw error',
+        attempt: 1,
+        error: expect.objectContaining({
+          message: 'Inner brain error',
+        }),
+      }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
         brainTitle: 'Failing Inner Brain',
@@ -1371,6 +1380,15 @@ describe('nested brains', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
+      }),
+      // Inner brain step retries once before failing
+      expect.objectContaining({
+        type: BRAIN_EVENTS.STEP_RETRY,
+        stepTitle: 'Throw error',
+        attempt: 1,
+        error: expect.objectContaining({
+          message: 'Inner brain error',
+        }),
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
@@ -2066,6 +2084,210 @@ describe('brain structure', () => {
       title: 'No Description Brain',
       description: undefined,
       steps: [{ type: 'step', title: 'Only step' }],
+    });
+  });
+
+  describe('step retry behavior', () => {
+    it('should retry a step that fails once then succeeds', async () => {
+      let callCount = 0;
+      const testBrain = brain('Retry Brain').step('Flaky step', () => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error('First attempt failed');
+        }
+        return { success: true };
+      });
+
+      const events: BrainEvent<any>[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify step was called twice
+      expect(callCount).toBe(2);
+
+      // Verify STEP_RETRY event was emitted
+      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
+      expect(retryEvent).toBeDefined();
+      expect(retryEvent).toEqual(
+        expect.objectContaining({
+          type: BRAIN_EVENTS.STEP_RETRY,
+          stepTitle: 'Flaky step',
+          stepId: expect.any(String),
+          error: expect.objectContaining({
+            name: 'Error',
+            message: 'First attempt failed',
+          }),
+          attempt: 1,
+        })
+      );
+
+      // Verify brain completed successfully
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+    });
+
+    it('should emit ERROR event when step fails twice', async () => {
+      let callCount = 0;
+      const testBrain = brain('Always Fail Brain').step(
+        'Always fails',
+        () => {
+          callCount++;
+          throw new Error('This step always fails');
+        }
+      );
+
+      const events: BrainEvent<any>[] = [];
+      let error: Error | undefined;
+
+      try {
+        for await (const event of testBrain.run({ client: mockClient })) {
+          events.push(event);
+        }
+      } catch (e) {
+        error = e as Error;
+      }
+
+      // Verify step was called twice (initial + 1 retry)
+      expect(callCount).toBe(2);
+
+      // Verify error was thrown
+      expect(error?.message).toBe('This step always fails');
+
+      // Verify STEP_RETRY event was emitted for the first failure
+      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
+      expect(retryEvent).toBeDefined();
+      expect(retryEvent).toEqual(
+        expect.objectContaining({
+          type: BRAIN_EVENTS.STEP_RETRY,
+          stepTitle: 'Always fails',
+          attempt: 1,
+        })
+      );
+
+      // Verify ERROR event was emitted for the final failure
+      const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
+      expect(errorEvent).toBeDefined();
+      expect(errorEvent).toEqual(
+        expect.objectContaining({
+          type: BRAIN_EVENTS.ERROR,
+          status: STATUS.ERROR,
+          error: expect.objectContaining({
+            message: 'This step always fails',
+          }),
+        })
+      );
+    });
+
+    it('should not emit STEP_RETRY when step succeeds on first attempt', async () => {
+      const testBrain = brain('Success Brain').step(
+        'Successful step',
+        () => ({ result: 'success' })
+      );
+
+      const events: BrainEvent<any>[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify no STEP_RETRY event was emitted
+      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
+      expect(retryEvent).toBeUndefined();
+
+      // Verify brain completed successfully
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+    });
+
+    it('should not retry nested brain errors at outer level', async () => {
+      let innerCallCount = 0;
+
+      // Inner brain that always fails
+      const innerBrain = brain<{}, { value: number }>('Failing Inner').step(
+        'Inner fail',
+        () => {
+          innerCallCount++;
+          throw new Error('Inner brain error');
+        }
+      );
+
+      // Outer brain wrapping the failing inner brain
+      const outerBrain = brain('Outer Brain')
+        .step('Before inner', () => ({ step: 'first' }))
+        .brain(
+          'Run inner',
+          innerBrain,
+          ({ state, brainState }) => ({
+            ...state,
+            innerResult: brainState.value,
+          }),
+          () => ({})
+        );
+
+      const events: BrainEvent<any>[] = [];
+      let error: Error | undefined;
+
+      try {
+        for await (const event of outerBrain.run({ client: mockClient })) {
+          events.push(event);
+        }
+      } catch (e) {
+        error = e as Error;
+      }
+
+      // Verify inner brain was only called twice (its own retry, not outer retry)
+      expect(innerCallCount).toBe(2);
+
+      // Verify error propagated
+      expect(error?.message).toBe('Inner brain error');
+
+      // Verify there's a STEP_RETRY event from inner brain
+      const retryEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.STEP_RETRY
+      );
+      expect(retryEvents.length).toBe(1);
+      expect(retryEvents[0]).toEqual(
+        expect.objectContaining({
+          stepTitle: 'Inner fail',
+        })
+      );
+    });
+
+    it('should retry async steps correctly', async () => {
+      let callCount = 0;
+      const testBrain = brain('Async Retry Brain').step(
+        'Async flaky step',
+        async () => {
+          callCount++;
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          if (callCount === 1) {
+            throw new Error('Async first attempt failed');
+          }
+          return { asyncSuccess: true };
+        }
+      );
+
+      const events: BrainEvent<any>[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify step was called twice
+      expect(callCount).toBe(2);
+
+      // Verify STEP_RETRY event was emitted
+      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
+      expect(retryEvent).toBeDefined();
+
+      // Verify brain completed successfully
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
     });
   });
 });

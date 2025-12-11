@@ -103,6 +103,15 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
   patch: JsonPatch;
 }
 
+export interface StepRetryEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.STEP_RETRY;
+  stepTitle: string;
+  stepId: string;
+  error: SerializedError;
+  attempt: number;
+}
+
 // 4. Webhook Event
 export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
@@ -120,6 +129,7 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>
+  | StepRetryEvent<TOptions>
   | WebhookEvent<TOptions>;
 
 export interface SerializedStep {
@@ -519,6 +529,8 @@ export class Brain<
 
 }
 
+const MAX_RETRIES = 1;
+
 class Step {
   public id: string;
   private patch?: JsonPatch;
@@ -802,17 +814,46 @@ class BrainEventStream<
     } else {
       // Get previous state before action
       const prevState = this.currentState;
+      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
 
-      // Execute regular step
-      const result = await block.action({
-        state: this.currentState,
-        options: this.options ?? ({} as TOptions),
-        client: this.client,
-        resources: this.resources,
-        response: this.currentResponse,
-        pages: this.pages,
-        ...this.services,
-      });
+      // Execute step with automatic retry on failure
+      let retries = 0;
+      let result;
+
+      while (true) {
+        try {
+          result = await stepBlock.action({
+            state: this.currentState,
+            options: this.options ?? ({} as TOptions),
+            client: this.client,
+            resources: this.resources,
+            response: this.currentResponse,
+            pages: this.pages,
+            ...this.services,
+          });
+          break; // Success
+        } catch (error) {
+          if (retries < MAX_RETRIES) {
+            retries++;
+            yield {
+              type: BRAIN_EVENTS.STEP_RETRY,
+              stepTitle: step.block.title,
+              stepId: step.id,
+              error: {
+                name: (error as Error).name,
+                message: (error as Error).message,
+                stack: (error as Error).stack,
+              },
+              attempt: retries,
+              options: this.options ?? ({} as TOptions),
+              brainRunId: this.brainRunId,
+            };
+            // Loop continues to retry
+          } else {
+            throw error;
+          }
+        }
+      }
 
       this.currentState = result && typeof result === 'object' && 'waitFor' in result ? result.state : result;
       yield* this.completeStep(step, prevState);
