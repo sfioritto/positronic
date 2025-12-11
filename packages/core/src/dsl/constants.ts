@@ -3,6 +3,7 @@ export const BRAIN_EVENTS = {
   RESTART: 'brain:restart',
   STEP_START: 'step:start',
   STEP_COMPLETE: 'step:complete',
+  STEP_RETRY: 'step:retry',
   STEP_STATUS: 'step:status',
   ERROR: 'brain:error',
   COMPLETE: 'brain:complete',

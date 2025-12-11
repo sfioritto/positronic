@@ -13,6 +13,7 @@ export type {
   StepStatusEvent,
   StepStartedEvent,
   StepCompletedEvent,
+  StepRetryEvent,
   BrainStructure,
   BrainFactory,
 } from './dsl/brain.js';
