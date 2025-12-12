@@ -389,6 +389,7 @@ describe('BrainRunner', () => {
       'test-webhook',
       z.object({ response: z.string() }),
       async (request: Request) => ({
+        type: 'webhook' as const,
         identifier: 'test-id',
         response: { response: 'test' }
       })
@@ -460,6 +461,7 @@ describe('BrainRunner', () => {
       'user-input-webhook',
       z.object({ userInput: z.string() }),
       async (request: Request) => ({
+        type: 'webhook' as const,
         identifier: 'user-id',
         response: { userInput: 'test input' }
       })

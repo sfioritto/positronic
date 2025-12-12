@@ -241,6 +241,7 @@ describe('brain creation', () => {
       'test-webhook',
       z.object({ userResponse: z.string() }),
       async (request: Request) => ({
+        type: 'webhook' as const,
         identifier: 'test-id',
         response: { userResponse: 'test' }
       })
@@ -2223,7 +2224,7 @@ describe('brain structure', () => {
           innerBrain,
           ({ state, brainState }) => ({
             ...state,
-            innerResult: brainState.value,
+            innerResult: (brainState as { value: number }).value,
           }),
           () => ({})
         );
