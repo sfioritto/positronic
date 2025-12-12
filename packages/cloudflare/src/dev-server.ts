@@ -540,6 +540,83 @@ export class CloudflareDevServer implements PositronicDevServer {
     await regenerateManifestFile(projectRoot, srcDir);
   }
 
+  private async ensureR2BucketExists(bucketName: string): Promise<void> {
+    const serverDir = path.join(this.projectRootDir, '.positronic');
+
+    // Check if bucket exists using wrangler r2 bucket list
+    const existingBuckets = await new Promise<string[]>((resolve) => {
+      exec(
+        'npx wrangler r2 bucket list --json',
+        {
+          cwd: serverDir,
+          env: {
+            ...process.env,
+            CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+            CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+          },
+        },
+        (error, stdout) => {
+          if (error) {
+            // If listing fails, we'll try to create anyway
+            console.warn('Could not list R2 buckets, will attempt to create');
+            resolve([]);
+            return;
+          }
+          try {
+            const buckets = JSON.parse(stdout);
+            resolve(buckets.map((b: { name: string }) => b.name));
+          } catch {
+            resolve([]);
+          }
+        }
+      );
+    });
+
+    if (existingBuckets.includes(bucketName)) {
+      console.log(`📦 R2 bucket '${bucketName}' already exists`);
+      return;
+    }
+
+    // Create the bucket
+    console.log(`📦 Creating R2 bucket '${bucketName}'...`);
+    await new Promise<void>((resolve, reject) => {
+      const createProcess = spawn(
+        'npx',
+        ['wrangler', 'r2', 'bucket', 'create', bucketName],
+        {
+          cwd: serverDir,
+          stdio: ['inherit', 'pipe', 'pipe'],
+          env: {
+            ...process.env,
+            CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+            CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+          },
+        }
+      );
+
+      createProcess.stdout?.on('data', (data) => {
+        process.stdout.write(data);
+      });
+
+      createProcess.stderr?.on('data', (data) => {
+        process.stderr.write(data);
+      });
+
+      createProcess.on('error', (err) => {
+        reject(new Error(`Failed to create R2 bucket: ${err.message}`));
+      });
+
+      createProcess.on('exit', (code) => {
+        if (code === 0) {
+          console.log(`✅ R2 bucket '${bucketName}' created successfully`);
+          resolve();
+        } else {
+          reject(new Error(`Failed to create R2 bucket (exit code ${code})`));
+        }
+      });
+    });
+  }
+
   async deploy(): Promise<void> {
     const projectRoot = this.projectRootDir;
     const serverDir = path.join(projectRoot, '.positronic');
@@ -560,6 +637,19 @@ export class CloudflareDevServer implements PositronicDevServer {
           '  export CLOUDFLARE_ACCOUNT_ID=your-account-id'
       );
     }
+
+    // Get project name from config (used as R2 bucket name)
+    const configPath = path.join(projectRoot, 'positronic.config.json');
+    const configContent = await fsPromises.readFile(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+    const bucketName = config.projectName;
+
+    if (!bucketName) {
+      throw new Error('Project name not found in positronic.config.json');
+    }
+
+    // Ensure R2 bucket exists before deploying
+    await this.ensureR2BucketExists(bucketName);
 
     console.log('🚀 Deploying to Cloudflare Workers (production)...');
 
