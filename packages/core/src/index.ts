@@ -1,4 +1,4 @@
-export { Brain, brain } from './dsl/brain.js';
+export { Brain, brain, StepTimeoutError } from './dsl/brain.js';
 export { BrainRunner } from './dsl/brain-runner.js';
 export { STATUS, BRAIN_EVENTS } from './dsl/constants.js';
 export type { Adapter } from './adapters/types.js';
