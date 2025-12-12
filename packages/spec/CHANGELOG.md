@@ -1,5 +1,14 @@
 # @positronic/spec
 
+## 0.0.26
+
+### Patch Changes
+
+- - Add automatic retry support for brain steps (1 retry on failure with STEP_RETRY event)
+  - Support brain definitions in subdirectories (brain-name/index.ts) in addition to flat files (brain-name.ts)
+  - Remove unnecessary console warnings when loading non-resource objects from R2 bucket
+  - Fix TypeScript errors in cloudflare test-project
+
 ## 0.0.25
 
 ### Patch Changes
