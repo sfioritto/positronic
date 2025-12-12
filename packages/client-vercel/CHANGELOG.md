@@ -1,5 +1,15 @@
 # @positronic/client-vercel
 
+## 0.0.27
+
+### Patch Changes
+
+- - Fix: Resources and pages are now properly separated in R2 storage - the resources API no longer throws errors when encountering page data or other non-resource objects without type metadata
+  - Feature: Deploy command now automatically creates R2 bucket if it doesn't exist, eliminating the need for manual bucket setup before first deployment
+  - Refactor: Simplified resource listing logic to use for-of loop instead of Promise.all with map
+- Updated dependencies
+  - @positronic/core@0.0.27
+
 ## 0.0.26
 
 ### Patch Changes
