@@ -5,7 +5,7 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import worker from '../src/index';
-import { testStatus, resources, brains, schedules, webhooks } from '@positronic/spec';
+import { testStatus, resources, brains, schedules, webhooks, pages } from '@positronic/spec';
 
 describe('Positronic Spec', () => {
   // Helper function to create fetch wrapper for Cloudflare workers
@@ -48,6 +48,11 @@ describe('Positronic Spec', () => {
 
     it('passes POST /resources/presigned-link test', async () => {
       const result = await resources.generatePresignedLink(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes DELETE /resources preserves pages test', async () => {
+      const result = await resources.deleteAllPreservesPages(createFetch());
       expect(result).toBe(true);
     });
   });
@@ -160,6 +165,13 @@ describe('Positronic Spec', () => {
 
     it('passes POST /webhooks/:slug with non-existent webhook test (404)', async () => {
       const result = await webhooks.notFound(createFetch(), 'non-existent-webhook');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('Pages', () => {
+    it('passes DELETE /pages preserves resources test', async () => {
+      const result = await pages.deletePreservesResources(createFetch());
       expect(result).toBe(true);
     });
   });

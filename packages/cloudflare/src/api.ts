@@ -461,35 +461,28 @@ app.get('/resources', async (context: Context) => {
     // R2 returns up to 1000 objects by default
     const listed = await bucket.list();
 
-    const resources = await Promise.all(
-      listed.objects.map(async (object: R2Object) => {
-        // Get the object to access its custom metadata
-        const r2Object = await bucket.head(object.key);
+    const resources: R2Resource[] = [];
 
-        if (!r2Object) {
-          throw new Error(`Resource "${object.key}" not found`);
-        }
+    for (const object of listed.objects) {
+      // Get the object to access its custom metadata
+      const r2Object = await bucket.head(object.key);
 
-        if (!r2Object.customMetadata?.type) {
-          throw new Error(
-            `Resource "${object.key}" is missing required metadata field "type"`
-          );
-        }
+      // Skip objects without type metadata (e.g., pages or other non-resource data)
+      if (!r2Object || !r2Object.customMetadata?.type) {
+        continue;
+      }
 
-        const resource: R2Resource = {
-          type: r2Object.customMetadata.type as (typeof RESOURCE_TYPES)[number],
-          ...(r2Object.customMetadata.path && {
-            path: r2Object.customMetadata.path,
-          }),
-          key: object.key,
-          size: object.size,
-          lastModified: object.uploaded.toISOString(),
-          local: r2Object.customMetadata.local === 'true', // R2 metadata is always strings
-        };
-
-        return resource;
-      })
-    );
+      resources.push({
+        type: r2Object.customMetadata.type as (typeof RESOURCE_TYPES)[number],
+        ...(r2Object.customMetadata.path && {
+          path: r2Object.customMetadata.path,
+        }),
+        key: object.key,
+        size: object.size,
+        lastModified: object.uploaded.toISOString(),
+        local: r2Object.customMetadata.local === 'true', // R2 metadata is always strings
+      });
+    }
 
     return context.json({
       resources,
@@ -615,10 +608,13 @@ app.delete('/resources', async (context: Context) => {
   const listed = await bucket.list();
   let deletedCount = 0;
 
-  // Delete each object
+  // Delete only resources (objects with type metadata), not pages or other data
   for (const object of listed.objects) {
-    await bucket.delete(object.key);
-    deletedCount++;
+    const r2Object = await bucket.head(object.key);
+    if (r2Object?.customMetadata?.type) {
+      await bucket.delete(object.key);
+      deletedCount++;
+    }
   }
 
   // Handle pagination if there are more than 1000 objects
@@ -626,8 +622,11 @@ app.delete('/resources', async (context: Context) => {
   while (listed.truncated && cursor) {
     const nextBatch = await bucket.list({ cursor });
     for (const object of nextBatch.objects) {
-      await bucket.delete(object.key);
-      deletedCount++;
+      const r2Object = await bucket.head(object.key);
+      if (r2Object?.customMetadata?.type) {
+        await bucket.delete(object.key);
+        deletedCount++;
+      }
     }
     cursor = nextBatch.cursor;
   }
