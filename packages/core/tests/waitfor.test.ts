@@ -12,6 +12,7 @@ describe('webhook type inference', () => {
         field2: z.number(),
       }),
       async (request) => ({
+        type: 'webhook' as const,
         identifier: 'test',
         response: { field1: 'hello', field2: 42 },
       })
@@ -24,6 +25,7 @@ describe('webhook type inference', () => {
         field4: z.array(z.string()),
       }),
       async (request) => ({
+        type: 'webhook' as const,
         identifier: 'test',
         response: { field3: true, field4: ['a', 'b'] },
       })

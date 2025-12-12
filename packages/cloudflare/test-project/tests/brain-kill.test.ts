@@ -40,7 +40,7 @@ describe('Brain Kill API', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
     
     // Test via spec
-    const result = await brains.kill((req) => worker.fetch(req, testEnv, ctx), brainRunId);
+    const result = await brains.kill(async (req) => worker.fetch(req, testEnv, ctx), brainRunId);
     expect(result).toBe(true);
   });
 

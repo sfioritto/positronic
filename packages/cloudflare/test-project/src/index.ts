@@ -91,23 +91,31 @@ const testWebhook = createWebhook(
     userId: z.string(),
   }),
   async (request: Request) => {
-    const body = await request.json();
+    const body = (await request.json()) as {
+      type?: string;
+      challenge?: string;
+      threadId?: string;
+      userId?: string;
+      text?: string;
+      message?: string;
+      user?: string;
+    };
 
     // Handle verification challenge (for testing verification flow)
     if (body.type === 'url_verification') {
       return {
         type: 'verification' as const,
-        challenge: body.challenge,
+        challenge: body.challenge!,
       };
     }
 
     // Normal webhook handling
     return {
       type: 'webhook' as const,
-      identifier: body.threadId || body.userId,
+      identifier: body.threadId || body.userId || '',
       response: {
-        message: body.text || body.message,
-        userId: body.user || body.userId,
+        message: body.text || body.message || '',
+        userId: body.user || body.userId || '',
       },
     };
   }
@@ -121,7 +129,11 @@ const notificationWebhook = createWebhook(
     timestamp: z.number(),
   }),
   async (request: Request) => {
-    const body = await request.json();
+    const body = (await request.json()) as {
+      notificationId: string;
+      type: string;
+      data: string;
+    };
     return {
       type: 'webhook' as const,
       identifier: body.notificationId,
