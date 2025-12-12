@@ -22,11 +22,41 @@ export type ProgressCallback = (progress: ProgressInfo) => void;
 // Type for the API client
 export type ApiClient = typeof apiClient;
 
+// API client configuration
+let apiBaseUrl: string | null = null;
+let isLocalDevMode: boolean = true;
+
+/**
+ * Configure the API client with a base URL.
+ * Call this at startup to set where API requests should go.
+ * @param baseUrl - The base URL for API requests (e.g., "http://localhost:8787" or "https://api.project.positronic.sh")
+ * @param localDevMode - Whether we're in local development mode (affects error messages)
+ */
+export function configureApiClient(baseUrl: string, localDevMode: boolean = true): void {
+  apiBaseUrl = baseUrl;
+  isLocalDevMode = localDevMode;
+}
+
+/**
+ * Get whether the API client is in local dev mode (for error message context)
+ */
+export function isApiLocalDevMode(): boolean {
+  return isLocalDevMode;
+}
+
 // Singleton API client instance
 export const apiClient = {
   fetch: async (apiPath: string, options?: RequestInit): Promise<Response> => {
-    const port = process.env.POSITRONIC_PORT || '8787';
-    const baseUrl = `http://localhost:${port}`;
+    let baseUrl: string;
+
+    if (apiBaseUrl) {
+      baseUrl = apiBaseUrl;
+    } else {
+      // Fallback to localhost (for backwards compatibility and testing)
+      const port = process.env.POSITRONIC_PORT || '8787';
+      baseUrl = `http://localhost:${port}`;
+    }
+
     const fullUrl = `${baseUrl}${
       apiPath.startsWith('/') ? apiPath : '/' + apiPath
     }`;
