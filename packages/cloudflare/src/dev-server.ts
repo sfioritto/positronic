@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fsPromises from 'fs/promises';
 import * as fs from 'fs';
+import type { Dirent } from 'fs';
 import * as os from 'os';
 import { spawn, exec, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
@@ -155,6 +156,29 @@ async function generateProject(
   }
 }
 
+export async function discoverBrains(
+  brainsDir: string
+): Promise<{ name: string; relativePath: string }[]> {
+  const entries = await fsPromises
+    .readdir(brainsDir, { withFileTypes: true })
+    .catch(() => [] as Dirent[]);
+
+  const brains = await Promise.all(
+    entries
+      .filter((e) => !e.name.startsWith('_'))
+      .map(async (entry) => {
+        if (entry.isFile() && entry.name.endsWith('.ts')) {
+          return { name: entry.name.replace(/\.ts$/, ''), relativePath: entry.name };
+        }
+        const indexPath = path.join(brainsDir, entry.name, 'index.ts');
+        const hasIndex = await fsPromises.access(indexPath).then(() => true, () => false);
+        return hasIndex ? { name: entry.name, relativePath: `${entry.name}/index.ts` } : null;
+      })
+  );
+
+  return brains.filter((b) => b !== null);
+}
+
 async function regenerateManifestFile(
   projectRootPath: string,
   targetSrcDir: string
@@ -166,30 +190,19 @@ async function regenerateManifestFile(
   let importStatements = `import type { Brain } from '@positronic/core';\n`;
   let manifestEntries = '';
 
-  const brainsDirExists = await fsPromises
-    .access(brainsDir)
-    .then(() => true)
-    .catch(() => false);
-  if (brainsDirExists) {
-    const files = await fsPromises.readdir(brainsDir);
-    const brainFiles = files.filter(
-      (file) => file.endsWith('.ts') && !file.startsWith('_')
-    );
+  const brains = await discoverBrains(brainsDir);
 
-    for (const file of brainFiles) {
-      const brainName = path.basename(file, '.ts');
-      const importPath = `../../brains/${brainName}.js`;
-      const importAlias = `brain_${brainName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+  for (const brain of brains) {
+    const importPath = `../../brains/${brain.relativePath.replace(/\.ts$/, '.js')}`;
+    const importAlias = `brain_${brain.name.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 
-      importStatements += `import * as ${importAlias} from '${importPath}';\n`;
-      
-      // Create manifest entry with metadata
-      manifestEntries += `  ${JSON.stringify(brainName)}: {\n`;
-      manifestEntries += `    filename: ${JSON.stringify(brainName)},\n`;
-      manifestEntries += `    path: ${JSON.stringify(`brains/${file}`)},\n`;
-      manifestEntries += `    brain: ${importAlias}.default as Brain,\n`;
-      manifestEntries += `  },\n`;
-    }
+    importStatements += `import * as ${importAlias} from '${importPath}';\n`;
+
+    manifestEntries += `  ${JSON.stringify(brain.name)}: {\n`;
+    manifestEntries += `    filename: ${JSON.stringify(brain.name)},\n`;
+    manifestEntries += `    path: ${JSON.stringify(`brains/${brain.relativePath}`)},\n`;
+    manifestEntries += `    brain: ${importAlias}.default as Brain,\n`;
+    manifestEntries += `  },\n`;
   }
 
   const manifestContent = `// This file is generated automatically. Do not edit directly.
