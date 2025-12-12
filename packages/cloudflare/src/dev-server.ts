@@ -3,7 +3,7 @@ import * as fsPromises from 'fs/promises';
 import * as fs from 'fs';
 import type { Dirent } from 'fs';
 import * as os from 'os';
-import { spawn, exec, type ChildProcess } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
 import caz from 'caz';
 import { createRequire } from 'module';
@@ -541,74 +541,61 @@ export class CloudflareDevServer implements PositronicDevServer {
   }
 
   private async ensureR2BucketExists(bucketName: string): Promise<void> {
-    const serverDir = path.join(this.projectRootDir, '.positronic');
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
-    // Check if bucket exists using wrangler r2 bucket list
-    const existingBuckets = await new Promise<string[]>((resolve, reject) => {
-      exec(
-        'npx wrangler r2 bucket list --json',
-        {
-          cwd: serverDir,
-          env: {
-            ...process.env,
-            CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
-            CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
-          },
-        },
-        (error, stdout) => {
-          if (error) {
-            reject(new Error(`Failed to list R2 buckets: ${error.message}`));
-            return;
-          }
-          const buckets = JSON.parse(stdout);
-          resolve(buckets.map((b: { name: string }) => b.name));
-        }
+    if (!apiToken || !accountId) {
+      throw new Error(
+        'Missing Cloudflare credentials for R2 bucket management.\n' +
+          'Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables.'
       );
-    });
+    }
+
+    const apiBase = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`;
+    const headers = {
+      Authorization: `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    };
+
+    // Check if bucket exists using Cloudflare API
+    const listResponse = await fetch(apiBase, { headers });
+
+    if (!listResponse.ok) {
+      const errorText = await listResponse.text();
+      throw new Error(
+        `Failed to list R2 buckets: ${listResponse.status} ${listResponse.statusText}\n${errorText}`
+      );
+    }
+
+    const listData = (await listResponse.json()) as {
+      success: boolean;
+      result: { buckets: Array<{ name: string }> };
+    };
+
+    const existingBuckets = listData.result.buckets.map((b) => b.name);
 
     if (existingBuckets.includes(bucketName)) {
       console.log(`📦 R2 bucket '${bucketName}' already exists`);
       return;
     }
 
-    // Create the bucket
+    // Create the bucket using Cloudflare API
     console.log(`📦 Creating R2 bucket '${bucketName}'...`);
-    await new Promise<void>((resolve, reject) => {
-      const createProcess = spawn(
-        'npx',
-        ['wrangler', 'r2', 'bucket', 'create', bucketName],
-        {
-          cwd: serverDir,
-          stdio: ['inherit', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
-            CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
-          },
-        }
-      );
 
-      createProcess.stdout?.on('data', (data) => {
-        process.stdout.write(data);
-      });
-
-      createProcess.stderr?.on('data', (data) => {
-        process.stderr.write(data);
-      });
-
-      createProcess.on('error', (err) => {
-        reject(new Error(`Failed to create R2 bucket: ${err.message}`));
-      });
-
-      createProcess.on('exit', (code) => {
-        if (code === 0) {
-          console.log(`✅ R2 bucket '${bucketName}' created successfully`);
-          resolve();
-        } else {
-          reject(new Error(`Failed to create R2 bucket (exit code ${code})`));
-        }
-      });
+    const createResponse = await fetch(apiBase, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: bucketName }),
     });
+
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      throw new Error(
+        `Failed to create R2 bucket: ${createResponse.status} ${createResponse.statusText}\n${errorText}`
+      );
+    }
+
+    console.log(`✅ R2 bucket '${bucketName}' created successfully`);
   }
 
   async deploy(): Promise<void> {
