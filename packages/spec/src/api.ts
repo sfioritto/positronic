@@ -253,6 +253,102 @@ export const resources = {
   },
 
   /**
+   * Test DELETE /resources preserves pages - bulk delete should not delete pages
+   */
+  async deleteAllPreservesPages(fetch: Fetch): Promise<boolean> {
+    try {
+      // First create a page
+      const pageSlug = `spec-test-page-${Date.now()}`;
+      const pageHtml = '<html><body>Test page for spec</body></html>';
+      const brainRunId = 'spec-test-brain-run-id';
+
+      const createPageRequest = new Request('http://example.com/pages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slug: pageSlug,
+          html: pageHtml,
+          brainRunId,
+        }),
+      });
+
+      const createPageResponse = await fetch(createPageRequest);
+      if (createPageResponse.status !== 201) {
+        console.error(
+          `Failed to create test page: ${createPageResponse.status}`
+        );
+        return false;
+      }
+
+      // Now bulk delete all resources
+      const deleteRequest = new Request('http://example.com/resources', {
+        method: 'DELETE',
+      });
+
+      const deleteResponse = await fetch(deleteRequest);
+
+      // Skip test if in production mode (403)
+      if (deleteResponse.status === 403) {
+        // Clean up the page we created
+        await fetch(
+          new Request(
+            `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
+            { method: 'DELETE' }
+          )
+        );
+        console.log(
+          'Skipping deleteAllPreservesPages test - bulk delete not available in production'
+        );
+        return true;
+      }
+
+      if (deleteResponse.status !== 200) {
+        console.error(
+          `DELETE /resources returned ${deleteResponse.status}, expected 200`
+        );
+        return false;
+      }
+
+      // Verify the page still exists
+      const getPageRequest = new Request(
+        `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
+        { method: 'GET' }
+      );
+
+      const getPageResponse = await fetch(getPageRequest);
+
+      if (getPageResponse.status === 404) {
+        console.error(
+          'DELETE /resources incorrectly deleted pages - page not found after bulk delete'
+        );
+        return false;
+      }
+
+      if (!getPageResponse.ok) {
+        console.error(
+          `GET /pages/${pageSlug} returned ${getPageResponse.status}`
+        );
+        return false;
+      }
+
+      // Clean up: delete the test page
+      await fetch(
+        new Request(
+          `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
+          { method: 'DELETE' }
+        )
+      );
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test DELETE /resources preserves pages:`, error);
+      return false;
+    }
+  },
+
+  /**
    * Test POST /resources/presigned-link - Generate presigned URL for upload
    */
   async generatePresignedLink(fetch: Fetch): Promise<boolean> {
@@ -2157,6 +2253,131 @@ export const pages = {
     } catch (error) {
       console.error(
         `Failed to test GET /pages/${slug} with non-existent page:`,
+        error
+      );
+      return false;
+    }
+  },
+
+  /**
+   * Test DELETE /pages/:slug preserves resources - deleting a page should not delete resources
+   */
+  async deletePreservesResources(fetch: Fetch): Promise<boolean> {
+    try {
+      // First create a resource
+      const formData = new FormData();
+      formData.append(
+        'file',
+        new Blob(['test content for spec'], { type: 'text/plain' }),
+        'spec-test-resource.txt'
+      );
+      formData.append('type', 'text');
+      formData.append('key', 'spec-test-resource.txt');
+      formData.append('local', 'false');
+
+      const createResourceRequest = new Request('http://example.com/resources', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const createResourceResponse = await fetch(createResourceRequest);
+      if (createResourceResponse.status !== 201) {
+        console.error(
+          `Failed to create test resource: ${createResourceResponse.status}`
+        );
+        return false;
+      }
+
+      // Create a page to delete
+      const pageSlug = `spec-test-page-${Date.now()}`;
+      const createPageRequest = new Request('http://example.com/pages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slug: pageSlug,
+          html: '<html><body>Test page</body></html>',
+          brainRunId: 'spec-test-brain-run-id',
+        }),
+      });
+
+      const createPageResponse = await fetch(createPageRequest);
+      if (createPageResponse.status !== 201) {
+        console.error(
+          `Failed to create test page: ${createPageResponse.status}`
+        );
+        // Clean up resource
+        await fetch(
+          new Request(
+            'http://example.com/resources/spec-test-resource.txt',
+            { method: 'DELETE' }
+          )
+        );
+        return false;
+      }
+
+      // Delete the page
+      const deletePageRequest = new Request(
+        `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
+        { method: 'DELETE' }
+      );
+
+      const deletePageResponse = await fetch(deletePageRequest);
+      if (deletePageResponse.status !== 204) {
+        console.error(
+          `DELETE /pages/${pageSlug} returned ${deletePageResponse.status}, expected 204`
+        );
+        // Clean up resource
+        await fetch(
+          new Request(
+            'http://example.com/resources/spec-test-resource.txt',
+            { method: 'DELETE' }
+          )
+        );
+        return false;
+      }
+
+      // Verify the resource still exists
+      const listResourcesRequest = new Request('http://example.com/resources', {
+        method: 'GET',
+      });
+
+      const listResourcesResponse = await fetch(listResourcesRequest);
+      if (!listResourcesResponse.ok) {
+        console.error(
+          `GET /resources returned ${listResourcesResponse.status}`
+        );
+        return false;
+      }
+
+      const resourcesData = (await listResourcesResponse.json()) as {
+        resources: Array<{ key: string }>;
+      };
+
+      const resourceExists = resourcesData.resources.some(
+        (r) => r.key === 'spec-test-resource.txt'
+      );
+
+      if (!resourceExists) {
+        console.error(
+          'DELETE /pages incorrectly deleted resources - resource not found after page delete'
+        );
+        return false;
+      }
+
+      // Clean up: delete the test resource
+      await fetch(
+        new Request(
+          'http://example.com/resources/spec-test-resource.txt',
+          { method: 'DELETE' }
+        )
+      );
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test DELETE /pages preserves resources:`,
         error
       );
       return false;

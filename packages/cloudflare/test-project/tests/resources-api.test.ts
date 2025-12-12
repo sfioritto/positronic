@@ -322,12 +322,12 @@ describe('Resources API Tests', () => {
       await waitOnExecutionContext(context);
     });
 
-    it('GET /resources with missing type metadata should return 500 error', async () => {
-      // Manually create a resource without type metadata
-      await testEnv.RESOURCES_BUCKET.put('bad-resource.txt', 'content', {
+    it('GET /resources should skip objects without type metadata', async () => {
+      // Manually create an object without type metadata (e.g., a page or other non-resource data)
+      await testEnv.RESOURCES_BUCKET.put('non-resource.txt', 'content', {
         customMetadata: {
-          path: 'bad-resource.txt',
-          // Missing type
+          path: 'non-resource.txt',
+          // Missing type - this is not a resource
         },
       });
 
@@ -335,12 +335,17 @@ describe('Resources API Tests', () => {
       const context = createExecutionContext();
 
       const response = await worker.fetch(request, testEnv, context);
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(200);
+
+      const data = (await response.json()) as { resources: unknown[]; count: number };
+      // The object without type metadata should be skipped
+      expect(data.resources).toEqual([]);
+      expect(data.count).toBe(0);
 
       await waitOnExecutionContext(context);
 
       // Clean up
-      await testEnv.RESOURCES_BUCKET.delete('bad-resource.txt');
+      await testEnv.RESOURCES_BUCKET.delete('non-resource.txt');
     });
   });
 
