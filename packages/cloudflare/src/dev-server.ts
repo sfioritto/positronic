@@ -544,7 +544,7 @@ export class CloudflareDevServer implements PositronicDevServer {
     const serverDir = path.join(this.projectRootDir, '.positronic');
 
     // Check if bucket exists using wrangler r2 bucket list
-    const existingBuckets = await new Promise<string[]>((resolve) => {
+    const existingBuckets = await new Promise<string[]>((resolve, reject) => {
       exec(
         'npx wrangler r2 bucket list --json',
         {
@@ -557,17 +557,11 @@ export class CloudflareDevServer implements PositronicDevServer {
         },
         (error, stdout) => {
           if (error) {
-            // If listing fails, we'll try to create anyway
-            console.warn('Could not list R2 buckets, will attempt to create');
-            resolve([]);
+            reject(new Error(`Failed to list R2 buckets: ${error.message}`));
             return;
           }
-          try {
-            const buckets = JSON.parse(stdout);
-            resolve(buckets.map((b: { name: string }) => b.name));
-          } catch {
-            resolve([]);
-          }
+          const buckets = JSON.parse(stdout);
+          resolve(buckets.map((b: { name: string }) => b.name));
         }
       );
     });
