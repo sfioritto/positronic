@@ -1,5 +1,17 @@
 # @positronic/cli
 
+## 0.0.29
+
+### Patch Changes
+
+- - Fix bug where CLI commands in global mode incorrectly connected to localhost instead of the selected production project URL
+  - Add 25-second step timeout to prevent brains from getting stuck in 'running' status when cloud platforms terminate long-running requests
+  - Improve error messages to distinguish between local development server and remote project connection failures
+- Updated dependencies
+  - @positronic/core@0.0.29
+  - @positronic/spec@0.0.29
+  - @positronic/template-new-project@0.0.29
+
 ## 0.0.28
 
 ### Patch Changes
