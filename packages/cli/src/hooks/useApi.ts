@@ -1,5 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '../commands/helpers.js';
+import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
+
+function getConnectionErrorMessage(): { title: string; message: string; details: string } {
+  if (isApiLocalDevMode()) {
+    return {
+      title: 'Connection Error',
+      message: 'Error connecting to the local development server.',
+      details: "Please ensure the server is running ('positronic server' or 'px s').",
+    };
+  } else {
+    return {
+      title: 'Connection Error',
+      message: 'Error connecting to the remote project server.',
+      details: 'Please check your network connection and verify the project URL is correct.',
+    };
+  }
+}
 
 export function useApiGet<T>(endpoint: string, options?: any) {
   const [data, setData] = useState<T | null>(null);
@@ -33,6 +49,7 @@ export function useApiGet<T>(endpoint: string, options?: any) {
           });
         }
       } catch (err: any) {
+        const baseError = getConnectionErrorMessage();
         let errorDetails = err.message;
         if (err.code === 'ECONNREFUSED') {
           errorDetails =
@@ -40,9 +57,8 @@ export function useApiGet<T>(endpoint: string, options?: any) {
         }
 
         setError({
-          title: 'Connection Error',
-          message: 'Error connecting to the local development server.',
-          details: `Please ensure the server is running ('positronic server' or 'px s'). ${errorDetails}`,
+          ...baseError,
+          details: `${baseError.details} ${errorDetails}`,
         });
       } finally {
         setLoading(false);
@@ -98,6 +114,7 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
           throw err;
         }
 
+        const baseError = getConnectionErrorMessage();
         let errorDetails = err.message;
         if (err.code === 'ECONNREFUSED') {
           errorDetails =
@@ -105,9 +122,8 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
         }
 
         const errorObj = {
-          title: 'Connection Error',
-          message: 'Error connecting to the local development server.',
-          details: `Please ensure the server is running ('positronic server' or 'px s'). ${errorDetails}`,
+          ...baseError,
+          details: `${baseError.details} ${errorDetails}`,
         };
         setError(errorObj);
         throw errorObj;
@@ -159,6 +175,7 @@ export function useApiDelete(resourceType: string) {
           throw err;
         }
 
+        const baseError = getConnectionErrorMessage();
         let errorDetails = err.message;
         if (err.code === 'ECONNREFUSED') {
           errorDetails =
@@ -166,9 +183,8 @@ export function useApiDelete(resourceType: string) {
         }
 
         const errorObj = {
-          title: 'Connection Error',
-          message: 'Error connecting to the local development server.',
-          details: `Please ensure the server is running ('positronic server' or 'px s'). ${errorDetails}`,
+          ...baseError,
+          details: `${baseError.details} ${errorDetails}`,
         };
         setError(errorObj);
         throw errorObj;
