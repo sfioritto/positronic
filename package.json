@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit && (cd packages/cloudflare/test-project && npm run typecheck)",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "changeset publish"
+    "release": "changeset publish --no-git-tag"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.5",
