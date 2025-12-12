@@ -14,6 +14,13 @@ export type SerializedError = {
   stack?: string;
 };
 
+export class StepTimeoutError extends Error {
+  constructor(stepTitle: string, timeoutMs: number) {
+    super(`Step "${stepTitle}" timed out after ${timeoutMs}ms`);
+    this.name = 'StepTimeoutError';
+  }
+}
+
 // Shared interface for step action functions
 export type StepAction<
   TStateIn,
@@ -822,15 +829,19 @@ class BrainEventStream<
 
       while (true) {
         try {
-          result = await stepBlock.action({
-            state: this.currentState,
-            options: this.options ?? ({} as TOptions),
-            client: this.client,
-            resources: this.resources,
-            response: this.currentResponse,
-            pages: this.pages,
-            ...this.services,
-          });
+          const actionPromise = Promise.resolve(
+            stepBlock.action({
+              state: this.currentState,
+              options: this.options ?? ({} as TOptions),
+              client: this.client,
+              resources: this.resources,
+              response: this.currentResponse,
+              pages: this.pages,
+              ...this.services,
+            })
+          );
+
+          result = await withTimeout(actionPromise, step.block.title);
           break; // Success
         } catch (error) {
           if (retries < MAX_RETRIES) {
@@ -924,3 +935,20 @@ export const brain: BrainFactory = function <
 };
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+const STEP_TIMEOUT_MS = 25_000; // Before 30s IoContext limit
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  stepTitle: string,
+  timeoutMs: number = STEP_TIMEOUT_MS
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new StepTimeoutError(stepTitle, timeoutMs));
+      }, timeoutMs);
+    }),
+  ]);
+}
