@@ -1,5 +1,20 @@
 # @positronic/cli
 
+## 0.0.28
+
+### Patch Changes
+
+- Use the Cloudflare API directly for R2 bucket creation
+
+  - Replace wrangler CLI commands with direct Cloudflare API calls for creating R2 buckets during deploy
+  - Simplifies R2 bucket management by removing dependency on spawned wrangler processes
+  - Provides better error handling with clearer error messages from the API
+
+- Updated dependencies
+  - @positronic/core@0.0.28
+  - @positronic/spec@0.0.28
+  - @positronic/template-new-project@0.0.28
+
 ## 0.0.27
 
 ### Patch Changes
