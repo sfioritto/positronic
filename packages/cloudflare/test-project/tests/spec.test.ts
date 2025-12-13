@@ -5,7 +5,7 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import worker from '../src/index';
-import { testStatus, resources, brains, schedules, webhooks, pages } from '@positronic/spec';
+import { testStatus, resources, brains, schedules, webhooks, pages, secrets } from '@positronic/spec';
 
 describe('Positronic Spec', () => {
   // Helper function to create fetch wrapper for Cloudflare workers
@@ -172,6 +172,40 @@ describe('Positronic Spec', () => {
   describe('Pages', () => {
     it('passes DELETE /pages preserves resources test', async () => {
       const result = await pages.deletePreservesResources(createFetch());
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('Secrets', () => {
+    it('passes GET /secrets test', async () => {
+      const result = await secrets.list(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /secrets test', async () => {
+      const result = await secrets.create(createFetch(), 'TEST_SECRET', 'test-value');
+      expect(result).toBe(true);
+    });
+
+    it('passes DELETE /secrets/:name test', async () => {
+      // First create a secret to delete
+      await secrets.create(createFetch(), 'SECRET_TO_DELETE', 'temp-value');
+
+      // Then delete it
+      const result = await secrets.delete(createFetch(), 'SECRET_TO_DELETE');
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /secrets/:name/exists test', async () => {
+      const result = await secrets.exists(createFetch(), 'TEST_SECRET');
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /secrets/bulk test', async () => {
+      const result = await secrets.bulk(createFetch(), [
+        { name: 'BULK_SECRET_1', value: 'value1' },
+        { name: 'BULK_SECRET_2', value: 'value2' },
+      ]);
       expect(result).toBe(true);
     });
   });
