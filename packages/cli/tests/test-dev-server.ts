@@ -2,6 +2,7 @@ import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 import nock from 'nock';
 import { parse } from 'dotenv';
 import fs from 'fs';
+import { STATUS } from '@positronic/core';
 
 interface MockResource {
   key: string;
@@ -123,7 +124,7 @@ interface MockBrainRun {
   brainTitle: string;
   brainDescription?: string;
   type: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETE' | 'ERROR';
+  status: (typeof STATUS)[keyof typeof STATUS];
   options?: any;
   error?: any;
   createdAt: number;
@@ -722,13 +723,13 @@ export class TestDevServer implements PositronicDevServer {
 
       this.logCall('getBrainActiveRuns', [identifier]);
 
-      // Filter brain runs by brain title and status RUNNING
+      // Filter brain runs by brain title and status running
       const activeRuns = this.brainRuns
         .filter(
           (run) =>
             run.brainTitle.toLowerCase() ===
               identifier.toLowerCase().replace(/-/g, ' ') &&
-            run.status === 'RUNNING'
+            run.status === STATUS.RUNNING
         )
         .sort((a, b) => b.createdAt - a.createdAt);
 

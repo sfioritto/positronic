@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, Box } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
+import { STATUS } from '@positronic/core';
 
 interface SerializedError {
   name: string;
@@ -14,7 +15,7 @@ interface BrainRun {
   brainTitle: string;
   brainDescription?: string;
   type: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETE' | 'ERROR' | 'CANCELLED';
+  status: (typeof STATUS)[keyof typeof STATUS];
   options?: Record<string, any>;
   error?: SerializedError;
   createdAt: number;
@@ -53,13 +54,13 @@ const formatDuration = (startMs: number, endMs: number): string => {
 // Helper to get status color
 const getStatusColor = (status: string): string => {
   switch (status) {
-    case 'COMPLETE':
+    case STATUS.COMPLETE:
       return 'green';
-    case 'ERROR':
+    case STATUS.ERROR:
       return 'red';
-    case 'RUNNING':
+    case STATUS.RUNNING:
       return 'yellow';
-    case 'CANCELLED':
+    case STATUS.CANCELLED:
       return 'gray';
     default:
       return 'white';
@@ -103,7 +104,7 @@ export const RunShow = ({ runId }: RunShowProps) => {
 
   const duration = data.startedAt && data.completedAt
     ? formatDuration(data.startedAt, data.completedAt)
-    : data.status === 'RUNNING'
+    : data.status === STATUS.RUNNING
     ? 'Running...'
     : 'N/A';
 
@@ -166,8 +167,8 @@ export const RunShow = ({ runId }: RunShowProps) => {
         </Box>
       )}
 
-      {/* Error details if status is ERROR */}
-      {data.status === 'ERROR' && data.error && (
+      {/* Error details if status is error */}
+      {data.status === STATUS.ERROR && data.error && (
         <Box flexDirection="column" marginTop={1}>
           <Box borderStyle="round" borderColor="red" flexDirection="column" paddingX={1}>
             <Text bold color="red">Error Details</Text>
@@ -192,14 +193,14 @@ export const RunShow = ({ runId }: RunShowProps) => {
       )}
 
       {/* Success message for completed runs */}
-      {data.status === 'COMPLETE' && (
+      {data.status === STATUS.COMPLETE && (
         <Box marginTop={1}>
           <Text color="green">Run completed successfully.</Text>
         </Box>
       )}
 
       {/* Cancelled message */}
-      {data.status === 'CANCELLED' && (
+      {data.status === STATUS.CANCELLED && (
         <Box marginTop={1}>
           <Text color="gray">Run was cancelled.</Text>
         </Box>

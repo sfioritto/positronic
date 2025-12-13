@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { createTestEnv, px } from './test-utils.js';
 import nock from 'nock';
+import { STATUS } from '@positronic/core';
 
 describe('CLI Integration: positronic brain commands', () => {
   describe('brain run command', () => {
@@ -384,7 +385,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainRunId: 'run-active-123',
         brainTitle: 'test brain',
         type: 'START',
-        status: 'RUNNING',
+        status: STATUS.RUNNING,
         createdAt: Date.now() - 60000, // 1 minute ago
         startedAt: Date.now() - 60000,
       });
@@ -448,7 +449,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainRunId: 'run-active-1',
         brainTitle: 'test brain',
         type: 'START',
-        status: 'RUNNING',
+        status: STATUS.RUNNING,
         createdAt: Date.now() - 120000, // 2 minutes ago
         startedAt: Date.now() - 120000,
       });
@@ -457,7 +458,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainRunId: 'run-active-2',
         brainTitle: 'test brain',
         type: 'START',
-        status: 'RUNNING',
+        status: STATUS.RUNNING,
         createdAt: Date.now() - 60000, // 1 minute ago
         startedAt: Date.now() - 60000,
       });
@@ -691,7 +692,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainTitle: 'Test Brain',
         brainDescription: 'A test brain',
         type: 'START',
-        status: 'COMPLETE',
+        status: STATUS.COMPLETE,
         createdAt: Date.now() - 3600000, // 1 hour ago
         startedAt: Date.now() - 3600000,
         completedAt: Date.now() - 3540000, // 1 minute duration
@@ -701,7 +702,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainRunId: 'run-456',
         brainTitle: 'Test Brain',
         type: 'START',
-        status: 'ERROR',
+        status: STATUS.ERROR,
         error: { message: 'Connection failed' },
         createdAt: Date.now() - 7200000, // 2 hours ago
         startedAt: Date.now() - 7200000,
@@ -768,7 +769,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainRunId: 'run-error',
         brainTitle: 'Test Brain',
         type: 'START',
-        status: 'ERROR',
+        status: STATUS.ERROR,
         error: 'Connection timeout',
         createdAt: Date.now() - 1800000,
         startedAt: Date.now() - 1800000,
@@ -841,7 +842,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainTitle: 'Test Brain',
         brainDescription: 'A test brain',
         type: 'brain:complete',
-        status: 'COMPLETE',
+        status: STATUS.COMPLETE,
         createdAt: Date.now() - 60000,
         startedAt: Date.now() - 60000,
         completedAt: Date.now(),
@@ -860,8 +861,8 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundTitle = await waitForOutput(/Test Brain/, 30);
         expect(foundTitle).toBe(true);
 
-        // Check for status
-        const foundStatus = await waitForOutput(/COMPLETE/, 30);
+        // Check for status (lowercase)
+        const foundStatus = await waitForOutput(/complete/, 30);
         expect(foundStatus).toBe(true);
 
         // Check for success message
@@ -881,7 +882,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainRunId: 'run-error-456',
         brainTitle: 'Failing Brain',
         type: 'brain:error',
-        status: 'ERROR',
+        status: STATUS.ERROR,
         error: {
           name: 'AnthropicError',
           message: 'Rate limit exceeded',
@@ -901,8 +902,8 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundRunId = await waitForOutput(/run-error-456/, 30);
         expect(foundRunId).toBe(true);
 
-        // Check for ERROR status
-        const foundStatus = await waitForOutput(/ERROR/, 30);
+        // Check for error status (lowercase)
+        const foundStatus = await waitForOutput(/error/, 30);
         expect(foundStatus).toBe(true);
 
         // Check for error type
@@ -943,7 +944,7 @@ describe('CLI Integration: positronic brain commands', () => {
         brainRunId: 'run-with-options',
         brainTitle: 'Configurable Brain',
         type: 'brain:complete',
-        status: 'COMPLETE',
+        status: STATUS.COMPLETE,
         options: {
           email: 'test@example.com',
           verbose: 'true',
