@@ -1,5 +1,12 @@
 # @positronic/shell
 
+## 0.0.34
+
+### Patch Changes
+
+- - Remove step timeout functionality that was causing issues
+  - Use STATUS constants instead of hardcoded strings across CLI and spec packages for better type safety and consistency
+
 ## 0.0.33
 
 ### Patch Changes

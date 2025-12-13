@@ -1,5 +1,14 @@
 # @positronic/client-vercel
 
+## 0.0.34
+
+### Patch Changes
+
+- - Remove step timeout functionality that was causing issues
+  - Use STATUS constants instead of hardcoded strings across CLI and spec packages for better type safety and consistency
+- Updated dependencies
+  - @positronic/core@0.0.34
+
 ## 0.0.33
 
 ### Patch Changes

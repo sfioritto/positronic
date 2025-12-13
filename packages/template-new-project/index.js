@@ -53,9 +53,9 @@ module.exports = {
   ],
   setup: async ctx => {
     const devRootPath = process.env.POSITRONIC_LOCAL_PATH;
-    let coreVersion = '^0.0.33';
-    let cloudflareVersion = '^0.0.33';
-    let clientVercelVersion = '^0.0.33';
+    let coreVersion = '^0.0.34';
+    let cloudflareVersion = '^0.0.34';
+    let clientVercelVersion = '^0.0.34';
 
     // Map backend selection to package names
     const backendPackageMap = {
