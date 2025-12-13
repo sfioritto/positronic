@@ -181,18 +181,6 @@ export const BrainHistory = ({ brainName, limit }: BrainHistoryProps) => {
           );
         })}
 
-        {/* Show errors if any */}
-        {data.runs.filter(r => r.status === STATUS.ERROR && r.error).length > 0 && (
-          <Box flexDirection="column" marginTop={1}>
-            <Text bold color="red">Errors:</Text>
-            {data.runs.filter(r => r.status === STATUS.ERROR && r.error).map((run) => (
-              <Box key={run.brainRunId} marginLeft={2}>
-                <Text dimColor>{run.brainRunId}: </Text>
-                <Text color="red">{typeof run.error === 'string' ? run.error : JSON.stringify(run.error)}</Text>
-              </Box>
-            ))}
-          </Box>
-        )}
       </Box>
     </Box>
   );

@@ -760,38 +760,6 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
-    it('should show error details for failed runs', async () => {
-      const env = await createTestEnv();
-      const { server } = env;
-      
-      // Add a failed brain run
-      server.addBrainRun({
-        brainRunId: 'run-error',
-        brainTitle: 'Test Brain',
-        type: 'START',
-        status: STATUS.ERROR,
-        error: 'Connection timeout',
-        createdAt: Date.now() - 1800000,
-        startedAt: Date.now() - 1800000,
-      });
-      
-      const px = await env.start();
-
-      try {
-        const { waitForOutput } = await px(['history', 'test-brain']);
-        
-        // Check for error section
-        const foundErrors = await waitForOutput(/Errors:/i, 30);
-        expect(foundErrors).toBe(true);
-        
-        // Check for error message
-        const foundErrorMsg = await waitForOutput(/Connection timeout/i, 30);
-        expect(foundErrorMsg).toBe(true);
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
     it('should handle server connection errors', async () => {
       const env = await createTestEnv();
       // Don't start the server to simulate connection error
