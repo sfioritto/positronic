@@ -1,5 +1,15 @@
 # @positronic/cloudflare
 
+## 0.0.31
+
+### Patch Changes
+
+- Fix Cloudflare secrets API endpoint - secret name now correctly passed in the request body instead of the URL path, fixing secret creation for deployed workers.
+- Updated dependencies
+  - @positronic/core@0.0.31
+  - @positronic/spec@0.0.31
+  - @positronic/template-new-project@0.0.31
+
 ## 0.0.30
 
 ### Patch Changes

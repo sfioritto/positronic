@@ -1,5 +1,13 @@
 # @positronic/client-vercel
 
+## 0.0.31
+
+### Patch Changes
+
+- Fix Cloudflare secrets API endpoint - secret name now correctly passed in the request body instead of the URL path, fixing secret creation for deployed workers.
+- Updated dependencies
+  - @positronic/core@0.0.31
+
 ## 0.0.30
 
 ### Patch Changes

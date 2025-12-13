@@ -1,5 +1,11 @@
 # @positronic/shell
 
+## 0.0.31
+
+### Patch Changes
+
+- Fix Cloudflare secrets API endpoint - secret name now correctly passed in the request body instead of the URL path, fixing secret creation for deployed workers.
+
 ## 0.0.30
 
 ### Patch Changes
