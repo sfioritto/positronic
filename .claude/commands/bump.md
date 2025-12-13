@@ -20,8 +20,7 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
 6. Reinstalls dependencies
 7. Builds all packages and runs tests via npm run dev
 8. Commits the version changes
-9. Runs `changeset publish` to create tags and publish to npm
-10. Pushes commits and tags to the remote repository
+9. **STOPS** and provides manual commands for publish (requires OTP)
 
 ## Pre-requisites
 
@@ -77,14 +76,18 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
 12. [ ] Verify tests pass (if tests fail, STOP and fix issues)
 13. [ ] Stage all changes (`git add -A`)
 14. [ ] Create commit (`git commit -m "Bump to v{version}"`)
-15. [ ] Run `npx changeset publish --no-git-tag` to publish all packages without creating individual package tags
-16. [ ] Create a single version tag (`git tag v{version}`)
-17. [ ] Push commit and tag (`git push origin main --tags`)
+15. [ ] **STOP HERE** - Tell the user to run these commands manually (OTP required):
+    ```bash
+    npx changeset publish --no-git-tag
+    git tag v{version}
+    git push origin main --tags
+    ```
 
 ## Important Notes
 
 - ALWAYS build before publishing to ensure the latest code is included
 - The command will fail if working directory has uncommitted changes
+- npm publish requires an OTP (one-time password) which cannot be entered non-interactively, so the final publish/tag/push steps must be run manually
 - npm authentication is configured via .npmrc file
 - All workspace versions are kept in sync using changesets linked packages
 - Changesets automatically handles inter-package dependency updates
