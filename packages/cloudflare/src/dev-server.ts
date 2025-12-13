@@ -732,7 +732,8 @@ export class CloudflareDevServer implements PositronicDevServer {
     secretValue: string,
     apiToken: string
   ): Promise<void> {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/secrets/${secretName}`;
+    // Cloudflare API endpoint - secret name goes in the body, not the URL
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/secrets`;
 
     const response = await fetch(url, {
       method: 'PUT',
