@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import {
   env,
   createExecutionContext,
   waitOnExecutionContext,
+  fetchMock,
 } from 'cloudflare:test';
 import worker from '../src/index';
 import { testStatus, resources, brains, schedules, webhooks, pages, secrets } from '@positronic/spec';
@@ -177,19 +178,76 @@ describe('Positronic Spec', () => {
   });
 
   describe('Secrets', () => {
+    // Mock the Cloudflare API for secrets management
+    const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com';
+    const SECRETS_PATH = '/client/v4/accounts/test-account-id/workers/scripts/test-project/secrets';
+
+    // Track mock secrets for realistic responses
+    let mockSecrets: Array<{ name: string; type: string }> = [];
+
+    beforeAll(() => {
+      fetchMock.activate();
+      fetchMock.disableNetConnect();
+    });
+
+    afterEach(() => {
+      fetchMock.assertNoPendingInterceptors();
+      mockSecrets = [];
+    });
+
     it('passes GET /secrets test', async () => {
+      // Mock Cloudflare API list secrets response
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: SECRETS_PATH, method: 'GET' })
+        .reply(200, {
+          success: true,
+          result: mockSecrets,
+          errors: [],
+        });
+
       const result = await secrets.list(createFetch());
       expect(result).toBe(true);
     });
 
     it('passes POST /secrets test', async () => {
+      // Mock Cloudflare API create secret response
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: `${SECRETS_PATH}/TEST_SECRET`, method: 'PUT' })
+        .reply(200, {
+          success: true,
+          result: { name: 'TEST_SECRET', type: 'secret_text' },
+          errors: [],
+        });
+
       const result = await secrets.create(createFetch(), 'TEST_SECRET', 'test-value');
       expect(result).toBe(true);
     });
 
     it('passes DELETE /secrets/:name test', async () => {
+      // Mock create first
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: `${SECRETS_PATH}/SECRET_TO_DELETE`, method: 'PUT' })
+        .reply(200, {
+          success: true,
+          result: { name: 'SECRET_TO_DELETE', type: 'secret_text' },
+          errors: [],
+        });
+
       // First create a secret to delete
       await secrets.create(createFetch(), 'SECRET_TO_DELETE', 'temp-value');
+
+      // Mock delete
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: `${SECRETS_PATH}/SECRET_TO_DELETE`, method: 'DELETE' })
+        .reply(200, {
+          success: true,
+          result: null,
+          errors: [],
+        });
 
       // Then delete it
       const result = await secrets.delete(createFetch(), 'SECRET_TO_DELETE');
@@ -197,11 +255,53 @@ describe('Positronic Spec', () => {
     });
 
     it('passes GET /secrets/:name/exists test', async () => {
+      // Add a secret to the mock list
+      mockSecrets = [{ name: 'TEST_SECRET', type: 'secret_text' }];
+
+      // Mock list to check existence
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: SECRETS_PATH, method: 'GET' })
+        .reply(200, {
+          success: true,
+          result: mockSecrets,
+          errors: [],
+        });
+
       const result = await secrets.exists(createFetch(), 'TEST_SECRET');
       expect(result).toBe(true);
     });
 
     it('passes POST /secrets/bulk test', async () => {
+      // Mock list to check existing secrets
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: SECRETS_PATH, method: 'GET' })
+        .reply(200, {
+          success: true,
+          result: [],
+          errors: [],
+        });
+
+      // Mock create for each secret
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: `${SECRETS_PATH}/BULK_SECRET_1`, method: 'PUT' })
+        .reply(200, {
+          success: true,
+          result: { name: 'BULK_SECRET_1', type: 'secret_text' },
+          errors: [],
+        });
+
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: `${SECRETS_PATH}/BULK_SECRET_2`, method: 'PUT' })
+        .reply(200, {
+          success: true,
+          result: { name: 'BULK_SECRET_2', type: 'secret_text' },
+          errors: [],
+        });
+
       const result = await secrets.bulk(createFetch(), [
         { name: 'BULK_SECRET_1', value: 'value1' },
         { name: 'BULK_SECRET_2', value: 'value2' },

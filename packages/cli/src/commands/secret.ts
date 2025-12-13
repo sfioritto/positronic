@@ -1,6 +1,5 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import React from 'react';
-import type { PositronicDevServer } from '@positronic/spec';
 import { SecretCreate } from '../components/secret-create.js';
 import { SecretList } from '../components/secret-list.js';
 import { SecretDelete } from '../components/secret-delete.js';
@@ -20,10 +19,8 @@ interface SecretBulkArgs {
 }
 
 export class SecretCommand {
-  constructor(private server?: PositronicDevServer) {}
-
   list(): React.ReactElement {
-    return React.createElement(SecretList, { server: this.server });
+    return React.createElement(SecretList);
   }
 
   create({
@@ -33,18 +30,14 @@ export class SecretCommand {
     return React.createElement(SecretCreate, {
       name,
       value,
-      server: this.server,
     });
   }
 
   delete({ name }: ArgumentsCamelCase<SecretDeleteArgs>): React.ReactElement {
-    return React.createElement(SecretDelete, { name, server: this.server });
+    return React.createElement(SecretDelete, { name });
   }
 
   bulk({ file }: ArgumentsCamelCase<SecretBulkArgs>): React.ReactElement {
-    return React.createElement(SecretBulk, { 
-      file,
-      server: this.server
-    });
+    return React.createElement(SecretBulk, { file });
   }
 }

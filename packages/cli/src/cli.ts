@@ -65,7 +65,7 @@ export function buildCli(options: CliOptions) {
   const projectCommand = new ProjectCommand();
   const brainCommand = new BrainCommand();
   const scheduleCommand = new ScheduleCommand();
-  const secretCommand = new SecretCommand(server);
+  const secretCommand = new SecretCommand();
   const pagesCommand = new PagesCommand();
 
   // Main CLI definition

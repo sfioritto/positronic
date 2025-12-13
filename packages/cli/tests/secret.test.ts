@@ -5,13 +5,28 @@ import * as path from 'path';
 
 describe('secret commands', () => {
   describe('secret create', () => {
-    it('should pass through to backend', async () => {
+    it('should create a secret via API', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
-        // Just verify it runs without error
-        await px(['secret', 'create', 'TEST_SECRET', '--value=test-value']);
+        const { waitForOutput } = await px([
+          'secret',
+          'create',
+          'TEST_SECRET',
+          '--value=test-value',
+        ]);
+
+        const foundSuccess = await waitForOutput(
+          /Secret created successfully/i,
+          30
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify API was called
+        const calls = env.server.getLogs();
+        const createCall = calls.find((c) => c.method === 'createSecret');
+        expect(createCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
       }
@@ -19,13 +34,39 @@ describe('secret commands', () => {
   });
 
   describe('secret list', () => {
-    it('should pass through to backend', async () => {
+    it('should list secrets from API', async () => {
+      const env = await createTestEnv();
+
+      // Add some test secrets
+      env.server.addSecret('API_KEY', 'secret-value');
+      env.server.addSecret('DATABASE_URL', 'db-connection-string');
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['secret', 'list']);
+
+        const foundSecrets = await waitForOutput(/Found 2 secrets/i, 30);
+        expect(foundSecrets).toBe(true);
+
+        // Verify API was called
+        const calls = env.server.getLogs();
+        const listCall = calls.find((c) => c.method === 'listSecrets');
+        expect(listCall).toBeDefined();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show empty state when no secrets exist', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
-        // Just verify it runs without error
-        await px(['secret', 'list']);
+        const { waitForOutput } = await px(['secret', 'list']);
+
+        const foundEmpty = await waitForOutput(/No secrets found/i, 30);
+        expect(foundEmpty).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
@@ -33,13 +74,27 @@ describe('secret commands', () => {
   });
 
   describe('secret delete', () => {
-    it('should pass through to backend', async () => {
+    it('should delete a secret via API', async () => {
       const env = await createTestEnv();
+
+      // Add a secret to delete
+      env.server.addSecret('TEST_SECRET', 'secret-value');
+
       const px = await env.start();
 
       try {
-        // Just verify it runs without error
-        await px(['secret', 'delete', 'TEST_SECRET']);
+        const { waitForOutput } = await px(['secret', 'delete', 'TEST_SECRET']);
+
+        const foundSuccess = await waitForOutput(
+          /Secret deleted successfully/i,
+          30
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify API was called
+        const calls = env.server.getLogs();
+        const deleteCall = calls.find((c) => c.method === 'deleteSecret');
+        expect(deleteCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
       }
@@ -61,15 +116,17 @@ TEST_REDIS_URL=redis://localhost:6379`;
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['secret', 'bulk']);
+        const { waitForOutput } = await px(['secret', 'bulk']);
 
-        // Since bulk command passes through to backend,
-        // we can't check for output. Just wait a bit for completion.
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        const foundSuccess = await waitForOutput(
+          /Secrets uploaded successfully/i,
+          30
+        );
+        expect(foundSuccess).toBe(true);
 
-        // Verify server method was called
+        // Verify the API was called with bulk create
         const calls = env.server.getLogs();
-        const bulkCall = calls.find((c) => c.method === 'bulkSecrets');
+        const bulkCall = calls.find((c) => c.method === 'bulkCreateSecrets');
         expect(bulkCall).toBeDefined();
 
         // Verify the server received the correct secret names
@@ -96,11 +153,17 @@ API_TOKEN=token123`;
       const px = await env.start();
 
       try {
-        await px(['secret', 'bulk', '.env.production']);
+        const { waitForOutput } = await px([
+          'secret',
+          'bulk',
+          '.env.production',
+        ]);
 
-        // Since bulk command passes through to backend,
-        // we can't check for output. Just wait a bit for completion.
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        const foundSuccess = await waitForOutput(
+          /Secrets uploaded successfully/i,
+          30
+        );
+        expect(foundSuccess).toBe(true);
 
         // Verify the server received the correct secret names
         const secrets = env.server.getSecrets();
@@ -126,15 +189,17 @@ KEY3=value3`;
       const px = await env.start();
 
       try {
-        await px(['secret', 'bulk']);
+        const { waitForOutput } = await px(['secret', 'bulk']);
 
-        // Since bulk command passes through to backend,
-        // we can't check for output. Just wait a bit for completion.
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        const foundSuccess = await waitForOutput(
+          /Secrets uploaded successfully/i,
+          30
+        );
+        expect(foundSuccess).toBe(true);
 
-        // Verify bulkSecrets was called
+        // Verify bulkCreateSecrets was called
         const calls = env.server.getLogs();
-        const bulkCall = calls.find((c) => c.method === 'bulkSecrets');
+        const bulkCall = calls.find((c) => c.method === 'bulkCreateSecrets');
         expect(bulkCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
@@ -172,10 +237,7 @@ KEY3=value3`;
       try {
         const { waitForOutput } = await px(['secret', 'bulk']);
 
-        const foundError = await waitForOutput(
-          /No secrets found in the .env file/i,
-          30
-        );
+        const foundError = await waitForOutput(/No secrets found/i, 30);
         expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -199,9 +261,18 @@ EXISTING_KEY=updated-value`;
       try {
         const { waitForOutput } = await px(['secret', 'bulk']);
 
-        // Since bulk command passes through to backend,
-        // we can't check for output. Just wait a bit for completion.
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        const foundSuccess = await waitForOutput(
+          /Secrets uploaded successfully/i,
+          30
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify the secrets were created/updated
+        const secrets = env.server.getSecrets();
+        expect(secrets.length).toBe(2);
+
+        const existingSecret = secrets.find((s) => s.name === 'EXISTING_KEY');
+        expect(existingSecret?.value).toBe('updated-value');
       } finally {
         await env.stopAndCleanup();
       }
