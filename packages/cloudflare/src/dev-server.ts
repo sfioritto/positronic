@@ -675,17 +675,82 @@ export class CloudflareDevServer implements PositronicDevServer {
         reject(err);
       });
 
-      wranglerProcess.on('exit', (code) => {
+      wranglerProcess.on('exit', async (code) => {
         if (code === 0) {
-          const successMessage = '✅ Deployment complete!\n';
-          this.logCallbacks.forEach((cb) => cb(successMessage));
           console.log('✅ Deployment complete!');
-          resolve();
+
+          // Set up secrets for the secrets management API
+          console.log('🔐 Configuring secrets management...');
+          try {
+            await this.setupSecretsManagement(bucketName);
+            const successMessage = '✅ Deployment and secrets configuration complete!\n';
+            this.logCallbacks.forEach((cb) => cb(successMessage));
+            console.log('✅ Secrets management configured!');
+            resolve();
+          } catch (secretsError) {
+            // Warn but don't fail deployment if secrets setup fails
+            console.warn('⚠️  Warning: Could not configure secrets management:', secretsError);
+            console.warn('   You can manually set these secrets later with:');
+            console.warn('   wrangler secret put CLOUDFLARE_API_TOKEN --env production');
+            console.warn('   wrangler secret put CLOUDFLARE_ACCOUNT_ID --env production');
+            console.warn('   wrangler secret put CF_SCRIPT_NAME --env production');
+            resolve();
+          }
         } else {
           reject(new Error(`Wrangler deploy exited with code ${code}`));
         }
       });
     });
+  }
+
+  /**
+   * Set up secrets required for the secrets management API.
+   * This allows the deployed worker to manage its own secrets via HTTP API.
+   */
+  private async setupSecretsManagement(projectName: string): Promise<void> {
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN!;
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID!;
+
+    const secrets = [
+      { name: 'CLOUDFLARE_API_TOKEN', value: apiToken },
+      { name: 'CLOUDFLARE_ACCOUNT_ID', value: accountId },
+      { name: 'CF_SCRIPT_NAME', value: projectName },
+    ];
+
+    for (const secret of secrets) {
+      await this.setWorkerSecret(accountId, projectName, secret.name, secret.value, apiToken);
+    }
+  }
+
+  /**
+   * Set a secret on a Cloudflare Worker using the Cloudflare API.
+   */
+  private async setWorkerSecret(
+    accountId: string,
+    scriptName: string,
+    secretName: string,
+    secretValue: string,
+    apiToken: string
+  ): Promise<void> {
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/secrets/${secretName}`;
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: secretName,
+        text: secretValue,
+        type: 'secret_text',
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to set secret ${secretName}: ${error}`);
+    }
   }
 
   onLog(callback: (message: string) => void): void {

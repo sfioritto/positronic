@@ -35,7 +35,10 @@
   },
   "vars": {
     "IS_TEST": "true",
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "CLOUDFLARE_API_TOKEN": "test-api-token",
+    "CLOUDFLARE_ACCOUNT_ID": "test-account-id",
+    "CF_SCRIPT_NAME": "test-project"
   },
   "r2_buckets": [
     {

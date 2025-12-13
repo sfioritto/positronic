@@ -131,6 +131,7 @@ export class TestEnv {
       return px(argv, {
         server: this.server,
         projectRootDir: this.projectRootDir,
+        configDir: this.projectRootDir,
       });
     };
   }
@@ -304,21 +305,16 @@ async function runCli(
     process.env.POSITRONIC_CONFIG_DIR = configDir;
   }
 
-  try {
-    const testCli = buildCli({
-      argv,
-      server,
-      exitProcess: false,
-      render: mockRenderFn,
-    });
+  // Note: We don't delete POSITRONIC_CONFIG_DIR after because React components
+  // may use it asynchronously in useEffect hooks
+  const testCli = buildCli({
+    argv,
+    server,
+    exitProcess: false,
+    render: mockRenderFn,
+  });
 
-    await testCli.parse();
+  await testCli.parse();
 
-    return capturedElement;
-  } finally {
-    // Cleanup project-specific environment if configDir was provided
-    if (configDir) {
-      delete process.env.POSITRONIC_CONFIG_DIR;
-    }
-  }
+  return capturedElement;
 }
