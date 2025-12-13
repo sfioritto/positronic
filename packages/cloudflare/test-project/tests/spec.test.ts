@@ -64,8 +64,8 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes GET /brains/:brainName test', async () => {
-      const result = await brains.show(createFetch(), 'basic-brain');
+    it('passes GET /brains/:brainName test (brain info)', async () => {
+      const result = await brains.getBrainInfo(createFetch(), 'basic-brain');
       expect(result).toBe(true);
     });
 
@@ -97,6 +97,21 @@ describe('Positronic Spec', () => {
 
       // Then test watching it
       const result = await brains.watch(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /brains/runs/:runId test (get run details)', async () => {
+      // First create a brain run
+      const brainRunId = await brains.run(createFetch(), 'basic-brain');
+      expect(brainRunId).toBeTruthy();
+
+      // Then test getting run details
+      const result = await brains.getRun(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /brains/runs/:runId test with non-existent run (404)', async () => {
+      const result = await brains.getRunNotFound(createFetch(), 'non-existent-run-id');
       expect(result).toBe(true);
     });
 

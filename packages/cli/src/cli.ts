@@ -310,19 +310,21 @@ export function buildCli(options: CliOptions) {
     }
   );
 
-  // --- Show Brain Command ---
+  // --- Show Run Command ---
   cli = cli.command(
-    'show <filename>',
-    'List all steps and other details for the brain\n',
+    'show <run-id>',
+    'Show detailed information about a brain run, including any errors\n',
     (yargsShow) => {
-      return yargsShow.positional('filename', {
-        describe: 'Filename of the brain',
-        type: 'string',
-        demandOption: true,
-      });
+      return yargsShow
+        .positional('run-id', {
+          describe: 'ID of the brain run to show',
+          type: 'string',
+          demandOption: true,
+        })
+        .example('$0 show abc123', 'Show details for brain run abc123');
     },
     (argv) => {
-      const element = brainCommand.show(argv);
+      const element = brainCommand.show(argv as any);
       render(element);
     }
   );
@@ -493,17 +495,19 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'show <filename>',
-        'List all steps and other details for the brain\n',
+        'show <run-id>',
+        'Show detailed information about a brain run, including any errors\n',
         (yargsShow) => {
-          return yargsShow.positional('filename', {
-            describe: 'Filename of the brain',
-            type: 'string',
-            demandOption: true,
-          });
+          return yargsShow
+            .positional('run-id', {
+              describe: 'ID of the brain run to show',
+              type: 'string',
+              demandOption: true,
+            })
+            .example('$0 brain show abc123', 'Show details for brain run abc123');
         },
         (argv) => {
-          const element = brainCommand.show(argv);
+          const element = brainCommand.show(argv as any);
           render(element);
         }
       )

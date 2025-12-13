@@ -825,9 +825,10 @@ export const brains = {
   },
 
   /**
-   * Test GET /brains/:identifier - Get brain structure
+   * Test GET /brains/:identifier - Get brain structure/definition
+   * (For future brain exploration/info command)
    */
-  async show(fetch: Fetch, identifier: string): Promise<boolean> {
+  async getBrainInfo(fetch: Fetch, identifier: string): Promise<boolean> {
     try {
       const request = new Request(
         `http://example.com/brains/${encodeURIComponent(identifier)}`,
@@ -986,9 +987,134 @@ export const brains = {
   },
 
   /**
-   * Test GET /brains/:identifier with ambiguous identifier - Should return multiple matches
+   * Test GET /brains/runs/:runId - Get detailed information about a specific brain run
    */
-  async showAmbiguous(
+  async getRun(fetch: Fetch, runId: string): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/brains/runs/${encodeURIComponent(runId)}`,
+        {
+          method: 'GET',
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /brains/runs/${runId} returned ${response.status}`);
+        return false;
+      }
+
+      const data = (await response.json()) as {
+        brainRunId: string;
+        brainTitle: string;
+        brainDescription?: string;
+        type: string;
+        status: string;
+        options?: Record<string, any>;
+        error?: {
+          name: string;
+          message: string;
+          stack?: string;
+        };
+        createdAt: number;
+        startedAt?: number;
+        completedAt?: number;
+      };
+
+      // Validate required fields
+      if (!data.brainRunId || typeof data.brainRunId !== 'string') {
+        console.error(
+          `Expected brainRunId to be string, got ${typeof data.brainRunId}`
+        );
+        return false;
+      }
+
+      if (!data.brainTitle || typeof data.brainTitle !== 'string') {
+        console.error(
+          `Expected brainTitle to be string, got ${typeof data.brainTitle}`
+        );
+        return false;
+      }
+
+      if (!data.type || typeof data.type !== 'string') {
+        console.error(`Expected type to be string, got ${typeof data.type}`);
+        return false;
+      }
+
+      if (!data.status || typeof data.status !== 'string') {
+        console.error(
+          `Expected status to be string, got ${typeof data.status}`
+        );
+        return false;
+      }
+
+      if (typeof data.createdAt !== 'number') {
+        console.error(
+          `Expected createdAt to be number, got ${typeof data.createdAt}`
+        );
+        return false;
+      }
+
+      // If status is ERROR, validate error structure
+      if (data.status === 'ERROR' && data.error) {
+        if (!data.error.name || typeof data.error.name !== 'string') {
+          console.error(
+            `Expected error.name to be string, got ${typeof data.error.name}`
+          );
+          return false;
+        }
+        if (!data.error.message || typeof data.error.message !== 'string') {
+          console.error(
+            `Expected error.message to be string, got ${typeof data.error.message}`
+          );
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /brains/runs/${runId}:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test GET /brains/runs/:runId with non-existent run - Should return 404
+   */
+  async getRunNotFound(fetch: Fetch, nonExistentRunId: string): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/brains/runs/${encodeURIComponent(nonExistentRunId)}`,
+        {
+          method: 'GET',
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (response.status !== 404) {
+        console.error(
+          `GET /brains/runs/${nonExistentRunId} returned ${response.status}, expected 404`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test GET /brains/runs/${nonExistentRunId}:`,
+        error
+      );
+      return false;
+    }
+  },
+
+  /**
+   * Test GET /brains/:identifier with ambiguous identifier - Should return multiple matches
+   * (For future brain exploration/info command)
+   */
+  async getBrainInfoAmbiguous(
     fetch: Fetch,
     ambiguousIdentifier: string
   ): Promise<boolean> {
