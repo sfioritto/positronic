@@ -1,5 +1,17 @@
 # @positronic/client-anthropic
 
+## 0.0.32
+
+### Patch Changes
+
+- Fix Cloudflare secrets API and enable preview URLs
+
+  - Fix secrets API to send secret name in body instead of URL path
+  - Enable `workers_dev` and `preview_urls` in wrangler config for both dev and production environments
+
+- Updated dependencies
+  - @positronic/core@0.0.32
+
 ## 0.0.31
 
 ### Patch Changes
