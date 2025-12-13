@@ -4,6 +4,7 @@ import { ErrorComponent } from './error.js';
 import { useApiPost } from '../hooks/useApi.js';
 import * as path from 'path';
 import * as fs from 'fs';
+import { parse as parseEnv } from 'dotenv';
 
 interface SecretBulkProps {
   file?: string;
@@ -13,41 +14,6 @@ interface SecretBulkProps {
 interface BulkSecretsResponse {
   created: number;
   updated: number;
-}
-
-// Parse .env file content into key-value pairs
-function parseEnvFile(content: string): Array<{ name: string; value: string }> {
-  const secrets: Array<{ name: string; value: string }> = [];
-  const lines = content.split('\n');
-
-  for (const line of lines) {
-    // Skip empty lines and comments
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) {
-      continue;
-    }
-
-    // Find the first = sign
-    const eqIndex = trimmed.indexOf('=');
-    if (eqIndex === -1) {
-      continue;
-    }
-
-    const name = trimmed.substring(0, eqIndex).trim();
-    let value = trimmed.substring(eqIndex + 1).trim();
-
-    // Remove surrounding quotes if present
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-
-    if (name) {
-      secrets.push({ name, value });
-    }
-  }
-
-  return secrets;
 }
 
 export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
@@ -79,9 +45,10 @@ export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
           return;
         }
 
-        // Read and parse the env file
+        // Read and parse the env file using dotenv
         const content = fs.readFileSync(filePath, 'utf-8');
-        const secrets = parseEnvFile(content);
+        const parsed = parseEnv(content);
+        const secrets = Object.entries(parsed).map(([name, value]) => ({ name, value }));
 
         if (secrets.length === 0) {
           setValidationError(
