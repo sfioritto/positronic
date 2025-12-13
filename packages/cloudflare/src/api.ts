@@ -1251,8 +1251,8 @@ app.post('/secrets', async (context: Context) => {
       return context.json({ error: 'Missing required field "value"' }, 400);
     }
 
-    // Cloudflare API uses PUT with name in URL and value in body
-    const response = await cloudflareSecretsApi(config, encodeURIComponent(name), {
+    // Cloudflare API uses PUT with name in body (not in URL)
+    const response = await cloudflareSecretsApi(config, '', {
       method: 'PUT',
       body: JSON.stringify({
         name,
@@ -1410,7 +1410,7 @@ app.post('/secrets/bulk', async (context: Context) => {
         continue; // Skip invalid entries
       }
 
-      const response = await cloudflareSecretsApi(config, encodeURIComponent(secret.name), {
+      const response = await cloudflareSecretsApi(config, '', {
         method: 'PUT',
         body: JSON.stringify({
           name: secret.name,
