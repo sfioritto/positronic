@@ -212,9 +212,10 @@ describe('Positronic Spec', () => {
 
     it('passes POST /secrets test', async () => {
       // Mock Cloudflare API create secret response
+      // Note: The API sends the secret name in the body, not the URL
       fetchMock
         .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: `${SECRETS_PATH}/TEST_SECRET`, method: 'PUT' })
+        .intercept({ path: SECRETS_PATH, method: 'PUT' })
         .reply(200, {
           success: true,
           result: { name: 'TEST_SECRET', type: 'secret_text' },
@@ -226,10 +227,10 @@ describe('Positronic Spec', () => {
     });
 
     it('passes DELETE /secrets/:name test', async () => {
-      // Mock create first
+      // Mock create first (secret name in body, not URL)
       fetchMock
         .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: `${SECRETS_PATH}/SECRET_TO_DELETE`, method: 'PUT' })
+        .intercept({ path: SECRETS_PATH, method: 'PUT' })
         .reply(200, {
           success: true,
           result: { name: 'SECRET_TO_DELETE', type: 'secret_text' },
@@ -239,7 +240,7 @@ describe('Positronic Spec', () => {
       // First create a secret to delete
       await secrets.create(createFetch(), 'SECRET_TO_DELETE', 'temp-value');
 
-      // Mock delete
+      // Mock delete (delete still uses name in URL)
       fetchMock
         .get(CLOUDFLARE_API_BASE)
         .intercept({ path: `${SECRETS_PATH}/SECRET_TO_DELETE`, method: 'DELETE' })
@@ -283,10 +284,10 @@ describe('Positronic Spec', () => {
           errors: [],
         });
 
-      // Mock create for each secret
+      // Mock create for each secret (secret name in body, not URL)
       fetchMock
         .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: `${SECRETS_PATH}/BULK_SECRET_1`, method: 'PUT' })
+        .intercept({ path: SECRETS_PATH, method: 'PUT' })
         .reply(200, {
           success: true,
           result: { name: 'BULK_SECRET_1', type: 'secret_text' },
@@ -295,7 +296,7 @@ describe('Positronic Spec', () => {
 
       fetchMock
         .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: `${SECRETS_PATH}/BULK_SECRET_2`, method: 'PUT' })
+        .intercept({ path: SECRETS_PATH, method: 'PUT' })
         .reply(200, {
           success: true,
           result: { name: 'BULK_SECRET_2', type: 'secret_text' },
