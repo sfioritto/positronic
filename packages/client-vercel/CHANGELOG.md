@@ -1,5 +1,16 @@
 # @positronic/client-vercel
 
+## 0.0.33
+
+### Patch Changes
+
+- - Redesigned `px show` command: now shows detailed run information (including errors) instead of brain structure. Usage changed from `px show <filename>` to `px show <run-id>`
+  - Fixed brain commands to work in production environments (not just local dev mode)
+  - Added new API endpoint `/brains/runs/:runId/full` for retrieving complete run details
+  - Improved error messages to distinguish between local dev server and remote project server connection issues
+- Updated dependencies
+  - @positronic/core@0.0.33
+
 ## 0.0.32
 
 ### Patch Changes
