@@ -5,7 +5,7 @@ import { Text } from 'ink';
 import { Watch } from '../components/watch.js';
 import { BrainList } from '../components/brain-list.js';
 import { BrainHistory } from '../components/brain-history.js';
-import { BrainShow } from '../components/brain-show.js';
+import { RunShow } from '../components/run-show.js';
 import { BrainRerun } from '../components/brain-rerun.js';
 import { BrainKill } from '../components/brain-kill.js';
 import { ErrorComponent } from '../components/error.js';
@@ -16,7 +16,7 @@ interface BrainHistoryArgs {
   limit: number;
 }
 interface BrainShowArgs {
-  filename: string;
+  runId: string;
 }
 interface BrainRerunArgs {
   filename: string;
@@ -51,9 +51,9 @@ export class BrainCommand {
   }
 
   show({
-    filename,
+    runId,
   }: ArgumentsCamelCase<BrainShowArgs>): React.ReactElement {
-    return React.createElement(BrainShow, { brainName: filename });
+    return React.createElement(RunShow, { runId });
   }
 
   rerun({

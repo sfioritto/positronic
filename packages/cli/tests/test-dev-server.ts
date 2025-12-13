@@ -359,12 +359,12 @@ export class TestDevServer implements PositronicDevServer {
       const match = uri.match(/^\/brains\/runs\/(.+)$/);
       if (match) {
         const runId = decodeURIComponent(match[1]);
-        
+
         // Check for configured error responses
         if (this.killBrainRunErrors.has(runId)) {
           const errorCode = this.killBrainRunErrors.get(runId)!;
           this.logCall('killBrainRun', [runId]);
-          
+
           if (errorCode === 404) {
             return [404, { error: `Brain run '${runId}' not found` }];
           } else if (errorCode === 409) {
@@ -372,10 +372,28 @@ export class TestDevServer implements PositronicDevServer {
           }
           return [errorCode, { error: `Error ${errorCode}` }];
         }
-        
+
         // Success case
         this.logCall('killBrainRun', [runId]);
         return [204, ''];
+      }
+      return [404, { error: 'Invalid brain run ID' }];
+    });
+
+    // GET /brains/runs/:runId (get single run details)
+    // Must be before the watch endpoint to avoid conflicts
+    nockInstance.get(/^\/brains\/runs\/([^/]+)$/).reply((uri) => {
+      const match = uri.match(/^\/brains\/runs\/([^/]+)$/);
+      if (match) {
+        const runId = decodeURIComponent(match[1]);
+        this.logCall('getRun', [runId]);
+
+        const run = this.brainRuns.find(r => r.brainRunId === runId);
+        if (!run) {
+          return [404, { error: `Brain run '${runId}' not found` }];
+        }
+
+        return [200, run];
       }
       return [404, { error: 'Invalid brain run ID' }];
     });

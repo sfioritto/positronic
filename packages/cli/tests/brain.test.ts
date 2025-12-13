@@ -830,71 +830,141 @@ describe('CLI Integration: positronic brain commands', () => {
     });
   });
 
-  describe('brain show command', () => {
-    it('should show brain structure when brain exists', async () => {
+  describe('show command (run details)', () => {
+    it('should show run details for a completed run', async () => {
       const env = await createTestEnv();
       const { server } = env;
-      
-      // Add a brain to the test server with structure
-      server.addBrain({
-        filename: 'test-brain',
-        title: 'Test Brain',
-        description: 'A test brain for unit testing',
-        steps: [
-          {
-            type: 'step',
-            title: 'Initialize',
-          },
-          {
-            type: 'step',
-            title: 'Process Data',
-          },
-          {
-            type: 'brain',
-            title: 'Nested Analysis',
-            innerBrain: {
-              title: 'Inner Brain',
-              description: 'Performs nested analysis',
-              steps: [
-                {
-                  type: 'step',
-                  title: 'Analyze Subset',
-                },
-              ],
-            },
-          },
-        ],
+
+      // Add a completed brain run
+      server.addBrainRun({
+        brainRunId: 'run-completed-123',
+        brainTitle: 'Test Brain',
+        brainDescription: 'A test brain',
+        type: 'brain:complete',
+        status: 'COMPLETE',
+        createdAt: Date.now() - 60000,
+        startedAt: Date.now() - 60000,
+        completedAt: Date.now(),
       });
-      
+
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', 'test-brain']);
-        
+        const { waitForOutput } = await px(['show', 'run-completed-123']);
+
+        // Check for run ID
+        const foundRunId = await waitForOutput(/run-completed-123/, 30);
+        expect(foundRunId).toBe(true);
+
         // Check for brain title
         const foundTitle = await waitForOutput(/Test Brain/, 30);
         expect(foundTitle).toBe(true);
-        
-        // Check for description
-        const foundDescription = await waitForOutput(/A test brain for unit testing/, 30);
-        expect(foundDescription).toBe(true);
-        
-        // Check for steps
-        const foundSteps = await waitForOutput(/• Initialize/, 30);
-        expect(foundSteps).toBe(true);
+
+        // Check for status
+        const foundStatus = await waitForOutput(/COMPLETE/, 30);
+        expect(foundStatus).toBe(true);
+
+        // Check for success message
+        const foundSuccess = await waitForOutput(/completed successfully/, 30);
+        expect(foundSuccess).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
     });
 
-    it('should show error when brain does not exist', async () => {
+    it('should show error details for a failed run', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      // Add a failed brain run with error details
+      server.addBrainRun({
+        brainRunId: 'run-error-456',
+        brainTitle: 'Failing Brain',
+        type: 'brain:error',
+        status: 'ERROR',
+        error: {
+          name: 'AnthropicError',
+          message: 'Rate limit exceeded',
+          stack: 'Error: Rate limit exceeded\n    at processStep (/src/brain.ts:123)\n    at runBrain (/src/runner.ts:45)',
+        },
+        createdAt: Date.now() - 120000,
+        startedAt: Date.now() - 120000,
+        completedAt: Date.now() - 60000,
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['show', 'run-error-456']);
+
+        // Check for run ID
+        const foundRunId = await waitForOutput(/run-error-456/, 30);
+        expect(foundRunId).toBe(true);
+
+        // Check for ERROR status
+        const foundStatus = await waitForOutput(/ERROR/, 30);
+        expect(foundStatus).toBe(true);
+
+        // Check for error type
+        const foundErrorType = await waitForOutput(/AnthropicError/, 30);
+        expect(foundErrorType).toBe(true);
+
+        // Check for error message
+        const foundErrorMessage = await waitForOutput(/Rate limit exceeded/, 30);
+        expect(foundErrorMessage).toBe(true);
+
+        // Check for stack trace
+        const foundStackTrace = await waitForOutput(/Stack Trace/, 30);
+        expect(foundStackTrace).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show error when run does not exist', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', 'non-existent-brain']);
-        const foundError = await waitForOutput(/Brain 'non-existent-brain' not found/, 30);
+        const { waitForOutput } = await px(['show', 'non-existent-run']);
+        const foundError = await waitForOutput(/not found/, 30);
         expect(foundError).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show options when present', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      // Add a run with options
+      server.addBrainRun({
+        brainRunId: 'run-with-options',
+        brainTitle: 'Configurable Brain',
+        type: 'brain:complete',
+        status: 'COMPLETE',
+        options: {
+          email: 'test@example.com',
+          verbose: 'true',
+        },
+        createdAt: Date.now() - 60000,
+        startedAt: Date.now() - 60000,
+        completedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['show', 'run-with-options']);
+
+        // Check for options section
+        const foundOptions = await waitForOutput(/Options/, 30);
+        expect(foundOptions).toBe(true);
+
+        // Check for option values
+        const foundEmail = await waitForOutput(/test@example.com/, 30);
+        expect(foundEmail).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }

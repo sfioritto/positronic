@@ -172,6 +172,20 @@ app.get('/brains/runs/:runId/watch', async (context: Context) => {
   return response;
 });
 
+app.get('/brains/runs/:runId', async (context: Context) => {
+  const runId = context.req.param('runId');
+
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+  const run = await monitorStub.getRun(runId);
+
+  if (!run) {
+    return context.json({ error: `Brain run '${runId}' not found` }, 404);
+  }
+
+  return context.json(run);
+});
+
 app.delete('/brains/runs/:runId', async (context: Context) => {
   const runId = context.req.param('runId');
   

@@ -224,6 +224,46 @@ export class MonitorDO extends DurableObject<Env> {
     return results.length > 0 ? results[0] : null;
   }
 
+  /**
+   * Get detailed information about a specific brain run
+   * Returns null if run not found
+   */
+  getRun(brainRunId: string) {
+    const results = this.storage
+      .exec(
+        `
+      SELECT
+        run_id as brainRunId,
+        brain_title as brainTitle,
+        brain_description as brainDescription,
+        type,
+        status,
+        options,
+        error,
+        created_at as createdAt,
+        started_at as startedAt,
+        completed_at as completedAt
+      FROM brain_runs
+      WHERE run_id = ?
+    `,
+        brainRunId
+      )
+      .toArray();
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    const run = results[0] as any;
+
+    // Parse JSON fields
+    return {
+      ...run,
+      options: run.options ? JSON.parse(run.options) : null,
+      error: run.error ? JSON.parse(run.error) : null,
+    };
+  }
+
   // Update history method parameter and query
   history(brainTitle: string, limit: number = 10) {
     // Renamed parameter
