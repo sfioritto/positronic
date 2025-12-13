@@ -5,6 +5,7 @@
   "compatibility_date": "2024-09-23",
   "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
   "workers_dev": true,
+  "preview_urls": true,
   "migrations": [
     {
       "tag": "v1",
@@ -30,7 +31,8 @@
   "env": {
     "production": {
       "name": "<%= projectName %>",
-      "workers_dev": false,
+      "workers_dev": true,
+      "preview_urls": true,
       "vars": {
         "NODE_ENV": "production",
         "R2_BUCKET_NAME": "<%= projectName %>"
