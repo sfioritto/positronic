@@ -1,5 +1,17 @@
 # @positronic/core
 
+## 0.0.30
+
+### Patch Changes
+
+- Implement secrets management feature
+
+  - Add secrets API endpoints to Cloudflare backend for CRUD operations
+  - Add `px secret list`, `px secret create`, `px secret delete`, and `px secret bulk` CLI commands
+  - Use dotenv library to parse .env files for bulk secret uploads
+  - Add comprehensive spec tests for secrets API
+  - Update CLI components to use useApiPost/useApiGet hooks for server communication
+
 ## 0.0.29
 
 ### Patch Changes
