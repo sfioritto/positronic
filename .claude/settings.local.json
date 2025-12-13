@@ -32,7 +32,8 @@
       "Bash(npx changeset:*)",
       "Bash(npx vitest:*)",
       "WebFetch(domain:docs.github.com)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git show:*)"
     ],
     "deny": []
   }
