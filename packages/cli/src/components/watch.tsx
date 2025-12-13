@@ -5,6 +5,7 @@ import type { BrainEvent, StepStatusEvent, BrainStartEvent, BrainErrorEvent } fr
 import { BRAIN_EVENTS } from '@positronic/core';
 import type { SerializedStep } from '@positronic/core';
 import { STATUS } from '@positronic/core';
+import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 
 type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
 
@@ -61,10 +62,9 @@ const WatchStatus = ({ steps, brainTitle, runId }: WatchStatusProps) => {
 
 interface WatchProps {
   runId: string;
-  port: string;
 }
 
-export const Watch = ({ runId, port }: WatchProps) => {
+export const Watch = ({ runId }: WatchProps) => {
   const [steps, setSteps] = useState<SerializedStepStatus[]>([]);
   const [brainTitle, setBrainTitle] = useState<string | undefined>(undefined);
   const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
@@ -73,7 +73,7 @@ export const Watch = ({ runId, port }: WatchProps) => {
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
   useEffect(() => {
-    const baseUrl = `http://localhost:${port}`;
+    const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/brains/runs/${runId}/watch`;
     const es = new EventSource(url);
 
@@ -114,16 +114,19 @@ export const Watch = ({ runId, port }: WatchProps) => {
 
     es.onerror = (err) => {
       // EventSource does not provide detailed error objects here, often just a generic Event
-      setError(new Error(`Connection to ${url} failed. Ensure the server is running and accessible.`));
+      const errorMessage = isApiLocalDevMode()
+        ? `Connection to ${url} failed. Ensure the local development server is running ('positronic server' or 'px s').`
+        : `Connection to ${url} failed. Please check your network connection and verify the project URL is correct.`;
+      setError(new Error(errorMessage));
       setIsConnected(false);
       es.close();
     };
 
-    // Cleanup function to close EventSource when component unmounts or runId/port changes
+    // Cleanup function to close EventSource when component unmounts or runId changes
     return () => {
       es.close();
     };
-  }, [runId, port]);
+  }, [runId]);
 
   if (!isConnected && steps.length === 0) {
     return <Text>Connecting to watch service...</Text>;

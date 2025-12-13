@@ -44,6 +44,19 @@ export function isApiLocalDevMode(): boolean {
   return isLocalDevMode;
 }
 
+/**
+ * Get the configured API base URL.
+ * Returns the configured URL if set, otherwise falls back to localhost.
+ */
+export function getApiBaseUrl(): string {
+  if (apiBaseUrl) {
+    return apiBaseUrl;
+  }
+  // Fallback to localhost (for backwards compatibility and testing)
+  const port = process.env.POSITRONIC_PORT || '8787';
+  return `http://localhost:${port}`;
+}
+
 // Singleton API client instance
 export const apiClient = {
   fetch: async (apiPath: string, options?: RequestInit): Promise<Response> => {

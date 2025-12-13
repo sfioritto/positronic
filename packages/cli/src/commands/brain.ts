@@ -1,5 +1,5 @@
 import type { ArgumentsCamelCase } from 'yargs';
-import { apiClient } from './helpers.js';
+import { apiClient, isApiLocalDevMode } from './helpers.js';
 import React from 'react';
 import { Text } from 'ink';
 import { Watch } from '../components/watch.js';
@@ -121,10 +121,17 @@ export class BrainCommand {
         process.exit(1);
       }
     } catch (error: any) {
-      console.error(`Error connecting to the local development server.`);
-      console.error(
-        "Please ensure the server is running ('positronic server' or 'px s')."
-      );
+      if (isApiLocalDevMode()) {
+        console.error(`Error connecting to the local development server.`);
+        console.error(
+          "Please ensure the server is running ('positronic server' or 'px s')."
+        );
+      } else {
+        console.error(`Error connecting to the remote project server.`);
+        console.error(
+          'Please check your network connection and verify the project URL is correct.'
+        );
+      }
       if (error.code === 'ECONNREFUSED') {
         console.error(
           'Reason: Connection refused. The server might not be running or is listening on a different port.'
@@ -142,8 +149,7 @@ export class BrainCommand {
   }: ArgumentsCamelCase<BrainWatchArgs>): Promise<React.ReactElement> {
     // If a specific run ID is provided, return the Watch component
     if (runId) {
-      const port = process.env.POSITRONIC_PORT || '8787';
-      return React.createElement(Watch, { runId, port });
+      return React.createElement(Watch, { runId });
     }
 
     // If watching by brain filename is requested, look up active runs
@@ -185,8 +191,7 @@ export class BrainCommand {
 
           // Exactly one active run found - watch it
           const activeRun = result.runs[0];
-          const port = process.env.POSITRONIC_PORT || '8787';
-          return React.createElement(Watch, { runId: activeRun.brainRunId, port });
+          return React.createElement(Watch, { runId: activeRun.brainRunId });
         } else {
           const errorText = await response.text();
           return React.createElement(
@@ -201,13 +206,21 @@ export class BrainCommand {
           );
         }
       } catch (error: any) {
+        const connectionError = isApiLocalDevMode()
+          ? {
+              message: 'Error connecting to the local development server.',
+              details: `Please ensure the server is running ('positronic server' or 'px s').\n\nError details: ${error.message}`
+            }
+          : {
+              message: 'Error connecting to the remote project server.',
+              details: `Please check your network connection and verify the project URL is correct.\n\nError details: ${error.message}`
+            };
         return React.createElement(
           ErrorComponent,
           {
             error: {
               title: 'Connection Error',
-              message: 'Error connecting to the local development server.',
-              details: `Please ensure the server is running ('positronic server' or 'px s').\n\nError details: ${error.message}`
+              ...connectionError
             }
           }
         );
