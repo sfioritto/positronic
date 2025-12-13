@@ -1,3 +1,5 @@
+import { STATUS } from '@positronic/core';
+
 type Fetch = (request: Request) => Promise<Response>;
 
 export async function testStatus(fetch: Fetch): Promise<boolean> {
@@ -967,10 +969,10 @@ export const brains = {
           return false;
         }
 
-        // All active runs should have status 'RUNNING'
-        if (run.status !== 'RUNNING') {
+        // All active runs should have status 'running'
+        if (run.status !== STATUS.RUNNING) {
           console.error(
-            `Expected active run status to be 'RUNNING', got ${run.status}`
+            `Expected active run status to be '${STATUS.RUNNING}', got ${run.status}`
           );
           return false;
         }
@@ -1056,8 +1058,8 @@ export const brains = {
         return false;
       }
 
-      // If status is ERROR, validate error structure
-      if (data.status === 'ERROR' && data.error) {
+      // If status is error, validate error structure
+      if (data.status === STATUS.ERROR && data.error) {
         if (!data.error.name || typeof data.error.name !== 'string') {
           console.error(
             `Expected error.name to be string, got ${typeof data.error.name}`
