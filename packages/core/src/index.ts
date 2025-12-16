@@ -1,4 +1,4 @@
-export { Brain, brain } from './dsl/brain.js';
+export { Brain, brain, DEFAULT_ENV } from './dsl/brain.js';
 export { BrainRunner } from './dsl/brain-runner.js';
 export { STATUS, BRAIN_EVENTS } from './dsl/constants.js';
 export type { Adapter } from './adapters/types.js';
@@ -18,7 +18,7 @@ export type {
   BrainFactory,
 } from './dsl/brain.js';
 export type { ObjectGenerator, Message } from './clients/types.js';
-export type { State } from './dsl/types.js';
+export type { State, RuntimeEnv } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer

@@ -1,4 +1,4 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
@@ -235,13 +235,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
     const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
+    // Create runtime environment - single source of truth for origin
+    const env: RuntimeEnv = {
+      origin: this.env.WORKER_URL || 'http://localhost:3000',
+    };
+
     // Create pages service for brain to use
-    const baseUrl = this.env.WORKER_URL || 'http://localhost:3000';
     const pagesService = createPagesService(
       brainRunId,
       this.env.RESOURCES_BUCKET,
       monitorDOStub,
-      baseUrl
+      env
     );
 
     if (!brainRunner) {
@@ -258,8 +262,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
       runnerWithResources = brainRunner.withResources(r2Resources);
     }
 
-    // Add pages service
-    runnerWithResources = runnerWithResources.withPages(pagesService);
+    // Add pages service and runtime env
+    runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
 
     // Extract options from initialData if present
     const options = initialData?.options;
@@ -376,13 +380,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
     const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
+    // Create runtime environment - single source of truth for origin
+    const env: RuntimeEnv = {
+      origin: this.env.WORKER_URL || 'http://localhost:3000',
+    };
+
     // Create pages service for brain to use
-    const baseUrl = this.env.WORKER_URL || 'http://localhost:3000';
     const pagesService = createPagesService(
       brainRunId,
       this.env.RESOURCES_BUCKET,
       monitorDOStub,
-      baseUrl
+      env
     );
 
     if (!brainRunner) {
@@ -397,8 +405,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
       runnerWithResources = brainRunner.withResources(r2Resources);
     }
 
-    // Add pages service
-    runnerWithResources = runnerWithResources.withPages(pagesService);
+    // Add pages service and runtime env
+    runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
 
     // Create abort controller for this run
     this.abortController = new AbortController();

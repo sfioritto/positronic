@@ -1,8 +1,8 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { Adapter } from '../adapters/types.js';
-import type { SerializedStep, Brain } from './brain.js';
-import type { State, JsonObject } from './types.js';
+import { DEFAULT_ENV, type SerializedStep, type Brain } from './brain.js';
+import type { State, JsonObject, RuntimeEnv } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
@@ -14,6 +14,7 @@ export class BrainRunner {
       client: ObjectGenerator;
       resources?: Resources;
       pages?: PagesService;
+      env?: RuntimeEnv;
     }
   ) {}
 
@@ -46,6 +47,13 @@ export class BrainRunner {
     });
   }
 
+  withEnv(env: RuntimeEnv): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      env,
+    });
+  }
+
   async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     {
@@ -66,7 +74,8 @@ export class BrainRunner {
       response?: JsonObject;
     } = {}
   ): Promise<TState> {
-    const { adapters, client, resources, pages } = this.options;
+    const { adapters, client, resources, pages, env } = this.options;
+    const resolvedEnv = env ?? DEFAULT_ENV;
 
     let currentState = initialState ?? ({} as TState);
     let stepNumber = 1;
@@ -92,6 +101,7 @@ export class BrainRunner {
             client,
             resources: resources ?? {},
             pages,
+            env: resolvedEnv,
             response,
           })
         : brain.run({
@@ -101,6 +111,7 @@ export class BrainRunner {
             brainRunId,
             resources: resources ?? {},
             pages,
+            env: resolvedEnv,
           });
 
     try {

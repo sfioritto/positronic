@@ -1,4 +1,4 @@
-import type { PagesService, Page, PageCreateOptions } from '@positronic/core';
+import type { PagesService, Page, PageCreateOptions, RuntimeEnv } from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
 import type { MonitorDO } from './monitor-do.js';
 
@@ -18,13 +18,13 @@ function generateUniqueSlug(brainRunId: string): string {
  * @param brainRunId - The current brain run ID (used for page registration/cleanup)
  * @param bucket - The R2 bucket for storing pages
  * @param monitorStub - The MonitorDO stub for page registration
- * @param baseUrl - The base URL for page URLs (e.g., "https://myapp.workers.dev")
+ * @param env - The runtime environment containing the origin URL
  */
 export function createPagesService(
   brainRunId: string,
   bucket: R2Bucket,
   monitorStub: DurableObjectStub<MonitorDO>,
-  baseUrl: string
+  env: RuntimeEnv
 ): PagesService {
   // Implementation function that handles both overloads
   async function createPage(
@@ -72,7 +72,7 @@ export function createPagesService(
     // Register the page with MonitorDO for cleanup tracking
     await monitorStub.registerPage(slug, brainRunId, persist);
 
-    const url = `${baseUrl}/pages/${slug}`;
+    const url = `${env.origin}/pages/${slug}`;
 
     return {
       slug,
@@ -107,7 +107,7 @@ export function createPagesService(
       }
 
       const metadata = r2Object.customMetadata || {};
-      const url = `${baseUrl}/pages/${slug}`;
+      const url = `${env.origin}/pages/${slug}`;
 
       return {
         slug: metadata.slug || slug,
@@ -140,7 +140,7 @@ export function createPagesService(
         customMetadata: existingMetadata,
       });
 
-      const url = `${baseUrl}/pages/${slug}`;
+      const url = `${env.origin}/pages/${slug}`;
 
       return {
         slug: existingMetadata.slug || slug,
