@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator } from '../clients/types.js';
-import type { State, JsonPatch, JsonObject } from './types.js';
+import type { State, JsonPatch, JsonObject, RuntimeEnv } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
@@ -12,6 +12,14 @@ export type SerializedError = {
   name: string;
   message: string;
   stack?: string;
+};
+
+/**
+ * Default runtime environment used when env is not provided.
+ * This ensures backward compatibility with existing code.
+ */
+export const DEFAULT_ENV: RuntimeEnv = {
+  origin: 'http://localhost:3000',
 };
 
 // Shared interface for step action functions
@@ -30,6 +38,7 @@ export type StepAction<
     resources: Resources;
     response: TResponseIn;
     pages?: PagesService;
+    env: RuntimeEnv;
   } & TServices
 ) =>
   | TStateOut
@@ -225,6 +234,7 @@ interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   resources?: Resources;
   options?: TOptions;
   pages?: PagesService;
+  env?: RuntimeEnv;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
@@ -321,6 +331,7 @@ export class Brain<
         resources: Resources;
         response: TResponse;
         pages?: PagesService;
+        env: RuntimeEnv;
       } & TServices
     ) =>
       | TNewState
@@ -578,6 +589,7 @@ class BrainEventStream<
   private services: TServices;
   private resources: Resources;
   private pages?: PagesService;
+  private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
 
   constructor(
@@ -600,6 +612,7 @@ class BrainEventStream<
       services,
       resources = {} as Resources,
       pages,
+      env,
       response,
     } = params as RerunParams<TOptions> & {
       title: string;
@@ -616,6 +629,7 @@ class BrainEventStream<
     this.services = services;
     this.resources = resources;
     this.pages = pages;
+    this.env = env ?? DEFAULT_ENV;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -789,6 +803,7 @@ class BrainEventStream<
         client: this.client,
         initialState,
         options: this.options ?? ({} as TOptions),
+        env: this.env,
       });
 
       for await (const event of innerRun) {
@@ -830,6 +845,7 @@ class BrainEventStream<
               resources: this.resources,
               response: this.currentResponse,
               pages: this.pages,
+              env: this.env,
               ...this.services,
             })
           );
