@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
-import { syncResources, generateTypes } from './helpers.js';
+import { syncResources, generateTypes, generateAndWriteSecretTypes } from './helpers.js';
 import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 
 export class ServerCommand {
@@ -164,6 +164,8 @@ export class ServerCommand {
           );
         }
         await generateTypes(this.server.projectRootDir);
+        // Generate secrets types from .env for autocomplete support
+        generateAndWriteSecretTypes(this.server.projectRootDir);
       } catch (error) {
         console.error(
           '❌ Error during resource synchronization:',
@@ -178,10 +180,12 @@ export class ServerCommand {
         // Don't exit here - let the server continue running
       }
 
-      // Watcher setup - target the user's brains and resources directories
+      // Watcher setup - target the user's brains, resources directories, and .env file
+      const envFilePath = path.join(this.server.projectRootDir, '.env');
       const watchPaths = [
         path.join(brainsDir, '*.ts'),
         path.join(resourcesDir, '**/*'),
+        envFilePath,
       ];
 
       watcher = chokidar.watch(watchPaths, {
@@ -199,9 +203,16 @@ export class ServerCommand {
         await generateTypes(this.server.projectRootDir);
       };
 
+      const handleEnvChange = () => {
+        generateAndWriteSecretTypes(this.server.projectRootDir);
+        console.log('✅ Updated secrets.d.ts from .env');
+      };
+
       watcher
         .on('add', async (filePath) => {
-          if (filePath.startsWith(resourcesDir)) {
+          if (filePath === envFilePath) {
+            handleEnvChange();
+          } else if (filePath.startsWith(resourcesDir)) {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
@@ -211,7 +222,9 @@ export class ServerCommand {
           }
         })
         .on('change', async (filePath) => {
-          if (filePath.startsWith(resourcesDir)) {
+          if (filePath === envFilePath) {
+            handleEnvChange();
+          } else if (filePath.startsWith(resourcesDir)) {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists
@@ -221,7 +234,9 @@ export class ServerCommand {
           }
         })
         .on('unlink', async (filePath) => {
-          if (filePath.startsWith(resourcesDir)) {
+          if (filePath === envFilePath) {
+            handleEnvChange();
+          } else if (filePath.startsWith(resourcesDir)) {
             await handleResourceChange();
           } else if (filePath.startsWith(brainsDir)) {
             // Call the dev server's watch method if it exists

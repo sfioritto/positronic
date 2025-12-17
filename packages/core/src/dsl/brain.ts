@@ -20,6 +20,7 @@ export type SerializedError = {
  */
 export const DEFAULT_ENV: RuntimeEnv = {
   origin: 'http://localhost:3000',
+  secrets: {},
 };
 
 // Shared interface for step action functions
