@@ -1,5 +1,17 @@
 # @positronic/template-new-project
 
+## 0.0.35
+
+### Patch Changes
+
+- Add runtime environment with origin and secrets access in brain steps
+
+  - Add `env.origin` to provide the base URL of the running instance in brain steps
+  - Add `env.secrets` to provide type-safe access to environment variables/secrets
+  - Auto-generate `secrets.d.ts` from `.env` file for TypeScript autocomplete on secret names
+  - Watch `.env` file for changes and regenerate types automatically
+  - Clean up brain history CLI output by removing redundant error display section
+
 ## 0.0.34
 
 ### Patch Changes
