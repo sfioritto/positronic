@@ -1,5 +1,15 @@
 # @positronic/template-new-project
 
+## 0.0.37
+
+### Patch Changes
+
+- Add WORKER_URL environment variable support for page URL construction.
+
+  - Pages now use configurable origin URL via WORKER_URL env var instead of inferring from request URL
+  - Enables proper URL generation when deployed behind proxies or custom domains
+  - Falls back to request-based URL detection when WORKER_URL is not set
+
 ## 0.0.36
 
 ### Patch Changes
