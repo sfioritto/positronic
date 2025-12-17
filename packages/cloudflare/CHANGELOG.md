@@ -1,5 +1,15 @@
 # @positronic/cloudflare
 
+## 0.0.36
+
+### Patch Changes
+
+- Fix Secrets interface to restore TypeScript autocomplete for project-specific secrets
+- Updated dependencies
+  - @positronic/core@0.0.36
+  - @positronic/spec@0.0.36
+  - @positronic/template-new-project@0.0.36
+
 ## 0.0.35
 
 ### Patch Changes

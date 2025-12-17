@@ -1,5 +1,11 @@
 # @positronic/shell
 
+## 0.0.36
+
+### Patch Changes
+
+- Fix Secrets interface to restore TypeScript autocomplete for project-specific secrets
+
 ## 0.0.35
 
 ### Patch Changes
