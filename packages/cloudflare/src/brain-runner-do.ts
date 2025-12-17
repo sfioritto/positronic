@@ -196,7 +196,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     return {
       origin: this.env.WORKER_URL || 'http://localhost:3000',
-      secrets,
+      // Cast to Secrets - the generated secrets.d.ts augments Secrets with specific keys
+      secrets: secrets as unknown as RuntimeEnv['secrets'],
     };
   }
 
