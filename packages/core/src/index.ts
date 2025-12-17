@@ -18,7 +18,7 @@ export type {
   BrainFactory,
 } from './dsl/brain.js';
 export type { ObjectGenerator, Message } from './clients/types.js';
-export type { State, RuntimeEnv } from './dsl/types.js';
+export type { State, RuntimeEnv, Secrets } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer

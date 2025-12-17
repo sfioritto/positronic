@@ -180,6 +180,26 @@ export class BrainRunnerDO extends DurableObject<Env> {
     return resources;
   }
 
+  /**
+   * Build the RuntimeEnv for brain execution.
+   * Extracts secrets from Cloudflare env bindings (string values only).
+   */
+  private buildRuntimeEnv(): RuntimeEnv {
+    // Extract secrets: filter this.env to only string values
+    // This automatically excludes infrastructure bindings (R2Bucket, DurableObjectNamespace are objects)
+    const secrets: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(this.env)) {
+      if (typeof value === 'string') {
+        secrets[key] = value;
+      }
+    }
+
+    return {
+      origin: this.env.WORKER_URL || 'http://localhost:3000',
+      secrets,
+    };
+  }
+
   async kill(): Promise<{ success: boolean; message: string }> {
     if (this.abortController && !this.abortController.signal.aborted) {
       this.abortController.abort();
@@ -235,10 +255,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
     const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
-    // Create runtime environment - single source of truth for origin
-    const env: RuntimeEnv = {
-      origin: this.env.WORKER_URL || 'http://localhost:3000',
-    };
+    // Create runtime environment with origin and secrets
+    const env = this.buildRuntimeEnv();
 
     // Create pages service for brain to use
     const pagesService = createPagesService(
@@ -380,10 +398,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
     const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
-    // Create runtime environment - single source of truth for origin
-    const env: RuntimeEnv = {
-      origin: this.env.WORKER_URL || 'http://localhost:3000',
-    };
+    // Create runtime environment with origin and secrets
+    const env = this.buildRuntimeEnv();
 
     // Create pages service for brain to use
     const pagesService = createPagesService(
