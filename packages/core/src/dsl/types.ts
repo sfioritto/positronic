@@ -7,11 +7,13 @@ export type State = JsonObject;
 
 /**
  * Secrets/environment variables available to brains at runtime.
- * This interface can be augmented via module declaration in generated secrets.d.ts
+ * This interface is augmented via module declaration in generated secrets.d.ts
  * to provide autocomplete for project-specific secrets.
+ *
+ * The base interface is empty - specific keys are added by the generated secrets.d.ts
  */
 export interface Secrets {
-  [key: string]: string | undefined;
+  // Augmented by generated secrets.d.ts
 }
 
 /**
