@@ -23,6 +23,8 @@ type Bindings = {
   CLOUDFLARE_API_TOKEN?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CF_SCRIPT_NAME?: string;
+  // Origin URL for constructing page URLs
+  WORKER_URL?: string;
 };
 
 type CreateBrainRunRequest = {
@@ -41,6 +43,18 @@ type R2Resource = Omit<ResourceEntry, 'path'> & {
   lastModified: string;
   local: boolean;
 };
+
+/**
+ * Get the origin URL for constructing page URLs.
+ * Uses WORKER_URL env var if set, otherwise falls back to request URL.
+ */
+function getOrigin(context: Context): string {
+  if (context.env.WORKER_URL) {
+    return context.env.WORKER_URL;
+  }
+  const url = new URL(context.req.url);
+  return `${url.protocol}//${url.host}`;
+}
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -909,8 +923,7 @@ app.post('/pages', async (context: Context) => {
     await monitorStub.registerPage(slug, brainRunId, persist === true);
 
     // Build the public URL for this page
-    const url = new URL(context.req.url);
-    const pageUrl = `${url.protocol}//${url.host}/pages/${slug}`;
+    const pageUrl = `${getOrigin(context)}/pages/${slug}`;
 
     return context.json(
       {
@@ -955,8 +968,7 @@ app.get('/pages', async (context: Context) => {
         const slug = metadata.slug || object.key.replace('pages/', '').replace('.html', '');
 
         // Build the public URL
-        const url = new URL(context.req.url);
-        const pageUrl = `${url.protocol}//${url.host}/pages/${slug}`;
+        const pageUrl = `${getOrigin(context)}/pages/${slug}`;
 
         return {
           slug,
@@ -1093,8 +1105,7 @@ app.put('/pages/:slug', async (context: Context) => {
     });
 
     // Build the public URL
-    const url = new URL(context.req.url);
-    const pageUrl = `${url.protocol}//${url.host}/pages/${slug}`;
+    const pageUrl = `${getOrigin(context)}/pages/${slug}`;
 
     return context.json({
       slug,
