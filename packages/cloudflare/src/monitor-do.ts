@@ -158,8 +158,13 @@ export class MonitorDO extends DurableObject<Env> {
     const encoder = new TextEncoder();
 
     if (url.pathname === '/watch') {
+      // Capture the controller so we can properly unsubscribe on cancel.
+      // The cancel callback receives a "reason" parameter, not the controller.
+      let streamController: ReadableStreamDefaultController | null = null;
+
       const stream = new ReadableStream({
         start: async (controller) => {
+          streamController = controller;
           try {
             const runningBrains = await this.storage
               .exec(
@@ -194,8 +199,10 @@ export class MonitorDO extends DurableObject<Env> {
             this.eventStreamHandler.unsubscribe(controller);
           }
         },
-        cancel: (controller) => {
-          this.eventStreamHandler.unsubscribe(controller);
+        cancel: () => {
+          if (streamController) {
+            this.eventStreamHandler.unsubscribe(streamController);
+          }
         },
       });
 
@@ -436,6 +443,7 @@ export class MonitorDO extends DurableObject<Env> {
       brainRunId
     );
   }
+
 }
 
 class EventStreamHandler {
