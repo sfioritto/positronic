@@ -9,6 +9,7 @@ export const BRAIN_EVENTS = {
   COMPLETE: 'brain:complete',
   CANCELLED: 'brain:cancelled',
   WEBHOOK: 'brain:webhook',
+  WEBHOOK_RESPONSE: 'brain:webhook_response',
   // Loop step events
   LOOP_START: 'loop:start',
   LOOP_ITERATION: 'loop:iteration',
@@ -17,6 +18,7 @@ export const BRAIN_EVENTS = {
   LOOP_ASSISTANT_MESSAGE: 'loop:assistant_message',
   LOOP_COMPLETE: 'loop:complete',
   LOOP_TOKEN_LIMIT: 'loop:token_limit',
+  LOOP_WEBHOOK: 'loop:webhook',
 } as const;
 
 export const STATUS = {

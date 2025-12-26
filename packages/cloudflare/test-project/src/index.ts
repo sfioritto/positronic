@@ -232,6 +232,58 @@ const fixedSlugBrain = brain({ title: 'fixed-slug-brain', description: 'A brain 
     };
   });
 
+// Webhook for loop testing
+const loopEscalationWebhook = createWebhook(
+  'loop-escalation',
+  z.object({
+    approved: z.boolean(),
+    reviewerNote: z.string().optional(),
+  }),
+  async (request: Request) => {
+    const body = (await request.json()) as {
+      escalationId?: string;
+      approved?: boolean;
+      note?: string;
+    };
+    return {
+      type: 'webhook' as const,
+      identifier: body.escalationId || '',
+      response: {
+        approved: body.approved ?? false,
+        reviewerNote: body.note,
+      },
+    };
+  }
+);
+
+// Brain with a loop step that uses webhooks for escalation
+const loopWebhookBrain = brain({ title: 'loop-webhook-brain', description: 'A brain that uses loop with webhook escalation' })
+  .loop('Process with escalation', ({ state }) => ({
+    system: 'You are an AI assistant that can escalate to humans when needed.',
+    prompt: 'Please process this request. If you need human review, use the escalate tool.',
+    tools: {
+      escalate: {
+        description: 'Escalate to a human for review',
+        inputSchema: z.object({
+          reason: z.string().describe('Why escalation is needed'),
+        }),
+        execute: async () => {
+          // Return waitFor to suspend the loop and wait for webhook
+          return {
+            waitFor: loopEscalationWebhook('test-escalation-123'),
+          };
+        },
+      },
+      finish: {
+        description: 'Complete the task with a final result',
+        inputSchema: z.object({
+          result: z.string().describe('The final result'),
+        }),
+        terminal: true,
+      },
+    },
+  }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -283,6 +335,11 @@ const brainManifest = {
     path: 'brains/fixed-slug-brain.ts',
     brain: fixedSlugBrain,
   },
+  'loop-webhook-brain': {
+    filename: 'loop-webhook-brain',
+    path: 'brains/loop-webhook-brain.ts',
+    brain: loopWebhookBrain,
+  },
 };
 
 const manifest = new PositronicManifest({
@@ -293,6 +350,7 @@ const manifest = new PositronicManifest({
 export const webhookManifest = {
   'test-webhook': testWebhook,
   'notification': notificationWebhook,
+  'loop-escalation': loopEscalationWebhook,
 };
 
 setManifest(manifest);

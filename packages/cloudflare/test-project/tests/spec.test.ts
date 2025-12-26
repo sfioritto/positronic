@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, beforeEach } from 'vitest';
 import {
   env,
   createExecutionContext,
@@ -7,6 +7,7 @@ import {
 } from 'cloudflare:test';
 import worker from '../src/index';
 import { testStatus, resources, brains, schedules, webhooks, pages, secrets } from '@positronic/spec';
+import { resetMockState } from '../src/runner';
 
 describe('Positronic Spec', () => {
   // Helper function to create fetch wrapper for Cloudflare workers
@@ -16,6 +17,11 @@ describe('Positronic Spec', () => {
     await waitOnExecutionContext(context);
     return response;
   };
+
+  // Reset mock state before each test
+  beforeEach(() => {
+    resetMockState();
+  });
 
   it('passes status endpoint test', async () => {
     const result = await testStatus(createFetch());
@@ -124,6 +130,25 @@ describe('Positronic Spec', () => {
 
     it('passes GET /brains/watch test', async () => {
       const result = await brains.watchAll(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes loop events spec test (LOOP_START, LOOP_ITERATION, LOOP_TOOL_CALL, LOOP_WEBHOOK)', async () => {
+      const result = await brains.watchLoopEvents(createFetch(), 'loop-webhook-brain');
+      expect(result).toBe(true);
+    });
+
+    it('passes loop webhook resume spec test (full suspend/resume cycle)', async () => {
+      const result = await brains.loopWebhookResume(
+        createFetch(),
+        'loop-webhook-brain',
+        'loop-escalation',
+        {
+          escalationId: 'test-escalation-123',
+          approved: true,
+          note: 'Approved via spec test',
+        }
+      );
       expect(result).toBe(true);
     });
   });

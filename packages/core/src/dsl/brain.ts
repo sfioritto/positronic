@@ -7,6 +7,7 @@ import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
 import type { WebhookRegistration, ExtractWebhookResponses, SerializedWebhookRegistration } from './webhook.js';
 import type { PagesService } from './pages.js';
+import type { LoopResumeContext } from './loop-messages.js';
 
 export type SerializedError = {
   name: string;
@@ -136,6 +137,8 @@ export interface LoopStartEvent<TOptions extends JsonObject = JsonObject>
   type: typeof BRAIN_EVENTS.LOOP_START;
   stepTitle: string;
   stepId: string;
+  prompt: string;
+  system?: string;
 }
 
 export interface LoopIterationEvent<TOptions extends JsonObject = JsonObject>
@@ -194,6 +197,22 @@ export interface LoopTokenLimitEvent<TOptions extends JsonObject = JsonObject>
   maxTokens: number;
 }
 
+export interface LoopWebhookEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_WEBHOOK;
+  stepTitle: string;
+  stepId: string;
+  toolCallId: string;
+  toolName: string;
+  input: JsonObject;
+}
+
+export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.WEBHOOK_RESPONSE;
+  response: JsonObject;
+}
+
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -205,13 +224,15 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepCompletedEvent<TOptions>
   | StepRetryEvent<TOptions>
   | WebhookEvent<TOptions>
+  | WebhookResponseEvent<TOptions>
   | LoopStartEvent<TOptions>
   | LoopIterationEvent<TOptions>
   | LoopToolCallEvent<TOptions>
   | LoopToolResultEvent<TOptions>
   | LoopAssistantMessageEvent<TOptions>
   | LoopCompleteEvent<TOptions>
-  | LoopTokenLimitEvent<TOptions>;
+  | LoopTokenLimitEvent<TOptions>
+  | LoopWebhookEvent<TOptions>;
 
 export interface SerializedStep {
   title: string;
@@ -346,6 +367,7 @@ export interface RerunParams<TOptions extends JsonObject = JsonObject>
   initialCompletedSteps: SerializedStep[];
   brainRunId: string;
   response?: JsonObject;
+  loopResumeContext?: LoopResumeContext | null;
 }
 
 export class Brain<
@@ -739,6 +761,7 @@ class BrainEventStream<
   private pages?: PagesService;
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
+  private loopResumeContext: LoopResumeContext | null | undefined = undefined;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -762,6 +785,7 @@ class BrainEventStream<
       pages,
       env,
       response,
+      loopResumeContext,
     } = params as RerunParams<TOptions> & {
       title: string;
       description?: string;
@@ -805,6 +829,11 @@ class BrainEventStream<
     // Set initial response if provided (for webhook restarts)
     if (response) {
       this.currentResponse = response;
+    }
+
+    // Set loop resume context if provided (for loop webhook restarts)
+    if (loopResumeContext) {
+      this.loopResumeContext = loopResumeContext;
     }
   }
 
@@ -1064,17 +1093,53 @@ class BrainEventStream<
       ...this.services,
     });
 
-    // Emit loop start event
-    yield {
-      type: BRAIN_EVENTS.LOOP_START,
-      stepTitle: step.block.title,
-      stepId: step.id,
-      options: this.options ?? ({} as TOptions),
-      brainRunId: this.brainRunId,
-    };
+    // Check if we're resuming from a webhook
+    let messages: ToolMessage[];
+    if (this.loopResumeContext) {
+      const resumeContext = this.loopResumeContext;
 
-    // Initialize messages and token tracking
-    const messages: ToolMessage[] = [{ role: 'user', content: config.prompt }];
+      // Emit WEBHOOK_RESPONSE event to record the response
+      yield {
+        type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
+        response: this.currentResponse!,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+
+      // Emit LOOP_TOOL_RESULT for the pending tool (webhook response injected as tool result)
+      yield {
+        type: BRAIN_EVENTS.LOOP_TOOL_RESULT,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        toolCallId: resumeContext.pendingToolCallId,
+        toolName: resumeContext.pendingToolName,
+        result: this.currentResponse as JsonObject,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+
+      // Use restored messages from the resume context
+      messages = resumeContext.messages;
+
+      // Clear the context so it's only used once
+      this.loopResumeContext = undefined;
+    } else {
+      // Emit loop start event (only for fresh starts)
+      yield {
+        type: BRAIN_EVENTS.LOOP_START,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        prompt: config.prompt,
+        system: config.system,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+
+      // Initialize messages for fresh start
+      messages = [{ role: 'user', content: config.prompt }];
+    }
+
+    // Initialize token tracking
     let totalTokens = 0;
     let iteration = 0;
 
@@ -1205,7 +1270,19 @@ class BrainEventStream<
           ) {
             const waitForResult = toolResult as LoopToolWaitFor;
 
-            // Emit webhook event
+            // Emit loop webhook event first (captures pending tool context)
+            yield {
+              type: BRAIN_EVENTS.LOOP_WEBHOOK,
+              stepTitle: step.block.title,
+              stepId: step.id,
+              toolCallId: toolCall.toolCallId,
+              toolName: toolCall.toolName,
+              input: toolCall.args as JsonObject,
+              options: this.options ?? ({} as TOptions),
+              brainRunId: this.brainRunId,
+            };
+
+            // Then emit webhook event
             yield {
               type: BRAIN_EVENTS.WEBHOOK,
               waitFor: [

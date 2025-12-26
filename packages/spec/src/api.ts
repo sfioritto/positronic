@@ -1,4 +1,4 @@
-import { STATUS } from '@positronic/core';
+import { STATUS, BRAIN_EVENTS } from '@positronic/core';
 
 type Fetch = (request: Request) => Promise<Response>;
 
@@ -1307,6 +1307,401 @@ export const brains = {
       return true;
     } catch (error) {
       console.error(`Failed to test DELETE /brains/runs/${runId}:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test that loop steps emit proper LOOP_* events in the SSE stream.
+   * Requires a brain with a loop step that will pause on a webhook.
+   *
+   * Expected events before webhook pause:
+   * - LOOP_START (with prompt and optional system)
+   * - LOOP_ITERATION
+   * - LOOP_TOOL_CALL
+   * - LOOP_WEBHOOK (before WEBHOOK event)
+   * - WEBHOOK
+   */
+  async watchLoopEvents(
+    fetch: Fetch,
+    loopBrainIdentifier: string
+  ): Promise<boolean> {
+    try {
+      // Start the loop brain
+      const runRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: loopBrainIdentifier }),
+      });
+
+      const runResponse = await fetch(runRequest);
+      if (runResponse.status !== 201) {
+        console.error(
+          `POST /brains/runs returned ${runResponse.status}, expected 201`
+        );
+        return false;
+      }
+
+      const { brainRunId } = (await runResponse.json()) as { brainRunId: string };
+
+      // Watch the brain run
+      const watchRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/watch`,
+        { method: 'GET' }
+      );
+
+      const watchResponse = await fetch(watchRequest);
+      if (!watchResponse.ok) {
+        console.error(
+          `GET /brains/runs/${brainRunId}/watch returned ${watchResponse.status}`
+        );
+        return false;
+      }
+
+      // Read SSE events until we get WEBHOOK or COMPLETE/ERROR
+      const events: any[] = [];
+      if (watchResponse.body) {
+        const reader = watchResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let done = false;
+
+        try {
+          while (!done) {
+            const { value, done: streamDone } = await reader.read();
+            if (streamDone) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process complete SSE messages
+            let eventEndIndex;
+            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+              const message = buffer.substring(0, eventEndIndex);
+              buffer = buffer.substring(eventEndIndex + 2);
+
+              if (message.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(message.substring(6));
+                  events.push(event);
+
+                  // Stop on terminal events
+                  if (
+                    event.type === BRAIN_EVENTS.WEBHOOK ||
+                    event.type === BRAIN_EVENTS.COMPLETE ||
+                    event.type === BRAIN_EVENTS.ERROR
+                  ) {
+                    done = true;
+                    break;
+                  }
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        } finally {
+          await reader.cancel();
+        }
+      }
+
+      // Verify required loop events are present
+      const hasLoopStart = events.some(
+        (e) => e.type === BRAIN_EVENTS.LOOP_START
+      );
+      if (!hasLoopStart) {
+        console.error('Missing LOOP_START event in SSE stream');
+        return false;
+      }
+
+      // Verify LOOP_START has prompt field
+      const loopStartEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.LOOP_START
+      );
+      if (!loopStartEvent.prompt || typeof loopStartEvent.prompt !== 'string') {
+        console.error('LOOP_START event missing prompt field');
+        return false;
+      }
+
+      const hasLoopIteration = events.some(
+        (e) => e.type === BRAIN_EVENTS.LOOP_ITERATION
+      );
+      if (!hasLoopIteration) {
+        console.error('Missing LOOP_ITERATION event in SSE stream');
+        return false;
+      }
+
+      const hasLoopToolCall = events.some(
+        (e) => e.type === BRAIN_EVENTS.LOOP_TOOL_CALL
+      );
+      if (!hasLoopToolCall) {
+        console.error('Missing LOOP_TOOL_CALL event in SSE stream');
+        return false;
+      }
+
+      // If we got a WEBHOOK event, verify LOOP_WEBHOOK came before it
+      const webhookIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      );
+      if (webhookIndex !== -1) {
+        const loopWebhookIndex = events.findIndex(
+          (e) => e.type === BRAIN_EVENTS.LOOP_WEBHOOK
+        );
+        if (loopWebhookIndex === -1) {
+          console.error('Missing LOOP_WEBHOOK event before WEBHOOK event');
+          return false;
+        }
+        if (loopWebhookIndex >= webhookIndex) {
+          console.error('LOOP_WEBHOOK event must come before WEBHOOK event');
+          return false;
+        }
+
+        // Verify LOOP_WEBHOOK has required fields
+        const loopWebhookEvent = events[loopWebhookIndex];
+        if (!loopWebhookEvent.toolCallId || !loopWebhookEvent.toolName) {
+          console.error(
+            'LOOP_WEBHOOK event missing toolCallId or toolName fields'
+          );
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test loop events for ${loopBrainIdentifier}:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test full loop webhook resumption flow:
+   * 1. Start a loop brain that will pause on a webhook
+   * 2. Verify it pauses with WEBHOOK event
+   * 3. Trigger the webhook with a response
+   * 4. Verify the brain resumes and emits WEBHOOK_RESPONSE and LOOP_TOOL_RESULT
+   *
+   * Requires:
+   * - A brain with a loop step that calls a tool returning { waitFor: webhook(...) }
+   * - The webhook slug and identifier to trigger
+   */
+  async loopWebhookResume(
+    fetch: Fetch,
+    loopBrainIdentifier: string,
+    webhookSlug: string,
+    webhookPayload: Record<string, any>
+  ): Promise<boolean> {
+    try {
+      // Step 1: Start the loop brain
+      const runRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: loopBrainIdentifier }),
+      });
+
+      const runResponse = await fetch(runRequest);
+      if (runResponse.status !== 201) {
+        console.error(
+          `POST /brains/runs returned ${runResponse.status}, expected 201`
+        );
+        return false;
+      }
+
+      const { brainRunId } = (await runResponse.json()) as { brainRunId: string };
+
+      // Step 2: Watch until WEBHOOK event (brain pauses)
+      const watchRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/watch`,
+        { method: 'GET' }
+      );
+
+      const watchResponse = await fetch(watchRequest);
+      if (!watchResponse.ok) {
+        console.error(
+          `GET /brains/runs/${brainRunId}/watch returned ${watchResponse.status}`
+        );
+        return false;
+      }
+
+      let foundWebhookEvent = false;
+      if (watchResponse.body) {
+        const reader = watchResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (!foundWebhookEvent) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eventEndIndex;
+            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+              const message = buffer.substring(0, eventEndIndex);
+              buffer = buffer.substring(eventEndIndex + 2);
+
+              if (message.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(message.substring(6));
+                  if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                    foundWebhookEvent = true;
+                    break;
+                  }
+                  if (
+                    event.type === BRAIN_EVENTS.COMPLETE ||
+                    event.type === BRAIN_EVENTS.ERROR
+                  ) {
+                    console.error(
+                      `Brain completed/errored before WEBHOOK event: ${event.type}`
+                    );
+                    return false;
+                  }
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        } finally {
+          await reader.cancel();
+        }
+      }
+
+      if (!foundWebhookEvent) {
+        console.error('Brain did not emit WEBHOOK event');
+        return false;
+      }
+
+      // Step 3: Trigger the webhook
+      const webhookRequest = new Request(
+        `http://example.com/webhooks/${encodeURIComponent(webhookSlug)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+        }
+      );
+
+      const webhookResponse = await fetch(webhookRequest);
+      if (!webhookResponse.ok) {
+        console.error(
+          `POST /webhooks/${webhookSlug} returned ${webhookResponse.status}`
+        );
+        return false;
+      }
+
+      const webhookResult = (await webhookResponse.json()) as {
+        received: boolean;
+        action?: string;
+      };
+
+      if (!webhookResult.received) {
+        console.error('Webhook was not received');
+        return false;
+      }
+
+      if (webhookResult.action !== 'resumed') {
+        console.error(
+          `Expected webhook action 'resumed', got '${webhookResult.action}'`
+        );
+        return false;
+      }
+
+      // Step 4: Watch again for resumed events
+      const resumeWatchRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/watch`,
+        { method: 'GET' }
+      );
+
+      const resumeWatchResponse = await fetch(resumeWatchRequest);
+      if (!resumeWatchResponse.ok) {
+        console.error(
+          `GET /brains/runs/${brainRunId}/watch (resume) returned ${resumeWatchResponse.status}`
+        );
+        return false;
+      }
+
+      const resumeEvents: any[] = [];
+      if (resumeWatchResponse.body) {
+        const reader = resumeWatchResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let done = false;
+
+        try {
+          while (!done) {
+            const { value, done: streamDone } = await reader.read();
+            if (streamDone) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eventEndIndex;
+            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+              const message = buffer.substring(0, eventEndIndex);
+              buffer = buffer.substring(eventEndIndex + 2);
+
+              if (message.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(message.substring(6));
+                  resumeEvents.push(event);
+
+                  if (
+                    event.type === BRAIN_EVENTS.COMPLETE ||
+                    event.type === BRAIN_EVENTS.ERROR
+                  ) {
+                    done = true;
+                    break;
+                  }
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        } finally {
+          await reader.cancel();
+        }
+      }
+
+      // Verify WEBHOOK_RESPONSE event is present
+      const hasWebhookResponse = resumeEvents.some(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK_RESPONSE
+      );
+      if (!hasWebhookResponse) {
+        console.error('Missing WEBHOOK_RESPONSE event after resume');
+        return false;
+      }
+
+      // Verify LOOP_TOOL_RESULT event is present (with the webhook response as result)
+      const hasLoopToolResult = resumeEvents.some(
+        (e) => e.type === BRAIN_EVENTS.LOOP_TOOL_RESULT
+      );
+      if (!hasLoopToolResult) {
+        console.error('Missing LOOP_TOOL_RESULT event after resume');
+        return false;
+      }
+
+      // Verify brain completed successfully
+      const completeEvent = resumeEvents.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      if (!completeEvent) {
+        console.error('Brain did not complete after resume');
+        return false;
+      }
+
+      if (completeEvent.status !== STATUS.COMPLETE) {
+        console.error(
+          `Expected COMPLETE status, got ${completeEvent.status}`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test loop webhook resume for ${loopBrainIdentifier}:`,
+        error
+      );
       return false;
     }
   },

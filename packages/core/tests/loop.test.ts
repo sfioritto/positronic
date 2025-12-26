@@ -9,11 +9,14 @@ import {
   type LoopToolResultEvent,
   type LoopCompleteEvent,
   type LoopTokenLimitEvent,
+  type LoopWebhookEvent,
+  type WebhookResponseEvent,
 } from '../src/dsl/brain.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import type { ObjectGenerator, ToolMessage } from '../src/clients/types.js';
 import { createWebhook } from '../src/dsl/webhook.js';
+import { reconstructLoopContext } from '../src/dsl/loop-messages.js';
 
 // Mock ObjectGenerator with generateText support
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -517,6 +520,254 @@ describe('loop step', () => {
         BRAIN_EVENTS.STEP_STATUS, // running -> complete
         BRAIN_EVENTS.COMPLETE,
       ]);
+    });
+  });
+
+  describe('loop webhook resumption', () => {
+    it('should include prompt and system in LOOP_START event', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'resolve',
+            args: { resolution: 'Done' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-loop-start').loop('Handle', () => ({
+        prompt: 'Handle the request',
+        system: 'You are a helpful assistant',
+        tools: {
+          resolve: {
+            description: 'Resolve',
+            inputSchema: z.object({ resolution: z.string() }),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      const loopStartEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.LOOP_START
+      ) as LoopStartEvent;
+      expect(loopStartEvent).toBeDefined();
+      expect(loopStartEvent.prompt).toBe('Handle the request');
+      expect(loopStartEvent.system).toBe('You are a helpful assistant');
+    });
+
+    it('should emit LOOP_WEBHOOK before WEBHOOK when tool returns waitFor', async () => {
+      const supportWebhook = createWebhook(
+        'support-response',
+        z.object({ ticketId: z.string(), response: z.string() }),
+        async () => ({
+          type: 'webhook' as const,
+          identifier: 'ticket-123',
+          response: { ticketId: 'ticket-123', response: 'Support response' },
+        })
+      );
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'escalate',
+            args: { summary: 'Customer needs help' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-loop-webhook').loop(
+        'Handle Escalation',
+        () => ({
+          prompt: 'Handle the request',
+          tools: {
+            escalate: {
+              description: 'Escalate to support',
+              inputSchema: z.object({ summary: z.string() }),
+              execute: async () => {
+                return {
+                  waitFor: supportWebhook('ticket-123'),
+                };
+              },
+            },
+            resolve: {
+              description: 'Mark resolved',
+              inputSchema: z.object({ resolution: z.string() }),
+              terminal: true,
+            },
+          },
+        })
+      );
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Should emit LOOP_WEBHOOK before WEBHOOK
+      const loopWebhookIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.LOOP_WEBHOOK
+      );
+      const webhookIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      );
+
+      expect(loopWebhookIndex).toBeGreaterThan(-1);
+      expect(webhookIndex).toBeGreaterThan(-1);
+      expect(loopWebhookIndex).toBeLessThan(webhookIndex);
+
+      // Verify LOOP_WEBHOOK has correct tool info
+      const loopWebhookEvent = events[loopWebhookIndex] as LoopWebhookEvent;
+      expect(loopWebhookEvent.toolCallId).toBe('call-1');
+      expect(loopWebhookEvent.toolName).toBe('escalate');
+      expect(loopWebhookEvent.input).toEqual({ summary: 'Customer needs help' });
+    });
+
+    describe('reconstructLoopContext', () => {
+      it('should return null when no LOOP_WEBHOOK event exists', () => {
+        const events: BrainEvent[] = [
+          {
+            type: BRAIN_EVENTS.LOOP_START,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            prompt: 'Hello',
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
+            type: BRAIN_EVENTS.LOOP_COMPLETE,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            terminalToolName: 'resolve',
+            result: {},
+            totalIterations: 1,
+            options: {},
+            brainRunId: 'run-1',
+          },
+        ];
+
+        const result = reconstructLoopContext(events, { response: 'test' });
+        expect(result).toBeNull();
+      });
+
+      it('should reconstruct messages from LOOP events', () => {
+        const events: BrainEvent[] = [
+          {
+            type: BRAIN_EVENTS.LOOP_START,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            prompt: 'Handle the request',
+            system: 'You are helpful',
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
+            type: BRAIN_EVENTS.LOOP_ITERATION,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            iteration: 1,
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
+            type: BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            content: 'Let me help you with that',
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
+            type: BRAIN_EVENTS.LOOP_TOOL_CALL,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            toolCallId: 'call-1',
+            toolName: 'search',
+            input: { query: 'test' },
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
+            type: BRAIN_EVENTS.LOOP_TOOL_RESULT,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            toolCallId: 'call-1',
+            toolName: 'search',
+            result: { found: true },
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
+            type: BRAIN_EVENTS.LOOP_TOOL_CALL,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            toolCallId: 'call-2',
+            toolName: 'escalate',
+            input: { summary: 'Need approval' },
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
+            type: BRAIN_EVENTS.LOOP_WEBHOOK,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            toolCallId: 'call-2',
+            toolName: 'escalate',
+            input: { summary: 'Need approval' },
+            options: {},
+            brainRunId: 'run-1',
+          },
+        ];
+
+        const webhookResponse = { approved: true, comment: 'Looks good' };
+        const result = reconstructLoopContext(events, webhookResponse);
+
+        expect(result).not.toBeNull();
+        expect(result!.prompt).toBe('Handle the request');
+        expect(result!.system).toBe('You are helpful');
+        expect(result!.pendingToolCallId).toBe('call-2');
+        expect(result!.pendingToolName).toBe('escalate');
+
+        // Check messages array
+        expect(result!.messages).toHaveLength(4);
+
+        // First message: initial user prompt
+        expect(result!.messages[0]).toEqual({
+          role: 'user',
+          content: 'Handle the request',
+        });
+
+        // Second message: assistant response
+        expect(result!.messages[1]).toEqual({
+          role: 'assistant',
+          content: 'Let me help you with that',
+        });
+
+        // Third message: first tool result
+        expect(result!.messages[2]).toEqual({
+          role: 'tool',
+          content: JSON.stringify({ found: true }),
+          toolCallId: 'call-1',
+          toolName: 'search',
+        });
+
+        // Fourth message: webhook response as tool result
+        expect(result!.messages[3]).toEqual({
+          role: 'tool',
+          content: JSON.stringify(webhookResponse),
+          toolCallId: 'call-2',
+          toolName: 'escalate',
+        });
+      });
     });
   });
 });
