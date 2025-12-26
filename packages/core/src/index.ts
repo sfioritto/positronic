@@ -17,8 +17,18 @@ export type {
   BrainStructure,
   BrainFactory,
 } from './dsl/brain.js';
-export type { ObjectGenerator, Message } from './clients/types.js';
-export type { State, RuntimeEnv, Secrets } from './dsl/types.js';
+export type { ObjectGenerator, Message, ToolMessage } from './clients/types.js';
+export type {
+  State,
+  RuntimeEnv,
+  Secrets,
+  LoopTool,
+  LoopConfig,
+  LoopMessage,
+  LoopToolWaitFor,
+  ExtractTerminalInput,
+} from './dsl/types.js';
+export { loopTool } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer
@@ -38,3 +48,14 @@ export type {
   ResourceType,
 } from './resources/resources.js';
 export { RESOURCE_TYPES } from './resources/resources.js';
+
+// Loop step event exports
+export type {
+  LoopStartEvent,
+  LoopIterationEvent,
+  LoopToolCallEvent,
+  LoopToolResultEvent,
+  LoopAssistantMessageEvent,
+  LoopCompleteEvent,
+  LoopTokenLimitEvent,
+} from './dsl/brain.js';

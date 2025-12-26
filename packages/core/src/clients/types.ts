@@ -9,6 +9,17 @@ export type Message = {
 };
 
 /**
+ * Represents a message in a tool-calling conversation.
+ * Extends Message to include tool messages.
+ */
+export type ToolMessage = {
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  toolCallId?: string;
+  toolName?: string;
+};
+
+/**
  * Interface for AI model interactions, focused on generating structured objects
  * and potentially other types of content in the future.
  */
@@ -51,4 +62,28 @@ export interface ObjectGenerator {
      */
     system?: string;
   }): Promise<z.infer<T>>;
+
+  /**
+   * Generates text with optional tool calling support.
+   * Used by loop steps for agentic workflows.
+   */
+  generateText?(params: {
+    /** System prompt for the LLM */
+    system?: string;
+    /** Conversation messages (including tool messages) */
+    messages: ToolMessage[];
+    /** Available tools for the LLM to call */
+    tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
+  }): Promise<{
+    /** Text response from the LLM */
+    text?: string;
+    /** Tool calls made by the LLM */
+    toolCalls?: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+    }>;
+    /** Token usage information */
+    usage: { totalTokens: number };
+  }>;
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { ObjectGenerator } from '../clients/types.js';
-import type { State, JsonPatch, JsonObject, RuntimeEnv } from './types.js';
+import type { ObjectGenerator, ToolMessage } from '../clients/types.js';
+import type { State, JsonPatch, JsonObject, RuntimeEnv, LoopTool, LoopConfig, LoopMessage, LoopToolWaitFor } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
@@ -130,6 +130,70 @@ export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   state: State;
 }
 
+// 5. Loop Events
+export interface LoopStartEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_START;
+  stepTitle: string;
+  stepId: string;
+}
+
+export interface LoopIterationEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_ITERATION;
+  stepTitle: string;
+  stepId: string;
+  iteration: number;
+}
+
+export interface LoopToolCallEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_TOOL_CALL;
+  stepTitle: string;
+  stepId: string;
+  toolName: string;
+  toolCallId: string;
+  input: JsonObject;
+}
+
+export interface LoopToolResultEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_TOOL_RESULT;
+  stepTitle: string;
+  stepId: string;
+  toolName: string;
+  toolCallId: string;
+  result: unknown;
+}
+
+export interface LoopAssistantMessageEvent<
+  TOptions extends JsonObject = JsonObject
+> extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE;
+  stepTitle: string;
+  stepId: string;
+  content: string;
+}
+
+export interface LoopCompleteEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_COMPLETE;
+  stepTitle: string;
+  stepId: string;
+  terminalToolName: string;
+  result: JsonObject;
+  totalIterations: number;
+}
+
+export interface LoopTokenLimitEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.LOOP_TOKEN_LIMIT;
+  stepTitle: string;
+  stepId: string;
+  totalTokens: number;
+  maxTokens: number;
+}
+
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -140,7 +204,14 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>
   | StepRetryEvent<TOptions>
-  | WebhookEvent<TOptions>;
+  | WebhookEvent<TOptions>
+  | LoopStartEvent<TOptions>
+  | LoopIterationEvent<TOptions>
+  | LoopToolCallEvent<TOptions>
+  | LoopToolResultEvent<TOptions>
+  | LoopAssistantMessageEvent<TOptions>
+  | LoopCompleteEvent<TOptions>
+  | LoopTokenLimitEvent<TOptions>;
 
 export interface SerializedStep {
   title: string;
@@ -157,7 +228,7 @@ export interface BrainStructure {
   title: string;
   description?: string;
   steps: Array<{
-    type: 'step' | 'brain';
+    type: 'step' | 'brain' | 'loop';
     title: string;
     innerBrain?: BrainStructure;
   }>;
@@ -212,6 +283,29 @@ type BrainBlock<
   ) => TNewState;
 };
 
+type LoopBlock<
+  TStateIn,
+  TStateOut,
+  TOptions extends JsonObject = JsonObject,
+  TServices extends object = object,
+  TResponseIn extends JsonObject | undefined = undefined,
+  TTools extends Record<string, LoopTool> = Record<string, LoopTool>
+> = {
+  type: 'loop';
+  title: string;
+  configFn: (
+    params: {
+      state: TStateIn;
+      options: TOptions;
+      client: ObjectGenerator;
+      resources: Resources;
+      response: TResponseIn;
+      pages?: PagesService;
+      env: RuntimeEnv;
+    } & TServices
+  ) => LoopConfig<TTools> | Promise<LoopConfig<TTools>>;
+};
+
 type Block<
   TStateIn,
   TStateOut,
@@ -228,7 +322,8 @@ type Block<
       TResponseIn,
       TWebhooks
     >
-  | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>;
+  | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
+  | LoopBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>;
 
 interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   client: ObjectGenerator;
@@ -274,6 +369,11 @@ export class Brain<
         if (block.type === 'step') {
           return {
             type: 'step' as const,
+            title: block.title,
+          };
+        } else if (block.type === 'loop') {
+          return {
+            type: 'loop' as const,
             title: block.title,
           };
         } else {
@@ -392,6 +492,53 @@ export class Brain<
     };
     this.blocks.push(nestedBlock);
     return this.nextBrain<TNewState>();
+  }
+
+  /**
+   * Add an agentic loop step that runs an LLM with tools.
+   * The loop continues until a terminal tool is called, no tool calls are returned,
+   * or maxTokens is exceeded.
+   */
+  loop<
+    TTools extends Record<string, LoopTool> = Record<string, LoopTool>,
+    TNewState extends State = TState
+  >(
+    title: string,
+    configFn: (
+      params: {
+        state: TState;
+        options: TOptions;
+        client: ObjectGenerator;
+        resources: Resources;
+        response: TResponse;
+        pages?: PagesService;
+        env: RuntimeEnv;
+      } & TServices
+    ) => LoopConfig<TTools> | Promise<LoopConfig<TTools>>
+  ): Brain<TOptions, TNewState, TServices, TResponse> {
+    const loopBlock: LoopBlock<
+      TState,
+      TNewState,
+      TOptions,
+      TServices,
+      TResponse,
+      TTools
+    > = {
+      type: 'loop',
+      title,
+      configFn: configFn as any,
+    };
+    this.blocks.push(loopBlock);
+
+    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+
+    nextBrain.services = this.services;
+    nextBrain.optionsSchema = this.optionsSchema;
+
+    return nextBrain;
   }
 
   // TResponseKey:
@@ -827,6 +974,8 @@ class BrainEventStream<
         this.services
       );
       yield* this.completeStep(step, prevState);
+    } else if (block.type === 'loop') {
+      yield* this.executeLoop(step);
     } else {
       // Get previous state before action
       const prevState = this.currentState;
@@ -895,6 +1044,202 @@ class BrainEventStream<
           options: this.options,
           brainRunId: this.brainRunId,
         };
+      }
+    }
+  }
+
+  private async *executeLoop(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as LoopBlock<any, any, TOptions, TServices, any, any>;
+    const prevState = this.currentState;
+
+    // Get loop configuration
+    const config = await block.configFn({
+      state: this.currentState,
+      options: this.options ?? ({} as TOptions),
+      client: this.client,
+      resources: this.resources,
+      response: this.currentResponse,
+      pages: this.pages,
+      env: this.env,
+      ...this.services,
+    });
+
+    // Emit loop start event
+    yield {
+      type: BRAIN_EVENTS.LOOP_START,
+      stepTitle: step.block.title,
+      stepId: step.id,
+      options: this.options ?? ({} as TOptions),
+      brainRunId: this.brainRunId,
+    };
+
+    // Initialize messages and token tracking
+    const messages: ToolMessage[] = [{ role: 'user', content: config.prompt }];
+    let totalTokens = 0;
+    let iteration = 0;
+
+    // Main loop
+    while (true) {
+      iteration++;
+
+      // Emit iteration event
+      yield {
+        type: BRAIN_EVENTS.LOOP_ITERATION,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        iteration,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+
+      // Check if client supports generateText
+      if (!this.client.generateText) {
+        throw new Error(
+          'Client does not support generateText. Use a client that implements generateText for loop steps.'
+        );
+      }
+
+      // Build tools object for the client (description and inputSchema only)
+      const toolsForClient: Record<
+        string,
+        { description: string; inputSchema: z.ZodSchema }
+      > = {};
+      for (const [name, toolDef] of Object.entries(config.tools)) {
+        const tool = toolDef as LoopTool;
+        toolsForClient[name] = {
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+        };
+      }
+
+      // Call the LLM
+      const response = await this.client.generateText({
+        system: config.system,
+        messages,
+        tools: toolsForClient,
+      });
+
+      // Track tokens
+      totalTokens += response.usage.totalTokens;
+
+      // Check max tokens limit
+      if (config.maxTokens && totalTokens > config.maxTokens) {
+        yield {
+          type: BRAIN_EVENTS.LOOP_TOKEN_LIMIT,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          totalTokens,
+          maxTokens: config.maxTokens,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+        yield* this.completeStep(step, prevState);
+        return;
+      }
+
+      // Handle assistant text response
+      if (response.text) {
+        yield {
+          type: BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          content: response.text,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+        messages.push({ role: 'assistant', content: response.text });
+      }
+
+      // If no tool calls, loop naturally ends
+      if (!response.toolCalls || response.toolCalls.length === 0) {
+        yield* this.completeStep(step, prevState);
+        return;
+      }
+
+      // Process tool calls
+      for (const toolCall of response.toolCalls) {
+        yield {
+          type: BRAIN_EVENTS.LOOP_TOOL_CALL,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          toolName: toolCall.toolName,
+          toolCallId: toolCall.toolCallId,
+          input: toolCall.args as JsonObject,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+
+        const tool = config.tools[toolCall.toolName];
+        if (!tool) {
+          throw new Error(`Unknown tool: ${toolCall.toolName}`);
+        }
+
+        // Check if this is a terminal tool
+        if (tool.terminal) {
+          yield {
+            type: BRAIN_EVENTS.LOOP_COMPLETE,
+            stepTitle: step.block.title,
+            stepId: step.id,
+            terminalToolName: toolCall.toolName,
+            result: toolCall.args as JsonObject,
+            totalIterations: iteration,
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+          };
+
+          // Merge terminal result into state
+          this.currentState = { ...this.currentState, ...(toolCall.args as JsonObject) };
+          yield* this.completeStep(step, prevState);
+          return;
+        }
+
+        // Execute non-terminal tool
+        if (tool.execute) {
+          const toolResult = await Promise.resolve(tool.execute(toolCall.args));
+
+          // Check if tool returned waitFor
+          if (
+            toolResult &&
+            typeof toolResult === 'object' &&
+            'waitFor' in toolResult
+          ) {
+            const waitForResult = toolResult as LoopToolWaitFor;
+
+            // Emit webhook event
+            yield {
+              type: BRAIN_EVENTS.WEBHOOK,
+              waitFor: [
+                {
+                  slug: waitForResult.waitFor.slug,
+                  identifier: waitForResult.waitFor.identifier,
+                },
+              ],
+              state: this.currentState,
+              options: this.options ?? ({} as TOptions),
+              brainRunId: this.brainRunId,
+            };
+            return;
+          }
+
+          // Normal tool result
+          yield {
+            type: BRAIN_EVENTS.LOOP_TOOL_RESULT,
+            stepTitle: step.block.title,
+            stepId: step.id,
+            toolName: toolCall.toolName,
+            toolCallId: toolCall.toolCallId,
+            result: toolResult,
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+          };
+
+          messages.push({
+            role: 'tool',
+            content: JSON.stringify(toolResult),
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+          });
+        }
       }
     }
   }

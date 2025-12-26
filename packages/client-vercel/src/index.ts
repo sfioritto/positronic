@@ -1,7 +1,7 @@
-import type { ObjectGenerator, Message } from '@positronic/core';
-import { generateObject } from 'ai';
+import type { ObjectGenerator, Message, ToolMessage } from '@positronic/core';
+import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
-import type { LanguageModel } from 'ai';
+import type { LanguageModel, ModelMessage } from 'ai';
 
 export class VercelClient implements ObjectGenerator {
   private model: LanguageModel;
@@ -61,5 +61,75 @@ export class VercelClient implements ObjectGenerator {
       });
       return object as z.infer<T>;
     }
+  }
+
+  async generateText(params: {
+    system?: string;
+    messages: ToolMessage[];
+    tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
+  }): Promise<{
+    text?: string;
+    toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
+    usage: { totalTokens: number };
+  }> {
+    const { system, messages, tools } = params;
+
+    // Convert ToolMessage[] to ModelMessage[]
+    const modelMessages: ModelMessage[] = [];
+
+    if (system) {
+      modelMessages.push({ role: 'system', content: system });
+    }
+
+    for (const msg of messages) {
+      if (msg.role === 'user') {
+        modelMessages.push({ role: 'user', content: msg.content });
+      } else if (msg.role === 'assistant') {
+        modelMessages.push({ role: 'assistant', content: msg.content });
+      } else if (msg.role === 'tool') {
+        modelMessages.push({
+          role: 'tool',
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId: msg.toolCallId!,
+              toolName: msg.toolName!,
+              output: { type: 'text', value: msg.content },
+            },
+          ],
+        });
+      }
+    }
+
+    // Convert our tool format to Vercel AI SDK format
+    const aiTools: Record<
+      string,
+      { description: string; inputSchema: z.ZodSchema }
+    > = {};
+    for (const [name, tool] of Object.entries(tools)) {
+      aiTools[name] = {
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      };
+    }
+
+    // AI SDK 5 runs a single step by default (no stopWhen = single step)
+    const result = await generateText({
+      model: this.model,
+      messages: modelMessages,
+      tools: aiTools,
+    });
+
+    return {
+      text: result.text || undefined,
+      toolCalls: result.toolCalls?.map((tc) => ({
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        args: tc.input,
+      })),
+      usage: {
+        totalTokens: result.usage?.totalTokens ?? 0,
+      },
+    };
   }
 }
