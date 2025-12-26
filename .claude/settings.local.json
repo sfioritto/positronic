@@ -36,7 +36,10 @@
       "Bash(git show:*)",
       "WebFetch(domain:sdk.vercel.ai)",
       "WebFetch(domain:ai-sdk.dev)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:www.braintrust.dev)",
+      "WebFetch(domain:simonwillison.net)",
+      "WebFetch(domain:sketch.dev)"
     ],
     "deny": []
   }
