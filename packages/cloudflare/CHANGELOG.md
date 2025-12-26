@@ -1,5 +1,26 @@
 # @positronic/cloudflare
 
+## 0.0.38
+
+### Patch Changes
+
+- Add loop() step for agentic LLM workflows
+
+  - **New `loop()` step**: Create agentic workflows where an LLM runs iteratively with tools until completion
+    - Supports tool definitions with Zod schemas
+    - Terminal tools to signal loop completion
+    - `waitFor` tools that pause execution and resume via webhooks
+    - Configurable token limits and iteration tracking
+    - Comprehensive event system for loop lifecycle (start, iteration, tool calls, completion)
+  - **Anthropic client**: Add `generateText` method to support loop step tool calling
+  - **Webhook resumption**: Support resuming loop steps after webhook responses
+  - **Loop messages**: Track conversation history for context management within loops
+
+- Updated dependencies
+  - @positronic/core@0.0.38
+  - @positronic/spec@0.0.38
+  - @positronic/template-new-project@0.0.38
+
 ## 0.0.37
 
 ### Patch Changes
