@@ -1,7 +1,8 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
+import { reconstructLoopContext } from './loop-messages.js';
 import type { Adapter } from '../adapters/types.js';
-import { DEFAULT_ENV, type SerializedStep, type Brain } from './brain.js';
+import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
 import type { State, JsonObject, RuntimeEnv } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
@@ -64,6 +65,7 @@ export class BrainRunner {
       endAfter,
       signal,
       response,
+      loopEvents,
     }: {
       initialState?: TState;
       options?: TOptions;
@@ -72,6 +74,7 @@ export class BrainRunner {
       endAfter?: number;
       signal?: AbortSignal;
       response?: JsonObject;
+      loopEvents?: BrainEvent[];
     } = {}
   ): Promise<TState> {
     const { adapters, client, resources, pages, env } = this.options;
@@ -91,6 +94,12 @@ export class BrainRunner {
       }
     });
 
+    // If loopEvents and response are provided, reconstruct loop context
+    const loopResumeContext =
+      loopEvents && response
+        ? reconstructLoopContext(loopEvents, response)
+        : null;
+
     const brainRun =
       brainRunId && initialCompletedSteps
         ? brain.run({
@@ -103,6 +112,7 @@ export class BrainRunner {
             pages,
             env: resolvedEnv,
             response,
+            loopResumeContext,
           })
         : brain.run({
             initialState,

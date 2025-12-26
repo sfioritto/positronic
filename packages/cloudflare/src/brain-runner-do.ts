@@ -387,6 +387,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
       };
     });
 
+    // Load LOOP_* events for potential loop resume
+    const loopEventsResult = sql
+      .exec<{ serialized_event: string }>(
+        `SELECT serialized_event FROM brain_events WHERE event_type LIKE 'loop:%' ORDER BY event_id ASC`
+      )
+      .toArray();
+
+    const loopEvents = loopEventsResult.map((row) =>
+      JSON.parse(row.serialized_event)
+    );
+
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
     const monitorDOStub = this.env.MONITOR_DO.get(
@@ -443,6 +454,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         brainRunId,
         response: webhookResponse,
         signal: this.abortController.signal,
+        loopEvents,
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner resume failed:`, err);

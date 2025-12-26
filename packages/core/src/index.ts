@@ -58,4 +58,10 @@ export type {
   LoopAssistantMessageEvent,
   LoopCompleteEvent,
   LoopTokenLimitEvent,
+  LoopWebhookEvent,
+  WebhookResponseEvent,
 } from './dsl/brain.js';
+
+// Loop message reconstruction
+export type { LoopResumeContext } from './dsl/loop-messages.js';
+export { reconstructLoopContext } from './dsl/loop-messages.js';

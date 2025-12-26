@@ -4,9 +4,10 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
+import { resetMockState } from '../src/runner';
 import type {
   BrainEvent,
   BrainStartEvent,
@@ -14,6 +15,12 @@ import type {
   StepStatusEvent,
   StepCompletedEvent,
   StepStartedEvent,
+  LoopStartEvent,
+  LoopToolCallEvent,
+  LoopWebhookEvent,
+  LoopToolResultEvent,
+  WebhookResponseEvent,
+  LoopCompleteEvent,
 } from '@positronic/core';
 import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
 import type { MonitorDO } from '../../src/monitor-do.js';
@@ -28,6 +35,11 @@ interface TestEnv {
 }
 
 describe('Hono API Tests', () => {
+  // Reset mock state before each test
+  beforeEach(() => {
+    resetMockState();
+  });
+
   // Helper to parse SSE data field
   function parseSseEvent(text: string): any | null {
     const lines = text.trim().split('\n');
@@ -1289,6 +1301,200 @@ describe('Hono API Tests', () => {
       const result = await webhookResponse.json<{ challenge: string }>();
       expect(result.challenge).toBe(challengeString);
       await waitOnExecutionContext(webhookContext);
+    });
+  });
+
+  describe('Loop Webhook Resumption', () => {
+    it('should pause loop on webhook and resume with restored context', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'loop-webhook-brain';
+      const webhookIdentifier = 'test-escalation-123';
+
+      // Step 1: Start the loop-webhook-brain
+      const createRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      expect(createResponse.status).toBe(201);
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
+      await waitOnExecutionContext(createContext);
+
+      // Step 2: Watch the brain - it should pause with LOOP_WEBHOOK and WEBHOOK events
+      const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+      const watchRequest = new Request(watchUrl);
+      const watchContext = createExecutionContext();
+      const watchResponse = await worker.fetch(
+        watchRequest,
+        testEnv,
+        watchContext
+      );
+
+      expect(watchResponse.status).toBe(200);
+      if (!watchResponse.body) {
+        throw new Error('Watch response body is null');
+      }
+
+      // Read events until we get the WEBHOOK event (brain pauses)
+      const reader = watchResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const events: BrainEvent[] = [];
+      let foundWebhookEvent = false;
+
+      while (!foundWebhookEvent) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        let eventEndIndex;
+        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+          const message = buffer.substring(0, eventEndIndex);
+          buffer = buffer.substring(eventEndIndex + 2);
+
+          if (message.startsWith('data:')) {
+            const event = parseSseEvent(message);
+            if (event) {
+              events.push(event);
+              if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                foundWebhookEvent = true;
+                reader.cancel();
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Step 3: Verify loop-specific events were emitted
+      expect(foundWebhookEvent).toBe(true);
+
+      // Should have LOOP_START with prompt
+      const loopStartEvent = events.find(
+        (e): e is LoopStartEvent<any> => e.type === BRAIN_EVENTS.LOOP_START
+      );
+      expect(loopStartEvent).toBeDefined();
+      expect(loopStartEvent?.prompt).toBe(
+        'Please process this request. If you need human review, use the escalate tool.'
+      );
+      expect(loopStartEvent?.system).toBe(
+        'You are an AI assistant that can escalate to humans when needed.'
+      );
+
+      // Should have LOOP_TOOL_CALL for the escalate tool
+      const loopToolCallEvent = events.find(
+        (e): e is LoopToolCallEvent<any> =>
+          e.type === BRAIN_EVENTS.LOOP_TOOL_CALL && e.toolName === 'escalate'
+      );
+      expect(loopToolCallEvent).toBeDefined();
+      expect(loopToolCallEvent?.toolName).toBe('escalate');
+
+      // Should have LOOP_WEBHOOK before WEBHOOK
+      const loopWebhookEvent = events.find(
+        (e): e is LoopWebhookEvent<any> => e.type === BRAIN_EVENTS.LOOP_WEBHOOK
+      );
+      expect(loopWebhookEvent).toBeDefined();
+      expect(loopWebhookEvent?.toolName).toBe('escalate');
+      expect(loopWebhookEvent?.toolCallId).toBeDefined();
+
+      // Should NOT have COMPLETE yet
+      const prematureComplete = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(prematureComplete).toBeUndefined();
+
+      await waitOnExecutionContext(watchContext);
+
+      // Step 4: Trigger the webhook with matching identifier
+      const webhookRequest = new Request(
+        'http://example.com/webhooks/loop-escalation',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            escalationId: webhookIdentifier,
+            approved: true,
+            note: 'Approved by human reviewer',
+          }),
+        }
+      );
+      const webhookContext = createExecutionContext();
+      const webhookResponse = await worker.fetch(
+        webhookRequest,
+        testEnv,
+        webhookContext
+      );
+
+      expect(webhookResponse.status).toBe(200);
+      const webhookResult = await webhookResponse.json<{
+        received: boolean;
+        action: string;
+        identifier?: string;
+      }>();
+      expect(webhookResult.received).toBe(true);
+      expect(webhookResult.action).toBe('resumed');
+      await waitOnExecutionContext(webhookContext);
+
+      // Step 5: Watch the brain again - it should resume and complete
+      const resumeWatchRequest = new Request(watchUrl);
+      const resumeWatchContext = createExecutionContext();
+      const resumeWatchResponse = await worker.fetch(
+        resumeWatchRequest,
+        testEnv,
+        resumeWatchContext
+      );
+
+      if (!resumeWatchResponse.body) {
+        throw new Error('Resume watch response body is null');
+      }
+
+      const resumeEvents = await readSseStream(resumeWatchResponse.body);
+      await waitOnExecutionContext(resumeWatchContext);
+
+      // Step 6: Verify resumed events
+      // Should have WEBHOOK_RESPONSE event
+      const webhookResponseEvent = resumeEvents.find(
+        (e): e is WebhookResponseEvent<any> =>
+          e.type === BRAIN_EVENTS.WEBHOOK_RESPONSE
+      );
+      expect(webhookResponseEvent).toBeDefined();
+      expect(webhookResponseEvent?.response).toEqual({
+        approved: true,
+        reviewerNote: 'Approved by human reviewer',
+      });
+
+      // Should have LOOP_TOOL_RESULT with the webhook response
+      const loopToolResultEvent = resumeEvents.find(
+        (e): e is LoopToolResultEvent<any> =>
+          e.type === BRAIN_EVENTS.LOOP_TOOL_RESULT &&
+          e.toolName === 'escalate'
+      );
+      expect(loopToolResultEvent).toBeDefined();
+      expect(loopToolResultEvent?.result).toEqual({
+        approved: true,
+        reviewerNote: 'Approved by human reviewer',
+      });
+
+      // Should have LOOP_COMPLETE
+      const loopCompleteEvent = resumeEvents.find(
+        (e): e is LoopCompleteEvent<any> => e.type === BRAIN_EVENTS.LOOP_COMPLETE
+      );
+      expect(loopCompleteEvent).toBeDefined();
+
+      // Should have BRAIN COMPLETE
+      const completeEvent = resumeEvents.find(
+        (e): e is BrainCompleteEvent => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent?.status).toBe(STATUS.COMPLETE);
     });
   });
 
