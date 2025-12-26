@@ -28,7 +28,6 @@ export type {
   LoopToolWaitFor,
   ExtractTerminalInput,
 } from './dsl/types.js';
-export { loopTool } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer

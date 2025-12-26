@@ -107,16 +107,6 @@ export interface LoopMessage {
 }
 
 /**
- * Helper to create a loop tool with proper typing.
- * This is a convenience function - you can also define tools inline.
- */
-export function loopTool<TInput extends z.ZodSchema>(
-  config: LoopTool<TInput>
-): LoopTool<TInput> {
-  return config;
-}
-
-/**
  * Helper type to extract the terminal tool's input type from a tools object.
  * Used for typing the result that gets merged into state.
  */
