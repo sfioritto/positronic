@@ -15,6 +15,8 @@ export interface LoopResumeContext {
   pendingToolName: string;
   prompt: string;
   system?: string;
+  /** The raw webhook response for event emission */
+  webhookResponse: JsonObject;
 }
 
 /**
@@ -81,5 +83,6 @@ export function reconstructLoopContext(
     pendingToolName: loopWebhookEvent.toolName,
     prompt: loopStartEvent.prompt,
     system: loopStartEvent.system,
+    webhookResponse,
   };
 }

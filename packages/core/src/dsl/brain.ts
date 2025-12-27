@@ -826,14 +826,17 @@ class BrainEventStream<
     // Use provided ID if available, otherwise generate one
     this.brainRunId = providedBrainRunId ?? uuidv4();
 
-    // Set initial response if provided (for webhook restarts)
-    if (response) {
-      this.currentResponse = response;
-    }
-
     // Set loop resume context if provided (for loop webhook restarts)
     if (loopResumeContext) {
       this.loopResumeContext = loopResumeContext;
+      // Note: We intentionally do NOT set currentResponse here.
+      // For loop resumption, the webhook response should flow through
+      // the messages array (via loopResumeContext), not through the
+      // config function's response parameter. The config function is
+      // for loop setup, not for processing webhook responses.
+    } else if (response) {
+      // Set initial response only for non-loop webhook restarts
+      this.currentResponse = response;
     }
   }
 
@@ -1101,7 +1104,7 @@ class BrainEventStream<
       // Emit WEBHOOK_RESPONSE event to record the response
       yield {
         type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
-        response: this.currentResponse!,
+        response: resumeContext.webhookResponse,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
       };
@@ -1113,7 +1116,7 @@ class BrainEventStream<
         stepId: step.id,
         toolCallId: resumeContext.pendingToolCallId,
         toolName: resumeContext.pendingToolName,
-        result: this.currentResponse as JsonObject,
+        result: resumeContext.webhookResponse,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
       };
