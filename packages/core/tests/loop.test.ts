@@ -1,4 +1,4 @@
-import { BRAIN_EVENTS } from '../src/dsl/constants.js';
+import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import {
   brain,
@@ -768,6 +768,161 @@ describe('loop step', () => {
           toolName: 'escalate',
         });
       });
+    });
+
+    it('should not pass webhook response as response parameter to config function on resumption', async () => {
+      // This test verifies that the loop config function receives the previous step's
+      // response (not the webhook response) when resuming from a webhook.
+      // The webhook response should only be available via the messages array.
+
+      const configFnCalls: Array<{ response: any }> = [];
+
+      const supportWebhook = createWebhook(
+        'support-response',
+        z.object({ ticketId: z.string(), approved: z.boolean() }),
+        async () => ({
+          type: 'webhook' as const,
+          identifier: 'ticket-456',
+          response: { ticketId: 'ticket-456', approved: true },
+        })
+      );
+
+      // First call: LLM calls escalate tool which triggers webhook
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'escalate',
+            args: { reason: 'Need approval' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      // Second call (after resumption): LLM calls terminal tool
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-2',
+            toolName: 'complete',
+            args: { result: 'Approved and completed' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-config-response')
+        .step('Init', () => ({ previousStepData: 'from-init-step' }))
+        .loop('Handle Request', ({ state, response }) => {
+          // Capture what response is each time config function is called
+          configFnCalls.push({ response });
+
+          return {
+            prompt: 'Handle the request',
+            tools: {
+              escalate: {
+                description: 'Escalate for approval',
+                inputSchema: z.object({ reason: z.string() }),
+                execute: async () => ({
+                  waitFor: supportWebhook('ticket-456'),
+                }),
+              },
+              complete: {
+                description: 'Complete the request',
+                inputSchema: z.object({ result: z.string() }),
+                terminal: true,
+              },
+            },
+          };
+        });
+
+      // Run until webhook pause
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify we paused on webhook
+      expect(events.some((e) => e.type === BRAIN_EVENTS.WEBHOOK)).toBe(true);
+
+      // Config function should have been called once (initial start)
+      expect(configFnCalls.length).toBe(1);
+      // On initial start, response should be undefined (no previous response from Init step
+      // because the step just sets state, doesn't return a "response" in the generateObject sense)
+      expect(configFnCalls[0].response).toBeUndefined();
+
+      // Now resume from webhook with a webhook response
+      const webhookResponse = { ticketId: 'ticket-456', approved: true };
+      const loopContext = reconstructLoopContext(events, webhookResponse);
+      expect(loopContext).not.toBeNull();
+
+      // Create a new brain instance to resume
+      const resumedBrain = brain('test-config-response')
+        .step('Init', () => ({ previousStepData: 'from-init-step' }))
+        .loop('Handle Request', ({ state, response }) => {
+          // Capture what response is on resumption
+          configFnCalls.push({ response });
+
+          return {
+            prompt: 'Handle the request',
+            tools: {
+              escalate: {
+                description: 'Escalate for approval',
+                inputSchema: z.object({ reason: z.string() }),
+                execute: async () => ({
+                  waitFor: supportWebhook('ticket-456'),
+                }),
+              },
+              complete: {
+                description: 'Complete the request',
+                inputSchema: z.object({ result: z.string() }),
+                terminal: true,
+              },
+            },
+          };
+        });
+
+      // Get step completion events to reconstruct state
+      const stepCompleteEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
+      );
+
+      // Get the brain run ID from the START event
+      const startEvent = events.find((e) => e.type === BRAIN_EVENTS.START) as any;
+      const brainRunId = startEvent.brainRunId;
+
+      // Resume the brain with the webhook response
+      const resumeEvents: BrainEvent[] = [];
+      for await (const event of resumedBrain.run({
+        client: mockClient,
+        response: webhookResponse,
+        loopResumeContext: loopContext!,
+        initialState: {},
+        brainRunId,
+        initialCompletedSteps: stepCompleteEvents.map((e: any) => ({
+          id: e.stepId,
+          title: e.stepTitle,
+          status: STATUS.COMPLETE,
+          patch: e.patch,
+        })),
+      })) {
+        resumeEvents.push(event);
+      }
+
+      // Verify brain completed
+      expect(resumeEvents.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+
+      // Config function should have been called again on resumption
+      expect(configFnCalls.length).toBe(2);
+
+      // THE KEY ASSERTION: On resumption, response should NOT be the webhook data
+      // It should be undefined (same as on initial start), because the config function
+      // is for setting up the loop, not for processing webhook responses.
+      // Webhook responses flow through the messages array, not the response parameter.
+      expect(configFnCalls[1].response).toBeUndefined();
+      expect(configFnCalls[1].response).not.toEqual(webhookResponse);
     });
   });
 });
