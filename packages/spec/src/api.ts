@@ -827,6 +827,87 @@ export const brains = {
   },
 
   /**
+   * Test GET /brains?q=<query> - Search brains by query string
+   * Returns brains matching the query (by title, filename, or description).
+   * The matching algorithm is implementation-defined; the spec only verifies
+   * the response structure and that results are relevant to the query.
+   */
+  async search(fetch: Fetch, query: string): Promise<{
+    brains: Array<{
+      title: string;
+      description: string;
+    }>;
+    count: number;
+  } | null> {
+    try {
+      const url = new URL('http://example.com/brains');
+      url.searchParams.set('q', query);
+
+      const request = new Request(url.toString(), {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /brains?q=${query} returned ${response.status}`);
+        return null;
+      }
+
+      const data = await response.json() as {
+        brains: Array<{
+          title: string;
+          description: string;
+        }>;
+        count: number;
+      };
+
+      // Validate response structure
+      if (!Array.isArray(data.brains)) {
+        console.error(
+          `Expected brains to be an array, got ${typeof data.brains}`
+        );
+        return null;
+      }
+
+      if (typeof data.count !== 'number') {
+        console.error(`Expected count to be number, got ${typeof data.count}`);
+        return null;
+      }
+
+      // Validate each brain has required fields
+      for (const brain of data.brains) {
+        if (
+          !brain.title ||
+          typeof brain.title !== 'string' ||
+          !brain.description ||
+          typeof brain.description !== 'string'
+        ) {
+          console.error(
+            `Brain missing required fields or has invalid types: ${JSON.stringify(
+              brain
+            )}`
+          );
+          return null;
+        }
+      }
+
+      // Count should match array length
+      if (data.count !== data.brains.length) {
+        console.error(
+          `Count (${data.count}) does not match brains array length (${data.brains.length})`
+        );
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`Failed to test GET /brains?q=${query}:`, error);
+      return null;
+    }
+  },
+
+  /**
    * Test GET /brains/:identifier - Get brain structure/definition
    * (For future brain exploration/info command)
    */
