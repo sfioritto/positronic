@@ -1,7 +1,5 @@
 import type { ArgumentsCamelCase } from 'yargs';
-import { apiClient, isApiLocalDevMode } from './helpers.js';
 import React from 'react';
-import { Text } from 'ink';
 import { Watch } from '../components/watch.js';
 import { BrainList } from '../components/brain-list.js';
 import { BrainHistory } from '../components/brain-history.js';
@@ -9,6 +7,8 @@ import { RunShow } from '../components/run-show.js';
 import { BrainRerun } from '../components/brain-rerun.js';
 import { BrainKill } from '../components/brain-kill.js';
 import { BrainRun } from '../components/brain-run.js';
+import { BrainResolver } from '../components/brain-resolver.js';
+import { BrainWatchWithResolver } from '../components/brain-watch.js';
 import { ErrorComponent } from '../components/error.js';
 
 interface BrainListArgs {}
@@ -48,7 +48,11 @@ export class BrainCommand {
     brain,
     limit,
   }: ArgumentsCamelCase<BrainHistoryArgs>): React.ReactElement {
-    return React.createElement(BrainHistory, { brainName: brain, limit });
+    return React.createElement(BrainResolver, {
+      identifier: brain,
+      children: (resolvedBrainTitle: string) =>
+        React.createElement(BrainHistory, { brainName: resolvedBrainTitle, limit }),
+    });
   }
 
   show({
@@ -63,11 +67,15 @@ export class BrainCommand {
     startsAt,
     stopsAfter,
   }: ArgumentsCamelCase<BrainRerunArgs>): React.ReactElement {
-    return React.createElement(BrainRerun, {
+    return React.createElement(BrainResolver, {
       identifier: brain,
-      runId,
-      startsAt,
-      stopsAfter,
+      children: (resolvedBrainTitle: string) =>
+        React.createElement(BrainRerun, {
+          identifier: resolvedBrainTitle,
+          runId,
+          startsAt,
+          stopsAfter,
+        }),
     });
   }
 
@@ -79,95 +87,31 @@ export class BrainCommand {
     });
   }
 
-  async watch({
+  watch({
     runId,
     brain,
-  }: ArgumentsCamelCase<BrainWatchArgs>): Promise<React.ReactElement> {
+  }: ArgumentsCamelCase<BrainWatchArgs>): React.ReactElement {
     // If a specific run ID is provided, return the Watch component
     if (runId) {
       return React.createElement(Watch, { runId });
     }
 
-    // If watching by brain identifier is requested, look up active runs
+    // If watching by brain identifier is requested, use BrainWatchWithResolver
+    // which handles fuzzy search, disambiguation, and active run lookup
     if (brain) {
-      try {
-        const apiPath = `/brains/${encodeURIComponent(brain)}/active-runs`;
-        const response = await apiClient.fetch(apiPath, {
-          method: 'GET',
-        });
-
-        if (response.status === 200) {
-          const result = await response.json() as { runs: Array<{ brainRunId: string; brainTitle: string; status: string; createdAt: number }> };
-
-          if (result.runs.length === 0) {
-            return React.createElement(
-              ErrorComponent,
-              {
-                error: {
-                  title: 'No Active Runs',
-                  message: `No currently running brain runs found for brain "${brain}".`,
-                  details: `To start a new run, use: positronic run ${brain}`
-                }
-              }
-            );
-          }
-
-          if (result.runs.length > 1) {
-            return React.createElement(
-              ErrorComponent,
-              {
-                error: {
-                  title: 'Multiple Active Runs',
-                  message: `Found ${result.runs.length} active runs for brain "${brain}".`,
-                  details: `Please specify a specific run ID with --run-id:\n${result.runs.map(run => `  positronic watch --run-id ${run.brainRunId}`).join('\n')}`
-                }
-              }
-            );
-          }
-
-          // Exactly one active run found - watch it
-          const activeRun = result.runs[0];
-          return React.createElement(Watch, { runId: activeRun.brainRunId });
-        } else {
-          const errorText = await response.text();
-          return React.createElement(
-            ErrorComponent,
-            {
-              error: {
-                title: 'API Error',
-                message: `Failed to get active runs for brain "${brain}".`,
-                details: `Server returned ${response.status}: ${errorText}`
-              }
-            }
-          );
-        }
-      } catch (error: any) {
-        const connectionError = isApiLocalDevMode()
-          ? {
-              message: 'Error connecting to the local development server.',
-              details: `Please ensure the server is running ('positronic server' or 'px s').\n\nError details: ${error.message}`
-            }
-          : {
-              message: 'Error connecting to the remote project server.',
-              details: `Please check your network connection and verify the project URL is correct.\n\nError details: ${error.message}`
-            };
-        return React.createElement(
-          ErrorComponent,
-          {
-            error: {
-              title: 'Connection Error',
-              ...connectionError
-            }
-          }
-        );
-      }
+      return React.createElement(BrainWatchWithResolver, { identifier: brain });
     }
 
     // Neither runId nor brainName provided – return an error element.
     return React.createElement(
-      Text,
-      { color: 'red' as any }, // Ink Text color prop
-      'Error: You must provide either a brain run ID or a brain name.'
+      ErrorComponent,
+      {
+        error: {
+          title: 'Missing Argument',
+          message: 'You must provide either a brain run ID or a brain identifier.',
+          details: 'Use --run-id to watch a specific run, or --brain to watch the active run of a brain.',
+        },
+      }
     );
   }
 

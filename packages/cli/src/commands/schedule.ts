@@ -4,9 +4,10 @@ import { ScheduleCreate } from '../components/schedule-create.js';
 import { ScheduleList } from '../components/schedule-list.js';
 import { ScheduleDelete } from '../components/schedule-delete.js';
 import { ScheduleRuns } from '../components/schedule-runs.js';
+import { BrainResolver } from '../components/brain-resolver.js';
 
 interface ScheduleCreateArgs {
-  brainFilename: string;
+  brain: string;
   cronExpression: string;
 }
 
@@ -29,12 +30,16 @@ export class ScheduleCommand {
   constructor() {}
 
   create({
-    brainFilename,
+    brain,
     cronExpression,
   }: ArgumentsCamelCase<ScheduleCreateArgs>): React.ReactElement {
-    return React.createElement(ScheduleCreate, {
-      identifier: brainFilename,
-      cronExpression,
+    return React.createElement(BrainResolver, {
+      identifier: brain,
+      children: (resolvedBrainTitle: string) =>
+        React.createElement(ScheduleCreate, {
+          identifier: resolvedBrainTitle,
+          cronExpression,
+        }),
     });
   }
 

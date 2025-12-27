@@ -717,12 +717,11 @@ export class TestDevServer implements PositronicDevServer {
 
         this.logCall('getBrainHistory', [identifier, limit]);
 
-        // Filter runs by brain title
+        // Filter runs by brain title (exact match on resolved title)
         const runs = this.brainRuns
           .filter(
             (run) =>
-              run.brainTitle.toLowerCase() ===
-              identifier.toLowerCase().replace(/-/g, ' ')
+              run.brainTitle.toLowerCase() === identifier.toLowerCase()
           )
           .sort((a, b) => b.createdAt - a.createdAt)
           .slice(0, limit);
@@ -737,12 +736,11 @@ export class TestDevServer implements PositronicDevServer {
 
       this.logCall('getBrainActiveRuns', [identifier]);
 
-      // Filter brain runs by brain title and status running
+      // Filter brain runs by brain title and status running (exact match on resolved title)
       const activeRuns = this.brainRuns
         .filter(
           (run) =>
-            run.brainTitle.toLowerCase() ===
-              identifier.toLowerCase().replace(/-/g, ' ') &&
+            run.brainTitle.toLowerCase() === identifier.toLowerCase() &&
             run.status === STATUS.RUNNING
         )
         .sort((a, b) => b.createdAt - a.createdAt);

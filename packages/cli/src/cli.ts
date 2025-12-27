@@ -897,14 +897,14 @@ export function buildCli(options: CliOptions) {
       yargsSchedule
         .command(
           [
-            'create <brain-filename> <cron-expression>',
-            'c <brain-filename> <cron-expression>',
+            'create <brain> <cron-expression>',
+            'c <brain> <cron-expression>',
           ],
           'Create a new schedule for a brain\n',
           (yargsCreate) => {
             return yargsCreate
-              .positional('brain-filename', {
-                describe: 'Filename of the brain to schedule',
+              .positional('brain', {
+                describe: 'Brain identifier (title, filename, or search term)',
                 type: 'string',
                 demandOption: true,
               })
