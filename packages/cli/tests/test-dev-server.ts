@@ -2,6 +2,7 @@ import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 import nock from 'nock';
 import { parse } from 'dotenv';
 import fs from 'fs';
+import Fuse from 'fuse.js';
 import { STATUS } from '@positronic/core';
 
 interface MockResource {
@@ -597,27 +598,75 @@ export class TestDevServer implements PositronicDevServer {
       }
     );
 
-    // GET /brains (with optional query filtering)
+    // GET /brains (with optional query filtering using fuse.js)
     nockInstance.get('/brains').query(true).reply((uri) => {
       const url = new URL(uri, 'http://example.com');
-      const query = url.searchParams.get('q')?.toLowerCase().trim();
+      const query = url.searchParams.get('q')?.trim();
 
-      let brains = Array.from(this.brains.values());
-
-      // If query is provided, filter brains by fuzzy matching
-      if (query) {
-        brains = brains.filter(brain => {
-          const titleMatch = brain.title.toLowerCase().includes(query);
-          const descriptionMatch = brain.description.toLowerCase().includes(query);
-          const filenameMatch = brain.filename.toLowerCase().includes(query);
-          return titleMatch || descriptionMatch || filenameMatch;
-        });
-      }
+      const allBrains = Array.from(this.brains.values());
 
       this.logCall('getBrains', [query || null]);
+
+      // If no query, return all brains
+      if (!query) {
+        return [200, {
+          brains: allBrains,
+          count: allBrains.length,
+        }];
+      }
+
+      // Check for exact match on title or filename first
+      const queryLower = query.toLowerCase();
+      const exactMatch = allBrains.find(
+        brain =>
+          brain.title.toLowerCase() === queryLower ||
+          brain.filename.toLowerCase() === queryLower
+      );
+
+      if (exactMatch) {
+        return [200, {
+          brains: [exactMatch],
+          count: 1,
+        }];
+      }
+
+      // Use fuse.js for fuzzy matching with weighted keys
+      const fuse = new Fuse(allBrains, {
+        keys: [
+          { name: 'title', weight: 2 },
+          { name: 'filename', weight: 2 },
+          { name: 'description', weight: 0.5 },
+        ],
+        includeScore: true,
+        threshold: 0.4,
+        ignoreLocation: true,
+      });
+
+      const results = fuse.search(query);
+
+      // If no results, return empty
+      if (results.length === 0) {
+        return [200, {
+          brains: [],
+          count: 0,
+        }];
+      }
+
+      // If top result is significantly better than others, return just that one
+      if (
+        results.length === 1 ||
+        (results.length > 1 && results[1].score! - results[0].score! > 0.2)
+      ) {
+        return [200, {
+          brains: [results[0].item],
+          count: 1,
+        }];
+      }
+
+      // Return all matching results
       return [200, {
-        brains,
-        count: brains.length,
+        brains: results.map(r => r.item),
+        count: results.length,
       }];
     });
 
