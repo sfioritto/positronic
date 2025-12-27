@@ -14,15 +14,31 @@ interface BrainsResponse {
   count: number;
 }
 
-// Helper to truncate text to fit column width
-const truncate = (text: string, maxWidth: number): string => {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-};
-
 // Helper to pad text to column width
 const padRight = (text: string, width: number): string => {
   return text + ' '.repeat(Math.max(0, width - text.length));
+};
+
+// Helper to wrap text to multiple lines
+const wrapText = (text: string, maxWidth: number): string[] => {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    if (currentLine.length === 0) {
+      currentLine = word;
+    } else if (currentLine.length + 1 + word.length <= maxWidth) {
+      currentLine += ' ' + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+  return lines.length > 0 ? lines : [''];
 };
 
 export const BrainList = () => {
@@ -53,14 +69,13 @@ export const BrainList = () => {
     );
   }
 
-  // Sort brains alphabetically by filename
-  const sortedBrains = [...data.brains].sort((a, b) => a.filename.localeCompare(b.filename));
+  // Sort brains alphabetically by title
+  const sortedBrains = [...data.brains].sort((a, b) => a.title.localeCompare(b.title));
 
   // Define column widths
   const columns = {
-    filename: { header: 'Filename', width: 25 },
-    title: { header: 'Title', width: 35 },
-    description: { header: 'Description', width: 50 },
+    title: { header: 'Brain', width: 25 },
+    description: { header: 'Description', width: 70 },
   };
 
   // Calculate total width for separator
@@ -75,11 +90,9 @@ export const BrainList = () => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.filename.header, columns.filename.width)}</Text>
-          <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.title.header, columns.title.width)}</Text>
           <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.description.header, columns.description.width)}</Text>
+          <Text bold color="cyan">{columns.description.header}</Text>
         </Box>
 
         {/* Separator */}
@@ -89,13 +102,21 @@ export const BrainList = () => {
 
         {/* Data rows */}
         {sortedBrains.map((brain) => {
+          const descriptionLines = wrapText(brain.description, columns.description.width);
           return (
-            <Box key={brain.filename}>
-              <Text>{padRight(truncate(brain.filename, columns.filename.width), columns.filename.width)}</Text>
-              <Text>  </Text>
-              <Text>{padRight(truncate(brain.title, columns.title.width), columns.title.width)}</Text>
-              <Text>  </Text>
-              <Text dimColor>{padRight(truncate(brain.description, columns.description.width), columns.description.width)}</Text>
+            <Box key={brain.filename} flexDirection="column" marginBottom={descriptionLines.length > 1 ? 1 : 0}>
+              <Box>
+                <Text>{padRight(brain.title.length > columns.title.width ? brain.title.substring(0, columns.title.width - 3) + '...' : brain.title, columns.title.width)}</Text>
+                <Text>  </Text>
+                <Text dimColor>{descriptionLines[0]}</Text>
+              </Box>
+              {descriptionLines.slice(1).map((line, index) => (
+                <Box key={index}>
+                  <Text>{' '.repeat(columns.title.width)}</Text>
+                  <Text>  </Text>
+                  <Text dimColor>{line}</Text>
+                </Box>
+              ))}
             </Box>
           );
         })}

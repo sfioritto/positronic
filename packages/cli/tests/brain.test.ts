@@ -624,21 +624,21 @@ describe('CLI Integration: positronic brain commands', () => {
       });
       
       const px = await env.start();
-      
+
       try {
         const { waitForOutput, instance } = await px(['list']);
-        
-        // Wait for brains to appear
-        const foundBrains = await waitForOutput(/daily-report/i, 30);
+
+        // Wait for brains to appear (check for title, not filename)
+        const foundBrains = await waitForOutput(/Daily Report Generator/i, 30);
         expect(foundBrains).toBe(true);
-        
-        // Check that all data is shown
+
+        // Check that titles and descriptions are shown
         const output = instance.lastFrame() || '';
-        expect(output).toContain('daily-report');
         expect(output).toContain('Daily Report Generator');
-        expect(output).toContain('data-processor');
         expect(output).toContain('Data Processing Pipeline');
-        
+        expect(output).toContain('Generates daily reports');
+        expect(output).toContain('Processes incoming data');
+
         // Verify API call
         const calls = server.getLogs();
         const listCall = calls.find(c => c.method === 'getBrains');
