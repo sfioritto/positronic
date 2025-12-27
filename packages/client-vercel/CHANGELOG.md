@@ -1,5 +1,21 @@
 # @positronic/client-vercel
 
+## 0.0.39
+
+### Patch Changes
+
+- Add fuzzy brain search and disambiguation to CLI
+
+  - **Fuzzy brain search**: Commands now accept brain titles, filenames, or search terms instead of just filenames. When multiple brains match, an interactive disambiguation UI lets you choose the correct one.
+  - **Updated commands**: `run`, `watch`, `history`, `rerun`, and `schedule create` all support the new fuzzy search with the renamed `<brain>` argument.
+  - **New search endpoint**: Added `GET /brains?q=<query>` for searching brains by title, filename, or description.
+  - **Improved brain list display**: Shows Brain/Description columns with wrapped text instead of redundant filename column.
+  - **Fix webhook-suspended brain killing**: Properly handle killing brains that are suspended waiting for webhooks (previously returned 409 error).
+  - **Fix loop config function**: The loop config function no longer incorrectly receives webhook response data when resuming from a webhook.
+
+- Updated dependencies
+  - @positronic/core@0.0.39
+
 ## 0.0.38
 
 ### Patch Changes
