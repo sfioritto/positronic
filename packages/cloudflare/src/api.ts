@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
 import { AwsClient } from 'aws4fetch';
 import { parseCronExpression } from 'cron-schedule';
+import Fuse from 'fuse.js';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 import { getManifest, getWebhookManifest } from './brain-runner-do.js';
 import type { MonitorDO } from './monitor-do.js';
@@ -317,7 +318,7 @@ app.get('/brains', async (context: Context) => {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
 
-  const query = context.req.query('q')?.toLowerCase().trim();
+  const query = context.req.query('q')?.trim();
 
   const brainFilenames = manifest.list();
   const brains = await Promise.all(
@@ -337,21 +338,69 @@ app.get('/brains', async (context: Context) => {
   );
 
   // Filter out any null entries
-  let validBrains = brains.filter(brain => brain !== null);
+  const validBrains = brains.filter(brain => brain !== null);
 
-  // If query is provided, filter brains by fuzzy matching
-  if (query) {
-    validBrains = validBrains.filter(brain => {
-      const titleMatch = brain.title.toLowerCase().includes(query);
-      const descriptionMatch = brain.description.toLowerCase().includes(query);
-      const filenameMatch = brain.filename.toLowerCase().includes(query);
-      return titleMatch || descriptionMatch || filenameMatch;
+  // If no query, return all brains
+  if (!query) {
+    return context.json({
+      brains: validBrains,
+      count: validBrains.length,
     });
   }
 
+  // Check for exact match on title or filename first
+  const queryLower = query.toLowerCase();
+  const exactMatch = validBrains.find(
+    brain =>
+      brain.title.toLowerCase() === queryLower ||
+      brain.filename.toLowerCase() === queryLower
+  );
+
+  if (exactMatch) {
+    return context.json({
+      brains: [exactMatch],
+      count: 1,
+    });
+  }
+
+  // Use fuse.js for fuzzy matching with weighted keys
+  const fuse = new Fuse(validBrains, {
+    keys: [
+      { name: 'title', weight: 2 },
+      { name: 'filename', weight: 2 },
+      { name: 'description', weight: 0.5 },
+    ],
+    includeScore: true,
+    threshold: 0.4, // Lower = stricter matching
+    ignoreLocation: true, // Match anywhere in the string
+  });
+
+  const results = fuse.search(query);
+
+  // If no results, return empty
+  if (results.length === 0) {
+    return context.json({
+      brains: [],
+      count: 0,
+    });
+  }
+
+  // If top result is significantly better than others (score difference > 0.2),
+  // or there's only one result, return just that one
+  if (
+    results.length === 1 ||
+    (results.length > 1 && results[1].score! - results[0].score! > 0.2)
+  ) {
+    return context.json({
+      brains: [results[0].item],
+      count: 1,
+    });
+  }
+
+  // Return all matching results, sorted by score (best first)
   return context.json({
-    brains: validBrains,
-    count: validBrains.length,
+    brains: results.map(r => r.item),
+    count: results.length,
   });
 });
 
