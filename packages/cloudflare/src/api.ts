@@ -312,10 +312,12 @@ app.get('/brains/watch', async (context: Context) => {
 
 app.get('/brains', async (context: Context) => {
   const manifest = getManifest();
-  
+
   if (!manifest) {
     return context.json({ error: 'Manifest not initialized' }, 500);
   }
+
+  const query = context.req.query('q')?.toLowerCase().trim();
 
   const brainFilenames = manifest.list();
   const brains = await Promise.all(
@@ -324,7 +326,7 @@ app.get('/brains', async (context: Context) => {
       if (!brain) {
         return null;
       }
-      
+
       const structure = brain.structure;
       return {
         filename,
@@ -335,7 +337,17 @@ app.get('/brains', async (context: Context) => {
   );
 
   // Filter out any null entries
-  const validBrains = brains.filter(brain => brain !== null);
+  let validBrains = brains.filter(brain => brain !== null);
+
+  // If query is provided, filter brains by fuzzy matching
+  if (query) {
+    validBrains = validBrains.filter(brain => {
+      const titleMatch = brain.title.toLowerCase().includes(query);
+      const descriptionMatch = brain.description.toLowerCase().includes(query);
+      const filenameMatch = brain.filename.toLowerCase().includes(query);
+      return titleMatch || descriptionMatch || filenameMatch;
+    });
+  }
 
   return context.json({
     brains: validBrains,

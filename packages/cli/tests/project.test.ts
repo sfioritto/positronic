@@ -29,6 +29,16 @@ import { createTestEnv, px } from './test-utils.js';
 describe('CLI Integration: positronic server with project', () => {
   it('runs a brain', async () => {
     const env = await createTestEnv();
+    const { server } = env;
+
+    // Add brain to mock server for search
+    server.addBrain({
+      filename: 'test-brain',
+      title: 'Test Brain',
+      description: 'A test brain for testing',
+      createdAt: Date.now(),
+      lastModified: Date.now(),
+    });
 
     // Setup test brain
     env.setup((dir: string) => {

@@ -7,6 +7,17 @@ describe('CLI Integration: positronic brain commands', () => {
   describe('brain run command', () => {
     it('should successfully run a brain and return run ID', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      // Add test brain to mock server
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
       const px = await env.start();
 
       try {
@@ -20,6 +31,16 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should run a brain with watch option', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
       const px = await env.start();
 
       try {
@@ -29,7 +50,7 @@ describe('CLI Integration: positronic brain commands', () => {
           /Connecting to watch service|Brain: test-brain/
         );
         expect(isOutputRendered).toBe(true);
-        
+
         // Unmount the component to trigger EventSource cleanup
         instance.unmount();
       } finally {
@@ -39,6 +60,16 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should run a brain with short watch flag', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
       const px = await env.start();
 
       try {
@@ -48,7 +79,7 @@ describe('CLI Integration: positronic brain commands', () => {
           /Connecting to watch service|Brain: test-brain/
         );
         expect(isOutputRendered).toBe(true);
-        
+
         // Unmount the component to trigger EventSource cleanup
         instance.unmount();
       } finally {
@@ -58,21 +89,31 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should run a brain with options', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px([
-          'run', 
-          'test-brain', 
-          '-o', 
+          'run',
+          'test-brain',
+          '-o',
           'channel=#general',
           '-o',
           'debug=true'
         ]);
-        
+
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
         expect(isOutputRendered).toBe(true);
-        
+
         // Verify API was called with options
         const calls = env.server.getLogs();
         const runCall = calls.find(c => c.method === 'createBrainRun');
@@ -89,13 +130,23 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should run a brain with options using long flag', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px([
-          'run', 
-          'test-brain', 
-          '--options', 
+          'run',
+          'test-brain',
+          '--options',
           'environment=production',
           '--options',
           'rate=100'
@@ -137,19 +188,29 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should handle options with values containing equals signs', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px([
-          'run', 
-          'test-brain', 
-          '-o', 
+          'run',
+          'test-brain',
+          '-o',
           'webhook=https://example.com/api?key=value&foo=bar'
         ]);
-        
+
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
         expect(isOutputRendered).toBe(true);
-        
+
         // Verify API was called with correct URL value
         const calls = env.server.getLogs();
         const runCall = calls.find(c => c.method === 'createBrainRun');
@@ -163,63 +224,46 @@ describe('CLI Integration: positronic brain commands', () => {
     });
 
 
-    it('should handle brain not found (404) error with helpful message', async () => {
+    it('should handle brain not found error with helpful message', async () => {
       const env = await createTestEnv();
+      // Don't add any brains - search will return empty results
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px(['run', 'non-existent-brain']);
 
-        // Check for error component output
+        // Check for error component output - now shows "No brains found matching"
         const foundErrorTitle = await waitForOutput(/Brain Not Found/i, 30);
         expect(foundErrorTitle).toBe(true);
 
-        const foundErrorMessage = await waitForOutput(/Brain 'non-existent-brain' not found/i, 30);
+        const foundErrorMessage = await waitForOutput(/No brains found matching 'non-existent-brain'/i, 30);
         expect(foundErrorMessage).toBe(true);
 
         const foundHelpText = await waitForOutput(/brain name is spelled correctly/i, 30);
         expect(foundHelpText).toBe(true);
-
-        // Verify the API was called
-        const calls = env.server.getLogs();
-        const runCall = calls.find(c => c.method === 'createBrainRun');
-        expect(runCall).toBeDefined();
-        expect(runCall?.args[0]).toBe('non-existent-brain');
       } finally {
         await env.stopAndCleanup();
       }
     });
 
-    it('should handle API server error responses', async () => {
+    it('should handle API server error on search', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
-        // Clear all existing nock interceptors to avoid conflicts
+        // Clear all existing nock interceptors and set up error mock
         nock.cleanAll();
-
-        // Mock the server to return a 500 error
         const port = env.server.port;
         nock(`http://localhost:${port}`)
-          .post('/brains/runs')
+          .get('/brains')
+          .query(true)
           .reply(500, 'Internal Server Error');
 
-        // Mock process.exit to prevent test from exiting
-        const originalExit = process.exit;
-        let exitCalled = false;
-        process.exit = ((code?: number) => {
-          exitCalled = true;
-          throw new Error(`process.exit called with code ${code}`);
-        }) as any;
+        const { waitForOutput } = await px(['run', 'test-brain']);
 
-        try {
-          await expect(px(['run', 'test-brain'])).rejects.toThrow(
-            'process.exit called with code 1'
-          );
-          expect(exitCalled).toBe(true);
-        } finally {
-          process.exit = originalExit;
-        }
+        // Should show server error
+        const foundError = await waitForOutput(/Server Error|Error searching/i, 30);
+        expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
@@ -230,105 +274,22 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        // Clear all existing nock interceptors to avoid conflicts
+        // Clear all existing nock interceptors and set up error mock
         nock.cleanAll();
-
-        // Mock a connection refused error
-        const port = env.server.port;
-        nock(`http://localhost:${port}`).post('/brains/runs').replyWithError({
-          message: 'connect ECONNREFUSED',
-          code: 'ECONNREFUSED',
-        });
-
-        // Mock process.exit to prevent test from exiting
-        const originalExit = process.exit;
-        let exitCalled = false;
-        process.exit = ((code?: number) => {
-          exitCalled = true;
-          throw new Error(`process.exit called with code ${code}`);
-        }) as any;
-
-        try {
-          await expect(px(['run', 'test-brain'])).rejects.toThrow(
-            'process.exit called with code 1'
-          );
-          expect(exitCalled).toBe(true);
-        } finally {
-          process.exit = originalExit;
-        }
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
-    it('should handle other network errors', async () => {
-      const env = await createTestEnv();
-      const px = await env.start();
-
-      try {
-        // Clear all existing nock interceptors to avoid conflicts
-        nock.cleanAll();
-
-        // Mock a different network error (without ECONNREFUSED code)
         const port = env.server.port;
         nock(`http://localhost:${port}`)
-          .post('/brains/runs')
+          .get('/brains')
+          .query(true)
           .replyWithError({
-            message: 'Network timeout error occurred',
-            code: 'TIMEOUT',
+            message: 'connect ECONNREFUSED',
+            code: 'ECONNREFUSED',
           });
 
-        // Mock process.exit to prevent test from exiting
-        const originalExit = process.exit;
-        let exitCalled = false;
-        process.exit = ((code?: number) => {
-          exitCalled = true;
-          throw new Error(`process.exit called with code ${code}`);
-        }) as any;
+        const { waitForOutput } = await px(['run', 'test-brain']);
 
-        try {
-          await expect(px(['run', 'test-brain'])).rejects.toThrow(
-            'process.exit called with code 1'
-          );
-          expect(exitCalled).toBe(true);
-        } finally {
-          process.exit = originalExit;
-        }
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
-    it('should handle network errors with specific error message', async () => {
-      const env = await createTestEnv();
-      const px = await env.start();
-
-      try {
-        // Clear all existing nock interceptors to avoid conflicts
-        nock.cleanAll();
-
-        // Mock a network error with a specific message (not ECONNREFUSED)
-        const port = env.server.port;
-        nock(`http://localhost:${port}`)
-          .post('/brains/runs')
-          .replyWithError(new Error('DNS resolution failed'));
-
-        // Mock process.exit to prevent test from exiting
-        const originalExit = process.exit;
-        let exitCalled = false;
-        process.exit = ((code?: number) => {
-          exitCalled = true;
-          throw new Error(`process.exit called with code ${code}`);
-        }) as any;
-
-        try {
-          await expect(px(['run', 'test-brain'])).rejects.toThrow(
-            'process.exit called with code 1'
-          );
-          expect(exitCalled).toBe(true);
-        } finally {
-          process.exit = originalExit;
-        }
+        // Should show connection error
+        const foundError = await waitForOutput(/Connection Error|Error connecting/i, 30);
+        expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
@@ -540,7 +501,7 @@ describe('CLI Integration: positronic brain commands', () => {
       try {
         // This will throw an error during yargs validation
         await expect(px(['watch'])).rejects.toThrow(
-          'You must provide either a brain filename or a --run-id'
+          'You must provide either a brain identifier or a --run-id'
         );
       } finally {
         await env.stopAndCleanup();

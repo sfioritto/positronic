@@ -597,14 +597,28 @@ export class TestDevServer implements PositronicDevServer {
       }
     );
 
-    // GET /brains
-    nockInstance.get('/brains').reply(200, () => {
-      const brains = Array.from(this.brains.values());
-      this.logCall('getBrains', []);
-      return {
+    // GET /brains (with optional query filtering)
+    nockInstance.get('/brains').query(true).reply((uri) => {
+      const url = new URL(uri, 'http://example.com');
+      const query = url.searchParams.get('q')?.toLowerCase().trim();
+
+      let brains = Array.from(this.brains.values());
+
+      // If query is provided, filter brains by fuzzy matching
+      if (query) {
+        brains = brains.filter(brain => {
+          const titleMatch = brain.title.toLowerCase().includes(query);
+          const descriptionMatch = brain.description.toLowerCase().includes(query);
+          const filenameMatch = brain.filename.toLowerCase().includes(query);
+          return titleMatch || descriptionMatch || filenameMatch;
+        });
+      }
+
+      this.logCall('getBrains', [query || null]);
+      return [200, {
         brains,
         count: brains.length,
-      };
+      }];
     });
 
     // GET /brains/schedules
