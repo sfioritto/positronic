@@ -1,5 +1,21 @@
 # @positronic/cloudflare
 
+## 0.0.40
+
+### Patch Changes
+
+- Improve brain search with fuse.js fuzzy matching
+
+  - Replace simple substring matching with fuse.js for proper fuzzy brain name matching
+  - Add exact match priority for brain title and filename lookups
+  - Weight brain title and filename higher than description in fuzzy search results
+  - Return single best match when score is significantly better than alternatives
+
+- Updated dependencies
+  - @positronic/core@0.0.40
+  - @positronic/spec@0.0.40
+  - @positronic/template-new-project@0.0.40
+
 ## 0.0.39
 
 ### Patch Changes
