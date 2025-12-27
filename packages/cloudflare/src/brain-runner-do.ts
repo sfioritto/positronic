@@ -202,12 +202,59 @@ export class BrainRunnerDO extends DurableObject<Env> {
   }
 
   async kill(): Promise<{ success: boolean; message: string }> {
+    // If brain is actively running, abort it
     if (this.abortController && !this.abortController.signal.aborted) {
       this.abortController.abort();
       return { success: true, message: 'Brain run kill signal sent' };
-    } else {
+    }
+
+    // Brain is not actively running - it might be suspended for a webhook
+    // First, get the actual brainRunId from the stored START event
+    // (this.brainRunId is the DO's internal ID, not the UUID brainRunId)
+    const { sql } = this;
+    const startEventResult = sql
+      .exec<{ serialized_event: string }>(
+        `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
+        BRAIN_EVENTS.START,
+        BRAIN_EVENTS.RESTART
+      )
+      .toArray();
+
+    if (startEventResult.length === 0) {
+      return { success: false, message: 'Brain run not found or never started' };
+    }
+
+    const startEvent = JSON.parse(startEventResult[0].serialized_event);
+    const actualBrainRunId = startEvent.brainRunId;
+
+    // Check if it's still in RUNNING status (which means it's suspended)
+    const monitorStub = this.env.MONITOR_DO.get(
+      this.env.MONITOR_DO.idFromName('singleton')
+    );
+
+    const existingRun = await monitorStub.getLastEvent(actualBrainRunId);
+    if (!existingRun) {
+      return { success: false, message: 'Brain run not found in monitor' };
+    }
+
+    // If already completed/cancelled/errored, nothing to do
+    if (existingRun.status !== STATUS.RUNNING) {
       return { success: false, message: 'Brain run is not active or already completed' };
     }
+
+    // Brain is suspended for a webhook - emit CANCELLED event to MonitorDO
+    const cancelledEvent: BrainEvent<any> = {
+      type: BRAIN_EVENTS.CANCELLED,
+      status: STATUS.CANCELLED,
+      brainTitle: startEvent.brainTitle,
+      brainDescription: startEvent.brainDescription || '',
+      brainRunId: actualBrainRunId,
+      options: startEvent.options || {},
+    };
+
+    await monitorStub.handleBrainEvent(cancelledEvent);
+
+    return { success: true, message: 'Suspended brain run cancelled' };
   }
 
   async start(
