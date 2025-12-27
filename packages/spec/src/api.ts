@@ -1312,6 +1312,204 @@ export const brains = {
   },
 
   /**
+   * Test DELETE /brains/runs/:runId for a brain suspended on a webhook.
+   * This tests that killing a webhook-suspended brain:
+   * 1. Returns 204 (not 409)
+   * 2. Updates status to CANCELLED
+   * 3. Clears webhook registrations (webhook no longer resumes the brain)
+   *
+   * Requires a brain with a loop step that will pause on a webhook.
+   */
+  async killSuspended(
+    fetch: Fetch,
+    loopBrainIdentifier: string,
+    webhookSlug: string,
+    webhookPayload: Record<string, any>
+  ): Promise<boolean> {
+    try {
+      // Step 1: Start the loop brain
+      const runRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: loopBrainIdentifier }),
+      });
+
+      const runResponse = await fetch(runRequest);
+      if (runResponse.status !== 201) {
+        console.error(
+          `POST /brains/runs returned ${runResponse.status}, expected 201`
+        );
+        return false;
+      }
+
+      const { brainRunId } = (await runResponse.json()) as { brainRunId: string };
+
+      // Step 2: Watch until WEBHOOK event (brain pauses)
+      const watchRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/watch`,
+        { method: 'GET' }
+      );
+
+      const watchResponse = await fetch(watchRequest);
+      if (!watchResponse.ok) {
+        console.error(
+          `GET /brains/runs/${brainRunId}/watch returned ${watchResponse.status}`
+        );
+        return false;
+      }
+
+      let foundWebhookEvent = false;
+      if (watchResponse.body) {
+        const reader = watchResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (!foundWebhookEvent) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eventEndIndex;
+            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+              const message = buffer.substring(0, eventEndIndex);
+              buffer = buffer.substring(eventEndIndex + 2);
+
+              if (message.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(message.substring(6));
+                  if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                    foundWebhookEvent = true;
+                    break;
+                  }
+                  if (
+                    event.type === BRAIN_EVENTS.COMPLETE ||
+                    event.type === BRAIN_EVENTS.ERROR
+                  ) {
+                    console.error(
+                      `Brain completed/errored before WEBHOOK event: ${event.type}`
+                    );
+                    return false;
+                  }
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        } finally {
+          await reader.cancel();
+        }
+      }
+
+      if (!foundWebhookEvent) {
+        console.error('Brain did not emit WEBHOOK event');
+        return false;
+      }
+
+      // Step 3: Kill the suspended brain
+      const killRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}`,
+        { method: 'DELETE' }
+      );
+
+      const killResponse = await fetch(killRequest);
+      if (killResponse.status !== 204) {
+        console.error(
+          `DELETE /brains/runs/${brainRunId} returned ${killResponse.status}, expected 204`
+        );
+        return false;
+      }
+
+      // Step 4: Verify status is CANCELLED via getRun
+      const getRunRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}`,
+        { method: 'GET' }
+      );
+
+      const getRunResponse = await fetch(getRunRequest);
+      if (!getRunResponse.ok) {
+        console.error(
+          `GET /brains/runs/${brainRunId} returned ${getRunResponse.status}`
+        );
+        return false;
+      }
+
+      const runData = (await getRunResponse.json()) as { status: string };
+      if (runData.status !== STATUS.CANCELLED) {
+        console.error(
+          `Expected status to be '${STATUS.CANCELLED}', got '${runData.status}'`
+        );
+        return false;
+      }
+
+      // Step 5: Verify webhook no longer resumes the brain
+      // Send a webhook - it should return 'no-match' since registrations were cleared
+      const webhookRequest = new Request(
+        `http://example.com/webhooks/${encodeURIComponent(webhookSlug)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+        }
+      );
+
+      const webhookResponse = await fetch(webhookRequest);
+      // Accept 200/202 - the important thing is it doesn't resume the brain
+      if (!webhookResponse.ok) {
+        console.error(
+          `POST /webhooks/${webhookSlug} returned ${webhookResponse.status}`
+        );
+        return false;
+      }
+
+      const webhookResult = (await webhookResponse.json()) as {
+        received: boolean;
+        action?: string;
+      };
+
+      // The action should be 'no-match' since webhook registrations were cleared
+      if (webhookResult.action === 'resumed') {
+        console.error(
+          'Webhook resumed the brain after it was killed - webhook registrations were not cleared'
+        );
+        return false;
+      }
+
+      // Verify the brain is still CANCELLED (didn't restart)
+      const finalCheckRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}`,
+        { method: 'GET' }
+      );
+
+      const finalCheckResponse = await fetch(finalCheckRequest);
+      if (!finalCheckResponse.ok) {
+        console.error(
+          `Final GET /brains/runs/${brainRunId} returned ${finalCheckResponse.status}`
+        );
+        return false;
+      }
+
+      const finalRunData = (await finalCheckResponse.json()) as { status: string };
+      if (finalRunData.status !== STATUS.CANCELLED) {
+        console.error(
+          `Final status check: expected '${STATUS.CANCELLED}', got '${finalRunData.status}'`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test kill suspended brain for ${loopBrainIdentifier}:`,
+        error
+      );
+      return false;
+    }
+  },
+
+  /**
    * Test that loop steps emit proper LOOP_* events in the SSE stream.
    * Requires a brain with a loop step that will pause on a webhook.
    *
