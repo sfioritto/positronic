@@ -39,7 +39,8 @@
       "WebSearch",
       "WebFetch(domain:www.braintrust.dev)",
       "WebFetch(domain:simonwillison.net)",
-      "WebFetch(domain:sketch.dev)"
+      "WebFetch(domain:sketch.dev)",
+      "WebFetch(domain:www.fusejs.io)"
     ],
     "deny": []
   }
