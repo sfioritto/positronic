@@ -14,6 +14,17 @@ describe('schedule command', () => {
   describe('schedule create', () => {
     it('should create a new schedule', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      // Add brain to mock server for fuzzy search resolution
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
       const px = await env.start();
 
       try {
