@@ -221,30 +221,33 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.MONITOR_DO.idFromName('singleton')
     );
 
-    // Try to get brainRunId from DO's SQLite state
+    // Use passed-in brainRunId/brainTitle if provided (from API which already verified the run exists)
+    // Only fall back to SQLite if not provided
     let actualBrainRunId = brainRunId;
     let actualBrainTitle = brainTitle;
     let startEvent: any = null;
 
-    const { sql } = this;
-    try {
-      const startEventResult = sql
-        .exec<{ serialized_event: string }>(
-          `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
-          BRAIN_EVENTS.START,
-          BRAIN_EVENTS.RESTART
-        )
-        .toArray();
+    // Only query SQLite if we don't have the brainRunId from the API
+    if (!actualBrainRunId) {
+      const { sql } = this;
+      try {
+        const startEventResult = sql
+          .exec<{ serialized_event: string }>(
+            `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
+            BRAIN_EVENTS.START,
+            BRAIN_EVENTS.RESTART
+          )
+          .toArray();
 
-      if (startEventResult.length > 0) {
-        startEvent = JSON.parse(startEventResult[0].serialized_event);
-        actualBrainRunId = startEvent.brainRunId;
-        actualBrainTitle = startEvent.brainTitle;
+        if (startEventResult.length > 0) {
+          startEvent = JSON.parse(startEventResult[0].serialized_event);
+          actualBrainRunId = startEvent.brainRunId;
+          actualBrainTitle = startEvent.brainTitle;
+        }
+      } catch (err) {
+        // Table doesn't exist - brain was killed before any events were written to DO's SQLite
+        console.log(`[DO ${this.brainRunId}] kill() could not query brain_events (table may not exist)`);
       }
-    } catch (err) {
-      // Table doesn't exist - brain was killed before any events were written to DO's SQLite
-      // This is fine if we have fallback brainRunId/brainTitle from the API
-      console.log(`[DO ${this.brainRunId}] kill() could not query brain_events (table may not exist)`);
     }
 
     // If we still don't have a brainRunId, we can't proceed
