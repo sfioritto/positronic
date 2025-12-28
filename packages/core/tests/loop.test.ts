@@ -334,6 +334,78 @@ describe('loop step', () => {
       const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
       expect(webhookEvent).toBeDefined();
     });
+
+    it('should emit WEBHOOK event with multiple webhooks when tool returns array', async () => {
+      const slackWebhook = createWebhook(
+        'slack-response',
+        z.object({ channel: z.string(), approved: z.boolean() }),
+        async () => ({
+          type: 'webhook' as const,
+          identifier: 'slack-thread-1',
+          response: { channel: '#approvals', approved: true },
+        })
+      );
+
+      const emailWebhook = createWebhook(
+        'email-response',
+        z.object({ email: z.string(), approved: z.boolean() }),
+        async () => ({
+          type: 'webhook' as const,
+          identifier: 'email-msg-1',
+          response: { email: 'manager@example.com', approved: true },
+        })
+      );
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'requestApproval',
+            args: { reason: 'Budget increase needed' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-array-waitfor').loop('Multi-channel Approval', () => ({
+        prompt: 'Request approval via multiple channels',
+        tools: {
+          requestApproval: {
+            description: 'Request approval via Slack and email',
+            inputSchema: z.object({ reason: z.string() }),
+            execute: async () => {
+              return {
+                waitFor: [slackWebhook('slack-thread-1'), emailWebhook('email-msg-1')],
+              };
+            },
+          },
+          complete: {
+            description: 'Complete the request',
+            inputSchema: z.object({ result: z.string() }),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Should emit single LOOP_WEBHOOK event (captures tool context)
+      const loopWebhookEvents = events.filter((e) => e.type === BRAIN_EVENTS.LOOP_WEBHOOK);
+      expect(loopWebhookEvents.length).toBe(1);
+
+      // Should emit WEBHOOK event with both webhooks
+      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      expect(webhookEvent).toBeDefined();
+      expect(webhookEvent.waitFor).toHaveLength(2);
+      expect(webhookEvent.waitFor[0].slug).toBe('slack-response');
+      expect(webhookEvent.waitFor[0].identifier).toBe('slack-thread-1');
+      expect(webhookEvent.waitFor[1].slug).toBe('email-response');
+      expect(webhookEvent.waitFor[1].identifier).toBe('email-msg-1');
+    });
   });
 
   describe('loop throws when generateText not implemented', () => {
@@ -379,7 +451,7 @@ describe('loop step', () => {
   });
 
   describe('loop with system prompt', () => {
-    it('should pass system prompt to generateText', async () => {
+    it('should prepend default system prompt and append user system prompt', async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
         toolCalls: [
@@ -409,12 +481,52 @@ describe('loop step', () => {
         events.push(event);
       }
 
-      // Verify system was passed to generateText
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          system: 'You are a helpful assistant.',
-        })
+      // Verify system prompt includes both default and user's prompt
+      const callArgs = mockGenerateText.mock.calls[0][0];
+      expect(callArgs.system).toBeDefined();
+      const systemPrompt = callArgs.system!;
+      expect(systemPrompt).toContain('## Tool Execution Behavior');
+      expect(systemPrompt).toContain('You are a helpful assistant.');
+      // Default should come first
+      expect(systemPrompt.indexOf('## Tool Execution Behavior')).toBeLessThan(
+        systemPrompt.indexOf('You are a helpful assistant.')
       );
+    });
+
+    it('should use default system prompt when none provided', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'done',
+            args: {},
+          },
+        ],
+        usage: { totalTokens: 50 },
+      });
+
+      const testBrain = brain('test-default-system').loop('No System', () => ({
+        prompt: 'Do something',
+        tools: {
+          done: {
+            description: 'Done',
+            inputSchema: z.object({}),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify default system prompt is used
+      const callArgs = mockGenerateText.mock.calls[0][0];
+      expect(callArgs.system).toContain('## Tool Execution Behavior');
+      expect(callArgs.system).toContain('Tools are executed sequentially');
+      expect(callArgs.system).toContain('webhook');
     });
   });
 

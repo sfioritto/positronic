@@ -31,6 +31,19 @@ export const DEFAULT_ENV: RuntimeEnv = {
 export const HEARTBEAT_INTERVAL_MS = 5000;
 
 /**
+ * Default system prompt prepended to all loop steps.
+ * Explains tool execution quirks to the LLM.
+ */
+const DEFAULT_LOOP_SYSTEM_PROMPT = `## Tool Execution Behavior
+- Tools are executed sequentially in the order you call them
+- If a tool triggers a webhook (e.g., human approval), remaining tools in your response will NOT execute - you'll need to call them again after resuming
+- When waiting on multiple webhooks (e.g., Slack + email), the first webhook response received will resume execution
+- Terminal tools end the loop immediately - no further tools or iterations will run
+
+## Resumption Context
+When resuming after a webhook response, that response appears as the tool result in your conversation history.`;
+
+/**
  * Simple sleep helper that returns a promise resolving after the specified delay.
  */
 const sleep = (ms: number): Promise<void> =>
@@ -1202,10 +1215,15 @@ class BrainEventStream<
         };
       }
 
+      // Prepend default system prompt to user's system prompt
+      const systemPrompt = config.system
+        ? `${DEFAULT_LOOP_SYSTEM_PROMPT}\n\n${config.system}`
+        : DEFAULT_LOOP_SYSTEM_PROMPT;
+
       // Call the LLM with heartbeat to keep DO alive during long API calls
       const response = yield* this.withHeartbeat(
         this.client.generateText({
-          system: config.system,
+          system: systemPrompt,
           messages,
           tools: toolsForClient,
         }),
@@ -1301,6 +1319,11 @@ class BrainEventStream<
           ) {
             const waitForResult = toolResult as LoopToolWaitFor;
 
+            // Normalize waitFor to array (supports single or multiple webhooks)
+            const webhooks = Array.isArray(waitForResult.waitFor)
+              ? waitForResult.waitFor
+              : [waitForResult.waitFor];
+
             // Emit loop webhook event first (captures pending tool context)
             yield {
               type: BRAIN_EVENTS.LOOP_WEBHOOK,
@@ -1313,15 +1336,13 @@ class BrainEventStream<
               brainRunId: this.brainRunId,
             };
 
-            // Then emit webhook event
+            // Then emit webhook event with all webhooks (first response wins)
             yield {
               type: BRAIN_EVENTS.WEBHOOK,
-              waitFor: [
-                {
-                  slug: waitForResult.waitFor.slug,
-                  identifier: waitForResult.waitFor.identifier,
-                },
-              ],
+              waitFor: webhooks.map((w) => ({
+                slug: w.slug,
+                identifier: w.identifier,
+              })),
               state: this.currentState,
               options: this.options ?? ({} as TOptions),
               brainRunId: this.brainRunId,
