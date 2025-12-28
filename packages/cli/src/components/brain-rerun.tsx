@@ -55,57 +55,47 @@ export const BrainRerun = ({ identifier, runId, startsAt, stopsAfter }: BrainRer
     rerunBrain();
   }, [identifier, runId, startsAt, stopsAfter]);
 
-  if (isLoading) {
-    return (
-      <Box>
-        <Text>🔄 Starting brain rerun...</Text>
-      </Box>
-    );
-  }
+  const errorDetails = runId
+    ? `Make sure the brain "${identifier}" and run ID "${runId}" exist.\nYou can list brain history with: positronic brain history ${identifier}`
+    : `Make sure the brain "${identifier}" exists.\nYou can list available brains with: positronic brain list`;
 
-  if (error) {
-    const errorDetails = runId 
-      ? `Make sure the brain "${identifier}" and run ID "${runId}" exist.\nYou can list brain history with: positronic brain history ${identifier}`
-      : `Make sure the brain "${identifier}" exists.\nYou can list available brains with: positronic brain list`;
+  const runDetails = runId ? ` from run ${runId}` : '';
+  const rangeDetails = startsAt || stopsAfter
+    ? ` (${startsAt ? `starting at step ${startsAt}` : ''}${startsAt && stopsAfter ? ', ' : ''}${stopsAfter ? `stopping after step ${stopsAfter}` : ''})`
+    : '';
 
-    return (
-      <ErrorComponent
-        error={{
-          title: 'Brain Rerun Failed',
-          message: error,
-          details: errorDetails
-        }}
-      />
-    );
-  }
-
-  if (newRunId) {
-    const runDetails = runId ? ` from run ${runId}` : '';
-    const rangeDetails = startsAt || stopsAfter
-      ? ` (${startsAt ? `starting at step ${startsAt}` : ''}${startsAt && stopsAfter ? ', ' : ''}${stopsAfter ? `stopping after step ${stopsAfter}` : ''})`
-      : '';
-
-    return (
-      <Box flexDirection="column">
-        <Text bold color="green">✅ Brain rerun started successfully!</Text>
-        <Text>
-          New run ID: <Text bold>{newRunId}</Text>
-        </Text>
-        <Text dimColor>
-          Rerunning brain "{identifier}"{runDetails}{rangeDetails}
-        </Text>
-        <Box marginTop={1}>
-          <Text dimColor>
-            Watch the run with: positronic watch --run-id {newRunId}
-          </Text>
-        </Box>
-      </Box>
-    );
-  }
-
+  // Maintain consistent Box wrapper to help Ink properly calculate
+  // terminal clearing between renders (prevents appending instead of overwriting)
   return (
-    <Box>
-      <Text color="red">❌ Unexpected error occurred</Text>
+    <Box flexDirection="column">
+      {isLoading ? (
+        <Text>🔄 Starting brain rerun...</Text>
+      ) : error ? (
+        <ErrorComponent
+          error={{
+            title: 'Brain Rerun Failed',
+            message: error,
+            details: errorDetails
+          }}
+        />
+      ) : newRunId ? (
+        <>
+          <Text bold color="green">✅ Brain rerun started successfully!</Text>
+          <Text>
+            New run ID: <Text bold>{newRunId}</Text>
+          </Text>
+          <Text dimColor>
+            Rerunning brain "{identifier}"{runDetails}{rangeDetails}
+          </Text>
+          <Box marginTop={1}>
+            <Text dimColor>
+              Watch the run with: positronic watch --run-id {newRunId}
+            </Text>
+          </Box>
+        </>
+      ) : (
+        <Text color="red">❌ Unexpected error occurred</Text>
+      )}
     </Box>
   );
 };

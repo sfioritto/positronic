@@ -86,47 +86,35 @@ const BrainWatchByTitle = ({ brainTitle }: BrainWatchByTitleProps) => {
     fetchActiveRuns();
   }, [brainTitle]);
 
-  if (phase === 'loading') {
-    return (
-      <Box>
+  // Maintain consistent Box wrapper to help Ink properly calculate
+  // terminal clearing between renders (prevents appending instead of overwriting)
+  return (
+    <Box flexDirection="column">
+      {phase === 'loading' ? (
         <Text>Looking for active runs for "{brainTitle}"...</Text>
-      </Box>
-    );
-  }
-
-  if (phase === 'error' && error) {
-    return <ErrorComponent error={error} />;
-  }
-
-  if (phase === 'no-runs') {
-    return (
-      <ErrorComponent
-        error={{
-          title: 'No Active Runs',
-          message: `No currently running brain runs found for brain "${brainTitle}".`,
-          details: `To start a new run, use: positronic run ${brainTitle}`,
-        }}
-      />
-    );
-  }
-
-  if (phase === 'multiple-runs') {
-    return (
-      <ErrorComponent
-        error={{
-          title: 'Multiple Active Runs',
-          message: `Found ${runs.length} active runs for brain "${brainTitle}".`,
-          details: `Please specify a specific run ID with --run-id:\n${runs.map((run) => `  positronic watch --run-id ${run.brainRunId}`).join('\n')}`,
-        }}
-      />
-    );
-  }
-
-  if (phase === 'watching' && runId) {
-    return <Watch runId={runId} />;
-  }
-
-  return null;
+      ) : phase === 'error' && error ? (
+        <ErrorComponent error={error} />
+      ) : phase === 'no-runs' ? (
+        <ErrorComponent
+          error={{
+            title: 'No Active Runs',
+            message: `No currently running brain runs found for brain "${brainTitle}".`,
+            details: `To start a new run, use: positronic run ${brainTitle}`,
+          }}
+        />
+      ) : phase === 'multiple-runs' ? (
+        <ErrorComponent
+          error={{
+            title: 'Multiple Active Runs',
+            message: `Found ${runs.length} active runs for brain "${brainTitle}".`,
+            details: `Please specify a specific run ID with --run-id:\n${runs.map((run) => `  positronic watch --run-id ${run.brainRunId}`).join('\n')}`,
+          }}
+        />
+      ) : phase === 'watching' && runId ? (
+        <Watch runId={runId} />
+      ) : null}
+    </Box>
+  );
 };
 
 interface BrainWatchWithResolverProps {
