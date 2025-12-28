@@ -24,6 +24,18 @@ export const DEFAULT_ENV: RuntimeEnv = {
   secrets: {},
 };
 
+/**
+ * Heartbeat interval in milliseconds.
+ * Emits heartbeat events during long-running operations to keep Durable Objects alive.
+ */
+export const HEARTBEAT_INTERVAL_MS = 5000;
+
+/**
+ * Simple sleep helper that returns a promise resolving after the specified delay.
+ */
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 // Shared interface for step action functions
 export type StepAction<
   TStateIn,
@@ -213,6 +225,14 @@ export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
   response: JsonObject;
 }
 
+// 6. Heartbeat Event (emitted during long-running operations to keep DO alive)
+export interface HeartbeatEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.HEARTBEAT;
+  stepId: string;
+  stepTitle: string;
+}
+
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -225,6 +245,7 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepRetryEvent<TOptions>
   | WebhookEvent<TOptions>
   | WebhookResponseEvent<TOptions>
+  | HeartbeatEvent<TOptions>
   | LoopStartEvent<TOptions>
   | LoopIterationEvent<TOptions>
   | LoopToolCallEvent<TOptions>
@@ -1032,7 +1053,8 @@ class BrainEventStream<
             })
           );
 
-          result = await actionPromise;
+          // Use withHeartbeat to emit heartbeat events during long-running operations
+          result = yield* this.withHeartbeat(actionPromise, step);
           break; // Success
         } catch (error) {
           if (retries < MAX_RETRIES) {
@@ -1180,12 +1202,15 @@ class BrainEventStream<
         };
       }
 
-      // Call the LLM
-      const response = await this.client.generateText({
-        system: config.system,
-        messages,
-        tools: toolsForClient,
-      });
+      // Call the LLM with heartbeat to keep DO alive during long API calls
+      const response = yield* this.withHeartbeat(
+        this.client.generateText({
+          system: config.system,
+          messages,
+          tools: toolsForClient,
+        }),
+        step
+      );
 
       // Track tokens
       totalTokens += response.usage.totalTokens;
@@ -1261,9 +1286,12 @@ class BrainEventStream<
           return;
         }
 
-        // Execute non-terminal tool
+        // Execute non-terminal tool with heartbeat to keep DO alive during long tool executions
         if (tool.execute) {
-          const toolResult = await Promise.resolve(tool.execute(toolCall.args));
+          const toolResult = yield* this.withHeartbeat(
+            Promise.resolve(tool.execute(toolCall.args)),
+            step
+          );
 
           // Check if tool returned waitFor
           if (
@@ -1343,6 +1371,51 @@ class BrainEventStream<
       options: this.options ?? ({} as TOptions),
       brainRunId: this.brainRunId,
     };
+  }
+
+  /**
+   * Wraps a promise with heartbeat emission to keep Durable Objects alive during long-running operations.
+   * Emits HEARTBEAT events at regular intervals while waiting for the promise to resolve.
+   */
+  private async *withHeartbeat<T>(
+    promise: Promise<T>,
+    step: Step
+  ): AsyncGenerator<BrainEvent<TOptions>, T> {
+    // Create a deferred to track completion
+    let resolved = false;
+    let result: T;
+    let error: Error | undefined;
+
+    const promiseHandler = promise
+      .then((r) => {
+        resolved = true;
+        result = r;
+      })
+      .catch((e) => {
+        resolved = true;
+        error = e;
+      });
+
+    while (!resolved) {
+      // Race between the promise and the heartbeat interval
+      await Promise.race([promiseHandler, sleep(HEARTBEAT_INTERVAL_MS)]);
+
+      if (!resolved) {
+        yield {
+          type: BRAIN_EVENTS.HEARTBEAT,
+          stepId: step.id,
+          stepTitle: step.block.title,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+      }
+    }
+
+    if (error) {
+      throw error;
+    }
+
+    return result!;
   }
 }
 

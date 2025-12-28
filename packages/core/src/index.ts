@@ -59,6 +59,7 @@ export type {
   LoopTokenLimitEvent,
   LoopWebhookEvent,
   WebhookResponseEvent,
+  HeartbeatEvent,
 } from './dsl/brain.js';
 
 // Loop message reconstruction
