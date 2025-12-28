@@ -9,14 +9,24 @@ import { z } from 'zod';
 // Track generateText calls for testing - allows mocking specific tool calls
 let generateTextCallCount = 0;
 let pendingToolResponse: unknown | null = null;
+let mockError: Error | null = null;
 
 export function setMockToolResponse(response: unknown) {
   pendingToolResponse = response;
 }
 
+/**
+ * Configure the mock client to throw an error on the next generateText call.
+ * Use this to simulate API errors like "request too large" or rate limits.
+ */
+export function setMockError(error: Error | null) {
+  mockError = error;
+}
+
 export function resetMockState() {
   generateTextCallCount = 0;
   pendingToolResponse = null;
+  mockError = null;
 }
 
 // A simple mock client for testing purposes
@@ -38,6 +48,13 @@ const mockClient: ObjectGenerator = {
     tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
   }) => {
     generateTextCallCount++;
+
+    // If an error is configured, throw it (simulates API errors like rate limits)
+    if (mockError) {
+      const error = mockError;
+      mockError = null; // Reset after throwing
+      throw error;
+    }
 
     // Check if we have tool messages - if the last one is a tool response,
     // the LLM should respond with text or call another tool
