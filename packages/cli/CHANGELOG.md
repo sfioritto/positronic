@@ -1,5 +1,20 @@
 # @positronic/cli
 
+## 0.0.41
+
+### Patch Changes
+
+- Add heartbeat events to keep Durable Objects alive during long-running operations
+
+  - Add HEARTBEAT event type that is emitted every 5 seconds during LLM API calls, step actions, and tool executions to prevent Cloudflare Durable Objects from timing out
+  - Fix schedule list/delete commands exiting before React components finish rendering
+  - Add comprehensive API error handling tests for brain runs
+
+- Updated dependencies
+  - @positronic/core@0.0.41
+  - @positronic/spec@0.0.41
+  - @positronic/template-new-project@0.0.41
+
 ## 0.0.40
 
 ### Patch Changes
