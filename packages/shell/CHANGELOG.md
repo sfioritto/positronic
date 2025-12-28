@@ -1,5 +1,18 @@
 # @positronic/shell
 
+## 0.0.42
+
+### Patch Changes
+
+- Bug fixes and improvements:
+
+  - Fix kill() to handle zombie brain runs with missing DO state - brain runs killed by IoContext timeout can now be properly cancelled even when their DO state is corrupted
+  - Fix watch showing 'brain complete' when inner brain finishes instead of waiting for outer brain
+  - Fix terminal raw mode not restored after Ctrl+C on dev server
+  - Fix Ink terminal rendering to overwrite instead of append
+  - Add array waitFor support for loop tools allowing multiple webhooks (first response wins)
+  - Add default system prompt for loops explaining tool execution behavior and webhook pausing
+
 ## 0.0.41
 
 ### Patch Changes
