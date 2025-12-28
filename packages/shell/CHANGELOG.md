@@ -1,5 +1,15 @@
 # @positronic/shell
 
+## 0.0.43
+
+### Patch Changes
+
+- Fix kill() to trust API-provided brainRunId over potentially corrupted DO SQLite state
+
+  When killing zombie brain runs, the DO's SQLite could contain stale/corrupted data with a different brainRunId. This caused kill() to query MonitorDO with the wrong ID, resulting in "Brain run is not active or already completed" errors even for runs that were still showing as "running".
+
+  Now kill() uses the brainRunId passed from the API (which already verified the run exists in MonitorDO) and only falls back to querying SQLite when no brainRunId is provided.
+
 ## 0.0.42
 
 ### Patch Changes
