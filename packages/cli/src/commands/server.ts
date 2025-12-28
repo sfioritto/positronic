@@ -104,6 +104,11 @@ export class ServerCommand {
         fs.unlinkSync(pidFile);
       }
 
+      // Restore terminal from raw mode (dev server may have set it)
+      if (process.stdin.isTTY && process.stdin.setRawMode) {
+        process.stdin.setRawMode(false);
+      }
+
       process.exit(0);
     };
 
