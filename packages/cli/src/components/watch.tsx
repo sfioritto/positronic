@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box } from 'ink';
 import { EventSource } from 'eventsource';
-import type { BrainEvent, StepStatusEvent, BrainStartEvent, BrainErrorEvent } from '@positronic/core';
+import type { BrainEvent, StepStatusEvent, BrainStartEvent, BrainErrorEvent, BrainCompleteEvent } from '@positronic/core';
 import { BRAIN_EVENTS } from '@positronic/core';
 import type { SerializedStep } from '@positronic/core';
 import { STATUS } from '@positronic/core';
@@ -74,6 +74,8 @@ export const Watch = ({ runId }: WatchProps) => {
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  // Track the main brain's brainRunId to distinguish from inner brain events
+  const mainBrainRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const baseUrl = getApiBaseUrl();
@@ -82,6 +84,7 @@ export const Watch = ({ runId }: WatchProps) => {
 
     setIsConnected(false);
     setError(null);
+    mainBrainRunIdRef.current = null;
 
     es.onopen = () => {
       setIsConnected(true);
@@ -99,16 +102,29 @@ export const Watch = ({ runId }: WatchProps) => {
           eventData.type === BRAIN_EVENTS.START ||
           eventData.type === BRAIN_EVENTS.RESTART
         ) {
-          setBrainTitle((eventData as BrainStartEvent).brainTitle);
+          const startEvent = eventData as BrainStartEvent;
+          // Only set the main brain info on the first START event
+          if (mainBrainRunIdRef.current === null) {
+            mainBrainRunIdRef.current = startEvent.brainRunId;
+            setBrainTitle(startEvent.brainTitle);
+          }
           setIsCompleted(false);
         }
 
+        // Only mark complete when the main brain completes, not inner brains
         if (eventData.type === BRAIN_EVENTS.COMPLETE || eventData.type === BRAIN_EVENTS.ERROR) {
-          setIsCompleted(true);
+          const completeEvent = eventData as BrainCompleteEvent | BrainErrorEvent;
+          if (completeEvent.brainRunId === mainBrainRunIdRef.current) {
+            setIsCompleted(true);
+          }
         }
 
         if (eventData.type === BRAIN_EVENTS.ERROR) {
-          setBrainError(eventData);
+          const errorEvent = eventData as BrainErrorEvent;
+          // Only show error for the main brain
+          if (errorEvent.brainRunId === mainBrainRunIdRef.current) {
+            setBrainError(errorEvent);
+          }
         }
       } catch (e: any) {
         setError(new Error(`Error parsing event data: ${e.message}`));
