@@ -284,6 +284,23 @@ const loopWebhookBrain = brain({ title: 'loop-webhook-brain', description: 'A br
     },
   }));
 
+// Brain with a loop step that will trigger an API error (simulates "too many tokens")
+// The mock client can be configured to throw an error via setMockError()
+const loopErrorBrain = brain({ title: 'loop-error-brain', description: 'A brain that triggers an API error in its loop step' })
+  .loop('Process request', ({ state }) => ({
+    system: 'You are a helpful assistant.',
+    prompt: 'Please process this request.',
+    tools: {
+      finish: {
+        description: 'Complete the task',
+        inputSchema: z.object({
+          result: z.string().describe('The final result'),
+        }),
+        terminal: true,
+      },
+    },
+  }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -339,6 +356,11 @@ const brainManifest = {
     filename: 'loop-webhook-brain',
     path: 'brains/loop-webhook-brain.ts',
     brain: loopWebhookBrain,
+  },
+  'loop-error-brain': {
+    filename: 'loop-error-brain',
+    path: 'brains/loop-error-brain.ts',
+    brain: loopErrorBrain,
   },
 };
 
