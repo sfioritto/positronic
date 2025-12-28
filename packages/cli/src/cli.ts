@@ -874,11 +874,15 @@ export function buildCli(options: CliOptions) {
         });
 
       // Handle top-level list/delete options
-      yargsSchedule.middleware((argv) => {
+      yargsSchedule.middleware(async (argv) => {
         // If -l flag is used, call list command
         if (argv.list) {
           const element = scheduleCommand.list({ brain: argv.brain } as any);
-          render(element);
+          const result = render(element);
+          // Wait for the component to finish rendering (in production, Ink's render returns waitUntilExit)
+          if (result && typeof result.waitUntilExit === 'function') {
+            await result.waitUntilExit();
+          }
           // Exit after completion to prevent further command processing
           process.exit(0);
         }
@@ -888,7 +892,11 @@ export function buildCli(options: CliOptions) {
             scheduleId: argv.delete as string,
             force: argv.force,
           } as any);
-          render(element);
+          const result = render(element);
+          // Wait for the component to finish rendering (in production, Ink's render returns waitUntilExit)
+          if (result && typeof result.waitUntilExit === 'function') {
+            await result.waitUntilExit();
+          }
           // Exit after completion to prevent further command processing
           process.exit(0);
         }

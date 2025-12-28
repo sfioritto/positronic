@@ -79,7 +79,7 @@ export const ScheduleCreate = ({ identifier, cronExpression }: ScheduleCreatePro
         </Box>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Use "px schedule list" to view all schedules
+            Tip: Use "px schedule -l" to view all schedules
           </Text>
         </Box>
       </Box>
