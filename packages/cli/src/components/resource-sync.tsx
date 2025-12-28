@@ -102,68 +102,66 @@ export const ResourceSync = ({
 
   const processedCount = uploadCount + skipCount + errorCount;
 
-  if (error) {
-    return <ErrorComponent error={error} />;
-  }
-
-  if (currentAction === 'connecting') {
-    return (
-      <Box>
-        <Text>🔌 Connecting to server...</Text>
-      </Box>
-    );
-  }
-
+  // Maintain consistent Box wrapper to help Ink properly calculate
+  // terminal clearing between renders (prevents appending instead of overwriting)
   return (
     <Box flexDirection="column">
-      {currentAction !== 'done' && currentFile && (
-        <Box>
-          <Text>
-            {currentAction === 'uploading' ? '⬆️  Uploading' :
-             currentAction === 'deleting' ? '🗑️  Deleting' :
-             '🔍 Checking'} {currentFile}...
-          </Text>
-        </Box>
-      )}
-
-      {totalCount > 0 && currentAction !== 'done' && (
-        <Box marginTop={1}>
-          <Text dimColor>Progress: {processedCount}/{totalCount} files processed</Text>
-        </Box>
-      )}
-
-      {totalCount === 0 && currentAction === 'done' && (
-        <Box flexDirection="column">
-          <Text>📁 No files found in the resources directory.</Text>
-          <Text dimColor>Resources directory has been created and is ready for use.</Text>
-        </Box>
-      )}
-
-      {errors.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color="red" bold>Errors:</Text>
-          {errors.map((error, i) => (
-            <Box key={i} paddingLeft={2}>
-              <Text color="red">❌ {error.file}: {error.message}</Text>
+      {error ? (
+        <ErrorComponent error={error} />
+      ) : currentAction === 'connecting' ? (
+        <Text>🔌 Connecting to server...</Text>
+      ) : (
+        <>
+          {currentAction !== 'done' && currentFile && (
+            <Box>
+              <Text>
+                {currentAction === 'uploading' ? '⬆️  Uploading' :
+                 currentAction === 'deleting' ? '🗑️  Deleting' :
+                 '🔍 Checking'} {currentFile}...
+              </Text>
             </Box>
-          ))}
-        </Box>
-      )}
+          )}
 
-      {currentAction === 'done' && totalCount > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>📊 Sync Summary:</Text>
-          <Box paddingLeft={2} flexDirection="column">
-            <Text color="green">  • Uploaded: {uploadCount}</Text>
-            <Text color="blue">  • Skipped (up to date): {skipCount}</Text>
-            {deleteCount > 0 && (
-              <Text color="yellow">  • Deleted: {deleteCount}</Text>
-            )}
-            {errorCount > 0 && (
-              <Text color="red">  • Errors: {errorCount}</Text>
-            )}
-          </Box>
-        </Box>
+          {totalCount > 0 && currentAction !== 'done' && (
+            <Box marginTop={1}>
+              <Text dimColor>Progress: {processedCount}/{totalCount} files processed</Text>
+            </Box>
+          )}
+
+          {totalCount === 0 && currentAction === 'done' && (
+            <Box flexDirection="column">
+              <Text>📁 No files found in the resources directory.</Text>
+              <Text dimColor>Resources directory has been created and is ready for use.</Text>
+            </Box>
+          )}
+
+          {errors.length > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              <Text color="red" bold>Errors:</Text>
+              {errors.map((err, i) => (
+                <Box key={i} paddingLeft={2}>
+                  <Text color="red">❌ {err.file}: {err.message}</Text>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {currentAction === 'done' && totalCount > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              <Text bold>📊 Sync Summary:</Text>
+              <Box paddingLeft={2} flexDirection="column">
+                <Text color="green">  • Uploaded: {uploadCount}</Text>
+                <Text color="blue">  • Skipped (up to date): {skipCount}</Text>
+                {deleteCount > 0 && (
+                  <Text color="yellow">  • Deleted: {deleteCount}</Text>
+                )}
+                {errorCount > 0 && (
+                  <Text color="red">  • Errors: {errorCount}</Text>
+                )}
+              </Box>
+            </Box>
+          )}
+        </>
       )}
     </Box>
   );

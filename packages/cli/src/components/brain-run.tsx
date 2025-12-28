@@ -153,63 +153,49 @@ export const BrainRun = ({ identifier, watch, options }: BrainRunProps) => {
     }
   });
 
-  // Render based on phase
-  if (phase === 'searching') {
-    return (
-      <Box>
+  // Maintain consistent Box wrapper to help Ink properly calculate
+  // terminal clearing between renders (prevents appending instead of overwriting)
+  return (
+    <Box flexDirection="column">
+      {phase === 'searching' ? (
         <Text>Searching for brain '{identifier}'...</Text>
-      </Box>
-    );
-  }
-
-  if (phase === 'error' && error) {
-    return <ErrorComponent error={error} />;
-  }
-
-  if (phase === 'disambiguating') {
-    return (
-      <Box flexDirection="column">
-        <Text bold>Multiple brains match '{identifier}':</Text>
-        <Box marginTop={1} flexDirection="column">
-          {brains.map((brain, index) => {
-            const isSelected = index === selectedIndex;
-            return (
-              <Box key={brain.title} flexDirection="column" marginBottom={1}>
-                <Text color={isSelected ? 'cyan' : undefined}>
-                  {isSelected ? '▶ ' : '  '}
-                  <Text bold>{brain.title}</Text>
-                </Text>
-                <Text dimColor>
-                  {'    '}
-                  {brain.description}
-                </Text>
-              </Box>
-            );
-          })}
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>
-            Use arrow keys to navigate, Enter to select, q to quit
-          </Text>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (phase === 'running') {
-    return (
-      <Box>
+      ) : phase === 'error' && error ? (
+        <ErrorComponent error={error} />
+      ) : phase === 'disambiguating' ? (
+        <>
+          <Text bold>Multiple brains match '{identifier}':</Text>
+          <Box marginTop={1} flexDirection="column">
+            {brains.map((brain, index) => {
+              const isSelected = index === selectedIndex;
+              return (
+                <Box key={brain.title} flexDirection="column" marginBottom={1}>
+                  <Text color={isSelected ? 'cyan' : undefined}>
+                    {isSelected ? '▶ ' : '  '}
+                    <Text bold>{brain.title}</Text>
+                  </Text>
+                  <Text dimColor>
+                    {'    '}
+                    {brain.description}
+                  </Text>
+                </Box>
+              );
+            })}
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>
+              Use arrow keys to navigate, Enter to select, q to quit
+            </Text>
+          </Box>
+        </>
+      ) : phase === 'running' ? (
         <Text>Starting brain run...</Text>
-      </Box>
-    );
-  }
-
-  if (phase === 'complete' && runId) {
-    if (watch) {
-      return <Watch runId={runId} />;
-    }
-    return <Text>Run ID: {runId}</Text>;
-  }
-
-  return null;
+      ) : phase === 'complete' && runId ? (
+        watch ? (
+          <Watch runId={runId} />
+        ) : (
+          <Text>Run ID: {runId}</Text>
+        )
+      ) : null}
+    </Box>
+  );
 };

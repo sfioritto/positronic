@@ -31,31 +31,34 @@ interface WatchStatusProps {
 }
 
 const WatchStatus = ({ steps, brainTitle, runId }: WatchStatusProps) => {
-  if (!steps || steps.length === 0) {
-    return <Text>Waiting for brain steps...</Text>;
-  }
-
+  // Maintain consistent Box wrapper for proper Ink terminal clearing
   return (
     <Box flexDirection="column">
-      {brainTitle && <Text bold>Brain: {brainTitle} Run ID: {runId}</Text>}
-      <Box marginTop={1} marginBottom={1}>
-        <Text bold>Steps:</Text>
-      </Box>
-      {steps.map((step) => (
-        <Box key={step.id} marginLeft={1} marginBottom={1} flexDirection="row">
-          <Box>
-            <Text color={
-              step.status === STATUS.COMPLETE ? 'green' :
-              step.status === STATUS.ERROR ? 'red' :
-              step.status === STATUS.RUNNING ? 'white' :
-              step.status === STATUS.PENDING ? 'gray' :
-              'yellow'
-            }>
-              {getStatusIndicator(step.status)} {step.title}
-            </Text>
+      {!steps || steps.length === 0 ? (
+        <Text>Waiting for brain steps...</Text>
+      ) : (
+        <>
+          {brainTitle && <Text bold>Brain: {brainTitle} Run ID: {runId}</Text>}
+          <Box marginTop={1} marginBottom={1}>
+            <Text bold>Steps:</Text>
           </Box>
-        </Box>
-      ))}
+          {steps.map((step) => (
+            <Box key={step.id} marginLeft={1} marginBottom={1} flexDirection="row">
+              <Box>
+                <Text color={
+                  step.status === STATUS.COMPLETE ? 'green' :
+                  step.status === STATUS.ERROR ? 'red' :
+                  step.status === STATUS.RUNNING ? 'white' :
+                  step.status === STATUS.PENDING ? 'gray' :
+                  'yellow'
+                }>
+                  {getStatusIndicator(step.status)} {step.title}
+                </Text>
+              </Box>
+            </Box>
+          ))}
+        </>
+      )}
     </Box>
   );
 };
@@ -128,30 +131,34 @@ export const Watch = ({ runId }: WatchProps) => {
     };
   }, [runId]);
 
-  if (!isConnected && steps.length === 0) {
-    return <Text>Connecting to watch service...</Text>;
-  }
-
+  // Maintain consistent Box wrapper to help Ink properly calculate
+  // terminal clearing between renders (prevents appending instead of overwriting)
   return (
     <Box flexDirection="column">
-      <WatchStatus steps={steps} brainTitle={brainTitle} runId={runId} />
-      {isCompleted && !error && !brainError && (
-        <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
-            <Text color="green">Brain completed.</Text>
-        </Box>
-      )}
-       {error && (
-        <Box borderStyle="round" borderColor="red" padding={1}>
-          <Text color="red">{error.message}</Text>
-          <Text color="red">{error.stack}</Text>
-        </Box>
-      )}
-      {brainError && (
-        <Box borderStyle="round" borderColor="red" padding={1}>
-          <Text color="red">{brainError.error.name}</Text>
-          <Text color="red">{brainError.error.message}</Text>
-          <Text color="red">{brainError.error.stack}</Text>
-        </Box>
+      {!isConnected && steps.length === 0 ? (
+        <Text>Connecting to watch service...</Text>
+      ) : (
+        <>
+          <WatchStatus steps={steps} brainTitle={brainTitle} runId={runId} />
+          {isCompleted && !error && !brainError && (
+            <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
+              <Text color="green">Brain completed.</Text>
+            </Box>
+          )}
+          {error && (
+            <Box borderStyle="round" borderColor="red" padding={1}>
+              <Text color="red">{error.message}</Text>
+              <Text color="red">{error.stack}</Text>
+            </Box>
+          )}
+          {brainError && (
+            <Box borderStyle="round" borderColor="red" padding={1}>
+              <Text color="red">{brainError.error.name}</Text>
+              <Text color="red">{brainError.error.message}</Text>
+              <Text color="red">{brainError.error.stack}</Text>
+            </Box>
+          )}
+        </>
       )}
     </Box>
   );
