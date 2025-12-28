@@ -10,6 +10,7 @@ export const BRAIN_EVENTS = {
   CANCELLED: 'brain:cancelled',
   WEBHOOK: 'brain:webhook',
   WEBHOOK_RESPONSE: 'brain:webhook_response',
+  HEARTBEAT: 'brain:heartbeat',
   // Loop step events
   LOOP_START: 'loop:start',
   LOOP_ITERATION: 'loop:iteration',
