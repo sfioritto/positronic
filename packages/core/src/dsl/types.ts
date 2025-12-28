@@ -49,9 +49,10 @@ export type JsonPatch = {
 
 /**
  * Return type for tools that need to suspend execution and wait for an external event.
+ * Supports single webhook or array of webhooks (first response wins).
  */
 export interface LoopToolWaitFor {
-  waitFor: WebhookRegistration<z.ZodSchema>;
+  waitFor: WebhookRegistration<z.ZodSchema> | WebhookRegistration<z.ZodSchema>[];
 }
 
 /**
