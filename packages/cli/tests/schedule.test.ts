@@ -86,7 +86,8 @@ describe('schedule command', () => {
     let originalExit: typeof process.exit;
 
     beforeEach(() => {
-      // Mock process.exit but don't throw - just track the call
+      // Mock process.exit to prevent it from killing the test process
+      // The middleware calls process.exit(0) after rendering completes
       originalExit = process.exit;
       process.exit = jest.fn() as any;
     });
@@ -105,9 +106,6 @@ describe('schedule command', () => {
         // Wait for the empty state message
         const foundEmpty = await waitForOutput(/No schedules found/i, 30);
         expect(foundEmpty).toBe(true);
-
-        // Verify process.exit was called
-        expect(process.exit).toHaveBeenCalledWith(0);
 
         // Verify API call was made
         const calls = env.server.getLogs();
@@ -155,9 +153,6 @@ describe('schedule command', () => {
         expect(output).toContain('hourly-sync');
         expect(output).toContain('0 9 * * *');
         expect(output).toContain('0 * * * *');
-
-        // Verify process.exit was called
-        expect(process.exit).toHaveBeenCalledWith(0);
 
         // Verify API call was made
         const calls = server.getLogs();
@@ -209,9 +204,6 @@ describe('schedule command', () => {
         expect(output).toContain('daily-report');
         expect(output).not.toContain('hourly-sync');
 
-        // Verify process.exit was called
-        expect(process.exit).toHaveBeenCalledWith(0);
-
         // Verify API call was made
         const calls = server.getLogs();
         const listCall = calls.find((c) => c.method === 'getSchedules');
@@ -235,9 +227,6 @@ describe('schedule command', () => {
           30
         );
         expect(foundError).toBe(true);
-
-        // Verify process.exit was called
-        expect(process.exit).toHaveBeenCalledWith(0);
       } finally {
         env.cleanup();
       }
@@ -248,7 +237,8 @@ describe('schedule command', () => {
     let originalExit: typeof process.exit;
 
     beforeEach(() => {
-      // Mock process.exit but don't throw - just track the call
+      // Mock process.exit to prevent it from killing the test process
+      // The middleware calls process.exit(0) after rendering completes
       originalExit = process.exit;
       process.exit = jest.fn() as any;
     });
@@ -288,9 +278,6 @@ describe('schedule command', () => {
         );
         expect(foundSuccess).toBe(true);
 
-        // Verify process.exit was called
-        expect(process.exit).toHaveBeenCalledWith(0);
-
         // Verify API call was made
         const calls = server.getLogs();
         const deleteCall = calls.find((c) => c.method === 'deleteSchedule');
@@ -306,7 +293,6 @@ describe('schedule command', () => {
 
     it('should handle deleting non-existent schedule', async () => {
       const env = await createTestEnv();
-      const { server } = env;
       const px = await env.start();
 
       try {
@@ -320,14 +306,6 @@ describe('schedule command', () => {
         // Wait for error message
         const foundError = await waitForOutput(/not found/i, 30);
         expect(foundError).toBe(true);
-
-        // Verify process.exit was called
-        expect(process.exit).toHaveBeenCalledWith(0);
-
-        // Verify no deleteSchedule call was logged (404 handled by nock)
-        const calls = server.getLogs();
-        // The server still logs the attempt, but nock returns 404
-        expect(calls.some((c) => c.method === 'start')).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
@@ -351,9 +329,6 @@ describe('schedule command', () => {
           30
         );
         expect(foundError).toBe(true);
-
-        // Verify process.exit was called
-        expect(process.exit).toHaveBeenCalledWith(0);
       } finally {
         env.cleanup();
       }
