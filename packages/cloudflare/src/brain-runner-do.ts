@@ -201,37 +201,58 @@ export class BrainRunnerDO extends DurableObject<Env> {
     };
   }
 
-  async kill(): Promise<{ success: boolean; message: string }> {
+  /**
+   * Kill a brain run. This method handles multiple scenarios:
+   * 1. Brain is actively running (has abortController) - abort it
+   * 2. Brain is suspended (waiting for webhook) - emit CANCELLED event
+   * 3. Brain is a "zombie" (DO state missing due to IoContext timeout) - directly update MonitorDO
+   *
+   * The brainRunId and brainTitle parameters are used as fallbacks when the DO's
+   * SQLite state is missing (zombie brain scenario).
+   */
+  async kill(brainRunId?: string, brainTitle?: string): Promise<{ success: boolean; message: string }> {
     // If brain is actively running, abort it
     if (this.abortController && !this.abortController.signal.aborted) {
       this.abortController.abort();
       return { success: true, message: 'Brain run kill signal sent' };
     }
 
-    // Brain is not actively running - it might be suspended for a webhook
-    // First, get the actual brainRunId from the stored START event
-    // (this.brainRunId is the DO's internal ID, not the UUID brainRunId)
-    const { sql } = this;
-    const startEventResult = sql
-      .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
-        BRAIN_EVENTS.START,
-        BRAIN_EVENTS.RESTART
-      )
-      .toArray();
-
-    if (startEventResult.length === 0) {
-      return { success: false, message: 'Brain run not found or never started' };
-    }
-
-    const startEvent = JSON.parse(startEventResult[0].serialized_event);
-    const actualBrainRunId = startEvent.brainRunId;
-
-    // Check if it's still in RUNNING status (which means it's suspended)
     const monitorStub = this.env.MONITOR_DO.get(
       this.env.MONITOR_DO.idFromName('singleton')
     );
 
+    // Try to get brainRunId from DO's SQLite state
+    let actualBrainRunId = brainRunId;
+    let actualBrainTitle = brainTitle;
+    let startEvent: any = null;
+
+    const { sql } = this;
+    try {
+      const startEventResult = sql
+        .exec<{ serialized_event: string }>(
+          `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
+          BRAIN_EVENTS.START,
+          BRAIN_EVENTS.RESTART
+        )
+        .toArray();
+
+      if (startEventResult.length > 0) {
+        startEvent = JSON.parse(startEventResult[0].serialized_event);
+        actualBrainRunId = startEvent.brainRunId;
+        actualBrainTitle = startEvent.brainTitle;
+      }
+    } catch (err) {
+      // Table doesn't exist - brain was killed before any events were written to DO's SQLite
+      // This is fine if we have fallback brainRunId/brainTitle from the API
+      console.log(`[DO ${this.brainRunId}] kill() could not query brain_events (table may not exist)`);
+    }
+
+    // If we still don't have a brainRunId, we can't proceed
+    if (!actualBrainRunId) {
+      return { success: false, message: 'Brain run not found or never started' };
+    }
+
+    // Check MonitorDO status
     const existingRun = await monitorStub.getLastEvent(actualBrainRunId);
     if (!existingRun) {
       return { success: false, message: 'Brain run not found in monitor' };
@@ -242,19 +263,19 @@ export class BrainRunnerDO extends DurableObject<Env> {
       return { success: false, message: 'Brain run is not active or already completed' };
     }
 
-    // Brain is suspended for a webhook - emit CANCELLED event to MonitorDO
+    // Emit CANCELLED event to MonitorDO
     const cancelledEvent: BrainEvent<any> = {
       type: BRAIN_EVENTS.CANCELLED,
       status: STATUS.CANCELLED,
-      brainTitle: startEvent.brainTitle,
-      brainDescription: startEvent.brainDescription || '',
+      brainTitle: actualBrainTitle || String(existingRun.brain_title) || 'unknown',
+      brainDescription: startEvent?.brainDescription || '',
       brainRunId: actualBrainRunId,
-      options: startEvent.options || {},
+      options: startEvent?.options || {},
     };
 
     await monitorStub.handleBrainEvent(cancelledEvent);
 
-    return { success: true, message: 'Suspended brain run cancelled' };
+    return { success: true, message: 'Brain run cancelled' };
   }
 
   async start(
