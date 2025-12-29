@@ -123,5 +123,10 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
     );
   }
 
-  return null;
+  // Confirmed but still processing - show killing message
+  return (
+    <Box>
+      <Text>🛑 Killing brain run...</Text>
+    </Box>
+  );
 };
