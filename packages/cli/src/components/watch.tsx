@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box } from 'ink';
 import { EventSource } from 'eventsource';
-import type { BrainEvent, StepStatusEvent, BrainStartEvent, BrainErrorEvent, BrainCompleteEvent } from '@positronic/core';
+import type { BrainEvent, StepStatusEvent, BrainStartEvent, BrainErrorEvent, BrainCompleteEvent, StepStartedEvent } from '@positronic/core';
 import { BRAIN_EVENTS } from '@positronic/core';
 import type { SerializedStep } from '@positronic/core';
 import { STATUS } from '@positronic/core';
@@ -9,6 +9,14 @@ import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
 
 type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
+
+// State for tracking each brain (parent and inner brains)
+interface BrainState {
+  brainRunId: string;
+  brainTitle: string;
+  steps: SerializedStepStatus[];
+  parentStepId: string | null; // Which parent step spawned this brain (null for main brain)
+}
 
 const getStatusIndicator = (status: SerializedStepStatus['status']) => {
   switch (status) {
@@ -25,39 +33,79 @@ const getStatusIndicator = (status: SerializedStepStatus['status']) => {
   }
 };
 
-interface WatchStatusProps {
-  steps: SerializedStepStatus[];
-  brainTitle?: string;
-  runId?: string;
+// Recursive component for rendering brain steps with nested inner brains
+interface BrainStepsViewProps {
+  brainRunId: string;
+  brains: Map<string, BrainState>;
+  depth?: number;
 }
 
-const WatchStatus = ({ steps, brainTitle, runId }: WatchStatusProps) => {
+const BrainStepsView = ({ brainRunId, brains, depth = 0 }: BrainStepsViewProps) => {
+  const brain = brains.get(brainRunId);
+  if (!brain) return null;
+
+  return (
+    <Box flexDirection="column" marginLeft={depth > 0 ? 2 : 0}>
+      {depth > 0 && (
+        <Text dimColor>└─ Inner Brain: {brain.brainTitle}</Text>
+      )}
+      {brain.steps.map((step) => {
+        // Find any inner brain associated with this step
+        const innerBrain = Array.from(brains.values()).find(
+          (b) => b.parentStepId === step.id
+        );
+
+        return (
+          <Box key={step.id} flexDirection="column">
+            <Box marginLeft={1} marginBottom={innerBrain ? 0 : 1} flexDirection="row">
+              <Text
+                color={
+                  step.status === STATUS.COMPLETE
+                    ? 'green'
+                    : step.status === STATUS.ERROR
+                      ? 'red'
+                      : step.status === STATUS.RUNNING
+                        ? 'white'
+                        : step.status === STATUS.PENDING
+                          ? 'gray'
+                          : 'yellow'
+                }
+              >
+                {getStatusIndicator(step.status)} {step.title}
+              </Text>
+            </Box>
+            {innerBrain && (
+              <Box marginBottom={1}>
+                <BrainStepsView brainRunId={innerBrain.brainRunId} brains={brains} depth={depth + 1} />
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+};
+
+interface WatchStatusProps {
+  brains: Map<string, BrainState>;
+  mainBrainRunId: string | null;
+}
+
+const WatchStatus = ({ brains, mainBrainRunId }: WatchStatusProps) => {
+  const mainBrain = mainBrainRunId ? brains.get(mainBrainRunId) : null;
+
   // Maintain consistent Box wrapper for proper Ink terminal clearing
   return (
     <Box flexDirection="column">
-      {!steps || steps.length === 0 ? (
+      {!mainBrain || mainBrain.steps.length === 0 ? (
         <Text>Waiting for brain steps...</Text>
       ) : (
         <>
-          {brainTitle && <Text bold>Brain: {brainTitle} Run ID: {runId}</Text>}
+          <Text bold>Brain: {mainBrain.brainTitle}</Text>
           <Box marginTop={1} marginBottom={1}>
             <Text bold>Steps:</Text>
           </Box>
-          {steps.map((step) => (
-            <Box key={step.id} marginLeft={1} marginBottom={1} flexDirection="row">
-              <Box>
-                <Text color={
-                  step.status === STATUS.COMPLETE ? 'green' :
-                  step.status === STATUS.ERROR ? 'red' :
-                  step.status === STATUS.RUNNING ? 'white' :
-                  step.status === STATUS.PENDING ? 'gray' :
-                  'yellow'
-                }>
-                  {getStatusIndicator(step.status)} {step.title}
-                </Text>
-              </Box>
-            </Box>
-          ))}
+          <BrainStepsView brainRunId={mainBrainRunId!} brains={brains} />
         </>
       )}
     </Box>
@@ -69,14 +117,17 @@ interface WatchProps {
 }
 
 export const Watch = ({ runId }: WatchProps) => {
-  const [steps, setSteps] = useState<SerializedStepStatus[]>([]);
-  const [brainTitle, setBrainTitle] = useState<string | undefined>(undefined);
+  // Track all brains (parent and inner) by their brainRunId
+  const [brains, setBrains] = useState<Map<string, BrainState>>(new Map());
   const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+
   // Track the main brain's brainRunId to distinguish from inner brain events
   const mainBrainRunIdRef = useRef<string | null>(null);
+  // Track the currently running step ID to associate inner brains with their parent step
+  const runningStepIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const baseUrl = getApiBaseUrl();
@@ -85,7 +136,9 @@ export const Watch = ({ runId }: WatchProps) => {
 
     setIsConnected(false);
     setError(null);
+    setBrains(new Map());
     mainBrainRunIdRef.current = null;
+    runningStepIdRef.current = null;
 
     es.onopen = () => {
       setIsConnected(true);
@@ -95,21 +148,50 @@ export const Watch = ({ runId }: WatchProps) => {
     es.onmessage = (event: MessageEvent) => {
       try {
         const eventData = JSON.parse(event.data) as BrainEvent;
-        if (eventData.type === BRAIN_EVENTS.STEP_STATUS) {
-          setSteps((eventData as StepStatusEvent).steps);
-        }
 
+        // Handle brain start - register new brain (parent or inner)
         if (
           eventData.type === BRAIN_EVENTS.START ||
           eventData.type === BRAIN_EVENTS.RESTART
         ) {
           const startEvent = eventData as BrainStartEvent;
-          // Only set the main brain info on the first START event
-          if (mainBrainRunIdRef.current === null) {
+          const isMainBrain = mainBrainRunIdRef.current === null;
+
+          if (isMainBrain) {
             mainBrainRunIdRef.current = startEvent.brainRunId;
-            setBrainTitle(startEvent.brainTitle);
           }
+
+          setBrains((prev) => {
+            const next = new Map(prev);
+            next.set(startEvent.brainRunId, {
+              brainRunId: startEvent.brainRunId,
+              brainTitle: startEvent.brainTitle,
+              steps: [],
+              parentStepId: isMainBrain ? null : runningStepIdRef.current,
+            });
+            return next;
+          });
+
           setIsCompleted(false);
+        }
+
+        // Handle step status - update steps for the specific brain only
+        if (eventData.type === BRAIN_EVENTS.STEP_STATUS) {
+          const statusEvent = eventData as StepStatusEvent;
+          setBrains((prev) => {
+            const next = new Map(prev);
+            const brain = next.get(statusEvent.brainRunId);
+            if (brain) {
+              next.set(statusEvent.brainRunId, { ...brain, steps: statusEvent.steps });
+            }
+            return next;
+          });
+        }
+
+        // Handle step start - track the running step for inner brain association
+        if (eventData.type === BRAIN_EVENTS.STEP_START) {
+          const stepEvent = eventData as StepStartedEvent;
+          runningStepIdRef.current = stepEvent.stepId;
         }
 
         // Only mark complete when the main brain completes, not inner brains
@@ -152,11 +234,11 @@ export const Watch = ({ runId }: WatchProps) => {
   // terminal clearing between renders (prevents appending instead of overwriting)
   return (
     <Box flexDirection="column">
-      {!isConnected && steps.length === 0 ? (
+      {!isConnected && brains.size === 0 ? (
         <Text>Connecting to watch service...</Text>
       ) : (
         <>
-          <WatchStatus steps={steps} brainTitle={brainTitle} runId={runId} />
+          <WatchStatus brains={brains} mainBrainRunId={mainBrainRunIdRef.current} />
           {isCompleted && !error && !brainError && (
             <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
               <Text color="green">Brain completed.</Text>
