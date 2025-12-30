@@ -6,6 +6,7 @@ import { BRAIN_EVENTS } from '@positronic/core';
 import type { SerializedStep } from '@positronic/core';
 import { STATUS } from '@positronic/core';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
+import { ErrorComponent } from './error.js';
 
 type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
 
@@ -162,17 +163,18 @@ export const Watch = ({ runId }: WatchProps) => {
             </Box>
           )}
           {error && (
-            <Box borderStyle="round" borderColor="red" padding={1}>
-              <Text color="red">{error.message}</Text>
-              <Text color="red">{error.stack}</Text>
-            </Box>
+            <ErrorComponent error={{
+              title: 'Connection Error',
+              message: error.message,
+              details: error.stack,
+            }} />
           )}
           {brainError && (
-            <Box borderStyle="round" borderColor="red" padding={1}>
-              <Text color="red">{brainError.error.name}</Text>
-              <Text color="red">{brainError.error.message}</Text>
-              <Text color="red">{brainError.error.stack}</Text>
-            </Box>
+            <ErrorComponent error={{
+              title: brainError.error.name || 'Brain Error',
+              message: brainError.error.message,
+              details: brainError.error.stack,
+            }} />
           )}
         </>
       )}
