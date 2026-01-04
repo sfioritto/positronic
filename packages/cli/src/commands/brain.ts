@@ -4,6 +4,7 @@ import { Watch } from '../components/watch.js';
 import { BrainList } from '../components/brain-list.js';
 import { BrainHistory } from '../components/brain-history.js';
 import { RunShow } from '../components/run-show.js';
+import { BrainShow } from '../components/brain-show.js';
 import { BrainRerun } from '../components/brain-rerun.js';
 import { BrainKill } from '../components/brain-kill.js';
 import { BrainRun } from '../components/brain-run.js';
@@ -17,7 +18,9 @@ interface BrainHistoryArgs {
   limit: number;
 }
 interface BrainShowArgs {
-  runId: string;
+  brain?: string;
+  runId?: string;
+  steps?: boolean;
 }
 interface BrainRerunArgs {
   brain: string;
@@ -56,9 +59,28 @@ export class BrainCommand {
   }
 
   show({
+    brain,
     runId,
+    steps,
   }: ArgumentsCamelCase<BrainShowArgs>): React.ReactElement {
-    return React.createElement(RunShow, { runId });
+    // If run ID is provided, show run info (existing behavior)
+    if (runId) {
+      return React.createElement(RunShow, { runId });
+    }
+
+    // If brain identifier is provided, show brain info
+    if (brain) {
+      return React.createElement(BrainShow, { identifier: brain, showSteps: steps || false });
+    }
+
+    // Neither provided - show error
+    return React.createElement(ErrorComponent, {
+      error: {
+        title: 'Missing Argument',
+        message: 'You must provide either a brain identifier or a run ID.',
+        details: 'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
+      },
+    });
   }
 
   rerun({

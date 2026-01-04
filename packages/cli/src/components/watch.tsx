@@ -208,7 +208,12 @@ export const Watch = ({ runId }: WatchProps) => {
   const runningStepIdRef = useRef<string | null>(null);
 
   // Enter alternate screen buffer on mount, exit on unmount
+  // Skip in test environment to avoid interfering with test output capture
   useEffect(() => {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
     // Enter alternate screen buffer and clear
     write('\x1B[?1049h\x1B[2J\x1B[H');
 

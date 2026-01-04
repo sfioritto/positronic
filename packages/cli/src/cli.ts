@@ -311,18 +311,35 @@ export function buildCli(options: CliOptions) {
     }
   );
 
-  // --- Show Run Command ---
+  // --- Show Brain/Run Command ---
   cli = cli.command(
-    'show <run-id>',
-    'Show detailed information about a brain run, including any errors\n',
+    'show [brain]',
+    'Show information about a brain or a specific run\n',
     (yargsShow) => {
       return yargsShow
-        .positional('run-id', {
-          describe: 'ID of the brain run to show',
+        .positional('brain', {
+          describe: 'Brain identifier to show info for',
           type: 'string',
-          demandOption: true,
         })
-        .example('$0 show abc123', 'Show details for brain run abc123');
+        .option('run-id', {
+          describe: 'ID of a specific brain run to show',
+          type: 'string',
+          alias: 'id',
+        })
+        .option('steps', {
+          describe: 'Show the step structure of the brain',
+          type: 'boolean',
+          default: false,
+        })
+        .check((argv) => {
+          if (!argv.brain && !argv.runId) {
+            throw new Error('You must provide either a brain identifier or a --run-id.');
+          }
+          return true;
+        })
+        .example('$0 show my-brain', 'Show info about my-brain')
+        .example('$0 show my-brain --steps', 'Show my-brain with step structure')
+        .example('$0 show --run-id abc123', 'Show details for a specific run');
     },
     (argv) => {
       const element = brainCommand.show(argv as any);
@@ -496,16 +513,33 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'show <run-id>',
-        'Show detailed information about a brain run, including any errors\n',
+        'show [brain]',
+        'Show information about a brain or a specific run\n',
         (yargsShow) => {
           return yargsShow
-            .positional('run-id', {
-              describe: 'ID of the brain run to show',
+            .positional('brain', {
+              describe: 'Brain identifier to show info for',
               type: 'string',
-              demandOption: true,
             })
-            .example('$0 brain show abc123', 'Show details for brain run abc123');
+            .option('run-id', {
+              describe: 'ID of a specific brain run to show',
+              type: 'string',
+              alias: 'id',
+            })
+            .option('steps', {
+              describe: 'Show the step structure of the brain',
+              type: 'boolean',
+              default: false,
+            })
+            .check((argv) => {
+              if (!argv.brain && !argv.runId) {
+                throw new Error('You must provide either a brain identifier or a --run-id.');
+              }
+              return true;
+            })
+            .example('$0 brain show my-brain', 'Show info about my-brain')
+            .example('$0 brain show my-brain --steps', 'Show my-brain with step structure')
+            .example('$0 brain show --run-id abc123', 'Show details for a specific run');
         },
         (argv) => {
           const element = brainCommand.show(argv as any);

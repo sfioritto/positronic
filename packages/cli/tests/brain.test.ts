@@ -556,7 +556,7 @@ describe('CLI Integration: positronic brain commands', () => {
     });
 
 
-    it('should display all step statuses correctly', async () => {
+    it('should display step statuses correctly', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
@@ -566,20 +566,16 @@ describe('CLI Integration: positronic brain commands', () => {
           '--run-id',
           'test-multi-status',
         ]);
-        
-        // Check for all different step statuses
-        const foundComplete = await waitForOutput(/✔.*Complete Step/);
-        expect(foundComplete).toBe(true);
-        
-        const foundError = await waitForOutput(/•.*Error Step/);
-        expect(foundError).toBe(true);
-        
+
+        // New watch shows 3 steps at a time (prev/current/next)
+        // Check that the brain title is shown
+        const foundTitle = await waitForOutput(/Multi Status Brain/);
+        expect(foundTitle).toBe(true);
+
+        // Check that at least one step is shown (the running one should be visible)
         const foundRunning = await waitForOutput(/•.*Running Step/);
         expect(foundRunning).toBe(true);
-        
-        const foundPending = await waitForOutput(/•.*Pending Step/);
-        expect(foundPending).toBe(true);
-        
+
         // Unmount the component to trigger EventSource cleanup
         instance.unmount();
       } finally {
@@ -876,7 +872,7 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', 'run-completed-123']);
+        const { waitForOutput } = await px(['show', '--run-id', 'run-completed-123']);
 
         // Check for run ID
         const foundRunId = await waitForOutput(/run-completed-123/, 30);
@@ -921,7 +917,7 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', 'run-error-456']);
+        const { waitForOutput } = await px(['show', '--run-id', 'run-error-456']);
 
         // Check for run ID
         const foundRunId = await waitForOutput(/run-error-456/, 30);
@@ -952,7 +948,7 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', 'non-existent-run']);
+        const { waitForOutput } = await px(['show', '--run-id', 'non-existent-run']);
         const foundError = await waitForOutput(/not found/, 30);
         expect(foundError).toBe(true);
       } finally {
@@ -982,7 +978,7 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', 'run-with-options']);
+        const { waitForOutput } = await px(['show', '--run-id', 'run-with-options']);
 
         // Check for options section
         const foundOptions = await waitForOutput(/Options/, 30);
