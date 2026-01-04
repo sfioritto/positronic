@@ -1,5 +1,19 @@
 # @positronic/core
 
+## 0.0.44
+
+### Patch Changes
+
+- ### CLI Improvements
+
+  - **Redesigned `show` command**: Now displays brain information with fuzzy matching support. Use `show <brain>` to view brain info or `show --run-id <id>` for run details. Added `--steps` flag to display step structure.
+
+  - **Redesigned `watch` UI**: Full-screen mode with minimal step view for better usability. Inner brains are now rendered nested under parent steps for clearer hierarchy.
+
+  - **Fixed brain kill confirmation flow**: Resolved issue where confirmation input wasn't being processed correctly.
+
+  - **Improved error handling**: Refactored watch component to use shared ErrorComponent for consistent error display.
+
 ## 0.0.43
 
 ### Patch Changes
