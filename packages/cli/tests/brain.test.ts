@@ -46,9 +46,7 @@ describe('CLI Integration: positronic brain commands', () => {
       try {
         const { waitForOutput, instance } = await px(['run', 'test-brain', '--watch']);
         // The watch component should be rendered - first shows connecting message
-        const isOutputRendered = await waitForOutput(
-          /Connecting to watch service|Brain: test-brain/
-        );
+        const isOutputRendered = await waitForOutput(/Test Step 1/);
         expect(isOutputRendered).toBe(true);
 
         // Unmount the component to trigger EventSource cleanup
@@ -74,10 +72,8 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         const { waitForOutput, instance } = await px(['run', 'test-brain', '-w']);
-        // The watch component should be rendered - first shows connecting message
-        const isOutputRendered = await waitForOutput(
-          /Connecting to watch service|Brain: test-brain/
-        );
+        // The watch component should be rendered - wait for SSE step data
+        const isOutputRendered = await waitForOutput(/Test Step 1/);
         expect(isOutputRendered).toBe(true);
 
         // Unmount the component to trigger EventSource cleanup
@@ -364,11 +360,9 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         const { waitForOutput, instance } = await px(['watch', 'test-brain']);
-        
-        // Should connect to watch the active run
-        const isOutputRendered = await waitForOutput(
-          /Connecting to watch service|Brain: test-brain/
-        );
+
+        // Should connect to watch the active run - wait for SSE step data
+        const isOutputRendered = await waitForOutput(/Test Step 1/);
         expect(isOutputRendered).toBe(true);
         
         // Verify API was called to get active runs
