@@ -74,6 +74,41 @@ describe('brain kill command', () => {
     }
   });
 
+  it('should kill brain when user types yes to confirm', async () => {
+    const env = await createTestEnv();
+    const px = await env.start();
+    const runId = 'run-confirm-test';
+
+    try {
+      const { waitForOutput, instance } = await px(['brain', 'kill', runId]);
+
+      // Should show warning message
+      const foundWarning = await waitForOutput(/Warning: This will stop the running brain/, 30);
+      expect(foundWarning).toBe(true);
+
+      // Give the stdin handler time to be set up
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Type "yes" to confirm
+      instance.stdin.write('yes\n');
+
+      // Give React time to process the input and make the API call
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Should show success message
+      const foundSuccess = await waitForOutput(/Brain run killed successfully!/, 30);
+      expect(foundSuccess).toBe(true);
+
+      // Verify API call was made
+      const calls = env.server.getLogs();
+      const killCall = calls.find(c => c.method === 'killBrainRun');
+      expect(killCall).toBeDefined();
+      expect(killCall?.args[0]).toBe(runId);
+    } finally {
+      await env.stopAndCleanup();
+    }
+  });
+
   it('should cancel kill when user types no', async () => {
     const env = await createTestEnv();
     const px = await env.start();

@@ -12,6 +12,7 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
   const [confirmed, setConfirmed] = useState(force);
   const [killed, setKilled] = useState(false);
   const [input, setInput] = useState('');
+  const inputRef = useRef(''); // Track input in ref to avoid stale closure
   const { stdin, setRawMode } = useStdin();
   const { exit } = useApp();
   const isKilling = useRef(false);
@@ -23,20 +24,27 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
       setRawMode(true);
 
       const handleData = (data: Buffer) => {
-        const char = data.toString();
+        const chars = data.toString();
 
-        if (char === '\r' || char === '\n') {
-          if (input.toLowerCase() === 'yes') {
-            setConfirmed(true);
-          } else {
+        // Process each character in the buffer (stdin may send multiple at once)
+        for (const char of chars) {
+          if (char === '\r' || char === '\n') {
+            if (inputRef.current.toLowerCase() === 'yes') {
+              setConfirmed(true);
+            } else {
+              exit();
+            }
+            return; // Stop processing after Enter
+          } else if (char === '\u0003') { // Ctrl+C
             exit();
+            return;
+          } else if (char === '\u007F' || char === '\b') { // Backspace
+            inputRef.current = inputRef.current.slice(0, -1);
+            setInput(inputRef.current);
+          } else {
+            inputRef.current = inputRef.current + char;
+            setInput(inputRef.current);
           }
-        } else if (char === '\u0003') { // Ctrl+C
-          exit();
-        } else if (char === '\u007F' || char === '\b') { // Backspace
-          setInput(prev => prev.slice(0, -1));
-        } else {
-          setInput(prev => prev + char);
         }
       };
 
