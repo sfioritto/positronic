@@ -1506,6 +1506,60 @@ describe('nested brains', () => {
       }),
     ]);
   });
+
+  it('should pass all step context params to nested brains', async () => {
+    // This test ensures that when new params are added to step context,
+    // they are also passed to nested brains. If someone adds a new service
+    // but forgets to pass it to inner brains, this test will fail.
+    //
+    // We capture keys that have defined (non-undefined) values, since
+    // Object.keys() includes keys even when values are undefined.
+    let outerDefinedKeys: string[] = [];
+    let innerDefinedKeys: string[] = [];
+
+    const innerBrain = brain('Inner Param Brain').step(
+      'Capture Inner Params',
+      (params) => {
+        // Capture keys that have defined values
+        innerDefinedKeys = Object.entries(params)
+          .filter(([_, value]) => value !== undefined)
+          .map(([key]) => key)
+          .sort();
+        return {};
+      }
+    );
+
+    const outerBrain = brain('Outer Param Brain')
+      .step('Capture Outer Params', (params) => {
+        // Capture keys that have defined values
+        outerDefinedKeys = Object.entries(params)
+          .filter(([_, value]) => value !== undefined)
+          .map(([key]) => key)
+          .sort();
+        return {};
+      })
+      .brain('Run Inner', innerBrain, ({ state }) => state);
+
+    // Create mock pages service
+    const mockPages = {
+      create: jest.fn(),
+      get: jest.fn(),
+      exists: jest.fn(),
+      update: jest.fn(),
+    };
+    const mockEnv = { origin: 'http://test.com', secrets: {} };
+
+    for await (const _ of outerBrain.run({
+      client: mockClient,
+      resources: mockResources,
+      pages: mockPages as any,
+      env: mockEnv,
+    })) {
+    }
+
+    // Inner brain steps should receive the same defined params as outer brain steps
+    expect(innerDefinedKeys).toEqual(outerDefinedKeys);
+  });
 });
 
 describe('brain options', () => {

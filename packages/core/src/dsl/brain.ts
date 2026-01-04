@@ -1017,6 +1017,7 @@ class BrainEventStream<
         client: this.client,
         initialState,
         options: this.options ?? ({} as TOptions),
+        pages: this.pages,
         env: this.env,
       });
 
