@@ -1,5 +1,15 @@
 # @positronic/template-new-project
 
+## 0.0.45
+
+### Patch Changes
+
+- Fix nested brain pages parameter and improve test stability
+
+  - Fixed a bug where the `pages` service was not passed to nested brains, causing pages to be unavailable in inner brain steps
+  - Added comprehensive test to verify all step context parameters are passed to nested brains
+  - Improved watch test stability by asserting on SSE step data instead of transient connection messages
+
 ## 0.0.44
 
 ### Patch Changes
