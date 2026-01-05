@@ -159,6 +159,64 @@ const webhookBrain = brain({ title: 'webhook-brain', description: 'A brain that 
     receivedUserId: response.userId,
   }));
 
+// Webhook for inner brain testing
+const innerWebhook = createWebhook(
+  'inner-webhook',
+  z.object({
+    data: z.string(),
+  }),
+  async (request: Request) => {
+    const body = (await request.json()) as {
+      identifier: string;
+      data: string;
+    };
+    return {
+      type: 'webhook' as const,
+      identifier: body.identifier,
+      response: {
+        data: body.data,
+      },
+    };
+  }
+);
+
+// Inner brain with a webhook - for testing nested brain webhook resume
+const innerWebhookBrain = brain<{ data: string }, { count: number }>({
+  title: 'inner-webhook-brain-inner',
+  description: 'Inner brain that waits for webhooks',
+})
+  .step('Inner step 1', ({ state }) => ({ count: state.count + 1 }))
+  .step('Wait for inner webhook', ({ state }) => ({
+    state: { ...state, waiting: true },
+    waitFor: [innerWebhook('inner-test-id')],
+  }))
+  .step('Process inner webhook', ({ state, response }) => ({
+    ...state,
+    waiting: false,
+    webhookData: response?.data || 'no-data',
+    processed: true,
+  }));
+
+// Outer brain containing inner brain with webhook
+const outerInnerWebhookBrain = brain({
+  title: 'inner-webhook-brain',
+  description: 'Outer brain containing inner brain with webhook',
+})
+  .step('Outer step 1', () => ({ prefix: 'outer-' }))
+  .brain(
+    'Run inner brain',
+    innerWebhookBrain,
+    ({ state, brainState }) => ({
+      ...state,
+      innerResult: brainState,
+    }),
+    () => ({ count: 0 })
+  )
+  .step('Outer step 2', ({ state }) => ({
+    ...state,
+    done: true,
+  }));
+
 // Brain that uses the pages service
 const pagesBrain = brain({ title: 'pages-brain', description: 'A brain that creates and manages pages' })
   .step('Create page', async ({ state, pages }) => {
@@ -362,6 +420,11 @@ const brainManifest = {
     path: 'brains/loop-error-brain.ts',
     brain: loopErrorBrain,
   },
+  'inner-webhook-brain': {
+    filename: 'inner-webhook-brain',
+    path: 'brains/inner-webhook-brain.ts',
+    brain: outerInnerWebhookBrain,
+  },
 };
 
 const manifest = new PositronicManifest({
@@ -373,6 +436,7 @@ export const webhookManifest = {
   'test-webhook': testWebhook,
   'notification': notificationWebhook,
   'loop-escalation': loopEscalationWebhook,
+  'inner-webhook': innerWebhook,
 };
 
 setManifest(manifest);

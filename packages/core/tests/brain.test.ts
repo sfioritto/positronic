@@ -854,13 +854,14 @@ describe('error handling', () => {
       }),
     ]);
 
-    // Find inner and outer error events by brainRunId
+    // Find inner and outer error events by brainTitle
+    // (inner brains share the same brainRunId as outer brain)
     const innerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId !== mainBrainId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Failing Inner Brain'
     ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId === mainBrainId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Outer Brain'
     ) as BrainErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(
@@ -1429,13 +1430,14 @@ describe('nested brains', () => {
       }),
     ]);
 
-    // Find inner and outer error events by brainRunId
+    // Find inner and outer error events by brainTitle
+    // (inner brains share the same brainRunId as outer brain)
     const innerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId !== mainBrainId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Failing Inner Brain'
     ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainRunId === mainBrainId
+      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Outer Brain'
     ) as BrainErrorEvent<any>;
 
     expect(innerErrorEvent.error).toEqual(
@@ -1559,6 +1561,207 @@ describe('nested brains', () => {
 
     // Inner brain steps should receive the same defined params as outer brain steps
     expect(innerDefinedKeys).toEqual(outerDefinedKeys);
+  });
+
+  it('should pass brainRunId to inner brain', async () => {
+    const innerBrain = brain<{}, { value: number }>('Inner Brain').step(
+      'Inner step',
+      ({ state }) => ({ value: state.value * 2 })
+    );
+
+    const outerBrain = brain('Outer Brain')
+      .step('Outer step', () => ({ prefix: 'test-' }))
+      .brain(
+        'Run inner brain',
+        innerBrain,
+        ({ state, brainState }) => ({
+          ...state,
+          innerResult: brainState.value,
+        }),
+        () => ({ value: 5 })
+      );
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      brainRunId: 'test-run-id-123',
+    })) {
+      events.push(event);
+    }
+
+    // All events should have the same brainRunId
+    const brainRunIds = events.map((e) => e.brainRunId);
+    const uniqueRunIds = [...new Set(brainRunIds)];
+
+    expect(uniqueRunIds).toEqual(['test-run-id-123']);
+  });
+
+  it('should resume inner brain after waitFor webhook', async () => {
+    // Define a webhook that the inner brain will wait for
+    const testWebhook = createWebhook(
+      'test-webhook',
+      z.object({ data: z.string() }),
+      async (request: Request) => ({
+        type: 'webhook' as const,
+        identifier: 'test-id',
+        response: { data: 'webhook-response' },
+      })
+    );
+
+    // Inner brain with a webhook wait
+    const innerBrain = brain<{ data: string }, { count: number }>(
+      'Inner Brain'
+    )
+      .step('Inner step 1', ({ state }) => ({ count: state.count + 1 }))
+      .step('Wait for webhook', ({ state }) => ({
+        state: { ...state, waiting: true },
+        waitFor: [testWebhook('test-id')],
+      }))
+      .step('Process webhook', ({ state, response }) => ({
+        ...state,
+        webhookData: response?.data || 'no-data',
+        processed: true,
+      }));
+
+    // Outer brain containing the inner brain
+    const outerBrain = brain('Outer Brain')
+      .step('Outer step 1', () => ({ prefix: 'outer-' }))
+      .brain(
+        'Run inner brain',
+        innerBrain,
+        ({ state, brainState }) => ({
+          ...state,
+          innerResult: brainState,
+        }),
+        () => ({ count: 0 })
+      )
+      .step('Outer step 2', ({ state }) => ({
+        ...state,
+        done: true,
+      }));
+
+    // First run - should stop at webhook in inner brain
+    // Like BrainRunner, we stop consuming events when we see WEBHOOK
+    const firstRunEvents: BrainEvent<any>[] = [];
+    const brainRun = outerBrain.run({
+      client: mockClient,
+      brainRunId: 'test-run-id',
+    });
+    for await (const event of brainRun) {
+      firstRunEvents.push(event);
+      // Stop when we see WEBHOOK event (like BrainRunner does)
+      if (event.type === BRAIN_EVENTS.WEBHOOK) {
+        break;
+      }
+    }
+
+    // Verify we got a WEBHOOK event
+    const webhookEvent = firstRunEvents.find(
+      (e) => e.type === BRAIN_EVENTS.WEBHOOK
+    );
+    expect(webhookEvent).toBeDefined();
+
+    // Verify we stopped before outer brain COMPLETE (it's waiting)
+    const outerCompleteEvent = firstRunEvents.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.COMPLETE &&
+        'brainTitle' in e &&
+        e.brainTitle === 'Outer Brain'
+    );
+    expect(outerCompleteEvent).toBeUndefined();
+
+    // Build nested initialCompletedSteps from events
+    // Outer step 1 is complete
+    const outerStep1Complete = firstRunEvents.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Outer step 1'
+    ) as any;
+
+    // Inner brain step 1 and step 2 (wait for webhook) are complete
+    const innerStep1Complete = firstRunEvents.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Inner step 1'
+    ) as any;
+
+    const innerStep2Complete = firstRunEvents.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Wait for webhook'
+    ) as any;
+
+    const initialCompletedSteps: SerializedStep[] = [
+      {
+        id: outerStep1Complete.stepId,
+        title: outerStep1Complete.stepTitle,
+        status: STATUS.COMPLETE,
+        patch: outerStep1Complete.patch,
+      },
+      {
+        // Inner brain step is NOT complete - it's still waiting for webhook
+        id: 'inner-brain-step-id',
+        title: 'Run inner brain',
+        status: STATUS.RUNNING, // Still running, waiting on inner brain
+        patch: undefined,
+        innerSteps: [
+          {
+            id: innerStep1Complete.stepId,
+            title: innerStep1Complete.stepTitle,
+            status: STATUS.COMPLETE,
+            patch: innerStep1Complete.patch,
+          },
+          {
+            id: innerStep2Complete.stepId,
+            title: innerStep2Complete.stepTitle,
+            status: STATUS.COMPLETE,
+            patch: innerStep2Complete.patch,
+          },
+        ],
+      },
+    ];
+
+    // Resume with webhook response
+    const resumeEvents: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      brainRunId: 'test-run-id',
+      initialCompletedSteps,
+      initialState: {}, // Will be reconstructed from patches
+      response: { data: 'hello from webhook!' },
+    })) {
+      resumeEvents.push(event);
+    }
+
+    // Verify the inner brain completed processing the webhook
+    const innerProcessStep = resumeEvents.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Process webhook'
+    );
+    expect(innerProcessStep).toBeDefined();
+
+    // Verify the outer brain completed
+    const outerComplete = resumeEvents.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.COMPLETE &&
+        'brainTitle' in e &&
+        e.brainTitle === 'Outer Brain'
+    );
+    expect(outerComplete).toBeDefined();
+
+    // Verify outer step 2 ran
+    const outerStep2 = resumeEvents.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Outer step 2'
+    );
+    expect(outerStep2).toBeDefined();
   });
 });
 
@@ -1755,6 +1958,8 @@ describe('type inference', () => {
     let finalStepStatus,
       finalState = {};
     let mainBrainId: string | undefined;
+    // Track brain nesting depth to only apply patches from outer brain (depth 1)
+    let brainDepth = 0;
 
     for await (const event of complexBrain.run({
       client: mockClient,
@@ -1767,13 +1972,22 @@ describe('type inference', () => {
         mainBrainId = event.brainRunId;
       }
 
+      // Track brain nesting depth
+      if (event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART) {
+        brainDepth++;
+      }
+
       if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
       } else if (
         event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        event.brainRunId === mainBrainId // Only process events from main brain
+        brainDepth === 1 // Only process events from outer brain (depth 1)
       ) {
         finalState = applyPatches(finalState, [event.patch]);
+      }
+
+      if (event.type === BRAIN_EVENTS.COMPLETE) {
+        brainDepth--;
       }
     }
 
@@ -1789,12 +2003,11 @@ describe('type inference', () => {
       })
     );
 
-    // Verify inner brain events are included
+    // Verify inner brain events are included (inner brains share brainRunId with outer)
     const innerStartEvent = events.find(
       (e) =>
         e.type === BRAIN_EVENTS.START &&
-        'brainRunId' in e &&
-        e.brainRunId !== mainBrainId
+        e.brainTitle === 'Inner Type Test'
     );
     expect(innerStartEvent).toEqual(
       expect.objectContaining({
@@ -1872,19 +2085,24 @@ describe('type inference', () => {
 
     // Run the brain to verify runtime behavior
     let finalState = {};
-    let mainBrainId: string | undefined;
+    // Track brain nesting depth to only apply patches from outer brain (depth 1)
+    let brainDepth = 0;
 
     for await (const event of outerBrain.run({
       client: mockClient,
     })) {
-      if (event.type === BRAIN_EVENTS.START && !mainBrainId) {
-        mainBrainId = event.brainRunId;
+      // Track brain nesting depth
+      if (event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART) {
+        brainDepth++;
       }
       if (
         event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        event.brainRunId === mainBrainId
+        brainDepth === 1 // Only process events from outer brain (depth 1)
       ) {
         finalState = applyPatches(finalState, [event.patch]);
+      }
+      if (event.type === BRAIN_EVENTS.COMPLETE) {
+        brainDepth--;
       }
     }
 
