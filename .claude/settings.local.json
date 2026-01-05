@@ -40,7 +40,10 @@
       "WebFetch(domain:www.braintrust.dev)",
       "WebFetch(domain:simonwillison.net)",
       "WebFetch(domain:sketch.dev)",
-      "WebFetch(domain:www.fusejs.io)"
+      "WebFetch(domain:www.fusejs.io)",
+      "WebFetch(domain:thisrobot.life)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:blog.logrocket.com)"
     ],
     "deny": []
   }
