@@ -1,5 +1,22 @@
 # @positronic/cli
 
+## 0.0.46
+
+### Patch Changes
+
+- Fix inner brain webhook resume and loop webhook resume
+
+  - Fixed webhook resume for inner brains by properly tracking brain nesting through event history
+  - Fixed webhook resume for loop steps that pause on webhooks
+  - Changed event query from DESC to ASC ordering to correctly identify the outer brain's start event
+  - Added comprehensive event replay logic that builds nested `initialCompletedSteps` by tracking brain stack levels
+  - Added tests for webhook resume scenarios with inner brains and loops
+
+- Updated dependencies
+  - @positronic/core@0.0.46
+  - @positronic/spec@0.0.46
+  - @positronic/template-new-project@0.0.46
+
 ## 0.0.45
 
 ### Patch Changes
