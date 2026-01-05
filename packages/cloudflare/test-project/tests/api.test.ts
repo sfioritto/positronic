@@ -63,6 +63,7 @@ describe('Hono API Tests', () => {
   }
 
   // Helper function to read the entire SSE stream and collect events
+  // Tracks brain nesting depth to only return when the outermost brain completes
   async function readSseStream(
     stream: ReadableStream<Uint8Array>
   ): Promise<BrainEvent[]> {
@@ -70,6 +71,7 @@ describe('Hono API Tests', () => {
     const decoder = new TextDecoder();
     let buffer = '';
     const events: BrainEvent[] = [];
+    let brainDepth = 0; // Track nesting depth for inner brains
 
     while (true) {
       const { value, done } = await reader.read();
@@ -95,10 +97,25 @@ describe('Hono API Tests', () => {
           const event = parseSseEvent(message);
           if (event) {
             events.push(event);
-            if (event.type === BRAIN_EVENTS.COMPLETE) {
-              reader.cancel(`Received terminal event: ${event.type}`);
-              return events;
+
+            // Track brain nesting depth
+            // Only count START, not RESTART - RESTART continues an already-counted brain
+            if (event.type === BRAIN_EVENTS.START) {
+              brainDepth++;
             }
+
+            if (event.type === BRAIN_EVENTS.COMPLETE) {
+              brainDepth--;
+              // Only return when the outermost brain completes (depth reaches 0)
+              if (brainDepth <= 0) {
+                reader.cancel(`Received terminal event: ${event.type}`);
+                return events;
+              }
+            }
+            // Note: WEBHOOK is NOT treated as terminal here because:
+            // 1. Tests that need to stop at WEBHOOK use their own read loops
+            // 2. When watching a resumed brain, we need to read past the historical
+            //    WEBHOOK to see the RESTART and completion events
             if (event.type === BRAIN_EVENTS.ERROR) {
               console.error(
                 'Received BRAIN_EVENTS.ERROR. Event details:',
@@ -1301,6 +1318,172 @@ describe('Hono API Tests', () => {
       const result = await webhookResponse.json<{ challenge: string }>();
       expect(result.challenge).toBe(challengeString);
       await waitOnExecutionContext(webhookContext);
+    });
+
+    it('should resume inner brain when webhook is received', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'inner-webhook-brain';
+      const webhookIdentifier = 'inner-test-id';
+
+      // Step 1: Start the inner-webhook-brain (outer brain with inner brain that has webhook)
+      const createRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      expect(createResponse.status).toBe(201);
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
+      await waitOnExecutionContext(createContext);
+
+      // Step 2: Watch the brain - it should pause with WEBHOOK event from inner brain
+      const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+      const watchRequest = new Request(watchUrl);
+      const watchContext = createExecutionContext();
+      const watchResponse = await worker.fetch(
+        watchRequest,
+        testEnv,
+        watchContext
+      );
+
+      expect(watchResponse.status).toBe(200);
+      if (!watchResponse.body) {
+        throw new Error('Watch response body is null');
+      }
+
+      // Read events until we get the WEBHOOK event (inner brain pauses)
+      const reader = watchResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const events: BrainEvent[] = [];
+      let foundWebhookEvent = false;
+
+      while (!foundWebhookEvent) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        let eventEndIndex;
+        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+          const message = buffer.substring(0, eventEndIndex);
+          buffer = buffer.substring(eventEndIndex + 2);
+
+          if (message.startsWith('data:')) {
+            const event = parseSseEvent(message);
+            if (event) {
+              events.push(event);
+              if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                foundWebhookEvent = true;
+                reader.cancel();
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Step 3: Verify we got the WEBHOOK event and brain paused
+      expect(foundWebhookEvent).toBe(true);
+      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
+      expect(webhookEvent).toBeDefined();
+
+      // Verify all events have the same brainRunId (inner brain should share outer brain's brainRunId)
+      const uniqueBrainRunIds = [...new Set(events.map((e) => e.brainRunId))];
+      expect(uniqueBrainRunIds).toEqual([brainRunId]);
+
+      // Should NOT have outer brain COMPLETE event yet
+      const prematureOuterComplete = events.find(
+        (e) =>
+          e.type === BRAIN_EVENTS.COMPLETE &&
+          'brainTitle' in e &&
+          e.brainTitle === 'inner-webhook-brain'
+      );
+      expect(prematureOuterComplete).toBeUndefined();
+
+      await waitOnExecutionContext(watchContext);
+
+      // Step 4: Trigger the inner webhook with matching identifier
+      const webhookRequest = new Request(
+        'http://example.com/webhooks/inner-webhook',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: webhookIdentifier,
+            data: 'Inner webhook response data',
+          }),
+        }
+      );
+      const webhookHttpContext = createExecutionContext();
+      const webhookResponse = await worker.fetch(
+        webhookRequest,
+        testEnv,
+        webhookHttpContext
+      );
+
+      expect(webhookResponse.status).toBe(200);
+      const webhookResult = await webhookResponse.json<{
+        received: boolean;
+        action: string;
+      }>();
+      expect(webhookResult.received).toBe(true);
+      expect(webhookResult.action).toBe('resumed');
+      await waitOnExecutionContext(webhookHttpContext);
+
+      // Step 5: Watch the brain again - it should now complete
+      const resumeWatchRequest = new Request(watchUrl);
+      const resumeWatchContext = createExecutionContext();
+      const resumeWatchResponse = await worker.fetch(
+        resumeWatchRequest,
+        testEnv,
+        resumeWatchContext
+      );
+
+      if (!resumeWatchResponse.body) {
+        throw new Error('Resume watch response body is null');
+      }
+
+      const resumeEvents = await readSseStream(resumeWatchResponse.body);
+      await waitOnExecutionContext(resumeWatchContext);
+
+      // Step 6: Verify inner brain processed the webhook
+      const innerProcessStep = resumeEvents.find(
+        (e): e is StepCompletedEvent =>
+          e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+          e.stepTitle === 'Process inner webhook'
+      );
+      expect(innerProcessStep).toBeDefined();
+
+      // Verify the patch includes the webhook response data
+      const innerPatch = innerProcessStep?.patch;
+      expect(innerPatch).toBeDefined();
+      const webhookDataOp = innerPatch?.find(
+        (op) => op.op === 'add' && op.path === '/webhookData'
+      );
+      expect(webhookDataOp?.value).toBe('Inner webhook response data');
+
+      // Step 7: Verify outer brain completed after inner brain
+      const outerStep2 = resumeEvents.find(
+        (e): e is StepCompletedEvent =>
+          e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+          e.stepTitle === 'Outer step 2'
+      );
+      expect(outerStep2).toBeDefined();
+
+      const outerCompleteEvent = resumeEvents.find(
+        (e): e is BrainCompleteEvent =>
+          e.type === BRAIN_EVENTS.COMPLETE &&
+          e.brainTitle === 'inner-webhook-brain'
+      );
+      expect(outerCompleteEvent).toBeDefined();
+      expect(outerCompleteEvent?.status).toBe(STATUS.COMPLETE);
     });
   });
 

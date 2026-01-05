@@ -273,6 +273,7 @@ export interface SerializedStep {
   status: (typeof STATUS)[keyof typeof STATUS];
   id: string;
   patch?: JsonPatch;
+  innerSteps?: SerializedStep[]; // For nested brain steps (recursive)
 }
 
 // New type for Step Status Event, omitting the patch
@@ -796,6 +797,7 @@ class BrainEventStream<
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
   private loopResumeContext: LoopResumeContext | null | undefined = undefined;
+  private initialCompletedSteps?: SerializedStep[];
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -836,6 +838,7 @@ class BrainEventStream<
     this.resources = resources;
     this.pages = pages;
     this.env = env ?? DEFAULT_ENV;
+    this.initialCompletedSteps = initialCompletedSteps;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -1010,22 +1013,68 @@ class BrainEventStream<
           ? block.initialState(this.currentState)
           : block.initialState;
 
+      // Check if this inner brain step has completed inner steps (for resume)
+      const stepIndex = this.steps.indexOf(step);
+      const completedStepEntry = this.initialCompletedSteps?.[stepIndex];
+      const innerCompletedSteps = completedStepEntry?.innerSteps;
+
       // Run inner brain and yield all its events
+      // Pass brainRunId so inner brain shares outer brain's run ID
+      // Pass innerSteps and response for resume scenarios
       let patches: JsonPatch[] = [];
-      const innerRun = block.innerBrain.run({
-        resources: this.resources,
-        client: this.client,
-        initialState,
-        options: this.options ?? ({} as TOptions),
-        pages: this.pages,
-        env: this.env,
-      });
+
+      // If resuming, include patches from already-completed inner steps
+      // These won't be re-emitted as STEP_COMPLETE events
+      if (innerCompletedSteps) {
+        for (const completedStep of innerCompletedSteps) {
+          if (completedStep.patch) {
+            patches.push(completedStep.patch);
+          }
+        }
+      }
+
+      let innerBrainPaused = false;
+      const innerRun = innerCompletedSteps
+        ? block.innerBrain.run({
+            resources: this.resources,
+            client: this.client,
+            initialState,
+            initialCompletedSteps: innerCompletedSteps,
+            options: this.options ?? ({} as TOptions),
+            pages: this.pages,
+            env: this.env,
+            brainRunId: this.brainRunId,
+            response: this.currentResponse,
+          })
+        : block.innerBrain.run({
+            resources: this.resources,
+            client: this.client,
+            initialState,
+            options: this.options ?? ({} as TOptions),
+            pages: this.pages,
+            env: this.env,
+            brainRunId: this.brainRunId,
+          });
 
       for await (const event of innerRun) {
         yield event; // Forward all inner brain events
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           patches.push(event.patch);
         }
+        // If inner brain yielded a WEBHOOK event, it's pausing
+        if (event.type === BRAIN_EVENTS.WEBHOOK) {
+          innerBrainPaused = true;
+        }
+        // If inner brain completed, break immediately to prevent hanging
+        if (event.type === BRAIN_EVENTS.COMPLETE) {
+          break;
+        }
+      }
+
+      // If inner brain paused for webhook, don't complete the outer brain step
+      // The outer brain should also pause
+      if (innerBrainPaused) {
+        return;
       }
 
       // Apply collected patches to get final inner state

@@ -87,12 +87,18 @@ export class BrainRunner {
     // to the initial state so that the brain
     // starts with a state that reflects all of the completed steps.
     // Need to do this when a brain is restarted with completed steps.
+    // Note: Only apply top-level step patches, not innerSteps patches
+    // (inner brain patches are applied to inner brain state, not outer brain state)
     initialCompletedSteps?.forEach((step) => {
       if (step.patch) {
         currentState = applyPatches(currentState, [step.patch]) as TState;
         stepNumber++;
       }
     });
+
+    // Track brain nesting depth to know which STEP_COMPLETE events
+    // belong to the top-level brain vs inner brains
+    let brainDepth = 0;
 
     // If loopEvents and response are provided, reconstruct loop context
     const loopResumeContext =
@@ -141,21 +147,35 @@ export class BrainRunner {
           return currentState;
         }
 
+        // Track brain nesting depth - START/RESTART increases, COMPLETE decreases
+        if (event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART) {
+          brainDepth++;
+        }
+
         // Dispatch event to all adapters
         await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
 
         // Update current state when steps complete
+        // Only apply patches from top-level brain (depth === 1)
+        // Inner brain patches are applied to inner brain state within brain.ts
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-          if (event.patch) {
+          if (event.patch && brainDepth === 1) {
             currentState = applyPatches(currentState, [event.patch]) as TState;
           }
 
-          // Check if we should stop after this step
-          if (endAfter && stepNumber >= endAfter) {
+          // Check if we should stop after this step (only for top-level steps)
+          if (brainDepth === 1 && endAfter && stepNumber >= endAfter) {
             return currentState;
           }
 
-          stepNumber++;
+          if (brainDepth === 1) {
+            stepNumber++;
+          }
+        }
+
+        // Track brain completion - decreases nesting depth
+        if (event.type === BRAIN_EVENTS.COMPLETE) {
+          brainDepth--;
         }
 
         // Stop execution when webhook event is encountered
