@@ -1,4 +1,4 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type SerializedStep } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type SerializedStep, createBrainExecutionMachine, sendEvent, getCompletedSteps } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
@@ -441,109 +441,22 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
     }
 
-    // Load all events to build nested initialCompletedSteps
-    // We need START, STEP_START, STEP_COMPLETE events to track brain nesting
+    // Load all events and feed them to the state machine to build nested initialCompletedSteps
     const allEventsResult = sql
-      .exec<{ serialized_event: string; event_type: string }>(
-        `SELECT serialized_event, event_type FROM brain_events
-         WHERE event_type IN (?, ?, ?, ?, ?)
-         ORDER BY event_id ASC`,
-        BRAIN_EVENTS.START,
-        BRAIN_EVENTS.RESTART,
-        BRAIN_EVENTS.STEP_START,
-        BRAIN_EVENTS.STEP_COMPLETE,
-        BRAIN_EVENTS.COMPLETE
+      .exec<{ serialized_event: string }>(
+        `SELECT serialized_event FROM brain_events ORDER BY event_id ASC`
       )
       .toArray();
 
-    // Build nested initialCompletedSteps by tracking brain levels
-    const initialCompletedSteps: SerializedStep[] = [];
-    const brainStack: { title: string; steps: SerializedStep[] }[] = [];
-    let pendingBrainStep: { stepId: string; stepTitle: string } | null = null;
-
+    // Create state machine and feed all historical events to reconstruct step hierarchy
+    const machine = createBrainExecutionMachine({ initialState: initialState });
     for (const row of allEventsResult) {
       const event = JSON.parse(row.serialized_event);
-
-      if (row.event_type === BRAIN_EVENTS.START || row.event_type === BRAIN_EVENTS.RESTART) {
-        // If we have a pending brain step (step that started an inner brain),
-        // add a placeholder for it before pushing the inner brain
-        if (pendingBrainStep && brainStack.length > 0) {
-          const parentBrain = brainStack[brainStack.length - 1];
-          parentBrain.steps.push({
-            id: pendingBrainStep.stepId,
-            title: pendingBrainStep.stepTitle,
-            status: STATUS.RUNNING, // Still running (executing inner brain)
-          });
-        }
-        // Push a new brain level
-        brainStack.push({ title: event.brainTitle, steps: [] });
-        pendingBrainStep = null;
-      } else if (row.event_type === BRAIN_EVENTS.STEP_START) {
-        // Track the current step being started (might be a brain step)
-        pendingBrainStep = { stepId: event.stepId, stepTitle: event.stepTitle };
-      } else if (row.event_type === BRAIN_EVENTS.STEP_COMPLETE) {
-        const step: SerializedStep = {
-          id: event.stepId,
-          title: event.stepTitle,
-          status: STATUS.COMPLETE,
-          patch: event.patch,
-        };
-
-        if (brainStack.length > 0) {
-          // Check if this completes the pending brain step
-          if (pendingBrainStep && pendingBrainStep.stepId === event.stepId) {
-            // This is the completion of the current pending step
-            pendingBrainStep = null;
-          }
-          // Add to the current brain's steps
-          brainStack[brainStack.length - 1].steps.push(step);
-        }
-      } else if (row.event_type === BRAIN_EVENTS.COMPLETE) {
-        // Pop the completed brain
-        const completedBrain = brainStack.pop();
-        if (brainStack.length > 0 && completedBrain) {
-          // This inner brain completed - find its parent step and add innerSteps
-          const parentBrain = brainStack[brainStack.length - 1];
-          // The last step in parent brain is the brain step that ran the inner brain
-          const parentStep = parentBrain.steps[parentBrain.steps.length - 1];
-          if (parentStep) {
-            parentStep.innerSteps = completedBrain.steps;
-            parentStep.status = STATUS.COMPLETE; // Mark as complete now
-          }
-        }
-      }
+      sendEvent(machine, event);
     }
 
-    // The outer brain is still running (waiting for webhook), so get its steps
-    // If there's still a brain on the stack, it's the outer brain that's paused
-    if (brainStack.length > 0) {
-      const outerBrain = brainStack[0];
-
-      // If there's an inner brain still on the stack (brainStack.length > 1),
-      // the current inner brain is paused, and we need to attach its steps
-      // to the parent's last step as innerSteps
-      if (brainStack.length > 1) {
-        const innerBrain = brainStack[brainStack.length - 1];
-        const parentBrain = brainStack[brainStack.length - 2];
-        const parentStep = parentBrain.steps[parentBrain.steps.length - 1];
-        if (parentStep) {
-          parentStep.innerSteps = innerBrain.steps;
-          parentStep.status = STATUS.RUNNING; // Mark as still running (waiting)
-        }
-      }
-
-      // If there's a pending step (e.g., loop step paused on webhook),
-      // add it with RUNNING status so the brain knows it's resuming this step
-      if (pendingBrainStep && brainStack.length === 1) {
-        outerBrain.steps.push({
-          id: pendingBrainStep.stepId,
-          title: pendingBrainStep.stepTitle,
-          status: STATUS.RUNNING, // Step is in progress (paused on webhook)
-        });
-      }
-
-      initialCompletedSteps.push(...outerBrain.steps);
-    }
+    // Get the reconstructed step hierarchy from the state machine
+    const initialCompletedSteps: SerializedStep[] = getCompletedSteps(machine);
 
     // Load LOOP_* events for potential loop resume
     const loopEventsResult = sql
