@@ -1,6 +1,7 @@
-import { BRAIN_EVENTS, STATUS } from './constants.js';
+import { BRAIN_EVENTS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import { reconstructLoopContext } from './loop-messages.js';
+import { createBrainExecutionMachine, sendEvent, sendAction, BRAIN_ACTIONS } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
 import type { State, JsonObject, RuntimeEnv } from './types.js';
@@ -80,25 +81,20 @@ export class BrainRunner {
     const { adapters, client, resources, pages, env } = this.options;
     const resolvedEnv = env ?? DEFAULT_ENV;
 
-    let currentState = initialState ?? ({} as TState);
-    let stepNumber = 1;
-
-    // Apply any patches from completed steps
-    // to the initial state so that the brain
-    // starts with a state that reflects all of the completed steps.
-    // Need to do this when a brain is restarted with completed steps.
-    // Note: Only apply top-level step patches, not innerSteps patches
-    // (inner brain patches are applied to inner brain state, not outer brain state)
+    // Apply any patches from completed steps to get the initial state
+    // for the state machine. The machine will then track all subsequent state changes.
+    let machineInitialState: JsonObject = initialState ?? {};
+    let initialStepCount = 0;
     initialCompletedSteps?.forEach((step) => {
       if (step.patch) {
-        currentState = applyPatches(currentState, [step.patch]) as TState;
-        stepNumber++;
+        machineInitialState = applyPatches(machineInitialState, [step.patch]) as JsonObject;
+        initialStepCount++;
       }
     });
 
-    // Track brain nesting depth to know which STEP_COMPLETE events
-    // belong to the top-level brain vs inner brains
-    let brainDepth = 0;
+    // Create state machine with pre-populated state
+    // The machine tracks: currentState, isTopLevel, topLevelStepCount, etc.
+    const machine = createBrainExecutionMachine({ initialState: machineInitialState });
 
     // If loopEvents and response are provided, reconstruct loop context
     const loopResumeContext =
@@ -134,72 +130,50 @@ export class BrainRunner {
       for await (const event of brainRun) {
         // Check if we've been cancelled
         if (signal?.aborted) {
-          // Emit a cancelled event
-          const cancelledEvent = {
-            type: BRAIN_EVENTS.CANCELLED,
-            status: STATUS.CANCELLED,
-            brainTitle: brain.title,
-            brainDescription: brain.structure.description,
-            brainRunId: brainRunId || event.brainRunId,
-            options: event.options,
-          } as const;
+          // Use state machine to create cancelled event
+          sendAction(machine, BRAIN_ACTIONS.CANCEL_BRAIN, {});
+          const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
           await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
-          return currentState;
+          // Cast is safe: state started as TState and patches maintain the structure
+          return machine.context.currentState as TState;
         }
 
-        // Track brain nesting depth - START/RESTART increases, COMPLETE decreases
-        if (event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART) {
-          brainDepth++;
-        }
+        // Feed event to state machine - this updates currentState, isTopLevel, stepCount, etc.
+        sendEvent(machine, event);
 
         // Dispatch event to all adapters
         await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
 
-        // Update current state when steps complete
-        // Only apply patches from top-level brain (depth === 1)
-        // Inner brain patches are applied to inner brain state within brain.ts
-        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-          if (event.patch && brainDepth === 1) {
-            currentState = applyPatches(currentState, [event.patch]) as TState;
-          }
-
-          // Check if we should stop after this step (only for top-level steps)
-          if (brainDepth === 1 && endAfter && stepNumber >= endAfter) {
-            return currentState;
-          }
-
-          if (brainDepth === 1) {
-            stepNumber++;
+        // Check if we should stop after this step (only for top-level steps)
+        // The machine's topLevelStepCount tracks steps since this run started,
+        // so we add initialStepCount to get the total step count.
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE && machine.context.isTopLevel) {
+          const totalSteps = machine.context.topLevelStepCount + initialStepCount;
+          if (endAfter && totalSteps >= endAfter) {
+            // Cast is safe: state started as TState and patches maintain the structure
+            return machine.context.currentState as TState;
           }
         }
 
-        // Track brain completion - decreases nesting depth
-        if (event.type === BRAIN_EVENTS.COMPLETE) {
-          brainDepth--;
-        }
-
-        // Stop execution when webhook event is encountered
-        if (event.type === BRAIN_EVENTS.WEBHOOK) {
-          return currentState;
+        // Stop execution when machine enters paused state (webhook)
+        if (machine.context.isPaused) {
+          // Cast is safe: state started as TState and patches maintain the structure
+          return machine.context.currentState as TState;
         }
       }
     } catch (error) {
       // If aborted while awaiting, check signal and emit cancelled event
       if (signal?.aborted) {
-        const cancelledEvent = {
-          type: BRAIN_EVENTS.CANCELLED,
-          status: STATUS.CANCELLED,
-          brainTitle: brain.title,
-          brainDescription: brain.structure.description,
-          brainRunId: brainRunId || '',
-          options: options || ({} as TOptions),
-        } as const;
+        sendAction(machine, BRAIN_ACTIONS.CANCEL_BRAIN, {});
+        const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
         await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
-        return currentState;
+        // Cast is safe: state started as TState and patches maintain the structure
+        return machine.context.currentState as TState;
       }
       throw error;
     }
 
-    return currentState;
+    // Cast is safe: state started as TState and patches maintain the structure
+    return machine.context.currentState as TState;
   }
 }
