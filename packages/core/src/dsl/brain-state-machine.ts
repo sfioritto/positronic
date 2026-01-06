@@ -168,59 +168,63 @@ const updateDerivedState = (ctx: BrainExecutionContext, executionState: Executio
 // Reducers - Update context on transitions
 // ============================================================================
 
-const startBrain = reduce<BrainExecutionContext, StartBrainPayload>((ctx, ev) => {
+const startBrain = reduce<BrainExecutionContext, StartBrainPayload>((ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
+  const { currentStepId, brainStack, depth, brainRunId: existingBrainRunId, currentState, options } = ctx;
+
   const newEntry: BrainStackEntry = {
-    brainRunId: ev.brainRunId,
-    brainTitle: ev.brainTitle,
-    brainDescription: ev.brainDescription,
-    parentStepId: ctx.currentStepId,
+    brainRunId,
+    brainTitle,
+    brainDescription,
+    parentStepId: currentStepId,
     steps: [],
   };
 
-  const newDepth = ctx.depth + 1;
+  const newDepth = depth + 1;
   const newCtx: BrainExecutionContext = {
     ...ctx,
-    brainStack: [...ctx.brainStack, newEntry],
+    brainStack: [...brainStack, newEntry],
     depth: newDepth,
-    brainRunId: ctx.brainRunId ?? ev.brainRunId,
-    currentState: newDepth === 1 ? (ev.initialState ?? ctx.currentState) : ctx.currentState,
+    brainRunId: existingBrainRunId ?? brainRunId,
+    currentState: newDepth === 1 ? (initialState ?? currentState) : currentState,
     currentEvent: {
       type: BRAIN_EVENTS.START,
-      brainTitle: ev.brainTitle,
-      brainDescription: ev.brainDescription,
-      brainRunId: ev.brainRunId,
-      initialState: ev.initialState ?? {},
+      brainTitle,
+      brainDescription,
+      brainRunId,
+      initialState: initialState ?? {},
       status: STATUS.RUNNING,
-      options: ctx.options,
+      options,
     },
   };
 
   return updateDerivedState(newCtx, 'running');
 });
 
-const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>((ctx, ev) => {
+const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>((ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
+  const { currentStepId, brainStack, depth, brainRunId: existingBrainRunId, options } = ctx;
+
   const newEntry: BrainStackEntry = {
-    brainRunId: ev.brainRunId,
-    brainTitle: ev.brainTitle,
-    brainDescription: ev.brainDescription,
-    parentStepId: ctx.currentStepId,
+    brainRunId,
+    brainTitle,
+    brainDescription,
+    parentStepId: currentStepId,
     steps: [],
   };
 
-  const newDepth = ctx.depth + 1;
+  const newDepth = depth + 1;
   const newCtx: BrainExecutionContext = {
     ...ctx,
-    brainStack: [...ctx.brainStack, newEntry],
+    brainStack: [...brainStack, newEntry],
     depth: newDepth,
-    brainRunId: ctx.brainRunId ?? ev.brainRunId,
+    brainRunId: existingBrainRunId ?? brainRunId,
     currentEvent: {
       type: BRAIN_EVENTS.RESTART,
-      brainTitle: ev.brainTitle,
-      brainDescription: ev.brainDescription,
-      brainRunId: ev.brainRunId,
-      initialState: ev.initialState ?? {},
+      brainTitle,
+      brainDescription,
+      brainRunId,
+      initialState: initialState ?? {},
       status: STATUS.RUNNING,
-      options: ctx.options,
+      options,
     },
   };
 
@@ -228,10 +232,12 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>((ctx, ev) 
 });
 
 const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  if (ctx.brainStack.length === 0) return ctx;
+  const { brainStack, depth, brainRunId, options } = ctx;
 
-  const completedBrain = ctx.brainStack[ctx.brainStack.length - 1];
-  const newStack = ctx.brainStack.slice(0, -1);
+  if (brainStack.length === 0) return ctx;
+
+  const completedBrain = brainStack[brainStack.length - 1];
+  const newStack = brainStack.slice(0, -1);
 
   // Attach completed brain's steps to parent step if nested
   if (newStack.length > 0 && completedBrain.parentStepId) {
@@ -243,7 +249,7 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
     }
   }
 
-  const newDepth = ctx.depth - 1;
+  const newDepth = depth - 1;
   const isNowComplete = newDepth === 0;
 
   const newCtx: BrainExecutionContext = {
@@ -254,29 +260,30 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
       type: BRAIN_EVENTS.COMPLETE,
       brainTitle: completedBrain.brainTitle,
       brainDescription: completedBrain.brainDescription,
-      brainRunId: ctx.brainRunId!,
+      brainRunId: brainRunId!,
       status: STATUS.COMPLETE,
-      options: ctx.options,
+      options,
     },
   };
 
   return updateDerivedState(newCtx, isNowComplete ? 'complete' : 'running');
 });
 
-const errorBrain = reduce<BrainExecutionContext, ErrorPayload>((ctx, ev) => {
-  const currentBrain = ctx.brainStack[ctx.brainStack.length - 1];
+const errorBrain = reduce<BrainExecutionContext, ErrorPayload>((ctx, { error }) => {
+  const { brainStack, brainRunId, options } = ctx;
+  const currentBrain = brainStack[brainStack.length - 1];
 
   const newCtx: BrainExecutionContext = {
     ...ctx,
-    error: ev.error,
+    error,
     currentEvent: {
       type: BRAIN_EVENTS.ERROR,
       brainTitle: currentBrain?.brainTitle,
       brainDescription: currentBrain?.brainDescription,
-      brainRunId: ctx.brainRunId!,
-      error: ev.error,
+      brainRunId: brainRunId!,
+      error,
       status: STATUS.ERROR,
-      options: ctx.options,
+      options,
     },
   };
 
@@ -284,7 +291,8 @@ const errorBrain = reduce<BrainExecutionContext, ErrorPayload>((ctx, ev) => {
 });
 
 const cancelBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  const currentBrain = ctx.brainStack[ctx.brainStack.length - 1];
+  const { brainStack, brainRunId, options } = ctx;
+  const currentBrain = brainStack[brainStack.length - 1];
 
   const newCtx: BrainExecutionContext = {
     ...ctx,
@@ -292,24 +300,26 @@ const cancelBrain = reduce<BrainExecutionContext, object>((ctx) => {
       type: BRAIN_EVENTS.CANCELLED,
       brainTitle: currentBrain?.brainTitle,
       brainDescription: currentBrain?.brainDescription,
-      brainRunId: ctx.brainRunId!,
+      brainRunId: brainRunId!,
       status: STATUS.CANCELLED,
-      options: ctx.options,
+      options,
     },
   };
 
   return updateDerivedState(newCtx, 'cancelled');
 });
 
-const startStep = reduce<BrainExecutionContext, StartStepPayload>((ctx, ev) => {
+const startStep = reduce<BrainExecutionContext, StartStepPayload>((ctx, { stepId, stepTitle }) => {
+  const { brainStack, brainRunId, options } = ctx;
+
   // Add step to current brain's steps if not already there
-  if (ctx.brainStack.length > 0) {
-    const currentBrain = ctx.brainStack[ctx.brainStack.length - 1];
-    const existingStep = currentBrain.steps.find((s) => s.id === ev.stepId);
+  if (brainStack.length > 0) {
+    const currentBrain = brainStack[brainStack.length - 1];
+    const existingStep = currentBrain.steps.find((s) => s.id === stepId);
     if (!existingStep) {
       currentBrain.steps.push({
-        id: ev.stepId,
-        title: ev.stepTitle,
+        id: stepId,
+        title: stepTitle,
         status: STATUS.RUNNING,
       });
     } else {
@@ -319,35 +329,37 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>((ctx, ev) => {
 
   return {
     ...ctx,
-    currentStepId: ev.stepId,
-    currentStepTitle: ev.stepTitle,
+    currentStepId: stepId,
+    currentStepTitle: stepTitle,
     currentEvent: {
       type: BRAIN_EVENTS.STEP_START,
-      brainRunId: ctx.brainRunId!,
-      stepId: ev.stepId,
-      stepTitle: ev.stepTitle,
+      brainRunId: brainRunId!,
+      stepId,
+      stepTitle,
       status: STATUS.RUNNING,
-      options: ctx.options,
+      options,
     },
   };
 });
 
-const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>((ctx, ev) => {
-  if (ctx.brainStack.length > 0) {
-    const currentBrain = ctx.brainStack[ctx.brainStack.length - 1];
-    const step = currentBrain.steps.find((s) => s.id === ev.stepId);
+const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>((ctx, { stepId, stepTitle, patch }) => {
+  const { brainStack, depth, currentState, topLevelStepCount, brainRunId, options } = ctx;
+
+  if (brainStack.length > 0) {
+    const currentBrain = brainStack[brainStack.length - 1];
+    const step = currentBrain.steps.find((s) => s.id === stepId);
     if (step) {
       step.status = STATUS.COMPLETE;
-      step.patch = ev.patch;
+      step.patch = patch;
     }
   }
 
   // Apply patch to currentState only for top-level brain
-  let newState = ctx.currentState;
-  let newStepCount = ctx.topLevelStepCount;
-  if (ctx.depth === 1 && ev.patch) {
-    newState = applyPatches(ctx.currentState, [ev.patch]) as JsonObject;
-    newStepCount = ctx.topLevelStepCount + 1;
+  let newState = currentState;
+  let newStepCount = topLevelStepCount;
+  if (depth === 1 && patch) {
+    newState = applyPatches(currentState, [patch]) as JsonObject;
+    newStepCount = topLevelStepCount + 1;
   }
 
   return {
@@ -356,80 +368,94 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>((ctx, ev
     topLevelStepCount: newStepCount,
     currentEvent: {
       type: BRAIN_EVENTS.STEP_COMPLETE,
-      brainRunId: ctx.brainRunId!,
-      stepId: ev.stepId,
-      stepTitle: ev.stepTitle,
-      patch: ev.patch,
+      brainRunId: brainRunId!,
+      stepId,
+      stepTitle,
+      patch,
       status: STATUS.RUNNING,
-      options: ctx.options,
+      options,
     },
   };
 });
 
-const webhookPause = reduce<BrainExecutionContext, WebhookPayload>((ctx, ev) => {
+const webhookPause = reduce<BrainExecutionContext, WebhookPayload>((ctx, { waitFor, state }) => {
+  const { brainRunId, currentState, options } = ctx;
+
   const newCtx: BrainExecutionContext = {
     ...ctx,
-    pendingWebhooks: ev.waitFor,
+    pendingWebhooks: waitFor,
     currentEvent: {
       type: BRAIN_EVENTS.WEBHOOK,
-      brainRunId: ctx.brainRunId!,
-      waitFor: ev.waitFor,
-      state: ev.state ?? ctx.currentState,
-      options: ctx.options,
+      brainRunId: brainRunId!,
+      waitFor,
+      state: state ?? currentState,
+      options,
     },
   };
 
   return updateDerivedState(newCtx, 'paused');
 });
 
-const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>((ctx, ev) => {
+const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>((ctx, { response }) => {
+  const { brainRunId, options } = ctx;
+
   const newCtx: BrainExecutionContext = {
     ...ctx,
     pendingWebhooks: null,
     currentEvent: {
       type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
-      brainRunId: ctx.brainRunId!,
-      response: ev.response,
-      options: ctx.options,
+      brainRunId: brainRunId!,
+      response,
+      options,
     },
   };
 
   return updateDerivedState(newCtx, 'running');
 });
 
-const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>((ctx, ev) => ({
-  ...ctx,
-  currentEvent: {
-    type: BRAIN_EVENTS.STEP_STATUS,
-    brainRunId: ctx.brainRunId!,
-    steps: ev.steps,
-    options: ctx.options,
-  },
-}));
+const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>((ctx, { steps }) => {
+  const { brainRunId, options } = ctx;
 
-const stepRetry = reduce<BrainExecutionContext, StepRetryPayload>((ctx, ev) => ({
-  ...ctx,
-  currentEvent: {
-    type: BRAIN_EVENTS.STEP_RETRY,
-    brainRunId: ctx.brainRunId!,
-    stepId: ev.stepId,
-    stepTitle: ev.stepTitle,
-    error: ev.error,
-    attempt: ev.attempt,
-    options: ctx.options,
-  },
-}));
+  return {
+    ...ctx,
+    currentEvent: {
+      type: BRAIN_EVENTS.STEP_STATUS,
+      brainRunId: brainRunId!,
+      steps,
+      options,
+    },
+  };
+});
+
+const stepRetry = reduce<BrainExecutionContext, StepRetryPayload>((ctx, { stepId, stepTitle, error, attempt }) => {
+  const { brainRunId, options } = ctx;
+
+  return {
+    ...ctx,
+    currentEvent: {
+      type: BRAIN_EVENTS.STEP_RETRY,
+      brainRunId: brainRunId!,
+      stepId,
+      stepTitle,
+      error,
+      attempt,
+      options,
+    },
+  };
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const passthrough = (eventType: string) => reduce<BrainExecutionContext, any>((ctx, ev) => {
+  const { brainRunId, options } = ctx;
   // Destructure to exclude 'type' (the action name) from being spread into currentEvent
   const { type: _actionType, ...eventData } = ev;
+
   return {
     ...ctx,
     currentEvent: {
       type: eventType,
-      brainRunId: ctx.brainRunId!,
-      options: ctx.options,
+      brainRunId: brainRunId!,
+      options,
       ...eventData,
     },
   };
@@ -678,11 +704,12 @@ export function isTopLevel(machine: BrainStateMachine): boolean {
 }
 
 export function getCurrentStep(machine: BrainStateMachine): StepInfo | null {
-  const ctx = machine.context;
-  if (ctx.brainStack.length === 0 || !ctx.currentStepId) return null;
+  const { brainStack, currentStepId } = machine.context;
 
-  const currentBrain = ctx.brainStack[ctx.brainStack.length - 1];
-  return currentBrain.steps.find((s) => s.id === ctx.currentStepId) ?? null;
+  if (brainStack.length === 0 || !currentStepId) return null;
+
+  const currentBrain = brainStack[brainStack.length - 1];
+  return currentBrain.steps.find((s) => s.id === currentStepId) ?? null;
 }
 
 export function getBrainStack(machine: BrainStateMachine): BrainStackEntry[] {
