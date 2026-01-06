@@ -43,7 +43,8 @@
       "WebFetch(domain:www.fusejs.io)",
       "WebFetch(domain:thisrobot.life)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:blog.logrocket.com)"
+      "WebFetch(domain:blog.logrocket.com)",
+      "WebFetch(domain:regularhuman.dev)"
     ],
     "deny": []
   }
