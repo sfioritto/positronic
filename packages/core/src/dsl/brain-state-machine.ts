@@ -111,6 +111,7 @@ export interface ErrorPayload {
 }
 
 export interface StepStatusPayload {
+  brainRunId: string;
   steps: Array<{ id: string; title: string; status: string }>;
 }
 
@@ -413,11 +414,36 @@ const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
   return updateDerivedState(newCtx, 'running');
 });
 
-const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>((ctx, { steps }) => {
-  const { brainRunId, options } = ctx;
+const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>((ctx, { brainRunId: eventBrainRunId, steps }) => {
+  const { brainRunId, brainStack, options } = ctx;
+
+  // Update the steps for the brain matching eventBrainRunId
+  // This is used when observing events (e.g., in watch components)
+  const updatedStack = brainStack.map(brain => {
+    if (brain.brainRunId === eventBrainRunId) {
+      // Create a map of existing steps to preserve their patches
+      const existingStepsById = new Map(brain.steps.map(s => [s.id, s]));
+
+      return {
+        ...brain,
+        steps: steps.map(s => {
+          const existing = existingStepsById.get(s.id);
+          return {
+            id: s.id,
+            title: s.title,
+            status: s.status as StepInfo['status'],
+            // Preserve existing patch if we have one
+            ...(existing?.patch ? { patch: existing.patch } : {}),
+          };
+        }),
+      };
+    }
+    return brain;
+  });
 
   return {
     ...ctx,
+    brainStack: updatedStack,
     currentEvent: {
       type: BRAIN_EVENTS.STEP_STATUS,
       brainRunId: brainRunId!,
@@ -675,6 +701,7 @@ function extractPayloadFromEvent(event: { type: string } & Record<string, any>):
       };
     case BRAIN_EVENTS.STEP_STATUS:
       return {
+        brainRunId: event.brainRunId,
         steps: event.steps,
       };
     case BRAIN_EVENTS.STEP_RETRY:
