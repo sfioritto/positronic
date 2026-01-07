@@ -1,5 +1,17 @@
 # @positronic/client-anthropic
 
+## 0.0.47
+
+### Patch Changes
+
+- - **Major refactor**: Introduced a state machine (using robot3) to manage brain execution complexity, replacing the previous imperative approach
+  - **Bug fix**: Fixed an inner brain resume bug that could cause issues when resuming nested brain executions
+  - **Improved watch component**: Refactored the CLI watch component to use the new state machine, simplifying the code and improving reliability
+  - **Documentation access**: Added support for fetching content from documentation sites
+  - **Updated examples**: Brain example now demonstrates using the client directly in a step
+- Updated dependencies
+  - @positronic/core@0.0.47
+
 ## 0.0.46
 
 ### Patch Changes

@@ -417,10 +417,14 @@ const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
 const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>((ctx, { brainRunId: eventBrainRunId, steps }) => {
   const { brainRunId, brainStack, options } = ctx;
 
-  // Update the steps for the brain matching eventBrainRunId
-  // This is used when observing events (e.g., in watch components)
-  const updatedStack = brainStack.map(brain => {
-    if (brain.brainRunId === eventBrainRunId) {
+  if (brainStack.length === 0) return ctx;
+
+  // Only update the current (deepest) brain on the stack.
+  // STEP_STATUS is emitted by the currently executing brain, which is always
+  // the deepest one. We can't match by brainRunId because nested brains share
+  // the same brainRunId, which would incorrectly update all nested brains.
+  const updatedStack = brainStack.map((brain, index) => {
+    if (index === brainStack.length - 1) {
       // Create a map of existing steps to preserve their patches
       const existingStepsById = new Map(brain.steps.map(s => [s.id, s]));
 
