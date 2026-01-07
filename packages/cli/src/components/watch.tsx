@@ -1,26 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout } from 'ink';
 import { EventSource } from 'eventsource';
-import type { BrainEvent, StepStatusEvent, BrainStartEvent, BrainErrorEvent, BrainCompleteEvent, StepStartedEvent } from '@positronic/core';
-import { BRAIN_EVENTS } from '@positronic/core';
-import type { SerializedStep } from '@positronic/core';
-import { STATUS } from '@positronic/core';
+import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
+import {
+  BRAIN_EVENTS,
+  STATUS,
+  createBrainExecutionMachine,
+  sendEvent,
+} from '@positronic/core';
+import type { BrainStateMachine, BrainStackEntry, StepInfo } from '@positronic/core';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
 
-type SerializedStepStatus = Omit<SerializedStep, 'patch'>;
-
-// State for tracking each brain (parent and inner brains)
-interface BrainState {
-  brainRunId: string;
-  brainTitle: string;
-  steps: SerializedStepStatus[];
-  parentStepId: string | null; // Which parent step spawned this brain (null for main brain)
-  isComplete: boolean;
-}
-
 // Get the index of the currently running step (or last completed if none running)
-const getCurrentStepIndex = (steps: SerializedStepStatus[]): number => {
+const getCurrentStepIndex = (steps: StepInfo[]): number => {
   const runningIndex = steps.findIndex((s) => s.status === STATUS.RUNNING);
   if (runningIndex >= 0) return runningIndex;
 
@@ -34,12 +27,12 @@ const getCurrentStepIndex = (steps: SerializedStepStatus[]): number => {
 };
 
 // Count completed steps
-const getCompletedCount = (steps: SerializedStepStatus[]): number => {
+const getCompletedCount = (steps: StepInfo[]): number => {
   return steps.filter((s) => s.status === STATUS.COMPLETE).length;
 };
 
 // Get status indicator character
-const getStatusChar = (status: SerializedStepStatus['status']): string => {
+const getStatusChar = (status: StepInfo['status']): string => {
   switch (status) {
     case STATUS.COMPLETE:
       return '✓';
@@ -55,7 +48,7 @@ const getStatusChar = (status: SerializedStepStatus['status']): string => {
 };
 
 // Get status color
-const getStatusColor = (status: SerializedStepStatus['status']): string => {
+const getStatusColor = (status: StepInfo['status']): string => {
   switch (status) {
     case STATUS.COMPLETE:
       return 'green';
@@ -92,7 +85,7 @@ const ProgressBar = ({ completed, total, width = 20 }: ProgressBarProps) => {
 
 // Step window component - shows prev/current/next steps
 interface StepWindowProps {
-  steps: SerializedStepStatus[];
+  steps: StepInfo[];
   indent?: number;
 }
 
@@ -139,12 +132,12 @@ const StepWindow = ({ steps, indent = 0 }: StepWindowProps) => {
 
 // Brain section component - header + step window + progress bar
 interface BrainSectionProps {
-  brain: BrainState;
+  brain: BrainStackEntry;
   isInner?: boolean;
-  brains: Map<string, BrainState>;
+  brainStack: BrainStackEntry[];
 }
 
-const BrainSection = ({ brain, isInner = false, brains }: BrainSectionProps) => {
+const BrainSection = ({ brain, isInner = false, brainStack }: BrainSectionProps) => {
   const indent = isInner ? 2 : 0;
   const completed = getCompletedCount(brain.steps);
   const total = brain.steps.length;
@@ -153,9 +146,9 @@ const BrainSection = ({ brain, isInner = false, brains }: BrainSectionProps) => 
   const currentIndex = getCurrentStepIndex(brain.steps);
   const currentStep = brain.steps[currentIndex];
 
-  // Find any inner brain associated with the current step
+  // Find any inner brain associated with the current step (active inner brains are on the stack)
   const innerBrain = currentStep
-    ? Array.from(brains.values()).find((b) => b.parentStepId === currentStep.id && !b.isComplete)
+    ? brainStack.find((b) => b.parentStepId === currentStep.id)
     : null;
 
   return (
@@ -181,7 +174,7 @@ const BrainSection = ({ brain, isInner = false, brains }: BrainSectionProps) => 
       {/* Inner brain section (if running) */}
       {innerBrain && (
         <Box marginTop={1}>
-          <BrainSection brain={innerBrain} isInner={true} brains={brains} />
+          <BrainSection brain={innerBrain} isInner={true} brainStack={brainStack} />
         </Box>
       )}
     </Box>
@@ -195,17 +188,14 @@ interface WatchProps {
 export const Watch = ({ runId }: WatchProps) => {
   const { write } = useStdout();
 
-  // Track all brains (parent and inner) by their brainRunId
-  const [brains, setBrains] = useState<Map<string, BrainState>>(new Map());
+  // Use state machine to track brain execution state
+  const machineRef = useRef<BrainStateMachine>(createBrainExecutionMachine());
+  // Store brain stack in state to trigger re-renders when it changes
+  const [brainStack, setBrainStack] = useState<BrainStackEntry[]>([]);
   const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
-
-  // Track the main brain's brainRunId to distinguish from inner brain events
-  const mainBrainRunIdRef = useRef<string | null>(null);
-  // Track the currently running step ID to associate inner brains with their parent step
-  const runningStepIdRef = useRef<string | null>(null);
 
   // Enter alternate screen buffer on mount, exit on unmount
   // Skip in test environment to avoid interfering with test output capture
@@ -228,11 +218,13 @@ export const Watch = ({ runId }: WatchProps) => {
     const url = `${baseUrl}/brains/runs/${runId}/watch`;
     const es = new EventSource(url);
 
+    // Reset state machine for new connection
+    machineRef.current = createBrainExecutionMachine();
     setIsConnected(false);
     setError(null);
-    setBrains(new Map());
-    mainBrainRunIdRef.current = null;
-    runningStepIdRef.current = null;
+    setBrainStack([]);
+    setBrainError(undefined);
+    setIsCompleted(false);
 
     es.onopen = () => {
       setIsConnected(true);
@@ -242,77 +234,32 @@ export const Watch = ({ runId }: WatchProps) => {
     es.onmessage = (event: MessageEvent) => {
       try {
         const eventData = JSON.parse(event.data) as BrainEvent;
+        const machine = machineRef.current;
 
-        // Handle brain start - register new brain (parent or inner)
-        if (
-          eventData.type === BRAIN_EVENTS.START ||
-          eventData.type === BRAIN_EVENTS.RESTART
-        ) {
-          const startEvent = eventData as BrainStartEvent;
-          const isMainBrain = mainBrainRunIdRef.current === null;
+        // Feed event to state machine - it handles all the state tracking
+        sendEvent(machine, eventData);
 
-          if (isMainBrain) {
-            mainBrainRunIdRef.current = startEvent.brainRunId;
-          }
-
-          setBrains((prev) => {
-            const next = new Map(prev);
-            next.set(startEvent.brainRunId, {
-              brainRunId: startEvent.brainRunId,
-              brainTitle: startEvent.brainTitle,
-              steps: [],
-              parentStepId: isMainBrain ? null : runningStepIdRef.current,
-              isComplete: false,
-            });
-            return next;
-          });
-
-          setIsCompleted(false);
+        // Update React state from machine context to trigger re-render
+        // Deep copy brainStack to ensure React detects the change
+        // Note: Only update if brainStack has entries - preserve last known state for completed brains
+        const currentStack = machine.context.brainStack;
+        if (currentStack.length > 0) {
+          setBrainStack(currentStack.map(entry => ({
+            ...entry,
+            steps: [...entry.steps],
+          })));
         }
 
-        // Handle step status - update steps for the specific brain only
-        if (eventData.type === BRAIN_EVENTS.STEP_STATUS) {
-          const statusEvent = eventData as StepStatusEvent;
-          setBrains((prev) => {
-            const next = new Map(prev);
-            const brain = next.get(statusEvent.brainRunId);
-            if (brain) {
-              next.set(statusEvent.brainRunId, { ...brain, steps: statusEvent.steps });
-            }
-            return next;
-          });
+        // Check for completion (outer brain)
+        if (machine.context.isComplete) {
+          setIsCompleted(true);
         }
 
-        // Handle step start - track the running step for inner brain association
-        if (eventData.type === BRAIN_EVENTS.STEP_START) {
-          const stepEvent = eventData as StepStartedEvent;
-          runningStepIdRef.current = stepEvent.stepId;
-        }
-
-        // Mark brain as complete when it completes
-        if (eventData.type === BRAIN_EVENTS.COMPLETE || eventData.type === BRAIN_EVENTS.ERROR) {
-          const completeEvent = eventData as BrainCompleteEvent | BrainErrorEvent;
-
-          // Mark this brain as complete
-          setBrains((prev) => {
-            const next = new Map(prev);
-            const brain = next.get(completeEvent.brainRunId);
-            if (brain) {
-              next.set(completeEvent.brainRunId, { ...brain, isComplete: true });
-            }
-            return next;
-          });
-
-          // Only mark overall as complete when the main brain completes
-          if (completeEvent.brainRunId === mainBrainRunIdRef.current) {
-            setIsCompleted(true);
-          }
-        }
-
+        // Check for error (capture the error event for display)
         if (eventData.type === BRAIN_EVENTS.ERROR) {
           const errorEvent = eventData as BrainErrorEvent;
-          // Only show error for the main brain
-          if (errorEvent.brainRunId === mainBrainRunIdRef.current) {
+          // Only show error for the main brain (isTopLevel check)
+          if (machine.context.brainRunId === errorEvent.brainRunId) {
             setBrainError(errorEvent);
           }
         }
@@ -335,17 +282,18 @@ export const Watch = ({ runId }: WatchProps) => {
     };
   }, [runId]);
 
-  const mainBrain = mainBrainRunIdRef.current ? brains.get(mainBrainRunIdRef.current) : null;
+  // Main brain is the first entry in the stack (outer brain)
+  const mainBrain = brainStack.length > 0 ? brainStack[0] : null;
 
   return (
     <Box flexDirection="column">
-      {!isConnected && brains.size === 0 ? (
+      {!isConnected && brainStack.length === 0 ? (
         <Text>Connecting to watch service...</Text>
       ) : !mainBrain ? (
         <Text>Waiting for brain to start...</Text>
       ) : (
         <>
-          <BrainSection brain={mainBrain} brains={brains} />
+          <BrainSection brain={mainBrain} brainStack={brainStack} />
 
           {isCompleted && !error && !brainError && (
             <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
