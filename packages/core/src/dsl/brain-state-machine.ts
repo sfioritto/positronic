@@ -103,7 +103,6 @@ export interface CompleteStepPayload {
 
 export interface WebhookPayload {
   waitFor: WebhookRegistration[];
-  state?: JsonObject;
 }
 
 export interface ErrorPayload {
@@ -379,8 +378,8 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>((ctx, { 
   };
 });
 
-const webhookPause = reduce<BrainExecutionContext, WebhookPayload>((ctx, { waitFor, state }) => {
-  const { brainRunId, currentState, options } = ctx;
+const webhookPause = reduce<BrainExecutionContext, WebhookPayload>((ctx, { waitFor }) => {
+  const { brainRunId, options } = ctx;
 
   const newCtx: BrainExecutionContext = {
     ...ctx,
@@ -389,7 +388,6 @@ const webhookPause = reduce<BrainExecutionContext, WebhookPayload>((ctx, { waitF
       type: BRAIN_EVENTS.WEBHOOK,
       brainRunId: brainRunId!,
       waitFor,
-      state: state ?? currentState,
       options,
     },
   };
@@ -697,7 +695,6 @@ function extractPayloadFromEvent(event: { type: string } & Record<string, any>):
     case BRAIN_EVENTS.WEBHOOK:
       return {
         waitFor: event.waitFor,
-        state: event.state,
       };
     case BRAIN_EVENTS.WEBHOOK_RESPONSE:
       return {

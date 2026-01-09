@@ -277,7 +277,6 @@ describe('brain creation', () => {
             identifier: 'test-id',
           }
         ],
-        state: { count: 1 },
         brainRunId: expect.any(String),
         options: {},
       })

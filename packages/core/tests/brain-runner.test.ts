@@ -430,7 +430,6 @@ describe('BrainRunner', () => {
             identifier: 'test-id',
           }
         ],
-        state: { count: 1 }
       })
     );
 
