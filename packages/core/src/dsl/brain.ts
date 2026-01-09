@@ -153,7 +153,6 @@ export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK;
   waitFor: SerializedWebhookRegistration[];
-  state: State;
 }
 
 // 5. Loop Events
@@ -1157,7 +1156,6 @@ class BrainEventStream<
         yield {
           type: BRAIN_EVENTS.WEBHOOK,
           waitFor: serializedWaitFor,
-          state: this.currentState,
           options: this.options,
           brainRunId: this.brainRunId,
         };
@@ -1393,7 +1391,6 @@ class BrainEventStream<
                 slug: w.slug,
                 identifier: w.identifier,
               })),
-              state: this.currentState,
               options: this.options ?? ({} as TOptions),
               brainRunId: this.brainRunId,
             };
