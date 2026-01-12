@@ -57,8 +57,7 @@ class EventStreamAdapter implements Adapter {
   }
 
   private broadcast(event: BrainEvent<any>) {
-    const { patch, ...rest } = event as any;
-    const message = `data: ${JSON.stringify(rest)}\n\n`;
+    const message = `data: ${JSON.stringify(event)}\n\n`;
     const encodedMessage = this.encoder.encode(message);
     this.subscribers.forEach((controller) => {
       try {
@@ -568,7 +567,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
               for (const row of existingEventsResult) {
                 try {
-                  const { patch, ...event } = JSON.parse(row.serialized_event);
+                  const event = JSON.parse(row.serialized_event);
                   sendEvent(controller, event);
                 } catch (parseError) {
                   console.error(
