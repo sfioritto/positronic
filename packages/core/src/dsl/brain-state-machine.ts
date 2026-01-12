@@ -1,11 +1,8 @@
-import {
-  createMachine,
-  state,
-  transition,
-  reduce,
-  guard,
-  interpret,
-} from 'robot3';
+import * as robot3 from 'robot3';
+// Use namespace import to work around ESM/CJS interop issues with robot3.
+// When installed globally or on different Node.js versions, the package may
+// resolve to its CJS entry point which doesn't properly expose named exports.
+const { createMachine, state, transition, reduce, guard, interpret } = robot3;
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { JsonPatch, JsonObject } from './types.js';
