@@ -1,5 +1,17 @@
 # @positronic/template-new-project
 
+## 0.0.51
+
+### Patch Changes
+
+- Add webhook documentation to project template
+
+  - Added comprehensive webhook documentation to the CLAUDE.md template
+  - Documents webhook creation with `createWebhook()` and Zod schema validation
+  - Explains how to use webhooks in brains with `waitFor`
+  - Describes auto-discovery from `/webhooks` directory
+  - Updated project structure to include `/webhooks` directory
+
 ## 0.0.49
 
 ### Patch Changes
