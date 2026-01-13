@@ -7,7 +7,7 @@
 // Only export modules that don't depend on cloudflare:workers
 export { PositronicManifest, type BrainMetadata, type ResolutionResult } from './manifest.js';
 export { CloudflareR2Loader } from './r2-loader.js';
-export { CloudflareDevServer, discoverBrains } from './dev-server.js';
+export { CloudflareDevServer, discoverBrains, discoverWebhooks } from './dev-server.js';
 // Export with standard name for CLI to use
 export { CloudflareDevServer as DevServer } from './dev-server.js';
 
