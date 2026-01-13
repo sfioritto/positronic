@@ -9,6 +9,7 @@ This is a Positronic project - an AI-powered framework for building and running 
 ## Project Structure
 
 - **`/brains`** - AI workflow definitions using the Brain DSL
+- **`/webhooks`** - Webhook definitions for external integrations (auto-discovered)
 - **`/resources`** - Files and documents that brains can access via the resource system
 - **`/tests`** - Test files for brains (kept separate to avoid deployment issues)
 - **`/docs`** - Documentation including brain testing guide
@@ -60,6 +61,69 @@ export default myBrain;
 ## Resource System
 
 Resources are files that brains can access during execution. They're stored in the `/resources` directory and are automatically typed based on the manifest.
+
+## Webhooks
+
+Webhooks allow brains to pause execution and wait for external events (like form submissions, API callbacks, or user approvals). Webhooks are auto-discovered from the `/webhooks` directory.
+
+### Creating a Webhook
+
+Create a file in the `/webhooks` directory with a default export:
+
+```typescript
+// webhooks/approval.ts
+import { createWebhook } from '@positronic/core';
+import { z } from 'zod';
+
+const approvalWebhook = createWebhook(
+  'approval',  // webhook name (should match filename)
+  z.object({   // response schema - what the webhook returns to the brain
+    approved: z.boolean(),
+    reviewerNote: z.string().optional(),
+  }),
+  async (request: Request) => {
+    // Parse the incoming request and return identifier + response
+    const body = await request.json();
+    return {
+      type: 'webhook',
+      identifier: body.requestId,  // matches the identifier used in waitFor
+      response: {
+        approved: body.approved,
+        reviewerNote: body.note,
+      },
+    };
+  }
+);
+
+export default approvalWebhook;
+```
+
+### Using Webhooks in Brains
+
+Import the webhook and use it with `waitFor`:
+
+```typescript
+import { brain } from '../brain.js';
+import approvalWebhook from '../webhooks/approval.js';
+
+export default brain('approval-workflow')
+  .step('Request approval', ({ state }) => ({
+    state: { ...state, status: 'pending' },
+    waitFor: [approvalWebhook(state.requestId)],  // pause and wait
+  }))
+  .step('Process approval', ({ state, response }) => ({
+    ...state,
+    status: response.approved ? 'approved' : 'rejected',
+    reviewerNote: response.reviewerNote,
+  }));
+```
+
+### How Auto-Discovery Works
+
+- Place webhook files in `/webhooks` directory
+- Each file must have a default export using `createWebhook()`
+- The dev server generates `_webhookManifest.ts` automatically
+- Webhook name comes from the filename (e.g., `approval.ts` → `'approval'`)
 
 ## Development Workflow
 
