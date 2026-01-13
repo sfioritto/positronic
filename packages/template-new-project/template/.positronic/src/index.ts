@@ -2,6 +2,7 @@ import {
   api as app,
   setManifest,
   setBrainRunner,
+  setWebhookManifest,
   BrainRunnerDO,
   MonitorDO,
   ScheduleDO,
@@ -18,6 +19,12 @@ const manifest = new PositronicManifest({
 
 setManifest(manifest);
 setBrainRunner(runner);
+
+// Register webhooks here if your brains use waitFor with webhooks
+// Example:
+// import { myWebhook } from '../../webhooks/my-webhook.js';
+// setWebhookManifest({ 'my-webhook': myWebhook });
+setWebhookManifest({});
 
 // Define Env type based on wrangler.jsonc bindings
 interface Env {
