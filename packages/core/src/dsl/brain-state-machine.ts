@@ -200,19 +200,85 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>((ctx, { brai
 const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>((ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
   const { currentStepId, brainStack, depth, brainRunId: existingBrainRunId, options } = ctx;
 
+  // brain:restart can be either:
+  // 1. A resume of an existing brain on the stack (same brainTitle) - should REPLACE
+  // 2. A nested inner brain restarting (different brainTitle) - should ADD
+  if (brainStack.length > 0) {
+    const lastBrain = brainStack[brainStack.length - 1];
+
+    // If the last brain has the same title, this is a resume - replace it
+    if (lastBrain.brainTitle === brainTitle) {
+      const newEntry: BrainStackEntry = {
+        brainRunId,
+        brainTitle,
+        brainDescription,
+        parentStepId: lastBrain.parentStepId, // Keep original parentStepId
+        steps: [], // Steps will be populated by subsequent step:status events
+      };
+
+      const newStack = [...brainStack.slice(0, -1), newEntry];
+
+      const newCtx: BrainExecutionContext = {
+        ...ctx,
+        brainStack: newStack,
+        // depth stays the same - we're replacing, not nesting
+        brainRunId: existingBrainRunId ?? brainRunId,
+        currentEvent: {
+          type: BRAIN_EVENTS.RESTART,
+          brainTitle,
+          brainDescription,
+          brainRunId,
+          initialState: initialState ?? {},
+          status: STATUS.RUNNING,
+          options,
+        },
+      };
+
+      return updateDerivedState(newCtx, 'running');
+    }
+
+    // Different title - this is a nested inner brain restarting, ADD to stack
+    const newEntry: BrainStackEntry = {
+      brainRunId,
+      brainTitle,
+      brainDescription,
+      parentStepId: currentStepId,
+      steps: [],
+    };
+
+    const newDepth = depth + 1;
+    const newCtx: BrainExecutionContext = {
+      ...ctx,
+      brainStack: [...brainStack, newEntry],
+      depth: newDepth,
+      brainRunId: existingBrainRunId ?? brainRunId,
+      currentEvent: {
+        type: BRAIN_EVENTS.RESTART,
+        brainTitle,
+        brainDescription,
+        brainRunId,
+        initialState: initialState ?? {},
+        status: STATUS.RUNNING,
+        options,
+      },
+    };
+
+    return updateDerivedState(newCtx, 'running');
+  }
+
+  // No brain on stack - this is a fresh restart from idle state
   const newEntry: BrainStackEntry = {
     brainRunId,
     brainTitle,
     brainDescription,
-    parentStepId: currentStepId,
+    parentStepId: null,
     steps: [],
   };
 
-  const newDepth = depth + 1;
   const newCtx: BrainExecutionContext = {
     ...ctx,
-    brainStack: [...brainStack, newEntry],
-    depth: newDepth,
+    brainStack: [newEntry],
+    depth: 1,
     brainRunId: existingBrainRunId ?? brainRunId,
     currentEvent: {
       type: BRAIN_EVENTS.RESTART,

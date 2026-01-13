@@ -147,8 +147,10 @@ const BrainSection = ({ brain, isInner = false, brainStack }: BrainSectionProps)
   const currentStep = brain.steps[currentIndex];
 
   // Find any inner brain associated with the current step (active inner brains are on the stack)
+  // Must exclude the current brain to prevent infinite recursion when a restarted brain
+  // has parentStepId matching its own step IDs
   const innerBrain = currentStep
-    ? brainStack.find((b) => b.parentStepId === currentStep.id)
+    ? brainStack.find((b) => b.parentStepId === currentStep.id && b !== brain)
     : null;
 
   return (
