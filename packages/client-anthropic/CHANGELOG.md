@@ -1,5 +1,15 @@
 # @positronic/client-anthropic
 
+## 0.0.49
+
+### Patch Changes
+
+- Bug fixes:
+  - Fixed "Webhook manifest not initialized" error by defaulting webhookManifest to empty object
+  - Added setWebhookManifest to project template so new projects are ready for webhook usage
+- Updated dependencies
+  - @positronic/core@0.0.49
+
 ## 0.0.48
 
 ### Patch Changes
