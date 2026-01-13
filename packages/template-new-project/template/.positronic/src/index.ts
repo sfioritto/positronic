@@ -8,10 +8,13 @@ import {
   ScheduleDO,
   PositronicManifest,
 } from "@positronic/cloudflare";
-// Import the generated manifest - NOTE the .js extension for runtime compatibility
+// Import the generated manifests - NOTE the .js extension for runtime compatibility
 // @ts-expect-error - _manifest.js is generated during template processing
 import { manifest as brainManifest } from "./_manifest.js";
+// @ts-expect-error - _webhookManifest.js is generated during template processing
+import { webhookManifest } from "./_webhookManifest.js";
 import { runner } from "./runner.js";
+
 // Configure the manifest to use the statically generated list
 const manifest = new PositronicManifest({
   manifest: brainManifest,
@@ -19,12 +22,7 @@ const manifest = new PositronicManifest({
 
 setManifest(manifest);
 setBrainRunner(runner);
-
-// Register webhooks here if your brains use waitFor with webhooks
-// Example:
-// import { myWebhook } from '../../webhooks/my-webhook.js';
-// setWebhookManifest({ 'my-webhook': myWebhook });
-setWebhookManifest({});
+setWebhookManifest(webhookManifest);
 
 // Define Env type based on wrangler.jsonc bindings
 interface Env {

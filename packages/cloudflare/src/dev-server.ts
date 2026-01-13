@@ -179,6 +179,23 @@ export async function discoverBrains(
   return brains.filter((b) => b !== null);
 }
 
+export async function discoverWebhooks(
+  webhooksDir: string
+): Promise<{ name: string; relativePath: string }[]> {
+  const entries = await fsPromises
+    .readdir(webhooksDir, { withFileTypes: true })
+    .catch(() => [] as Dirent[]);
+
+  const webhooks = entries
+    .filter((e) => !e.name.startsWith('_') && e.isFile() && e.name.endsWith('.ts'))
+    .map((entry) => ({
+      name: entry.name.replace(/\.ts$/, ''),
+      relativePath: entry.name,
+    }));
+
+  return webhooks;
+}
+
 async function regenerateManifestFile(
   projectRootPath: string,
   targetSrcDir: string
@@ -221,6 +238,37 @@ ${manifestEntries}};
     runnerContent,
     'utf-8'
   );
+}
+
+async function regenerateWebhookManifestFile(
+  projectRootPath: string,
+  targetSrcDir: string
+) {
+  const webhooksDir = path.join(projectRootPath, 'webhooks');
+  const manifestPath = path.join(targetSrcDir, '_webhookManifest.ts');
+
+  const webhooks = await discoverWebhooks(webhooksDir);
+
+  let importStatements = '';
+  let manifestEntries = '';
+
+  for (const webhook of webhooks) {
+    const importPath = `../../webhooks/${webhook.relativePath.replace(/\.ts$/, '.js')}`;
+    const importAlias = `webhook_${webhook.name.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+
+    importStatements += `import ${importAlias} from '${importPath}';\n`;
+
+    manifestEntries += `  ${JSON.stringify(webhook.name)}: ${importAlias},\n`;
+  }
+
+  const manifestContent = `// This file is generated automatically. Do not edit directly.
+${importStatements}
+export const webhookManifest: Record<string, any> = {
+${manifestEntries}};
+`;
+
+  await fsPromises.mkdir(targetSrcDir, { recursive: true });
+  await fsPromises.writeFile(manifestPath, manifestContent, 'utf-8');
 }
 
 export class CloudflareDevServer implements PositronicDevServer {
@@ -354,6 +402,7 @@ export class CloudflareDevServer implements PositronicDevServer {
   ): Promise<void> {
     const srcDir = path.join(serverDir, 'src');
     await regenerateManifestFile(projectRoot, srcDir);
+    await regenerateWebhookManifestFile(projectRoot, srcDir);
   }
 
   private async updateWranglerConfiguration(
@@ -532,12 +581,18 @@ export class CloudflareDevServer implements PositronicDevServer {
     event: 'add' | 'change' | 'unlink'
   ): Promise<void> {
     const projectRoot = this.projectRootDir;
-    // Regenerate manifest when brain files change
     const serverDir = path.join(projectRoot, '.positronic');
     const srcDir = path.join(serverDir, 'src');
+    const relativePath = path.relative(projectRoot, filePath);
 
-    console.log(`Brain file ${event}: ${path.relative(projectRoot, filePath)}`);
-    await regenerateManifestFile(projectRoot, srcDir);
+    // Determine if this is a brain or webhook file change
+    if (relativePath.startsWith('brains/') || relativePath.startsWith('brains\\')) {
+      console.log(`Brain file ${event}: ${relativePath}`);
+      await regenerateManifestFile(projectRoot, srcDir);
+    } else if (relativePath.startsWith('webhooks/') || relativePath.startsWith('webhooks\\')) {
+      console.log(`Webhook file ${event}: ${relativePath}`);
+      await regenerateWebhookManifestFile(projectRoot, srcDir);
+    }
   }
 
   private async ensureR2BucketExists(bucketName: string): Promise<void> {
