@@ -1,4 +1,4 @@
-import { brain, createWebhook } from '@positronic/core';
+import { brain } from '@positronic/core';
 import { z } from 'zod';
 import app from '../../src/api';
 import {
@@ -11,6 +11,12 @@ import { MonitorDO } from '../../src/monitor-do';
 import { ScheduleDO } from '../../src/schedule-do';
 import { PositronicManifest } from '../../src/manifest.js';
 import { runner } from './runner';
+// Import webhooks from webhooks/ directory (simulates auto-discovery pattern)
+import testWebhook from '../webhooks/test-webhook.js';
+import innerWebhook from '../webhooks/inner-webhook.js';
+import loopEscalationWebhook from '../webhooks/loop-escalation.js';
+// Import the webhook manifest (simulates generated _webhookManifest.ts)
+import { webhookManifest } from './_webhookManifest.js';
 
 const basicBrain = brain({ title: 'basic-brain', description: 'A basic brain for testing' })
   .step('First step', ({ state }) => ({
@@ -83,69 +89,6 @@ const titleTestBrain = brain({ title: 'Brain with Custom Title', description: 'T
     status: 'completed',
   }));
 
-// Test webhooks
-const testWebhook = createWebhook(
-  'test-webhook',
-  z.object({
-    message: z.string(),
-    userId: z.string(),
-  }),
-  async (request: Request) => {
-    const body = (await request.json()) as {
-      type?: string;
-      challenge?: string;
-      threadId?: string;
-      userId?: string;
-      text?: string;
-      message?: string;
-      user?: string;
-    };
-
-    // Handle verification challenge (for testing verification flow)
-    if (body.type === 'url_verification') {
-      return {
-        type: 'verification' as const,
-        challenge: body.challenge!,
-      };
-    }
-
-    // Normal webhook handling
-    return {
-      type: 'webhook' as const,
-      identifier: body.threadId || body.userId || '',
-      response: {
-        message: body.text || body.message || '',
-        userId: body.user || body.userId || '',
-      },
-    };
-  }
-);
-
-const notificationWebhook = createWebhook(
-  'notification',
-  z.object({
-    type: z.string(),
-    data: z.string(),
-    timestamp: z.number(),
-  }),
-  async (request: Request) => {
-    const body = (await request.json()) as {
-      notificationId: string;
-      type: string;
-      data: string;
-    };
-    return {
-      type: 'webhook' as const,
-      identifier: body.notificationId,
-      response: {
-        type: body.type,
-        data: body.data,
-        timestamp: Date.now(),
-      },
-    };
-  }
-);
-
 // Brain that uses webhooks
 const webhookBrain = brain({ title: 'webhook-brain', description: 'A brain that waits for webhooks' })
   .step('Send message and wait', ({ state }) => ({
@@ -158,27 +101,6 @@ const webhookBrain = brain({ title: 'webhook-brain', description: 'A brain that 
     receivedMessage: response.message,
     receivedUserId: response.userId,
   }));
-
-// Webhook for inner brain testing
-const innerWebhook = createWebhook(
-  'inner-webhook',
-  z.object({
-    data: z.string(),
-  }),
-  async (request: Request) => {
-    const body = (await request.json()) as {
-      identifier: string;
-      data: string;
-    };
-    return {
-      type: 'webhook' as const,
-      identifier: body.identifier,
-      response: {
-        data: body.data,
-      },
-    };
-  }
-);
 
 // Inner brain with a webhook - for testing nested brain webhook resume
 const innerWebhookBrain = brain<{ data: string }, { count: number }>({
@@ -289,30 +211,6 @@ const fixedSlugBrain = brain({ title: 'fixed-slug-brain', description: 'A brain 
       runNumber: fixedSlugRunCount,
     };
   });
-
-// Webhook for loop testing
-const loopEscalationWebhook = createWebhook(
-  'loop-escalation',
-  z.object({
-    approved: z.boolean(),
-    reviewerNote: z.string().optional(),
-  }),
-  async (request: Request) => {
-    const body = (await request.json()) as {
-      escalationId?: string;
-      approved?: boolean;
-      note?: string;
-    };
-    return {
-      type: 'webhook' as const,
-      identifier: body.escalationId || '',
-      response: {
-        approved: body.approved ?? false,
-        reviewerNote: body.note,
-      },
-    };
-  }
-);
 
 // Brain with a loop step that uses webhooks for escalation
 const loopWebhookBrain = brain({ title: 'loop-webhook-brain', description: 'A brain that uses loop with webhook escalation' })
@@ -430,14 +328,6 @@ const brainManifest = {
 const manifest = new PositronicManifest({
   manifest: brainManifest,
 });
-
-// Webhook manifest for discovery
-export const webhookManifest = {
-  'test-webhook': testWebhook,
-  'notification': notificationWebhook,
-  'loop-escalation': loopEscalationWebhook,
-  'inner-webhook': innerWebhook,
-};
 
 setManifest(manifest);
 setBrainRunner(runner);
