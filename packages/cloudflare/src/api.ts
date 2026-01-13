@@ -831,10 +831,6 @@ app.post('/resources/presigned-link', async (context: Context) => {
 app.get('/webhooks', async (context: Context) => {
   const webhookManifest = getWebhookManifest();
 
-  if (!webhookManifest) {
-    return context.json({ webhooks: [], count: 0 });
-  }
-
   const webhooks = Object.entries(webhookManifest).map(([slug, webhook]: [string, any]) => ({
     slug,
     description: webhook.description,
@@ -850,11 +846,6 @@ app.get('/webhooks', async (context: Context) => {
 app.post('/webhooks/:slug', async (context: Context) => {
   const slug = context.req.param('slug');
   const webhookManifest = getWebhookManifest();
-
-  if (!webhookManifest) {
-    return context.json({ error: 'Webhook manifest not initialized' }, 500);
-  }
-
   const webhook = webhookManifest[slug];
 
   if (!webhook) {

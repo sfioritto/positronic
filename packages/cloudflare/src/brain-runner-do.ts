@@ -27,12 +27,12 @@ export function setBrainRunner(runner: BrainRunner) {
   brainRunner = runner;
 }
 
-let webhookManifest: Record<string, any> | null = null;
+let webhookManifest: Record<string, any> = {};
 export function setWebhookManifest(manifest: Record<string, any>) {
   webhookManifest = manifest;
 }
 
-export function getWebhookManifest(): Record<string, any> | null {
+export function getWebhookManifest(): Record<string, any> {
   return webhookManifest;
 }
 
