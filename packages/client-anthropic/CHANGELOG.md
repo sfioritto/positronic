@@ -1,5 +1,18 @@
 # @positronic/client-anthropic
 
+## 0.0.48
+
+### Patch Changes
+
+- Bug fixes and improvements:
+  - Fixed infinite loop in the brain state machine
+  - Fixed ESM/CJS interop issue with robot3 import
+  - Reverted patches removal from events for proper watch client functionality
+  - Improved test stability with increased timeouts
+  - Removed unused currentState property from brain
+- Updated dependencies
+  - @positronic/core@0.0.48
+
 ## 0.0.47
 
 ### Patch Changes
