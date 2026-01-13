@@ -1,5 +1,44 @@
 # @positronic/cloudflare
 
+## 0.0.50
+
+### Patch Changes
+
+- ### Auto-discover webhooks from `webhooks/` directory
+
+  Webhooks are now automatically discovered from the `webhooks/` directory, following the same pattern as brains. Previously, webhooks had to be manually registered via `setWebhookManifest()`.
+
+  **New behavior:**
+
+  - Place webhook files in your project's `webhooks/` directory
+  - Each webhook should be a default export using `createWebhook()`
+  - The dev server automatically generates `_webhookManifest.ts`
+  - The generated manifest is imported and registered in your `.positronic/src/index.ts`
+
+  **Example webhook file (`webhooks/my-webhook.ts`):**
+
+  ```typescript
+  import { createWebhook } from '@positronic/core';
+  import { z } from 'zod';
+
+  const myWebhook = createWebhook(
+    'my-webhook',
+    z.object({ data: z.string() }),
+    async (request) => {
+      const body = await request.json();
+      return {
+        type: 'webhook',
+        identifier: body.id,
+        response: { data: body.data },
+      };
+    }
+  );
+
+  export default myWebhook;
+  ```
+
+  This change also improves error handling when webhooks are not found, returning a 404 with "Webhook 'name' not found" instead of a 500 error.
+
 ## 0.0.49
 
 ### Patch Changes
