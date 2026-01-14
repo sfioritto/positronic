@@ -1,5 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
-import { BRAIN_EVENTS, STATUS } from '@positronic/core';
+import {
+  BRAIN_EVENTS,
+  STATUS,
+  createBrainExecutionMachine,
+  sendEvent as sendMachineEvent,
+} from '@positronic/core';
 import type { BrainEvent } from '@positronic/core';
 
 export interface Env {
@@ -18,8 +23,8 @@ export class MonitorDO extends DurableObject<Env> {
     this.storage.exec(`
       CREATE TABLE IF NOT EXISTS brain_runs (
         run_id TEXT PRIMARY KEY,
-        brain_title TEXT NOT NULL, -- Renamed column
-        brain_description TEXT, -- Renamed column
+        brain_title TEXT NOT NULL,
+        brain_description TEXT,
         type TEXT NOT NULL,
         status TEXT NOT NULL,
         options TEXT,
@@ -28,6 +33,17 @@ export class MonitorDO extends DurableObject<Env> {
         started_at INTEGER,
         completed_at INTEGER
       );
+
+      CREATE TABLE IF NOT EXISTS brain_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        event_data TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_brain_events_run
+      ON brain_events(run_id, id);
 
       CREATE INDEX IF NOT EXISTS idx_brain_status -- Renamed index
       ON brain_runs(brain_title, status);
@@ -73,21 +89,52 @@ export class MonitorDO extends DurableObject<Env> {
       event.type === BRAIN_EVENTS.ERROR ||
       event.type === BRAIN_EVENTS.CANCELLED
     ) {
+      const { brainRunId } = event;
       const currentTime = Date.now();
+
+      // Store the event in the event stream (append-only)
+      this.storage.exec(
+        `INSERT INTO brain_events (run_id, event_type, event_data, created_at) VALUES (?, ?, ?, ?)`,
+        brainRunId,
+        event.type,
+        JSON.stringify(event),
+        currentTime
+      );
+
+      // Load all events for this brain run and replay through state machine
+      const storedEvents = this.storage
+        .exec(
+          `SELECT event_type, event_data FROM brain_events WHERE run_id = ? ORDER BY id`,
+          brainRunId
+        )
+        .toArray() as Array<{ event_type: string; event_data: string }>;
+
+      // Create fresh state machine and replay all events
+      const machine = createBrainExecutionMachine();
+      for (const { event_data } of storedEvents) {
+        const parsedEvent = JSON.parse(event_data);
+        sendMachineEvent(machine, parsedEvent);
+      }
+
+      // Use the state machine's computed status (depth-aware)
+      const { status } = machine.context;
+
       const startTime =
         event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART
           ? currentTime
           : null;
-      const completeTime =
-        event.type === BRAIN_EVENTS.COMPLETE ||
-        event.type === BRAIN_EVENTS.ERROR ||
-        event.type === BRAIN_EVENTS.CANCELLED
-          ? currentTime
-          : null;
+
+      // Only set completedAt when status is terminal
+      const isTerminalStatus =
+        status === STATUS.COMPLETE ||
+        status === STATUS.ERROR ||
+        status === STATUS.CANCELLED;
+      const completeTime = isTerminalStatus ? currentTime : null;
+
       const error =
         event.type === BRAIN_EVENTS.ERROR ? JSON.stringify(event.error) : null;
 
-      // Update SQL insert/update with new column names, read from existing event fields
+      // Update the brain_runs summary table
       this.storage.exec(
         `
         INSERT INTO brain_runs (
@@ -100,11 +147,11 @@ export class MonitorDO extends DurableObject<Env> {
           error = excluded.error,
           completed_at = excluded.completed_at
       `,
-        event.brainRunId, // Use brainRunId for run_id
-        event.brainTitle, // Read from event field, store in brain_title
-        event.brainDescription || null, // Read from event field, store in brain_description
+        brainRunId,
+        event.brainTitle,
+        event.brainDescription || null,
         event.type,
-        event.status,
+        status,
         JSON.stringify(event.options || {}),
         error,
         currentTime,
@@ -113,12 +160,8 @@ export class MonitorDO extends DurableObject<Env> {
       );
 
       // Clean up registrations when brain terminates
-      if (
-        event.type === BRAIN_EVENTS.COMPLETE ||
-        event.type === BRAIN_EVENTS.ERROR ||
-        event.type === BRAIN_EVENTS.CANCELLED
-      ) {
-        this.clearWebhookRegistrations(event.brainRunId);
+      if (isTerminalStatus) {
+        this.clearWebhookRegistrations(brainRunId);
         // Note: Non-persistent page cleanup is handled by PageAdapter which has access to R2
         // We just track pages here, actual R2 deletion happens in the adapter
       }
