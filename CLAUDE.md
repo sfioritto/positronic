@@ -83,6 +83,7 @@ The project uses npm workspaces with the following packages:
 - Place all imports at the top of the file - avoid inline dynamic imports (`await import(...)`) except in rare cases
 - Follow existing patterns in the codebase
 - Consider adding small delays, e.g. awaiting a promise wrapping a setTimeout, when dealing with asynchronous code to be bad practice and a last resort.
+- You tend to want to add things like `eslint-disable-next-line @typescript-eslint/no-explicit-any` to avoid type errors BUT you don't need to do this. Don't add eslint disable comments unless you see a linter error when running the lint command — which you won't because there's no linter.
 
 ### Testing
 
@@ -93,7 +94,7 @@ The project uses npm workspaces with the following packages:
 
 ## Development Workflow
 
-- Run `npm run build:workspaces` and then `npm run test` from the top of this mono repo every time you change a file and addresses errors and test failures as needed
+- Run `npm run dev` from the top of this mono repo every time you change a file and addresses errors and test failures as needed
 - Run `npm run typecheck` to verify TypeScript types across the entire codebase
 
 ## Testing Memories

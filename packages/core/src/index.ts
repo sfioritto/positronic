@@ -69,7 +69,6 @@ export { reconstructLoopContext } from './dsl/loop-messages.js';
 // Brain state machine
 export {
   createBrainExecutionMachine,
-  sendAction,
   sendEvent,
   getDepth,
   isTopLevel,
@@ -80,7 +79,6 @@ export {
   getPendingWebhooks,
   getError,
   getCompletedSteps,
-  BRAIN_ACTIONS,
 } from './dsl/brain-state-machine.js';
 export type {
   BrainStateMachine,
