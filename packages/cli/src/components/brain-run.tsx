@@ -153,6 +153,14 @@ export const BrainRun = ({ identifier, watch, options }: BrainRunProps) => {
     }
   });
 
+  // Exit the app when run completes without watch mode
+  // This is needed because useInput keeps the terminal in raw mode
+  useEffect(() => {
+    if (phase === 'complete' && runId && !watch) {
+      exit();
+    }
+  }, [phase, runId, watch, exit]);
+
   // Maintain consistent Box wrapper to help Ink properly calculate
   // terminal clearing between renders (prevents appending instead of overwriting)
   return (
