@@ -3,7 +3,6 @@ import {
   BRAIN_EVENTS,
   STATUS,
   createBrainExecutionMachine,
-  sendEvent as sendMachineEvent,
 } from '@positronic/core';
 import type { BrainEvent } from '@positronic/core';
 
@@ -101,20 +100,16 @@ export class MonitorDO extends DurableObject<Env> {
         currentTime
       );
 
-      // Load all events for this brain run and replay through state machine
+      // Load all events for this brain run and create state machine with history
       const storedEvents = this.storage
         .exec(
-          `SELECT event_type, event_data FROM brain_events WHERE run_id = ? ORDER BY id`,
+          `SELECT event_data FROM brain_events WHERE run_id = ? ORDER BY id`,
           brainRunId
         )
-        .toArray() as Array<{ event_type: string; event_data: string }>;
+        .toArray() as Array<{ event_data: string }>;
 
-      // Create fresh state machine and replay all events
-      const machine = createBrainExecutionMachine();
-      for (const { event_data } of storedEvents) {
-        const parsedEvent = JSON.parse(event_data);
-        sendMachineEvent(machine, parsedEvent);
-      }
+      const events = storedEvents.map(({ event_data }) => JSON.parse(event_data));
+      const machine = createBrainExecutionMachine({ events });
 
       // Use the state machine's computed status (depth-aware)
       const { status } = machine.context;
