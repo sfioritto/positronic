@@ -156,6 +156,7 @@ export class TestDevServer implements PositronicDevServer {
   private scheduleRuns: MockScheduleRun[] = [];
   private brains: Map<string, MockBrain> = new Map();
   private brainRuns: MockBrainRun[] = [];
+  private runningBrainsForWatch: MockBrainRun[] = [];
   private secrets: Map<string, MockSecret> = new Map();
   private pages: Map<string, MockPage> = new Map();
   public port: number = 0;
@@ -597,6 +598,26 @@ export class TestDevServer implements PositronicDevServer {
         Connection: 'keep-alive',
       }
     );
+
+    // GET /brains/watch (SSE endpoint for watching all running brains)
+    // Note: Must be defined BEFORE the catch-all /brains/:identifier routes
+    // Store reference to this for the callback
+    const self = this;
+    nockInstance
+      .get('/brains/watch')
+      .reply(
+        200,
+        function () {
+          self.logCall('watchAllBrains', []);
+          const data = { runningBrains: self.runningBrainsForWatch };
+          return `data: ${JSON.stringify(data)}\n\n`;
+        },
+        {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        }
+      );
 
     // GET /brains (with optional query filtering using fuse.js)
     nockInstance.get('/brains').query(true).reply((uri) => {
@@ -1078,6 +1099,15 @@ export class TestDevServer implements PositronicDevServer {
 
   clearBrainRuns() {
     this.brainRuns = [];
+  }
+
+  // Running brains for watch endpoint helper methods
+  setRunningBrainsForWatch(brains: MockBrainRun[]) {
+    this.runningBrainsForWatch = brains;
+  }
+
+  clearRunningBrainsForWatch() {
+    this.runningBrainsForWatch = [];
   }
 
   clearBrains() {

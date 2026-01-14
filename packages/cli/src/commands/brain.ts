@@ -10,6 +10,7 @@ import { BrainKill } from '../components/brain-kill.js';
 import { BrainRun } from '../components/brain-run.js';
 import { BrainResolver } from '../components/brain-resolver.js';
 import { BrainWatchWithResolver } from '../components/brain-watch.js';
+import { BrainTop } from '../components/brain-top.js';
 import { ErrorComponent } from '../components/error.js';
 
 interface BrainListArgs {}
@@ -40,6 +41,9 @@ interface BrainWatchArgs {
 interface BrainKillArgs {
   runId: string;
   force: boolean;
+}
+interface BrainTopArgs {
+  brain?: string;
 }
 
 export class BrainCommand {
@@ -144,4 +148,7 @@ export class BrainCommand {
     return React.createElement(BrainKill, { runId, force });
   }
 
+  top({ brain }: ArgumentsCamelCase<BrainTopArgs>): React.ReactElement {
+    return React.createElement(BrainTop, { brainFilter: brain });
+  }
 }

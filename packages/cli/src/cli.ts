@@ -477,6 +477,25 @@ export function buildCli(options: CliOptions) {
     }
   );
 
+  // --- Top Command (view running brains) ---
+  cli = cli.command(
+    'top [brain]',
+    'View live status of all running brains\n',
+    (yargsTop) => {
+      return yargsTop
+        .positional('brain', {
+          describe: 'Filter to brains matching this name',
+          type: 'string',
+        })
+        .example('$0 top', 'View all running brains')
+        .example('$0 top my-brain', 'View running brains matching "my-brain"');
+    },
+    (argv) => {
+      const element = brainCommand.top(argv);
+      render(element);
+    }
+  );
+
   // --- Brain Commands ---
   cli = cli.command('brain', 'Manage your brains\n', (yargsBrain) => {
     yargsBrain
@@ -700,9 +719,26 @@ export function buildCli(options: CliOptions) {
           render(element);
         }
       )
+      .command(
+        'top [brain]',
+        'View live status of all running brains\n',
+        (yargsTop) => {
+          return yargsTop
+            .positional('brain', {
+              describe: 'Filter to brains matching this name',
+              type: 'string',
+            })
+            .example('$0 brain top', 'View all running brains')
+            .example('$0 brain top my-brain', 'View running brains matching "my-brain"');
+        },
+        (argv) => {
+          const element = brainCommand.top(argv);
+          render(element);
+        }
+      )
       .demandCommand(
         1,
-        'You need to specify a brain command (list, history, show, rerun, run, watch, kill).'
+        'You need to specify a brain command (list, history, show, rerun, run, watch, kill, top).'
       );
 
     return yargsBrain;
