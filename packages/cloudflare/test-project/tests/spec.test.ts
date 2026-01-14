@@ -151,6 +151,20 @@ describe('Positronic Spec', () => {
       );
       expect(result).toBe(true);
     });
+
+    it('passes inner brain COMPLETE does not affect outer brain status test', async () => {
+      const result = await brains.innerBrainCompleteDoesNotAffectOuterStatus(
+        createFetch(),
+        'outer-webhook-after-inner',
+        'test-webhook',
+        {
+          text: 'Resume outer brain',
+          user: 'test-user',
+          threadId: 'outer-status-test',
+        }
+      );
+      expect(result).toBe(true);
+    });
   });
 
   describe('Schedules', () => {

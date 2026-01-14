@@ -66,6 +66,8 @@ export interface BrainExecutionContext {
   options: JsonObject;
 
   // Derived state (updated by reducers)
+  // The authoritative status (depth-aware) - use this instead of checking event.status
+  status: (typeof STATUS)[keyof typeof STATUS];
   isTopLevel: boolean;
   isRunning: boolean;
   isComplete: boolean;
@@ -138,6 +140,7 @@ const createInitialContext = (opts?: CreateMachineOptions): BrainExecutionContex
   currentState: opts?.initialState ?? {},
   currentEvent: null,
   options: opts?.options ?? {},
+  status: STATUS.PENDING,
   isTopLevel: false,
   isRunning: false,
   isComplete: false,
@@ -151,15 +154,44 @@ const createInitialContext = (opts?: CreateMachineOptions): BrainExecutionContex
 // Helper to update derived state
 // ============================================================================
 
-const updateDerivedState = (ctx: BrainExecutionContext, executionState: ExecutionState): BrainExecutionContext => ({
-  ...ctx,
-  isTopLevel: ctx.depth === 1,
-  isRunning: executionState === 'running',
-  isComplete: executionState === 'complete',
-  isPaused: executionState === 'paused',
-  isError: executionState === 'error',
-  isCancelled: executionState === 'cancelled',
-});
+const updateDerivedState = (ctx: BrainExecutionContext, executionState: ExecutionState): BrainExecutionContext => {
+  // Map ExecutionState to STATUS - this gives consumers the authoritative status
+  let status: (typeof STATUS)[keyof typeof STATUS];
+  switch (executionState) {
+    case 'idle':
+      status = STATUS.PENDING;
+      break;
+    case 'running':
+      status = STATUS.RUNNING;
+      break;
+    case 'paused':
+      // Paused brains are still considered "running" in terms of database status
+      status = STATUS.RUNNING;
+      break;
+    case 'complete':
+      status = STATUS.COMPLETE;
+      break;
+    case 'error':
+      status = STATUS.ERROR;
+      break;
+    case 'cancelled':
+      status = STATUS.CANCELLED;
+      break;
+    default:
+      status = STATUS.RUNNING;
+  }
+
+  return {
+    ...ctx,
+    status,
+    isTopLevel: ctx.depth === 1,
+    isRunning: executionState === 'running',
+    isComplete: executionState === 'complete',
+    isPaused: executionState === 'paused',
+    isError: executionState === 'error',
+    isCancelled: executionState === 'cancelled',
+  };
+};
 
 // ============================================================================
 // Reducers - Update context on transitions

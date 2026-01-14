@@ -1984,6 +1984,266 @@ export const brains = {
       return false;
     }
   },
+
+  /**
+   * Test that inner brain COMPLETE events don't overwrite outer brain status.
+   *
+   * This test verifies that when a nested inner brain completes, the outer brain's
+   * status in history remains RUNNING (not prematurely set to COMPLETE).
+   *
+   * Test scenario:
+   * 1. Run outer brain that contains inner brain + webhook step after inner brain
+   * 2. Watch SSE until outer brain's WEBHOOK event (after inner completes)
+   * 3. Query history for the brain
+   * 4. Assert status is RUNNING (not COMPLETE from inner brain)
+   * 5. Trigger webhook to complete outer brain
+   * 6. Assert final status is COMPLETE
+   */
+  async innerBrainCompleteDoesNotAffectOuterStatus(
+    fetch: Fetch,
+    outerBrainIdentifier: string,
+    webhookSlug: string,
+    webhookPayload: Record<string, any>
+  ): Promise<boolean> {
+    try {
+      // Step 1: Start the outer brain
+      const runRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: outerBrainIdentifier }),
+      });
+
+      const runResponse = await fetch(runRequest);
+      if (runResponse.status !== 201) {
+        console.error(
+          `POST /brains/runs returned ${runResponse.status}, expected 201`
+        );
+        return false;
+      }
+
+      const { brainRunId } = (await runResponse.json()) as {
+        brainRunId: string;
+      };
+
+      // Step 2: Watch SSE until WEBHOOK event from outer brain (after inner completes)
+      const watchRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/watch`,
+        { method: 'GET' }
+      );
+
+      const watchResponse = await fetch(watchRequest);
+      if (!watchResponse.ok) {
+        console.error(
+          `GET /brains/runs/${brainRunId}/watch returned ${watchResponse.status}`
+        );
+        return false;
+      }
+
+      let foundOuterWebhook = false;
+      let innerCompleteCount = 0;
+      if (watchResponse.body) {
+        const reader = watchResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (!foundOuterWebhook) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eventEndIndex;
+            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+              const message = buffer.substring(0, eventEndIndex);
+              buffer = buffer.substring(eventEndIndex + 2);
+
+              if (message.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(message.substring(6));
+
+                  // Track inner brain completes
+                  if (event.type === BRAIN_EVENTS.COMPLETE) {
+                    innerCompleteCount++;
+                    // First complete is inner brain, second would be outer
+                  }
+
+                  // Outer brain webhook (happens after inner brain completes)
+                  if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                    foundOuterWebhook = true;
+                    break;
+                  }
+
+                  if (event.type === BRAIN_EVENTS.ERROR) {
+                    console.error(
+                      `Brain errored: ${JSON.stringify(event.error)}`
+                    );
+                    return false;
+                  }
+                } catch {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        } finally {
+          await reader.cancel();
+        }
+      }
+
+      if (!foundOuterWebhook) {
+        console.error('Did not receive outer brain WEBHOOK event');
+        return false;
+      }
+
+      if (innerCompleteCount === 0) {
+        console.error('Inner brain did not emit COMPLETE event');
+        return false;
+      }
+
+      // Step 3: Query history - status should be RUNNING, not COMPLETE
+      const historyRequest = new Request(
+        `http://example.com/brains/${encodeURIComponent(outerBrainIdentifier)}/history?limit=1`,
+        { method: 'GET' }
+      );
+
+      const historyResponse = await fetch(historyRequest);
+      if (!historyResponse.ok) {
+        console.error(
+          `GET /brains/${outerBrainIdentifier}/history returned ${historyResponse.status}`
+        );
+        return false;
+      }
+
+      const historyData = (await historyResponse.json()) as {
+        runs: Array<{ brainRunId: string; status: string }>;
+      };
+
+      const ourRun = historyData.runs.find((r) => r.brainRunId === brainRunId);
+      if (!ourRun) {
+        console.error(`Run ${brainRunId} not found in history`);
+        return false;
+      }
+
+      // KEY ASSERTION: Status should be RUNNING despite inner brain COMPLETE event
+      if (ourRun.status !== STATUS.RUNNING) {
+        console.error(
+          `Expected status '${STATUS.RUNNING}' but got '${ourRun.status}'. ` +
+            `Bug: Inner brain COMPLETE event overwrote outer brain status!`
+        );
+        return false;
+      }
+
+      // Step 4: Trigger webhook to complete outer brain
+      const webhookRequest = new Request(
+        `http://example.com/webhooks/${encodeURIComponent(webhookSlug)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+        }
+      );
+
+      const webhookResponse = await fetch(webhookRequest);
+      if (!webhookResponse.ok) {
+        console.error(
+          `POST /webhooks/${webhookSlug} returned ${webhookResponse.status}`
+        );
+        return false;
+      }
+
+      // Step 5: Watch for final completion
+      const resumeWatchRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/watch`,
+        { method: 'GET' }
+      );
+
+      const resumeWatchResponse = await fetch(resumeWatchRequest);
+      if (!resumeWatchResponse.ok) {
+        console.error(
+          `Resume watch returned ${resumeWatchResponse.status}`
+        );
+        return false;
+      }
+
+      // Wait for the OUTER brain's COMPLETE event specifically (by tracking depth)
+      // When resuming, the SSE stream includes historical events, so we need to
+      // track START/COMPLETE events to know when the outer brain truly finishes
+      let foundFinalComplete = false;
+      let depth = 0;
+      if (resumeWatchResponse.body) {
+        const reader = resumeWatchResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (!foundFinalComplete) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eventEndIndex;
+            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+              const message = buffer.substring(0, eventEndIndex);
+              buffer = buffer.substring(eventEndIndex + 2);
+
+              if (message.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(message.substring(6));
+
+                  // Track depth to find the outer brain's COMPLETE
+                  if (event.type === BRAIN_EVENTS.START) {
+                    depth++;
+                  } else if (event.type === BRAIN_EVENTS.COMPLETE) {
+                    depth--;
+                    // When depth reaches 0, the outer brain has completed
+                    if (depth <= 0) {
+                      foundFinalComplete = true;
+                      break;
+                    }
+                  }
+                } catch {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        } finally {
+          await reader.cancel();
+        }
+      }
+
+      // Step 6: Verify final status is COMPLETE
+      const finalHistoryResponse = await fetch(historyRequest);
+      if (!finalHistoryResponse.ok) {
+        console.error('Final history query failed');
+        return false;
+      }
+
+      const finalHistoryData = (await finalHistoryResponse.json()) as {
+        runs: Array<{ brainRunId: string; status: string }>;
+      };
+
+      const finalRun = finalHistoryData.runs.find(
+        (r) => r.brainRunId === brainRunId
+      );
+      if (!finalRun || finalRun.status !== STATUS.COMPLETE) {
+        console.error(
+          `Expected final status '${STATUS.COMPLETE}' but got '${finalRun?.status}'`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test inner brain complete status for ${outerBrainIdentifier}:`,
+        error
+      );
+      return false;
+    }
+  },
 };
 
 export const schedules = {
