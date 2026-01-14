@@ -139,6 +139,32 @@ const outerInnerWebhookBrain = brain({
     done: true,
   }));
 
+// Simple inner brain that completes immediately - for testing status reporting
+const simpleInnerBrain = brain<{}, { innerDone: boolean }>({
+  title: 'simple-inner-brain',
+  description: 'Inner brain that completes immediately',
+})
+  .step('Inner work', () => ({ innerDone: true }));
+
+// Outer brain with webhook AFTER inner brain - for testing that inner brain COMPLETE
+// does not prematurely mark the outer brain as complete
+const outerWebhookAfterInner = brain({
+  title: 'outer-webhook-after-inner',
+  description: 'Outer brain with webhook after inner brain completes',
+})
+  .step('Outer step 1', () => ({ started: true }))
+  .brain(
+    'Run inner brain',
+    simpleInnerBrain,
+    ({ state, brainState }) => ({ ...state, innerResult: brainState }),
+    () => ({})
+  )
+  .step('Wait for webhook', ({ state }) => ({
+    state: { ...state, waitingForWebhook: true },
+    waitFor: [testWebhook('outer-status-test')],
+  }))
+  .step('After webhook', ({ state }) => ({ ...state, complete: true }));
+
 // Brain that uses the pages service
 const pagesBrain = brain({ title: 'pages-brain', description: 'A brain that creates and manages pages' })
   .step('Create page', async ({ state, pages }) => {
@@ -322,6 +348,11 @@ const brainManifest = {
     filename: 'inner-webhook-brain',
     path: 'brains/inner-webhook-brain.ts',
     brain: outerInnerWebhookBrain,
+  },
+  'outer-webhook-after-inner': {
+    filename: 'outer-webhook-after-inner',
+    path: 'brains/outer-webhook-after-inner.ts',
+    brain: outerWebhookAfterInner,
   },
 };
 

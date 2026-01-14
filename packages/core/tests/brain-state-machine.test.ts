@@ -1,8 +1,6 @@
 import {
   createBrainExecutionMachine,
   sendEvent,
-  BRAIN_ACTIONS,
-  sendAction,
 } from '../src/dsl/brain-state-machine.js';
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 

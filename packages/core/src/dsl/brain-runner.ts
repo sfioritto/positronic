@@ -1,7 +1,7 @@
 import { BRAIN_EVENTS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import { reconstructLoopContext } from './loop-messages.js';
-import { createBrainExecutionMachine, sendEvent, sendAction, BRAIN_ACTIONS } from './brain-state-machine.js';
+import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
 import type { State, JsonObject, RuntimeEnv } from './types.js';
@@ -131,7 +131,7 @@ export class BrainRunner {
         // Check if we've been cancelled
         if (signal?.aborted) {
           // Use state machine to create cancelled event
-          sendAction(machine, BRAIN_ACTIONS.CANCEL_BRAIN, {});
+          sendEvent(machine, { type: BRAIN_EVENTS.CANCELLED });
           const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
           await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
           // Cast is safe: state started as TState and patches maintain the structure
@@ -164,7 +164,7 @@ export class BrainRunner {
     } catch (error) {
       // If aborted while awaiting, check signal and emit cancelled event
       if (signal?.aborted) {
-        sendAction(machine, BRAIN_ACTIONS.CANCEL_BRAIN, {});
+        sendEvent(machine, { type: BRAIN_EVENTS.CANCELLED });
         const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
         await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
         // Cast is safe: state started as TState and patches maintain the structure
