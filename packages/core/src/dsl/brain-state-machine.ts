@@ -127,6 +127,8 @@ export interface StepRetryPayload {
 export interface CreateMachineOptions {
   initialState?: JsonObject;
   options?: JsonObject;
+  /** Events to replay through the machine to restore state */
+  events?: Array<{ type: string } & Record<string, unknown>>;
 }
 
 const createInitialContext = (opts?: CreateMachineOptions): BrainExecutionContext => ({
@@ -701,62 +703,29 @@ export interface BrainStateMachine {
   send: (event: { type: string; [key: string]: unknown }) => void;
 }
 
-/**
- * Create a new brain execution state machine.
- */
-export function createBrainExecutionMachine(options?: CreateMachineOptions): BrainStateMachine {
-  const initialContext = createInitialContext(options);
-  const machine = createBrainMachine(initialContext);
-  return interpret(machine, () => {});
-}
-
-/**
- * Send a transition action to the machine.
- * After calling this, read machine.context.currentEvent to get the event to yield.
- */
-export function sendAction(
-  machine: BrainStateMachine,
-  action: string,
-  payload?: object
-): void {
-  machine.send({ type: action, ...payload });
-}
-
-/**
- * Feed an incoming event into the machine to update state (observer mode).
- * Maps brain event types to machine actions.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function sendEvent(machine: BrainStateMachine, event: { type: string } & Record<string, any>): void {
-  const eventToAction: Record<string, string> = {
-    [BRAIN_EVENTS.START]: ACTIONS.START_BRAIN,
-    [BRAIN_EVENTS.RESTART]: ACTIONS.RESTART_BRAIN,
-    [BRAIN_EVENTS.COMPLETE]: ACTIONS.COMPLETE_BRAIN,
-    [BRAIN_EVENTS.ERROR]: ACTIONS.ERROR_BRAIN,
-    [BRAIN_EVENTS.CANCELLED]: ACTIONS.CANCEL_BRAIN,
-    [BRAIN_EVENTS.WEBHOOK]: ACTIONS.WEBHOOK,
-    [BRAIN_EVENTS.WEBHOOK_RESPONSE]: ACTIONS.WEBHOOK_RESPONSE,
-    [BRAIN_EVENTS.STEP_START]: ACTIONS.START_STEP,
-    [BRAIN_EVENTS.STEP_COMPLETE]: ACTIONS.COMPLETE_STEP,
-    [BRAIN_EVENTS.STEP_STATUS]: ACTIONS.STEP_STATUS,
-    [BRAIN_EVENTS.STEP_RETRY]: ACTIONS.STEP_RETRY,
-    [BRAIN_EVENTS.LOOP_START]: ACTIONS.LOOP_START,
-    [BRAIN_EVENTS.LOOP_ITERATION]: ACTIONS.LOOP_ITERATION,
-    [BRAIN_EVENTS.LOOP_TOOL_CALL]: ACTIONS.LOOP_TOOL_CALL,
-    [BRAIN_EVENTS.LOOP_TOOL_RESULT]: ACTIONS.LOOP_TOOL_RESULT,
-    [BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE]: ACTIONS.LOOP_ASSISTANT_MESSAGE,
-    [BRAIN_EVENTS.LOOP_COMPLETE]: ACTIONS.LOOP_COMPLETE,
-    [BRAIN_EVENTS.LOOP_TOKEN_LIMIT]: ACTIONS.LOOP_TOKEN_LIMIT,
-    [BRAIN_EVENTS.LOOP_WEBHOOK]: ACTIONS.LOOP_WEBHOOK,
-    [BRAIN_EVENTS.HEARTBEAT]: ACTIONS.HEARTBEAT,
-  };
-
-  const action = eventToAction[event.type];
-  if (action) {
-    const payload = extractPayloadFromEvent(event);
-    machine.send({ type: action, ...payload });
-  }
-}
+// Event type to action mapping
+const EVENT_TO_ACTION: Record<string, string> = {
+  [BRAIN_EVENTS.START]: ACTIONS.START_BRAIN,
+  [BRAIN_EVENTS.RESTART]: ACTIONS.RESTART_BRAIN,
+  [BRAIN_EVENTS.COMPLETE]: ACTIONS.COMPLETE_BRAIN,
+  [BRAIN_EVENTS.ERROR]: ACTIONS.ERROR_BRAIN,
+  [BRAIN_EVENTS.CANCELLED]: ACTIONS.CANCEL_BRAIN,
+  [BRAIN_EVENTS.WEBHOOK]: ACTIONS.WEBHOOK,
+  [BRAIN_EVENTS.WEBHOOK_RESPONSE]: ACTIONS.WEBHOOK_RESPONSE,
+  [BRAIN_EVENTS.STEP_START]: ACTIONS.START_STEP,
+  [BRAIN_EVENTS.STEP_COMPLETE]: ACTIONS.COMPLETE_STEP,
+  [BRAIN_EVENTS.STEP_STATUS]: ACTIONS.STEP_STATUS,
+  [BRAIN_EVENTS.STEP_RETRY]: ACTIONS.STEP_RETRY,
+  [BRAIN_EVENTS.LOOP_START]: ACTIONS.LOOP_START,
+  [BRAIN_EVENTS.LOOP_ITERATION]: ACTIONS.LOOP_ITERATION,
+  [BRAIN_EVENTS.LOOP_TOOL_CALL]: ACTIONS.LOOP_TOOL_CALL,
+  [BRAIN_EVENTS.LOOP_TOOL_RESULT]: ACTIONS.LOOP_TOOL_RESULT,
+  [BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE]: ACTIONS.LOOP_ASSISTANT_MESSAGE,
+  [BRAIN_EVENTS.LOOP_COMPLETE]: ACTIONS.LOOP_COMPLETE,
+  [BRAIN_EVENTS.LOOP_TOKEN_LIMIT]: ACTIONS.LOOP_TOKEN_LIMIT,
+  [BRAIN_EVENTS.LOOP_WEBHOOK]: ACTIONS.LOOP_WEBHOOK,
+  [BRAIN_EVENTS.HEARTBEAT]: ACTIONS.HEARTBEAT,
+};
 
 /**
  * Extract relevant payload fields from a brain event for the state machine.
@@ -812,6 +781,58 @@ function extractPayloadFromEvent(event: { type: string } & Record<string, any>):
       const { type, ...rest } = event;
       return rest;
   }
+}
+
+/**
+ * Replay a single event into the machine.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function replayEventToMachine(machine: BrainStateMachine, event: { type: string } & Record<string, any>): void {
+  const action = EVENT_TO_ACTION[event.type];
+  if (action) {
+    const payload = extractPayloadFromEvent(event);
+    machine.send({ type: action, ...payload });
+  }
+}
+
+/**
+ * Create a new brain execution state machine.
+ * Optionally replay events to restore state from history.
+ */
+export function createBrainExecutionMachine(options?: CreateMachineOptions): BrainStateMachine {
+  const initialContext = createInitialContext(options);
+  const machine = createBrainMachine(initialContext);
+  const service = interpret(machine, () => {});
+
+  // Replay events if provided
+  if (options?.events) {
+    for (const event of options.events) {
+      replayEventToMachine(service, event);
+    }
+  }
+
+  return service;
+}
+
+/**
+ * Send a transition action to the machine.
+ * After calling this, read machine.context.currentEvent to get the event to yield.
+ */
+export function sendAction(
+  machine: BrainStateMachine,
+  action: string,
+  payload?: object
+): void {
+  machine.send({ type: action, ...payload });
+}
+
+/**
+ * Feed an incoming event into the machine to update state (observer mode).
+ * Maps brain event types to machine actions.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function sendEvent(machine: BrainStateMachine, event: { type: string } & Record<string, any>): void {
+  replayEventToMachine(machine, event);
 }
 
 // ============================================================================
