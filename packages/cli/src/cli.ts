@@ -396,7 +396,7 @@ export function buildCli(options: CliOptions) {
 
   // --- Run Brain Command ---
   cli = cli.command(
-    'run <brain>',
+    ['run <brain>', 'r <brain>'],
     'Run a brain and optionally watch its execution\n',
     (yargsRun) => {
       return yargsRun
