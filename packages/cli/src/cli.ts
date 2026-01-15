@@ -438,42 +438,27 @@ export function buildCli(options: CliOptions) {
 
   // --- Watch Brain Run Command ---
   cli = cli.command(
-    'watch [brain]',
-    'Watch a brain run: latest by brain name (default) or specific by ID\n',
+    'watch <identifier>',
+    'Watch a brain run by brain name or run ID\n',
     (yargsWatch) => {
       return yargsWatch
-        .positional('brain', {
-          describe: 'Brain identifier to watch (watches the most recent active run)',
+        .positional('identifier', {
+          describe: 'Brain name or run ID to watch',
           type: 'string',
-        })
-        .option('run-id', {
-          describe: 'ID of the specific brain run to watch',
-          type: 'string',
-          alias: 'id',
-        })
-        .conflicts('brain', 'run-id')
-        .check((argv) => {
-          if (!argv.brain && !argv.runId) {
-            throw new Error(
-              'You must provide either a brain identifier or a --run-id.'
-            );
-          }
-          return true;
+          demandOption: true,
         })
         .example(
           '$0 watch my-brain',
           "Watch the latest run of the brain named 'my-brain'"
         )
         .example(
-          '$0 watch --run-id abc123def',
+          '$0 watch abc123def',
           'Watch a specific brain run by its ID'
         );
     },
-    async (argv) => {
-      const element = await brainCommand.watch(argv);
-      if (element) {
-        render(element);
-      }
+    (argv) => {
+      const element = brainCommand.watch(argv);
+      render(element);
     }
   );
 
@@ -651,42 +636,27 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'watch [brain]',
-        'Watch a brain run: latest by brain name (default) or specific by ID\n',
+        'watch <identifier>',
+        'Watch a brain run by brain name or run ID\n',
         (yargsWatch) => {
           return yargsWatch
-            .positional('brain', {
-              describe: 'Brain identifier to watch (watches the most recent active run)',
+            .positional('identifier', {
+              describe: 'Brain name or run ID to watch',
               type: 'string',
-            })
-            .option('run-id', {
-              describe: 'ID of the specific brain run to watch',
-              type: 'string',
-              alias: 'id',
-            })
-            .conflicts('brain', 'run-id')
-            .check((argv) => {
-              if (!argv.brain && !argv.runId) {
-                throw new Error(
-                  'You must provide either a brain identifier or a --run-id.'
-                );
-              }
-              return true;
+              demandOption: true,
             })
             .example(
               '$0 brain watch my-brain',
               "Watch the latest run of the brain named 'my-brain'"
             )
             .example(
-              '$0 brain watch --run-id abc123def',
+              '$0 brain watch abc123def',
               'Watch a specific brain run by its ID'
             );
         },
-        async (argv) => {
-          const element = await brainCommand.watch(argv);
-          if (element) {
-            render(element);
-          }
+        (argv) => {
+          const element = brainCommand.watch(argv);
+          render(element);
         }
       )
       .command(
