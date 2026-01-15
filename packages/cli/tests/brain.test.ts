@@ -293,21 +293,37 @@ describe('CLI Integration: positronic brain commands', () => {
   });
 
   describe('brain watch command', () => {
-    it('should watch a brain run by run ID', async () => {
+    it('should watch by brain name when brain exists and has active run', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      // Add brain to mock server for fuzzy search resolution
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
+      // Add a running brain run
+      server.addBrainRun({
+        brainRunId: 'run-active-123',
+        brainTitle: 'test-brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now() - 60000,
+        startedAt: Date.now() - 60000,
+      });
+
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px([
-          'watch',
-          '--run-id',
-          'test-run-123',
-        ]);
-        const isOutputRendered = await waitForOutput(
-          /Connecting to watch service|Brain: test-brain/
-        );
+        const { waitForOutput, instance } = await px(['watch', 'test-brain']);
+        // Should connect to watch - wait for SSE step data
+        const isOutputRendered = await waitForOutput(/Test Step 1/);
         expect(isOutputRendered).toBe(true);
-        
+
         // Unmount the component to trigger EventSource cleanup
         instance.unmount();
       } finally {
@@ -315,19 +331,68 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
-    it('should watch a brain run by run ID using short flag', async () => {
+    it('should fall back to run ID when brain name not found', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      // Add a brain run but no brain definition
+      server.addBrainRun({
+        brainRunId: 'run-direct-456',
+        brainTitle: 'some-brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now() - 60000,
+        startedAt: Date.now() - 60000,
+      });
+
+      const px = await env.start();
+
+      try {
+        // Use a run ID that exists - should fall back to run lookup
+        const { waitForOutput, instance } = await px(['watch', 'run-direct-456']);
+
+        // Should connect to watch - wait for SSE step data
+        const isOutputRendered = await waitForOutput(/Test Step 1/);
+        expect(isOutputRendered).toBe(true);
+
+        // Verify brain search was attempted first
+        const calls = server.getLogs();
+        const brainSearchCall = calls.find(c => c.method === 'getBrains');
+        expect(brainSearchCall).toBeDefined();
+
+        // Verify run lookup was made (fallback)
+        const runLookupCall = calls.find(c => c.method === 'getRun');
+        expect(runLookupCall).toBeDefined();
+        expect(runLookupCall?.args[0]).toBe('run-direct-456');
+
+        // Unmount the component to trigger EventSource cleanup
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show error when neither brain nor run ID found', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', '--id', 'test-run-456']);
-        const isOutputRendered = await waitForOutput(
-          /Connecting to watch service|Brain: test-brain/
-        );
-        expect(isOutputRendered).toBe(true);
-        
-        // Unmount the component to trigger EventSource cleanup
-        instance.unmount();
+        const { waitForOutput } = await px(['watch', 'nonexistent-thing']);
+
+        // Should show "not found" error
+        const foundTitle = await waitForOutput(/Not Found/i, 30);
+        expect(foundTitle).toBe(true);
+
+        const foundMessage = await waitForOutput(/No brain or run found matching 'nonexistent-thing'/i, 30);
+        expect(foundMessage).toBe(true);
+
+        // Verify both lookups were attempted
+        const calls = env.server.getLogs();
+        const brainSearchCall = calls.find(c => c.method === 'getBrains');
+        expect(brainSearchCall).toBeDefined();
+
+        const runLookupCall = calls.find(c => c.method === 'getRun');
+        expect(runLookupCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
       }
@@ -459,7 +524,7 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundMessage = await waitForOutput(/Found 2 active runs for brain "test-brain"/i, 30);
         expect(foundMessage).toBe(true);
         
-        const foundDetails = await waitForOutput(/positronic watch --run-id run-active-/i, 30);
+        const foundDetails = await waitForOutput(/positronic watch run-active-/i, 30);
         expect(foundDetails).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -535,14 +600,14 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
-    it('should show error when no run ID or brain name provided', async () => {
+    it('should show error when no identifier provided', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
-        // This will throw an error during yargs validation
+        // This will throw an error during yargs validation - identifier is required
         await expect(px(['watch'])).rejects.toThrow(
-          'You must provide either a brain identifier or a --run-id'
+          'Not enough non-option arguments: got 0, need at least 1'
         );
       } finally {
         await env.stopAndCleanup();
@@ -552,12 +617,23 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should display step statuses correctly', async () => {
       const env = await createTestEnv();
+      const { server } = env;
+
+      // Add a brain run for the test-multi-status run ID
+      server.addBrainRun({
+        brainRunId: 'test-multi-status',
+        brainTitle: 'Multi Status Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now() - 60000,
+        startedAt: Date.now() - 60000,
+      });
+
       const px = await env.start();
 
       try {
         const { waitForOutput, instance } = await px([
           'watch',
-          '--run-id',
           'test-multi-status',
         ]);
 
@@ -1019,7 +1095,7 @@ describe('CLI Integration: positronic brain commands', () => {
         expect(foundDescription).toBe(true);
 
         // Check for watch command suggestion
-        const foundWatchSuggestion = await waitForOutput(/Watch the run with: positronic watch --run-id/i, 30);
+        const foundWatchSuggestion = await waitForOutput(/Watch the run with: positronic watch rerun-/i, 30);
         expect(foundWatchSuggestion).toBe(true);
 
         // Verify API call
