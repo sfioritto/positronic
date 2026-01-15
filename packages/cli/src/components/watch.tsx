@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout } from 'ink';
 import { EventSource } from 'eventsource';
-import type { BrainEvent, BrainErrorEvent, BrainStateMachine } from '@positronic/core';
-import {
-  BRAIN_EVENTS,
-  STATUS,
-  createBrainExecutionMachine,
-  sendEvent,
-} from '@positronic/core';
+import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
+import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
+import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
 
@@ -181,11 +177,19 @@ export const Watch = ({ runId }: WatchProps) => {
   const { write } = useStdout();
 
   // Use state machine to track brain execution state
-  const machineRef = useRef<BrainStateMachine>(createBrainExecutionMachine());
+  // Machine is recreated when runId changes, giving us fresh context
+  const [current, send] = useBrainMachine(runId);
 
-  // React state extracted from machine context - updated on each event
-  const [rootBrain, setRootBrain] = useState<RunningBrain | null>(null);
-  const [isComplete, setIsComplete] = useState(false);
+  // Keep a ref to the latest send function to avoid stale closure issues
+  // When runId changes, useMachine updates send asynchronously, but our EventSource
+  // effect runs immediately. Using a ref ensures we always call the current send.
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+
+  // Read brain state directly from machine context - useMachine handles re-renders
+  const { rootBrain, isComplete } = current.context;
 
   // Additional state for connection and errors (not part of the brain state machine)
   const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
@@ -213,13 +217,11 @@ export const Watch = ({ runId }: WatchProps) => {
     const url = `${baseUrl}/brains/runs/${runId}/watch`;
     const es = new EventSource(url);
 
-    // Reset state machine for new connection
-    machineRef.current = createBrainExecutionMachine();
+    // Reset connection state for new connection
+    // Note: rootBrain and isComplete are handled by the new machine (via useMemo)
     setIsConnected(false);
     setConnectionError(null);
-    setRootBrain(null);
     setBrainError(undefined);
-    setIsComplete(false);
 
     es.onopen = () => {
       setIsConnected(true);
@@ -229,23 +231,12 @@ export const Watch = ({ runId }: WatchProps) => {
     es.onmessage = (event: MessageEvent) => {
       try {
         const eventData = JSON.parse(event.data) as BrainEvent;
-        const machine = machineRef.current;
 
-        // Feed event to state machine - it handles all the state tracking
-        sendEvent(machine, eventData);
+        // Send event to state machine - useMachine handles re-renders automatically
+        // Use ref to ensure we always call the latest send function
+        sendRef.current(eventData);
 
-        // Update React state from machine context to trigger re-render
-        const { rootBrain: newRootBrain, isComplete: newIsComplete } = machine.context;
-        if (newRootBrain) {
-          setRootBrain(newRootBrain);
-        }
-
-        // Check for completion (outer brain)
-        if (newIsComplete) {
-          setIsComplete(true);
-        }
-
-        // Check for error (capture the error event for display)
+        // Capture error event for display (error state is separate from machine)
         if (eventData.type === BRAIN_EVENTS.ERROR) {
           setBrainError(eventData as BrainErrorEvent);
         }

@@ -69,7 +69,7 @@ export { reconstructLoopContext } from './dsl/loop-messages.js';
 // Brain state machine
 export {
   createBrainExecutionMachine,
-  createBrainMachineForReact,
+  createBrainMachine,
   sendEvent,
   getDepth,
   isTopLevel,

@@ -517,11 +517,14 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
   const completedBrain = getDeepestBrain(rootBrain);
   if (!completedBrain) return ctx;
 
-  // Remove deepest brain from tree and attach its steps to parent step
-  const newRootBrain = cloneTreeRemovingDeepest(rootBrain);
-
   const newDepth = depth - 1;
-  const isNowComplete = newDepth === 0;
+  const isOuterBrainComplete = newDepth === 0;
+
+  // When the outer brain completes, keep rootBrain so we can still display
+  // the final state. Only remove inner brains (attaching their steps to parent).
+  const newRootBrain = isOuterBrainComplete
+    ? rootBrain
+    : cloneTreeRemovingDeepest(rootBrain);
 
   const newCtx: BrainExecutionContext = {
     ...ctx,
@@ -538,7 +541,7 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
     },
   };
 
-  return updateDerivedState(newCtx, isNowComplete ? 'complete' : 'running');
+  return updateDerivedState(newCtx, isOuterBrainComplete ? 'complete' : 'running');
 });
 
 const errorBrain = reduce<BrainExecutionContext, ErrorPayload>(
@@ -807,8 +810,8 @@ const isInnerBrain = guard<BrainExecutionContext, object>(
 // State Machine Definition
 // ============================================================================
 
-// Create machine factory - needs to be called with initial context
-const createBrainMachine = (initialContext: BrainExecutionContext) =>
+// Internal machine factory - called with pre-built context
+const makeBrainMachine = (initialContext: BrainExecutionContext) =>
   createMachine(
     'idle',
     {
@@ -949,7 +952,7 @@ export function createBrainExecutionMachine(
   options?: CreateMachineOptions
 ): BrainStateMachine {
   const initialContext = createInitialContext(options);
-  const machine = createBrainMachine(initialContext);
+  const machine = makeBrainMachine(initialContext);
   const service = interpret(machine, () => {});
 
   // Replay events if provided - just send each event directly to the machine
@@ -963,12 +966,12 @@ export function createBrainExecutionMachine(
 }
 
 /**
- * Create a raw brain execution machine for use with react-robot's useMachine hook.
- * This returns the uninterpreted machine definition, not a service.
+ * Create an uninterpreted brain execution machine.
+ * Use with robot3's interpret() or react-robot's useMachine() hook.
  */
-export function createBrainMachineForReact(options?: CreateMachineOptions) {
+export function createBrainMachine(options?: CreateMachineOptions) {
   const initialContext = createInitialContext(options);
-  return createBrainMachine(initialContext);
+  return makeBrainMachine(initialContext);
 }
 
 /**
