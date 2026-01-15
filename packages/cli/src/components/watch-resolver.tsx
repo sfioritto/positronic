@@ -1,11 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import * as robot3 from 'robot3';
+import { createMachine, state, transition, reduce, invoke, immediate, guard } from 'robot3';
+import { useMachine } from 'react-robot';
 import { Watch } from './watch.js';
 import { ErrorComponent } from './error.js';
 import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
-
-const { createMachine, state, transition, reduce, invoke, immediate, guard, interpret } = robot3;
 
 // Types
 interface Brain {
@@ -185,6 +184,20 @@ const setBrainTitleFromSelection = reduce(
   (ctx: ResolverContext, ev: { brainTitle: string }) => ({ ...ctx, resolvedBrainTitle: ev.brainTitle })
 );
 
+const moveSelectionUp = reduce(
+  (ctx: ResolverContext) => ({
+    ...ctx,
+    selectedIndex: (ctx.selectedIndex - 1 + ctx.brains.length) % ctx.brains.length,
+  })
+);
+
+const moveSelectionDown = reduce(
+  (ctx: ResolverContext) => ({
+    ...ctx,
+    selectedIndex: (ctx.selectedIndex + 1) % ctx.brains.length,
+  })
+);
+
 // Guards for routing
 const brainFoundGuard = guard<ResolverContext, object>(
   (ctx) => ctx.brainSearchResult?.count === 1
@@ -238,7 +251,9 @@ const createResolverMachine = (identifier: string) =>
 
       // User selects from multiple matching brains
       disambiguating: state(
-        transition('BRAIN_SELECTED', 'fetchingActiveRuns', setBrainTitleFromSelection)
+        transition('UP', 'disambiguating', moveSelectionUp),
+        transition('DOWN', 'disambiguating', moveSelectionDown) as any,
+        transition('BRAIN_SELECTED', 'fetchingActiveRuns', setBrainTitleFromSelection) as any
       ),
 
       // Invoke state: fetch active runs for the brain
@@ -289,21 +304,11 @@ interface WatchResolverProps {
  * 3. If neither works, show an error
  */
 export const WatchResolver = ({ identifier }: WatchResolverProps) => {
-  const [, forceUpdate] = useState({});
   const { exit } = useApp();
+  const machine = useMemo(() => createResolverMachine(identifier), [identifier]);
+  const [current, send] = useMachine(machine);
 
-  // Initialize service lazily - use any to avoid complex robot3 type issues
-  const serviceRef = useRef<any>(null);
-
-  if (!serviceRef.current) {
-    serviceRef.current = interpret(createResolverMachine(identifier), () => {
-      // Schedule update for next tick to avoid updates during render
-      Promise.resolve().then(() => forceUpdate({}));
-    });
-  }
-
-  const { machine, context, send } = serviceRef.current;
-  const currentState = machine.current;
+  const currentState = current.name;
   const {
     brains,
     selectedIndex,
@@ -311,18 +316,16 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
     resolvedRunId,
     activeRuns,
     error,
-  } = context as ResolverContext;
+  } = current.context as ResolverContext;
 
   // Handle keyboard input for brain disambiguation
   useInput((input, key) => {
     if (currentState !== 'disambiguating') return;
 
     if (key.upArrow) {
-      (context as ResolverContext).selectedIndex = (selectedIndex - 1 + brains.length) % brains.length;
-      forceUpdate({});
+      send('UP');
     } else if (key.downArrow) {
-      (context as ResolverContext).selectedIndex = (selectedIndex + 1) % brains.length;
-      forceUpdate({});
+      send('DOWN');
     } else if (key.return) {
       const { title } = brains[selectedIndex];
       send({ type: 'BRAIN_SELECTED', brainTitle: title });
