@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout } from 'ink';
 import { EventSource } from 'eventsource';
-import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
+import type { BrainEvent, BrainErrorEvent, BrainStateMachine } from '@positronic/core';
 import {
   BRAIN_EVENTS,
   STATUS,
   createBrainExecutionMachine,
   sendEvent,
 } from '@positronic/core';
-import type { BrainStateMachine, BrainStackEntry, StepInfo } from '@positronic/core';
+import type { RunningBrain, StepInfo } from '@positronic/core';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
 
@@ -132,26 +132,16 @@ const StepWindow = ({ steps, indent = 0 }: StepWindowProps) => {
 
 // Brain section component - header + step window + progress bar
 interface BrainSectionProps {
-  brain: BrainStackEntry;
+  brain: RunningBrain;
   isInner?: boolean;
-  brainStack: BrainStackEntry[];
 }
 
-const BrainSection = ({ brain, isInner = false, brainStack }: BrainSectionProps) => {
+const BrainSection = ({ brain, isInner = false }: BrainSectionProps) => {
   const indent = isInner ? 2 : 0;
   const completed = getCompletedCount(brain.steps);
   const total = brain.steps.length;
 
-  // Find the currently running step to check for inner brain
-  const currentIndex = getCurrentStepIndex(brain.steps);
-  const currentStep = brain.steps[currentIndex];
-
-  // Find any inner brain associated with the current step (active inner brains are on the stack)
-  // Must exclude the current brain to prevent infinite recursion when a restarted brain
-  // has parentStepId matching its own step IDs
-  const innerBrain = currentStep
-    ? brainStack.find((b) => b.parentStepId === currentStep.id && b !== brain)
-    : null;
+  const { innerBrain } = brain;
 
   return (
     <Box flexDirection="column" marginLeft={indent}>
@@ -176,7 +166,7 @@ const BrainSection = ({ brain, isInner = false, brainStack }: BrainSectionProps)
       {/* Inner brain section (if running) */}
       {innerBrain && (
         <Box marginTop={1}>
-          <BrainSection brain={innerBrain} isInner={true} brainStack={brainStack} />
+          <BrainSection brain={innerBrain} isInner={true} />
         </Box>
       )}
     </Box>
@@ -192,12 +182,15 @@ export const Watch = ({ runId }: WatchProps) => {
 
   // Use state machine to track brain execution state
   const machineRef = useRef<BrainStateMachine>(createBrainExecutionMachine());
-  // Store brain stack in state to trigger re-renders when it changes
-  const [brainStack, setBrainStack] = useState<BrainStackEntry[]>([]);
+
+  // React state extracted from machine context - updated on each event
+  const [rootBrain, setRootBrain] = useState<RunningBrain | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+
+  // Additional state for connection and errors (not part of the brain state machine)
   const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
-  const [error, setError] = useState<Error | null>(null);
+  const [connectionError, setConnectionError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
   // Enter alternate screen buffer on mount, exit on unmount
   // Skip in test environment to avoid interfering with test output capture
@@ -223,14 +216,14 @@ export const Watch = ({ runId }: WatchProps) => {
     // Reset state machine for new connection
     machineRef.current = createBrainExecutionMachine();
     setIsConnected(false);
-    setError(null);
-    setBrainStack([]);
+    setConnectionError(null);
+    setRootBrain(null);
     setBrainError(undefined);
-    setIsCompleted(false);
+    setIsComplete(false);
 
     es.onopen = () => {
       setIsConnected(true);
-      setError(null);
+      setConnectionError(null);
     };
 
     es.onmessage = (event: MessageEvent) => {
@@ -242,31 +235,22 @@ export const Watch = ({ runId }: WatchProps) => {
         sendEvent(machine, eventData);
 
         // Update React state from machine context to trigger re-render
-        // Deep copy brainStack to ensure React detects the change
-        // Note: Only update if brainStack has entries - preserve last known state for completed brains
-        const currentStack = machine.context.brainStack;
-        if (currentStack.length > 0) {
-          setBrainStack(currentStack.map(entry => ({
-            ...entry,
-            steps: [...entry.steps],
-          })));
+        const { rootBrain: newRootBrain, isComplete: newIsComplete } = machine.context;
+        if (newRootBrain) {
+          setRootBrain(newRootBrain);
         }
 
         // Check for completion (outer brain)
-        if (machine.context.isComplete) {
-          setIsCompleted(true);
+        if (newIsComplete) {
+          setIsComplete(true);
         }
 
         // Check for error (capture the error event for display)
         if (eventData.type === BRAIN_EVENTS.ERROR) {
-          const errorEvent = eventData as BrainErrorEvent;
-          // Only show error for the main brain (isTopLevel check)
-          if (machine.context.brainRunId === errorEvent.brainRunId) {
-            setBrainError(errorEvent);
-          }
+          setBrainError(eventData as BrainErrorEvent);
         }
       } catch (e: any) {
-        setError(new Error(`Error parsing event data: ${e.message}`));
+        setConnectionError(new Error(`Error parsing event data: ${e.message}`));
       }
     };
 
@@ -274,7 +258,7 @@ export const Watch = ({ runId }: WatchProps) => {
       const errorMessage = isApiLocalDevMode()
         ? `Connection to ${url} failed. Ensure the local development server is running ('positronic server' or 'px s').`
         : `Connection to ${url} failed. Please check your network connection and verify the project URL is correct.`;
-      setError(new Error(errorMessage));
+      setConnectionError(new Error(errorMessage));
       setIsConnected(false);
       es.close();
     };
@@ -284,42 +268,31 @@ export const Watch = ({ runId }: WatchProps) => {
     };
   }, [runId]);
 
-  // Main brain is the first entry in the stack (outer brain)
-  const mainBrain = brainStack.length > 0 ? brainStack[0] : null;
+  // Prepare error props using destructuring
+  const connectionErrorProps = connectionError
+    ? { title: 'Connection Error', message: connectionError.message, details: connectionError.stack }
+    : null;
+  const brainErrorProps = brainError
+    ? { title: brainError.error.name || 'Brain Error', ...brainError.error }
+    : null;
 
   return (
     <Box flexDirection="column">
-      {!isConnected && brainStack.length === 0 ? (
+      {!isConnected && !rootBrain ? (
         <Text>Connecting to watch service...</Text>
-      ) : !mainBrain ? (
+      ) : !rootBrain ? (
         <Text>Waiting for brain to start...</Text>
       ) : (
         <>
-          <BrainSection brain={mainBrain} brainStack={brainStack} />
+          <BrainSection brain={rootBrain} />
 
-          {isCompleted && !error && !brainError && (
+          {isComplete && !connectionError && !brainError && (
             <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
               <Text color="green">Brain completed.</Text>
             </Box>
           )}
-          {error && (
-            <ErrorComponent
-              error={{
-                title: 'Connection Error',
-                message: error.message,
-                details: error.stack,
-              }}
-            />
-          )}
-          {brainError && (
-            <ErrorComponent
-              error={{
-                title: brainError.error.name || 'Brain Error',
-                message: brainError.error.message,
-                details: brainError.error.stack,
-              }}
-            />
-          )}
+          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
       )}
     </Box>
