@@ -89,7 +89,7 @@ export const BrainRerun = ({ identifier, runId, startsAt, stopsAfter }: BrainRer
           </Text>
           <Box marginTop={1}>
             <Text dimColor>
-              Watch the run with: positronic watch --run-id {newRunId}
+              Watch the run with: positronic watch {newRunId}
             </Text>
           </Box>
         </>
