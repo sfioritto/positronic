@@ -19,6 +19,20 @@ export interface BrainStackEntry {
   steps: StepInfo[];
 }
 
+/**
+ * Represents a running brain in a nested tree structure.
+ * Each brain can have at most one inner brain running at a time.
+ */
+export interface RunningBrain {
+  brainRunId: string;
+  brainTitle: string;
+  brainDescription?: string;
+  parentStepId: string | null;
+  steps: StepInfo[];
+  innerBrain: RunningBrain | null;
+  depth: number;
+}
+
 export interface StepInfo {
   id: string;
   title: string;
@@ -47,7 +61,9 @@ export interface BrainEvent {
 }
 
 export interface BrainExecutionContext {
-  // Core tracking
+  // Core tracking - tree structure (primary)
+  rootBrain: RunningBrain | null;
+  // Flat stack (computed from tree for backwards compatibility)
   brainStack: BrainStackEntry[];
   depth: number;
   brainRunId: string | null;
@@ -127,6 +143,122 @@ export interface StepRetryPayload {
 }
 
 // ============================================================================
+// Tree Helper Functions
+// ============================================================================
+
+/**
+ * Get the deepest (currently executing) brain in the tree.
+ */
+function getDeepestBrain(root: RunningBrain | null): RunningBrain | null {
+  if (!root) return null;
+  let current = root;
+  while (current.innerBrain) {
+    current = current.innerBrain;
+  }
+  return current;
+}
+
+/**
+ * Clone tree with a new innerBrain attached to the deepest node.
+ */
+function cloneTreeWithNewInner(
+  root: RunningBrain,
+  newInner: RunningBrain
+): RunningBrain {
+  if (!root.innerBrain) {
+    return { ...root, innerBrain: newInner };
+  }
+  return {
+    ...root,
+    innerBrain: cloneTreeWithNewInner(root.innerBrain, newInner),
+  };
+}
+
+/**
+ * Clone tree replacing the deepest brain.
+ */
+function cloneTreeReplacingDeepest(
+  root: RunningBrain,
+  replacement: RunningBrain
+): RunningBrain {
+  if (!root.innerBrain) {
+    return replacement;
+  }
+  return {
+    ...root,
+    innerBrain: cloneTreeReplacingDeepest(root.innerBrain, replacement),
+  };
+}
+
+/**
+ * Clone tree updating steps on the deepest brain.
+ */
+function cloneTreeUpdatingDeepestSteps(
+  root: RunningBrain,
+  newSteps: StepInfo[]
+): RunningBrain {
+  if (!root.innerBrain) {
+    return { ...root, steps: newSteps };
+  }
+  return {
+    ...root,
+    innerBrain: cloneTreeUpdatingDeepestSteps(root.innerBrain, newSteps),
+  };
+}
+
+/**
+ * Clone tree removing the deepest brain and attaching its steps to parent step.
+ * Returns null if root is the deepest (no parent).
+ */
+function cloneTreeRemovingDeepest(root: RunningBrain): RunningBrain | null {
+  if (!root.innerBrain) {
+    // Root is the deepest - can't remove, return null
+    return null;
+  }
+
+  if (!root.innerBrain.innerBrain) {
+    // root.innerBrain is the deepest - remove it and attach steps to parent step
+    const completedBrain = root.innerBrain;
+    const updatedSteps = root.steps.map((step) => {
+      if (step.id === completedBrain.parentStepId) {
+        return {
+          ...step,
+          innerSteps: completedBrain.steps,
+          status: STATUS.COMPLETE as StepInfo['status'],
+        };
+      }
+      return step;
+    });
+    return { ...root, steps: updatedSteps, innerBrain: null };
+  }
+
+  // Recurse down
+  return {
+    ...root,
+    innerBrain: cloneTreeRemovingDeepest(root.innerBrain),
+  };
+}
+
+/**
+ * Convert tree to flat array (for backwards compatibility).
+ */
+function treeToStack(root: RunningBrain | null): BrainStackEntry[] {
+  const stack: BrainStackEntry[] = [];
+  let current = root;
+  while (current) {
+    stack.push({
+      brainRunId: current.brainRunId,
+      brainTitle: current.brainTitle,
+      brainDescription: current.brainDescription,
+      parentStepId: current.parentStepId,
+      steps: current.steps,
+    });
+    current = current.innerBrain;
+  }
+  return stack;
+}
+
+// ============================================================================
 // Context Factory
 // ============================================================================
 
@@ -140,6 +272,7 @@ export interface CreateMachineOptions {
 const createInitialContext = (
   opts?: CreateMachineOptions
 ): BrainExecutionContext => ({
+  rootBrain: null,
   brainStack: [],
   depth: 0,
   brainRunId: null,
@@ -214,25 +347,33 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
   (ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
     const {
       currentStepId,
-      brainStack,
+      rootBrain,
       depth,
       brainRunId: existingBrainRunId,
       currentState,
       options,
     } = ctx;
 
-    const newEntry: BrainStackEntry = {
+    const newDepth = depth + 1;
+    const newBrain: RunningBrain = {
       brainRunId,
       brainTitle,
       brainDescription,
       parentStepId: currentStepId,
       steps: [],
+      innerBrain: null,
+      depth: newDepth,
     };
 
-    const newDepth = depth + 1;
+    // Build tree: if no root, this is root; else attach to deepest
+    const newRootBrain = rootBrain
+      ? cloneTreeWithNewInner(rootBrain, newBrain)
+      : newBrain;
+
     const newCtx: BrainExecutionContext = {
       ...ctx,
-      brainStack: [...brainStack, newEntry],
+      rootBrain: newRootBrain,
+      brainStack: treeToStack(newRootBrain),
       depth: newDepth,
       brainRunId: existingBrainRunId ?? brainRunId,
       currentState:
@@ -256,7 +397,7 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
   (ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
     const {
       currentStepId,
-      brainStack,
+      rootBrain,
       depth,
       brainRunId: existingBrainRunId,
       options,
@@ -265,24 +406,27 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
     // brain:restart can be either:
     // 1. A resume of an existing brain on the stack (same brainTitle) - should REPLACE
     // 2. A nested inner brain restarting (different brainTitle) - should ADD
-    if (brainStack.length > 0) {
-      const lastBrain = brainStack[brainStack.length - 1];
+    if (rootBrain) {
+      const deepestBrain = getDeepestBrain(rootBrain);
 
-      // If the last brain has the same title, this is a resume - replace it
-      if (lastBrain.brainTitle === brainTitle) {
-        const newEntry: BrainStackEntry = {
+      // If the deepest brain has the same title, this is a resume - replace it
+      if (deepestBrain && deepestBrain.brainTitle === brainTitle) {
+        const replacementBrain: RunningBrain = {
           brainRunId,
           brainTitle,
           brainDescription,
-          parentStepId: lastBrain.parentStepId, // Keep original parentStepId
+          parentStepId: deepestBrain.parentStepId, // Keep original parentStepId
           steps: [], // Steps will be populated by subsequent step:status events
+          innerBrain: null,
+          depth: deepestBrain.depth,
         };
 
-        const newStack = [...brainStack.slice(0, -1), newEntry];
+        const newRootBrain = cloneTreeReplacingDeepest(rootBrain, replacementBrain);
 
         const newCtx: BrainExecutionContext = {
           ...ctx,
-          brainStack: newStack,
+          rootBrain: newRootBrain,
+          brainStack: treeToStack(newRootBrain),
           // depth stays the same - we're replacing, not nesting
           brainRunId: existingBrainRunId ?? brainRunId,
           currentEvent: {
@@ -299,19 +443,24 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
         return updateDerivedState(newCtx, 'running');
       }
 
-      // Different title - this is a nested inner brain restarting, ADD to stack
-      const newEntry: BrainStackEntry = {
+      // Different title - this is a nested inner brain restarting, ADD to tree
+      const newDepth = depth + 1;
+      const newBrain: RunningBrain = {
         brainRunId,
         brainTitle,
         brainDescription,
         parentStepId: currentStepId,
         steps: [],
+        innerBrain: null,
+        depth: newDepth,
       };
 
-      const newDepth = depth + 1;
+      const newRootBrain = cloneTreeWithNewInner(rootBrain, newBrain);
+
       const newCtx: BrainExecutionContext = {
         ...ctx,
-        brainStack: [...brainStack, newEntry],
+        rootBrain: newRootBrain,
+        brainStack: treeToStack(newRootBrain),
         depth: newDepth,
         brainRunId: existingBrainRunId ?? brainRunId,
         currentEvent: {
@@ -329,17 +478,20 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
     }
 
     // No brain on stack - this is a fresh restart from idle state
-    const newEntry: BrainStackEntry = {
+    const newBrain: RunningBrain = {
       brainRunId,
       brainTitle,
       brainDescription,
       parentStepId: null,
       steps: [],
+      innerBrain: null,
+      depth: 1,
     };
 
     const newCtx: BrainExecutionContext = {
       ...ctx,
-      brainStack: [newEntry],
+      rootBrain: newBrain,
+      brainStack: treeToStack(newBrain),
       depth: 1,
       brainRunId: existingBrainRunId ?? brainRunId,
       currentEvent: {
@@ -358,31 +510,23 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
 );
 
 const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  const { brainStack, depth, brainRunId, options } = ctx;
+  const { rootBrain, depth, brainRunId, options } = ctx;
 
-  if (brainStack.length === 0) return ctx;
+  if (!rootBrain) return ctx;
 
-  const completedBrain = brainStack[brainStack.length - 1];
-  const newStack = brainStack.slice(0, -1);
+  const completedBrain = getDeepestBrain(rootBrain);
+  if (!completedBrain) return ctx;
 
-  // Attach completed brain's steps to parent step if nested
-  if (newStack.length > 0 && completedBrain.parentStepId) {
-    const parentBrain = newStack[newStack.length - 1];
-    const parentStep = parentBrain.steps.find(
-      (s) => s.id === completedBrain.parentStepId
-    );
-    if (parentStep) {
-      parentStep.innerSteps = completedBrain.steps;
-      parentStep.status = STATUS.COMPLETE;
-    }
-  }
+  // Remove deepest brain from tree and attach its steps to parent step
+  const newRootBrain = cloneTreeRemovingDeepest(rootBrain);
 
   const newDepth = depth - 1;
   const isNowComplete = newDepth === 0;
 
   const newCtx: BrainExecutionContext = {
     ...ctx,
-    brainStack: newStack,
+    rootBrain: newRootBrain,
+    brainStack: treeToStack(newRootBrain),
     depth: newDepth,
     currentEvent: {
       type: BRAIN_EVENTS.COMPLETE,
@@ -399,8 +543,8 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
 
 const errorBrain = reduce<BrainExecutionContext, ErrorPayload>(
   (ctx, { error }) => {
-    const { brainStack, brainRunId, options } = ctx;
-    const currentBrain = brainStack[brainStack.length - 1];
+    const { rootBrain, brainRunId, options } = ctx;
+    const currentBrain = getDeepestBrain(rootBrain);
 
     const newCtx: BrainExecutionContext = {
       ...ctx,
@@ -421,8 +565,8 @@ const errorBrain = reduce<BrainExecutionContext, ErrorPayload>(
 );
 
 const cancelBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  const { brainStack, brainRunId, options } = ctx;
-  const currentBrain = brainStack[brainStack.length - 1];
+  const { rootBrain, brainRunId, options } = ctx;
+  const currentBrain = getDeepestBrain(rootBrain);
 
   const newCtx: BrainExecutionContext = {
     ...ctx,
@@ -441,25 +585,33 @@ const cancelBrain = reduce<BrainExecutionContext, object>((ctx) => {
 
 const startStep = reduce<BrainExecutionContext, StartStepPayload>(
   (ctx, { stepId, stepTitle }) => {
-    const { brainStack, brainRunId, options } = ctx;
+    const { rootBrain, brainRunId, options } = ctx;
 
     // Add step to current brain's steps if not already there
-    if (brainStack.length > 0) {
-      const currentBrain = brainStack[brainStack.length - 1];
-      const existingStep = currentBrain.steps.find((s) => s.id === stepId);
-      if (!existingStep) {
-        currentBrain.steps.push({
-          id: stepId,
-          title: stepTitle,
-          status: STATUS.RUNNING,
-        });
-      } else {
-        existingStep.status = STATUS.RUNNING;
+    let newRootBrain = rootBrain;
+    if (rootBrain) {
+      const currentBrain = getDeepestBrain(rootBrain);
+      if (currentBrain) {
+        const existingStep = currentBrain.steps.find((s) => s.id === stepId);
+        let newSteps: StepInfo[];
+        if (!existingStep) {
+          newSteps = [
+            ...currentBrain.steps,
+            { id: stepId, title: stepTitle, status: STATUS.RUNNING },
+          ];
+        } else {
+          newSteps = currentBrain.steps.map((s) =>
+            s.id === stepId ? { ...s, status: STATUS.RUNNING } : s
+          );
+        }
+        newRootBrain = cloneTreeUpdatingDeepestSteps(rootBrain, newSteps);
       }
     }
 
     return {
       ...ctx,
+      rootBrain: newRootBrain,
+      brainStack: treeToStack(newRootBrain),
       currentStepId: stepId,
       currentStepTitle: stepTitle,
       currentEvent: {
@@ -477,7 +629,7 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
 const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
   (ctx, { stepId, stepTitle, patch }) => {
     const {
-      brainStack,
+      rootBrain,
       depth,
       currentState,
       topLevelStepCount,
@@ -485,12 +637,14 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       options,
     } = ctx;
 
-    if (brainStack.length > 0) {
-      const currentBrain = brainStack[brainStack.length - 1];
-      const step = currentBrain.steps.find((s) => s.id === stepId);
-      if (step) {
-        step.status = STATUS.COMPLETE;
-        step.patch = patch;
+    let newRootBrain = rootBrain;
+    if (rootBrain) {
+      const currentBrain = getDeepestBrain(rootBrain);
+      if (currentBrain) {
+        const newSteps = currentBrain.steps.map((s) =>
+          s.id === stepId ? { ...s, status: STATUS.COMPLETE as StepInfo['status'], patch } : s
+        );
+        newRootBrain = cloneTreeUpdatingDeepestSteps(rootBrain, newSteps);
       }
     }
 
@@ -504,6 +658,8 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
 
     return {
       ...ctx,
+      rootBrain: newRootBrain,
+      brainStack: treeToStack(newRootBrain),
       currentState: newState,
       topLevelStepCount: newStepCount,
       currentEvent: {
@@ -559,39 +715,37 @@ const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
 
 const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
   (ctx, { brainRunId: eventBrainRunId, steps }) => {
-    const { brainRunId, brainStack, options } = ctx;
+    const { brainRunId, rootBrain, options } = ctx;
 
-    if (brainStack.length === 0) return ctx;
+    if (!rootBrain) return ctx;
 
-    // Only update the current (deepest) brain on the stack.
+    // Only update the current (deepest) brain in the tree.
     // STEP_STATUS is emitted by the currently executing brain, which is always
     // the deepest one. We can't match by brainRunId because nested brains share
     // the same brainRunId, which would incorrectly update all nested brains.
-    const updatedStack = brainStack.map((brain, index) => {
-      if (index === brainStack.length - 1) {
-        // Create a map of existing steps to preserve their patches
-        const existingStepsById = new Map(brain.steps.map((s) => [s.id, s]));
+    const currentBrain = getDeepestBrain(rootBrain);
+    if (!currentBrain) return ctx;
 
-        return {
-          ...brain,
-          steps: steps.map((s) => {
-            const existing = existingStepsById.get(s.id);
-            return {
-              id: s.id,
-              title: s.title,
-              status: s.status as StepInfo['status'],
-              // Preserve existing patch if we have one
-              ...(existing?.patch ? { patch: existing.patch } : {}),
-            };
-          }),
-        };
-      }
-      return brain;
+    // Create a map of existing steps to preserve their patches
+    const existingStepsById = new Map(currentBrain.steps.map((s) => [s.id, s]));
+
+    const newSteps = steps.map((s) => {
+      const existing = existingStepsById.get(s.id);
+      return {
+        id: s.id,
+        title: s.title,
+        status: s.status as StepInfo['status'],
+        // Preserve existing patch if we have one
+        ...(existing?.patch ? { patch: existing.patch } : {}),
+      };
     });
+
+    const newRootBrain = cloneTreeUpdatingDeepestSteps(rootBrain, newSteps);
 
     return {
       ...ctx,
-      brainStack: updatedStack,
+      rootBrain: newRootBrain,
+      brainStack: treeToStack(newRootBrain),
       currentEvent: {
         type: BRAIN_EVENTS.STEP_STATUS,
         brainRunId: brainRunId!,
@@ -809,6 +963,15 @@ export function createBrainExecutionMachine(
 }
 
 /**
+ * Create a raw brain execution machine for use with react-robot's useMachine hook.
+ * This returns the uninterpreted machine definition, not a service.
+ */
+export function createBrainMachineForReact(options?: CreateMachineOptions) {
+  const initialContext = createInitialContext(options);
+  return createBrainMachine(initialContext);
+}
+
+/**
  * Send an event to the machine.
  * The machine transitions use BRAIN_EVENTS types directly, so just pass the event through.
  */
@@ -832,12 +995,12 @@ export function isTopLevel(machine: BrainStateMachine): boolean {
 }
 
 export function getCurrentStep(machine: BrainStateMachine): StepInfo | null {
-  const { brainStack, currentStepId } = machine.context;
+  const { rootBrain, currentStepId } = machine.context;
 
-  if (brainStack.length === 0 || !currentStepId) return null;
+  if (!rootBrain || !currentStepId) return null;
 
-  const currentBrain = brainStack[brainStack.length - 1];
-  return currentBrain.steps.find((s) => s.id === currentStepId) ?? null;
+  const currentBrain = getDeepestBrain(rootBrain);
+  return currentBrain?.steps.find((s) => s.id === currentStepId) ?? null;
 }
 
 export function getBrainStack(machine: BrainStateMachine): BrainStackEntry[] {
@@ -864,45 +1027,39 @@ export function getError(machine: BrainStateMachine): SerializedError | null {
 
 /**
  * Get the completed steps from the state machine in the format needed for resume.
- * This reconstructs the nested step hierarchy from the brain stack.
+ * This reconstructs the nested step hierarchy from the brain tree.
  * Returns a deep copy to avoid mutating the state machine's context.
  */
 export function getCompletedSteps(machine: BrainStateMachine): StepInfo[] {
-  const { brainStack } = machine.context;
+  const { rootBrain } = machine.context;
 
-  if (brainStack.length === 0) {
+  if (!rootBrain) {
     return [];
   }
 
-  // Deep copy the steps to avoid mutating state machine context
+  // Deep copy the steps, including any innerBrain's steps attached to parent step
   const copyStep = (step: StepInfo): StepInfo => ({
     ...step,
     innerSteps: step.innerSteps?.map(copyStep),
   });
 
-  const copyBrainStack = brainStack.map((brain) => ({
-    ...brain,
-    steps: brain.steps.map(copyStep),
-  }));
+  // Recursively build steps from the brain tree
+  const copyBrainSteps = (brain: RunningBrain): StepInfo[] => {
+    const steps = brain.steps.map(copyStep);
 
-  // The outer brain's steps, with inner brain steps nested
-  const outerBrain = copyBrainStack[0];
-
-  // If there are nested brains still on the stack (paused mid-execution),
-  // attach their steps to the parent step as innerSteps
-  if (copyBrainStack.length > 1) {
-    for (let i = copyBrainStack.length - 1; i > 0; i--) {
-      const innerBrain = copyBrainStack[i];
-      const parentBrain = copyBrainStack[i - 1];
-      // Find the parent step (the one that started this inner brain)
-      const parentStep = parentBrain.steps.find(
-        (s) => s.id === innerBrain.parentStepId
-      );
-      if (parentStep) {
-        parentStep.innerSteps = innerBrain.steps;
+    // If there's a running inner brain, attach its steps to the parent step
+    if (brain.innerBrain) {
+      const parentStepId = brain.innerBrain.parentStepId;
+      if (parentStepId) {
+        const parentStep = steps.find((s) => s.id === parentStepId);
+        if (parentStep) {
+          parentStep.innerSteps = copyBrainSteps(brain.innerBrain);
+        }
       }
     }
-  }
 
-  return outerBrain.steps;
+    return steps;
+  };
+
+  return copyBrainSteps(rootBrain);
 }
