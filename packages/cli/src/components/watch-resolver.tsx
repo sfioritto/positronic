@@ -316,7 +316,7 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
     resolvedRunId,
     activeRuns,
     error,
-  } = current.context as ResolverContext;
+  } = current.context;
 
   // Handle keyboard input for brain disambiguation
   useInput((input, key) => {
