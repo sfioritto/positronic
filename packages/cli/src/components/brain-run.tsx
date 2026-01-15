@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import { Box, Text, useApp } from 'ink';
 import { ErrorComponent } from './error.js';
+import { SelectList } from './select-list.js';
 import { Watch } from './watch.js';
 import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
 
@@ -25,7 +26,6 @@ type Phase = 'searching' | 'disambiguating' | 'running' | 'complete' | 'error';
 export const BrainRun = ({ identifier, watch, options }: BrainRunProps) => {
   const [phase, setPhase] = useState<Phase>('searching');
   const [brains, setBrains] = useState<Brain[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [runId, setRunId] = useState<string | null>(null);
   const [error, setError] = useState<{
     title: string;
@@ -137,24 +137,7 @@ export const BrainRun = ({ identifier, watch, options }: BrainRunProps) => {
     searchBrains();
   }, [identifier, runBrain, getConnectionError]);
 
-  // Handle keyboard input for disambiguation
-  useInput((input, key) => {
-    if (phase !== 'disambiguating') return;
-
-    if (key.upArrow) {
-      setSelectedIndex((prev) => (prev - 1 + brains.length) % brains.length);
-    } else if (key.downArrow) {
-      setSelectedIndex((prev) => (prev + 1) % brains.length);
-    } else if (key.return) {
-      const selectedBrain = brains[selectedIndex];
-      runBrain(selectedBrain.title);
-    } else if (input === 'q' || key.escape) {
-      exit();
-    }
-  });
-
   // Exit the app when run completes without watch mode
-  // This is needed because useInput keeps the terminal in raw mode
   useEffect(() => {
     if (phase === 'complete' && runId && !watch) {
       exit();
@@ -170,31 +153,13 @@ export const BrainRun = ({ identifier, watch, options }: BrainRunProps) => {
       ) : phase === 'error' && error ? (
         <ErrorComponent error={error} />
       ) : phase === 'disambiguating' ? (
-        <>
-          <Text bold>Multiple brains match '{identifier}':</Text>
-          <Box marginTop={1} flexDirection="column">
-            {brains.map((brain, index) => {
-              const isSelected = index === selectedIndex;
-              return (
-                <Box key={brain.title} flexDirection="column" marginBottom={1}>
-                  <Text color={isSelected ? 'cyan' : undefined}>
-                    {isSelected ? '▶ ' : '  '}
-                    <Text bold>{brain.title}</Text>
-                  </Text>
-                  <Text dimColor>
-                    {'    '}
-                    {brain.description}
-                  </Text>
-                </Box>
-              );
-            })}
-          </Box>
-          <Box marginTop={1}>
-            <Text dimColor>
-              Use arrow keys to navigate, Enter to select, q to quit
-            </Text>
-          </Box>
-        </>
+        <SelectList
+          items={brains.map((b) => ({ id: b.title, label: b.title, description: b.description }))}
+          header={`Multiple brains match '${identifier}':`}
+          onSelect={(item) => {
+            runBrain(item.label);
+          }}
+        />
       ) : phase === 'running' ? (
         <Text>Starting brain run...</Text>
       ) : phase === 'complete' && runId ? (
