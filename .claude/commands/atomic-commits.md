@@ -35,6 +35,11 @@ Read and internalize these guides before committing:
      - Provides context a reviewer would need
    - Create the commit
 5. Repeat until all changes are committed as clean, atomic units
+6. Create a new branch if not already on a feature branch (not main)
+7. Push the branch to origin
+8. Create a PR using `gh pr create` with:
+   - A clear title summarizing the overall change
+   - A body that provides context and lists the atomic commits made
 
 ## Commit Message Format
 
