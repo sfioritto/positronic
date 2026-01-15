@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import * as robot3 from 'robot3';
 import { Watch } from './watch.js';
 import { ErrorComponent } from './error.js';
 import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
 
-const { createMachine, state, transition, reduce, interpret } = robot3;
+const { createMachine, state, transition, reduce, invoke, immediate, guard, interpret } = robot3;
 
 // Types
 interface Brain {
@@ -48,88 +48,11 @@ interface ResolverContext {
   resolvedRunId: string | null;
   activeRuns: ActiveRunsResponse['runs'];
   error: ErrorInfo | null;
+  // Temporary storage for routing
+  brainSearchResult: BrainsResponse | null;
+  runSearchResult: BrainRun | null;
+  activeRunsResult: ActiveRunsResponse['runs'] | null;
 }
-
-// Events
-const EVENTS = {
-  BRAIN_FOUND: 'BRAIN_FOUND',
-  BRAIN_NOT_FOUND: 'BRAIN_NOT_FOUND',
-  BRAINS_MULTIPLE: 'BRAINS_MULTIPLE',
-  RUN_FOUND: 'RUN_FOUND',
-  NOT_FOUND: 'NOT_FOUND',
-  BRAIN_SELECTED: 'BRAIN_SELECTED',
-  ACTIVE_RUN_FOUND: 'ACTIVE_RUN_FOUND',
-  NO_ACTIVE_RUNS: 'NO_ACTIVE_RUNS',
-  MULTIPLE_ACTIVE_RUNS: 'MULTIPLE_ACTIVE_RUNS',
-  ERROR: 'ERROR',
-} as const;
-
-// Reducers - using object destructuring as requested
-const setBrainTitle = reduce(
-  (ctx: ResolverContext, { brainTitle }: { brainTitle: string }) => ({ ...ctx, resolvedBrainTitle: brainTitle })
-);
-
-const setBrains = reduce(
-  (ctx: ResolverContext, { brains }: { brains: Brain[] }) => ({ ...ctx, brains, selectedIndex: 0 })
-);
-
-const setRunId = reduce(
-  (ctx: ResolverContext, { runId }: { runId: string }) => ({ ...ctx, resolvedRunId: runId })
-);
-
-const setActiveRuns = reduce(
-  (ctx: ResolverContext, { runs }: { runs: ActiveRunsResponse['runs'] }) => ({ ...ctx, activeRuns: runs })
-);
-
-const setError = reduce(
-  (ctx: ResolverContext, { error }: { error: ErrorInfo }) => ({ ...ctx, error })
-);
-
-// State machine definition
-// Note: Using `as any` to work around robot3's strict transition typing
-const createResolverMachine = (identifier: string) =>
-  createMachine(
-    'searchingBrain',
-    {
-      searchingBrain: state(
-        transition(EVENTS.BRAIN_FOUND, 'fetchingActiveRuns', setBrainTitle),
-        transition(EVENTS.BRAIN_NOT_FOUND, 'searchingRun') as any,
-        transition(EVENTS.BRAINS_MULTIPLE, 'disambiguating', setBrains) as any,
-        transition(EVENTS.ERROR, 'error', setError) as any
-      ),
-
-      searchingRun: state(
-        transition(EVENTS.RUN_FOUND, 'resolved', setRunId),
-        transition(EVENTS.NOT_FOUND, 'error', setError) as any,
-        transition(EVENTS.ERROR, 'error', setError) as any
-      ),
-
-      disambiguating: state(
-        transition(EVENTS.BRAIN_SELECTED, 'fetchingActiveRuns', setBrainTitle)
-      ),
-
-      fetchingActiveRuns: state(
-        transition(EVENTS.ACTIVE_RUN_FOUND, 'resolved', setRunId),
-        transition(EVENTS.NO_ACTIVE_RUNS, 'noActiveRuns') as any,
-        transition(EVENTS.MULTIPLE_ACTIVE_RUNS, 'multipleActiveRuns', setActiveRuns) as any,
-        transition(EVENTS.ERROR, 'error', setError) as any
-      ),
-
-      resolved: state(),
-      noActiveRuns: state(),
-      multipleActiveRuns: state(),
-      error: state(),
-    },
-    () => ({
-      identifier,
-      brains: [],
-      selectedIndex: 0,
-      resolvedBrainTitle: null,
-      resolvedRunId: null,
-      activeRuns: [],
-      error: null,
-    })
-  );
 
 // Helper to get connection error message
 const getConnectionError = () => {
@@ -147,6 +70,211 @@ const getConnectionError = () => {
   };
 };
 
+// Async functions for invoke states
+const searchBrains = async (ctx: ResolverContext) => {
+  const url = `/brains?q=${encodeURIComponent(ctx.identifier)}`;
+  const response = await apiClient.fetch(url, { method: 'GET' });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw {
+      title: 'Server Error',
+      message: `Error searching for brains: ${response.status} ${response.statusText}`,
+      details: errorText,
+    };
+  }
+
+  return (await response.json()) as BrainsResponse;
+};
+
+const searchRun = async (ctx: ResolverContext) => {
+  const url = `/brains/runs/${encodeURIComponent(ctx.identifier)}`;
+  const response = await apiClient.fetch(url, { method: 'GET' });
+
+  if (response.ok) {
+    return (await response.json()) as BrainRun;
+  }
+
+  if (response.status === 404) {
+    throw {
+      title: 'Not Found',
+      message: `No brain or run found matching '${ctx.identifier}'.`,
+      details:
+        'Please check that:\n' +
+        '  1. The brain name or run ID is correct\n' +
+        '  2. The brain exists in your project\n' +
+        '\nYou can list available brains with: positronic list',
+    };
+  }
+
+  const errorText = await response.text();
+  throw {
+    title: 'Server Error',
+    message: `Error looking up run: ${response.status} ${response.statusText}`,
+    details: errorText,
+  };
+};
+
+const fetchActiveRuns = async (ctx: ResolverContext) => {
+  const apiPath = `/brains/${encodeURIComponent(ctx.resolvedBrainTitle!)}/active-runs`;
+  const response = await apiClient.fetch(apiPath, { method: 'GET' });
+
+  if (response.status === 200) {
+    const { runs } = (await response.json()) as ActiveRunsResponse;
+    return runs;
+  }
+
+  const errorText = await response.text();
+  throw {
+    title: 'API Error',
+    message: `Failed to get active runs for brain "${ctx.resolvedBrainTitle}".`,
+    details: `Server returned ${response.status}: ${errorText}`,
+  };
+};
+
+// Error handler for network errors
+const handleNetworkError = (err: unknown): ErrorInfo => {
+  // If it's already an ErrorInfo object (thrown from our async functions)
+  if (err && typeof err === 'object' && 'title' in err && 'message' in err) {
+    return err as ErrorInfo;
+  }
+  // Network/connection error
+  const baseError = getConnectionError();
+  const message = err instanceof Error ? err.message : String(err);
+  return { ...baseError, details: `${baseError.details} ${message}` };
+};
+
+// Reducers
+const storeBrainSearchResult = reduce(
+  (ctx: ResolverContext, ev: { data: BrainsResponse }) => ({ ...ctx, brainSearchResult: ev.data })
+);
+
+const storeRunAndResolve = reduce(
+  (ctx: ResolverContext, ev: { data: BrainRun }) => ({
+    ...ctx,
+    runSearchResult: ev.data,
+    resolvedRunId: ev.data.brainRunId,
+  })
+);
+
+const storeActiveRunsResult = reduce(
+  (ctx: ResolverContext, ev: { data: ActiveRunsResponse['runs'] }) => ({ ...ctx, activeRunsResult: ev.data })
+);
+
+const setErrorFromEvent = reduce(
+  (ctx: ResolverContext, ev: { error: unknown }) => ({ ...ctx, error: handleNetworkError(ev.error) })
+);
+
+const applyBrainFound = reduce(
+  (ctx: ResolverContext) => ({ ...ctx, resolvedBrainTitle: ctx.brainSearchResult!.brains[0].title })
+);
+
+const applyBrainsMultiple = reduce(
+  (ctx: ResolverContext) => ({ ...ctx, brains: ctx.brainSearchResult!.brains, selectedIndex: 0 })
+);
+
+const applyActiveRunFound = reduce(
+  (ctx: ResolverContext) => ({ ...ctx, resolvedRunId: ctx.activeRunsResult![0].brainRunId })
+);
+
+const applyMultipleActiveRuns = reduce(
+  (ctx: ResolverContext) => ({ ...ctx, activeRuns: ctx.activeRunsResult! })
+);
+
+const setBrainTitleFromSelection = reduce(
+  (ctx: ResolverContext, ev: { brainTitle: string }) => ({ ...ctx, resolvedBrainTitle: ev.brainTitle })
+);
+
+// Guards for routing
+const brainFoundGuard = guard<ResolverContext, object>(
+  (ctx) => ctx.brainSearchResult?.count === 1
+);
+
+const brainNotFoundGuard = guard<ResolverContext, object>(
+  (ctx) => ctx.brainSearchResult?.count === 0
+);
+
+const brainsMultipleGuard = guard<ResolverContext, object>(
+  (ctx) => (ctx.brainSearchResult?.count ?? 0) > 1
+);
+
+const activeRunFoundGuard = guard<ResolverContext, object>(
+  (ctx) => ctx.activeRunsResult?.length === 1
+);
+
+const noActiveRunsGuard = guard<ResolverContext, object>(
+  (ctx) => ctx.activeRunsResult?.length === 0
+);
+
+const multipleActiveRunsGuard = guard<ResolverContext, object>(
+  (ctx) => (ctx.activeRunsResult?.length ?? 0) > 1
+);
+
+// State machine definition
+const createResolverMachine = (identifier: string) =>
+  createMachine(
+    'searchingBrain',
+    {
+      // Invoke state: search for brain by name
+      searchingBrain: invoke(
+        searchBrains,
+        transition('done', 'routeBrainSearch', storeBrainSearchResult),
+        transition('error', 'error', setErrorFromEvent)
+      ),
+
+      // Route based on brain search result
+      routeBrainSearch: state(
+        immediate('fetchingActiveRuns', brainFoundGuard, applyBrainFound),
+        immediate('searchingRun', brainNotFoundGuard) as any,
+        immediate('disambiguating', brainsMultipleGuard, applyBrainsMultiple) as any
+      ),
+
+      // Invoke state: search for run by ID
+      searchingRun: invoke(
+        searchRun,
+        transition('done', 'resolved', storeRunAndResolve),
+        transition('error', 'error', setErrorFromEvent)
+      ),
+
+      // User selects from multiple matching brains
+      disambiguating: state(
+        transition('BRAIN_SELECTED', 'fetchingActiveRuns', setBrainTitleFromSelection)
+      ),
+
+      // Invoke state: fetch active runs for the brain
+      fetchingActiveRuns: invoke(
+        fetchActiveRuns,
+        transition('done', 'routeActiveRuns', storeActiveRunsResult),
+        transition('error', 'error', setErrorFromEvent)
+      ),
+
+      // Route based on active runs result
+      routeActiveRuns: state(
+        immediate('resolved', activeRunFoundGuard, applyActiveRunFound),
+        immediate('noActiveRuns', noActiveRunsGuard) as any,
+        immediate('multipleActiveRuns', multipleActiveRunsGuard, applyMultipleActiveRuns) as any
+      ),
+
+      // Terminal states
+      resolved: state(),
+      noActiveRuns: state(),
+      multipleActiveRuns: state(),
+      error: state(),
+    },
+    () => ({
+      identifier,
+      brains: [],
+      selectedIndex: 0,
+      resolvedBrainTitle: null,
+      resolvedRunId: null,
+      activeRuns: [],
+      error: null,
+      brainSearchResult: null,
+      runSearchResult: null,
+      activeRunsResult: null,
+    })
+  );
+
 interface WatchResolverProps {
   identifier: string;
 }
@@ -154,16 +282,25 @@ interface WatchResolverProps {
 /**
  * WatchResolver - Resolves an identifier to either a brain name or run ID and starts watching.
  *
- * State machine handles state/transitions, useEffect triggers async operations.
+ * State machine handles all async operations via invoke.
  * Resolution order:
  * 1. Try to resolve as a brain name (fuzzy search)
  * 2. If no brain matches, try as a run ID
  * 3. If neither works, show an error
  */
 export const WatchResolver = ({ identifier }: WatchResolverProps) => {
-  const serviceRef = useRef(interpret(createResolverMachine(identifier), () => forceUpdate({})));
   const [, forceUpdate] = useState({});
   const { exit } = useApp();
+
+  // Initialize service lazily - use any to avoid complex robot3 type issues
+  const serviceRef = useRef<any>(null);
+
+  if (!serviceRef.current) {
+    serviceRef.current = interpret(createResolverMachine(identifier), () => {
+      // Schedule update for next tick to avoid updates during render
+      Promise.resolve().then(() => forceUpdate({}));
+    });
+  }
 
   const { machine, context, send } = serviceRef.current;
   const currentState = machine.current;
@@ -174,167 +311,21 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
     resolvedRunId,
     activeRuns,
     error,
-  } = context;
-
-  // Single effect that runs async operations based on current state
-  useEffect(() => {
-    let cancelled = false;
-
-    const runStateAction = async () => {
-      switch (currentState) {
-        case 'searchingBrain': {
-          try {
-            const url = `/brains?q=${encodeURIComponent(identifier)}`;
-            const response = await apiClient.fetch(url, { method: 'GET' });
-
-            if (cancelled) return;
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              send({
-                type: EVENTS.ERROR,
-                error: {
-                  title: 'Server Error',
-                  message: `Error searching for brains: ${response.status} ${response.statusText}`,
-                  details: errorText,
-                },
-              } as any);
-              return;
-            }
-
-            const { brains: foundBrains, count } = (await response.json()) as BrainsResponse;
-
-            if (cancelled) return;
-
-            if (count === 0) {
-              send({ type: EVENTS.BRAIN_NOT_FOUND } as any);
-            } else if (count === 1) {
-              send({ type: EVENTS.BRAIN_FOUND, brainTitle: foundBrains[0].title } as any);
-            } else {
-              send({ type: EVENTS.BRAINS_MULTIPLE, brains: foundBrains } as any);
-            }
-          } catch (err) {
-            if (cancelled) return;
-            const baseError = getConnectionError();
-            const message = err instanceof Error ? err.message : String(err);
-            send({
-              type: EVENTS.ERROR,
-              error: { ...baseError, details: `${baseError.details} ${message}` },
-            } as any);
-          }
-          break;
-        }
-
-        case 'searchingRun': {
-          try {
-            const url = `/brains/runs/${encodeURIComponent(identifier)}`;
-            const response = await apiClient.fetch(url, { method: 'GET' });
-
-            if (cancelled) return;
-
-            if (response.ok) {
-              const { brainRunId } = (await response.json()) as BrainRun;
-              send({ type: EVENTS.RUN_FOUND, runId: brainRunId } as any);
-            } else if (response.status === 404) {
-              send({
-                type: EVENTS.NOT_FOUND,
-                error: {
-                  title: 'Not Found',
-                  message: `No brain or run found matching '${identifier}'.`,
-                  details:
-                    'Please check that:\n' +
-                    '  1. The brain name or run ID is correct\n' +
-                    '  2. The brain exists in your project\n' +
-                    '\nYou can list available brains with: positronic list',
-                },
-              } as any);
-            } else {
-              const errorText = await response.text();
-              send({
-                type: EVENTS.ERROR,
-                error: {
-                  title: 'Server Error',
-                  message: `Error looking up run: ${response.status} ${response.statusText}`,
-                  details: errorText,
-                },
-              } as any);
-            }
-          } catch (err) {
-            if (cancelled) return;
-            const baseError = getConnectionError();
-            const message = err instanceof Error ? err.message : String(err);
-            send({
-              type: EVENTS.ERROR,
-              error: { ...baseError, details: `${baseError.details} ${message}` },
-            } as any);
-          }
-          break;
-        }
-
-        case 'fetchingActiveRuns': {
-          if (!resolvedBrainTitle) return;
-
-          try {
-            const apiPath = `/brains/${encodeURIComponent(resolvedBrainTitle)}/active-runs`;
-            const response = await apiClient.fetch(apiPath, { method: 'GET' });
-
-            if (cancelled) return;
-
-            if (response.status === 200) {
-              const { runs } = (await response.json()) as ActiveRunsResponse;
-
-              if (runs.length === 0) {
-                send({ type: EVENTS.NO_ACTIVE_RUNS } as any);
-              } else if (runs.length === 1) {
-                send({ type: EVENTS.ACTIVE_RUN_FOUND, runId: runs[0].brainRunId } as any);
-              } else {
-                send({ type: EVENTS.MULTIPLE_ACTIVE_RUNS, runs } as any);
-              }
-            } else {
-              const errorText = await response.text();
-              send({
-                type: EVENTS.ERROR,
-                error: {
-                  title: 'API Error',
-                  message: `Failed to get active runs for brain "${resolvedBrainTitle}".`,
-                  details: `Server returned ${response.status}: ${errorText}`,
-                },
-              } as any);
-            }
-          } catch (err) {
-            if (cancelled) return;
-            const baseError = getConnectionError();
-            const message = err instanceof Error ? err.message : String(err);
-            send({
-              type: EVENTS.ERROR,
-              error: { ...baseError, details: `${baseError.details} ${message}` },
-            } as any);
-          }
-          break;
-        }
-      }
-    };
-
-    runStateAction();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentState, identifier, resolvedBrainTitle, send]);
+  } = context as ResolverContext;
 
   // Handle keyboard input for brain disambiguation
   useInput((input, key) => {
     if (currentState !== 'disambiguating') return;
 
     if (key.upArrow) {
-      context.selectedIndex = (selectedIndex - 1 + brains.length) % brains.length;
+      (context as ResolverContext).selectedIndex = (selectedIndex - 1 + brains.length) % brains.length;
       forceUpdate({});
     } else if (key.downArrow) {
-      context.selectedIndex = (selectedIndex + 1) % brains.length;
+      (context as ResolverContext).selectedIndex = (selectedIndex + 1) % brains.length;
       forceUpdate({});
     } else if (key.return) {
       const { title } = brains[selectedIndex];
-      send({ type: EVENTS.BRAIN_SELECTED, brainTitle: title });
+      send({ type: 'BRAIN_SELECTED', brainTitle: title });
     } else if (input === 'q' || key.escape) {
       exit();
     }
@@ -349,6 +340,13 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
         </Box>
       );
 
+    case 'routeBrainSearch':
+      return (
+        <Box>
+          <Text>Searching for '{identifier}'...</Text>
+        </Box>
+      );
+
     case 'searchingRun':
       return (
         <Box>
@@ -357,6 +355,13 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
       );
 
     case 'fetchingActiveRuns':
+      return (
+        <Box>
+          <Text>Looking for active runs for "{resolvedBrainTitle}"...</Text>
+        </Box>
+      );
+
+    case 'routeActiveRuns':
       return (
         <Box>
           <Text>Looking for active runs for "{resolvedBrainTitle}"...</Text>
