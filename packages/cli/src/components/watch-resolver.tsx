@@ -65,27 +65,27 @@ const EVENTS = {
 } as const;
 
 // Reducers - using object destructuring as requested
-const setBrainTitle = reduce<ResolverContext, { brainTitle: string }>(
-  (ctx, { brainTitle }) => ({ ...ctx, resolvedBrainTitle: brainTitle })
+const setBrainTitle = reduce(
+  (ctx: ResolverContext, { brainTitle }: { brainTitle: string }) => ({ ...ctx, resolvedBrainTitle: brainTitle })
 );
 
-const setBrains = reduce<ResolverContext, { brains: Brain[] }>(
-  (ctx, { brains }) => ({ ...ctx, brains, selectedIndex: 0 })
+const setBrains = reduce(
+  (ctx: ResolverContext, { brains }: { brains: Brain[] }) => ({ ...ctx, brains, selectedIndex: 0 })
 );
 
-const setRunId = reduce<ResolverContext, { runId: string }>(
-  (ctx, { runId }) => ({ ...ctx, resolvedRunId: runId })
+const setRunId = reduce(
+  (ctx: ResolverContext, { runId }: { runId: string }) => ({ ...ctx, resolvedRunId: runId })
 );
 
-const setActiveRuns = reduce<ResolverContext, { runs: ActiveRunsResponse['runs'] }>(
-  (ctx, { runs }) => ({ ...ctx, activeRuns: runs })
+const setActiveRuns = reduce(
+  (ctx: ResolverContext, { runs }: { runs: ActiveRunsResponse['runs'] }) => ({ ...ctx, activeRuns: runs })
 );
 
-const setError = reduce<ResolverContext, { error: ErrorInfo }>(
-  (ctx, { error }) => ({ ...ctx, error })
+const setError = reduce(
+  (ctx: ResolverContext, { error }: { error: ErrorInfo }) => ({ ...ctx, error })
 );
 
-// State machine definition - states and transitions are explicit
+// State machine definition
 // Note: Using `as any` to work around robot3's strict transition typing
 const createResolverMachine = (identifier: string) =>
   createMachine(
@@ -132,7 +132,7 @@ const createResolverMachine = (identifier: string) =>
   );
 
 // Helper to get connection error message
-const getConnectionError = (): ErrorInfo => {
+const getConnectionError = () => {
   if (isApiLocalDevMode()) {
     return {
       title: 'Connection Error',
@@ -166,7 +166,7 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
   const { exit } = useApp();
 
   const { machine, context, send } = serviceRef.current;
-  const currentState = machine.current as string;
+  const currentState = machine.current;
   const {
     brains,
     selectedIndex,
@@ -174,7 +174,7 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
     resolvedRunId,
     activeRuns,
     error,
-  } = context as ResolverContext;
+  } = context;
 
   // Single effect that runs async operations based on current state
   useEffect(() => {
@@ -213,12 +213,13 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
             } else {
               send({ type: EVENTS.BRAINS_MULTIPLE, brains: foundBrains } as any);
             }
-          } catch (err: any) {
+          } catch (err) {
             if (cancelled) return;
             const baseError = getConnectionError();
+            const message = err instanceof Error ? err.message : String(err);
             send({
               type: EVENTS.ERROR,
-              error: { ...baseError, details: `${baseError.details} ${err.message}` },
+              error: { ...baseError, details: `${baseError.details} ${message}` },
             } as any);
           }
           break;
@@ -258,12 +259,13 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
                 },
               } as any);
             }
-          } catch (err: any) {
+          } catch (err) {
             if (cancelled) return;
             const baseError = getConnectionError();
+            const message = err instanceof Error ? err.message : String(err);
             send({
               type: EVENTS.ERROR,
-              error: { ...baseError, details: `${baseError.details} ${err.message}` },
+              error: { ...baseError, details: `${baseError.details} ${message}` },
             } as any);
           }
           break;
@@ -299,12 +301,13 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
                 },
               } as any);
             }
-          } catch (err: any) {
+          } catch (err) {
             if (cancelled) return;
             const baseError = getConnectionError();
+            const message = err instanceof Error ? err.message : String(err);
             send({
               type: EVENTS.ERROR,
-              error: { ...baseError, details: `${baseError.details} ${err.message}` },
+              error: { ...baseError, details: `${baseError.details} ${message}` },
             } as any);
           }
           break;
@@ -324,16 +327,14 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
     if (currentState !== 'disambiguating') return;
 
     if (key.upArrow) {
-      (context as ResolverContext).selectedIndex =
-        (selectedIndex - 1 + brains.length) % brains.length;
+      context.selectedIndex = (selectedIndex - 1 + brains.length) % brains.length;
       forceUpdate({});
     } else if (key.downArrow) {
-      (context as ResolverContext).selectedIndex =
-        (selectedIndex + 1) % brains.length;
+      context.selectedIndex = (selectedIndex + 1) % brains.length;
       forceUpdate({});
     } else if (key.return) {
       const { title } = brains[selectedIndex];
-      send({ type: EVENTS.BRAIN_SELECTED, brainTitle: title } as any);
+      send({ type: EVENTS.BRAIN_SELECTED, brainTitle: title });
     } else if (input === 'q' || key.escape) {
       exit();
     }
