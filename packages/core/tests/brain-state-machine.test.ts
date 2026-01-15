@@ -143,8 +143,9 @@ describe('brain-state-machine', () => {
       });
 
       // CRITICAL ASSERTION: brain should be complete
+      // rootBrain is preserved after completion so we can display final state
       expect(machine.context.isComplete).toBe(true);
-      expect(machine.context.brainStack.length).toBe(0);
+      expect(machine.context.brainStack.length).toBe(1);
       expect(machine.context.depth).toBe(0);
     });
 
@@ -245,7 +246,8 @@ describe('brain-state-machine', () => {
         status: STATUS.COMPLETE,
       });
 
-      expect(machine.context.brainStack.length).toBe(0);
+      // rootBrain is preserved after completion so we can display final state
+      expect(machine.context.brainStack.length).toBe(1);
       expect(machine.context.depth).toBe(0);
       expect(machine.context.isComplete).toBe(true);
     });
@@ -280,8 +282,9 @@ describe('brain-state-machine', () => {
         status: STATUS.COMPLETE,
       });
 
+      // rootBrain is preserved after completion so we can display final state
       expect(machine.context.isComplete).toBe(true);
-      expect(machine.context.brainStack.length).toBe(0);
+      expect(machine.context.brainStack.length).toBe(1);
     });
   });
 });
