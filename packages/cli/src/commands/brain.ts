@@ -9,7 +9,7 @@ import { BrainKill } from '../components/brain-kill.js';
 import { BrainRun } from '../components/brain-run.js';
 import { BrainResolver } from '../components/brain-resolver.js';
 import { WatchResolver } from '../components/watch-resolver.js';
-import { BrainTop } from '../components/brain-top.js';
+import { TopNavigator } from '../components/top-navigator.js';
 import { ErrorComponent } from '../components/error.js';
 
 interface BrainListArgs {}
@@ -125,6 +125,6 @@ export class BrainCommand {
   }
 
   top({ brain }: ArgumentsCamelCase<BrainTopArgs>): React.ReactElement {
-    return React.createElement(BrainTop, { brainFilter: brain });
+    return React.createElement(TopNavigator, { brainFilter: brain });
   }
 }

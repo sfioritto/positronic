@@ -171,9 +171,10 @@ const BrainSection = ({ brain, isInner = false }: BrainSectionProps) => {
 
 interface WatchProps {
   runId: string;
+  manageScreenBuffer?: boolean;
 }
 
-export const Watch = ({ runId }: WatchProps) => {
+export const Watch = ({ runId, manageScreenBuffer = true }: WatchProps) => {
   const { write } = useStdout();
 
   // Use state machine to track brain execution state
@@ -197,9 +198,9 @@ export const Watch = ({ runId }: WatchProps) => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
   // Enter alternate screen buffer on mount, exit on unmount
-  // Skip in test environment to avoid interfering with test output capture
+  // Skip in test environment or when parent manages screen buffer
   useEffect(() => {
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === 'test' || !manageScreenBuffer) {
       return;
     }
 
@@ -210,7 +211,7 @@ export const Watch = ({ runId }: WatchProps) => {
       // Exit alternate screen buffer
       write('\x1B[?1049l');
     };
-  }, [write]);
+  }, [write, manageScreenBuffer]);
 
   useEffect(() => {
     const baseUrl = getApiBaseUrl();
