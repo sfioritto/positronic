@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp, useStdin } from 'ink';
+import { Box, Text, useStdin } from 'ink';
+import { SelectList } from './select-list.js';
 import type { Project, ProjectConfigManager } from '../commands/project-config-manager.js';
 
 interface ProjectSelectProps {
@@ -7,40 +8,21 @@ interface ProjectSelectProps {
   projectConfig: ProjectConfigManager;
 }
 
-// Separate component for interactive selection that uses useInput
+// Separate component for interactive selection
 const InteractiveProjectSelect = ({
   projects,
   currentProject,
-  projectConfig
+  projectConfig,
 }: {
   projects: Project[];
   currentProject: string | null;
   projectConfig: ProjectConfigManager;
 }) => {
-  const [selectedIndex, setSelectedIndex] = useState(() => {
-    const currentIndex = projects.findIndex(p => p.name === currentProject);
-    return currentIndex >= 0 ? currentIndex : 0;
-  });
   const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
-  const { exit } = useApp();
-
-  useInput((input, key) => {
-    if (key.upArrow) {
-      setSelectedIndex((prev) => (prev - 1 + projects.length) % projects.length);
-    } else if (key.downArrow) {
-      setSelectedIndex((prev) => (prev + 1) % projects.length);
-    } else if (key.return) {
-      const selectedProject = projects[selectedIndex];
-      const selectResult = projectConfig.selectProject(selectedProject.name);
-      setResult(selectResult);
-    } else if (input === 'q' || key.escape) {
-      exit();
-    }
-  });
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   // If selection was made, show success
-  if (result && result.success) {
-    const selectedProject = projects[selectedIndex];
+  if (result && result.success && selectedProject) {
     return (
       <Box flexDirection="column">
         <Text color="green">✅ Project switched successfully!</Text>
@@ -56,32 +38,26 @@ const InteractiveProjectSelect = ({
     );
   }
 
-  // Show interactive selection UI
-  return (
-    <Box flexDirection="column">
-      <Text bold>Select a project:</Text>
-      <Box marginTop={1} flexDirection="column">
-        {projects.map((project, index) => {
-          const isSelected = index === selectedIndex;
-          const isCurrent = project.name === currentProject;
+  const currentIndex = projects.findIndex((p) => p.name === currentProject);
 
-          return (
-            <Box key={project.name}>
-              <Text color={isSelected ? 'cyan' : undefined}>
-                {isSelected ? '▶ ' : '  '}
-                {project.name}
-                {isCurrent && <Text color="green"> (current)</Text>}
-              </Text>
-            </Box>
-          );
-        })}
-      </Box>
-      <Box marginTop={1}>
-        <Text dimColor>
-          Use arrow keys to navigate, Enter to select, q to quit
-        </Text>
-      </Box>
-    </Box>
+  return (
+    <SelectList
+      items={projects.map((p) => ({
+        id: p.name,
+        label: p.name,
+        extra: p.name === currentProject ? <Text color="green"> (current)</Text> : undefined,
+      }))}
+      header="Select a project:"
+      initialIndex={currentIndex >= 0 ? currentIndex : 0}
+      onSelect={(item) => {
+        const project = projects.find((p) => p.name === item.label);
+        if (project) {
+          setSelectedProject(project);
+          const selectResult = projectConfig.selectProject(project.name);
+          setResult(selectResult);
+        }
+      }}
+    />
   );
 };
 

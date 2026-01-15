@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
+import { SelectList } from './select-list.js';
 import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
 
 interface Brain {
@@ -31,14 +32,12 @@ type Phase = 'searching' | 'disambiguating' | 'resolved' | 'error';
 export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
   const [phase, setPhase] = useState<Phase>('searching');
   const [brains, setBrains] = useState<Brain[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [resolvedTitle, setResolvedTitle] = useState<string | null>(null);
   const [error, setError] = useState<{
     title: string;
     message: string;
     details?: string;
   } | null>(null);
-  const { exit } = useApp();
 
   const getConnectionError = useCallback(() => {
     if (isApiLocalDevMode()) {
@@ -105,23 +104,6 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
     searchBrains();
   }, [identifier, getConnectionError]);
 
-  // Handle keyboard input for disambiguation
-  useInput((input, key) => {
-    if (phase !== 'disambiguating') return;
-
-    if (key.upArrow) {
-      setSelectedIndex((prev) => (prev - 1 + brains.length) % brains.length);
-    } else if (key.downArrow) {
-      setSelectedIndex((prev) => (prev + 1) % brains.length);
-    } else if (key.return) {
-      const selectedBrain = brains[selectedIndex];
-      setResolvedTitle(selectedBrain.title);
-      setPhase('resolved');
-    } else if (input === 'q' || key.escape) {
-      exit();
-    }
-  });
-
   // Render based on phase
   if (phase === 'searching') {
     return (
@@ -137,31 +119,14 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
 
   if (phase === 'disambiguating') {
     return (
-      <Box flexDirection="column">
-        <Text bold>Multiple brains match '{identifier}':</Text>
-        <Box marginTop={1} flexDirection="column">
-          {brains.map((brain, index) => {
-            const isSelected = index === selectedIndex;
-            return (
-              <Box key={brain.title} flexDirection="column" marginBottom={1}>
-                <Text color={isSelected ? 'cyan' : undefined}>
-                  {isSelected ? '▶ ' : '  '}
-                  <Text bold>{brain.title}</Text>
-                </Text>
-                <Text dimColor>
-                  {'    '}
-                  {brain.description}
-                </Text>
-              </Box>
-            );
-          })}
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>
-            Use arrow keys to navigate, Enter to select, q to quit
-          </Text>
-        </Box>
-      </Box>
+      <SelectList
+        items={brains.map((b) => ({ id: b.title, label: b.title, description: b.description }))}
+        header={`Multiple brains match '${identifier}':`}
+        onSelect={(item) => {
+          setResolvedTitle(item.label);
+          setPhase('resolved');
+        }}
+      />
     );
   }
 

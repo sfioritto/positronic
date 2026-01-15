@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import { Box, Text } from 'ink';
 import { createMachine, state, transition, reduce, invoke, immediate, guard } from 'robot3';
 import { useMachine } from 'react-robot';
 import { Watch } from './watch.js';
 import { ErrorComponent } from './error.js';
+import { SelectList } from './select-list.js';
 import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
 
 // Types
@@ -42,7 +43,6 @@ interface ErrorInfo {
 interface ResolverContext {
   identifier: string;
   brains: Brain[];
-  selectedIndex: number;
   resolvedBrainTitle: string | null;
   resolvedRunId: string | null;
   activeRuns: ActiveRunsResponse['runs'];
@@ -169,7 +169,7 @@ const applyBrainFound = reduce(
 );
 
 const applyBrainsMultiple = reduce(
-  (ctx: ResolverContext) => ({ ...ctx, brains: ctx.brainSearchResult!.brains, selectedIndex: 0 })
+  (ctx: ResolverContext) => ({ ...ctx, brains: ctx.brainSearchResult!.brains })
 );
 
 const applyActiveRunFound = reduce(
@@ -182,20 +182,6 @@ const applyMultipleActiveRuns = reduce(
 
 const setBrainTitleFromSelection = reduce(
   (ctx: ResolverContext, ev: { brainTitle: string }) => ({ ...ctx, resolvedBrainTitle: ev.brainTitle })
-);
-
-const moveSelectionUp = reduce(
-  (ctx: ResolverContext) => ({
-    ...ctx,
-    selectedIndex: (ctx.selectedIndex - 1 + ctx.brains.length) % ctx.brains.length,
-  })
-);
-
-const moveSelectionDown = reduce(
-  (ctx: ResolverContext) => ({
-    ...ctx,
-    selectedIndex: (ctx.selectedIndex + 1) % ctx.brains.length,
-  })
 );
 
 // Guards for routing
@@ -251,9 +237,7 @@ const createResolverMachine = (identifier: string) =>
 
       // User selects from multiple matching brains
       disambiguating: state(
-        transition('UP', 'disambiguating', moveSelectionUp),
-        transition('DOWN', 'disambiguating', moveSelectionDown) as any,
-        transition('BRAIN_SELECTED', 'fetchingActiveRuns', setBrainTitleFromSelection) as any
+        transition('BRAIN_SELECTED', 'fetchingActiveRuns', setBrainTitleFromSelection)
       ),
 
       // Invoke state: fetch active runs for the brain
@@ -276,10 +260,9 @@ const createResolverMachine = (identifier: string) =>
       multipleActiveRuns: state(),
       error: state(),
     },
-    () => ({
+    (): ResolverContext => ({
       identifier,
       brains: [],
-      selectedIndex: 0,
       resolvedBrainTitle: null,
       resolvedRunId: null,
       activeRuns: [],
@@ -304,35 +287,17 @@ interface WatchResolverProps {
  * 3. If neither works, show an error
  */
 export const WatchResolver = ({ identifier }: WatchResolverProps) => {
-  const { exit } = useApp();
   const machine = useMemo(() => createResolverMachine(identifier), [identifier]);
   const [current, send] = useMachine(machine);
 
   const currentState = current.name;
   const {
     brains,
-    selectedIndex,
     resolvedBrainTitle,
     resolvedRunId,
     activeRuns,
     error,
   } = current.context;
-
-  // Handle keyboard input for brain disambiguation
-  useInput((input, key) => {
-    if (currentState !== 'disambiguating') return;
-
-    if (key.upArrow) {
-      send('UP');
-    } else if (key.downArrow) {
-      send('DOWN');
-    } else if (key.return) {
-      const { title } = brains[selectedIndex];
-      send({ type: 'BRAIN_SELECTED', brainTitle: title });
-    } else if (input === 'q' || key.escape) {
-      exit();
-    }
-  });
 
   // Render based on state
   switch (currentState) {
@@ -373,30 +338,13 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
 
     case 'disambiguating':
       return (
-        <Box flexDirection="column">
-          <Text bold>Multiple brains match '{identifier}':</Text>
-          <Box marginTop={1} flexDirection="column">
-            {brains.map((brain, index) => {
-              const isSelected = index === selectedIndex;
-              const { title, description } = brain;
-              return (
-                <Box key={title} flexDirection="column" marginBottom={1}>
-                  <Text color={isSelected ? 'cyan' : undefined}>
-                    {isSelected ? '> ' : '  '}
-                    <Text bold>{title}</Text>
-                  </Text>
-                  <Text dimColor>
-                    {'    '}
-                    {description}
-                  </Text>
-                </Box>
-              );
-            })}
-          </Box>
-          <Box marginTop={1}>
-            <Text dimColor>Use arrow keys to navigate, Enter to select, q to quit</Text>
-          </Box>
-        </Box>
+        <SelectList
+          items={brains.map((b) => ({ id: b.title, label: b.title, description: b.description }))}
+          header={`Multiple brains match '${identifier}':`}
+          onSelect={(item) => {
+            send({ type: 'BRAIN_SELECTED', brainTitle: item.label });
+          }}
+        />
       );
 
     case 'noActiveRuns':
