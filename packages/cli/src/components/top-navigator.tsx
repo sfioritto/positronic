@@ -173,12 +173,11 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
   // Detail mode - show Watch component
   if (mode === 'detail' && selectedRunId) {
     return (
-      <Box flexDirection="column">
-        <Watch runId={selectedRunId} manageScreenBuffer={false} />
-        <Box marginTop={1}>
-          <Text dimColor>b back • q quit</Text>
-        </Box>
-      </Box>
+      <Watch
+        runId={selectedRunId}
+        manageScreenBuffer={false}
+        footer="b back • k kill • q quit"
+      />
     );
   }
 

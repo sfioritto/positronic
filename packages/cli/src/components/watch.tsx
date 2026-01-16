@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Text, Box, useStdout } from 'ink';
+import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
+import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 
 // Get the index of the currently running step (or last completed if none running)
@@ -172,10 +173,12 @@ const BrainSection = ({ brain, isInner = false }: BrainSectionProps) => {
 interface WatchProps {
   runId: string;
   manageScreenBuffer?: boolean;
+  footer?: string;
 }
 
-export const Watch = ({ runId, manageScreenBuffer = true }: WatchProps) => {
+export const Watch = ({ runId, manageScreenBuffer = true, footer = 'k kill • q quit' }: WatchProps) => {
   const { write } = useStdout();
+  const { exit } = useApp();
 
   // Use state machine to track brain execution state
   // Machine is recreated when runId changes, giving us fresh context
@@ -195,7 +198,12 @@ export const Watch = ({ runId, manageScreenBuffer = true }: WatchProps) => {
   // Additional state for connection and errors (not part of the brain state machine)
   const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
   const [connectionError, setConnectionError] = useState<Error | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Kill state
+  const [isKilling, setIsKilling] = useState(false);
+  const [isKilled, setIsKilled] = useState(false);
+  const { execute: killBrain, error: killError } = useApiDelete('brain');
 
   // Enter alternate screen buffer on mount, exit on unmount
   // Skip in test environment or when parent manages screen buffer
@@ -260,12 +268,36 @@ export const Watch = ({ runId, manageScreenBuffer = true }: WatchProps) => {
     };
   }, [runId]);
 
+  // Keyboard handling
+  useInput((input) => {
+    if (input === 'k' && !isKilling && !isKilled && !isComplete) {
+      setIsKilling(true);
+      killBrain(`/brains/runs/${runId}`)
+        .then(() => {
+          setIsKilled(true);
+        })
+        .catch(() => {
+          // Error handled by useApiDelete
+        })
+        .finally(() => {
+          setIsKilling(false);
+        });
+    } else if (input === 'q') {
+      exit();
+    }
+  });
+
   // Prepare error props using destructuring
   const connectionErrorProps = connectionError
     ? { title: 'Connection Error', message: connectionError.message, details: connectionError.stack }
     : null;
   const brainErrorProps = brainError
     ? { title: brainError.error.name || 'Brain Error', ...brainError.error }
+    : null;
+
+  // Prepare kill error props
+  const killErrorProps = killError
+    ? { title: 'Kill Error', message: killError.message, details: killError.details }
     : null;
 
   return (
@@ -278,15 +310,29 @@ export const Watch = ({ runId, manageScreenBuffer = true }: WatchProps) => {
         <>
           <BrainSection brain={rootBrain} />
 
-          {isComplete && !connectionError && !brainError && (
+          {isKilling && (
+            <Box marginTop={1}>
+              <Text color="yellow">Killing brain...</Text>
+            </Box>
+          )}
+          {isKilled && (
+            <Box marginTop={1} borderStyle="round" borderColor="red" paddingX={1}>
+              <Text color="red">Brain killed.</Text>
+            </Box>
+          )}
+          {isComplete && !connectionError && !brainError && !isKilled && (
             <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
               <Text color="green">Brain completed.</Text>
             </Box>
           )}
           {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
+          {killErrorProps && <ErrorComponent error={killErrorProps} />}
         </>
       )}
+      <Box marginTop={1}>
+        <Text dimColor>{footer}</Text>
+      </Box>
     </Box>
   );
 };
