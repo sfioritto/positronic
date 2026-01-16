@@ -1,6 +1,6 @@
 {
   "name": "@positronic/cloudflare",
-  "version": "0.0.51",
+  "version": "0.0.52",
   "publishConfig": {
     "access": "public"
   },
@@ -31,9 +31,9 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
   "dependencies": {
-    "@positronic/core": "^0.0.51",
-    "@positronic/spec": "^0.0.51",
-    "@positronic/template-new-project": "^0.0.51",
+    "@positronic/core": "^0.0.52",
+    "@positronic/spec": "^0.0.52",
+    "@positronic/template-new-project": "^0.0.52",
     "aws4fetch": "^1.0.18",
     "caz": "^2.0.0",
     "cron-schedule": "^5.0.4",
