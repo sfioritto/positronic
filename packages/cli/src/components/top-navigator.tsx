@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
+import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { BrainTopTable, type RunningBrain } from './brain-top-table.js';
 import { Watch } from './watch.js';
@@ -30,6 +31,12 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [, setTick] = useState(0);
+
+  // Kill state (for list mode)
+  const [confirmingKill, setConfirmingKill] = useState(false);
+  const [isKilling, setIsKilling] = useState(false);
+  const [killMessage, setKillMessage] = useState<string | null>(null);
+  const { execute: killBrain, error: killError } = useApiDelete('brain');
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const hasReceivedDataRef = useRef(false);
@@ -123,10 +130,32 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
   // Keyboard handling
   useInput((input, key) => {
     if (mode === 'list') {
-      // List mode navigation
-      if (key.upArrow && filteredBrains.length > 0) {
+      // Handle kill confirmation
+      if (confirmingKill) {
+        if (input === 'y') {
+          const brain = filteredBrains[selectedIndex];
+          if (brain) {
+            setConfirmingKill(false);
+            setIsKilling(true);
+            killBrain(`/brains/runs/${brain.brainRunId}`)
+              .then(() => {
+                setKillMessage(`Killed: ${brain.brainTitle}`);
+                setTimeout(() => setKillMessage(null), 2000);
+              })
+              .finally(() => {
+                setIsKilling(false);
+              });
+          }
+        } else if (input === 'n' || key.escape) {
+          setConfirmingKill(false);
+        }
+        return;
+      }
+
+      // List mode navigation (arrows and vim j/k)
+      if ((key.upArrow || input === 'k') && filteredBrains.length > 0) {
         setSelectedIndex((prev) => (prev - 1 + filteredBrains.length) % filteredBrains.length);
-      } else if (key.downArrow && filteredBrains.length > 0) {
+      } else if ((key.downArrow || input === 'j') && filteredBrains.length > 0) {
         setSelectedIndex((prev) => (prev + 1) % filteredBrains.length);
       } else if (key.return && filteredBrains.length > 0) {
         // Drill into watch view
@@ -135,17 +164,16 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
           setSelectedRunId(brain.brainRunId);
           setMode('detail');
         }
-      } else if (input === 'q') {
+      } else if (input === 'x' && filteredBrains.length > 0 && !isKilling) {
+        setConfirmingKill(true);
+      } else if (input === 'q' || key.escape) {
         exit();
       }
     } else if (mode === 'detail') {
-      // Detail mode navigation
+      // Detail mode navigation - b or escape goes back to list
       if (input === 'b' || key.escape) {
-        // Return to list
         setSelectedRunId(null);
         setMode('list');
-      } else if (input === 'q') {
-        exit();
       }
     }
   });
@@ -176,7 +204,7 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
       <Watch
         runId={selectedRunId}
         manageScreenBuffer={false}
-        footer="b back • k kill • q quit"
+        footer="b back • x kill"
       />
     );
   }
@@ -190,14 +218,34 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
     );
   }
 
+  // Build footer based on state
+  let listFooter = 'j/k or ↑/↓ select • Enter watch • x kill • esc quit';
+  if (confirmingKill) {
+    const brain = filteredBrains[selectedIndex];
+    listFooter = `Kill "${brain?.brainTitle}"? (y/n)`;
+  }
+
   // List mode - show table
   return (
-    <BrainTopTable
-      runningBrains={runningBrains}
-      selectedIndex={selectedIndex}
-      interactive={true}
-      brainFilter={brainFilter}
-      footer="↑/↓ select • Enter watch • q quit"
-    />
+    <Box flexDirection="column">
+      <BrainTopTable
+        runningBrains={runningBrains}
+        selectedIndex={selectedIndex}
+        interactive={true}
+        brainFilter={brainFilter}
+        footer={listFooter}
+      />
+      {isKilling && (
+        <Box>
+          <Text color="yellow">Killing brain...</Text>
+        </Box>
+      )}
+      {killMessage && (
+        <Box>
+          <Text color="green">{killMessage}</Text>
+        </Box>
+      )}
+      {killError && <ErrorComponent error={killError} />}
+    </Box>
   );
 };
