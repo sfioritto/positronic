@@ -1,5 +1,32 @@
 # @positronic/client-vercel
 
+## 0.0.52
+
+### Patch Changes
+
+- ## New Features
+
+  - Add `px top` command for live-updating view of running brains with interactive navigation
+  - Add kill functionality from watch and list views with confirmation prompts
+  - Add vim-style navigation (j/k) to top command
+  - Add 'r' shortcut alias for 'run' command
+  - Unify watch command interface - now accepts brain name, run ID, or interactive selection
+
+  ## Improvements
+
+  - Extract reusable SelectList component for disambiguation UI
+  - Refactor brain state machine to use nested tree structure for better organization
+  - Refactor WatchResolver to use robot3 state machine for cleaner async handling
+  - Add events option to createBrainExecutionMachine for state replay
+
+  ## Bug Fixes
+
+  - Fix terminal raw mode not restored after Ctrl-C on px server
+  - Fix MonitorDO showing incorrect status when inner brain completes
+
+- Updated dependencies
+  - @positronic/core@0.0.52
+
 ## 0.0.51
 
 ### Patch Changes
