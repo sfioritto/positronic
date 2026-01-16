@@ -176,7 +176,7 @@ interface WatchProps {
   footer?: string;
 }
 
-export const Watch = ({ runId, manageScreenBuffer = true, footer = 'k kill • q quit' }: WatchProps) => {
+export const Watch = ({ runId, manageScreenBuffer = true, footer = 'x kill • esc quit' }: WatchProps) => {
   const { write } = useStdout();
   const { exit } = useApp();
 
@@ -201,6 +201,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer = 'k kill • q
   const [isConnected, setIsConnected] = useState(false);
 
   // Kill state
+  const [confirmingKill, setConfirmingKill] = useState(false);
   const [isKilling, setIsKilling] = useState(false);
   const [isKilled, setIsKilled] = useState(false);
   const { execute: killBrain, error: killError } = useApiDelete('brain');
@@ -269,21 +270,29 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer = 'k kill • q
   }, [runId]);
 
   // Keyboard handling
-  useInput((input) => {
-    if (input === 'k' && !isKilling && !isKilled && !isComplete) {
-      setIsKilling(true);
-      killBrain(`/brains/runs/${runId}`)
-        .then(() => {
-          setIsKilled(true);
-        })
-        .catch(() => {
-          // Error handled by useApiDelete
-        })
-        .finally(() => {
-          setIsKilling(false);
-        });
-    } else if (input === 'q') {
-      exit();
+  useInput((input, key) => {
+    if (confirmingKill) {
+      if (input === 'y') {
+        setConfirmingKill(false);
+        setIsKilling(true);
+        killBrain(`/brains/runs/${runId}`)
+          .then(() => {
+            setIsKilled(true);
+          })
+          .finally(() => {
+            setIsKilling(false);
+          });
+      } else if (input === 'n' || key.escape) {
+        setConfirmingKill(false);
+      }
+    } else {
+      if (input === 'x' && !isKilling && !isKilled && !isComplete) {
+        setConfirmingKill(true);
+      } else if ((input === 'q' || key.escape) && manageScreenBuffer) {
+        // Only handle quit when standalone (manageScreenBuffer=true)
+        // When embedded, parent handles q/escape
+        exit();
+      }
     }
   });
 
@@ -310,6 +319,11 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer = 'k kill • q
         <>
           <BrainSection brain={rootBrain} />
 
+          {confirmingKill && (
+            <Box marginTop={1}>
+              <Text color="yellow">Kill brain? (y/n)</Text>
+            </Box>
+          )}
           {isKilling && (
             <Box marginTop={1}>
               <Text color="yellow">Killing brain...</Text>
