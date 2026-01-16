@@ -51,6 +51,13 @@ export class ServerCommand {
     let watcher: FSWatcher | null = null;
     let logStream: fs.WriteStream | null = null;
 
+    // Restore terminal state on ANY exit - this is synchronous and guaranteed to run
+    process.on('exit', () => {
+      if (process.stdin.isTTY && process.stdin.setRawMode) {
+        process.stdin.setRawMode(false);
+      }
+    });
+
     // Always create a log file (use default if not specified)
     const logFilePath = argv.logFile
       ? path.resolve(argv.logFile)
@@ -83,9 +90,9 @@ export class ServerCommand {
     this.server.onError((message) => logBoth('ERROR', message));
     this.server.onWarning((message) => logBoth('WARN', message));
 
-    const cleanup = async () => {
+    const cleanup = () => {
       if (watcher) {
-        await watcher.close();
+        watcher.close();
         watcher = null;
       }
       if (serverHandle && !serverHandle.killed) {
@@ -104,11 +111,7 @@ export class ServerCommand {
         fs.unlinkSync(pidFile);
       }
 
-      // Restore terminal from raw mode (dev server may have set it)
-      if (process.stdin.isTTY && process.stdin.setRawMode) {
-        process.stdin.setRawMode(false);
-      }
-
+      // Terminal is restored by process.on('exit') handler
       process.exit(0);
     };
 
@@ -127,6 +130,7 @@ export class ServerCommand {
           watcher.close();
           watcher = null;
         }
+        // Terminal is restored by process.on('exit') handler
         process.exit(code ?? 1); // Exit with server's code or 1 if null
       });
 
@@ -136,6 +140,7 @@ export class ServerCommand {
           watcher.close();
           watcher = null;
         }
+        // Terminal is restored by process.on('exit') handler
         process.exit(1);
       });
       // Wait for the server to be ready before syncing resources
@@ -150,6 +155,7 @@ export class ServerCommand {
         if (serverHandle && !serverHandle.killed) {
           serverHandle.kill();
         }
+        // Terminal is restored by process.on('exit') handler
         process.exit(1);
       }
 

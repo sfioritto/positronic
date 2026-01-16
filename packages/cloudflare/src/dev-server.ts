@@ -538,7 +538,10 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     const wranglerProcess = spawn('npx', ['wrangler', ...wranglerArgs], {
       cwd: serverDir,
-      stdio: ['inherit', 'pipe', 'pipe'], // stdin inherit, stdout/stderr piped
+      // Don't inherit stdin - this prevents wrangler from:
+      // 1. Setting terminal to raw mode (which breaks Ctrl-A, Ctrl-E after exit)
+      // 2. Receiving SIGINT directly (we handle Ctrl-C in the parent process)
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     // Capture and forward stdout
