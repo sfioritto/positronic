@@ -6,7 +6,14 @@ export type JsonArray = JsonValue[];
 export type JsonObject = { [Key in string]?: JsonValue };
 export type JsonValue = JsonPrimitive | JsonArray | JsonObject;
 
-export type State = JsonObject;
+/**
+ * State represents the shape of brain state through its execution.
+ * Using `object` instead of `JsonObject` to allow TypeScript interfaces
+ * (which don't have implicit index signatures) as state values.
+ * The JSON patch system operates on runtime values, so the type constraint
+ * is primarily for compile-time ergonomics.
+ */
+export type State = object;
 
 /**
  * Secrets/environment variables available to brains at runtime.
