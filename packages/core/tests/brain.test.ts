@@ -1871,7 +1871,7 @@ describe('type inference', () => {
       )
       .step('Final step', ({ state }) => ({
         ...state,
-        completed: true,
+        completed: true as const,
       }));
 
     // Type test setup
@@ -1974,7 +1974,7 @@ describe('type inference', () => {
     // Create an inner brain with a specific state shape
     const innerBrain = brain('Inner State Test').step('Inner step', () => ({
       innerValue: 42,
-      metadata: { processed: true },
+      metadata: { processed: true as const },
     }));
 
     // Create outer brain to test reducer type inference
