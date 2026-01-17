@@ -722,14 +722,9 @@ const completeBrain = brain({
       }),
       name: 'plan' as const,
     },
-  },
-  // Services available in reduce function too
-  ({ state, response, logger }) => {
-    logger.log(`Plan generated with <%= '${response.tasks.length}' %> tasks`);
-    return { ...state, plan: response };
   })
   .step('Process Plan', ({ state, logger, analytics }) => {
-    logger.log(`Processing <%= '${state.plan.tasks.length}' %> tasks`);
+    logger.log(`Plan generated with <%= '${state.plan.tasks.length}' %> tasks`);
     analytics.track('plan_processed', {
       task_count: state.plan.tasks.length,
       duration: state.plan.duration

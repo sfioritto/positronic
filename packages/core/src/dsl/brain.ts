@@ -681,7 +681,7 @@ export class Brain<
   // a consumer of this brain must use "as const" to ensure the key is a string literal
   // this type makes sure that the will get a ts error if they don't.
 
-  // Overload 1: Single execution (existing behavior)
+  // Overload 1: Single execution - runs prompt once with current state
   prompt<
     TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
@@ -700,19 +700,10 @@ export class Brain<
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
       };
       client?: ObjectGenerator;
-    },
-    reduce?: (
-      params: {
-        state: TState;
-        response: z.infer<TSchema>;
-        options: TOptions;
-        prompt: string;
-        resources: Resources;
-      } & TServices
-    ) => TNewState | Promise<TNewState>
+    }
   ): Brain<TOptions, TNewState, TServices, TResponse>;
 
-  // Overload 2: Batch execution (new)
+  // Overload 2: Batch execution - runs prompt for each item in array
   prompt<
     TItem,
     TResponseKey extends string & { readonly brand?: unique symbol },
@@ -739,7 +730,7 @@ export class Brain<
     }
   ): Brain<TOptions, TNewState, TServices, TResponse>;
 
-  // Implementation - uses 'any' for parameters that differ between overloads
+  // Implementation
   prompt(
     title: string,
     config: {
@@ -750,22 +741,16 @@ export class Brain<
       };
       client?: ObjectGenerator;
     },
-    thirdArg?: any
+    batchConfig?: {
+      over: (state: any) => any[];
+      concurrency?: number;
+      stagger?: number;
+      retry?: RetryConfig;
+      error?: (item: any, error: Error) => any | null;
+    }
   ): any {
-    // Detect batch mode by checking if thirdArg has 'over' property
-    const isBatchMode =
-      thirdArg && typeof thirdArg === 'object' && 'over' in thirdArg;
-
-    if (isBatchMode) {
-      // Batch mode
-      const batchConfig = thirdArg as {
-        over: (state: any) => any[];
-        concurrency?: number;
-        stagger?: number;
-        retry?: RetryConfig;
-        error?: (item: any, error: Error) => any | null;
-      };
-
+    if (batchConfig) {
+      // Batch mode - run prompt for each item
       const promptBlock: StepBlock<
         TState,
         any,
@@ -776,37 +761,26 @@ export class Brain<
       > = {
         type: 'step',
         title,
-        action: async ({
-          state,
-          client: runClient,
-          resources,
-        }) => {
+        action: async ({ state, client: runClient, resources }) => {
           const { template, outputSchema, client: stepClient } = config;
           const { schema, name: schemaName } = outputSchema;
           const client = stepClient ?? runClient;
 
-          // Get items from state using the over function
           const items = batchConfig.over(state);
           const semaphore = new Semaphore(batchConfig.concurrency ?? 10);
           const stagger = batchConfig.stagger ?? 0;
           const retryConfig = normalizeRetryConfig(batchConfig.retry);
 
-          // Results array preserves order - undefined means item was skipped
-          const results: ([any, any] | undefined)[] = new Array(
-            items.length
-          );
+          const results: ([any, any] | undefined)[] = new Array(items.length);
 
           const promises = items.map(async (item, index) => {
-            // Stagger: wait before starting this item
             if (stagger > 0 && index > 0) {
               await sleep(stagger * index);
             }
 
             await semaphore.acquire();
             try {
-              // Generate prompt and call LLM with retry
               const promptText = await template(item, resources);
-
               const output = await executeWithRetry(
                 () =>
                   client.generateObject({
@@ -816,18 +790,14 @@ export class Brain<
                   }),
                 retryConfig
               );
-
               results[index] = [item, output];
             } catch (error) {
-              // If error handler provided, use it
               if (batchConfig.error) {
                 const fallback = batchConfig.error(item, error as Error);
                 if (fallback !== null) {
                   results[index] = [item, fallback];
                 }
-                // null means skip this item (results[index] stays undefined)
               } else {
-                // No handler - fail the whole step
                 throw error;
               }
             } finally {
@@ -837,12 +807,10 @@ export class Brain<
 
           await Promise.all(promises);
 
-          // Filter out undefined (skipped items) and preserve order
           const finalResults = results.filter(
             (r): r is [any, any] => r !== undefined
           );
 
-          // Merge results into state under outputSchema.name
           return {
             ...state,
             [config.outputSchema.name]: finalResults,
@@ -852,19 +820,7 @@ export class Brain<
       this.blocks.push(promptBlock);
       return this.nextBrain<any>();
     } else {
-      // Single mode (existing behavior)
-      const reduce = thirdArg as
-        | ((
-            params: {
-              state: TState;
-              response: any;
-              options: TOptions;
-              prompt: string;
-              resources: Resources;
-            } & TServices
-          ) => any | Promise<any>)
-        | undefined;
-
+      // Single mode - run prompt once with current state
       const promptBlock: StepBlock<
         TState,
         any,
@@ -875,14 +831,7 @@ export class Brain<
       > = {
         type: 'step',
         title,
-        action: async ({
-          state,
-          client: runClient,
-          options,
-          resources,
-          response: webhookResponse,
-          ...services
-        }) => {
+        action: async ({ state, client: runClient, resources }) => {
           const { template, outputSchema, client: stepClient } = config;
           const { schema, name: schemaName } = outputSchema;
           const client = stepClient ?? runClient;
@@ -892,21 +841,10 @@ export class Brain<
             schemaName,
             prompt,
           });
-          const stateWithResponse = {
+          return {
             ...state,
             [config.outputSchema.name]: response,
           };
-
-          return reduce
-            ? reduce({
-                state,
-                response,
-                options,
-                prompt,
-                resources,
-                ...(services as TServices),
-              })
-            : stateWithResponse;
         },
       };
       this.blocks.push(promptBlock);

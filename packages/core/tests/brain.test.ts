@@ -459,68 +459,6 @@ describe('brain creation', () => {
       expect(loadedText).toBe('mock myFile text content');
     });
 
-    it('should make resources available in a prompt action and reducer', async () => {
-      mockGenerateObject.mockResolvedValue({ summary: 'Generated summary' });
-      let promptTemplateString: string | undefined;
-      let reduceContent: string | undefined;
-
-      const testBrain = brain<
-        {},
-        {
-          promptResult?: any;
-          reducedResult?: string;
-          fileContentForPrompt?: string;
-        }
-      >('Resource Prompt Test')
-        .step('Load File For Prompt', async ({ resources }) => {
-          const fileContent = await (resources.myFile as any).loadText();
-          return { fileContentForPrompt: fileContent };
-        })
-        .prompt(
-          'Summarize File',
-          {
-            template: (state) => {
-              return 'Summarize: ' + state.fileContentForPrompt;
-            },
-            outputSchema: {
-              schema: z.object({ summary: z.string() }),
-              name: 'promptResult' as const,
-            },
-          },
-          async ({ state, response, resources }) => {
-            reduceContent = await (
-              (resources.nested as any).anotherFile as any
-            ).loadText();
-            return {
-              ...state,
-              reducedResult: response.summary + ' based on ' + reduceContent,
-            };
-          }
-        );
-
-      const run = testBrain.run({
-        client: mockClient,
-        resources: mockResources,
-      });
-      let finalState: any = {};
-      const allPatches: JsonPatch[] = [];
-      const initialStateForReconstruction = {};
-
-      for await (const event of run) {
-        if (event.type === BRAIN_EVENTS.STEP_COMPLETE && event.patch) {
-          allPatches.push(event.patch);
-        }
-      }
-      finalState = applyPatches(initialStateForReconstruction, allPatches);
-
-      expect(mockResourceLoad).toHaveBeenCalledWith('myFile', 'text');
-      expect(mockResourceLoad).toHaveBeenCalledWith('anotherFile', 'text');
-      expect(reduceContent).toBe('mock anotherFile text content');
-      expect(finalState.reducedResult).toBe(
-        'Generated summary based on mock anotherFile text content'
-      );
-    });
-
     it('should pass resources to prompt template function', async () => {
       const testBrain = brain('Resource Prompt Template Test').prompt(
         'Generate Summary',
@@ -2219,64 +2157,6 @@ describe('type inference', () => {
     });
   });
 
-  it('should correctly handle prompt reduce function', async () => {
-    const testBrain = brain('Prompt Reduce Test').prompt(
-      'Get numbers',
-      {
-        template: () => 'Give me some numbers',
-        outputSchema: {
-          schema: z.object({ numbers: z.array(z.number()) }),
-          name: 'numbersResponse' as const,
-        },
-      },
-      ({ state, response, options }) => ({
-        ...state,
-        numbersResponse: response, // Include the response explicitly
-        sum: response.numbers.reduce((a, b) => a + b, 0),
-        count: response.numbers.length,
-      })
-    );
-
-    // Mock the client response
-    mockClient.generateObject.mockResolvedValueOnce({
-      numbers: [1, 2, 3, 4, 5],
-    });
-
-    // Run brain and collect final state
-    let finalState = {};
-    for await (const event of testBrain.run({
-      client: mockClient,
-    })) {
-      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-        finalState = applyPatches(finalState, [event.patch]);
-      }
-    }
-
-    // Verify the brain executed correctly with reduced state
-    expect(finalState).toEqual({
-      numbersResponse: {
-        numbers: [1, 2, 3, 4, 5],
-      },
-      sum: 15,
-      count: 5,
-    });
-
-    // Verify type inference works correctly
-    type ExpectedState = {
-      numbersResponse: {
-        numbers: number[];
-      };
-      sum: number;
-      count: number;
-    };
-
-    type ActualState = Parameters<
-      Parameters<(typeof testBrain)['step']>[1]
-    >[0]['state'];
-
-    type TypeTest = AssertEquals<ActualState, ExpectedState>;
-    const _typeAssert: TypeTest = true;
-  });
 });
 
 describe('brain structure', () => {
