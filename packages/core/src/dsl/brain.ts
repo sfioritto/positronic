@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator, ToolMessage } from '../clients/types.js';
-import type { State, JsonPatch, JsonObject, RuntimeEnv, LoopTool, LoopConfig, LoopMessage, LoopToolWaitFor } from './types.js';
+import type { State, JsonPatch, JsonObject, RuntimeEnv, LoopTool, LoopConfig, LoopMessage, LoopToolWaitFor, RetryConfig } from './types.js';
 import { STATUS, BRAIN_EVENTS } from './constants.js';
 import { createPatch, applyPatches } from './json-patch.js';
 import type { Resources } from '../resources/resources.js';
@@ -48,6 +48,85 @@ When resuming after a webhook response, that response appears as the tool result
  */
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Simple semaphore for limiting concurrent operations.
+ * Used internally by batch prompt execution.
+ */
+class Semaphore {
+  private current = 0;
+  private queue: (() => void)[] = [];
+
+  constructor(private readonly max: number) {}
+
+  async acquire() {
+    if (this.current < this.max) {
+      this.current++;
+      return;
+    }
+    return new Promise<void>((resolve) => this.queue.push(resolve));
+  }
+
+  release() {
+    this.current--;
+    const next = this.queue.shift();
+    if (next) {
+      this.current++;
+      next();
+    }
+  }
+}
+
+/**
+ * Normalize retry config with defaults.
+ */
+function normalizeRetryConfig(config?: RetryConfig): Required<RetryConfig> {
+  return {
+    maxRetries: config?.maxRetries ?? 3,
+    backoff: config?.backoff ?? 'exponential',
+    initialDelay: config?.initialDelay ?? 1000,
+    maxDelay: config?.maxDelay ?? 30000,
+  };
+}
+
+/**
+ * Calculate backoff delay based on attempt number and config.
+ */
+function calculateBackoff(attempt: number, config: Required<RetryConfig>) {
+  switch (config.backoff) {
+    case 'none':
+      return config.initialDelay;
+    case 'linear':
+      return Math.min(config.initialDelay * (attempt + 1), config.maxDelay);
+    case 'exponential':
+      return Math.min(config.initialDelay * Math.pow(2, attempt), config.maxDelay);
+  }
+}
+
+/**
+ * Execute a function with retry and exponential backoff.
+ */
+async function executeWithRetry<T>(
+  fn: () => Promise<T>,
+  config: Required<RetryConfig>
+) {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt < config.maxRetries) {
+        const delay = calculateBackoff(attempt, config);
+        await sleep(delay);
+      }
+    }
+  }
+
+  throw lastError;
+}
 
 // Shared interface for step action functions
 export type StepAction<
@@ -509,16 +588,16 @@ export class Brain<
       action: action as any,
     };
     this.blocks.push(stepBlock);
-    
+
     // Create next brain with inferred response type
     const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
-    
+
     nextBrain.services = this.services;
     nextBrain.optionsSchema = this.optionsSchema;
-    
+
     return nextBrain;
   }
 
@@ -601,6 +680,8 @@ export class Brain<
   // The response key must be a string literal, so if defining a response model
   // a consumer of this brain must use "as const" to ensure the key is a string literal
   // this type makes sure that the will get a ts error if they don't.
+
+  // Overload 1: Single execution (existing behavior)
   prompt<
     TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
@@ -629,53 +710,208 @@ export class Brain<
         resources: Resources;
       } & TServices
     ) => TNewState | Promise<TNewState>
-  ) {
-    const promptBlock: StepBlock<
-      TState,
-      TNewState,
-      TOptions,
-      TServices,
-      TResponse,
-      readonly []
-    > = {
-      type: 'step',
-      title,
-      action: async ({
-        state,
-        client: runClient,
-        options,
-        resources,
-        response: webhookResponse,
-        ...services
-      }) => {
-        const { template, outputSchema, client: stepClient } = config;
-        const { schema, name: schemaName } = outputSchema;
-        const client = stepClient ?? runClient;
-        const prompt = await template(state, resources);
-        const response = await client.generateObject({
-          schema,
-          schemaName,
-          prompt,
-        });
-        const stateWithResponse = {
-          ...state,
-          [config.outputSchema.name]: response,
-        };
+  ): Brain<TOptions, TNewState, TServices, TResponse>;
 
-        return reduce
-          ? reduce({
-              state,
-              response,
-              options,
-              prompt,
-              resources,
-              ...(services as TServices),
-            })
-          : (stateWithResponse as unknown as TNewState);
-      },
-    };
-    this.blocks.push(promptBlock);
-    return this.nextBrain<TNewState>();
+  // Overload 2: Batch execution (new)
+  prompt<
+    TItem,
+    TResponseKey extends string & { readonly brand?: unique symbol },
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & {
+      [K in TResponseKey]: [TItem, z.infer<TSchema>][];
+    }
+  >(
+    title: string,
+    config: {
+      template: (item: TItem, resources: Resources) => string | Promise<string>;
+      outputSchema: {
+        schema: TSchema;
+        name: TResponseKey & (string extends TResponseKey ? never : unknown);
+      };
+      client?: ObjectGenerator;
+    },
+    batchConfig: {
+      over: (state: TState) => TItem[];
+      concurrency?: number;
+      stagger?: number;
+      retry?: RetryConfig;
+      error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
+    }
+  ): Brain<TOptions, TNewState, TServices, TResponse>;
+
+  // Implementation - uses 'any' for parameters that differ between overloads
+  prompt(
+    title: string,
+    config: {
+      template: (input: any, resources: Resources) => string | Promise<string>;
+      outputSchema: {
+        schema: z.ZodObject<any>;
+        name: string;
+      };
+      client?: ObjectGenerator;
+    },
+    thirdArg?: any
+  ): any {
+    // Detect batch mode by checking if thirdArg has 'over' property
+    const isBatchMode =
+      thirdArg && typeof thirdArg === 'object' && 'over' in thirdArg;
+
+    if (isBatchMode) {
+      // Batch mode
+      const batchConfig = thirdArg as {
+        over: (state: any) => any[];
+        concurrency?: number;
+        stagger?: number;
+        retry?: RetryConfig;
+        error?: (item: any, error: Error) => any | null;
+      };
+
+      const promptBlock: StepBlock<
+        TState,
+        any,
+        TOptions,
+        TServices,
+        TResponse,
+        readonly []
+      > = {
+        type: 'step',
+        title,
+        action: async ({
+          state,
+          client: runClient,
+          resources,
+        }) => {
+          const { template, outputSchema, client: stepClient } = config;
+          const { schema, name: schemaName } = outputSchema;
+          const client = stepClient ?? runClient;
+
+          // Get items from state using the over function
+          const items = batchConfig.over(state);
+          const semaphore = new Semaphore(batchConfig.concurrency ?? 10);
+          const stagger = batchConfig.stagger ?? 0;
+          const retryConfig = normalizeRetryConfig(batchConfig.retry);
+
+          // Results array preserves order - undefined means item was skipped
+          const results: ([any, any] | undefined)[] = new Array(
+            items.length
+          );
+
+          const promises = items.map(async (item, index) => {
+            // Stagger: wait before starting this item
+            if (stagger > 0 && index > 0) {
+              await sleep(stagger * index);
+            }
+
+            await semaphore.acquire();
+            try {
+              // Generate prompt and call LLM with retry
+              const promptText = await template(item, resources);
+
+              const output = await executeWithRetry(
+                () =>
+                  client.generateObject({
+                    schema,
+                    schemaName,
+                    prompt: promptText,
+                  }),
+                retryConfig
+              );
+
+              results[index] = [item, output];
+            } catch (error) {
+              // If error handler provided, use it
+              if (batchConfig.error) {
+                const fallback = batchConfig.error(item, error as Error);
+                if (fallback !== null) {
+                  results[index] = [item, fallback];
+                }
+                // null means skip this item (results[index] stays undefined)
+              } else {
+                // No handler - fail the whole step
+                throw error;
+              }
+            } finally {
+              semaphore.release();
+            }
+          });
+
+          await Promise.all(promises);
+
+          // Filter out undefined (skipped items) and preserve order
+          const finalResults = results.filter(
+            (r): r is [any, any] => r !== undefined
+          );
+
+          // Merge results into state under outputSchema.name
+          return {
+            ...state,
+            [config.outputSchema.name]: finalResults,
+          };
+        },
+      };
+      this.blocks.push(promptBlock);
+      return this.nextBrain<any>();
+    } else {
+      // Single mode (existing behavior)
+      const reduce = thirdArg as
+        | ((
+            params: {
+              state: TState;
+              response: any;
+              options: TOptions;
+              prompt: string;
+              resources: Resources;
+            } & TServices
+          ) => any | Promise<any>)
+        | undefined;
+
+      const promptBlock: StepBlock<
+        TState,
+        any,
+        TOptions,
+        TServices,
+        TResponse,
+        readonly []
+      > = {
+        type: 'step',
+        title,
+        action: async ({
+          state,
+          client: runClient,
+          options,
+          resources,
+          response: webhookResponse,
+          ...services
+        }) => {
+          const { template, outputSchema, client: stepClient } = config;
+          const { schema, name: schemaName } = outputSchema;
+          const client = stepClient ?? runClient;
+          const prompt = await template(state, resources);
+          const response = await client.generateObject({
+            schema,
+            schemaName,
+            prompt,
+          });
+          const stateWithResponse = {
+            ...state,
+            [config.outputSchema.name]: response,
+          };
+
+          return reduce
+            ? reduce({
+                state,
+                response,
+                options,
+                prompt,
+                resources,
+                ...(services as TServices),
+              })
+            : stateWithResponse;
+        },
+      };
+      this.blocks.push(promptBlock);
+      return this.nextBrain<any>();
+    }
   }
 
   // Overload signatures
