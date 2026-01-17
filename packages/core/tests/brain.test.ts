@@ -2563,3 +2563,744 @@ describe('brain structure', () => {
     });
   });
 });
+
+describe('batch prompt', () => {
+  // Use a separate mock for batch tests to avoid conflicts with module-level mock
+  const batchMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const batchMockClient = {
+    generateObject: batchMockGenerateObject,
+  };
+
+  beforeEach(() => {
+    batchMockGenerateObject.mockClear();
+  });
+
+  describe('basic execution', () => {
+    it('should execute template for each item and return tuples', async () => {
+      // Track calls to verify template is called for each item
+      const templateCalls: string[] = [];
+
+      // Mock client to return category based on email content
+      batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
+        if (prompt?.includes('urgent')) return { category: 'urgent' };
+        if (prompt?.includes('newsletter')) return { category: 'newsletter' };
+        return { category: 'general' };
+      });
+
+      const testBrain = brain('Batch Test')
+        .step('Init', () => ({
+          emails: [
+            { id: '1', subject: 'urgent: meeting', body: 'This is urgent' },
+            { id: '2', subject: 'Newsletter', body: 'Monthly newsletter' },
+            { id: '3', subject: 'Hello', body: 'General email' },
+          ],
+        }))
+        .prompt(
+          'Categorize',
+          {
+            template: (email: { id: string; subject: string; body: string }) => {
+              templateCalls.push(email.id);
+              return `Categorize: ${email.subject} - ${email.body}`;
+            },
+            outputSchema: {
+              schema: z.object({ category: z.string() }),
+              name: 'categories' as const,
+            },
+          },
+          {
+            over: (state) => state.emails,
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Verify template was called for each email
+      expect(templateCalls).toEqual(['1', '2', '3']);
+
+      // Verify results are stored as tuples
+      expect(finalState.categories).toHaveLength(3);
+      expect(finalState.categories[0]).toEqual([
+        { id: '1', subject: 'urgent: meeting', body: 'This is urgent' },
+        { category: 'urgent' },
+      ]);
+      expect(finalState.categories[1]).toEqual([
+        { id: '2', subject: 'Newsletter', body: 'Monthly newsletter' },
+        { category: 'newsletter' },
+      ]);
+      expect(finalState.categories[2]).toEqual([
+        { id: '3', subject: 'Hello', body: 'General email' },
+        { category: 'general' },
+      ]);
+    });
+
+    it('should store results under outputSchema.name', async () => {
+      batchMockGenerateObject.mockResolvedValue({ sentiment: 'positive' });
+
+      const testBrain = brain('Named Results Test')
+        .step('Init', () => ({
+          items: [{ text: 'hello' }, { text: 'world' }],
+        }))
+        .prompt(
+          'Analyze',
+          {
+            template: (item: { text: string }) => item.text,
+            outputSchema: {
+              schema: z.object({ sentiment: z.string() }),
+              name: 'sentimentResults' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Verify results are stored under the correct key
+      expect(finalState.sentimentResults).toBeDefined();
+      expect(finalState.sentimentResults).toHaveLength(2);
+    });
+
+    it('should maintain item order in results', async () => {
+      // Make the mock return different values based on order of calls
+      let callOrder = 0;
+      batchMockGenerateObject.mockImplementation(async () => {
+        const order = callOrder++;
+        // Add artificial delays to test order preservation
+        await new Promise((resolve) => setTimeout(resolve, (3 - order) * 10));
+        return { order };
+      });
+
+      const testBrain = brain('Order Test')
+        .step('Init', () => ({
+          items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: string }) => item.id,
+            outputSchema: {
+              schema: z.object({ order: z.number() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Results should be in original item order, not completion order
+      expect(finalState.results[0][0]).toEqual({ id: 'a' });
+      expect(finalState.results[1][0]).toEqual({ id: 'b' });
+      expect(finalState.results[2][0]).toEqual({ id: 'c' });
+    });
+  });
+
+  describe('concurrency', () => {
+    it('should respect concurrency limit', async () => {
+      let concurrentCalls = 0;
+      let maxConcurrentCalls = 0;
+
+      batchMockGenerateObject.mockImplementation(async () => {
+        concurrentCalls++;
+        maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentCalls);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        concurrentCalls--;
+        return { done: true };
+      });
+
+      const testBrain = brain('Concurrency Test')
+        .step('Init', () => ({
+          items: Array.from({ length: 10 }, (_, i) => ({ id: i })),
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            concurrency: 3,
+          }
+        );
+
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        // Just consume events
+      }
+
+      // Max concurrent calls should not exceed the limit
+      expect(maxConcurrentCalls).toBeLessThanOrEqual(3);
+      // Should have processed all items
+      expect(batchMockGenerateObject).toHaveBeenCalledTimes(10);
+    });
+
+    it('should default to concurrency of 10', async () => {
+      let concurrentCalls = 0;
+      let maxConcurrentCalls = 0;
+
+      batchMockGenerateObject.mockImplementation(async () => {
+        concurrentCalls++;
+        maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentCalls);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        concurrentCalls--;
+        return { done: true };
+      });
+
+      const testBrain = brain('Default Concurrency Test')
+        .step('Init', () => ({
+          items: Array.from({ length: 20 }, (_, i) => ({ id: i })),
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            // No concurrency specified - should default to 10
+          }
+        );
+
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        // Just consume events
+      }
+
+      // Max concurrent calls should not exceed default of 10
+      expect(maxConcurrentCalls).toBeLessThanOrEqual(10);
+    });
+  });
+
+  describe('stagger', () => {
+    it('should delay between starting each item', async () => {
+      const startTimes: number[] = [];
+
+      batchMockGenerateObject.mockImplementation(async () => {
+        startTimes.push(Date.now());
+        return { done: true };
+      });
+
+      const testBrain = brain('Stagger Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            stagger: 50, // 50ms between each item start
+          }
+        );
+
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        // Just consume events
+      }
+
+      // Verify delays between start times
+      // Item 1 should start immediately, item 2 after ~50ms, item 3 after ~100ms
+      expect(startTimes.length).toBe(3);
+      expect(startTimes[1] - startTimes[0]).toBeGreaterThanOrEqual(40); // Allow some tolerance
+      expect(startTimes[2] - startTimes[0]).toBeGreaterThanOrEqual(90);
+    });
+  });
+
+  describe('retry', () => {
+    it('should retry failed items up to maxRetries', async () => {
+      let callCount = 0;
+
+      batchMockGenerateObject.mockImplementation(async () => {
+        callCount++;
+        if (callCount <= 2) {
+          throw new Error('Transient error');
+        }
+        return { success: true };
+      });
+
+      const testBrain = brain('Retry Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ success: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            retry: {
+              maxRetries: 3,
+              backoff: 'none',
+              initialDelay: 10,
+            },
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Should have been called 3 times (2 failures + 1 success)
+      expect(callCount).toBe(3);
+      expect(finalState.results[0][1]).toEqual({ success: true });
+    });
+
+    it('should use exponential backoff by default', async () => {
+      const callTimes: number[] = [];
+      let callCount = 0;
+
+      batchMockGenerateObject.mockImplementation(async () => {
+        callTimes.push(Date.now());
+        callCount++;
+        if (callCount <= 2) {
+          throw new Error('Transient error');
+        }
+        return { success: true };
+      });
+
+      const testBrain = brain('Backoff Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ success: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            retry: {
+              maxRetries: 3,
+              initialDelay: 50,
+              // backoff defaults to 'exponential'
+            },
+          }
+        );
+
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        // Just consume events
+      }
+
+      // Verify exponential backoff timing
+      // First retry after ~50ms, second after ~100ms (50 * 2)
+      expect(callTimes.length).toBe(3);
+      const firstDelay = callTimes[1] - callTimes[0];
+      const secondDelay = callTimes[2] - callTimes[1];
+
+      // Allow some tolerance but verify second delay is longer
+      expect(firstDelay).toBeGreaterThanOrEqual(40);
+      expect(secondDelay).toBeGreaterThanOrEqual(80);
+    });
+  });
+
+  describe('error handling', () => {
+    it('should fail whole step when no error handler and item fails', async () => {
+      batchMockGenerateObject.mockRejectedValue(new Error('API error'));
+
+      const testBrain = brain('Fail Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            retry: { maxRetries: 0 }, // No retries for faster test
+          }
+        );
+
+      let error: Error | undefined;
+      try {
+        for await (const event of testBrain.run({ client: batchMockClient })) {
+          // Just consume events
+        }
+      } catch (e) {
+        error = e as Error;
+      }
+
+      expect(error?.message).toBe('API error');
+    });
+
+    it('should use error handler return value as fallback', async () => {
+      let callCount = 0;
+      batchMockGenerateObject.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Failed for item 2');
+        }
+        return { status: 'success' };
+      });
+
+      const testBrain = brain('Error Handler Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ status: z.string() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            retry: { maxRetries: 0 },
+            error: (item, err) => ({ status: 'failed' }),
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // All items should be present
+      expect(finalState.results).toHaveLength(3);
+      expect(finalState.results[0][1]).toEqual({ status: 'success' });
+      expect(finalState.results[1][1]).toEqual({ status: 'failed' });
+      expect(finalState.results[2][1]).toEqual({ status: 'success' });
+    });
+
+    it('should skip item when error handler returns null', async () => {
+      let callCount = 0;
+      batchMockGenerateObject.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Failed for item 2');
+        }
+        return { status: 'success' };
+      });
+
+      const testBrain = brain('Skip Item Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ status: z.string() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            retry: { maxRetries: 0 },
+            error: (item, err) => null, // Return null to skip
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Only 2 items should be present (item 2 was skipped)
+      expect(finalState.results).toHaveLength(2);
+      expect(finalState.results[0][0]).toEqual({ id: 1 });
+      expect(finalState.results[1][0]).toEqual({ id: 3 });
+    });
+
+    it('should continue processing other items after handled error', async () => {
+      const processedItems: number[] = [];
+      batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
+        const id = parseInt(prompt?.split(' ')[1] ?? '0');
+        processedItems.push(id);
+        if (id === 2) {
+          throw new Error('Error on item 2');
+        }
+        return { done: true };
+      });
+
+      const testBrain = brain('Continue After Error Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            retry: { maxRetries: 0 },
+            error: () => ({ done: false }),
+          }
+        );
+
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        // Just consume events
+      }
+
+      // All items should have been processed
+      expect(processedItems).toContain(1);
+      expect(processedItems).toContain(2);
+      expect(processedItems).toContain(3);
+      expect(processedItems).toContain(4);
+    });
+  });
+
+  describe('type inference', () => {
+    it('should infer TItem from over function', async () => {
+      batchMockGenerateObject.mockResolvedValue({ label: 'test' });
+
+      const testBrain = brain('Type Inference Test')
+        .step('Init', () => ({
+          myItems: [
+            { name: 'a', value: 1 },
+            { name: 'b', value: 2 },
+          ],
+        }))
+        .prompt(
+          'Label',
+          {
+            template: (item: { name: string; value: number }) => {
+              // TypeScript should know item has name and value
+              const nameUppercase = item.name.toUpperCase();
+              const doubledValue = item.value * 2;
+              return `${nameUppercase}: ${doubledValue}`;
+            },
+            outputSchema: {
+              schema: z.object({ label: z.string() }),
+              name: 'labeled' as const,
+            },
+          },
+          {
+            over: (state) => state.myItems,
+          }
+        )
+        .step('Use Results', ({ state }) => {
+          // Access the labeled results - use runtime check for tuple structure
+          const firstTuple = state.labeled[0] as [{ name: string; value: number }, { label: string }];
+          const firstItem = firstTuple[0];
+          const firstResult = firstTuple[1];
+
+          return {
+            ...state,
+            firstName: firstItem.name,
+            firstLabel: firstResult.label,
+          };
+        });
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(finalState.firstName).toBe('a');
+      expect(finalState.firstLabel).toBe('test');
+    });
+
+    it('should provide correct state type to subsequent steps', async () => {
+      batchMockGenerateObject.mockResolvedValue({ score: 10 });
+
+      const testBrain = brain('Subsequent Step Type Test')
+        .step('Init', () => ({
+          items: [{ text: 'hello' }],
+        }))
+        .prompt(
+          'Score',
+          {
+            template: (item: { text: string }) => item.text,
+            outputSchema: {
+              schema: z.object({ score: z.number() }),
+              name: 'scores' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+          }
+        )
+        .step('Aggregate', ({ state }) => {
+          // Access scores with proper tuple typing
+          const scores = state.scores as [{ text: string }, { score: number }][];
+          const total = scores.reduce(
+            (sum, [_, result]) => sum + result.score,
+            0
+          );
+          return {
+            ...state,
+            total,
+          };
+        });
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(finalState.total).toBe(10);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle empty items array', async () => {
+      const testBrain = brain('Empty Items Test')
+        .step('Init', () => ({
+          items: [] as { id: number }[],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(finalState.results).toEqual([]);
+      expect(batchMockGenerateObject).not.toHaveBeenCalled();
+    });
+
+    it('should work with async template function', async () => {
+      batchMockGenerateObject.mockResolvedValue({ processed: true });
+
+      const testBrain = brain('Async Template Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: async (item: { id: number }) => {
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              return `Async item ${item.id}`;
+            },
+            outputSchema: {
+              schema: z.object({ processed: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(batchMockGenerateObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: 'Async item 1',
+        })
+      );
+    });
+
+    it('should work with custom client per prompt', async () => {
+      const customGenerateObject = jest.fn<ObjectGenerator['generateObject']>().mockResolvedValue({ custom: true });
+      const customClient = {
+        generateObject: customGenerateObject,
+      };
+
+      const testBrain = brain('Custom Client Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ custom: z.boolean() }),
+              name: 'results' as const,
+            },
+            client: customClient,
+          },
+          {
+            over: (state) => state.items,
+          }
+        );
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Should have used the custom client, not the run client
+      expect(customGenerateObject).toHaveBeenCalled();
+      expect(batchMockGenerateObject).not.toHaveBeenCalled();
+      expect(finalState.results[0][1]).toEqual({ custom: true });
+    });
+  });
+});

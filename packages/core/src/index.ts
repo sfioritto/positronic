@@ -27,6 +27,7 @@ export type {
   LoopMessage,
   LoopToolWaitFor,
   ExtractTerminalInput,
+  RetryConfig,
 } from './dsl/types.js';
 export { createPatch, applyPatches } from './dsl/json-patch.js';
 
