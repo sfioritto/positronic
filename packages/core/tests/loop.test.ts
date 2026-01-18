@@ -21,9 +21,11 @@ import { reconstructLoopContext } from '../src/dsl/loop-messages.js';
 // Mock ObjectGenerator with generateText support
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
 const mockGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 const mockClient: jest.Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
   generateText: mockGenerateText,
+  streamText: mockStreamText,
 };
 
 describe('loop step', () => {
@@ -412,6 +414,7 @@ describe('loop step', () => {
     it('should throw descriptive error when client lacks generateText', async () => {
       const clientWithoutGenerateText: ObjectGenerator = {
         generateObject: mockGenerateObject,
+        streamText: mockStreamText,
         // No generateText
       };
 

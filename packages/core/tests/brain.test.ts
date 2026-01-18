@@ -44,8 +44,10 @@ type AssertEquals<T, U> = 0 extends 1 & T
 
 // Mock ObjectGenerator for testing
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 const mockClient: jest.Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
+  streamText: mockStreamText,
 };
 
 // Mock Resources for testing
@@ -361,6 +363,7 @@ describe('brain creation', () => {
       generateObject: jest
         .fn<ObjectGenerator['generateObject']>()
         .mockResolvedValue({ override: true }),
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
     };
 
     // Make sure that for the default prompt the default client returns a known value.
@@ -949,6 +952,7 @@ describe('step creation', () => {
 describe('brain resumption', () => {
   const mockClient = {
     generateObject: jest.fn(),
+    streamText: jest.fn(),
   };
 
   it('should resume brain from the correct step when given initialCompletedSteps', async () => {
@@ -2447,8 +2451,10 @@ describe('brain structure', () => {
 describe('batch prompt', () => {
   // Use a separate mock for batch tests to avoid conflicts with module-level mock
   const batchMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const batchMockStreamText = jest.fn<ObjectGenerator['streamText']>();
   const batchMockClient = {
     generateObject: batchMockGenerateObject,
+    streamText: batchMockStreamText,
   };
 
   beforeEach(() => {

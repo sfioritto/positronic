@@ -11,8 +11,10 @@ import { z } from 'zod';
 
 describe('BrainRunner', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
   const mockClient: jest.Mocked<ObjectGenerator> = {
     generateObject: mockGenerateObject,
+    streamText: mockStreamText,
   };
 
   const mockDispatch = jest.fn<Adapter['dispatch']>();
@@ -237,9 +239,11 @@ describe('BrainRunner', () => {
   it('should replace client with withClient method', async () => {
     const originalClient: jest.Mocked<ObjectGenerator> = {
       generateObject: jest.fn(),
+      streamText: jest.fn(),
     };
     const newClient: jest.Mocked<ObjectGenerator> = {
       generateObject: jest.fn(),
+      streamText: jest.fn(),
     };
 
     // Configure the new client's response

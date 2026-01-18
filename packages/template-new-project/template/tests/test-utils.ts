@@ -19,8 +19,13 @@ export function createMockClient(): MockClient {
     return responses[responseIndex++];
   });
 
+  const streamText = jest.fn(async () => {
+    throw new Error('streamText not implemented in mock');
+  });
+
   return {
     generateObject,
+    streamText,
     mockResponses: (...newResponses: any[]) => {
       responses.push(...newResponses);
     },
@@ -28,6 +33,7 @@ export function createMockClient(): MockClient {
       responses.length = 0;
       responseIndex = 0;
       generateObject.mockClear();
+      streamText.mockClear();
     },
   };
 }
