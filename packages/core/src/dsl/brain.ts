@@ -9,6 +9,15 @@ import type { WebhookRegistration, ExtractWebhookResponses, SerializedWebhookReg
 import type { PagesService } from './pages.js';
 import type { LoopResumeContext } from './loop-messages.js';
 
+/**
+ * Page object available after a .ui() step.
+ * Contains link to the page and optional webhook for form submissions.
+ */
+export type GeneratedPage<TSchema extends z.ZodSchema = z.ZodSchema> = {
+  link: string;
+  webhook: WebhookRegistration<TSchema> | null;
+};
+
 export type SerializedError = {
   name: string;
   message: string;
@@ -136,7 +145,8 @@ export type StepAction<
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
   TWaitFor extends readonly any[] = readonly [],
-  TResponseOut extends JsonObject | undefined = undefined
+  TResponseOut extends JsonObject | undefined = undefined,
+  TPageIn extends GeneratedPage | undefined = undefined
 > = (
   params: {
     state: TStateIn;
@@ -144,6 +154,7 @@ export type StepAction<
     client: ObjectGenerator;
     resources: Resources;
     response: TResponseIn;
+    page: TPageIn;
     pages?: PagesService;
     env: RuntimeEnv;
   } & TServices
@@ -388,7 +399,8 @@ type StepBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWebhooks extends readonly any[] = readonly []
+  TWebhooks extends readonly any[] = readonly [],
+  TPageIn extends GeneratedPage | undefined = undefined
 > = {
   type: 'step';
   title: string;
@@ -398,7 +410,9 @@ type StepBlock<
     TOptions,
     TServices,
     TResponseIn,
-    TWebhooks
+    TWebhooks,
+    JsonObject | undefined,
+    TPageIn
   >;
 };
 
@@ -449,7 +463,8 @@ type Block<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWebhooks extends readonly any[] = readonly []
+  TWebhooks extends readonly any[] = readonly [],
+  TPageIn extends GeneratedPage | undefined = undefined
 > =
   | StepBlock<
       TStateIn,
@@ -457,7 +472,8 @@ type Block<
       TOptions,
       TServices,
       TResponseIn,
-      TWebhooks
+      TWebhooks,
+      TPageIn
     >
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
   | LoopBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>;
@@ -490,9 +506,10 @@ export class Brain<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
   TServices extends object = object,
-  TResponse extends JsonObject | undefined = undefined
+  TResponse extends JsonObject | undefined = undefined,
+  TPage extends GeneratedPage | undefined = undefined
 > {
-  private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
+  private blocks: Block<any, any, TOptions, TServices, any, any, any>[] = [];
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
   private optionsSchema?: z.ZodSchema<any>;
@@ -529,8 +546,8 @@ export class Brain<
   // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
-  ): Brain<TOptions, TState, TNewServices, TResponse> {
-    const nextBrain = new Brain<TOptions, TState, TNewServices, TResponse>(
+  ): Brain<TOptions, TState, TNewServices, TResponse, TPage> {
+    const nextBrain = new Brain<TOptions, TState, TNewServices, TResponse, TPage>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -545,8 +562,8 @@ export class Brain<
 
   withOptionsSchema<TSchema extends z.ZodSchema>(
     schema: TSchema
-  ): Brain<z.infer<TSchema>, TState, TServices, TResponse> {
-    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices, TResponse>(
+  ): Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage> {
+    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -569,6 +586,7 @@ export class Brain<
         client: ObjectGenerator;
         resources: Resources;
         response: TResponse;
+        page: TPage;
         pages?: PagesService;
         env: RuntimeEnv;
       } & TServices
@@ -577,14 +595,15 @@ export class Brain<
       | Promise<TNewState>
       | { state: TNewState; waitFor: TWaitFor }
       | Promise<{ state: TNewState; waitFor: TWaitFor }>
-  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>> {
+  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>, undefined> {
     const stepBlock: StepBlock<
       TState,
       TNewState,
       TOptions,
       TServices,
       TResponse,
-      TWaitFor
+      TWaitFor,
+      TPage
     > = {
       type: 'step',
       title,
@@ -592,8 +611,8 @@ export class Brain<
     };
     this.blocks.push(stepBlock);
 
-    // Create next brain with inferred response type
-    const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>>(
+    // Create next brain with inferred response type and reset page to undefined
+    const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>, undefined>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -649,11 +668,12 @@ export class Brain<
         client: ObjectGenerator;
         resources: Resources;
         response: TResponse;
+        page: TPage;
         pages?: PagesService;
         env: RuntimeEnv;
       } & TServices
     ) => LoopConfig<TTools> | Promise<LoopConfig<TTools>>
-  ): Brain<TOptions, TNewState, TServices, TResponse> {
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined> {
     const loopBlock: LoopBlock<
       TState,
       TNewState,
@@ -668,7 +688,7 @@ export class Brain<
     };
     this.blocks.push(loopBlock);
 
-    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse>(
+    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse, undefined>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -704,7 +724,7 @@ export class Brain<
       };
       client?: ObjectGenerator;
     }
-  ): Brain<TOptions, TNewState, TServices, TResponse>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
   // Overload 2: Batch execution - runs prompt for each item in array
   prompt<
@@ -731,7 +751,7 @@ export class Brain<
       retry?: RetryConfig;
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
     }
-  ): Brain<TOptions, TNewState, TServices, TResponse>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
   // Overload 3: Schema-less prompt - returns text response for next step
   prompt(
@@ -743,7 +763,7 @@ export class Brain<
       ) => string | Promise<string>;
       client?: ObjectGenerator;
     }
-  ): Brain<TOptions, TState, TServices, { text: string }>;
+  ): Brain<TOptions, TState, TServices, { text: string }, undefined>;
 
   // Implementation
   prompt(
@@ -773,7 +793,8 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly []
+        readonly [],
+        TPage
       > = {
         type: 'step',
         title,
@@ -806,7 +827,8 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly []
+        readonly [],
+        TPage
       > = {
         type: 'step',
         title,
@@ -876,7 +898,8 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly []
+        readonly [],
+        TPage
       > = {
         type: 'step',
         title,
@@ -941,7 +964,7 @@ export class Brain<
   }
 
   private withBlocks(
-    blocks: Block<any, any, TOptions, TServices, any, any>[]
+    blocks: Block<any, any, TOptions, TServices, any, any, any>[]
   ): this {
     this.blocks = blocks;
     return this;
@@ -949,10 +972,11 @@ export class Brain<
 
   private nextBrain<
     TNewState extends State,
-    TResponse extends JsonObject | undefined = undefined
-  >(): Brain<TOptions, TNewState, TServices, TResponse> {
+    TNewResponse extends JsonObject | undefined = undefined,
+    TNewPage extends GeneratedPage | undefined = undefined
+  >(): Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage> {
     // Pass default options to the next brain
-    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse>(
+    const nextBrain = new Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -1018,6 +1042,7 @@ class BrainEventStream<
   private pages?: PagesService;
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
+  private currentPage: GeneratedPage | undefined = undefined;
   private loopResumeContext: LoopResumeContext | null | undefined = undefined;
   private initialCompletedSteps?: SerializedStep[];
 
@@ -1025,7 +1050,7 @@ class BrainEventStream<
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices, any, any>[];
+      blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
     }
   ) {
@@ -1047,7 +1072,7 @@ class BrainEventStream<
     } = params as RerunParams<TOptions> & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices, any, any>[];
+      blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
     };
 
@@ -1317,7 +1342,7 @@ class BrainEventStream<
     } else {
       // Get previous state before action
       const prevState = this.currentState;
-      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
+      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any, any>;
 
       // Execute step with automatic retry on failure
       let retries = 0;
@@ -1332,6 +1357,7 @@ class BrainEventStream<
               client: this.client,
               resources: this.resources,
               response: this.currentResponse,
+              page: this.currentPage,
               pages: this.pages,
               env: this.env,
               ...this.services,
@@ -1393,6 +1419,9 @@ class BrainEventStream<
       if (result && typeof result === 'object' && 'promptResponse' in result) {
         this.currentResponse = result.promptResponse;
       }
+
+      // Reset currentPage after step consumes it (page is ephemeral)
+      this.currentPage = undefined;
     }
   }
 
@@ -1407,10 +1436,14 @@ class BrainEventStream<
       client: this.client,
       resources: this.resources,
       response: this.currentResponse,
+      page: this.currentPage,
       pages: this.pages,
       env: this.env,
       ...this.services,
     });
+
+    // Reset currentPage after configFn consumes it (page is ephemeral)
+    this.currentPage = undefined;
 
     // Check if we're resuming from a webhook
     let messages: ToolMessage[];

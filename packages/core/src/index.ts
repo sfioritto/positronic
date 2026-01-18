@@ -16,6 +16,7 @@ export type {
   StepRetryEvent,
   BrainStructure,
   BrainFactory,
+  GeneratedPage,
 } from './dsl/brain.js';
 export type { ObjectGenerator, Message, ToolMessage } from './clients/types.js';
 export type {
