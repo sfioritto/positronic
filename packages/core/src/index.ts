@@ -67,6 +67,10 @@ export type {
 export type { LoopResumeContext } from './dsl/loop-messages.js';
 export { reconstructLoopContext } from './dsl/loop-messages.js';
 
+// UI types
+export type { UIComponent, FormPrimitive, FormField, FormSchema } from './ui/types.js';
+export { isFormSchema } from './ui/types.js';
+
 // Brain state machine
 export {
   createBrainExecutionMachine,
