@@ -3189,4 +3189,96 @@ describe('batch prompt', () => {
       expect(finalState.results[0][1]).toEqual({ custom: true });
     });
   });
+
+  describe('schema-less prompt', () => {
+    const schemaLessMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+    const schemaLessMockClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: schemaLessMockGenerateObject,
+      streamText: jest.fn(),
+    };
+
+    beforeEach(() => {
+      schemaLessMockGenerateObject.mockClear();
+    });
+
+    it('should return text response available in next step', async () => {
+      // Mock the internal text schema response
+      schemaLessMockGenerateObject.mockResolvedValueOnce({ text: 'Generated summary text' });
+
+      const testBrain = brain('Schema-less Prompt Test')
+        .step('Init', () => ({ data: 'some data' }))
+        .prompt('Generate Summary', {
+          template: (state) => `Summarize: ${state.data}`,
+        })
+        .step('Use Response', ({ state, response }) => {
+          // response should be { text: string }
+          return { ...state, summary: response.text };
+        });
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: schemaLessMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Verify generateObject was called with the internal text schema
+      expect(schemaLessMockGenerateObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          schemaName: 'TextResponse',
+          prompt: 'Summarize: some data',
+        })
+      );
+
+      // Verify final state has the summary from the response
+      expect(finalState).toEqual({
+        data: 'some data',
+        summary: 'Generated summary text',
+      });
+    });
+
+    it('should not modify state in schema-less prompt step', async () => {
+      schemaLessMockGenerateObject.mockResolvedValueOnce({ text: 'Result' });
+
+      const testBrain = brain('Schema-less No State Change')
+        .step('Init', () => ({ original: 'value' }))
+        .prompt('Generate', {
+          template: () => 'Generate something',
+        })
+        .step('Check State', ({ state }) => {
+          // State should still only have original value
+          return state;
+        });
+
+      let finalState: any = {};
+      for await (const event of testBrain.run({ client: schemaLessMockClient })) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // State should not include the text response - it's ephemeral
+      expect(finalState).toEqual({ original: 'value' });
+    });
+
+    it('should have correct TypeScript types for response', async () => {
+      schemaLessMockGenerateObject.mockResolvedValueOnce({ text: 'Typed text' });
+
+      // This test verifies compile-time types - if it compiles, types are correct
+      const testBrain = brain('Type Test')
+        .step('Init', () => ({ count: 0 }))
+        .prompt('Generate', {
+          template: () => 'test',
+        })
+        .step('Use Response', ({ state, response }) => {
+          // TypeScript should know response is { text: string }
+          const text: string = response.text;
+          return { ...state, result: text };
+        });
+
+      for await (const _ of testBrain.run({ client: schemaLessMockClient })) {
+        // Just run to verify it works
+      }
+    });
+  });
 });

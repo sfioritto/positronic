@@ -135,7 +135,8 @@ export type StepAction<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWaitFor extends readonly any[] = readonly []
+  TWaitFor extends readonly any[] = readonly [],
+  TResponseOut extends JsonObject | undefined = undefined
 > = (
   params: {
     state: TStateIn;
@@ -150,7 +151,9 @@ export type StepAction<
   | TStateOut
   | Promise<TStateOut>
   | { state: TStateOut; waitFor: TWaitFor }
-  | Promise<{ state: TStateOut; waitFor: TWaitFor }>;
+  | Promise<{ state: TStateOut; waitFor: TWaitFor }>
+  | { state: TStateOut; promptResponse: TResponseOut }
+  | Promise<{ state: TStateOut; promptResponse: TResponseOut }>;
 
 // New Event Type System
 // Base event interface with only type and options
@@ -730,12 +733,24 @@ export class Brain<
     }
   ): Brain<TOptions, TNewState, TServices, TResponse>;
 
+  // Overload 3: Schema-less prompt - returns text response for next step
+  prompt(
+    title: string,
+    config: {
+      template: (
+        state: TState,
+        resources: Resources
+      ) => string | Promise<string>;
+      client?: ObjectGenerator;
+    }
+  ): Brain<TOptions, TState, TServices, { text: string }>;
+
   // Implementation
   prompt(
     title: string,
     config: {
       template: (input: any, resources: Resources) => string | Promise<string>;
-      outputSchema: {
+      outputSchema?: {
         schema: z.ZodObject<any>;
         name: string;
       };
@@ -749,6 +764,40 @@ export class Brain<
       error?: (item: any, error: Error) => any | null;
     }
   ): any {
+    // Schema-less prompt - returns text response for next step
+    if (!config.outputSchema) {
+      const textSchema = z.object({ text: z.string() });
+      const promptBlock: StepBlock<
+        TState,
+        any,
+        TOptions,
+        TServices,
+        TResponse,
+        readonly []
+      > = {
+        type: 'step',
+        title,
+        action: async ({ state, client: runClient, resources }) => {
+          const { template, client: stepClient } = config;
+          const client = stepClient ?? runClient;
+          const prompt = await template(state, resources);
+          const response = await client.generateObject({
+            schema: textSchema,
+            schemaName: 'TextResponse',
+            prompt,
+          });
+          return {
+            state,
+            promptResponse: response,
+          };
+        },
+      };
+      this.blocks.push(promptBlock);
+      return this.nextBrain<any>();
+    }
+    // At this point, outputSchema is guaranteed to exist (schema-less case returned early)
+    const outputSchema = config.outputSchema!;
+
     if (batchConfig) {
       // Batch mode - run prompt for each item
       const promptBlock: StepBlock<
@@ -762,7 +811,7 @@ export class Brain<
         type: 'step',
         title,
         action: async ({ state, client: runClient, resources }) => {
-          const { template, outputSchema, client: stepClient } = config;
+          const { template, client: stepClient } = config;
           const { schema, name: schemaName } = outputSchema;
           const client = stepClient ?? runClient;
 
@@ -813,7 +862,7 @@ export class Brain<
 
           return {
             ...state,
-            [config.outputSchema.name]: finalResults,
+            [outputSchema.name]: finalResults,
           };
         },
       };
@@ -832,7 +881,7 @@ export class Brain<
         type: 'step',
         title,
         action: async ({ state, client: runClient, resources }) => {
-          const { template, outputSchema, client: stepClient } = config;
+          const { template, client: stepClient } = config;
           const { schema, name: schemaName } = outputSchema;
           const client = stepClient ?? runClient;
           const prompt = await template(state, resources);
@@ -843,7 +892,7 @@ export class Brain<
           });
           return {
             ...state,
-            [config.outputSchema.name]: response,
+            [outputSchema.name]: response,
           };
         },
       };
@@ -1315,7 +1364,12 @@ class BrainEventStream<
         }
       }
 
-      this.currentState = result && typeof result === 'object' && 'waitFor' in result ? result.state : result;
+      // Extract state from result (handles waitFor and promptResponse cases)
+      if (result && typeof result === 'object' && ('waitFor' in result || 'promptResponse' in result)) {
+        this.currentState = result.state;
+      } else {
+        this.currentState = result;
+      }
       yield* this.completeStep(step, prevState);
 
       if (result && typeof result === 'object' && 'waitFor' in result) {
@@ -1333,6 +1387,11 @@ class BrainEventStream<
           options: this.options,
           brainRunId: this.brainRunId,
         };
+      }
+
+      // Handle promptResponse - set currentResponse for next step
+      if (result && typeof result === 'object' && 'promptResponse' in result) {
+        this.currentResponse = result.promptResponse;
       }
     }
   }
