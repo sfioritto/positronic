@@ -3155,6 +3155,7 @@ describe('batch prompt', () => {
       const customGenerateObject = jest.fn<ObjectGenerator['generateObject']>().mockResolvedValue({ custom: true });
       const customClient = {
         generateObject: customGenerateObject,
+        streamText: jest.fn<ObjectGenerator['streamText']>(),
       };
 
       const testBrain = brain('Custom Client Test')
