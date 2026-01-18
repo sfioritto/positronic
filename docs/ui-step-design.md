@@ -534,10 +534,11 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 - Returns `placements` array with component IDs and props
 - Exported from core
 
-**Step 11**: Implement `ValidateForm` tool
+**Step 11**: Implement `ValidateForm` tool ✅
 - Checks if current component tree satisfies schema
-- Returns errors or OK
-- Used by generateUI loop
+- Returns `{ valid: boolean, errors: string[] }`
+- Uses shared placements array via closure to see current state
+- Added when schema is provided to generateUI
 
 **Step 12**: Add `.ui()` method to Brain
 - Runs generateUI with components

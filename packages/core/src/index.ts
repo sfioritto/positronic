@@ -74,7 +74,7 @@ export { isFormSchema } from './ui/types.js';
 
 // UI generation
 export { generateUI } from './ui/generate-ui.js';
-export type { ComponentPlacement, GenerateUIResult } from './ui/generate-ui.js';
+export type { ComponentPlacement, GenerateUIResult, ValidationResult } from './ui/generate-ui.js';
 
 // Brain state machine
 export {

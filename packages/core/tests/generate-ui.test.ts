@@ -6,7 +6,7 @@ import type { UIComponent } from '../src/ui/types.js';
 
 const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 const mockClient: ObjectGenerator = {
-  generateObject: jest.fn(),
+  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
   streamText: mockStreamText,
 };
 
@@ -92,5 +92,108 @@ describe('generateUI', () => {
 
     expect(result.placements).toHaveLength(0);
     expect(result.text).toBe('No components needed.');
+  });
+
+  it('should include ValidateForm tool when schema is provided', async () => {
+    const schema = z.object({
+      email: z.string(),
+      name: z.string(),
+    });
+
+    mockStreamText.mockImplementationOnce(async (params) => {
+      // Verify ValidateForm tool is present
+      expect(params.tools.ValidateForm).toBeDefined();
+      expect(params.tools.ValidateForm.description).toContain('schema');
+
+      // Place only email field (missing name)
+      const result1 = await params.tools.TestInput.execute!({ name: 'email', label: 'Email' });
+
+      // Call ValidateForm - should report missing 'name' field
+      const validation = await params.tools.ValidateForm.execute!({});
+
+      return {
+        toolCalls: [
+          { toolCallId: 'c1', toolName: 'TestInput', args: { name: 'email', label: 'Email' }, result: result1 },
+          { toolCallId: 'c2', toolName: 'ValidateForm', args: {}, result: validation },
+        ],
+        usage: { totalTokens: 100 },
+      };
+    });
+
+    const result = await generateUI({
+      client: mockClient,
+      prompt: 'Create a contact form',
+      components: { TestInput },
+      schema,
+    });
+
+    // Should have the input placement plus ValidateForm result
+    expect(result.placements).toHaveLength(1);
+
+    // The ValidateForm result should indicate missing field
+    const validationResult = mockStreamText.mock.calls[0][0].tools.ValidateForm;
+    expect(validationResult).toBeDefined();
+  });
+
+  it('should validate form fields against schema', async () => {
+    const schema = z.object({
+      email: z.string(),
+      age: z.number(),
+      subscribe: z.boolean().optional(),
+    });
+
+    let validationResults: any[] = [];
+
+    mockStreamText.mockImplementationOnce(async (params) => {
+      // First validation - no fields placed yet
+      const v1 = await params.tools.ValidateForm.execute!({});
+      validationResults.push(v1);
+
+      // Place email field
+      const r1 = await params.tools.TestInput.execute!({ name: 'email', label: 'Email' });
+
+      // Second validation - missing age (subscribe is optional)
+      const v2 = await params.tools.ValidateForm.execute!({});
+      validationResults.push(v2);
+
+      // Place age field
+      const r2 = await params.tools.TestInput.execute!({ name: 'age', label: 'Age' });
+
+      // Third validation - all required fields present
+      const v3 = await params.tools.ValidateForm.execute!({});
+      validationResults.push(v3);
+
+      return {
+        toolCalls: [
+          { toolCallId: 'c1', toolName: 'ValidateForm', args: {}, result: v1 },
+          { toolCallId: 'c2', toolName: 'TestInput', args: { name: 'email', label: 'Email' }, result: r1 },
+          { toolCallId: 'c3', toolName: 'ValidateForm', args: {}, result: v2 },
+          { toolCallId: 'c4', toolName: 'TestInput', args: { name: 'age', label: 'Age' }, result: r2 },
+          { toolCallId: 'c5', toolName: 'ValidateForm', args: {}, result: v3 },
+        ],
+        usage: { totalTokens: 200 },
+      };
+    });
+
+    await generateUI({
+      client: mockClient,
+      prompt: 'Create a signup form',
+      components: { TestInput },
+      schema,
+    });
+
+    // First validation: missing both email and age
+    expect(validationResults[0].valid).toBe(false);
+    expect(validationResults[0].errors).toContain('Missing required field: email');
+    expect(validationResults[0].errors).toContain('Missing required field: age');
+
+    // Second validation: missing age
+    expect(validationResults[1].valid).toBe(false);
+    expect(validationResults[1].errors).not.toContain('Missing required field: email');
+    expect(validationResults[1].errors).toContain('Missing required field: age');
+
+    // Third validation: all required fields present
+    expect(validationResults[2].valid).toBe(true);
+    expect(validationResults[2].errors).toHaveLength(0);
   });
 });
