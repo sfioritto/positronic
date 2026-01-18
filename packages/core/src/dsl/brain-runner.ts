@@ -8,6 +8,7 @@ import type { State, JsonObject, RuntimeEnv } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
+import type { UIComponent } from '../ui/types.js';
 
 export class BrainRunner {
   constructor(
@@ -17,6 +18,7 @@ export class BrainRunner {
       resources?: Resources;
       pages?: PagesService;
       env?: RuntimeEnv;
+      components?: Record<string, UIComponent>;
     }
   ) {}
 
@@ -53,6 +55,28 @@ export class BrainRunner {
     return new BrainRunner({
       ...this.options,
       env,
+    });
+  }
+
+  /**
+   * Configure UI components for generative UI steps.
+   * Components are merged with any existing components, allowing overrides.
+   *
+   * @example
+   * ```typescript
+   * import { defaultComponents } from '@positronic/gen-ui-components';
+   *
+   * const runner = new BrainRunner({ client, adapters })
+   *   .withComponents(defaultComponents);
+   * ```
+   */
+  withComponents(components: Record<string, UIComponent>): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      components: {
+        ...this.options.components,
+        ...components,
+      },
     });
   }
 
