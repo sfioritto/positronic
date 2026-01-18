@@ -30,6 +30,19 @@ export class MockObjectGenerator implements ObjectGenerator {
     return this.generateObjectMock(params) as Promise<z.infer<T>>;
   }
 
+  async streamText(): Promise<{
+    toolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      result: unknown;
+    }>;
+    text?: string;
+    usage: { totalTokens: number };
+  }> {
+    throw new Error('streamText not implemented in mock');
+  }
+
   /**
    * Mock a response for the next generateObject call
    */

@@ -86,4 +86,48 @@ export interface ObjectGenerator {
     /** Token usage information */
     usage: { totalTokens: number };
   }>;
+
+  /**
+   * Generates text with multi-step tool calling support.
+   * Used for agentic workflows that require multiple LLM iterations.
+   *
+   * Unlike generateText (single step), this method:
+   * - Executes tools and feeds results back to the LLM automatically
+   * - Continues until maxSteps reached or LLM stops calling tools
+   * - Returns all tool calls with their results
+   *
+   * This is a thin wrapper around the underlying SDK's multi-step capabilities
+   * (e.g., Vercel AI SDK's stopWhen: stepCountIs()).
+   */
+  streamText(params: {
+    /** System prompt for the LLM */
+    system?: string;
+    /** Initial user prompt */
+    prompt: string;
+    /** Conversation messages (optional, for context) */
+    messages?: ToolMessage[];
+    /** Available tools for the LLM to call */
+    tools: Record<
+      string,
+      {
+        description: string;
+        inputSchema: z.ZodSchema;
+        execute?: (args: unknown) => Promise<unknown> | unknown;
+      }
+    >;
+    /** Maximum number of LLM iterations (default: 10) */
+    maxSteps?: number;
+  }): Promise<{
+    /** All tool calls made across all steps, with their results */
+    toolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      result: unknown;
+    }>;
+    /** Final text response (if any) */
+    text?: string;
+    /** Token usage across all steps */
+    usage: { totalTokens: number };
+  }>;
 }

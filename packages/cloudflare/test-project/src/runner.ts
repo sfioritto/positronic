@@ -90,6 +90,10 @@ const mockClient: ObjectGenerator = {
       usage: { totalTokens: 100 },
     };
   },
+
+  streamText: async () => {
+    throw new Error('streamText not implemented in mock');
+  },
 };
 
 export const runner = new BrainRunner({

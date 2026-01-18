@@ -1,5 +1,10 @@
 import type { ObjectGenerator, Message, ToolMessage } from '@positronic/core';
-import { generateObject, generateText } from 'ai';
+import {
+  generateObject,
+  generateText,
+  streamText as vercelStreamText,
+  stepCountIs,
+} from 'ai';
 import { z } from 'zod';
 import type { LanguageModel, ModelMessage } from 'ai';
 
@@ -129,6 +134,128 @@ export class VercelClient implements ObjectGenerator {
       })),
       usage: {
         totalTokens: result.usage?.totalTokens ?? 0,
+      },
+    };
+  }
+
+  async streamText(params: {
+    system?: string;
+    prompt: string;
+    messages?: ToolMessage[];
+    tools: Record<
+      string,
+      {
+        description: string;
+        inputSchema: z.ZodSchema;
+        execute?: (args: unknown) => Promise<unknown> | unknown;
+      }
+    >;
+    maxSteps?: number;
+  }): Promise<{
+    toolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      result: unknown;
+    }>;
+    text?: string;
+    usage: { totalTokens: number };
+  }> {
+    const { system, prompt, messages, tools, maxSteps = 10 } = params;
+
+    // Build messages array
+    const modelMessages: ModelMessage[] = [];
+
+    if (system) {
+      modelMessages.push({ role: 'system', content: system });
+    }
+
+    // Add any context messages
+    if (messages) {
+      for (const msg of messages) {
+        if (msg.role === 'user') {
+          modelMessages.push({ role: 'user', content: msg.content });
+        } else if (msg.role === 'assistant') {
+          modelMessages.push({ role: 'assistant', content: msg.content });
+        } else if (msg.role === 'tool') {
+          modelMessages.push({
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: msg.toolCallId!,
+                toolName: msg.toolName!,
+                output: { type: 'text', value: msg.content },
+              },
+            ],
+          });
+        }
+      }
+    }
+
+    // Add the initial prompt
+    modelMessages.push({ role: 'user', content: prompt });
+
+    // Convert tools to Vercel AI SDK format (with execute functions)
+    const aiTools: Record<
+      string,
+      {
+        description: string;
+        inputSchema: z.ZodSchema;
+        execute?: (args: unknown) => Promise<unknown> | unknown;
+      }
+    > = {};
+    for (const [name, tool] of Object.entries(tools)) {
+      aiTools[name] = {
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        execute: tool.execute,
+      };
+    }
+
+    // Call Vercel's streamText with multi-step support
+    const stream = vercelStreamText({
+      model: this.model,
+      messages: modelMessages,
+      tools: aiTools,
+      stopWhen: stepCountIs(maxSteps),
+    });
+
+    // Await the steps and text (automatically consumes the stream)
+    const [steps, text, usage] = await Promise.all([
+      stream.steps,
+      stream.text,
+      stream.totalUsage,
+    ]);
+
+    // Collect all tool calls across all steps with their results
+    const allToolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      result: unknown;
+    }> = [];
+
+    for (const step of steps) {
+      // Match tool calls with their results
+      for (const toolCall of step.toolCalls) {
+        const toolResult = step.toolResults.find(
+          (tr) => tr.toolCallId === toolCall.toolCallId
+        );
+        allToolCalls.push({
+          toolCallId: toolCall.toolCallId,
+          toolName: toolCall.toolName,
+          args: toolCall.input,
+          result: toolResult?.output,
+        });
+      }
+    }
+
+    return {
+      toolCalls: allToolCalls,
+      text: text || undefined,
+      usage: {
+        totalTokens: usage?.totalTokens ?? 0,
       },
     };
   }

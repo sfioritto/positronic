@@ -189,4 +189,148 @@ export class AnthropicClient implements ObjectGenerator {
       },
     };
   }
+
+  async streamText(params: {
+    system?: string;
+    prompt: string;
+    messages?: ToolMessage[];
+    tools: Record<
+      string,
+      {
+        description: string;
+        inputSchema: z.ZodSchema;
+        execute?: (args: unknown) => Promise<unknown> | unknown;
+      }
+    >;
+    maxSteps?: number;
+  }): Promise<{
+    toolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      result: unknown;
+    }>;
+    text?: string;
+    usage: { totalTokens: number };
+  }> {
+    const { system, prompt, messages = [], tools, maxSteps = 10 } = params;
+
+    // Convert tools to Anthropic format
+    const anthropicTools: Anthropic.Tool[] = Object.entries(tools).map(
+      ([name, tool]) => ({
+        name,
+        description: tool.description,
+        input_schema: zodToJsonSchema(tool.inputSchema) as Anthropic.Tool.InputSchema,
+      })
+    );
+
+    // Build initial messages
+    const anthropicMessages: Anthropic.MessageParam[] = [];
+
+    // Add context messages
+    for (const msg of messages) {
+      if (msg.role === 'user') {
+        anthropicMessages.push({ role: 'user', content: msg.content });
+      } else if (msg.role === 'assistant') {
+        anthropicMessages.push({ role: 'assistant', content: msg.content });
+      }
+    }
+
+    // Add the initial prompt
+    anthropicMessages.push({ role: 'user', content: prompt });
+
+    // Collect all tool calls with results across steps
+    const allToolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      result: unknown;
+    }> = [];
+
+    let totalTokens = 0;
+    let finalText: string | undefined;
+    let step = 0;
+
+    while (step < maxSteps) {
+      step++;
+
+      const response = await this.anthropicSdk.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8192,
+        system: system,
+        messages: anthropicMessages,
+        tools: anthropicTools,
+      });
+
+      totalTokens += response.usage.input_tokens + response.usage.output_tokens;
+
+      // Extract text and tool calls from response
+      let stepText: string | undefined;
+      const stepToolCalls: Array<{ id: string; name: string; input: unknown }> = [];
+
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          stepText = (stepText || '') + block.text;
+        } else if (block.type === 'tool_use') {
+          stepToolCalls.push({
+            id: block.id,
+            name: block.name,
+            input: block.input,
+          });
+        }
+      }
+
+      finalText = stepText;
+
+      // If no tool calls, we're done
+      if (stepToolCalls.length === 0) {
+        break;
+      }
+
+      // Add assistant message with tool calls
+      anthropicMessages.push({
+        role: 'assistant',
+        content: response.content,
+      });
+
+      // Execute tools and collect results
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+      for (const toolCall of stepToolCalls) {
+        const tool = tools[toolCall.name];
+        let result: unknown;
+
+        if (tool?.execute) {
+          result = await tool.execute(toolCall.input);
+        } else {
+          result = { success: true };
+        }
+
+        allToolCalls.push({
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          args: toolCall.input,
+          result,
+        });
+
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolCall.id,
+          content: typeof result === 'string' ? result : JSON.stringify(result),
+        });
+      }
+
+      // Add user message with tool results
+      anthropicMessages.push({
+        role: 'user',
+        content: toolResults,
+      });
+    }
+
+    return {
+      toolCalls: allToolCalls,
+      text: finalText,
+      usage: { totalTokens },
+    };
+  }
 }
