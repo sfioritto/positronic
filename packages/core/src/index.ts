@@ -72,6 +72,10 @@ export { reconstructLoopContext } from './dsl/loop-messages.js';
 export type { UIComponent, FormPrimitive, FormField, FormSchema } from './ui/types.js';
 export { isFormSchema } from './ui/types.js';
 
+// UI generation
+export { generateUI } from './ui/generate-ui.js';
+export type { ComponentPlacement, GenerateUIResult } from './ui/generate-ui.js';
+
 // Brain state machine
 export {
   createBrainExecutionMachine,

@@ -50,8 +50,8 @@ const summaryPrompt = prompt({
 ```typescript
 .prompt('Summary', summaryPrompt)
 .step('UseSummary', ({ state, response }) => {
-  // response: string
-  return { ...state, summary: response };
+  // response: { text: string }
+  return { ...state, summary: response.text };
 })
 ```
 
@@ -85,7 +85,7 @@ const summaryPrompt = prompt({
 | After | Available in next step | Type |
 |-------|------------------------|------|
 | `.prompt()` with schema | merged into state | `state[name]: z.infer<Schema>` |
-| `.prompt()` without schema | response (ephemeral) | `string` |
+| `.prompt()` without schema | response (ephemeral) | `{ text: string }` |
 | `.ui()` | page (ephemeral) | `{ link: string, webhook: WebhookRegistration<Schema> \| null }` |
 | `waitFor: [webhook]` | response (ephemeral) | `z.infer<WebhookSchema>` |
 
@@ -103,7 +103,8 @@ const summaryPrompt = prompt({
 **Default components at runner level:**
 
 ```typescript
-import { BrainRunner, defaultComponents } from '@positronic/core';
+import { BrainRunner } from '@positronic/core';
+import { defaultComponents } from '@positronic/gen-ui-components';
 import { EmailCard } from './components/email-card';
 
 const runner = new BrainRunner({ client, adapters })
@@ -192,15 +193,26 @@ Keep client interface simple - just thin wrappers around Vercel SDK methods. The
 interface ObjectGenerator {
   generateObject<T>(...): Promise<T>;
 
-  // NEW: Wrap Vercel AI SDK's streamText
+  // Multi-step tool calling with automatic tool execution
   streamText(params: {
-    system: string;
+    system?: string;
     prompt: string;
-    tools: Record<string, Tool>;
-    stopWhen?: StopCondition;  // e.g., stepCountIs(10)
+    messages?: ToolMessage[];  // Optional context messages
+    tools: Record<string, {
+      description: string;
+      inputSchema: z.ZodSchema;
+      execute?: (args: unknown) => Promise<unknown> | unknown;
+    }>;
+    maxSteps?: number;  // Default: 10
   }): Promise<{
-    toolCalls: Array<{ tool: string; args: unknown; result: unknown }>;
+    toolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      result: unknown;
+    }>;
     text?: string;
+    usage: { totalTokens: number };
   }>;
 }
 ```
@@ -221,7 +233,12 @@ export async function generateUI(params: {
   schema?: z.ZodSchema;
   maxSteps?: number;
 }): Promise<{
-  toolCalls: Array<{ tool: string; args: unknown; result: unknown }>;
+  toolCalls: Array<{
+    toolCallId: string;
+    toolName: string;
+    args: unknown;
+    result: unknown;
+  }>;
 }> {
   const tools = {
     ...componentsToTools(params.components),
@@ -233,7 +250,7 @@ export async function generateUI(params: {
       Use the ValidateForm tool to check your form matches the required schema.`,
     prompt: params.prompt,
     tools,
-    stopWhen: stepCountIs(params.maxSteps ?? 10),
+    maxSteps: params.maxSteps ?? 10,
   });
 }
 ```
@@ -324,9 +341,10 @@ const Container: UIComponent = {
 };
 ```
 
-**Default components exported from core:**
+**Default components exported from `@positronic/gen-ui-components`:**
 
 ```typescript
+// packages/gen-ui-components/src/index.ts
 export const defaultComponents: Record<string, UIComponent> = {
   Form,
   Input,
@@ -454,17 +472,17 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 
 ### Phase 1: Client Infrastructure (no breaking changes)
 
-**Step 1**: Add `streamText` to ObjectGenerator interface
-- Add optional `streamText` method to `ObjectGenerator` in core
-- Define types for params and return value
+**Step 1**: Add `streamText` to ObjectGenerator interface ✅
+- Add `streamText` method to `ObjectGenerator` in core
+- Define types for params and return value (maxSteps, messages, execute functions, usage)
 - Existing code continues to work
 
-**Step 2**: Implement `streamText` in `client-vercel`
+**Step 2**: Implement `streamText` in `client-vercel` ✅
 - Thin wrapper around Vercel AI SDK's `streamText`
-- Handle `stopWhen: stepCountIs()` for multi-step
+- Handle `maxSteps` for multi-step (uses `stepCountIs()` internally)
 - Write tests
 
-**Step 3**: Implement `streamText` in `client-anthropic`
+**Step 3**: Implement `streamText` in `client-anthropic` ✅
 - Implement equivalent using Anthropic API's tool use with iteration
 - Match the same interface
 - Write tests
@@ -473,18 +491,18 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 
 ### Phase 2: Component System (no breaking changes)
 
-**Step 4**: Define `UIComponent` interface
+**Step 4**: Define `UIComponent` interface ✅
 - Create interface combining React component + tool definition
 - Export from core
 - No runtime impact yet
 
-**Step 5**: Build default components
+**Step 5**: Build default components ✅
 - Create React components: Form, Input, TextArea, Checkbox, Select, MultiTextInput, Button, Text, Heading, Container
 - Add tool descriptions and parameter schemas
 - Build with tsc
-- Export `defaultComponents` from core
+- Export `defaultComponents` from `@positronic/gen-ui-components` (separate package, not core)
 
-**Step 6**: Add `.withComponents()` to BrainRunner
+**Step 6**: Add `.withComponents()` to BrainRunner ✅
 - Additive method on BrainRunner
 - Stores components for later use by `.ui()` steps
 - No impact on existing brains
@@ -493,26 +511,27 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 
 ### Phase 3: Prompt Changes (modifies existing behavior)
 
-**Step 7**: Make `responseSchema` optional in `prompt()`
+**Step 7**: Make `responseSchema` optional in `prompt()` ✅
 - Update prompt factory to allow omitting responseSchema
 - Existing prompts with schemas continue to work unchanged
 
-**Step 8**: Schema-less `.prompt()` returns ephemeral response
-- When no schema, prompt step returns text
-- Text available as `response: string` in next step (ephemeral)
+**Step 8**: Schema-less `.prompt()` returns ephemeral response ✅
+- When no schema, prompt step returns text wrapped in object
+- Text available as `response: { text: string }` in next step (ephemeral)
 - Add type parameter handling
 
 ---
 
 ### Phase 4: UI Step (builds on everything above)
 
-**Step 9**: Add `TPage` type parameter to Brain
+**Step 9**: Add `TPage` type parameter to Brain ✅
 - New type parameter for ephemeral page
 - Pattern matches existing `TResponse` handling
 
-**Step 10**: Implement `generateUI` helper in core
+**Step 10**: Implement `generateUI` helper in core ✅
 - Uses `client.streamText` internally
-- Handles component tools, validation loop
+- Converts components to tools via `componentsToTools`
+- Returns `placements` array with component IDs and props
 - Exported from core
 
 **Step 11**: Implement `ValidateForm` tool
@@ -544,6 +563,6 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 - [ ] Events per tool call during UI generation
 - [ ] Logging service in spec package
 - [ ] Implement logging in Cloudflare backend
-- [ ] Update `px init` template to include `.withComponents(defaultComponents)`
+- [ ] Update `px init` template to include `.withComponents(defaultComponents)` from `@positronic/gen-ui-components`
 - [ ] Bundle components into base page template
 - [ ] Tool call results → `React.createElement` rendering
