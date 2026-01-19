@@ -184,7 +184,7 @@ interface BrainBaseEvent<TOptions extends JsonObject = JsonObject>
 export interface BrainStartEvent<TOptions extends JsonObject = JsonObject>
   extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.START | typeof BRAIN_EVENTS.RESTART;
-  initialState: State;
+  initialState?: State; // Only present for START events; RESTART reconstructs state from patches
   status: typeof STATUS.RUNNING;
 }
 
@@ -1143,7 +1143,8 @@ class BrainEventStream<
         status: STATUS.RUNNING,
         brainTitle,
         brainDescription,
-        initialState: currentState,
+        // Only include initialState for START events; RESTART reconstructs state from patches
+        ...(hasCompletedSteps ? {} : { initialState: currentState }),
         options,
         brainRunId,
       };
