@@ -1009,9 +1009,17 @@ describe('brain resumption', () => {
     executedSteps.length = 0;
 
     // Resume brain with first step completed
-    let resumedState: State | undefined;
     if (!initialCompletedSteps)
       throw new Error('Expected initialCompletedSteps');
+
+    // Start with initial state and apply patches from already-completed steps
+    // (RESTART events don't include initialState; state is reconstructed from patches)
+    let resumedState: State = initialState;
+    for (const step of initialCompletedSteps) {
+      if (step.patch) {
+        resumedState = applyPatches(resumedState, [step.patch]);
+      }
+    }
 
     for await (const event of threeStepBrain.run({
       client: mockClient as ObjectGenerator,
@@ -1019,10 +1027,8 @@ describe('brain resumption', () => {
       initialCompletedSteps,
       brainRunId: 'test-run-id',
     })) {
-      if (event.type === BRAIN_EVENTS.RESTART) {
-        resumedState = event.initialState;
-      } else if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-        resumedState = applyPatches(resumedState!, [event.patch]);
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        resumedState = applyPatches(resumedState, [event.patch]);
       }
     }
 
