@@ -19,7 +19,7 @@ export interface GenerateUIResult {
  * Uses a shared placements array so ValidateForm can inspect current state.
  */
 function createUITools(
-  components: Record<string, UIComponent<unknown>>,
+  components: Record<string, UIComponent<any>>,
   schema: FormSchema | undefined,
   data: Record<string, unknown>
 ) {
@@ -71,7 +71,7 @@ function createUITools(
  * Build the system prompt for UI generation.
  */
 function buildSystemPrompt(
-  components: Record<string, UIComponent<unknown>>,
+  components: Record<string, UIComponent<any>>,
   hasSchema: boolean
 ): string {
   const componentList = Object.entries(components)
@@ -135,7 +135,7 @@ After placing form fields, call ValidateForm to verify:
 export async function generateUI(params: {
   client: ObjectGenerator;
   prompt: string;
-  components: Record<string, UIComponent<unknown>>;
+  components: Record<string, UIComponent<any>>;
   schema?: FormSchema;
   data?: Record<string, unknown>;
   system?: string;
