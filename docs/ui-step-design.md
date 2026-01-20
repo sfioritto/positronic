@@ -233,6 +233,49 @@ interface Placement {
 }
 ```
 
+**Tree structure via `parentId`:**
+
+Components specify their parent when placed. The LLM receives the parent's ID from the previous tool call result and uses it in the next call. This builds a flat array that represents a tree:
+
+```typescript
+// Tool execution returns the placement ID
+execute: (props) => {
+  const id = generateId();
+  placements.push({ id, component: name, props, parentId: props.parentId ?? null });
+  return { id, component: name };  // LLM sees this ID and can use it as parentId
+}
+
+// Example placements array (flat, but represents tree via parentId):
+[
+  { id: "form-1", component: "Form", props: {}, parentId: null },
+  { id: "input-1", component: "Input", props: { name: "email", parentId: "form-1" }, parentId: "form-1" },
+  { id: "input-2", component: "Input", props: { name: "name", parentId: "form-1" }, parentId: "form-1" },
+]
+```
+
+**Data binding syntax:**
+
+Props can contain binding expressions using `{{path}}` syntax. These are preserved in placements and resolved at render time:
+
+```typescript
+// In placement props (stored as-is):
+{ title: "{{email.subject}}", items: "{{emails}}" }
+
+// At render time, bootstrap runtime resolves against data:
+function resolveProp(value, data) {
+  if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
+    const path = value.slice(2, -2).trim();
+    return path.split('.').reduce((obj, key) => obj?.[key], data);
+  }
+  return value;
+}
+```
+
+Loop components (like `List`) create local scope for their items:
+- `List` with `items: "{{emails}}"` and `as: "email"`
+- Children can reference `{{email.subject}}`, `{{email.id}}`, etc.
+- The bootstrap runtime handles this by passing the loop item as additional context
+
 **`generateUI` helper exported from core:**
 
 ```typescript
@@ -344,18 +387,20 @@ const CheckboxTool: ComponentToolDefinition = {
 
 **React components in gen-ui-components:**
 
+Components use Tailwind utility classes for styling (Tailwind loaded via CDN at runtime):
+
 ```typescript
 // packages/gen-ui-components/src/components/Input.tsx
 export function Input({ name, label, placeholder, required, type = 'text' }) {
   return (
-    <div className="ui-field">
-      {label && <label className="ui-label">{label}</label>}
+    <div className="mb-4">
+      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
       <input
         type={type}
         name={name}
         placeholder={placeholder}
         required={required}
-        className="ui-input"
+        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
       />
     </div>
   );
@@ -413,12 +458,14 @@ function componentsToTools(
 2. `generateUI` returns placements array (component tree as JSON)
 3. Page template generated with:
    - React/ReactDOM from CDN (`<script>` tags)
+   - Tailwind CSS from CDN (`<script src="https://cdn.tailwindcss.com">`)
    - Component bundle inlined (`<script>` with bundle contents)
    - Placements JSON embedded (`window.__POSITRONIC_TREE__`)
    - Runtime data embedded (`window.__POSITRONIC_DATA__`)
    - Bootstrap script that resolves bindings and renders
 4. React renders entirely client-side
 5. No React dependency in core at runtime
+6. Components use Tailwind classes for styling - no separate CSS bundle needed
 
 **Page template structure:**
 
@@ -426,9 +473,12 @@ function componentsToTools(
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <style>/* component styles inlined */</style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -710,11 +760,12 @@ peerDependencies: (none - components are bundled)
 exports:
   - defaultComponentTools: Record<string, ComponentToolDefinition>
   - dist/components.js (pre-bundled, React external, IIFE)
-  - dist/components.css
+  - (no CSS - components use Tailwind classes, loaded via CDN at runtime)
 
 build:
-  1. swc src -d dist (transpile TypeScript)
-  2. esbuild dist/bundle.js --bundle --external:react --external:react-dom \
+  1. tsc (type declarations only)
+  2. swc src -d dist/src (transpile TypeScript to JS)
+  3. esbuild src/bundle.ts --bundle --external:react --external:react-dom \
        --format=iife --global-name=PositronicComponents --outfile=dist/components.js
 ```
 
@@ -782,10 +833,11 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 
 **Step 5b**: Bundle components with esbuild
 - Add esbuild as devDependency to `gen-ui-components`
-- Create bundle entry point that exposes components to `window.PositronicComponents`
-- Configure esbuild: React as external, IIFE format, inline into single file
-- Build produces `dist/components.js` and `dist/components.css`
+- Create bundle entry point (`src/bundle.ts`) that exposes React components to `window.PositronicComponents`
+- Configure esbuild: React as external, IIFE format, single output file
+- Build produces `dist/components.js` (no CSS - components use Tailwind classes via CDN)
 - Add build script: `esbuild src/bundle.ts --bundle --external:react --external:react-dom --format=iife --global-name=PositronicComponents --outfile=dist/components.js`
+- Components should use Tailwind utility classes for styling
 
 **Step 6**: Add `.withComponents()` to BrainRunner ✅
 - Additive method on BrainRunner

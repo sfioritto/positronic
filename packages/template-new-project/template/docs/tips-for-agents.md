@@ -182,6 +182,46 @@ brain('validation-example')
 
 Most generated brains should not have try-catch blocks. Only use them when the error state is meaningful to subsequent steps in the workflow.
 
+## UI Steps for Form Generation
+
+When you need to collect user input, use the `.ui()` method instead of building forms manually:
+
+```typescript
+import { z } from 'zod';
+
+// ✅ DO THIS - use UI steps for forms
+brain('feedback-collector')
+  .step('Initialize', ({ state }) => ({
+    ...state,
+    userName: 'John',
+  }))
+  .ui('Collect Feedback', {
+    template: (state) => <%= '\`' %>
+      Create a feedback form for <%= '${state.userName}' %>:
+      - Rating (1-5)
+      - Comments textarea
+      - Submit button
+    <%= '\`' %>,
+    responseSchema: z.object({
+      rating: z.number().min(1).max(5),
+      comments: z.string(),
+    }),
+  })
+  .step('Process', ({ state, page }) => ({
+    ...state,
+    rating: page.rating,       // Typed from responseSchema
+    comments: page.comments,
+  }));
+```
+
+Key points:
+- The `template` function describes what UI to generate
+- `responseSchema` defines the expected form data (and provides types for `page`)
+- The next step receives form data via the `page` parameter
+- Be specific in your template about layout and field requirements
+
+See `/docs/brain-dsl-guide.md` for more UI step examples.
+
 ## Service Organization
 
 When implementing services for the project brain, consider creating a `services/` directory at the root of your project to keep service implementations organized and reusable:

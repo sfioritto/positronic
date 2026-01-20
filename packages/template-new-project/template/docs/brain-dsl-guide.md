@@ -678,6 +678,150 @@ Extract prompts to separate files when:
 - The prompt might be reused in other brains
 - You want to test the prompt logic separately
 
+## UI Steps
+
+UI steps allow brains to generate dynamic user interfaces using AI. When a brain reaches a UI step, it creates a form or page that can collect user input.
+
+### Basic UI Step
+
+```typescript
+import { z } from 'zod';
+
+brain('Feedback Collector')
+  .step('Initialize', ({ state }) => ({
+    ...state,
+    userName: 'John Doe',
+  }))
+  .ui('Collect Feedback', {
+    template: (state) => `
+      Create a feedback form for <%= '${state.userName}' %>.
+      Include fields for:
+      - Rating (1-5 stars)
+      - Comments (text area)
+      - Submit button
+    `,
+    responseSchema: z.object({
+      rating: z.number().min(1).max(5),
+      comments: z.string(),
+    }),
+  })
+  .step('Process Feedback', ({ state, page }) => ({
+    ...state,
+    feedbackReceived: true,
+    rating: page.rating,
+    comments: page.comments,
+  }));
+```
+
+### How UI Steps Work
+
+1. **Template**: The `template` function generates a prompt describing the desired UI
+2. **AI Generation**: The AI creates a component tree based on the prompt
+3. **Validation**: If `responseSchema` is provided, the form is validated to ensure it collects all required fields
+4. **User Interaction**: The rendered page is shown to the user
+5. **Data Flow**: Form submission data is available via `page` in the next step
+
+### Template Best Practices
+
+Be specific about layout and content:
+
+```typescript
+.ui('Contact Form', {
+  template: (state) => `
+    Create a contact form with:
+    - Header: "Get in Touch"
+    - Name field (required)
+    - Email field (required, pre-filled with "<%= '${state.email}' %>")
+    - Message textarea (required)
+    - Submit button labeled "Send Message"
+
+    Use a clean, centered single-column layout.
+  `,
+  responseSchema: z.object({
+    name: z.string(),
+    email: z.string().email(),
+    message: z.string(),
+  }),
+})
+```
+
+### Data Bindings
+
+Use `{{path}}` syntax to bind props to runtime data:
+
+```typescript
+.ui('Order Summary', {
+  template: (state) => `
+    Create an order summary showing:
+    - List of items from {{cart.items}}
+    - Total: {{cart.total}}
+    - Shipping address input
+    - Confirm button
+  `,
+  responseSchema: z.object({
+    shippingAddress: z.string(),
+  }),
+})
+```
+
+### Using Resources in Templates
+
+```typescript
+.ui('Survey', {
+  template: async (state, resources) => {
+    const template = await resources.prompts.survey.loadText();
+    return template.replace('{{userName}}', state.userName);
+  },
+  responseSchema: z.object({
+    answers: z.array(z.string()),
+  }),
+})
+```
+
+### Multi-Step Forms
+
+Chain UI steps for multi-page workflows:
+
+```typescript
+brain('User Onboarding')
+  .ui('Personal Info', {
+    template: () => `
+      Create a form for personal information:
+      - First name, Last name
+      - Date of birth
+      - Next button
+    `,
+    responseSchema: z.object({
+      firstName: z.string(),
+      lastName: z.string(),
+      dob: z.string(),
+    }),
+  })
+  .step('Save Personal', ({ state, page }) => ({
+    ...state,
+    personal: page,
+  }))
+  .ui('Preferences', {
+    template: (state) => `
+      Create preferences form for <%= '${state.personal.firstName}' %>:
+      - Newsletter subscription checkbox
+      - Contact preference (email/phone/sms)
+      - Complete button
+    `,
+    responseSchema: z.object({
+      newsletter: z.boolean(),
+      contactMethod: z.enum(['email', 'phone', 'sms']),
+    }),
+  })
+  .step('Complete', ({ state, page }) => ({
+    ...state,
+    preferences: page,
+    onboardingComplete: true,
+  }));
+```
+
+For more details on UI steps, see the full UI Step Guide in the main Positronic documentation.
+
 ## Complete Example
 
 ```typescript
