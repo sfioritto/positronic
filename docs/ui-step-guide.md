@@ -4,7 +4,10 @@ This guide explains how to use the `.ui()` method to generate dynamic user inter
 
 ## Overview
 
-The UI step allows brains to generate React-based user interfaces dynamically using AI. When a brain reaches a UI step, it uses the provided components and prompt to generate a form or page that can collect user input.
+The UI step allows brains to generate React-based user interfaces dynamically using AI. When a brain reaches a UI step, it generates a page and provides a `page` object to the next step. The brain author is responsible for:
+1. Notifying users about the page (via Slack, email, etc.)
+2. Using `waitFor` to pause until the form is submitted
+3. Processing the form data in the step after `waitFor`
 
 ## Basic Usage
 
@@ -12,16 +15,15 @@ The UI step allows brains to generate React-based user interfaces dynamically us
 import { brain } from '../brain.js';
 import { z } from 'zod';
 
-const formBrain = brain('Contact Form')
+const feedbackBrain = brain('Collect Feedback')
   .step('Initialize', ({ state }) => ({
     ...state,
     userName: 'John Doe',
-    userEmail: 'john@example.com',
   }))
-  .ui('Collect Feedback', {
+  // Generate the form
+  .ui('Create Feedback Form', {
     template: (state) => `
       Create a feedback form for ${state.userName}.
-      Pre-fill the email field with ${state.userEmail}.
       Include fields for rating (1-5) and comments.
     `,
     responseSchema: z.object({
@@ -29,12 +31,124 @@ const formBrain = brain('Contact Form')
       comments: z.string(),
     }),
   })
-  .step('Process Feedback', ({ state, page }) => ({
+  // Notify user and wait for submission
+  .step('Notify and Wait', async ({ state, page, slack }) => {
+    await slack.post('#feedback', `Please fill out: ${page.url}`);
+    return {
+      state,
+      waitFor: [page.webhook],
+    };
+  })
+  // Process the form submission
+  .step('Process Feedback', ({ state, response }) => ({
     ...state,
     feedbackReceived: true,
-    rating: page.rating,
-    comments: page.comments,
+    rating: response.rating,       // typed as number
+    comments: response.comments,   // typed as string
   }));
+```
+
+## How It Works
+
+1. **UI Generation**: The `.ui()` step calls an AI agent to generate UI components based on your template prompt.
+
+2. **Page Creation**: The components are rendered to an HTML page and stored. A webhook is automatically configured for form submissions.
+
+3. **Page Object**: The next step receives a `page` object with:
+   - `url`: Where users can access the form
+   - `webhook`: A pre-configured webhook for form submissions
+
+4. **Notification**: You notify users about the page however you want (Slack, email, SMS, etc.).
+
+5. **Waiting**: You use `waitFor: [page.webhook]` to pause the brain until the form is submitted.
+
+6. **Form Data**: After submission, the step following `waitFor` receives the form data via the `response` parameter, typed according to your `responseSchema`.
+
+## Complete Example
+
+Here's a full example showing a support ticket workflow:
+
+```typescript
+import { brain } from '../brain.js';
+import { z } from 'zod';
+
+const ticketSchema = z.object({
+  subject: z.string(),
+  priority: z.enum(['low', 'medium', 'high']),
+  description: z.string(),
+  contactEmail: z.string().email(),
+});
+
+const supportTicketBrain = brain('Support Ticket')
+  .step('Initialize', ({ state }) => ({
+    ...state,
+    ticketId: `TICKET-${Date.now()}`,
+    defaultEmail: 'user@example.com',
+  }))
+
+  // Generate the ticket form
+  .ui('Create Ticket Form', {
+    template: (state) => `
+      Create a support ticket form with:
+      - A heading "Submit Support Ticket"
+      - Subject line input (required)
+      - Priority dropdown: low, medium, high (default medium)
+      - Description textarea (required)
+      - Contact email, pre-filled with "${state.defaultEmail}"
+      - Submit button labeled "Create Ticket"
+    `,
+    responseSchema: ticketSchema,
+  })
+
+  // Notify user and wait for form submission
+  .step('Send Notification', async ({ state, page, email }) => {
+    // Send email with link to the form
+    await email.send({
+      to: state.defaultEmail,
+      subject: 'Action Required: Submit Your Support Ticket',
+      body: `Please submit your support ticket here: ${page.url}`,
+    });
+
+    return {
+      state: { ...state, notificationSent: true },
+      waitFor: [page.webhook],
+    };
+  })
+
+  // Process the submitted form data
+  .step('Process Ticket', ({ state, response }) => {
+    // response is fully typed based on ticketSchema:
+    // - response.subject: string
+    // - response.priority: 'low' | 'medium' | 'high'
+    // - response.description: string
+    // - response.contactEmail: string
+
+    return {
+      ...state,
+      ticket: {
+        id: state.ticketId,
+        subject: response.subject,
+        priority: response.priority,
+        description: response.description,
+        contactEmail: response.contactEmail,
+        createdAt: new Date().toISOString(),
+        status: 'open',
+      },
+    };
+  })
+
+  // Send confirmation
+  .step('Send Confirmation', async ({ state, email }) => {
+    await email.send({
+      to: state.ticket.contactEmail,
+      subject: `Ticket ${state.ticket.id}: ${state.ticket.subject}`,
+      body: `Your support ticket has been created. We'll respond within 24 hours.`,
+    });
+
+    return { ...state, confirmationSent: true };
+  });
+
+export default supportTicketBrain;
 ```
 
 ## The `.ui()` Method
@@ -51,121 +165,19 @@ const formBrain = brain('Contact Form')
 ### Parameters
 
 - **`title`**: A descriptive name for this UI step (shown in logs and events)
-- **`config.template`**: A function that generates the prompt for the AI to create the UI. Receives the current state and resources.
-- **`config.responseSchema`**: (Optional) A Zod schema defining the expected form submission data. When provided, the generated form will be validated to ensure it can collect all required fields.
+- **`config.template`**: A function that generates the prompt for the AI to create the UI
+- **`config.responseSchema`**: A Zod schema defining the expected form submission data
 
-## How It Works
+### The `page` Object
 
-1. **Template Execution**: When the brain reaches a UI step, it calls the template function with the current state and resources to generate a prompt.
-
-2. **UI Generation**: The AI uses the prompt and available components to generate a component tree (placements) that creates the desired interface.
-
-3. **Validation**: If a `responseSchema` is provided, the system validates that the generated form can collect all required fields.
-
-4. **Page Rendering**: The placements are rendered into a complete HTML page with React, Tailwind CSS, and the component library.
-
-5. **User Interaction**: The user fills out the form and submits it.
-
-6. **Data Flow**: The submitted data is available in the next step via the `page` parameter, typed according to the `responseSchema`.
-
-## Complete Example
-
-Here's a full example showing how to create a support ticket form and process the submitted data:
+After a `.ui()` step, the next step receives a `page` parameter:
 
 ```typescript
-import { brain } from '../brain.js';
-import { z } from 'zod';
-
-// Define the schema for form data
-const ticketSchema = z.object({
-  subject: z.string(),
-  priority: z.enum(['low', 'medium', 'high']),
-  description: z.string(),
-  contactEmail: z.string().email(),
-});
-
-const supportTicketBrain = brain('Support Ticket')
-  // Step 1: Initialize with any data needed for the form
-  .step('Initialize', ({ state }) => ({
-    ...state,
-    ticketId: `TICKET-${Date.now()}`,
-    userEmail: 'user@example.com', // Could come from auth
-  }))
-
-  // Step 2: Generate and display the form
-  .ui('Create Ticket Form', {
-    template: (state) => `
-      Create a support ticket form with:
-      - A heading "Submit Support Ticket"
-      - Subject line input (required)
-      - Priority dropdown with options: low, medium, high (default to medium)
-      - Description textarea for the issue details (required)
-      - Contact email input, pre-filled with "${state.userEmail}"
-      - A submit button labeled "Create Ticket"
-
-      Use a clean card layout with proper spacing.
-    `,
-    responseSchema: ticketSchema,
-  })
-
-  // Step 3: Process the form submission
-  // The `page` parameter contains the typed form data
-  .step('Process Ticket', ({ state, page }) => {
-    // `page` is fully typed based on ticketSchema:
-    // - page.subject: string
-    // - page.priority: 'low' | 'medium' | 'high'
-    // - page.description: string
-    // - page.contactEmail: string
-
-    return {
-      ...state,
-      ticket: {
-        id: state.ticketId,
-        subject: page.subject,
-        priority: page.priority,
-        description: page.description,
-        contactEmail: page.contactEmail,
-        createdAt: new Date().toISOString(),
-        status: 'open',
-      },
-    };
-  })
-
-  // Step 4: Send confirmation (example with services)
-  .step('Send Confirmation', async ({ state, email }) => {
-    // Use the processed ticket data
-    await email.send({
-      to: state.ticket.contactEmail,
-      subject: `Ticket ${state.ticket.id}: ${state.ticket.subject}`,
-      body: `Your support ticket has been created. We'll respond within 24 hours.`,
-    });
-
-    return {
-      ...state,
-      confirmationSent: true,
-    };
-  });
-
-export default supportTicketBrain;
+interface GeneratedPage<TSchema> {
+  url: string;                        // URL to the generated page
+  webhook: WebhookRegistration<TSchema>;  // Pre-configured form webhook
+}
 ```
-
-### Key Points About Form Data Flow
-
-1. **The `page` parameter**: After a UI step, the next step receives the form submission data through the `page` parameter in its action function.
-
-2. **Type inference**: When you provide a `responseSchema`, TypeScript automatically infers the type of `page`. In the example above, `page.priority` is typed as `'low' | 'medium' | 'high'`, not just `string`.
-
-3. **The `page` parameter is only available in the step immediately following a UI step**. If you need the form data in later steps, save it to state:
-
-```typescript
-// Save form data to state so it's available in all subsequent steps
-.step('Process Ticket', ({ state, page }) => ({
-  ...state,
-  formData: page,  // Now available as state.formData in all later steps
-}))
-```
-
-4. **Without a responseSchema**: If you don't provide a `responseSchema`, the `page` parameter will be typed as `Record<string, unknown>` and you'll need to handle the types yourself.
 
 ## Template Best Practices
 
@@ -181,7 +193,7 @@ export default supportTicketBrain;
     - Bio textarea (optional)
     - A submit button labeled "Save Profile"
 
-    Use a clean, single-column layout.
+    Use a clean, single-column layout with proper spacing.
   `,
   responseSchema: z.object({
     name: z.string(),
@@ -191,22 +203,21 @@ export default supportTicketBrain;
 })
 ```
 
-### Use Data Bindings
+### Use Data Bindings for Display
 
-The template can reference state values that will be resolved at render time:
+The template can reference state values that will be resolved at render time using `{{path}}` syntax:
 
 ```typescript
 .ui('Order Review', {
   template: (state) => `
     Create an order review form showing:
-    - Order items from the cart (use {{cart.items}} for the list)
+    - List of items from {{cart.items}}
     - Total price: {{cart.total}}
     - Shipping address input
     - Confirm order button
   `,
   responseSchema: z.object({
     shippingAddress: z.string(),
-    confirmed: z.boolean(),
   }),
 })
 ```
@@ -218,8 +229,8 @@ The template can reference state values that will be resolved at render time:
   template: async (state, resources) => {
     const surveyTemplate = await resources.prompts.surveyTemplate.loadText();
     return surveyTemplate
-      .replace('{{questions}}', JSON.stringify(state.questions))
-      .replace('{{userName}}', state.userName);
+      .replace('{{userName}}', state.userName)
+      .replace('{{questions}}', JSON.stringify(state.questions));
   },
   responseSchema: z.object({
     answers: z.array(z.string()),
@@ -229,10 +240,10 @@ The template can reference state values that will be resolved at render time:
 
 ## Response Schema
 
-The `responseSchema` defines what data the form should collect. This serves two purposes:
+The `responseSchema` defines what data the form collects. This provides:
 
 1. **Validation**: The AI-generated form is validated to ensure it has inputs for all required fields
-2. **Type Safety**: The `page` parameter in the next step is typed according to the schema
+2. **Type Safety**: The `response` parameter is typed according to the schema
 
 ### Schema Examples
 
@@ -251,63 +262,27 @@ const profileSchema = z.object({
   website: z.string().url().optional(),
 });
 
-// Form with complex types
+// Form with enums and numbers
 const surveySchema = z.object({
   rating: z.number().min(1).max(5),
-  wouldRecommend: z.boolean(),
+  recommend: z.boolean(),
+  category: z.enum(['bug', 'feature', 'question']),
   feedback: z.string(),
 });
 ```
 
-## Available Components
+## Multi-Step Form Workflows
 
-The UI step uses a pre-built component library that includes:
-
-- **Form**: Container for form elements with submission handling
-- **Input**: Text input field with label
-- **TextArea**: Multi-line text input
-- **Checkbox**: Boolean checkbox input
-- **Select**: Dropdown selection
-- **Button**: Action buttons (submit, etc.)
-- **Text**: Static text display
-- **Heading**: Section headers
-- **Card**: Container for grouping related content
-- **List**: Display lists of items with data binding support
-
-All components use Tailwind CSS for styling and are designed to work together seamlessly.
-
-## Data Binding Syntax
-
-Props can use the `{{path}}` syntax to bind to runtime data:
-
-- `{{user.name}}` - Access nested properties
-- `{{items}}` - Bind to arrays (useful with List component)
-- `{{count}}` - Bind to primitive values
-
-Data bindings are resolved at render time when the page is displayed to the user.
-
-## Generated Page Structure
-
-The generated HTML page includes:
-
-- React 18 and ReactDOM from CDN
-- Tailwind CSS from CDN
-- Pre-bundled component library
-- Bootstrap runtime that resolves data bindings and renders the component tree
-
-The page is self-contained and can be served directly to users.
-
-## Example: Multi-Step Workflow
+You can chain multiple UI steps for multi-page forms:
 
 ```typescript
-const onboardingBrain = brain('User Onboarding')
-  .step('Start', () => ({
-    step: 'personal',
-    userData: {},
-  }))
-  .ui('Personal Info', {
+brain('User Onboarding')
+  .step('Start', () => ({ step: 1, userData: {} }))
+
+  // Step 1: Personal info
+  .ui('Personal Info Form', {
     template: () => `
-      Create a personal information form with:
+      Create a personal information form:
       - First name (required)
       - Last name (required)
       - Date of birth (required)
@@ -319,81 +294,96 @@ const onboardingBrain = brain('User Onboarding')
       dateOfBirth: z.string(),
     }),
   })
-  .step('Save Personal', ({ state, page }) => ({
+  .step('Wait for Personal Info', async ({ state, page, notify }) => {
+    await notify(`Complete step 1: ${page.url}`);
+    return { state, waitFor: [page.webhook] };
+  })
+  .step('Save Personal Info', ({ state, response }) => ({
     ...state,
-    step: 'preferences',
-    userData: {
-      ...state.userData,
-      ...page,
-    },
+    step: 2,
+    userData: { ...state.userData, ...response },
   }))
-  .ui('Preferences', {
+
+  // Step 2: Preferences
+  .ui('Preferences Form', {
     template: (state) => `
       Create a preferences form for ${state.userData.firstName}:
       - Newsletter subscription (checkbox)
-      - Preferred contact method (select: email, phone, sms)
-      - Complete signup button
+      - Contact method (select: email, phone, sms)
+      - Complete button
     `,
     responseSchema: z.object({
       newsletter: z.boolean(),
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
   })
-  .step('Complete', ({ state, page }) => ({
+  .step('Wait for Preferences', async ({ state, page, notify }) => {
+    await notify(`Complete step 2: ${page.url}`);
+    return { state, waitFor: [page.webhook] };
+  })
+  .step('Complete Onboarding', ({ state, response }) => ({
     ...state,
     step: 'complete',
-    userData: {
-      ...state.userData,
-      preferences: page,
-    },
+    userData: { ...state.userData, preferences: response },
     onboardingComplete: true,
   }));
 ```
 
-## Configuration
+## Available Components
 
-To use UI steps, you need to configure the BrainRunner with:
+The UI step uses a pre-built component library:
 
-1. **Component Bundle**: The pre-built JavaScript containing the component library
-2. **Components**: The component definitions for the AI to use
+- **Form**: Container for form elements with submission handling
+- **Input**: Text input field with label
+- **TextArea**: Multi-line text input
+- **Checkbox**: Boolean checkbox input
+- **Select**: Dropdown selection
+- **Button**: Action buttons
+- **Text**: Static text display
+- **Heading**: Section headers
+- **Card**: Container for grouping content
+- **List**: Display lists with data binding support
 
-```typescript
-import { BrainRunner } from '@positronic/core';
-import * as components from '@positronic/gen-ui-components';
-import componentBundle from '@positronic/gen-ui-components/dist/components.js';
+All components use Tailwind CSS for styling.
 
-const runner = new BrainRunner({
-  client: aiClient,
-  // ... other config
-})
-  .withComponents(components)
-  .withComponentBundle(componentBundle);
+## Data Binding Syntax
 
-const result = await runner.run(myBrain);
-```
+Props can use `{{path}}` syntax to bind to runtime data:
 
-## Handling Form Submissions
+- `{{user.name}}` - Access nested properties
+- `{{items}}` - Bind to arrays (for List component)
+- `{{count}}` - Bind to primitive values
 
-When a user submits a form generated by a UI step:
+Data bindings are resolved when the page is rendered.
 
-1. The form data is validated against the `responseSchema`
-2. The brain resumes execution with the form data available via the `page` parameter
-3. The next step can access the typed form data
+## Key Concepts
 
-The submission handling is automatic - you just need to process the data in the next step.
+### The `page` Parameter
 
-## Error Handling
+- Available only in the step immediately following a `.ui()` step
+- Contains `url` and `webhook`
+- Use `page.url` to notify users
+- Use `page.webhook` with `waitFor` to pause for submission
 
-If the AI generates a form that doesn't satisfy the schema requirements:
+### The `response` Parameter
 
-- Validation errors are reported
-- The AI can retry with the validation feedback
-- Multiple validation attempts ensure the form meets requirements
+- Available in the step following a `waitFor`
+- Contains the submitted form data
+- Typed according to `responseSchema`
+
+### Separation of Concerns
+
+The `.ui()` step only generates the page. You control:
+- **How** users are notified (Slack, email, SMS, push notification, etc.)
+- **When** to pause for submission (`waitFor`)
+- **What** to do with the form data
+
+This gives you flexibility to integrate with any notification system your brain uses.
 
 ## Tips
 
 1. **Be Descriptive**: The more detail in your template, the better the generated UI
-2. **Use Schema Validation**: Always provide a `responseSchema` for forms that collect data
-3. **Leverage State**: Pre-fill forms with data from previous steps
-4. **Keep It Simple**: Start with basic forms and add complexity as needed
-5. **Test Incrementally**: Test each UI step independently before combining into complex workflows
+2. **Always Provide Schema**: The `responseSchema` ensures type safety and validation
+3. **Handle Notifications**: Choose the right channel for your users
+4. **Test Incrementally**: Test each UI step independently before combining
+5. **Use Meaningful Titles**: Step titles appear in logs and help with debugging

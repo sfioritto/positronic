@@ -680,7 +680,7 @@ Extract prompts to separate files when:
 
 ## UI Steps
 
-UI steps allow brains to generate dynamic user interfaces using AI. When a brain reaches a UI step, it creates a form or page that can collect user input.
+UI steps allow brains to generate dynamic user interfaces using AI. The `.ui()` step generates a page and provides a `page` object to the next step. You then notify users and use `waitFor` to pause until the form is submitted.
 
 ### Basic UI Step
 
@@ -692,24 +692,31 @@ brain('Feedback Collector')
     ...state,
     userName: 'John Doe',
   }))
+  // Generate the form
   .ui('Collect Feedback', {
     template: (state) => `
       Create a feedback form for <%= '${state.userName}' %>.
-      Include fields for:
-      - Rating (1-5 stars)
-      - Comments (text area)
-      - Submit button
+      Include fields for rating (1-5) and comments.
     `,
     responseSchema: z.object({
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
   })
-  .step('Process Feedback', ({ state, page }) => ({
+  // Notify user and wait for submission
+  .step('Notify and Wait', async ({ state, page, slack }) => {
+    await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
+    return {
+      state,
+      waitFor: [page.webhook],
+    };
+  })
+  // Process the form data (comes through response, not page)
+  .step('Process Feedback', ({ state, response }) => ({
     ...state,
     feedbackReceived: true,
-    rating: page.rating,
-    comments: page.comments,
+    rating: response.rating,     // typed from responseSchema
+    comments: response.comments,
   }));
 ```
 
@@ -717,9 +724,16 @@ brain('Feedback Collector')
 
 1. **Template**: The `template` function generates a prompt describing the desired UI
 2. **AI Generation**: The AI creates a component tree based on the prompt
-3. **Validation**: If `responseSchema` is provided, the form is validated to ensure it collects all required fields
-4. **User Interaction**: The rendered page is shown to the user
-5. **Data Flow**: Form submission data is available via `page` in the next step
+3. **Page Object**: Next step receives `page` with `url` and `webhook`
+4. **Notification**: You notify users however you want (Slack, email, etc.)
+5. **Wait**: Use `waitFor: [page.webhook]` to pause until form submission
+6. **Form Data**: Step after `waitFor` receives form data via `response`
+
+### The `page` Object
+
+After a `.ui()` step, the next step receives:
+- `page.url` - URL where users can access the form
+- `page.webhook` - Pre-configured webhook for form submissions
 
 ### Template Best Practices
 
@@ -764,26 +778,15 @@ Use `{{path}}` syntax to bind props to runtime data:
 })
 ```
 
-### Using Resources in Templates
-
-```typescript
-.ui('Survey', {
-  template: async (state, resources) => {
-    const template = await resources.prompts.survey.loadText();
-    return template.replace('{{userName}}', state.userName);
-  },
-  responseSchema: z.object({
-    answers: z.array(z.string()),
-  }),
-})
-```
-
 ### Multi-Step Forms
 
 Chain UI steps for multi-page workflows:
 
 ```typescript
 brain('User Onboarding')
+  .step('Start', () => ({ userData: {} }))
+
+  // Step 1: Personal info
   .ui('Personal Info', {
     template: () => `
       Create a form for personal information:
@@ -797,13 +800,19 @@ brain('User Onboarding')
       dob: z.string(),
     }),
   })
-  .step('Save Personal', ({ state, page }) => ({
+  .step('Wait for Personal', async ({ state, page, notify }) => {
+    await notify(`Step 1: <%= '${page.url}' %>`);
+    return { state, waitFor: [page.webhook] };
+  })
+  .step('Save Personal', ({ state, response }) => ({
     ...state,
-    personal: page,
+    userData: { ...state.userData, ...response },
   }))
+
+  // Step 2: Preferences
   .ui('Preferences', {
     template: (state) => `
-      Create preferences form for <%= '${state.personal.firstName}' %>:
+      Create preferences form for <%= '${state.userData.firstName}' %>:
       - Newsletter subscription checkbox
       - Contact preference (email/phone/sms)
       - Complete button
@@ -813,9 +822,13 @@ brain('User Onboarding')
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
   })
-  .step('Complete', ({ state, page }) => ({
+  .step('Wait for Preferences', async ({ state, page, notify }) => {
+    await notify(`Step 2: <%= '${page.url}' %>`);
+    return { state, waitFor: [page.webhook] };
+  })
+  .step('Complete', ({ state, response }) => ({
     ...state,
-    preferences: page,
+    userData: { ...state.userData, preferences: response },
     onboardingComplete: true,
   }));
 ```
