@@ -184,7 +184,7 @@ brain('email-digest')
 
 **Architecture: `streamText` on client, `generateUI` in core**
 
-Keep client interface simple - just thin wrappers around Vercel SDK methods. The `generateUI` logic lives in core.
+Keep client interface simple - just thin wrappers around Vercel SDK methods. The `generateUI` logic lives in core. Core has no React runtime dependency.
 
 **Update client interface:**
 
@@ -221,37 +221,49 @@ interface ObjectGenerator {
 - `client-vercel`: Thin wrapper around Vercel AI SDK's `streamText`
 - `client-anthropic`: Implement equivalent using Anthropic API's tool use
 
+**Placement structure (component tree as data):**
+
+```typescript
+// packages/core/src/ui/types.ts
+interface Placement {
+  id: string;
+  component: string;          // Component name, e.g., "Form", "Checkbox"
+  props: Record<string, unknown>;  // Props with binding syntax preserved
+  parentId: string | null;    // Parent placement ID, null for root
+}
+```
+
 **`generateUI` helper exported from core:**
 
 ```typescript
 // packages/core/src/ui/generate-ui.ts
 export async function generateUI(params: {
   client: ObjectGenerator;
-  system: string;
   prompt: string;
-  components: Record<string, UIComponent>;
+  components: Record<string, ComponentToolDefinition>;
   schema?: z.ZodSchema;
+  data: Record<string, unknown>;  // For data binding validation
   maxSteps?: number;
 }): Promise<{
-  toolCalls: Array<{
-    toolCallId: string;
-    toolName: string;
-    args: unknown;
-    result: unknown;
-  }>;
+  placements: Placement[];
+  rootId: string;
 }> {
+  const placements: Placement[] = [];
+
   const tools = {
-    ...componentsToTools(params.components),
-    ValidateForm: createValidateFormTool(params.schema),
+    ...componentsToTools(params.components, placements),
+    ValidateForm: createValidateFormTool(params.schema, params.data, placements),
   };
 
-  return client.streamText({
-    system: `You generate UI pages using component tools.
-      Use the ValidateForm tool to check your form matches the required schema.`,
+  await client.streamText({
+    system: buildSystemPrompt(params.components),
     prompt: params.prompt,
     tools,
     maxSteps: params.maxSteps ?? 10,
   });
+
+  const rootId = placements.find(p => p.parentId === null)?.id;
+  return { placements, rootId };
 }
 ```
 
@@ -260,19 +272,26 @@ export async function generateUI(params: {
 ```typescript
 const result = await generateUI({
   client,
-  system: frameworkSystemPrompt,
-  prompt: promptText,  // User's prompt - includes schema requirements
+  prompt: promptText,
   components: resolvedComponents,
   schema: prompt.responseSchema,
+  data: state,  // Brain state for data binding validation
   maxSteps: options.maxSteps ?? 10,
 });
 
-// result.toolCalls contains all component placements
-const page = renderToolCallsToPage(result.toolCalls, components);
+// result.placements is the component tree as JSON data
+// Passed to page template generator (no React needed here)
+const page = await pagesService.createPage({
+  placements: result.placements,
+  rootId: result.rootId,
+  data: state,
+  schema: prompt.responseSchema,
+});
 ```
 
 **Loop behavior:**
 - Agent calls component tools to build page structure
+- Each tool call adds a Placement to the shared array
 - Agent calls `ValidateForm` to check form matches schema
 - Tool results fed back automatically by SDK/implementation
 - Agent iterates until `ValidateForm` returns OK
@@ -284,94 +303,103 @@ const page = renderToolCallsToPage(result.toolCalls, components);
 
 ## Component System
 
-**Component definition (tool + React component + metadata):**
+**Separation of concerns:**
+
+Core needs only tool metadata (no React dependency). React components live in `gen-ui-components` and are bundled separately for client-side rendering.
+
+**Tool definition in core (no React):**
 
 ```typescript
-interface UIComponent {
-  // React component for rendering
-  component: React.ComponentType<any>;
-
-  // Tool definition for LLM
-  tool: {
-    description: string;
-    parameters: z.ZodSchema;
-  };
+// packages/core/src/ui/types.ts
+interface ComponentToolDefinition {
+  description: string;
+  parameters: z.ZodSchema;
 }
 
-const Input: UIComponent = {
-  component: InputComponent,
-  tool: {
-    description: `A single-line text input field. Use for short text like names,
-      emails, titles. For longer text, use TextArea instead.`,
-    parameters: z.object({
-      name: z.string().describe('Form field name, used as key in submitted data'),
-      label: z.string().describe('Label displayed above the input'),
-      placeholder: z.string().optional().describe('Placeholder text when empty'),
-      required: z.boolean().optional().describe('Whether field is required'),
-      type: z.enum(['text', 'email', 'number', 'password']).optional()
-        .describe('Input type, defaults to text'),
-    }),
-  },
+// Example tool definitions
+const InputTool: ComponentToolDefinition = {
+  description: `A single-line text input field. Use for short text like names,
+    emails, titles. For longer text, use TextArea instead.`,
+  parameters: z.object({
+    name: z.string().describe('Form field name, used as key in submitted data'),
+    label: z.string().describe('Label displayed above the input'),
+    placeholder: z.string().optional().describe('Placeholder text when empty'),
+    required: z.boolean().optional().describe('Whether field is required'),
+    type: z.enum(['text', 'email', 'number', 'password']).optional()
+      .describe('Input type, defaults to text'),
+  }),
 };
 
-const Checkbox: UIComponent = {
-  component: CheckboxComponent,
-  tool: {
-    description: `A checkbox for boolean yes/no choices. Returns true/false
-      in form data. Use for single toggles, confirmations, opt-ins.`,
-    parameters: z.object({
-      name: z.string().describe('Form field name'),
-      label: z.string().describe('Label displayed next to checkbox'),
-      defaultChecked: z.boolean().optional(),
-    }),
-  },
-};
-
-const Container: UIComponent = {
-  component: ContainerComponent,
-  tool: {
-    description: `A layout container that groups child components. Use to
-      organize page sections, create visual hierarchy, add spacing.`,
-    parameters: z.object({
-      children: z.array(z.string()).describe('IDs of child components'),
-      direction: z.enum(['row', 'column']).optional(),
-      gap: z.enum(['none', 'small', 'medium', 'large']).optional(),
-    }),
-  },
+const CheckboxTool: ComponentToolDefinition = {
+  description: `A checkbox for boolean yes/no choices. Returns true/false
+    in form data. Use for single toggles, confirmations, opt-ins.`,
+  parameters: z.object({
+    name: z.string().describe('Form field name'),
+    label: z.string().describe('Label displayed next to checkbox'),
+    value: z.string().optional().describe('Value submitted when checked'),
+    defaultChecked: z.boolean().optional(),
+  }),
 };
 ```
 
-**Default components exported from `@positronic/gen-ui-components`:**
+**React components in gen-ui-components:**
+
+```typescript
+// packages/gen-ui-components/src/components/Input.tsx
+export function Input({ name, label, placeholder, required, type = 'text' }) {
+  return (
+    <div className="ui-field">
+      {label && <label className="ui-label">{label}</label>}
+      <input
+        type={type}
+        name={name}
+        placeholder={placeholder}
+        required={required}
+        className="ui-input"
+      />
+    </div>
+  );
+}
+```
+
+**Package exports from `@positronic/gen-ui-components`:**
 
 ```typescript
 // packages/gen-ui-components/src/index.ts
-export const defaultComponents: Record<string, UIComponent> = {
-  Form,
-  Input,
-  TextArea,
-  Checkbox,
-  Select,
-  MultiTextInput,
-  Button,
-  Text,
-  Heading,
-  Container,
+
+// Tool definitions (used by core at generation time)
+export const defaultComponentTools: Record<string, ComponentToolDefinition> = {
+  Form: FormTool,
+  Input: InputTool,
+  TextArea: TextAreaTool,
+  Checkbox: CheckboxTool,
+  Select: SelectTool,
+  List: ListTool,
+  // ...
 };
+
+// React components are NOT exported as JS imports
+// They are pre-bundled into dist/components.js for client-side use
 ```
 
-**Tool generation from components:**
+**Tool generation from definitions:**
 
 ```typescript
-function componentsToTools(components: Record<string, UIComponent>) {
+// packages/core/src/ui/generate-ui.ts
+function componentsToTools(
+  components: Record<string, ComponentToolDefinition>,
+  placements: Placement[]
+) {
   return Object.fromEntries(
-    Object.entries(components).map(([name, comp]) => [
+    Object.entries(components).map(([name, def]) => [
       name,
       {
-        description: comp.tool.description,
-        parameters: comp.tool.parameters,
+        description: def.description,
+        parameters: def.parameters,
         execute: async (params) => {
-          // Record tool call, return component ID
-          return { id: generateId(), component: name, props: params };
+          const id = generateId();
+          placements.push({ id, component: name, props: params, parentId: null });
+          return { id, component: name };
         },
       },
     ])
@@ -379,12 +407,91 @@ function componentsToTools(components: Record<string, UIComponent>) {
 }
 ```
 
-**Page rendering:**
-1. Components built with tsc
-2. Bundled into base page template
-3. Tool call results → `React.createElement()` tree
-4. React renders client-side
-5. Brain state embedded at generation time
+**Page rendering (client-side with React from CDN):**
+
+1. Components built with SWC, bundled with esbuild (React as external)
+2. `generateUI` returns placements array (component tree as JSON)
+3. Page template generated with:
+   - React/ReactDOM from CDN (`<script>` tags)
+   - Component bundle inlined (`<script>` with bundle contents)
+   - Placements JSON embedded (`window.__POSITRONIC_TREE__`)
+   - Runtime data embedded (`window.__POSITRONIC_DATA__`)
+   - Bootstrap script that resolves bindings and renders
+4. React renders entirely client-side
+5. No React dependency in core at runtime
+
+**Page template structure:**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <style>/* component styles inlined */</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Pre-bundled components (inlined) -->
+  <script>/* contents of gen-ui-components/dist/components.js */</script>
+
+  <!-- Data injected at generation time -->
+  <script>
+    window.__POSITRONIC_DATA__ = { /* brain state */ };
+    window.__POSITRONIC_TREE__ = [ /* placements array */ ];
+    window.__POSITRONIC_ROOT__ = "placement-id";
+  </script>
+
+  <!-- Bootstrap runtime -->
+  <script>/* runtime that builds and renders React tree */</script>
+</body>
+</html>
+```
+
+**Bootstrap runtime (inlined in page):**
+
+```javascript
+(function() {
+  const components = window.PositronicComponents;
+  const data = window.__POSITRONIC_DATA__;
+  const tree = window.__POSITRONIC_TREE__;
+  const rootId = window.__POSITRONIC_ROOT__;
+
+  function resolveBinding(path, ctx) {
+    return path.split('.').reduce((o, k) => o?.[k], ctx);
+  }
+
+  function resolveProp(value, ctx) {
+    if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
+      return resolveBinding(value.slice(2, -2).trim(), ctx);
+    }
+    return value;
+  }
+
+  function buildElement(placementId, ctx) {
+    const placement = tree.find(p => p.id === placementId);
+    const Component = components[placement.component];
+
+    // Resolve props
+    const props = {};
+    for (const [key, value] of Object.entries(placement.props)) {
+      props[key] = resolveProp(value, ctx);
+    }
+
+    // Find children
+    const childIds = tree.filter(p => p.parentId === placementId).map(p => p.id);
+    const children = childIds.map(id => buildElement(id, ctx));
+
+    return React.createElement(Component, props, ...children);
+  }
+
+  ReactDOM.render(
+    buildElement(rootId, data),
+    document.getElementById('root')
+  );
+})();
+```
 
 ---
 
@@ -452,15 +559,187 @@ Runtime validation as backup.
 
 ## Schema Communication to Agent
 
-The **user's prompt** (from template) describes what the form should collect, including schema requirements. The framework's system prompt just instructs the agent on how to use tools.
+The **user's prompt** (from template) describes what the form should collect, including schema requirements. The framework's system prompt instructs the agent on how to use tools.
 
-A **`ValidateForm` tool** allows the agent to check if the current component tree produces data matching the schema:
+**`ValidateForm` tool implementation:**
+
+The tool validates two things:
+1. Form fields will produce data matching the expected Zod schema
+2. All data bindings (`{{path}}`) reference valid paths in the provided data
+
+```typescript
+// packages/core/src/ui/validate-form.ts
+function createValidateFormTool(
+  schema: ZodType | undefined,
+  data: Record<string, unknown>,
+  placements: Placement[]
+) {
+  const dataType = inferDataType(data);
+
+  return {
+    description: `Validate the current form structure. Checks that:
+      1. Form fields will produce data matching the expected schema
+      2. All data bindings reference valid paths in the provided data
+      Call this after building your form to verify it's correct.`,
+    parameters: z.object({}),  // No input - reads current placements
+    execute: async () => {
+      const errors: ValidationError[] = [];
+
+      // 1. Extract form schema from placements
+      const extracted = extractFormSchema(placements);
+
+      // 2. Validate against expected Zod schema (if provided)
+      if (schema) {
+        const schemaResult = validateAgainstZod(extracted, schema);
+        errors.push(...schemaResult.errors);
+      }
+
+      // 3. Validate all data bindings
+      const bindingResult = validateDataBindings(placements, dataType);
+      errors.push(...bindingResult.errors);
+
+      return {
+        valid: errors.length === 0,
+        errors: errors.map(e => ({ type: e.type, message: e.message })),
+        extractedFields: extracted.fields.map(f => ({
+          name: f.name,
+          type: f.type,
+        })),
+      };
+    },
+  };
+}
+```
+
+**Form schema extraction:**
+
+```typescript
+// Walks placements, finds form input components, extracts field info
+function extractFormSchema(placements: Placement[]): ExtractedFormSchema {
+  const fields: FormField[] = [];
+
+  for (const placement of placements) {
+    const formComponent = FORM_COMPONENTS[placement.component];
+    if (formComponent) {
+      const name = placement.props[formComponent.nameProp];
+      if (typeof name === 'string') {
+        fields.push({
+          name,
+          type: formComponent.fieldType,
+          insideLoop: isInsideLoop(placement, placements),
+        });
+      }
+    }
+  }
+
+  return { fields };
+}
+
+// Maps component names to their form field behavior
+const FORM_COMPONENTS = {
+  TextInput: { nameProp: 'name', fieldType: 'string' },
+  NumberInput: { nameProp: 'name', fieldType: 'number' },
+  Checkbox: { nameProp: 'name', fieldType: 'boolean' },
+  Select: { nameProp: 'name', fieldType: 'string' },
+  HiddenInput: { nameProp: 'name', fieldType: 'string' },
+  TextArea: { nameProp: 'name', fieldType: 'string' },
+};
+```
+
+**Data binding validation:**
+
+```typescript
+// Validates that all {{path}} bindings reference valid data paths
+function validateDataBindings(
+  placements: Placement[],
+  dataType: DataType
+): ValidationResult {
+  const errors: ValidationError[] = [];
+
+  for (const placement of placements) {
+    for (const [propName, propValue] of Object.entries(placement.props)) {
+      if (isBinding(propValue)) {
+        const path = extractBindingPath(propValue);
+        const resolved = resolvePathType(path, dataType, getLoopContext(placement));
+
+        if (resolved === null) {
+          errors.push({
+            type: 'invalid-binding',
+            message: `Invalid binding "{{${path}}}" - path does not exist in data`,
+            path: `${placement.component}.${propName}`,
+          });
+        }
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+```
+
+**Loop behavior:**
 - Agent builds form with component tools
 - Agent calls `ValidateForm`
-- Tool returns errors (missing fields, wrong types) or OK
+- Tool returns errors (missing fields, wrong types, invalid bindings) or OK
 - Agent iterates until valid
 
-TBD: exact implementation of ValidateForm tool.
+---
+
+## Package Structure
+
+**`@positronic/core`** - No React dependency
+
+```
+dependencies: zod
+devDependencies: (build tools)
+
+exports:
+  - ComponentToolDefinition interface
+  - generateUI helper
+  - generatePageHtml (page template generator)
+  - ValidateForm tool factory
+  - extractFormSchema, validateDataBindings utilities
+```
+
+**`@positronic/gen-ui-components`** - React as dev dependency only
+
+```
+devDependencies: react, react-dom, esbuild, @swc/core
+peerDependencies: (none - components are bundled)
+
+exports:
+  - defaultComponentTools: Record<string, ComponentToolDefinition>
+  - dist/components.js (pre-bundled, React external, IIFE)
+  - dist/components.css
+
+build:
+  1. swc src -d dist (transpile TypeScript)
+  2. esbuild dist/bundle.js --bundle --external:react --external:react-dom \
+       --format=iife --global-name=PositronicComponents --outfile=dist/components.js
+```
+
+**Bundle entry point:**
+
+```typescript
+// packages/gen-ui-components/src/bundle.ts
+import { Form, Input, TextArea, Checkbox, Select, List, ... } from './components';
+
+// Expose to window for client-side rendering
+(window as any).PositronicComponents = {
+  Form,
+  Input,
+  TextArea,
+  Checkbox,
+  Select,
+  List,
+  Section,
+  Card,
+  Text,
+  Button,
+  HiddenInput,
+  SubmitButton,
+};
+```
 
 ---
 
@@ -491,20 +770,26 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 
 ### Phase 2: Component System (no breaking changes)
 
-**Step 4**: Define `UIComponent` interface ✅
-- Create interface combining React component + tool definition
+**Step 4**: Define `ComponentToolDefinition` interface ✅
+- Create interface for tool metadata only (no React dependency)
 - Export from core
 - No runtime impact yet
 
 **Step 5**: Build default components ✅
-- Create React components: Form, Input, TextArea, Checkbox, Select, MultiTextInput, Button, Text, Heading, Container
-- Add tool descriptions and parameter schemas
-- Build with tsc
-- Export `defaultComponents` from `@positronic/gen-ui-components` (separate package, not core)
+- Create React components: Form, Input, TextArea, Checkbox, Select, List, Button, Text, Heading, Section, Card
+- Add tool descriptions and parameter schemas as separate `ComponentToolDefinition` objects
+- Export tool definitions from `@positronic/gen-ui-components`
+
+**Step 5b**: Bundle components with esbuild
+- Add esbuild as devDependency to `gen-ui-components`
+- Create bundle entry point that exposes components to `window.PositronicComponents`
+- Configure esbuild: React as external, IIFE format, inline into single file
+- Build produces `dist/components.js` and `dist/components.css`
+- Add build script: `esbuild src/bundle.ts --bundle --external:react --external:react-dom --format=iife --global-name=PositronicComponents --outfile=dist/components.js`
 
 **Step 6**: Add `.withComponents()` to BrainRunner ✅
 - Additive method on BrainRunner
-- Stores components for later use by `.ui()` steps
+- Stores component tool definitions for later use by `.ui()` steps
 - No impact on existing brains
 
 ---
@@ -536,13 +821,33 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 
 **Step 11**: Implement `ValidateForm` tool ✅
 - Checks if current component tree satisfies schema
-- Returns `{ valid: boolean, errors: string[] }`
+- Validates data bindings against provided data type
+- Returns `{ valid: boolean, errors: ValidationError[] }`
 - Uses shared placements array via closure to see current state
 - Added when schema is provided to generateUI
 
-**Step 12**: Add `.ui()` method to Brain
+**Step 11b**: Implement data binding validation
+- `inferDataType`: Infer type structure from sample data
+- `validateDataBindings`: Check all `{{path}}` bindings resolve to valid paths
+- Handle loop context (e.g., `{{item.field}}` inside a List)
+- Return detailed errors for invalid bindings
+
+**Step 11c**: Implement form schema extraction
+- `extractFormSchema`: Walk placements, find form inputs, extract field info
+- `validateAgainstZod`: Check extracted fields match expected Zod schema
+- Handle fields inside loops (become arrays)
+
+**Step 12**: Implement page template generator
+- Create `generatePageHtml` function in core
+- Inputs: placements, rootId, data, component bundle, styles
+- Inlines React from CDN, component bundle, data as JSON, bootstrap runtime
+- Returns complete HTML string
+- No React runtime dependency (just string concatenation)
+
+**Step 13**: Add `.ui()` method to Brain
 - Runs generateUI with components
-- Creates page via PagesService
+- Calls page template generator
+- Creates page via PagesService (stores HTML)
 - Injects `page` into next step (ephemeral)
 - TypeScript enforcement of FormSchema constraint
 
@@ -550,7 +855,7 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 
 ### Phase 5: Backend (can parallelize with Phase 4)
 
-**Step 13**: Form submission webhook handler
+**Step 14**: Form submission webhook handler
 - Handle POST from generated forms
 - Form data → JSON (mechanical transform)
 - Zod validate against schema
@@ -564,6 +869,5 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 - [ ] Events per tool call during UI generation
 - [ ] Logging service in spec package
 - [ ] Implement logging in Cloudflare backend
-- [ ] Update `px init` template to include `.withComponents(defaultComponents)` from `@positronic/gen-ui-components`
-- [ ] Bundle components into base page template
-- [ ] Tool call results → `React.createElement` rendering
+- [ ] Update `px init` template to include component setup
+- [ ] Custom component authoring guide (how users add their own components)
