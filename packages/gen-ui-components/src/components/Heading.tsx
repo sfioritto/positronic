@@ -6,11 +6,17 @@ export interface HeadingProps {
   level?: '1' | '2' | '3' | '4' | 1 | 2 | 3 | 4;
 }
 
+const levelClasses = {
+  1: 'text-3xl',
+  2: 'text-2xl',
+  3: 'text-xl',
+  4: 'text-lg',
+};
+
 const HeadingComponent = ({ content, level = '2' }: HeadingProps) => {
-  // Support both string and number levels for flexibility
   const numLevel = typeof level === 'string' ? parseInt(level, 10) : level;
   const Tag = `h${numLevel}` as keyof JSX.IntrinsicElements;
-  return <Tag className="heading">{content}</Tag>;
+  return <Tag className={`font-semibold text-gray-900 ${levelClasses[numLevel as keyof typeof levelClasses]}`}>{content}</Tag>;
 };
 
 export const Heading: UIComponent<HeadingProps> = {

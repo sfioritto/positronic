@@ -222,6 +222,27 @@ describe('Positronic Spec', () => {
       const result = await webhooks.notFound(createFetch(), 'non-existent-webhook');
       expect(result).toBe(true);
     });
+
+    it('passes POST /webhooks/ui-form test', async () => {
+      const result = await webhooks.uiForm(createFetch(), 'test-identifier-123', {
+        name: 'Test User',
+        email: 'test@example.com',
+      });
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /webhooks/ui-form with array values test', async () => {
+      const result = await webhooks.uiForm(createFetch(), 'test-identifier-456', {
+        selectedItems: ['item1', 'item2', 'item3'],
+        name: 'Test User',
+      });
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /webhooks/ui-form missing identifier test (400)', async () => {
+      const result = await webhooks.uiFormMissingIdentifier(createFetch());
+      expect(result).toBe(true);
+    });
   });
 
   describe('Pages', () => {

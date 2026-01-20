@@ -46,14 +46,25 @@ const bootstrapRuntime = `
   }
 
   /**
-   * Resolve a prop value - either return the literal or look up the binding.
+   * Resolve a prop value - handle both full bindings and embedded bindings.
+   * - "{{path}}" -> resolved value (preserves type - arrays, objects, etc.)
+   * - "Hello {{name}}, score: {{score}}" -> "Hello John, score: 42"
    */
   function resolveProp(value, ctx) {
-    if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
-      var path = value.slice(2, -2).trim();
-      return resolveBinding(path, ctx);
+    if (typeof value !== 'string') {
+      return value;
     }
-    return value;
+    // Check if the entire value is a single binding - return the actual value (preserves arrays/objects)
+    var fullBindingMatch = value.match(/^\{\{([^}]+)\}\}$/);
+    if (fullBindingMatch) {
+      var resolved = resolveBinding(fullBindingMatch[1].trim(), ctx);
+      return resolved !== undefined ? resolved : value;
+    }
+    // Otherwise replace embedded bindings as strings
+    return value.replace(/\{\{([^}]+)\}\}/g, function(match, path) {
+      var resolved = resolveBinding(path.trim(), ctx);
+      return resolved !== undefined ? String(resolved) : match;
+    });
   }
 
   /**
@@ -66,21 +77,15 @@ const bootstrapRuntime = `
       return null;
     }
 
-    var Component = components[placement.component];
-    if (!Component) {
-      console.error('Component not found:', placement.component);
-      return null;
-    }
-
-    // Resolve props
+    // Resolve props first (needed for List handling)
     var props = {};
     for (var key in placement.props) {
       props[key] = resolveProp(placement.props[key], ctx);
     }
 
-    // Handle List component specially - it creates a loop context
+    // Handle List component specially - it's a virtual component that creates a loop context
     if (placement.component === 'List') {
-      var items = props.items || [];
+      var items = Array.isArray(props.items) ? props.items : [];
       var itemVarName = props.as || 'item';
 
       // Find direct children of this List
@@ -98,10 +103,17 @@ const bootstrapRuntime = `
           return buildElement(childId, itemCtx);
         });
 
-        return React.createElement('div', { key: index, className: 'list-item' }, children);
+        return React.createElement('div', { key: index, className: 'p-4 bg-white border border-gray-200 rounded-lg' }, children);
       });
 
-      return React.createElement('div', { className: 'list' }, listItems);
+      return React.createElement('div', { className: 'flex flex-col gap-4' }, listItems);
+    }
+
+    // Look up the component (after handling virtual components like List)
+    var Component = components[placement.component];
+    if (!Component) {
+      console.error('Component not found:', placement.component);
+      return null;
     }
 
     // Handle Form component - inject action URL

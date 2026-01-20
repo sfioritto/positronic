@@ -7,12 +7,18 @@ export interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger';
 }
 
+const variantClasses = {
+  primary: 'bg-blue-500 text-white hover:bg-blue-600',
+  secondary: 'bg-gray-200 text-gray-700 hover:bg-gray-300',
+  danger: 'bg-red-500 text-white hover:bg-red-600',
+};
+
 const ButtonComponent = ({
   label,
   type = 'button',
   variant = 'primary',
 }: ButtonProps) => (
-  <button type={type} className={`btn btn-${variant}`}>
+  <button type={type} className={`px-4 py-2 font-medium rounded-md transition-colors ${variantClasses[variant]}`}>
     {label}
   </button>
 );

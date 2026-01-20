@@ -5,13 +5,14 @@ import { z } from 'zod';
 export interface FormProps {
   children?: ReactNode;
   submitLabel?: string;
+  action?: string;
 }
 
-const FormComponent = ({ children, submitLabel = 'Submit' }: FormProps) => (
-  <form className="form" method="POST">
+const FormComponent = ({ children, submitLabel = 'Submit', action }: FormProps) => (
+  <form className="flex flex-col gap-6" method="POST" action={action}>
     {children}
-    <div className="form-actions">
-      <button type="submit" className="btn btn-primary">
+    <div className="mt-4 flex gap-3">
+      <button type="submit" className="px-4 py-2 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 transition-colors">
         {submitLabel}
       </button>
     </div>

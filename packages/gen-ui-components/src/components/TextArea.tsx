@@ -18,8 +18,8 @@ const TextAreaComponent = ({
   rows = 4,
   defaultValue,
 }: TextAreaProps) => (
-  <div className="field">
-    <label htmlFor={name}>{label}</label>
+  <div className="flex flex-col gap-1.5">
+    <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
     <textarea
       id={name}
       name={name}
@@ -27,6 +27,7 @@ const TextAreaComponent = ({
       required={required}
       rows={rows}
       defaultValue={defaultValue}
+      className="px-3 py-2 border border-gray-300 rounded-md text-base w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
     />
   </div>
 );
