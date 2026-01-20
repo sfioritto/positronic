@@ -18,7 +18,8 @@ export class BrainRunner {
       resources?: Resources;
       pages?: PagesService;
       env?: RuntimeEnv;
-      components?: Record<string, UIComponent>;
+      components?: Record<string, UIComponent<any>>;
+      componentBundle?: string;
     }
   ) {}
 
@@ -62,21 +63,25 @@ export class BrainRunner {
    * Configure UI components for generative UI steps.
    * Components are merged with any existing components, allowing overrides.
    *
+   * @param components - Record of component definitions
+   * @param componentBundle - Pre-bundled JavaScript for client-side rendering (required for .ui() steps)
+   *
    * @example
    * ```typescript
-   * import { defaultComponents } from '@positronic/gen-ui-components';
+   * import { defaultComponents, componentBundle } from '@positronic/gen-ui-components';
    *
    * const runner = new BrainRunner({ client, adapters })
-   *   .withComponents(defaultComponents);
+   *   .withComponents(defaultComponents, componentBundle);
    * ```
    */
-  withComponents(components: Record<string, UIComponent>): BrainRunner {
+  withComponents(components: Record<string, UIComponent<any>>, componentBundle?: string): BrainRunner {
     return new BrainRunner({
       ...this.options,
       components: {
         ...this.options.components,
         ...components,
       },
+      componentBundle: componentBundle ?? this.options.componentBundle,
     });
   }
 
@@ -102,7 +107,7 @@ export class BrainRunner {
       loopEvents?: BrainEvent[];
     } = {}
   ): Promise<TState> {
-    const { adapters, client, resources, pages, env } = this.options;
+    const { adapters, client, resources, pages, env, components, componentBundle } = this.options;
     const resolvedEnv = env ?? DEFAULT_ENV;
 
     // Apply any patches from completed steps to get the initial state
@@ -139,6 +144,8 @@ export class BrainRunner {
             env: resolvedEnv,
             response,
             loopResumeContext,
+            components,
+            componentBundle,
           })
         : brain.run({
             initialState,
@@ -148,6 +155,8 @@ export class BrainRunner {
             resources: resources ?? {},
             pages,
             env: resolvedEnv,
+            components,
+            componentBundle,
           });
 
     try {
