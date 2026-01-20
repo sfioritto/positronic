@@ -1868,9 +1868,25 @@ class BrainEventStream<
     );
 
     if (!uiResult.rootId) {
-      throw new Error(
-        `UI generation failed - no root component created for step "${stepBlock.title}"`
-      );
+      // Provide detailed debug information
+      const placementCount = uiResult.placements.length;
+      const placementInfo = uiResult.placements
+        .map(p => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
+        .join(', ');
+
+      if (placementCount === 0) {
+        throw new Error(
+          `UI generation failed for step "${stepBlock.title}" - no components were placed. ` +
+          `The LLM may not have called any component tools. ` +
+          `LLM response text: ${uiResult.text ?? '(none)'}`
+        );
+      } else {
+        throw new Error(
+          `UI generation failed for step "${stepBlock.title}" - no root component found. ` +
+          `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
+          `The first component should be placed without a parentId to serve as the root.`
+        );
+      }
     }
 
     // Create unique identifier for this form submission webhook
