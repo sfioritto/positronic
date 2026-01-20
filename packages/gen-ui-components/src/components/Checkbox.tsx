@@ -4,15 +4,17 @@ import { z } from 'zod';
 export interface CheckboxProps {
   name: string;
   label: string;
+  value?: string;
   defaultChecked?: boolean;
 }
 
-const CheckboxComponent = ({ name, label, defaultChecked }: CheckboxProps) => (
+const CheckboxComponent = ({ name, label, value, defaultChecked }: CheckboxProps) => (
   <div className="flex items-center gap-2">
     <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
       <input
         type="checkbox"
         name={name}
+        value={value}
         defaultChecked={defaultChecked}
         className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
       />
@@ -24,10 +26,11 @@ const CheckboxComponent = ({ name, label, defaultChecked }: CheckboxProps) => (
 export const Checkbox: UIComponent<CheckboxProps> = {
   component: CheckboxComponent,
   tool: {
-    description: `A checkbox for boolean yes/no choices. Returns true/false in form data. Use for single toggles, confirmations, opt-ins.`,
+    description: `A checkbox for selecting items. When used in a List, set value to the item's ID so the form returns an array of selected IDs. For simple boolean toggles, omit value.`,
     parameters: z.object({
       name: z.string().describe('Form field name, used as key in submitted data'),
       label: z.string().describe('Label displayed next to checkbox'),
+      value: z.string().optional().describe('Value submitted when checked. Use with Lists to identify which items are selected (e.g., item ID)'),
       defaultChecked: z.boolean().optional().describe('Whether checkbox is checked by default'),
     }),
   },

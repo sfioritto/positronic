@@ -248,7 +248,8 @@ ${componentDocs}
 3. String values with special characters should be quoted
 4. The root must be a single component (usually Form or Container)
 5. Use \`children:\` array for nested components
-${hasSchema ? '\n6. After generating the YAML, call validate_template to verify it matches the expected schema' : ''}`;
+6. Do NOT use markdown formatting in content strings - no **bold**, *italic*, or [links](url). These are React components, not markdown. URLs should be included as plain text.
+${hasSchema ? '7. After generating the YAML, call validate_template to verify it matches the expected schema' : ''}`;
 }
 
 /**
