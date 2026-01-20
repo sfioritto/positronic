@@ -11,11 +11,25 @@ import type { LoopResumeContext } from './loop-messages.js';
 
 /**
  * Page object available after a .ui() step.
- * Contains link to the page and optional webhook for form submissions.
+ * Contains URL to the page and a pre-configured webhook for form submissions.
+ *
+ * Usage:
+ * ```typescript
+ * .ui('Create Form', { template: ..., responseSchema: z.object({ name: z.string() }) })
+ * .step('Notify', async ({ page, slack }) => {
+ *   await slack.post(`Fill out the form: ${page.url}`);
+ *   return { state, waitFor: [page.webhook] };
+ * })
+ * .step('Process', ({ response }) => {
+ *   // response.name is typed from responseSchema
+ * })
+ * ```
  */
 export type GeneratedPage<TSchema extends z.ZodSchema = z.ZodSchema> = {
-  link: string;
-  webhook: WebhookRegistration<TSchema> | null;
+  /** URL where the generated page can be accessed */
+  url: string;
+  /** Pre-configured webhook for form submissions, typed based on responseSchema */
+  webhook: WebhookRegistration<TSchema>;
 };
 
 export type SerializedError = {
@@ -938,23 +952,39 @@ export class Brain<
    * 1. Calls an LLM agent to generate UI components based on the prompt
    * 2. Renders the components to an HTML page
    * 3. Stores the page and makes it available via URL
-   * 4. Optionally creates a webhook for form submissions (if schema is provided)
+   * 4. Creates a webhook for form submissions (typed based on responseSchema)
    *
    * The next step receives a `page` object with:
-   * - `link`: URL to the generated page
-   * - `webhook`: WebhookRegistration for form submissions (or null if no schema)
+   * - `url`: URL to the generated page
+   * - `webhook`: Pre-configured WebhookRegistration for form submissions
+   *
+   * The brain author is responsible for notifying users about the page (via Slack,
+   * email, etc.) and using `waitFor` to pause until the form is submitted.
+   * Form data arrives in the `response` parameter of the step after `waitFor`.
    *
    * @example
    * ```typescript
-   * brain('email-digest')
-   *   .ui('ShowDigest', {
-   *     template: ({ emails }) => `Show these ${emails.length} emails grouped by category`,
-   *     responseSchema: z.object({ archiveIds: z.array(z.string()) }),
+   * brain('feedback-form')
+   *   .step('Initialize', () => ({ userName: 'John' }))
+   *   .ui('Create Form', {
+   *     template: (state) => `Create a feedback form for ${state.userName}`,
+   *     responseSchema: z.object({
+   *       rating: z.number().min(1).max(5),
+   *       comments: z.string(),
+   *     }),
    *   })
-   *   .step('WaitForSubmission', ({ page }) => {
-   *     sendNotification(`View digest: ${page.link}`);
+   *   .step('Notify and Wait', async ({ state, page, slack }) => {
+   *     // Notify user however you want
+   *     await slack.post('#general', `Please fill out: ${page.url}`);
+   *     // Wait for form submission
    *     return { state, waitFor: [page.webhook] };
    *   })
+   *   .step('Process Feedback', ({ state, response }) => ({
+   *     ...state,
+   *     // response is typed: { rating: number, comments: string }
+   *     rating: response.rating,
+   *     comments: response.comments,
+   *   }))
    * ```
    */
   ui<TSchema extends z.ZodObject<any> = z.ZodObject<any>>(
