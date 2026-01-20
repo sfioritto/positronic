@@ -83,21 +83,23 @@ function buildSystemPrompt(
 ## Available Components
 ${componentList}
 
-## Building the UI
-- Call component tools to place components on the page
-- Each tool returns an { id, component } object
-- Use the returned id as parentId to nest components inside containers
-- Root components should have no parentId (or parentId: null)
+## IMPORTANT: Building the UI
+You MUST call component tools to build the UI. Do not just describe what you would do - actually call the tools.
+
+1. FIRST: Call Form (or Container) WITHOUT a parentId - this is the ROOT component
+2. THEN: Call other components WITH parentId set to the root's id to nest them inside
+3. Each tool call returns { id, component } - use the id as parentId for children
 
 ## Data Bindings
 - Use {{path}} syntax to bind props to data values
 - Example: {{user.name}} binds to the "name" property of "user" in the data
 - Inside loops (List component), use the loop variable: {{item.field}}
 
-## Tree Structure
-1. First, place a container component (Form, Container, etc.) - this becomes the root
-2. Then place child components with parentId set to the root's id
-3. Continue nesting as needed`;
+## Example Flow
+1. Call Form() → returns { id: "abc123", component: "Form" }
+2. Call Heading({ content: "My Form", parentId: "abc123" })
+3. Call Input({ name: "email", label: "Email", parentId: "abc123" })
+4. Call Button({ label: "Submit", type: "submit", parentId: "abc123" })`;
 
   const schemaPrompt = hasSchema
     ? `
