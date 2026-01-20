@@ -68,6 +68,105 @@ const formBrain = brain('Contact Form')
 
 6. **Data Flow**: The submitted data is available in the next step via the `page` parameter, typed according to the `responseSchema`.
 
+## Complete Example
+
+Here's a full example showing how to create a support ticket form and process the submitted data:
+
+```typescript
+import { brain } from '../brain.js';
+import { z } from 'zod';
+
+// Define the schema for form data
+const ticketSchema = z.object({
+  subject: z.string(),
+  priority: z.enum(['low', 'medium', 'high']),
+  description: z.string(),
+  contactEmail: z.string().email(),
+});
+
+const supportTicketBrain = brain('Support Ticket')
+  // Step 1: Initialize with any data needed for the form
+  .step('Initialize', ({ state }) => ({
+    ...state,
+    ticketId: `TICKET-${Date.now()}`,
+    userEmail: 'user@example.com', // Could come from auth
+  }))
+
+  // Step 2: Generate and display the form
+  .ui('Create Ticket Form', {
+    template: (state) => `
+      Create a support ticket form with:
+      - A heading "Submit Support Ticket"
+      - Subject line input (required)
+      - Priority dropdown with options: low, medium, high (default to medium)
+      - Description textarea for the issue details (required)
+      - Contact email input, pre-filled with "${state.userEmail}"
+      - A submit button labeled "Create Ticket"
+
+      Use a clean card layout with proper spacing.
+    `,
+    responseSchema: ticketSchema,
+  })
+
+  // Step 3: Process the form submission
+  // The `page` parameter contains the typed form data
+  .step('Process Ticket', ({ state, page }) => {
+    // `page` is fully typed based on ticketSchema:
+    // - page.subject: string
+    // - page.priority: 'low' | 'medium' | 'high'
+    // - page.description: string
+    // - page.contactEmail: string
+
+    return {
+      ...state,
+      ticket: {
+        id: state.ticketId,
+        subject: page.subject,
+        priority: page.priority,
+        description: page.description,
+        contactEmail: page.contactEmail,
+        createdAt: new Date().toISOString(),
+        status: 'open',
+      },
+    };
+  })
+
+  // Step 4: Send confirmation (example with services)
+  .step('Send Confirmation', async ({ state, email }) => {
+    // Use the processed ticket data
+    await email.send({
+      to: state.ticket.contactEmail,
+      subject: `Ticket ${state.ticket.id}: ${state.ticket.subject}`,
+      body: `Your support ticket has been created. We'll respond within 24 hours.`,
+    });
+
+    return {
+      ...state,
+      confirmationSent: true,
+    };
+  });
+
+export default supportTicketBrain;
+```
+
+### Key Points About Form Data Flow
+
+1. **The `page` parameter**: After a UI step, the next step receives the form submission data through the `page` parameter in its action function.
+
+2. **Type inference**: When you provide a `responseSchema`, TypeScript automatically infers the type of `page`. In the example above, `page.priority` is typed as `'low' | 'medium' | 'high'`, not just `string`.
+
+3. **The `page` parameter is only available in the step immediately following a UI step**. If you need the form data in later steps, save it to state:
+
+```typescript
+// Save form data to state so it's available in all subsequent steps
+.step('Process Ticket', ({ state, page }) => ({
+  ...state,
+  formData: page,  // Now available as state.formData in all later steps
+}))
+```
+
+4. **Without a responseSchema**: If you don't provide a `responseSchema`, the `page` parameter will be typed as `Record<string, unknown>` and you'll need to handle the types yourself.
+
 ## Template Best Practices
 
 ### Be Specific About Layout
