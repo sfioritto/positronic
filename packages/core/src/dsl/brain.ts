@@ -414,6 +414,13 @@ type StepBlock<
     JsonObject | undefined,
     TPageIn
   >;
+  /** If true, this is a UI generation step that requires components configuration */
+  isUIStep?: boolean;
+  /** Configuration for UI generation steps */
+  uiConfig?: {
+    template: (state: TStateIn, resources: Resources) => string | Promise<string>;
+    responseSchema?: z.ZodObject<any>;
+  };
 };
 
 type BrainBlock<
@@ -922,6 +929,82 @@ export class Brain<
       this.blocks.push(promptBlock);
       return this.nextBrain<any>();
     }
+  }
+
+  /**
+   * Add a UI generation step that creates an interactive page.
+   *
+   * The step:
+   * 1. Calls an LLM agent to generate UI components based on the prompt
+   * 2. Renders the components to an HTML page
+   * 3. Stores the page and makes it available via URL
+   * 4. Optionally creates a webhook for form submissions (if schema is provided)
+   *
+   * The next step receives a `page` object with:
+   * - `link`: URL to the generated page
+   * - `webhook`: WebhookRegistration for form submissions (or null if no schema)
+   *
+   * @example
+   * ```typescript
+   * brain('email-digest')
+   *   .ui('ShowDigest', {
+   *     template: ({ emails }) => `Show these ${emails.length} emails grouped by category`,
+   *     responseSchema: z.object({ archiveIds: z.array(z.string()) }),
+   *   })
+   *   .step('WaitForSubmission', ({ page }) => {
+   *     sendNotification(`View digest: ${page.link}`);
+   *     return { state, waitFor: [page.webhook] };
+   *   })
+   * ```
+   */
+  ui<TSchema extends z.ZodObject<any> = z.ZodObject<any>>(
+    title: string,
+    config: {
+      template: (
+        state: TState,
+        resources: Resources
+      ) => string | Promise<string>;
+      responseSchema?: TSchema;
+    }
+  ): Brain<TOptions, TState, TServices, TResponse, GeneratedPage<TSchema>> {
+    const uiBlock: StepBlock<
+      TState,
+      TState,
+      TOptions,
+      TServices,
+      TResponse,
+      readonly [],
+      TPage
+    > = {
+      type: 'step',
+      title,
+      isUIStep: true,
+      uiConfig: {
+        template: config.template as (state: any, resources: Resources) => string | Promise<string>,
+        responseSchema: config.responseSchema,
+      },
+      action: async (params) => {
+        // The actual UI generation is handled by BrainRunner/BrainEventStream
+        // This action is a placeholder that gets replaced during execution
+        // when the runner detects `isUIStep: true` and has components configured
+        throw new Error(
+          `UI step "${title}" requires components to be configured via BrainRunner.withComponents(). ` +
+          `The UI generation is handled by the runner, not the step action directly.`
+        );
+      },
+    };
+    this.blocks.push(uiBlock);
+
+    // Return brain with TPage set to GeneratedPage<TSchema>
+    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, GeneratedPage<TSchema>>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+
+    nextBrain.services = this.services;
+    nextBrain.optionsSchema = this.optionsSchema;
+
+    return nextBrain;
   }
 
   // Overload signatures

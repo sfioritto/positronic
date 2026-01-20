@@ -1,72 +1,17 @@
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { ObjectGenerator } from '../clients/types.js';
-import type { UIComponent } from './types.js';
-import type { FormSchema } from './types.js';
-
-/**
- * Result of a component tool call during UI generation.
- */
-export interface ComponentPlacement {
-  id: string;
-  component: string;
-  props: unknown;
-}
+import type { UIComponent, Placement, FormSchema } from './types.js';
+import { createValidateFormTool } from './validate-form.js';
 
 /**
  * Result of generateUI - contains all component placements from the agent loop.
  */
 export interface GenerateUIResult {
-  placements: ComponentPlacement[];
+  placements: Placement[];
+  rootId: string | undefined;
   text?: string;
   usage: { totalTokens: number };
-}
-
-/**
- * Result of ValidateForm tool execution.
- */
-export interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-}
-
-/**
- * Extract form field names from placements.
- * Form fields are components with a `name` prop (Input, TextArea, Checkbox, Select, etc.)
- */
-function extractFormFields(placements: ComponentPlacement[]): Set<string> {
-  const fields = new Set<string>();
-  for (const placement of placements) {
-    const props = placement.props as Record<string, unknown>;
-    if (props && typeof props.name === 'string') {
-      fields.add(props.name);
-    }
-  }
-  return fields;
-}
-
-/**
- * Validate placements against a form schema.
- * Checks that all required schema fields have corresponding form inputs.
- */
-function validateAgainstSchema(placements: ComponentPlacement[], schema: FormSchema): ValidationResult {
-  const formFields = extractFormFields(placements);
-  const errors: string[] = [];
-
-  // Get schema shape and check each field
-  const shape = schema.shape;
-  for (const [fieldName, fieldSchema] of Object.entries(shape)) {
-    const isOptional = fieldSchema instanceof z.ZodOptional;
-
-    if (!isOptional && !formFields.has(fieldName)) {
-      errors.push(`Missing required field: ${fieldName}`);
-    }
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
 }
 
 /**
@@ -74,43 +19,47 @@ function validateAgainstSchema(placements: ComponentPlacement[], schema: FormSch
  * Uses a shared placements array so ValidateForm can inspect current state.
  */
 function createUITools(
-  components: Record<string, UIComponent<any>>,
-  schema?: FormSchema
+  components: Record<string, UIComponent<unknown>>,
+  schema: FormSchema | undefined,
+  data: Record<string, unknown>
 ) {
   // Shared state - placements accumulate as tools are called
-  const placements: ComponentPlacement[] = [];
+  const placements: Placement[] = [];
 
   // Create component tools that push to shared placements
   const componentTools = Object.fromEntries(
-    Object.entries(components).map(([name, comp]) => [
-      name,
-      {
-        description: comp.tool.description,
-        inputSchema: comp.tool.parameters,
-        execute: (props: unknown): ComponentPlacement => {
-          const placement = {
-            id: uuidv4(),
-            component: name,
-            props,
-          };
-          placements.push(placement);
-          return placement;
+    Object.entries(components).map(([name, comp]) => {
+      // Extend the component's parameters to include parentId
+      const extendedParameters = comp.tool.parameters.and(
+        z.object({
+          parentId: z.string().optional().describe('ID of the parent component to place this inside'),
+        })
+      );
+
+      return [
+        name,
+        {
+          description: comp.tool.description,
+          inputSchema: extendedParameters,
+          execute: (props: Record<string, unknown>): { id: string; component: string } => {
+            // Extract parentId from props, rest goes to the component
+            const { parentId, ...componentProps } = props;
+            const placement: Placement = {
+              id: uuidv4(),
+              component: name,
+              props: componentProps,
+              parentId: (parentId as string) ?? null,
+            };
+            placements.push(placement);
+            return { id: placement.id, component: name };
+          },
         },
-      },
-    ])
+      ];
+    })
   );
 
-  // If no schema, just return component tools
-  if (!schema) {
-    return { tools: componentTools, placements };
-  }
-
-  // Add ValidateForm tool that checks against schema
-  const validateFormTool = {
-    description: `Check if the current form satisfies the required schema. Call this after placing form fields to verify all required fields are present. Returns { valid: true } if OK, or { valid: false, errors: [...] } with missing fields.`,
-    inputSchema: z.object({}),
-    execute: (): ValidationResult => validateAgainstSchema(placements, schema),
-  };
+  // Add ValidateForm tool that checks schema and data bindings
+  const validateFormTool = createValidateFormTool(placements, schema, data);
 
   return {
     tools: { ...componentTools, ValidateForm: validateFormTool },
@@ -119,13 +68,55 @@ function createUITools(
 }
 
 /**
+ * Build the system prompt for UI generation.
+ */
+function buildSystemPrompt(
+  components: Record<string, UIComponent<unknown>>,
+  hasSchema: boolean
+): string {
+  const componentList = Object.entries(components)
+    .map(([name, comp]) => `- ${name}: ${comp.tool.description.split('\n')[0]}`)
+    .join('\n');
+
+  const basePrompt = `You are a UI generator. Build pages by calling component tools.
+
+## Available Components
+${componentList}
+
+## Building the UI
+- Call component tools to place components on the page
+- Each tool returns an { id, component } object
+- Use the returned id as parentId to nest components inside containers
+- Root components should have no parentId (or parentId: null)
+
+## Data Bindings
+- Use {{path}} syntax to bind props to data values
+- Example: {{user.name}} binds to the "name" property of "user" in the data
+- Inside loops (List component), use the loop variable: {{item.field}}
+
+## Tree Structure
+1. First, place a container component (Form, Container, etc.) - this becomes the root
+2. Then place child components with parentId set to the root's id
+3. Continue nesting as needed`;
+
+  const schemaPrompt = hasSchema
+    ? `
+
+## Validation
+After placing form fields, call ValidateForm to verify:
+1. All required schema fields have corresponding form inputs
+2. All data bindings reference valid paths in the data`
+    : '';
+
+  return basePrompt + schemaPrompt;
+}
+
+/**
  * Generate a UI page using an LLM agent loop with component tools.
  *
  * The agent receives the user's prompt and can call component tools to build
- * a page structure. Each tool call records a component placement.
- *
- * When a schema is provided, a ValidateForm tool is added that the agent can
- * call to check if the form satisfies the schema requirements.
+ * a page structure. Each tool call records a component placement with parent
+ * references to form a tree.
  *
  * @example
  * ```typescript
@@ -134,34 +125,27 @@ function createUITools(
  *   prompt: 'Create a form to collect user name and email',
  *   components: defaultComponents,
  *   schema: z.object({ name: z.string(), email: z.string() }),
+ *   data: { user: { name: 'John' } },
  * });
  *
- * // result.placements contains the component tree
+ * // result.placements contains the component tree as a flat array
+ * // result.rootId is the ID of the root component
  * ```
  */
 export async function generateUI(params: {
   client: ObjectGenerator;
   prompt: string;
-  components: Record<string, UIComponent<any>>;
+  components: Record<string, UIComponent<unknown>>;
   schema?: FormSchema;
+  data?: Record<string, unknown>;
   system?: string;
   maxSteps?: number;
 }): Promise<GenerateUIResult> {
-  const { client, prompt, components, schema, maxSteps = 10 } = params;
+  const { client, prompt, components, schema, data = {}, maxSteps = 10 } = params;
 
-  const { tools, placements } = createUITools(components, schema);
+  const { tools, placements } = createUITools(components, schema, data);
 
-  const baseSystemPrompt = `You are a UI generator. Build pages by calling component tools.
-
-Available components can be used to create forms, display text, and organize layouts.
-Call the appropriate component tools to build the requested UI.
-Each tool call places a component on the page.`;
-
-  const schemaSystemPrompt = schema
-    ? `\n\nAfter placing form fields, call ValidateForm to verify all required fields are present.`
-    : '';
-
-  const systemPrompt = params.system ?? (baseSystemPrompt + schemaSystemPrompt);
+  const systemPrompt = params.system ?? buildSystemPrompt(components, !!schema);
 
   const result = await client.streamText({
     system: systemPrompt,
@@ -170,8 +154,12 @@ Each tool call places a component on the page.`;
     maxSteps,
   });
 
+  // Find the root placement (no parent)
+  const rootId = placements.find(p => p.parentId === null)?.id;
+
   return {
     placements,
+    rootId,
     text: result.text,
     usage: result.usage,
   };

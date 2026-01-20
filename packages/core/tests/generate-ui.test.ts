@@ -11,7 +11,9 @@ const mockClient: ObjectGenerator = {
 };
 
 // Simple test components
-const TestInput: UIComponent<{ name: string; label: string }> = {
+// Note: Component names must match those in FORM_COMPONENTS (validate-form.ts)
+// for form validation to recognize them
+const Input: UIComponent<{ name: string; label: string }> = {
   component: () => null,
   tool: {
     description: 'A text input field',
@@ -22,7 +24,7 @@ const TestInput: UIComponent<{ name: string; label: string }> = {
   },
 };
 
-const TestButton: UIComponent<{ text: string }> = {
+const Button: UIComponent<{ text: string }> = {
   component: () => null,
   tool: {
     description: 'A button',
@@ -40,13 +42,13 @@ describe('generateUI', () => {
   it('should return placements for each component tool call', async () => {
     // Mock simulates a real client by calling the execute functions
     mockStreamText.mockImplementationOnce(async (params) => {
-      const result1 = await params.tools.TestInput.execute!({ name: 'email', label: 'Email Address' });
-      const result2 = await params.tools.TestButton.execute!({ text: 'Submit' });
+      const result1 = await params.tools.Input.execute!({ name: 'email', label: 'Email Address' });
+      const result2 = await params.tools.Button.execute!({ text: 'Submit' });
 
       return {
         toolCalls: [
-          { toolCallId: 'call-1', toolName: 'TestInput', args: { name: 'email', label: 'Email Address' }, result: result1 },
-          { toolCallId: 'call-2', toolName: 'TestButton', args: { text: 'Submit' }, result: result2 },
+          { toolCallId: 'call-1', toolName: 'Input', args: { name: 'email', label: 'Email Address' }, result: result1 },
+          { toolCallId: 'call-2', toolName: 'Button', args: { text: 'Submit' }, result: result2 },
         ],
         text: 'Created the form.',
         usage: { totalTokens: 150 },
@@ -56,22 +58,26 @@ describe('generateUI', () => {
     const result = await generateUI({
       client: mockClient,
       prompt: 'Create a form with an email input and submit button',
-      components: { TestInput, TestButton },
+      components: { Input, Button },
     });
 
     expect(result.placements).toHaveLength(2);
     expect(result.placements[0]).toMatchObject({
-      component: 'TestInput',
+      component: 'Input',
       props: { name: 'email', label: 'Email Address' },
+      parentId: null,
     });
     expect(result.placements[1]).toMatchObject({
-      component: 'TestButton',
+      component: 'Button',
       props: { text: 'Submit' },
+      parentId: null,
     });
     // Each placement gets a unique ID
     expect(result.placements[0].id).toBeDefined();
     expect(result.placements[1].id).toBeDefined();
     expect(result.placements[0].id).not.toBe(result.placements[1].id);
+    // First placement should be the root
+    expect(result.rootId).toBe(result.placements[0].id);
 
     expect(result.text).toBe('Created the form.');
     expect(result.usage.totalTokens).toBe(150);
@@ -87,7 +93,7 @@ describe('generateUI', () => {
     const result = await generateUI({
       client: mockClient,
       prompt: 'Show a blank page',
-      components: { TestInput },
+      components: { Input },
     });
 
     expect(result.placements).toHaveLength(0);
@@ -106,14 +112,14 @@ describe('generateUI', () => {
       expect(params.tools.ValidateForm.description).toContain('schema');
 
       // Place only email field (missing name)
-      const result1 = await params.tools.TestInput.execute!({ name: 'email', label: 'Email' });
+      const result1 = await params.tools.Input.execute!({ name: 'email', label: 'Email' });
 
       // Call ValidateForm - should report missing 'name' field
       const validation = await params.tools.ValidateForm.execute!({});
 
       return {
         toolCalls: [
-          { toolCallId: 'c1', toolName: 'TestInput', args: { name: 'email', label: 'Email' }, result: result1 },
+          { toolCallId: 'c1', toolName: 'Input', args: { name: 'email', label: 'Email' }, result: result1 },
           { toolCallId: 'c2', toolName: 'ValidateForm', args: {}, result: validation },
         ],
         usage: { totalTokens: 100 },
@@ -123,7 +129,7 @@ describe('generateUI', () => {
     const result = await generateUI({
       client: mockClient,
       prompt: 'Create a contact form',
-      components: { TestInput },
+      components: { Input },
       schema,
     });
 
@@ -150,14 +156,14 @@ describe('generateUI', () => {
       validationResults.push(v1);
 
       // Place email field
-      const r1 = await params.tools.TestInput.execute!({ name: 'email', label: 'Email' });
+      const r1 = await params.tools.Input.execute!({ name: 'email', label: 'Email' });
 
       // Second validation - missing age (subscribe is optional)
       const v2 = await params.tools.ValidateForm.execute!({});
       validationResults.push(v2);
 
       // Place age field
-      const r2 = await params.tools.TestInput.execute!({ name: 'age', label: 'Age' });
+      const r2 = await params.tools.Input.execute!({ name: 'age', label: 'Age' });
 
       // Third validation - all required fields present
       const v3 = await params.tools.ValidateForm.execute!({});
@@ -166,9 +172,9 @@ describe('generateUI', () => {
       return {
         toolCalls: [
           { toolCallId: 'c1', toolName: 'ValidateForm', args: {}, result: v1 },
-          { toolCallId: 'c2', toolName: 'TestInput', args: { name: 'email', label: 'Email' }, result: r1 },
+          { toolCallId: 'c2', toolName: 'Input', args: { name: 'email', label: 'Email' }, result: r1 },
           { toolCallId: 'c3', toolName: 'ValidateForm', args: {}, result: v2 },
-          { toolCallId: 'c4', toolName: 'TestInput', args: { name: 'age', label: 'Age' }, result: r2 },
+          { toolCallId: 'c4', toolName: 'Input', args: { name: 'age', label: 'Age' }, result: r2 },
           { toolCallId: 'c5', toolName: 'ValidateForm', args: {}, result: v3 },
         ],
         usage: { totalTokens: 200 },
@@ -178,19 +184,19 @@ describe('generateUI', () => {
     await generateUI({
       client: mockClient,
       prompt: 'Create a signup form',
-      components: { TestInput },
+      components: { Input },
       schema,
     });
 
     // First validation: missing both email and age
     expect(validationResults[0].valid).toBe(false);
-    expect(validationResults[0].errors).toContain('Missing required field: email');
-    expect(validationResults[0].errors).toContain('Missing required field: age');
+    expect(validationResults[0].errors.map((e: { message: string }) => e.message)).toContain('Missing required field: email');
+    expect(validationResults[0].errors.map((e: { message: string }) => e.message)).toContain('Missing required field: age');
 
     // Second validation: missing age
     expect(validationResults[1].valid).toBe(false);
-    expect(validationResults[1].errors).not.toContain('Missing required field: email');
-    expect(validationResults[1].errors).toContain('Missing required field: age');
+    expect(validationResults[1].errors.map((e: { message: string }) => e.message)).not.toContain('Missing required field: email');
+    expect(validationResults[1].errors.map((e: { message: string }) => e.message)).toContain('Missing required field: age');
 
     // Third validation: all required fields present
     expect(validationResults[2].valid).toBe(true);

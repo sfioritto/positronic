@@ -1,6 +1,119 @@
 import type { ComponentType } from 'react';
 import { z } from 'zod';
 
+// ============================================
+// PLACEMENT TYPES
+// ============================================
+
+/**
+ * A placed component in the UI tree.
+ * Components are stored in a flat array with parentId references to form a tree.
+ */
+export interface Placement {
+  /** Unique identifier for this placement */
+  id: string;
+  /** Component name, e.g., "Form", "Input", "Checkbox" */
+  component: string;
+  /** Props for the component, may contain binding expressions like "{{path}}" */
+  props: Record<string, unknown>;
+  /** Parent placement ID, null for root components */
+  parentId: string | null;
+}
+
+// ============================================
+// DATA TYPE INFERENCE
+// ============================================
+
+/**
+ * Represents the inferred type of a data value.
+ * Used for validating data bindings against the provided data.
+ */
+export type DataType =
+  | { kind: 'primitive'; type: 'string' | 'number' | 'boolean' | 'null' }
+  | { kind: 'array'; elementType: DataType }
+  | { kind: 'object'; properties: Record<string, DataType> }
+  | { kind: 'unknown' };
+
+/**
+ * Infer the DataType from a sample value.
+ */
+export function inferDataType(value: unknown): DataType {
+  if (value === null) {
+    return { kind: 'primitive', type: 'null' };
+  }
+
+  if (typeof value === 'string') {
+    return { kind: 'primitive', type: 'string' };
+  }
+
+  if (typeof value === 'number') {
+    return { kind: 'primitive', type: 'number' };
+  }
+
+  if (typeof value === 'boolean') {
+    return { kind: 'primitive', type: 'boolean' };
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return { kind: 'array', elementType: { kind: 'unknown' } };
+    }
+    // Infer from first element
+    return { kind: 'array', elementType: inferDataType(value[0]) };
+  }
+
+  if (typeof value === 'object') {
+    const properties: Record<string, DataType> = {};
+    for (const [key, val] of Object.entries(value)) {
+      properties[key] = inferDataType(val);
+    }
+    return { kind: 'object', properties };
+  }
+
+  return { kind: 'unknown' };
+}
+
+// ============================================
+// VALIDATION TYPES
+// ============================================
+
+/**
+ * A validation error from ValidateForm.
+ */
+export interface ValidationError {
+  type: 'form-schema-mismatch' | 'invalid-binding' | 'unknown-component' | 'missing-prop';
+  message: string;
+  path?: string;
+}
+
+/**
+ * Result of validation.
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}
+
+/**
+ * Extracted form field info.
+ */
+export interface ExtractedFormField {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'string[]' | 'number[]';
+  insideLoop: boolean;
+}
+
+/**
+ * The extracted form schema from placements.
+ */
+export interface ExtractedFormSchema {
+  fields: ExtractedFormField[];
+}
+
+// ============================================
+// UI COMPONENT TYPES
+// ============================================
+
 /**
  * A UI component that can be used by the LLM to build pages.
  * Combines a React component with its tool definition for the LLM.

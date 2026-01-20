@@ -69,12 +69,37 @@ export type { LoopResumeContext } from './dsl/loop-messages.js';
 export { reconstructLoopContext } from './dsl/loop-messages.js';
 
 // UI types
-export type { UIComponent, FormPrimitive, FormField, FormSchema } from './ui/types.js';
-export { isFormSchema } from './ui/types.js';
+export type {
+  UIComponent,
+  FormPrimitive,
+  FormField,
+  FormSchema,
+  Placement,
+  DataType,
+  ValidationError,
+  ValidationResult,
+  ExtractedFormField,
+  ExtractedFormSchema,
+} from './ui/types.js';
+export { isFormSchema, inferDataType } from './ui/types.js';
 
 // UI generation
 export { generateUI } from './ui/generate-ui.js';
-export type { ComponentPlacement, GenerateUIResult, ValidationResult } from './ui/generate-ui.js';
+export type { GenerateUIResult } from './ui/generate-ui.js';
+
+// UI validation
+export {
+  isBinding,
+  extractBindingPath,
+  validateDataBindings,
+  extractFormSchema,
+  validateAgainstZod,
+  createValidateFormTool,
+} from './ui/validate-form.js';
+
+// Page HTML generation
+export { generatePageHtml } from './ui/generate-page-html.js';
+export type { GeneratePageHtmlOptions } from './ui/generate-page-html.js';
 
 // Brain state machine
 export {

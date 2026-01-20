@@ -239,5 +239,5 @@ const api = {
 
 - **Documentation**: https://positronic.dev
 - **CLI Help**: `px --help`
-- **Brain DSL Guide**: `/docs/brain-dsl-guide.md`
+- **Brain DSL Guide**: `/docs/brain-dsl-guide.md` (includes UI steps for generating forms)
 - **Testing Guide**: `/docs/brain-testing-guide.md`
