@@ -16,7 +16,7 @@
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist/src --strip-leading-paths",
-    "bundle": "esbuild src/bundle.ts --bundle --external:react --external:react-dom --format=iife --global-name=PositronicComponents --outfile=dist/components.js",
+    "bundle": "node esbuild.config.mjs",
     "generate-bundle-export": "node scripts/generate-bundle-export.js",
     "build": "npm run bundle && npm run generate-bundle-export && npm run tsc && npm run swc",
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules src/generated-bundle.ts"

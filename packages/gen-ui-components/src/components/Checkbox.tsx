@@ -8,12 +8,13 @@ export interface CheckboxProps {
 }
 
 const CheckboxComponent = ({ name, label, defaultChecked }: CheckboxProps) => (
-  <div className="field checkbox">
-    <label>
+  <div className="flex items-center gap-2">
+    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
       <input
         type="checkbox"
         name={name}
         defaultChecked={defaultChecked}
+        className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
       />
       {label}
     </label>

@@ -6,8 +6,14 @@ export interface TextProps {
   variant?: 'body' | 'small' | 'muted';
 }
 
+const variantClasses = {
+  body: 'text-base text-gray-700',
+  small: 'text-sm text-gray-600',
+  muted: 'text-sm text-gray-500',
+};
+
 const TextComponent = ({ content, variant = 'body' }: TextProps) => (
-  <p className={`text text-${variant}`}>{content}</p>
+  <p className={variantClasses[variant]}>{content}</p>
 );
 
 export const Text: UIComponent<TextProps> = {

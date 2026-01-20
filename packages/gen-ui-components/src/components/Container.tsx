@@ -9,15 +9,32 @@ export interface ContainerProps {
   padding?: 'none' | 'small' | 'medium' | 'large';
 }
 
+const directionClasses = {
+  row: 'flex-row',
+  column: 'flex-col',
+};
+
+const gapClasses = {
+  none: 'gap-0',
+  small: 'gap-2',
+  medium: 'gap-4',
+  large: 'gap-6',
+};
+
+const paddingClasses = {
+  none: 'p-0',
+  small: 'p-2',
+  medium: 'p-4',
+  large: 'p-6',
+};
+
 const ContainerComponent = ({
   children,
   direction = 'column',
   gap = 'medium',
   padding = 'none',
 }: ContainerProps) => (
-  <div
-    className={`container direction-${direction} gap-${gap} padding-${padding}`}
-  >
+  <div className={`flex ${directionClasses[direction]} ${gapClasses[gap]} ${paddingClasses[padding]}`}>
     {children}
   </div>
 );

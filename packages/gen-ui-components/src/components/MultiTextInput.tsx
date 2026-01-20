@@ -14,22 +14,23 @@ const MultiTextInputComponent = ({
   placeholder,
   defaultValues = [],
 }: MultiTextInputProps) => (
-  <div className="field multi-text-input" data-name={name} data-default={JSON.stringify(defaultValues)}>
-    <label>{label}</label>
-    <div className="multi-text-items">
+  <div className="flex flex-col gap-1.5" data-name={name} data-default={JSON.stringify(defaultValues)}>
+    <label className="text-sm font-medium text-gray-700">{label}</label>
+    <div className="flex flex-col gap-2">
       {defaultValues.map((value, index) => (
-        <div key={index} className="multi-text-item">
+        <div key={index} className="flex gap-2 items-center">
           <input
             type="text"
             name={`${name}[]`}
             defaultValue={value}
             placeholder={placeholder}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
-          <button type="button" className="remove-item">Remove</button>
+          <button type="button" className="text-xs text-red-500 hover:text-red-700">Remove</button>
         </div>
       ))}
     </div>
-    <button type="button" className="add-item" data-placeholder={placeholder}>
+    <button type="button" className="mt-2 text-sm text-blue-500 hover:text-blue-700" data-placeholder={placeholder}>
       Add item
     </button>
   </div>
