@@ -8,6 +8,9 @@ import type { Resources } from '../resources/resources.js';
 import type { WebhookRegistration, ExtractWebhookResponses, SerializedWebhookRegistration } from './webhook.js';
 import type { PagesService } from './pages.js';
 import type { LoopResumeContext } from './loop-messages.js';
+import type { UIComponent } from '../ui/types.js';
+import { generateUI } from '../ui/generate-ui.js';
+import { generatePageHtml } from '../ui/generate-page-html.js';
 
 /**
  * Page object available after a .ui() step.
@@ -505,6 +508,10 @@ interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   options?: TOptions;
   pages?: PagesService;
   env?: RuntimeEnv;
+  /** UI components for generative UI steps */
+  components?: Record<string, UIComponent<any>>;
+  /** Pre-bundled component JavaScript for page rendering */
+  componentBundle?: string;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
@@ -1158,6 +1165,8 @@ class BrainEventStream<
   private currentPage: GeneratedPage | undefined = undefined;
   private loopResumeContext: LoopResumeContext | null | undefined = undefined;
   private initialCompletedSteps?: SerializedStep[];
+  private components?: Record<string, UIComponent<any>>;
+  private componentBundle?: string;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -1182,6 +1191,8 @@ class BrainEventStream<
       env,
       response,
       loopResumeContext,
+      components,
+      componentBundle,
     } = params as RerunParams<TOptions> & {
       title: string;
       description?: string;
@@ -1199,6 +1210,8 @@ class BrainEventStream<
     this.pages = pages;
     this.env = env ?? DEFAULT_ENV;
     this.initialCompletedSteps = initialCompletedSteps;
+    this.components = components;
+    this.componentBundle = componentBundle;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -1367,6 +1380,16 @@ class BrainEventStream<
 
   private async *executeStep(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as Block<any, any, TOptions, TServices, any, any>;
+
+    if (block.type === 'step') {
+      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any, any>;
+
+      // Check if this is a UI step - handle specially
+      if (stepBlock.isUIStep) {
+        yield* this.executeUIStep(step, stepBlock);
+        return;
+      }
+    }
 
     if (block.type === 'brain') {
       const initialState =
@@ -1798,6 +1821,94 @@ class BrainEventStream<
         }
       }
     }
+  }
+
+  /**
+   * Execute a UI generation step.
+   * Generates UI components, renders to HTML, creates page, and sets up webhook.
+   */
+  private async *executeUIStep(
+    step: Step,
+    stepBlock: StepBlock<any, any, TOptions, TServices, any, any, any>
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const prevState = this.currentState;
+
+    // Validate required configuration
+    if (!this.components) {
+      throw new Error(
+        `UI step "${stepBlock.title}" requires components to be configured via BrainRunner.withComponents()`
+      );
+    }
+    if (!this.componentBundle) {
+      throw new Error(
+        `UI step "${stepBlock.title}" requires componentBundle to be configured via BrainRunner.withComponents()`
+      );
+    }
+    if (!this.pages) {
+      throw new Error(
+        `UI step "${stepBlock.title}" requires pages service to be configured`
+      );
+    }
+
+    const uiConfig = stepBlock.uiConfig!;
+
+    // Get the prompt from template (with heartbeat for long-running template functions)
+    const prompt = await uiConfig.template(this.currentState, this.resources);
+
+    // Generate UI components using the LLM (with heartbeat)
+    const uiResult = yield* this.withHeartbeat(
+      generateUI({
+        client: this.client,
+        prompt,
+        components: this.components,
+        schema: uiConfig.responseSchema,
+        data: this.currentState as Record<string, unknown>,
+      }),
+      step
+    );
+
+    if (!uiResult.rootId) {
+      throw new Error(
+        `UI generation failed - no root component created for step "${stepBlock.title}"`
+      );
+    }
+
+    // Create unique identifier for this form submission webhook
+    const webhookIdentifier = `${this.brainRunId}-${step.id}`;
+
+    // Construct form action URL for the webhook
+    const formAction = `${this.env.origin}/webhooks/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
+
+    // Generate HTML page
+    const html = generatePageHtml({
+      placements: uiResult.placements,
+      rootId: uiResult.rootId,
+      data: this.currentState as Record<string, unknown>,
+      componentBundle: this.componentBundle,
+      title: stepBlock.title,
+      formAction,
+    });
+
+    // Store the page (with heartbeat for potential network latency)
+    const page = yield* this.withHeartbeat(this.pages.create(html), step);
+
+    // Create webhook registration for form submissions
+    // Uses a built-in 'ui-form' webhook slug that the backend knows how to handle
+    const webhook: WebhookRegistration = {
+      slug: 'ui-form',
+      identifier: webhookIdentifier,
+      schema: uiConfig.responseSchema ?? z.record(z.unknown()),
+    };
+
+    // Set currentPage for the next step to access
+    this.currentPage = {
+      url: page.url,
+      webhook,
+    };
+
+    // State doesn't change from UI step - it just sets up the page
+    // The next step will receive the page object and can use waitFor
+    yield* this.completeStep(step, prevState);
   }
 
   private *completeStep(

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import type { UIComponent } from '@positronic/core';
 
 import { Input } from './components/Input.js';
@@ -11,19 +14,38 @@ import { Heading } from './components/Heading.js';
 import { Container } from './components/Container.js';
 import { Form } from './components/Form.js';
 
+// Load the component bundle at import time
+// The bundle is in dist/components.js, relative to dist/src/index.js
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const bundlePath = join(__dirname, '..', 'components.js');
+
+/**
+ * Pre-bundled JavaScript for client-side component rendering.
+ * Pass this to BrainRunner.withComponents() along with defaultComponents.
+ *
+ * @example
+ * ```typescript
+ * import { defaultComponents, componentBundle } from '@positronic/gen-ui-components';
+ *
+ * const runner = new BrainRunner()
+ *   .withComponents(defaultComponents, componentBundle);
+ * ```
+ */
+export const componentBundle: string = readFileSync(bundlePath, 'utf-8');
+
 /**
  * Default UI components for Positronic generative UI.
  * Pass these to your BrainRunner via .withComponents() to enable UI generation.
  *
  * @example
  * ```typescript
- * import { defaultComponents } from '@positronic/gen-ui-components';
+ * import { defaultComponents, componentBundle } from '@positronic/gen-ui-components';
  *
  * const runner = new BrainRunner()
- *   .withComponents(defaultComponents);
+ *   .withComponents(defaultComponents, componentBundle);
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const defaultComponents: Record<string, UIComponent<any>> = {
   Input,
   TextArea,
