@@ -1893,7 +1893,7 @@ class BrainEventStream<
     const webhookIdentifier = `${this.brainRunId}-${step.id}`;
 
     // Construct form action URL for the webhook
-    const formAction = `${this.env.origin}/webhooks/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
+    const formAction = `${this.env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
 
     // Generate HTML page
     const html = generatePageHtml({
