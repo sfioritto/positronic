@@ -336,13 +336,14 @@ The UI step uses a pre-built component library:
 - **Form**: Container for form elements with submission handling
 - **Input**: Text input field with label
 - **TextArea**: Multi-line text input
-- **Checkbox**: Boolean checkbox input
+- **Checkbox**: Boolean checkbox input (supports `value` prop for multi-select scenarios)
 - **Select**: Dropdown selection
-- **Button**: Action buttons
+- **MultiTextInput**: Dynamic list of text inputs where users can add/remove items
+- **Button**: Action buttons (required inside Form for submission)
 - **Text**: Static text display
 - **Heading**: Section headers
-- **Card**: Container for grouping content
-- **List**: Display lists with data binding support
+- **Container**: Layout container for grouping and organizing content
+- **HiddenInput**: Hidden form field for passing IDs or metadata
 
 All components use Tailwind CSS for styling.
 
