@@ -27,3 +27,6 @@ export type { ContainerProps } from './Container.js';
 
 export { Form } from './Form.js';
 export type { FormProps } from './Form.js';
+
+export { HiddenInput } from './HiddenInput.js';
+export type { HiddenInputProps } from './HiddenInput.js';

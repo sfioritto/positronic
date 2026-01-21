@@ -193,9 +193,10 @@ export function validateDataBindings(
 const FORM_COMPONENTS: Record<string, { nameProp: string; fieldType: ExtractedFormField['type'] }> = {
   Input: { nameProp: 'name', fieldType: 'string' },
   TextArea: { nameProp: 'name', fieldType: 'string' },
-  Checkbox: { nameProp: 'name', fieldType: 'boolean' },
+  Checkbox: { nameProp: 'name', fieldType: 'boolean' }, // Note: overridden to 'string' if value prop is set
   Select: { nameProp: 'name', fieldType: 'string' },
   MultiTextInput: { nameProp: 'name', fieldType: 'string[]' },
+  HiddenInput: { nameProp: 'name', fieldType: 'string' },
 };
 
 /**
@@ -213,6 +214,12 @@ export function extractFormSchema(placements: Placement[]): ExtractedFormSchema 
 
       if (typeof nameProp === 'string') {
         let fieldType = formComponent.fieldType;
+
+        // Special handling for Checkbox: if it has a value prop, it returns that string value
+        if (placement.component === 'Checkbox' && placement.props.value !== undefined) {
+          fieldType = 'string';
+        }
+
         const insideLoop = isInsideLoop(placement, placements);
 
         // If inside a loop and it's a single value type, it becomes an array

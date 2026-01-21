@@ -10,6 +10,7 @@ import { Text } from './components/Text.js';
 import { Heading } from './components/Heading.js';
 import { Container } from './components/Container.js';
 import { Form } from './components/Form.js';
+import { HiddenInput } from './components/HiddenInput.js';
 import { componentBundle } from './generated-bundle.js';
 
 /**
@@ -43,6 +44,7 @@ export const components = createComponentRegistry(
     Heading,
     Container,
     Form,
+    HiddenInput,
   },
   componentBundle
 );
@@ -59,6 +61,7 @@ export {
   Heading,
   Container,
   Form,
+  HiddenInput,
 };
 
 // Re-export prop types for TypeScript users
@@ -73,4 +76,5 @@ export type {
   HeadingProps,
   ContainerProps,
   FormProps,
+  HiddenInputProps,
 } from './components/index.js';
