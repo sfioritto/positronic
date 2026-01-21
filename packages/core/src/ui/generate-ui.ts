@@ -80,8 +80,9 @@ function createValidateTemplateTool(
     description: `Validate a YAML template. Checks that:
 1. The YAML is valid and can be parsed
 2. All component names are valid
-3. The form fields will produce data matching the expected schema
-4. All data bindings (like {{email.subject}}) reference valid paths in the provided data
+3. All data bindings (like {{email.subject}}) reference valid paths in the provided data
+4. Form components have a Button for submission
+5. The form fields will produce data matching the expected schema (if schema provided)
 
 Call this after generating your YAML template to verify it's correct before finalizing.`,
     inputSchema: z.object({
@@ -130,7 +131,11 @@ Call this after generating your YAML template to verify it's correct before fina
       const bindingResult = validateDataBindings(root, dataType);
       errors.push(...bindingResult.errors);
 
-      // 4. Validate form schema if provided
+      // 4. Validate Form components have a Button for submission
+      const formButtonErrors = validateFormHasButton(root);
+      errors.push(...formButtonErrors);
+
+      // 5. Validate form schema if provided
       let extractedFields: Array<{ name: string; type: string }> | undefined;
       if (schema) {
         const extracted = extractFormSchema(root);
@@ -170,6 +175,41 @@ function validateComponentNames(
   }
 
   return unknown;
+}
+
+/**
+ * Check if a component tree contains a Button component.
+ */
+function hasButtonDescendant(node: ComponentNode): boolean {
+  if (node.component === 'Button') {
+    return true;
+  }
+  return node.children.some(hasButtonDescendant);
+}
+
+/**
+ * Validate that all Form components have a Button for submission.
+ */
+function validateFormHasButton(root: ComponentNode): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  function checkNode(node: ComponentNode): void {
+    if (node.component === 'Form') {
+      if (!hasButtonDescendant(node)) {
+        errors.push({
+          type: 'form-missing-submit-button',
+          message: 'Form component requires a Button for submission',
+        });
+      }
+    }
+    // Check children for nested forms
+    for (const child of node.children) {
+      checkNode(child);
+    }
+  }
+
+  checkNode(root);
+  return errors;
 }
 
 /**
