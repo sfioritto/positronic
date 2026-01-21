@@ -483,8 +483,8 @@ export class CloudflareDevServer implements PositronicDevServer {
         config.r2_buckets[0].bucket_name = env.R2_BUCKET_NAME;
         changed = true;
       }
-      if (!config.r2_buckets[0].experimental_remote) {
-        config.r2_buckets[0].experimental_remote = true;
+      if (!config.r2_buckets[0].remote) {
+        config.r2_buckets[0].remote = true;
         changed = true;
       }
     }
@@ -507,8 +507,8 @@ export class CloudflareDevServer implements PositronicDevServer {
       const projectName =
         configName.replace(/^positronic-dev-/, '') || 'local-project';
 
-      if (config.r2_buckets[0].experimental_remote) {
-        delete config.r2_buckets[0].experimental_remote;
+      if (config.r2_buckets[0].remote) {
+        delete config.r2_buckets[0].remote;
         changed = true;
       }
       if (config.r2_buckets[0].bucket_name !== projectName) {
@@ -530,7 +530,7 @@ export class CloudflareDevServer implements PositronicDevServer {
     const serverDir = path.join(this.projectRootDir, '.positronic');
 
     // Start wrangler dev server
-    const wranglerArgs = ['dev', '--x-remote-bindings'];
+    const wranglerArgs = ['dev'];
 
     // Always specify a port - use 8787 as default if not provided
     const serverPort = port || 8787;
