@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:components": "node esbuild.config.mjs"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +16,8 @@
     "zod": "^3.24.1",
     "@positronic/client-vercel": "<%= positronicClientVercelVersion %>",
     "@ai-sdk/openai": "^1.3.22",
-    "@positronic/core": "<%= positronicCoreVersion %>"<% if (backend === 'cloudflare') { %>,
+    "@positronic/core": "<%= positronicCoreVersion %>",
+    "@positronic/gen-ui-components": "<%= positronicGenUIComponentsVersion %>"<% if (backend === 'cloudflare') { %>,
     "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
   },
   "devDependencies": {<% if (backend === 'cloudflare') { %>
@@ -24,6 +26,8 @@
     "jest": "^30.0.4",
     "@jest/globals": "^30.0.4",
     "ts-jest": "^29.2.6",
-    "@types/jest": "^30.0.0"
+    "@types/jest": "^30.0.0",
+    "esbuild": "^0.24.0",
+    "@types/react": "^18.2.0"
   }
 }

@@ -1,16 +1,19 @@
 import { brain as coreBrain, type BrainFactory } from '@positronic/core';
+import { components } from './components/index.js';
 
 /**
  * Base brain factory for this project.
- * 
- * This wrapper allows you to configure services once and have them available
- * in all brains throughout your project.
- * 
+ *
+ * This wrapper allows you to configure services and components once and have
+ * them available in all brains throughout your project.
+ *
+ * Components are pre-configured for UI generation (forms, inputs, etc.).
+ *
  * To add services:
  * 1. Define your service interfaces
  * 2. Create service instances
  * 3. Call .withServices() on the brain before returning it
- * 
+ *
  * Example with services:
  * ```typescript
  * interface ProjectServices {
@@ -22,9 +25,10 @@ import { brain as coreBrain, type BrainFactory } from '@positronic/core';
  *     fetch: (endpoint: string) => Promise<any>;
  *   };
  * }
- * 
+ *
  * export const brain: BrainFactory = (brainConfig) => {
  *   return coreBrain(brainConfig)
+ *     .withComponents(components)
  *     .withServices({
  *       logger: {
  *         info: (msg) => console.log(`[INFO] <%= '${msg}' %>`),
@@ -39,17 +43,17 @@ import { brain as coreBrain, type BrainFactory } from '@positronic/core';
  *     });
  * }
  * ```
- * 
+ *
  * Then in your brain files (in the brains/ directory):
  * ```typescript
  * import { brain } from '../brain.js';
  * import { z } from 'zod';
- * 
+ *
  * const optionsSchema = z.object({
  *   environment: z.string().default('prod'),
  *   verbose: z.string().default('false')
  * });
- * 
+ *
  * export default brain('My Brain')
  *   .withOptionsSchema(optionsSchema)
  *   .step('Use Services', async ({ state, options, logger, api }) => {
@@ -61,12 +65,12 @@ import { brain as coreBrain, type BrainFactory } from '@positronic/core';
  *     return { users: data };
  *   });
  * ```
- * 
+ *
  * Run with custom options from CLI:
  * px brain run my-brain -o environment=dev -o verbose=true
  */
 export const brain: BrainFactory = (brainConfig) => {
-  // For now, just return the core brain without any services.
-  // Update this function to add your project-wide services.
-  return coreBrain(brainConfig);
+  // Components are pre-configured for UI generation (forms, inputs, etc.)
+  // Add your project-wide services with .withServices() if needed
+  return coreBrain(brainConfig).withComponents(components);
 };

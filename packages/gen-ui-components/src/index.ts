@@ -1,5 +1,3 @@
-import { createComponentRegistry } from '@positronic/core';
-
 import { Input } from './components/Input.js';
 import { TextArea } from './components/TextArea.js';
 import { Checkbox } from './components/Checkbox.js';
@@ -11,43 +9,36 @@ import { Heading } from './components/Heading.js';
 import { Container } from './components/Container.js';
 import { Form } from './components/Form.js';
 import { HiddenInput } from './components/HiddenInput.js';
-import { componentBundle } from './generated-bundle.js';
 
 /**
- * Default UI components for Positronic generative UI with attached bundle.
- * Pass these to your BrainRunner via .withComponents() to enable UI generation.
- *
- * The bundle is attached via a Symbol key, so spread operations preserve it:
- * `{ ...components, MyCustomButton }` keeps the bundle.
+ * Default UI components for Positronic generative UI.
+ * Pass these to your Brain via .withComponents() to enable UI generation.
  *
  * @example
  * ```typescript
  * import { components } from '@positronic/gen-ui-components';
  *
- * // Simple usage
- * const runner = new BrainRunner({ client, adapters })
- *   .withComponents(components);
+ * const myBrain = brain('example')
+ *   .withComponents(components)
+ *   .uiStep('Show Form', ...);
  *
- * // Adding custom components (bundle is preserved via spread)
+ * // Adding custom components
  * .withComponents({ ...components, MyCustomButton });
  * ```
  */
-export const components = createComponentRegistry(
-  {
-    Input,
-    TextArea,
-    Checkbox,
-    Select,
-    MultiTextInput,
-    Button,
-    Text,
-    Heading,
-    Container,
-    Form,
-    HiddenInput,
-  },
-  componentBundle
-);
+export const components = {
+  Input,
+  TextArea,
+  Checkbox,
+  Select,
+  MultiTextInput,
+  Button,
+  Text,
+  Heading,
+  Container,
+  Form,
+  HiddenInput,
+};
 
 // Re-export individual components for custom composition
 export {

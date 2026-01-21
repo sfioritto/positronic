@@ -2,13 +2,6 @@ import { generatePageHtml } from '../src/ui/generate-page-html.js';
 import type { Placement } from '../src/ui/types.js';
 
 describe('generatePageHtml', () => {
-  const mockComponentBundle = `
-    window.PositronicComponents = {
-      Form: function(props) { return React.createElement('form', props); },
-      Input: function(props) { return React.createElement('input', props); },
-    };
-  `;
-
   it('should generate valid HTML with all required elements', () => {
     const placements: Placement[] = [
       { id: 'form-1', component: 'Form', props: {}, parentId: null },
@@ -19,7 +12,6 @@ describe('generatePageHtml', () => {
       placements,
       rootId: 'form-1',
       data: { user: { name: 'John' } },
-      componentBundle: mockComponentBundle,
       title: 'Test Page',
     });
 
@@ -35,8 +27,8 @@ describe('generatePageHtml', () => {
     // Check Tailwind CDN
     expect(html).toContain('https://cdn.tailwindcss.com');
 
-    // Check component bundle is included
-    expect(html).toContain('window.PositronicComponents');
+    // Check component bundle script src is included
+    expect(html).toContain('/bundle/components.js');
 
     // Check data is embedded
     expect(html).toContain('window.__POSITRONIC_DATA__');
@@ -65,7 +57,6 @@ describe('generatePageHtml', () => {
       placements,
       rootId: 'root',
       data: {},
-      componentBundle: mockComponentBundle,
       title: '<script>alert("xss")</script>',
     });
 
@@ -82,7 +73,6 @@ describe('generatePageHtml', () => {
       placements,
       rootId: 'root',
       data: { html: '<script>alert("xss")</script>' },
-      componentBundle: mockComponentBundle,
     });
 
     // Script tags in data should be escaped
@@ -99,7 +89,6 @@ describe('generatePageHtml', () => {
       placements,
       rootId: 'form-1',
       data: {},
-      componentBundle: mockComponentBundle,
       formAction: '/api/submit',
     });
 
@@ -116,7 +105,6 @@ describe('generatePageHtml', () => {
       placements,
       rootId: 'root',
       data: {},
-      componentBundle: mockComponentBundle,
     });
 
     expect(html).toContain('<title>Generated Page</title>');
@@ -137,7 +125,6 @@ describe('generatePageHtml', () => {
       placements,
       rootId: 'root',
       data: { user: { email: 'test@example.com' } },
-      componentBundle: mockComponentBundle,
     });
 
     // Binding syntax should be preserved in placements

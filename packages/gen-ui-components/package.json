@@ -16,10 +16,8 @@
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist/src --strip-leading-paths",
-    "bundle": "node esbuild.config.mjs",
-    "generate-bundle-export": "node scripts/generate-bundle-export.js",
-    "build": "npm run bundle && npm run generate-bundle-export && npm run tsc && npm run swc",
-    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules src/generated-bundle.ts"
+    "build": "npm run tsc && npm run swc",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
     "@positronic/core": "^0.0.52",
@@ -28,7 +26,6 @@
   "devDependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@types/react": "^18.2.0",
-    "esbuild": "^0.24.0"
+    "@types/react": "^18.2.0"
   }
 }

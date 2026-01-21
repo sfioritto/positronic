@@ -5,6 +5,7 @@ import resources from './resources.js';
 import webhooks from './webhooks/index.js';
 import pages from './pages.js';
 import secrets from './secrets.js';
+import bundle from './bundle.js';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -19,6 +20,7 @@ app.route('/resources', resources);
 app.route('/webhooks', webhooks);
 app.route('/pages', pages);
 app.route('/secrets', secrets);
+app.route('/bundle', bundle);
 
 export default app;
 
