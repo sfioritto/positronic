@@ -166,7 +166,9 @@ This form collects a name.`,
         label: "Email"
     - Input:
         name: "name"
-        label: "Name"`,
+        label: "Name"
+    - Button:
+        text: "Submit"`,
       });
 
       expect(validationResult.valid).toBe(true);
@@ -188,7 +190,9 @@ This form collects a name.`,
         label: "Email"
     - Input:
         name: "name"
-        label: "Name"`,
+        label: "Name"
+    - Button:
+        text: "Submit"`,
         usage: { totalTokens: 100 },
       };
     });
@@ -196,11 +200,11 @@ This form collects a name.`,
     const result = await generateUI({
       client: mockClient,
       prompt: 'Create a contact form',
-      components: { Form, Input },
+      components: { Form, Input, Button },
       schema,
     });
 
-    expect(result.placements).toHaveLength(3);
+    expect(result.placements).toHaveLength(4);
   });
 
   it('should detect missing required fields in schema validation', async () => {
@@ -215,17 +219,19 @@ This form collects a name.`,
     const validationResults: unknown[] = [];
 
     mockStreamText.mockImplementationOnce(async (params) => {
-      // First validation - only email field
+      // First validation - only email field (missing name, also missing Button)
       const v1 = await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
     - Input:
         name: "email"
-        label: "Email"`,
+        label: "Email"
+    - Button:
+        text: "Submit"`,
       });
       validationResults.push(v1);
 
-      // Second validation - email and name
+      // Second validation - email and name with Button
       const v2 = await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
@@ -234,7 +240,9 @@ This form collects a name.`,
         label: "Email"
     - Input:
         name: "name"
-        label: "Name"`,
+        label: "Name"
+    - Button:
+        text: "Submit"`,
       });
       validationResults.push(v2);
 
@@ -247,7 +255,9 @@ This form collects a name.`,
         label: "Email"
     - Input:
         name: "name"
-        label: "Name"`,
+        label: "Name"
+    - Button:
+        text: "Submit"`,
         usage: { totalTokens: 200 },
       };
     });
@@ -255,7 +265,7 @@ This form collects a name.`,
     await generateUI({
       client: mockClient,
       prompt: 'Create a signup form',
-      components: { Form, Input },
+      components: { Form, Input, Button },
       schema,
     });
 
@@ -363,5 +373,165 @@ This form collects a name.`,
     });
 
     expect(result.yaml).toBe(yamlContent);
+  });
+
+  it('should fail validation when Form has no Button', async () => {
+    mockStreamText.mockImplementationOnce(async (params) => {
+      // Form without a Button - should fail validation
+      const result = await params.tools.validate_template.execute!({
+        yaml: `Form:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"`,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].type).toBe('form-missing-submit-button');
+      expect(result.errors[0].message).toBe(
+        'Form component requires a Button for submission'
+      );
+
+      return {
+        toolCalls: [],
+        text: `Form:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"`,
+        usage: { totalTokens: 100 },
+      };
+    });
+
+    await generateUI({
+      client: mockClient,
+      prompt: 'Create a form',
+      components: { Form, Input },
+    });
+  });
+
+  it('should pass validation when Form has a Button', async () => {
+    mockStreamText.mockImplementationOnce(async (params) => {
+      // Form with a Button - should pass validation
+      const result = await params.tools.validate_template.execute!({
+        yaml: `Form:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"
+    - Button:
+        text: "Submit"`,
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+
+      return {
+        toolCalls: [],
+        text: `Form:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"
+    - Button:
+        text: "Submit"`,
+        usage: { totalTokens: 100 },
+      };
+    });
+
+    await generateUI({
+      client: mockClient,
+      prompt: 'Create a form with submit button',
+      components: { Form, Input, Button },
+    });
+  });
+
+  it('should pass validation when Form has nested Button', async () => {
+    const Container: UIComponent<Record<string, never>> = {
+      component: () => null,
+      tool: {
+        description: 'A container',
+        parameters: z.object({}),
+      },
+    };
+
+    mockStreamText.mockImplementationOnce(async (params) => {
+      // Form with Button nested inside a Container - should pass
+      const result = await params.tools.validate_template.execute!({
+        yaml: `Form:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"
+    - Container:
+        children:
+          - Button:
+              text: "Submit"`,
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+
+      return {
+        toolCalls: [],
+        text: `Form:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"
+    - Container:
+        children:
+          - Button:
+              text: "Submit"`,
+        usage: { totalTokens: 100 },
+      };
+    });
+
+    await generateUI({
+      client: mockClient,
+      prompt: 'Create a form with nested button',
+      components: { Form, Input, Button, Container },
+    });
+  });
+
+  it('should not require Button for non-Form components', async () => {
+    const Container: UIComponent<Record<string, never>> = {
+      component: () => null,
+      tool: {
+        description: 'A container',
+        parameters: z.object({}),
+      },
+    };
+
+    mockStreamText.mockImplementationOnce(async (params) => {
+      // Container without Form - no Button required
+      const result = await params.tools.validate_template.execute!({
+        yaml: `Container:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"`,
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+
+      return {
+        toolCalls: [],
+        text: `Container:
+  children:
+    - Input:
+        name: "email"
+        label: "Email"`,
+        usage: { totalTokens: 100 },
+      };
+    });
+
+    await generateUI({
+      client: mockClient,
+      prompt: 'Create a container with input',
+      components: { Container, Input },
+    });
   });
 });

@@ -78,7 +78,8 @@ export interface ValidationError {
     | 'form-schema-mismatch'
     | 'invalid-binding'
     | 'unknown-component'
-    | 'missing-prop';
+    | 'missing-prop'
+    | 'form-missing-submit-button';
   message: string;
   path?: string;
 }
