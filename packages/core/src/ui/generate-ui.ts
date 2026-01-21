@@ -304,10 +304,12 @@ Call validate_template after generating your YAML to verify correctness.`;
  *
  * @example
  * ```typescript
+ * import { components } from '@positronic/gen-ui-components';
+ *
  * const result = await generateUI({
  *   client,
  *   prompt: 'Create a form to collect user name and email',
- *   components: defaultComponents,
+ *   components,
  *   schema: z.object({ name: z.string(), email: z.string() }),
  *   data: { user: { name: 'John' } },
  * });

@@ -226,3 +226,71 @@ function isFormPrimitive(schema: z.ZodSchema): schema is FormPrimitive {
     schema instanceof z.ZodEnum
   );
 }
+
+// ============================================
+// COMPONENT REGISTRY
+// ============================================
+
+/**
+ * Symbol key for attaching the component bundle to a ComponentRegistry.
+ * Using a Symbol ensures:
+ * - Spread operations preserve the key ({ ...components, MyButton } keeps the bundle)
+ * - Object.keys() only shows component names
+ * - Clean TypeScript typing
+ */
+export const BUNDLE_KEY = Symbol('positronic.componentBundle');
+
+/**
+ * A record of UI components with an attached bundle.
+ * The bundle is stored on a Symbol key so spread operations work naturally.
+ *
+ * @example
+ * ```typescript
+ * import { components } from '@positronic/gen-ui-components';
+ *
+ * // Simple usage
+ * runner.withComponents(components);
+ *
+ * // Adding custom components (bundle is preserved via spread)
+ * runner.withComponents({ ...components, MyCustomButton });
+ * ```
+ */
+export interface ComponentRegistry extends Record<string, UIComponent<any>> {
+  [BUNDLE_KEY]?: string;
+}
+
+/**
+ * Extract the component bundle from a ComponentRegistry.
+ *
+ * @param registry - A ComponentRegistry that may have an attached bundle
+ * @returns The bundle string if present, undefined otherwise
+ */
+export function getComponentBundle(registry: ComponentRegistry): string | undefined {
+  return registry[BUNDLE_KEY];
+}
+
+/**
+ * Create a ComponentRegistry with an attached bundle.
+ * This is used by component packages to export unified component sets.
+ *
+ * @param components - Record of UI components
+ * @param bundle - The bundled JavaScript for browser runtime
+ * @returns A ComponentRegistry with the bundle attached via Symbol key
+ *
+ * @example
+ * ```typescript
+ * // In a component package:
+ * export const components = createComponentRegistry(
+ *   { Button, Input, Form },
+ *   bundledJavaScript
+ * );
+ * ```
+ */
+export function createComponentRegistry(
+  components: Record<string, UIComponent<any>>,
+  bundle: string
+): ComponentRegistry {
+  const registry = { ...components } as ComponentRegistry;
+  registry[BUNDLE_KEY] = bundle;
+  return registry;
+}

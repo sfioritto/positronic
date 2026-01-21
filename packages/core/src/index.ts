@@ -80,8 +80,18 @@ export type {
   ValidationResult,
   ExtractedFormField,
   ExtractedFormSchema,
+  ComponentRegistry,
 } from './ui/types.js';
-export { isFormSchema, inferDataType } from './ui/types.js';
+export {
+  isFormSchema,
+  inferDataType,
+  BUNDLE_KEY,
+  getComponentBundle,
+  createComponentRegistry,
+} from './ui/types.js';
+
+// Component utilities
+export { mergeComponents } from './ui/component-utils.js';
 
 // UI generation
 export { generateUI } from './ui/generate-ui.js';
