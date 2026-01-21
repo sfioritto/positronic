@@ -8,7 +8,8 @@ import type { State, JsonObject, RuntimeEnv } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
-import type { UIComponent } from '../ui/types.js';
+import type { UIComponent, ComponentRegistry } from '../ui/types.js';
+import { getComponentBundle } from '../ui/types.js';
 
 export class BrainRunner {
   constructor(
@@ -63,25 +64,30 @@ export class BrainRunner {
    * Configure UI components for generative UI steps.
    * Components are merged with any existing components, allowing overrides.
    *
-   * @param components - Record of component definitions
-   * @param componentBundle - Pre-bundled JavaScript for client-side rendering (required for .ui() steps)
+   * @param components - ComponentRegistry with attached bundle, or plain Record of components
    *
    * @example
    * ```typescript
-   * import { defaultComponents, componentBundle } from '@positronic/gen-ui-components';
+   * import { components } from '@positronic/gen-ui-components';
    *
    * const runner = new BrainRunner({ client, adapters })
-   *   .withComponents(defaultComponents, componentBundle);
+   *   .withComponents(components);
+   *
+   * // Adding custom components (bundle preserved via spread):
+   * .withComponents({ ...components, MyCustomButton });
    * ```
    */
-  withComponents(components: Record<string, UIComponent<any>>, componentBundle?: string): BrainRunner {
+  withComponents(components: Record<string, UIComponent<any>> | ComponentRegistry): BrainRunner {
+    // Extract bundle from registry, or keep existing bundle for chaining
+    const bundle = getComponentBundle(components as ComponentRegistry) ?? this.options.componentBundle;
+
     return new BrainRunner({
       ...this.options,
       components: {
         ...this.options.components,
         ...components,
       },
-      componentBundle: componentBundle ?? this.options.componentBundle,
+      componentBundle: bundle,
     });
   }
 

@@ -104,14 +104,14 @@ const summaryPrompt = prompt({
 
 ```typescript
 import { BrainRunner } from '@positronic/core';
-import { defaultComponents } from '@positronic/gen-ui-components';
+import { components } from '@positronic/gen-ui-components';
 import { EmailCard } from './components/email-card';
 
 const runner = new BrainRunner({ client, adapters })
   .withResources(resources)
   .withPages(pages)
   .withComponents({
-    ...defaultComponents,        // Form, Input, TextArea, Checkbox, etc.
+    ...components,               // Form, Input, TextArea, Checkbox, etc. (bundle attached)
     EmailCard,                   // Project-wide custom component
   });
 
@@ -131,7 +131,7 @@ brain('email-digest')
   })
 ```
 
-**Resolution order**: step components → runner components → defaultComponents
+**Resolution order**: step components → runner components → default components
 
 ---
 
@@ -411,20 +411,16 @@ export function Input({ name, label, placeholder, required, type = 'text' }) {
 
 ```typescript
 // packages/gen-ui-components/src/index.ts
+import { createComponentRegistry } from '@positronic/core';
 
-// Tool definitions (used by core at generation time)
-export const defaultComponentTools: Record<string, ComponentToolDefinition> = {
-  Form: FormTool,
-  Input: InputTool,
-  TextArea: TextAreaTool,
-  Checkbox: CheckboxTool,
-  Select: SelectTool,
-  List: ListTool,
-  // ...
-};
+// Unified export: components with attached bundle
+// The bundle is attached via a Symbol key, so spread operations preserve it
+export const components = createComponentRegistry(
+  { Form, Input, TextArea, Checkbox, Select, ... },
+  componentBundle
+);
 
-// React components are NOT exported as JS imports
-// They are pre-bundled into dist/components.js for client-side use
+// React components are also pre-bundled into dist/components.js for client-side use
 ```
 
 **Tool generation from definitions:**
