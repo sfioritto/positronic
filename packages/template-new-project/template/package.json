@@ -19,7 +19,7 @@
     "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
   },
   "devDependencies": {<% if (backend === 'cloudflare') { %>
-    "wrangler": "^4.0.0",<% } %>
+    "wrangler": "^4.37.0",<% } %>
     "typescript": "^5.0.0",
     "jest": "^30.0.4",
     "@jest/globals": "^30.0.4",
