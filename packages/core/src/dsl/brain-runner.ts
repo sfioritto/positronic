@@ -8,8 +8,6 @@ import type { State, JsonObject, RuntimeEnv } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
-import type { UIComponent, ComponentRegistry } from '../ui/types.js';
-import { getComponentBundle } from '../ui/types.js';
 
 export class BrainRunner {
   constructor(
@@ -19,8 +17,6 @@ export class BrainRunner {
       resources?: Resources;
       pages?: PagesService;
       env?: RuntimeEnv;
-      components?: Record<string, UIComponent<any>>;
-      componentBundle?: string;
     }
   ) {}
 
@@ -60,37 +56,6 @@ export class BrainRunner {
     });
   }
 
-  /**
-   * Configure UI components for generative UI steps.
-   * Components are merged with any existing components, allowing overrides.
-   *
-   * @param components - ComponentRegistry with attached bundle, or plain Record of components
-   *
-   * @example
-   * ```typescript
-   * import { components } from '@positronic/gen-ui-components';
-   *
-   * const runner = new BrainRunner({ client, adapters })
-   *   .withComponents(components);
-   *
-   * // Adding custom components (bundle preserved via spread):
-   * .withComponents({ ...components, MyCustomButton });
-   * ```
-   */
-  withComponents(components: Record<string, UIComponent<any>> | ComponentRegistry): BrainRunner {
-    // Extract bundle from registry, or keep existing bundle for chaining
-    const bundle = getComponentBundle(components as ComponentRegistry) ?? this.options.componentBundle;
-
-    return new BrainRunner({
-      ...this.options,
-      components: {
-        ...this.options.components,
-        ...components,
-      },
-      componentBundle: bundle,
-    });
-  }
-
   async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     {
@@ -113,7 +78,7 @@ export class BrainRunner {
       loopEvents?: BrainEvent[];
     } = {}
   ): Promise<TState> {
-    const { adapters, client, resources, pages, env, components, componentBundle } = this.options;
+    const { adapters, client, resources, pages, env } = this.options;
     const resolvedEnv = env ?? DEFAULT_ENV;
 
     // Apply any patches from completed steps to get the initial state
@@ -150,8 +115,6 @@ export class BrainRunner {
             env: resolvedEnv,
             response,
             loopResumeContext,
-            components,
-            componentBundle,
           })
         : brain.run({
             initialState,
@@ -161,8 +124,6 @@ export class BrainRunner {
             resources: resources ?? {},
             pages,
             env: resolvedEnv,
-            components,
-            componentBundle,
           });
 
     try {

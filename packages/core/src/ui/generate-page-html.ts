@@ -10,8 +10,6 @@ export interface GeneratePageHtmlOptions {
   rootId: string;
   /** Data to be passed to components for data binding resolution */
   data: Record<string, unknown>;
-  /** The component bundle JavaScript (contents of dist/components.js) */
-  componentBundle: string;
   /** Page title */
   title?: string;
   /** Form action URL for form submission */
@@ -148,7 +146,7 @@ const bootstrapRuntime = `
  * The generated page includes:
  * - React and ReactDOM from CDN
  * - Tailwind CSS from CDN
- * - The pre-bundled component library
+ * - Reference to component bundle at /bundle/components.js
  * - Data and placements embedded as JSON
  * - Bootstrap runtime that builds and renders the React tree
  *
@@ -158,7 +156,6 @@ const bootstrapRuntime = `
  *   placements: result.placements,
  *   rootId: result.rootId,
  *   data: brainState,
- *   componentBundle: fs.readFileSync('dist/components.js', 'utf-8'),
  *   title: 'My Generated Page',
  *   formAction: '/api/submit',
  * });
@@ -169,7 +166,6 @@ export function generatePageHtml(options: GeneratePageHtmlOptions): string {
     placements,
     rootId,
     data,
-    componentBundle,
     title = 'Generated Page',
     formAction,
   } = options;
@@ -203,9 +199,7 @@ export function generatePageHtml(options: GeneratePageHtmlOptions): string {
   <div id="root" class="max-w-4xl mx-auto p-6"></div>
 
   <!-- Pre-bundled components -->
-  <script>
-${componentBundle}
-  </script>
+  <script src="/bundle/components.js"></script>
 
   <!-- Data and placements -->
   <script>

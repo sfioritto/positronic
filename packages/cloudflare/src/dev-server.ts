@@ -3,7 +3,7 @@ import * as fsPromises from 'fs/promises';
 import * as fs from 'fs';
 import type { Dirent } from 'fs';
 import * as os from 'os';
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, type ChildProcess, execSync } from 'child_process';
 import * as dotenv from 'dotenv';
 import caz from 'caz';
 import { createRequire } from 'module';
@@ -313,6 +313,9 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     // Update wrangler config based on environment
     await this.updateWranglerConfiguration(projectRoot, serverDir);
+
+    // Build and upload component bundle
+    await this.buildAndUploadBundle(projectRoot);
   }
 
   private async ensureServerDirectory(
@@ -526,6 +529,80 @@ export class CloudflareDevServer implements PositronicDevServer {
     return changed;
   }
 
+  /**
+   * Build the component bundle and upload it to local R2.
+   * Uses esbuild to bundle components/bundle.ts and uploads to R2 for serving.
+   */
+  private async buildAndUploadBundle(projectRoot: string): Promise<void> {
+    const bundleEntryPath = path.join(projectRoot, 'components', 'bundle.ts');
+    const distDir = path.join(projectRoot, 'dist');
+    const bundleOutputPath = path.join(distDir, 'components.js');
+
+    // Check if components directory exists
+    const componentsDir = path.join(projectRoot, 'components');
+    const hasComponents = await fsPromises
+      .access(componentsDir)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!hasComponents) {
+      console.log('📦 No components/ directory found, skipping bundle build');
+      return;
+    }
+
+    // Check if bundle.ts exists
+    const hasBundleEntry = await fsPromises
+      .access(bundleEntryPath)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!hasBundleEntry) {
+      console.log('📦 No components/bundle.ts found, skipping bundle build');
+      return;
+    }
+
+    try {
+      console.log('📦 Building component bundle...');
+
+      // Ensure dist directory exists
+      await fsPromises.mkdir(distDir, { recursive: true });
+
+      // Run esbuild to build the bundle
+      execSync(`npx esbuild "${bundleEntryPath}" --bundle --external:react --external:react-dom --format=iife --outfile="${bundleOutputPath}" --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment`, {
+        cwd: projectRoot,
+        stdio: 'inherit',
+      });
+
+      // Read the built bundle
+      const bundleContent = await fsPromises.readFile(bundleOutputPath, 'utf-8');
+
+      // Upload to local R2 using wrangler
+      const serverDir = path.join(projectRoot, '.positronic');
+      const r2Key = 'bundle/components.js';
+
+      // Write bundle to a temp file for wrangler r2 object put
+      const tempBundlePath = path.join(os.tmpdir(), `positronic-bundle-${Date.now()}.js`);
+      await fsPromises.writeFile(tempBundlePath, bundleContent);
+
+      try {
+        execSync(`npx wrangler r2 object put "${r2Key}" --file="${tempBundlePath}" --local`, {
+          cwd: serverDir,
+          stdio: 'pipe',
+        });
+        console.log('✅ Component bundle built and uploaded');
+      } finally {
+        // Clean up temp file
+        await fsPromises.unlink(tempBundlePath).catch(() => {});
+      }
+    } catch (error) {
+      console.warn(
+        '⚠️  Warning: Failed to build component bundle:',
+        error instanceof Error ? error.message : error
+      );
+      console.warn('   Pages may not render correctly without the bundle.');
+    }
+  }
+
   async start(port?: number): Promise<ServerHandle> {
     const serverDir = path.join(this.projectRootDir, '.positronic');
 
@@ -588,13 +665,16 @@ export class CloudflareDevServer implements PositronicDevServer {
     const srcDir = path.join(serverDir, 'src');
     const relativePath = path.relative(projectRoot, filePath);
 
-    // Determine if this is a brain or webhook file change
+    // Determine if this is a brain, webhook, or component file change
     if (relativePath.startsWith('brains/') || relativePath.startsWith('brains\\')) {
       console.log(`Brain file ${event}: ${relativePath}`);
       await regenerateManifestFile(projectRoot, srcDir);
     } else if (relativePath.startsWith('webhooks/') || relativePath.startsWith('webhooks\\')) {
       console.log(`Webhook file ${event}: ${relativePath}`);
       await regenerateWebhookManifestFile(projectRoot, srcDir);
+    } else if (relativePath.startsWith('components/') || relativePath.startsWith('components\\')) {
+      console.log(`Component file ${event}: ${relativePath}`);
+      await this.buildAndUploadBundle(projectRoot);
     }
   }
 

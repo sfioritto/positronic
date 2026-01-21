@@ -508,10 +508,6 @@ interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   options?: TOptions;
   pages?: PagesService;
   env?: RuntimeEnv;
-  /** UI components for generative UI steps */
-  components?: Record<string, UIComponent<any>>;
-  /** Pre-bundled component JavaScript for page rendering */
-  componentBundle?: string;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
@@ -541,6 +537,7 @@ export class Brain<
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
   private optionsSchema?: z.ZodSchema<any>;
+  private components?: Record<string, UIComponent<any>>;
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -584,6 +581,7 @@ export class Brain<
     nextBrain.services = services;
     // Copy optionsSchema to maintain it through the chain
     nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.components = this.components;
 
     return nextBrain;
   }
@@ -598,6 +596,36 @@ export class Brain<
 
     nextBrain.optionsSchema = schema;
     nextBrain.services = this.services;
+    nextBrain.components = this.components;
+
+    return nextBrain;
+  }
+
+  /**
+   * Configure UI components for generative UI steps.
+   *
+   * @param components - Record of component definitions
+   *
+   * @example
+   * ```typescript
+   * import { components } from '@positronic/gen-ui-components';
+   *
+   * const myBrain = brain('my-brain')
+   *   .withComponents(components)
+   *   .ui('Show Form', formPrompt);
+   * ```
+   */
+  withComponents(
+    components: Record<string, UIComponent<any>>
+  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, TPage>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+
+    nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.services = this.services;
+    nextBrain.components = components;
 
     return nextBrain;
   }
@@ -1078,6 +1106,7 @@ export class Brain<
       ...params,
       options: validatedOptions,
       services: this.services,
+      components: this.components,
     });
 
     yield* stream.next();
@@ -1105,6 +1134,8 @@ export class Brain<
     nextBrain.services = this.services;
     // Copy optionsSchema to the next brain
     nextBrain.optionsSchema = this.optionsSchema;
+    // Copy components to the next brain
+    nextBrain.components = this.components;
 
     return nextBrain;
   }
@@ -1166,7 +1197,6 @@ class BrainEventStream<
   private loopResumeContext: LoopResumeContext | null | undefined = undefined;
   private initialCompletedSteps?: SerializedStep[];
   private components?: Record<string, UIComponent<any>>;
-  private componentBundle?: string;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -1174,6 +1204,7 @@ class BrainEventStream<
       description?: string;
       blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
+      components?: Record<string, UIComponent<any>>;
     }
   ) {
     const {
@@ -1192,12 +1223,12 @@ class BrainEventStream<
       response,
       loopResumeContext,
       components,
-      componentBundle,
     } = params as RerunParams<TOptions> & {
       title: string;
       description?: string;
       blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
+      components?: Record<string, UIComponent<any>>;
     };
 
     this.initialState = initialState as TState;
@@ -1211,7 +1242,6 @@ class BrainEventStream<
     this.env = env ?? DEFAULT_ENV;
     this.initialCompletedSteps = initialCompletedSteps;
     this.components = components;
-    this.componentBundle = componentBundle;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -1836,12 +1866,7 @@ class BrainEventStream<
     // Validate required configuration
     if (!this.components) {
       throw new Error(
-        `UI step "${stepBlock.title}" requires components to be configured via BrainRunner.withComponents()`
-      );
-    }
-    if (!this.componentBundle) {
-      throw new Error(
-        `UI step "${stepBlock.title}" requires componentBundle to be configured via BrainRunner.withComponents()`
+        `UI step "${stepBlock.title}" requires components to be configured via brain.withComponents()`
       );
     }
     if (!this.pages) {
@@ -1900,7 +1925,6 @@ class BrainEventStream<
       placements: uiResult.placements,
       rootId: uiResult.rootId,
       data: this.currentState as Record<string, unknown>,
-      componentBundle: this.componentBundle,
       title: stepBlock.title,
       formAction,
     });
