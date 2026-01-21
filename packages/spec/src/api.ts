@@ -2925,7 +2925,7 @@ export const webhooks = {
   },
 
   /**
-   * Test POST /webhooks/ui-form - Built-in webhook for UI form submissions.
+   * Test POST /webhooks/system/ui-form - Built-in webhook for UI form submissions.
    * This is used by pages generated via .ui() steps to submit form data.
    *
    * The endpoint:
@@ -2952,7 +2952,7 @@ export const webhooks = {
       }
 
       const request = new Request(
-        `http://example.com/webhooks/ui-form?identifier=${encodeURIComponent(identifier)}`,
+        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
         {
           method: 'POST',
           headers: {
@@ -2967,7 +2967,7 @@ export const webhooks = {
       // Accept 200 (found and processed) or 404 (no brain waiting)
       if (response.status !== 200 && response.status !== 404) {
         console.error(
-          `POST /webhooks/ui-form returned ${response.status}, expected 200 or 404`
+          `POST /webhooks/system/ui-form returned ${response.status}, expected 200 or 404`
         );
         return false;
       }
@@ -3003,17 +3003,17 @@ export const webhooks = {
 
       return true;
     } catch (error) {
-      console.error('Failed to test POST /webhooks/ui-form:', error);
+      console.error('Failed to test POST /webhooks/system/ui-form:', error);
       return false;
     }
   },
 
   /**
-   * Test POST /webhooks/ui-form with missing identifier - Should return 400
+   * Test POST /webhooks/system/ui-form with missing identifier - Should return 400
    */
   async uiFormMissingIdentifier(fetch: Fetch): Promise<boolean> {
     try {
-      const request = new Request('http://example.com/webhooks/ui-form', {
+      const request = new Request('http://example.com/webhooks/system/ui-form', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -3025,7 +3025,7 @@ export const webhooks = {
 
       if (response.status !== 400) {
         console.error(
-          `POST /webhooks/ui-form without identifier returned ${response.status}, expected 400`
+          `POST /webhooks/system/ui-form without identifier returned ${response.status}, expected 400`
         );
         return false;
       }
@@ -3047,7 +3047,7 @@ export const webhooks = {
       return true;
     } catch (error) {
       console.error(
-        'Failed to test POST /webhooks/ui-form without identifier:',
+        'Failed to test POST /webhooks/system/ui-form without identifier:',
         error
       );
       return false;

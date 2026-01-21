@@ -223,7 +223,7 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/ui-form test', async () => {
+    it('passes POST /webhooks/system/ui-form test', async () => {
       const result = await webhooks.uiForm(createFetch(), 'test-identifier-123', {
         name: 'Test User',
         email: 'test@example.com',
@@ -231,7 +231,7 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/ui-form with array values test', async () => {
+    it('passes POST /webhooks/system/ui-form with array values test', async () => {
       const result = await webhooks.uiForm(createFetch(), 'test-identifier-456', {
         selectedItems: ['item1', 'item2', 'item3'],
         name: 'Test User',
@@ -239,7 +239,7 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/ui-form missing identifier test (400)', async () => {
+    it('passes POST /webhooks/system/ui-form missing identifier test (400)', async () => {
       const result = await webhooks.uiFormMissingIdentifier(createFetch());
       expect(result).toBe(true);
     });
