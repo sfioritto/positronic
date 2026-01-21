@@ -40,7 +40,14 @@ export function extractFormSchema(root: ComponentNode): ExtractedFormSchema {
 
   function extractFromNode(node: ComponentNode, insideLoop: boolean): void {
     // Check if this is a form component
-    const fieldType = FORM_COMPONENTS[node.component];
+    let fieldType = FORM_COMPONENTS[node.component];
+
+    // Special handling for Checkbox: if it has a value prop, it returns that string value
+    if (node.component === 'Checkbox') {
+      const valueProp = node.props.value;
+      fieldType = valueProp ? 'string' : 'boolean';
+    }
+
     if (fieldType) {
       const nameProp = node.props.name;
       if (nameProp?.type === 'literal' && typeof nameProp.value === 'string') {

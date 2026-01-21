@@ -19,6 +19,7 @@ import { Text } from './components/Text.js';
 import { Heading } from './components/Heading.js';
 import { Container } from './components/Container.js';
 import { Form } from './components/Form.js';
+import { HiddenInput } from './components/HiddenInput.js';
 
 // Extract the React component from each UIComponent and expose to window
 const PositronicComponents = {
@@ -32,6 +33,7 @@ const PositronicComponents = {
   Heading: Heading.component,
   Container: Container.component,
   Form: Form.component,
+  HiddenInput: HiddenInput.component,
 };
 
 // Expose to window for client-side rendering
