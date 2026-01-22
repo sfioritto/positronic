@@ -12,6 +12,54 @@ import { describeDataShape } from '../yaml/type-inference.js';
 import type { ComponentNode, ValidationError } from '../yaml/types.js';
 
 /**
+ * Get the type name from a Zod schema for documentation.
+ */
+function getZodTypeName(schema: z.ZodTypeAny): string {
+  if (schema instanceof z.ZodString) return 'string';
+  if (schema instanceof z.ZodNumber) return 'number';
+  if (schema instanceof z.ZodBoolean) return 'boolean';
+  if (schema instanceof z.ZodEnum) {
+    const values = schema._def.values as string[];
+    return values.map((v) => `"${v}"`).join(' | ');
+  }
+  if (schema instanceof z.ZodArray) {
+    return `${getZodTypeName(schema.element)}[]`;
+  }
+  if (schema instanceof z.ZodOptional) {
+    return getZodTypeName(schema.unwrap());
+  }
+  if (schema instanceof z.ZodDefault) {
+    return getZodTypeName(schema._def.innerType);
+  }
+  if (schema instanceof z.ZodObject) {
+    return 'object';
+  }
+  return 'unknown';
+}
+
+/**
+ * Format a Zod object schema into documentation for the LLM.
+ */
+function formatPropsSchema(schema: z.ZodObject<z.ZodRawShape>): string {
+  const shape = schema.shape;
+  const lines: string[] = [];
+
+  for (const [key, fieldSchema] of Object.entries(shape)) {
+    const zodField = fieldSchema as z.ZodTypeAny;
+    const isOptional =
+      zodField instanceof z.ZodOptional || zodField instanceof z.ZodDefault;
+    const typeName = getZodTypeName(zodField);
+    const description = zodField._def.description || '';
+
+    const optionalMarker = isOptional ? '?' : '';
+    const descPart = description ? ` - ${description}` : '';
+    lines.push(`  - ${key}${optionalMarker}: ${typeName}${descPart}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Result of generateUI - contains all component placements from the agent loop.
  */
 export interface GenerateUIResult {
@@ -221,7 +269,11 @@ function buildSystemPrompt(
 ): string {
   const componentDocs = Object.entries(components)
     .map(([name, comp]) => {
-      const desc = comp.tool.description.split('\n')[0];
+      const desc = comp.description.split('\n')[0];
+      if (comp.propsSchema) {
+        const propsDoc = formatPropsSchema(comp.propsSchema);
+        return `### ${name}\n${desc}\nProps:\n${propsDoc}`;
+      }
       return `### ${name}\n${desc}`;
     })
     .join('\n\n');
