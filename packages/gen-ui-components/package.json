@@ -1,0 +1,31 @@
+{
+  "name": "@positronic/gen-ui-components",
+  "version": "0.0.52",
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Default UI components for Positronic generative UI",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/types/index.d.ts",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "tsc": "tsc --project tsconfig.json",
+    "swc": "swc src -d dist/src --strip-leading-paths",
+    "build": "npm run tsc && npm run swc",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
+  },
+  "dependencies": {
+    "@positronic/core": "^0.0.52",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@types/react": "^18.2.0"
+  }
+}
