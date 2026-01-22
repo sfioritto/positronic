@@ -1,4 +1,4 @@
-export { Brain, brain, DEFAULT_ENV } from './dsl/brain.js';
+export { Brain, brain } from './dsl/brain.js';
 export { BrainRunner } from './dsl/brain-runner.js';
 export { STATUS, BRAIN_EVENTS } from './dsl/constants.js';
 export type { Adapter } from './adapters/types.js';
@@ -30,7 +30,7 @@ export type {
   ExtractTerminalInput,
   RetryConfig,
 } from './dsl/types.js';
-export { createPatch, applyPatches } from './dsl/json-patch.js';
+export { applyPatches } from './dsl/json-patch.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer
 // dependency so when not using file://..path/to/package links the version numbers
@@ -64,45 +64,8 @@ export type {
   HeartbeatEvent,
 } from './dsl/brain.js';
 
-// Loop message reconstruction
-export type { LoopResumeContext } from './dsl/loop-messages.js';
-export { reconstructLoopContext } from './dsl/loop-messages.js';
-
-// UI types
-export type {
-  UIComponent,
-  FormPrimitive,
-  FormField,
-  FormSchema,
-  Placement,
-  DataType,
-  ValidationError,
-  ValidationResult,
-  ExtractedFormField,
-  ExtractedFormSchema,
-} from './ui/types.js';
-export { isFormSchema, inferDataType } from './ui/types.js';
-
-// Component utilities
-export { mergeComponents } from './ui/component-utils.js';
-
-// UI generation
-export { generateUI } from './ui/generate-ui.js';
-export type { GenerateUIResult } from './ui/generate-ui.js';
-
-// UI validation
-export {
-  isBinding,
-  extractBindingPath,
-  validateDataBindings,
-  extractFormSchema,
-  validateAgainstZod,
-  createValidateFormTool,
-} from './ui/validate-form.js';
-
-// Page HTML generation
-export { generatePageHtml } from './ui/generate-page-html.js';
-export type { GeneratePageHtmlOptions } from './ui/generate-page-html.js';
+// UI types (only UIComponent is public - used by gen-ui-components)
+export type { UIComponent } from './ui/types.js';
 
 // Brain state machine
 export {
