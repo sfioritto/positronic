@@ -1,5 +1,43 @@
 # @positronic/spec
 
+## 0.0.53
+
+### Patch Changes
+
+- ## New Features
+
+  - **UI Step System**: Add complete UI step implementation with YAML-based UI generation, Tailwind components, and form webhooks for building interactive AI workflows
+  - **Agent Steps**: Rename `loop` to `agent` with new `.brain()` step overloads for nested brain execution
+  - **createBrain Helper**: Add `createBrain` helper function and `brain()` function overloads for more flexible brain definition
+  - **Batch Prompt Support**: Add batch prompt support to Brain DSL
+  - **streamText Method**: Add `streamText` method to ObjectGenerator interface for streaming responses
+  - **New Components**: Add HiddenInput component, improve Checkbox value typing, add validation requiring Form components to have a Button
+
+  ## Improvements
+
+  - **Modular Architecture**: Reorganize brain.ts into modular directory structure for better maintainability
+  - **Cloudflare API Refactor**: Split monolithic api.ts into separate modules (brains, bundle, pages, resources, secrets, webhooks)
+  - **Better Type Safety**: Fix State type to allow TypeScript interfaces in brain state, make responseSchema optional in prompt()
+  - **Production Bundle Upload**: Add production bundle upload to deploy and bundle API spec
+  - **Schema-First Props**: Add schema-first props to UIComponent for better LLM documentation
+
+  ## Bug Fixes
+
+  - Fix components not propagating through brain method chain
+  - Fix UIComponent type variance in generateUI function
+  - Fix UI step pattern to use waitFor for form submissions
+  - Fix SQLITE_TOOBIG by removing initialState from RESTART events
+  - Fix Heading level enum for Gemini API compatibility
+  - Fix componentBundle for Cloudflare Workers compatibility
+  - Fix typecheck errors for streamText and gen-ui-components
+
+  ## Internal Changes
+
+  - Remove unused heartbeat event system
+  - Remove BrainFactory, add BrainConfig type
+  - Remove internal-only exports from @positronic/core and @positronic/cloudflare
+  - Add new @positronic/gen-ui-components package
+
 ## 0.0.52
 
 ### Patch Changes
