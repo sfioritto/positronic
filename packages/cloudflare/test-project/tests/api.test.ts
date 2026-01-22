@@ -15,12 +15,12 @@ import type {
   StepStatusEvent,
   StepCompletedEvent,
   StepStartedEvent,
-  LoopStartEvent,
-  LoopToolCallEvent,
-  LoopWebhookEvent,
-  LoopToolResultEvent,
+  AgentStartEvent,
+  AgentToolCallEvent,
+  AgentWebhookEvent,
+  AgentToolResultEvent,
   WebhookResponseEvent,
-  LoopCompleteEvent,
+  AgentCompleteEvent,
 } from '@positronic/core';
 import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
 import type { MonitorDO } from '../../src/monitor-do.js';
@@ -1487,13 +1487,13 @@ describe('Hono API Tests', () => {
     });
   });
 
-  describe('Loop Webhook Resumption', () => {
-    it('should pause loop on webhook and resume with restored context', async () => {
+  describe('Agent Webhook Resumption', () => {
+    it('should pause agent on webhook and resume with restored context', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'loop-webhook-brain';
+      const brainName = 'agent-webhook-brain';
       const webhookIdentifier = 'test-escalation-123';
 
-      // Step 1: Start the loop-webhook-brain
+      // Step 1: Start the agent-webhook-brain
       const createRequest = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1511,7 +1511,7 @@ describe('Hono API Tests', () => {
       }>();
       await waitOnExecutionContext(createContext);
 
-      // Step 2: Watch the brain - it should pause with LOOP_WEBHOOK and WEBHOOK events
+      // Step 2: Watch the brain - it should pause with AGENT_WEBHOOK and WEBHOOK events
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
       const watchRequest = new Request(watchUrl);
       const watchContext = createExecutionContext();
@@ -1557,36 +1557,36 @@ describe('Hono API Tests', () => {
         }
       }
 
-      // Step 3: Verify loop-specific events were emitted
+      // Step 3: Verify agent-specific events were emitted
       expect(foundWebhookEvent).toBe(true);
 
-      // Should have LOOP_START with prompt
-      const loopStartEvent = events.find(
-        (e): e is LoopStartEvent<any> => e.type === BRAIN_EVENTS.LOOP_START
+      // Should have AGENT_START with prompt
+      const agentStartEvent = events.find(
+        (e): e is AgentStartEvent<any> => e.type === BRAIN_EVENTS.AGENT_START
       );
-      expect(loopStartEvent).toBeDefined();
-      expect(loopStartEvent?.prompt).toBe(
+      expect(agentStartEvent).toBeDefined();
+      expect(agentStartEvent?.prompt).toBe(
         'Please process this request. If you need human review, use the escalate tool.'
       );
-      expect(loopStartEvent?.system).toBe(
+      expect(agentStartEvent?.system).toBe(
         'You are an AI assistant that can escalate to humans when needed.'
       );
 
-      // Should have LOOP_TOOL_CALL for the escalate tool
-      const loopToolCallEvent = events.find(
-        (e): e is LoopToolCallEvent<any> =>
-          e.type === BRAIN_EVENTS.LOOP_TOOL_CALL && e.toolName === 'escalate'
+      // Should have AGENT_TOOL_CALL for the escalate tool
+      const agentToolCallEvent = events.find(
+        (e): e is AgentToolCallEvent<any> =>
+          e.type === BRAIN_EVENTS.AGENT_TOOL_CALL && e.toolName === 'escalate'
       );
-      expect(loopToolCallEvent).toBeDefined();
-      expect(loopToolCallEvent?.toolName).toBe('escalate');
+      expect(agentToolCallEvent).toBeDefined();
+      expect(agentToolCallEvent?.toolName).toBe('escalate');
 
-      // Should have LOOP_WEBHOOK before WEBHOOK
-      const loopWebhookEvent = events.find(
-        (e): e is LoopWebhookEvent<any> => e.type === BRAIN_EVENTS.LOOP_WEBHOOK
+      // Should have AGENT_WEBHOOK before WEBHOOK
+      const agentWebhookEvent = events.find(
+        (e): e is AgentWebhookEvent<any> => e.type === BRAIN_EVENTS.AGENT_WEBHOOK
       );
-      expect(loopWebhookEvent).toBeDefined();
-      expect(loopWebhookEvent?.toolName).toBe('escalate');
-      expect(loopWebhookEvent?.toolCallId).toBeDefined();
+      expect(agentWebhookEvent).toBeDefined();
+      expect(agentWebhookEvent?.toolName).toBe('escalate');
+      expect(agentWebhookEvent?.toolCallId).toBeDefined();
 
       // Should NOT have COMPLETE yet
       const prematureComplete = events.find(
@@ -1654,23 +1654,23 @@ describe('Hono API Tests', () => {
         reviewerNote: 'Approved by human reviewer',
       });
 
-      // Should have LOOP_TOOL_RESULT with the webhook response
-      const loopToolResultEvent = resumeEvents.find(
-        (e): e is LoopToolResultEvent<any> =>
-          e.type === BRAIN_EVENTS.LOOP_TOOL_RESULT &&
+      // Should have AGENT_TOOL_RESULT with the webhook response
+      const agentToolResultEvent = resumeEvents.find(
+        (e): e is AgentToolResultEvent<any> =>
+          e.type === BRAIN_EVENTS.AGENT_TOOL_RESULT &&
           e.toolName === 'escalate'
       );
-      expect(loopToolResultEvent).toBeDefined();
-      expect(loopToolResultEvent?.result).toEqual({
+      expect(agentToolResultEvent).toBeDefined();
+      expect(agentToolResultEvent?.result).toEqual({
         approved: true,
         reviewerNote: 'Approved by human reviewer',
       });
 
-      // Should have LOOP_COMPLETE
-      const loopCompleteEvent = resumeEvents.find(
-        (e): e is LoopCompleteEvent<any> => e.type === BRAIN_EVENTS.LOOP_COMPLETE
+      // Should have AGENT_COMPLETE
+      const agentCompleteEvent = resumeEvents.find(
+        (e): e is AgentCompleteEvent<any> => e.type === BRAIN_EVENTS.AGENT_COMPLETE
       );
-      expect(loopCompleteEvent).toBeDefined();
+      expect(agentCompleteEvent).toBeDefined();
 
       // Should have BRAIN COMPLETE
       const completeEvent = resumeEvents.find(

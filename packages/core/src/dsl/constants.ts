@@ -10,15 +10,15 @@ export const BRAIN_EVENTS = {
   CANCELLED: 'brain:cancelled',
   WEBHOOK: 'brain:webhook',
   WEBHOOK_RESPONSE: 'brain:webhook_response',
-  // Loop step events
-  LOOP_START: 'loop:start',
-  LOOP_ITERATION: 'loop:iteration',
-  LOOP_TOOL_CALL: 'loop:tool_call',
-  LOOP_TOOL_RESULT: 'loop:tool_result',
-  LOOP_ASSISTANT_MESSAGE: 'loop:assistant_message',
-  LOOP_COMPLETE: 'loop:complete',
-  LOOP_TOKEN_LIMIT: 'loop:token_limit',
-  LOOP_WEBHOOK: 'loop:webhook',
+  // Agent step events
+  AGENT_START: 'agent:start',
+  AGENT_ITERATION: 'agent:iteration',
+  AGENT_TOOL_CALL: 'agent:tool_call',
+  AGENT_TOOL_RESULT: 'agent:tool_result',
+  AGENT_ASSISTANT_MESSAGE: 'agent:assistant_message',
+  AGENT_COMPLETE: 'agent:complete',
+  AGENT_TOKEN_LIMIT: 'agent:token_limit',
+  AGENT_WEBHOOK: 'agent:webhook',
 } as const;
 
 export const STATUS = {

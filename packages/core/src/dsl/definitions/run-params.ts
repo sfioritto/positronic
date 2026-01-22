@@ -3,7 +3,7 @@ import type { State, JsonObject, RuntimeEnv } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { SerializedStep } from './steps.js';
-import type { LoopResumeContext } from '../loop-messages.js';
+import type { AgentResumeContext } from '../agent-messages.js';
 
 export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   client: ObjectGenerator;
@@ -26,5 +26,5 @@ export interface RerunParams<TOptions extends JsonObject = JsonObject>
   initialCompletedSteps: SerializedStep[];
   brainRunId: string;
   response?: JsonObject;
-  loopResumeContext?: LoopResumeContext | null;
+  agentResumeContext?: AgentResumeContext | null;
 }

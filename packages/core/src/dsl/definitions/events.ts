@@ -90,27 +90,27 @@ export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   waitFor: SerializedWebhookRegistration[];
 }
 
-// Loop Events
-export interface LoopStartEvent<TOptions extends JsonObject = JsonObject>
+// Agent Events
+export interface AgentStartEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_START;
+  type: typeof BRAIN_EVENTS.AGENT_START;
   stepTitle: string;
   stepId: string;
   prompt: string;
   system?: string;
 }
 
-export interface LoopIterationEvent<TOptions extends JsonObject = JsonObject>
+export interface AgentIterationEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_ITERATION;
+  type: typeof BRAIN_EVENTS.AGENT_ITERATION;
   stepTitle: string;
   stepId: string;
   iteration: number;
 }
 
-export interface LoopToolCallEvent<TOptions extends JsonObject = JsonObject>
+export interface AgentToolCallEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_TOOL_CALL;
+  type: typeof BRAIN_EVENTS.AGENT_TOOL_CALL;
   stepTitle: string;
   stepId: string;
   toolName: string;
@@ -118,9 +118,9 @@ export interface LoopToolCallEvent<TOptions extends JsonObject = JsonObject>
   input: JsonObject;
 }
 
-export interface LoopToolResultEvent<TOptions extends JsonObject = JsonObject>
+export interface AgentToolResultEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_TOOL_RESULT;
+  type: typeof BRAIN_EVENTS.AGENT_TOOL_RESULT;
   stepTitle: string;
   stepId: string;
   toolName: string;
@@ -128,18 +128,18 @@ export interface LoopToolResultEvent<TOptions extends JsonObject = JsonObject>
   result: unknown;
 }
 
-export interface LoopAssistantMessageEvent<
+export interface AgentAssistantMessageEvent<
   TOptions extends JsonObject = JsonObject
 > extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE;
+  type: typeof BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE;
   stepTitle: string;
   stepId: string;
   content: string;
 }
 
-export interface LoopCompleteEvent<TOptions extends JsonObject = JsonObject>
+export interface AgentCompleteEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_COMPLETE;
+  type: typeof BRAIN_EVENTS.AGENT_COMPLETE;
   stepTitle: string;
   stepId: string;
   terminalToolName: string;
@@ -147,18 +147,18 @@ export interface LoopCompleteEvent<TOptions extends JsonObject = JsonObject>
   totalIterations: number;
 }
 
-export interface LoopTokenLimitEvent<TOptions extends JsonObject = JsonObject>
+export interface AgentTokenLimitEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_TOKEN_LIMIT;
+  type: typeof BRAIN_EVENTS.AGENT_TOKEN_LIMIT;
   stepTitle: string;
   stepId: string;
   totalTokens: number;
   maxTokens: number;
 }
 
-export interface LoopWebhookEvent<TOptions extends JsonObject = JsonObject>
+export interface AgentWebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.LOOP_WEBHOOK;
+  type: typeof BRAIN_EVENTS.AGENT_WEBHOOK;
   stepTitle: string;
   stepId: string;
   toolCallId: string;
@@ -184,11 +184,11 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepRetryEvent<TOptions>
   | WebhookEvent<TOptions>
   | WebhookResponseEvent<TOptions>
-  | LoopStartEvent<TOptions>
-  | LoopIterationEvent<TOptions>
-  | LoopToolCallEvent<TOptions>
-  | LoopToolResultEvent<TOptions>
-  | LoopAssistantMessageEvent<TOptions>
-  | LoopCompleteEvent<TOptions>
-  | LoopTokenLimitEvent<TOptions>
-  | LoopWebhookEvent<TOptions>;
+  | AgentStartEvent<TOptions>
+  | AgentIterationEvent<TOptions>
+  | AgentToolCallEvent<TOptions>
+  | AgentToolResultEvent<TOptions>
+  | AgentAssistantMessageEvent<TOptions>
+  | AgentCompleteEvent<TOptions>
+  | AgentTokenLimitEvent<TOptions>
+  | AgentWebhookEvent<TOptions>;

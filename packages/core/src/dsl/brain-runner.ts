@@ -1,6 +1,6 @@
 import { BRAIN_EVENTS } from './constants.js';
 import { applyPatches } from './json-patch.js';
-import { reconstructLoopContext } from './loop-messages.js';
+import { reconstructAgentContext } from './agent-messages.js';
 import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
@@ -66,7 +66,7 @@ export class BrainRunner {
       endAfter,
       signal,
       response,
-      loopEvents,
+      agentEvents,
     }: {
       initialState?: TState;
       options?: TOptions;
@@ -75,7 +75,7 @@ export class BrainRunner {
       endAfter?: number;
       signal?: AbortSignal;
       response?: JsonObject;
-      loopEvents?: BrainEvent[];
+      agentEvents?: BrainEvent[];
     } = {}
   ): Promise<TState> {
     const { adapters, client, resources, pages, env } = this.options;
@@ -96,10 +96,10 @@ export class BrainRunner {
     // The machine tracks: currentState, isTopLevel, topLevelStepCount, etc.
     const machine = createBrainExecutionMachine({ initialState: machineInitialState });
 
-    // If loopEvents and response are provided, reconstruct loop context
-    const loopResumeContext =
-      loopEvents && response
-        ? reconstructLoopContext(loopEvents, response)
+    // If agentEvents and response are provided, reconstruct agent context
+    const agentResumeContext =
+      agentEvents && response
+        ? reconstructAgentContext(agentEvents, response)
         : null;
 
     const brainRun =
@@ -114,7 +114,7 @@ export class BrainRunner {
             pages,
             env: resolvedEnv,
             response,
-            loopResumeContext,
+            agentResumeContext,
           })
         : brain.run({
             initialState,

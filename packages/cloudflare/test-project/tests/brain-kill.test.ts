@@ -107,7 +107,7 @@ describe('Brain Kill API', () => {
 
     const result = await brains.killSuspended(
       async (req) => worker.fetch(req, testEnv, ctx),
-      'loop-webhook-brain',
+      'agent-webhook-brain',
       'loop-escalation',
       { escalationId: 'test-escalation-123', approved: true, note: 'Approved after kill' }
     );
@@ -119,11 +119,11 @@ describe('Brain Kill API', () => {
     const testEnv = env as TestEnv;
     const ctx = createExecutionContext();
 
-    // Step 1: Start the loop-webhook-brain
+    // Step 1: Start the agent-webhook-brain
     const createRequest = new Request('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'loop-webhook-brain' }),
+      body: JSON.stringify({ identifier: 'agent-webhook-brain' }),
     });
 
     const createResponse = await worker.fetch(createRequest, testEnv, ctx);

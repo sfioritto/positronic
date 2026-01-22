@@ -3,20 +3,20 @@ import { applyPatches } from '../src/dsl/json-patch.js';
 import {
   brain,
   type BrainEvent,
-  type LoopStartEvent,
-  type LoopIterationEvent,
-  type LoopToolCallEvent,
-  type LoopToolResultEvent,
-  type LoopCompleteEvent,
-  type LoopTokenLimitEvent,
-  type LoopWebhookEvent,
+  type AgentStartEvent,
+  type AgentIterationEvent,
+  type AgentToolCallEvent,
+  type AgentToolResultEvent,
+  type AgentCompleteEvent,
+  type AgentTokenLimitEvent,
+  type AgentWebhookEvent,
   type WebhookResponseEvent,
 } from '../src/dsl/brain.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import type { ObjectGenerator, ToolMessage } from '../src/clients/types.js';
 import { createWebhook } from '../src/dsl/webhook.js';
-import { reconstructLoopContext } from '../src/dsl/loop-messages.js';
+import { reconstructAgentContext } from '../src/dsl/agent-messages.js';
 
 // Mock ObjectGenerator with generateText support
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -28,13 +28,13 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   streamText: mockStreamText,
 };
 
-describe('loop step', () => {
+describe('agent step', () => {
   beforeEach(() => {
     mockGenerateObject.mockClear();
     mockGenerateText.mockClear();
   });
 
-  describe('basic loop with terminal tool', () => {
+  describe('basic agent with terminal tool', () => {
     it('should complete when terminal tool is called', async () => {
       // Mock the LLM to call the terminal tool immediately
       mockGenerateText.mockResolvedValueOnce({
@@ -49,7 +49,7 @@ describe('loop step', () => {
         usage: { totalTokens: 100 },
       });
 
-      const testBrain = brain('test-loop').loop(
+      const testBrain = brain('test-agent').brain(
         'Handle Request',
         ({ state }) => ({
           prompt: 'Handle this request',
@@ -69,24 +69,24 @@ describe('loop step', () => {
       }
 
       // Verify events emitted
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_START)).toBe(true);
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_ITERATION)).toBe(
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_START)).toBe(true);
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION)).toBe(
         true
       );
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_TOOL_CALL)).toBe(
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_TOOL_CALL)).toBe(
         true
       );
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_COMPLETE)).toBe(
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE)).toBe(
         true
       );
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
 
-      // Verify loop complete event has correct data
-      const loopCompleteEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.LOOP_COMPLETE
-      ) as LoopCompleteEvent;
-      expect(loopCompleteEvent.terminalToolName).toBe('resolve');
-      expect(loopCompleteEvent.result).toEqual({ resolution: 'Issue fixed' });
+      // Verify agent complete event has correct data
+      const agentCompleteEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE
+      ) as AgentCompleteEvent;
+      expect(agentCompleteEvent.terminalToolName).toBe('resolve');
+      expect(agentCompleteEvent.result).toEqual({ resolution: 'Issue fixed' });
 
       // Verify final state has terminal tool result merged
       let finalState = {};
@@ -99,8 +99,8 @@ describe('loop step', () => {
     });
   });
 
-  describe('loop with tool execution', () => {
-    it('should execute non-terminal tools and continue loop', async () => {
+  describe('agent with tool execution', () => {
+    it('should execute non-terminal tools and continue agent', async () => {
       const lookupOrderMock = jest.fn<(input: { orderId: string }) => Promise<{ orderId: string; status: string }>>()
         .mockResolvedValue({ orderId: '123', status: 'shipped' });
 
@@ -130,7 +130,7 @@ describe('loop step', () => {
         usage: { totalTokens: 60 },
       });
 
-      const testBrain = brain('test-loop-tools').loop(
+      const testBrain = brain('test-agent-tools').brain(
         'Handle Order Request',
         () => ({
           prompt: 'Look up the order',
@@ -159,15 +159,15 @@ describe('loop step', () => {
 
       // Verify tool result event was emitted
       const toolResultEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.LOOP_TOOL_RESULT
-      ) as LoopToolResultEvent[];
+        (e) => e.type === BRAIN_EVENTS.AGENT_TOOL_RESULT
+      ) as AgentToolResultEvent[];
       expect(toolResultEvents.length).toBe(1);
       expect(toolResultEvents[0].toolName).toBe('lookupOrder');
       expect(toolResultEvents[0].result).toEqual({ orderId: '123', status: 'shipped' });
 
       // Verify two iterations occurred
       const iterationEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.LOOP_ITERATION
+        (e) => e.type === BRAIN_EVENTS.AGENT_ITERATION
       );
       expect(iterationEvents.length).toBe(2);
 
@@ -176,8 +176,8 @@ describe('loop step', () => {
     });
   });
 
-  describe('loop ends when no tool calls', () => {
-    it('should complete loop when LLM returns no tool calls', async () => {
+  describe('agent ends when no tool calls', () => {
+    it('should complete agent when LLM returns no tool calls', async () => {
       // LLM returns text but no tool calls
       mockGenerateText.mockResolvedValueOnce({
         text: 'I have completed the task.',
@@ -185,7 +185,7 @@ describe('loop step', () => {
         usage: { totalTokens: 100 },
       });
 
-      const testBrain = brain('test-no-tools').loop('Simple Task', () => ({
+      const testBrain = brain('test-no-tools').brain('Simple Task', () => ({
         prompt: 'Do something',
         tools: {
           resolve: {
@@ -201,25 +201,25 @@ describe('loop step', () => {
         events.push(event);
       }
 
-      // Loop should complete without LOOP_COMPLETE (that's for terminal tools)
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_START)).toBe(true);
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_ITERATION)).toBe(
+      // Agent should complete without AGENT_COMPLETE (that's for terminal tools)
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_START)).toBe(true);
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION)).toBe(
         true
       );
       expect(
-        events.some((e) => e.type === BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE)
+        events.some((e) => e.type === BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE)
       ).toBe(true);
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
 
-      // No LOOP_COMPLETE since no terminal tool was called
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_COMPLETE)).toBe(
+      // No AGENT_COMPLETE since no terminal tool was called
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE)).toBe(
         false
       );
     });
   });
 
-  describe('loop with maxTokens limit', () => {
-    it('should stop loop when maxTokens exceeded', async () => {
+  describe('agent with maxTokens limit', () => {
+    it('should stop agent when maxTokens exceeded', async () => {
       // Each call uses more tokens, eventually exceeding limit
       mockGenerateText
         .mockResolvedValueOnce({
@@ -244,7 +244,7 @@ describe('loop step', () => {
           usage: { totalTokens: 400 },
         });
 
-      const testBrain = brain('test-max-tokens').loop('Long Task', () => ({
+      const testBrain = brain('test-max-tokens').brain('Long Task', () => ({
         prompt: 'Do lots of work',
         tools: {
           doWork: {
@@ -267,21 +267,21 @@ describe('loop step', () => {
       }
 
       // Should emit token limit event
-      expect(events.some((e) => e.type === BRAIN_EVENTS.LOOP_TOKEN_LIMIT)).toBe(
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_TOKEN_LIMIT)).toBe(
         true
       );
 
       const tokenLimitEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.LOOP_TOKEN_LIMIT
-      ) as LoopTokenLimitEvent;
+        (e) => e.type === BRAIN_EVENTS.AGENT_TOKEN_LIMIT
+      ) as AgentTokenLimitEvent;
       expect(tokenLimitEvent.totalTokens).toBeGreaterThanOrEqual(1000);
 
-      // Loop should still complete
+      // Agent should still complete
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
     });
   });
 
-  describe('loop with waitFor', () => {
+  describe('agent with waitFor', () => {
     it('should emit WEBHOOK event when tool returns waitFor', async () => {
       const supportWebhook = createWebhook(
         'support-response',
@@ -305,7 +305,7 @@ describe('loop step', () => {
         usage: { totalTokens: 100 },
       });
 
-      const testBrain = brain('test-waitfor').loop('Handle Escalation', () => ({
+      const testBrain = brain('test-waitfor').brain('Handle Escalation', () => ({
         prompt: 'Handle the request',
         tools: {
           escalate: {
@@ -370,7 +370,7 @@ describe('loop step', () => {
         usage: { totalTokens: 100 },
       });
 
-      const testBrain = brain('test-array-waitfor').loop('Multi-channel Approval', () => ({
+      const testBrain = brain('test-array-waitfor').brain('Multi-channel Approval', () => ({
         prompt: 'Request approval via multiple channels',
         tools: {
           requestApproval: {
@@ -395,9 +395,9 @@ describe('loop step', () => {
         events.push(event);
       }
 
-      // Should emit single LOOP_WEBHOOK event (captures tool context)
-      const loopWebhookEvents = events.filter((e) => e.type === BRAIN_EVENTS.LOOP_WEBHOOK);
-      expect(loopWebhookEvents.length).toBe(1);
+      // Should emit single AGENT_WEBHOOK event (captures tool context)
+      const agentWebhookEvents = events.filter((e) => e.type === BRAIN_EVENTS.AGENT_WEBHOOK);
+      expect(agentWebhookEvents.length).toBe(1);
 
       // Should emit WEBHOOK event with both webhooks
       const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
@@ -410,7 +410,7 @@ describe('loop step', () => {
     });
   });
 
-  describe('loop throws when generateText not implemented', () => {
+  describe('agent throws when generateText not implemented', () => {
     it('should throw descriptive error when client lacks generateText', async () => {
       const clientWithoutGenerateText: ObjectGenerator = {
         generateObject: mockGenerateObject,
@@ -418,7 +418,7 @@ describe('loop step', () => {
         // No generateText
       };
 
-      const testBrain = brain('test-no-generate-text').loop(
+      const testBrain = brain('test-no-generate-text').brain(
         'Will Fail',
         () => ({
           prompt: 'Test',
@@ -453,7 +453,7 @@ describe('loop step', () => {
     });
   });
 
-  describe('loop with system prompt', () => {
+  describe('agent with system prompt', () => {
     it('should prepend default system prompt and append user system prompt', async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
@@ -467,7 +467,7 @@ describe('loop step', () => {
         usage: { totalTokens: 50 },
       });
 
-      const testBrain = brain('test-system').loop('With System', () => ({
+      const testBrain = brain('test-system').brain('With System', () => ({
         system: 'You are a helpful assistant.',
         prompt: 'Help the user',
         tools: {
@@ -509,7 +509,7 @@ describe('loop step', () => {
         usage: { totalTokens: 50 },
       });
 
-      const testBrain = brain('test-default-system').loop('No System', () => ({
+      const testBrain = brain('test-default-system').brain('No System', () => ({
         prompt: 'Do something',
         tools: {
           done: {
@@ -533,7 +533,7 @@ describe('loop step', () => {
     });
   });
 
-  describe('loop with state access', () => {
+  describe('agent with state access', () => {
     it('should have access to prior step state in config function', async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
@@ -549,7 +549,7 @@ describe('loop step', () => {
 
       const testBrain = brain('test-state-access')
         .step('Init', () => ({ customerName: 'Alice', issue: 'Login problem' }))
-        .loop('Respond', ({ state }) => ({
+        .brain('Respond', ({ state }) => ({
           prompt: `Help ${state.customerName} with: ${state.issue}`,
           tools: {
             respond: {
@@ -577,7 +577,7 @@ describe('loop step', () => {
         })
       );
 
-      // Verify final state has both init step and loop result
+      // Verify final state has both init step and agent result
       let finalState = {};
       for (const event of events) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
@@ -602,7 +602,7 @@ describe('loop step', () => {
         usage: { totalTokens: 50 },
       });
 
-      const testBrain = brain('test-event-order').loop('Task', () => ({
+      const testBrain = brain('test-event-order').brain('Task', () => ({
         prompt: 'Do task',
         tools: {
           done: {
@@ -620,17 +620,17 @@ describe('loop step', () => {
 
       const eventTypes = events.map((e) => e.type);
 
-      // Verify order (includes STEP_STATUS for 'running' before loop)
+      // Verify order (includes STEP_STATUS for 'running' before agent)
       expect(eventTypes).toEqual([
         BRAIN_EVENTS.START,
         BRAIN_EVENTS.STEP_STATUS, // pending -> running
         BRAIN_EVENTS.STEP_START,
         BRAIN_EVENTS.STEP_STATUS, // running status during step
-        BRAIN_EVENTS.LOOP_START,
-        BRAIN_EVENTS.LOOP_ITERATION,
-        BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE,
-        BRAIN_EVENTS.LOOP_TOOL_CALL,
-        BRAIN_EVENTS.LOOP_COMPLETE,
+        BRAIN_EVENTS.AGENT_START,
+        BRAIN_EVENTS.AGENT_ITERATION,
+        BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
+        BRAIN_EVENTS.AGENT_TOOL_CALL,
+        BRAIN_EVENTS.AGENT_COMPLETE,
         BRAIN_EVENTS.STEP_COMPLETE,
         BRAIN_EVENTS.STEP_STATUS, // running -> complete
         BRAIN_EVENTS.COMPLETE,
@@ -638,8 +638,8 @@ describe('loop step', () => {
     });
   });
 
-  describe('loop webhook resumption', () => {
-    it('should include prompt and system in LOOP_START event', async () => {
+  describe('agent webhook resumption', () => {
+    it('should include prompt and system in AGENT_START event', async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
         toolCalls: [
@@ -652,7 +652,7 @@ describe('loop step', () => {
         usage: { totalTokens: 100 },
       });
 
-      const testBrain = brain('test-loop-start').loop('Handle', () => ({
+      const testBrain = brain('test-agent-start').brain('Handle', () => ({
         prompt: 'Handle the request',
         system: 'You are a helpful assistant',
         tools: {
@@ -669,15 +669,15 @@ describe('loop step', () => {
         events.push(event);
       }
 
-      const loopStartEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.LOOP_START
-      ) as LoopStartEvent;
-      expect(loopStartEvent).toBeDefined();
-      expect(loopStartEvent.prompt).toBe('Handle the request');
-      expect(loopStartEvent.system).toBe('You are a helpful assistant');
+      const agentStartEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.AGENT_START
+      ) as AgentStartEvent;
+      expect(agentStartEvent).toBeDefined();
+      expect(agentStartEvent.prompt).toBe('Handle the request');
+      expect(agentStartEvent.system).toBe('You are a helpful assistant');
     });
 
-    it('should emit LOOP_WEBHOOK before WEBHOOK when tool returns waitFor', async () => {
+    it('should emit AGENT_WEBHOOK before WEBHOOK when tool returns waitFor', async () => {
       const supportWebhook = createWebhook(
         'support-response',
         z.object({ ticketId: z.string(), response: z.string() }),
@@ -700,7 +700,7 @@ describe('loop step', () => {
         usage: { totalTokens: 100 },
       });
 
-      const testBrain = brain('test-loop-webhook').loop(
+      const testBrain = brain('test-agent-webhook').brain(
         'Handle Escalation',
         () => ({
           prompt: 'Handle the request',
@@ -728,30 +728,30 @@ describe('loop step', () => {
         events.push(event);
       }
 
-      // Should emit LOOP_WEBHOOK before WEBHOOK
-      const loopWebhookIndex = events.findIndex(
-        (e) => e.type === BRAIN_EVENTS.LOOP_WEBHOOK
+      // Should emit AGENT_WEBHOOK before WEBHOOK
+      const agentWebhookIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.AGENT_WEBHOOK
       );
       const webhookIndex = events.findIndex(
         (e) => e.type === BRAIN_EVENTS.WEBHOOK
       );
 
-      expect(loopWebhookIndex).toBeGreaterThan(-1);
+      expect(agentWebhookIndex).toBeGreaterThan(-1);
       expect(webhookIndex).toBeGreaterThan(-1);
-      expect(loopWebhookIndex).toBeLessThan(webhookIndex);
+      expect(agentWebhookIndex).toBeLessThan(webhookIndex);
 
-      // Verify LOOP_WEBHOOK has correct tool info
-      const loopWebhookEvent = events[loopWebhookIndex] as LoopWebhookEvent;
-      expect(loopWebhookEvent.toolCallId).toBe('call-1');
-      expect(loopWebhookEvent.toolName).toBe('escalate');
-      expect(loopWebhookEvent.input).toEqual({ summary: 'Customer needs help' });
+      // Verify AGENT_WEBHOOK has correct tool info
+      const agentWebhookEvent = events[agentWebhookIndex] as AgentWebhookEvent;
+      expect(agentWebhookEvent.toolCallId).toBe('call-1');
+      expect(agentWebhookEvent.toolName).toBe('escalate');
+      expect(agentWebhookEvent.input).toEqual({ summary: 'Customer needs help' });
     });
 
-    describe('reconstructLoopContext', () => {
-      it('should return null when no LOOP_WEBHOOK event exists', () => {
+    describe('reconstructAgentContext', () => {
+      it('should return null when no AGENT_WEBHOOK event exists', () => {
         const events: BrainEvent[] = [
           {
-            type: BRAIN_EVENTS.LOOP_START,
+            type: BRAIN_EVENTS.AGENT_START,
             stepTitle: 'Test',
             stepId: 'step-1',
             prompt: 'Hello',
@@ -759,7 +759,7 @@ describe('loop step', () => {
             brainRunId: 'run-1',
           },
           {
-            type: BRAIN_EVENTS.LOOP_COMPLETE,
+            type: BRAIN_EVENTS.AGENT_COMPLETE,
             stepTitle: 'Test',
             stepId: 'step-1',
             terminalToolName: 'resolve',
@@ -770,14 +770,14 @@ describe('loop step', () => {
           },
         ];
 
-        const result = reconstructLoopContext(events, { response: 'test' });
+        const result = reconstructAgentContext(events, { response: 'test' });
         expect(result).toBeNull();
       });
 
-      it('should reconstruct messages from LOOP events', () => {
+      it('should reconstruct messages from AGENT events', () => {
         const events: BrainEvent[] = [
           {
-            type: BRAIN_EVENTS.LOOP_START,
+            type: BRAIN_EVENTS.AGENT_START,
             stepTitle: 'Test',
             stepId: 'step-1',
             prompt: 'Handle the request',
@@ -786,7 +786,7 @@ describe('loop step', () => {
             brainRunId: 'run-1',
           },
           {
-            type: BRAIN_EVENTS.LOOP_ITERATION,
+            type: BRAIN_EVENTS.AGENT_ITERATION,
             stepTitle: 'Test',
             stepId: 'step-1',
             iteration: 1,
@@ -794,7 +794,7 @@ describe('loop step', () => {
             brainRunId: 'run-1',
           },
           {
-            type: BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE,
+            type: BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
             stepTitle: 'Test',
             stepId: 'step-1',
             content: 'Let me help you with that',
@@ -802,7 +802,7 @@ describe('loop step', () => {
             brainRunId: 'run-1',
           },
           {
-            type: BRAIN_EVENTS.LOOP_TOOL_CALL,
+            type: BRAIN_EVENTS.AGENT_TOOL_CALL,
             stepTitle: 'Test',
             stepId: 'step-1',
             toolCallId: 'call-1',
@@ -812,7 +812,7 @@ describe('loop step', () => {
             brainRunId: 'run-1',
           },
           {
-            type: BRAIN_EVENTS.LOOP_TOOL_RESULT,
+            type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
             stepTitle: 'Test',
             stepId: 'step-1',
             toolCallId: 'call-1',
@@ -822,7 +822,7 @@ describe('loop step', () => {
             brainRunId: 'run-1',
           },
           {
-            type: BRAIN_EVENTS.LOOP_TOOL_CALL,
+            type: BRAIN_EVENTS.AGENT_TOOL_CALL,
             stepTitle: 'Test',
             stepId: 'step-1',
             toolCallId: 'call-2',
@@ -832,7 +832,7 @@ describe('loop step', () => {
             brainRunId: 'run-1',
           },
           {
-            type: BRAIN_EVENTS.LOOP_WEBHOOK,
+            type: BRAIN_EVENTS.AGENT_WEBHOOK,
             stepTitle: 'Test',
             stepId: 'step-1',
             toolCallId: 'call-2',
@@ -844,7 +844,7 @@ describe('loop step', () => {
         ];
 
         const webhookResponse = { approved: true, comment: 'Looks good' };
-        const result = reconstructLoopContext(events, webhookResponse);
+        const result = reconstructAgentContext(events, webhookResponse);
 
         expect(result).not.toBeNull();
         expect(result!.prompt).toBe('Handle the request');
@@ -886,7 +886,7 @@ describe('loop step', () => {
     });
 
     it('should not pass webhook response as response parameter to config function on resumption', async () => {
-      // This test verifies that the loop config function receives the previous step's
+      // This test verifies that the agent config function receives the previous step's
       // response (not the webhook response) when resuming from a webhook.
       // The webhook response should only be available via the messages array.
 
@@ -930,7 +930,7 @@ describe('loop step', () => {
 
       const testBrain = brain('test-config-response')
         .step('Init', () => ({ previousStepData: 'from-init-step' }))
-        .loop('Handle Request', ({ state, response }) => {
+        .brain('Handle Request', ({ state, response }) => {
           // Capture what response is each time config function is called
           configFnCalls.push({ response });
 
@@ -970,13 +970,13 @@ describe('loop step', () => {
 
       // Now resume from webhook with a webhook response
       const webhookResponse = { ticketId: 'ticket-456', approved: true };
-      const loopContext = reconstructLoopContext(events, webhookResponse);
-      expect(loopContext).not.toBeNull();
+      const agentContext = reconstructAgentContext(events, webhookResponse);
+      expect(agentContext).not.toBeNull();
 
       // Create a new brain instance to resume
       const resumedBrain = brain('test-config-response')
         .step('Init', () => ({ previousStepData: 'from-init-step' }))
-        .loop('Handle Request', ({ state, response }) => {
+        .brain('Handle Request', ({ state, response }) => {
           // Capture what response is on resumption
           configFnCalls.push({ response });
 
@@ -1013,7 +1013,7 @@ describe('loop step', () => {
       for await (const event of resumedBrain.run({
         client: mockClient,
         response: webhookResponse,
-        loopResumeContext: loopContext!,
+        agentResumeContext: agentContext!,
         initialState: {},
         brainRunId,
         initialCompletedSteps: stepCompleteEvents.map((e: any) => ({
@@ -1034,7 +1034,7 @@ describe('loop step', () => {
 
       // THE KEY ASSERTION: On resumption, response should NOT be the webhook data
       // It should be undefined (same as on initial start), because the config function
-      // is for setting up the loop, not for processing webhook responses.
+      // is for setting up the agent, not for processing webhook responses.
       // Webhook responses flow through the messages array, not the response parameter.
       expect(configFnCalls[1].response).toBeUndefined();
       expect(configFnCalls[1].response).not.toEqual(webhookResponse);
