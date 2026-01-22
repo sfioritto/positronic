@@ -133,15 +133,15 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes loop events spec test (LOOP_START, LOOP_ITERATION, LOOP_TOOL_CALL, LOOP_WEBHOOK)', async () => {
-      const result = await brains.watchLoopEvents(createFetch(), 'loop-webhook-brain');
+    it('passes agent events spec test (AGENT_START, AGENT_ITERATION, AGENT_TOOL_CALL, AGENT_WEBHOOK)', async () => {
+      const result = await brains.watchAgentEvents(createFetch(), 'agent-webhook-brain');
       expect(result).toBe(true);
     });
 
-    it('passes loop webhook resume spec test (full suspend/resume cycle)', async () => {
-      const result = await brains.loopWebhookResume(
+    it('passes agent webhook resume spec test (full suspend/resume cycle)', async () => {
+      const result = await brains.agentWebhookResume(
         createFetch(),
-        'loop-webhook-brain',
+        'agent-webhook-brain',
         'loop-escalation',
         {
           escalationId: 'test-escalation-123',

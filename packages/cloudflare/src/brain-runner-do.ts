@@ -458,14 +458,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Get the reconstructed step hierarchy from the state machine
     const initialCompletedSteps: SerializedStep[] = getCompletedSteps(machine);
 
-    // Load LOOP_* events for potential loop resume
-    const loopEventsResult = sql
+    // Load AGENT_* events for potential agent resume
+    const agentEventsResult = sql
       .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events WHERE event_type LIKE 'loop:%' ORDER BY event_id ASC`
+        `SELECT serialized_event FROM brain_events WHERE event_type LIKE 'agent:%' ORDER BY event_id ASC`
       )
       .toArray();
 
-    const loopEvents = loopEventsResult.map((row) =>
+    const agentEvents = agentEventsResult.map((row) =>
       JSON.parse(row.serialized_event)
     );
 
@@ -525,7 +525,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         brainRunId,
         response: webhookResponse,
         signal: this.abortController.signal,
-        loopEvents,
+        agentEvents,
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner resume failed:`, err);

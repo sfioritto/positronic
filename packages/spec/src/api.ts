@@ -1591,26 +1591,26 @@ export const brains = {
   },
 
   /**
-   * Test that loop steps emit proper LOOP_* events in the SSE stream.
-   * Requires a brain with a loop step that will pause on a webhook.
+   * Test that agent steps emit proper AGENT_* events in the SSE stream.
+   * Requires a brain with an agent step that will pause on a webhook.
    *
    * Expected events before webhook pause:
-   * - LOOP_START (with prompt and optional system)
-   * - LOOP_ITERATION
-   * - LOOP_TOOL_CALL
-   * - LOOP_WEBHOOK (before WEBHOOK event)
+   * - AGENT_START (with prompt and optional system)
+   * - AGENT_ITERATION
+   * - AGENT_TOOL_CALL
+   * - AGENT_WEBHOOK (before WEBHOOK event)
    * - WEBHOOK
    */
-  async watchLoopEvents(
+  async watchAgentEvents(
     fetch: Fetch,
-    loopBrainIdentifier: string
+    agentBrainIdentifier: string
   ): Promise<boolean> {
     try {
-      // Start the loop brain
+      // Start the agent brain
       const runRequest = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: loopBrainIdentifier }),
+        body: JSON.stringify({ identifier: agentBrainIdentifier }),
       });
 
       const runResponse = await fetch(runRequest);
@@ -1683,62 +1683,62 @@ export const brains = {
         }
       }
 
-      // Verify required loop events are present
-      const hasLoopStart = events.some(
-        (e) => e.type === BRAIN_EVENTS.LOOP_START
+      // Verify required agent events are present
+      const hasAgentStart = events.some(
+        (e) => e.type === BRAIN_EVENTS.AGENT_START
       );
-      if (!hasLoopStart) {
-        console.error('Missing LOOP_START event in SSE stream');
+      if (!hasAgentStart) {
+        console.error('Missing AGENT_START event in SSE stream');
         return false;
       }
 
-      // Verify LOOP_START has prompt field
-      const loopStartEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.LOOP_START
+      // Verify AGENT_START has prompt field
+      const agentStartEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.AGENT_START
       );
-      if (!loopStartEvent.prompt || typeof loopStartEvent.prompt !== 'string') {
-        console.error('LOOP_START event missing prompt field');
+      if (!agentStartEvent.prompt || typeof agentStartEvent.prompt !== 'string') {
+        console.error('AGENT_START event missing prompt field');
         return false;
       }
 
-      const hasLoopIteration = events.some(
-        (e) => e.type === BRAIN_EVENTS.LOOP_ITERATION
+      const hasAgentIteration = events.some(
+        (e) => e.type === BRAIN_EVENTS.AGENT_ITERATION
       );
-      if (!hasLoopIteration) {
-        console.error('Missing LOOP_ITERATION event in SSE stream');
+      if (!hasAgentIteration) {
+        console.error('Missing AGENT_ITERATION event in SSE stream');
         return false;
       }
 
-      const hasLoopToolCall = events.some(
-        (e) => e.type === BRAIN_EVENTS.LOOP_TOOL_CALL
+      const hasAgentToolCall = events.some(
+        (e) => e.type === BRAIN_EVENTS.AGENT_TOOL_CALL
       );
-      if (!hasLoopToolCall) {
-        console.error('Missing LOOP_TOOL_CALL event in SSE stream');
+      if (!hasAgentToolCall) {
+        console.error('Missing AGENT_TOOL_CALL event in SSE stream');
         return false;
       }
 
-      // If we got a WEBHOOK event, verify LOOP_WEBHOOK came before it
+      // If we got a WEBHOOK event, verify AGENT_WEBHOOK came before it
       const webhookIndex = events.findIndex(
         (e) => e.type === BRAIN_EVENTS.WEBHOOK
       );
       if (webhookIndex !== -1) {
-        const loopWebhookIndex = events.findIndex(
-          (e) => e.type === BRAIN_EVENTS.LOOP_WEBHOOK
+        const agentWebhookIndex = events.findIndex(
+          (e) => e.type === BRAIN_EVENTS.AGENT_WEBHOOK
         );
-        if (loopWebhookIndex === -1) {
-          console.error('Missing LOOP_WEBHOOK event before WEBHOOK event');
+        if (agentWebhookIndex === -1) {
+          console.error('Missing AGENT_WEBHOOK event before WEBHOOK event');
           return false;
         }
-        if (loopWebhookIndex >= webhookIndex) {
-          console.error('LOOP_WEBHOOK event must come before WEBHOOK event');
+        if (agentWebhookIndex >= webhookIndex) {
+          console.error('AGENT_WEBHOOK event must come before WEBHOOK event');
           return false;
         }
 
-        // Verify LOOP_WEBHOOK has required fields
-        const loopWebhookEvent = events[loopWebhookIndex];
-        if (!loopWebhookEvent.toolCallId || !loopWebhookEvent.toolName) {
+        // Verify AGENT_WEBHOOK has required fields
+        const agentWebhookEvent = events[agentWebhookIndex];
+        if (!agentWebhookEvent.toolCallId || !agentWebhookEvent.toolName) {
           console.error(
-            'LOOP_WEBHOOK event missing toolCallId or toolName fields'
+            'AGENT_WEBHOOK event missing toolCallId or toolName fields'
           );
           return false;
         }
@@ -1746,34 +1746,34 @@ export const brains = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test loop events for ${loopBrainIdentifier}:`, error);
+      console.error(`Failed to test agent events for ${agentBrainIdentifier}:`, error);
       return false;
     }
   },
 
   /**
-   * Test full loop webhook resumption flow:
-   * 1. Start a loop brain that will pause on a webhook
+   * Test full agent webhook resumption flow:
+   * 1. Start an agent brain that will pause on a webhook
    * 2. Verify it pauses with WEBHOOK event
    * 3. Trigger the webhook with a response
-   * 4. Verify the brain resumes and emits WEBHOOK_RESPONSE and LOOP_TOOL_RESULT
+   * 4. Verify the brain resumes and emits WEBHOOK_RESPONSE and AGENT_TOOL_RESULT
    *
    * Requires:
-   * - A brain with a loop step that calls a tool returning { waitFor: webhook(...) }
+   * - A brain with an agent step that calls a tool returning { waitFor: webhook(...) }
    * - The webhook slug and identifier to trigger
    */
-  async loopWebhookResume(
+  async agentWebhookResume(
     fetch: Fetch,
-    loopBrainIdentifier: string,
+    agentBrainIdentifier: string,
     webhookSlug: string,
     webhookPayload: Record<string, any>
   ): Promise<boolean> {
     try {
-      // Step 1: Start the loop brain
+      // Step 1: Start the agent brain
       const runRequest = new Request('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: loopBrainIdentifier }),
+        body: JSON.stringify({ identifier: agentBrainIdentifier }),
       });
 
       const runResponse = await fetch(runRequest);
@@ -1950,12 +1950,12 @@ export const brains = {
         return false;
       }
 
-      // Verify LOOP_TOOL_RESULT event is present (with the webhook response as result)
-      const hasLoopToolResult = resumeEvents.some(
-        (e) => e.type === BRAIN_EVENTS.LOOP_TOOL_RESULT
+      // Verify AGENT_TOOL_RESULT event is present (with the webhook response as result)
+      const hasAgentToolResult = resumeEvents.some(
+        (e) => e.type === BRAIN_EVENTS.AGENT_TOOL_RESULT
       );
-      if (!hasLoopToolResult) {
-        console.error('Missing LOOP_TOOL_RESULT event after resume');
+      if (!hasAgentToolResult) {
+        console.error('Missing AGENT_TOOL_RESULT event after resume');
         return false;
       }
 
@@ -1978,7 +1978,7 @@ export const brains = {
       return true;
     } catch (error) {
       console.error(
-        `Failed to test loop webhook resume for ${loopBrainIdentifier}:`,
+        `Failed to test agent webhook resume for ${agentBrainIdentifier}:`,
         error
       );
       return false;

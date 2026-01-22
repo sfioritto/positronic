@@ -238,9 +238,9 @@ const fixedSlugBrain = brain({ title: 'fixed-slug-brain', description: 'A brain 
     };
   });
 
-// Brain with a loop step that uses webhooks for escalation
-const loopWebhookBrain = brain({ title: 'loop-webhook-brain', description: 'A brain that uses loop with webhook escalation' })
-  .loop('Process with escalation', ({ state }) => ({
+// Brain with an agent step that uses webhooks for escalation
+const agentWebhookBrain = brain({ title: 'agent-webhook-brain', description: 'A brain that uses agent with webhook escalation' })
+  .brain('Process with escalation', ({ state }) => ({
     system: 'You are an AI assistant that can escalate to humans when needed.',
     prompt: 'Please process this request. If you need human review, use the escalate tool.',
     tools: {
@@ -250,7 +250,7 @@ const loopWebhookBrain = brain({ title: 'loop-webhook-brain', description: 'A br
           reason: z.string().describe('Why escalation is needed'),
         }),
         execute: async () => {
-          // Return waitFor to suspend the loop and wait for webhook
+          // Return waitFor to suspend the agent and wait for webhook
           return {
             waitFor: loopEscalationWebhook('test-escalation-123'),
           };
@@ -266,10 +266,10 @@ const loopWebhookBrain = brain({ title: 'loop-webhook-brain', description: 'A br
     },
   }));
 
-// Brain with a loop step that will trigger an API error (simulates "too many tokens")
+// Brain with an agent step that will trigger an API error (simulates "too many tokens")
 // The mock client can be configured to throw an error via setMockError()
-const loopErrorBrain = brain({ title: 'loop-error-brain', description: 'A brain that triggers an API error in its loop step' })
-  .loop('Process request', ({ state }) => ({
+const agentErrorBrain = brain({ title: 'agent-error-brain', description: 'A brain that triggers an API error in its agent step' })
+  .brain('Process request', ({ state }) => ({
     system: 'You are a helpful assistant.',
     prompt: 'Please process this request.',
     tools: {
@@ -334,15 +334,15 @@ const brainManifest = {
     path: 'brains/fixed-slug-brain.ts',
     brain: fixedSlugBrain,
   },
-  'loop-webhook-brain': {
-    filename: 'loop-webhook-brain',
-    path: 'brains/loop-webhook-brain.ts',
-    brain: loopWebhookBrain,
+  'agent-webhook-brain': {
+    filename: 'agent-webhook-brain',
+    path: 'brains/agent-webhook-brain.ts',
+    brain: agentWebhookBrain,
   },
-  'loop-error-brain': {
-    filename: 'loop-error-brain',
-    path: 'brains/loop-error-brain.ts',
-    brain: loopErrorBrain,
+  'agent-error-brain': {
+    filename: 'agent-error-brain',
+    path: 'brains/agent-error-brain.ts',
+    brain: agentErrorBrain,
   },
   'inner-webhook-brain': {
     filename: 'inner-webhook-brain',

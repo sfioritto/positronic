@@ -1,5 +1,7 @@
 export { Brain, brain } from './dsl/brain.js';
 export { BrainRunner } from './dsl/brain-runner.js';
+export { createBrain } from './dsl/create-brain.js';
+export type { CreateBrainConfig } from './dsl/create-brain.js';
 export { STATUS, BRAIN_EVENTS } from './dsl/constants.js';
 export type { Adapter } from './adapters/types.js';
 export type {
@@ -23,10 +25,10 @@ export type {
   State,
   RuntimeEnv,
   Secrets,
-  LoopTool,
-  LoopConfig,
-  LoopMessage,
-  LoopToolWaitFor,
+  AgentTool,
+  AgentConfig,
+  AgentMessage,
+  AgentToolWaitFor,
   ExtractTerminalInput,
   RetryConfig,
 } from './dsl/types.js';
@@ -50,18 +52,21 @@ export type {
 } from './resources/resources.js';
 export { RESOURCE_TYPES } from './resources/resources.js';
 
-// Loop step event exports
+// Agent step event exports
 export type {
-  LoopStartEvent,
-  LoopIterationEvent,
-  LoopToolCallEvent,
-  LoopToolResultEvent,
-  LoopAssistantMessageEvent,
-  LoopCompleteEvent,
-  LoopTokenLimitEvent,
-  LoopWebhookEvent,
+  AgentStartEvent,
+  AgentIterationEvent,
+  AgentToolCallEvent,
+  AgentToolResultEvent,
+  AgentAssistantMessageEvent,
+  AgentCompleteEvent,
+  AgentTokenLimitEvent,
+  AgentWebhookEvent,
   WebhookResponseEvent,
-} from './dsl/brain.js';
+} from './dsl/definitions/events.js';
+
+// Default tools
+export { defaultTools, generateUI } from './tools/index.js';
 
 // UI types (only UIComponent is public - used by gen-ui-components)
 export type { UIComponent } from './ui/types.js';
