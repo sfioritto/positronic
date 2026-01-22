@@ -1,9 +1,9 @@
 import { BrainRunner } from '@positronic/core';
 import { VercelClient } from '@positronic/client-vercel';
-import { openai } from '@ai-sdk/openai';
+import { google } from '@ai-sdk/google';
 
 export const runner = new BrainRunner({
   adapters: [],
-  client: new VercelClient(openai('gpt-4o-mini')),
+  client: new VercelClient(google('gemini-3-pro-preview')),
   resources: {},
 });
