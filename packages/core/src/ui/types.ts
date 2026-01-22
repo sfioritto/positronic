@@ -116,7 +116,27 @@ export interface ExtractedFormSchema {
 
 /**
  * A UI component that can be used by the LLM to build pages.
- * Combines a React component with its tool definition for the LLM.
+ * Combines a React component with metadata for the LLM.
+ *
+ * Use the schema-first approach: define props as a Zod schema,
+ * then derive the TypeScript type with `z.infer<typeof schema>`.
+ *
+ * @example
+ * ```typescript
+ * const InputPropsSchema = z.object({
+ *   name: z.string().describe('Form field name'),
+ *   label: z.string().describe('Label displayed above input'),
+ *   required: z.boolean().optional().describe('Whether field is required'),
+ * });
+ *
+ * type InputProps = z.infer<typeof InputPropsSchema>;
+ *
+ * export const Input: UIComponent<InputProps> = {
+ *   component: InputComponent,
+ *   description: 'A single-line text input field.',
+ *   propsSchema: InputPropsSchema,
+ * };
+ * ```
  */
 export interface UIComponent<TProps = unknown> {
   /**
@@ -125,21 +145,17 @@ export interface UIComponent<TProps = unknown> {
   component: ComponentType<TProps>;
 
   /**
-   * Tool definition for the LLM to call this component.
+   * Description of what this component does and when to use it.
+   * This is shown to the LLM to help it choose appropriate components.
    */
-  tool: {
-    /**
-     * Description of what this component does and when to use it.
-     * This is shown to the LLM to help it choose appropriate components.
-     */
-    description: string;
+  description: string;
 
-    /**
-     * Zod schema defining the props/parameters for this component.
-     * The LLM will generate arguments matching this schema.
-     */
-    parameters: z.ZodSchema<TProps>;
-  };
+  /**
+   * Zod schema defining the props for this component.
+   * Used to generate documentation for the LLM about available props.
+   * Use `.describe()` on each field to provide helpful descriptions.
+   */
+  propsSchema?: z.ZodObject<z.ZodRawShape>;
 }
 
 /**

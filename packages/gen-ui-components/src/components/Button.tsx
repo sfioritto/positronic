@@ -1,11 +1,19 @@
 import type { UIComponent } from '@positronic/core';
 import { z } from 'zod';
 
-export interface ButtonProps {
-  label: string;
-  type?: 'submit' | 'button';
-  variant?: 'primary' | 'secondary' | 'danger';
-}
+const ButtonPropsSchema = z.object({
+  label: z.string().describe('Text displayed on the button'),
+  type: z
+    .enum(['submit', 'button'])
+    .optional()
+    .describe('Button type - submit for form submission, button for other actions'),
+  variant: z
+    .enum(['primary', 'secondary', 'danger'])
+    .optional()
+    .describe('Visual style - primary (main action), secondary (alternative), danger (destructive)'),
+});
+
+export type ButtonProps = z.infer<typeof ButtonPropsSchema>;
 
 const variantClasses = {
   primary: 'bg-blue-500 text-white hover:bg-blue-600',
@@ -25,18 +33,6 @@ const ButtonComponent = ({
 
 export const Button: UIComponent<ButtonProps> = {
   component: ButtonComponent,
-  tool: {
-    description: `A clickable button. Use type="submit" for form submission buttons. Use variants to indicate importance: primary for main actions, secondary for alternatives, danger for destructive actions.`,
-    parameters: z.object({
-      label: z.string().describe('Text displayed on the button'),
-      type: z
-        .enum(['submit', 'button'])
-        .optional()
-        .describe('Button type - submit for form submission, button for other actions'),
-      variant: z
-        .enum(['primary', 'secondary', 'danger'])
-        .optional()
-        .describe('Visual style - primary (main action), secondary (alternative), danger (destructive)'),
-    }),
-  },
+  description: `A clickable button. Use type="submit" for form submission buttons. Use variants to indicate importance: primary for main actions, secondary for alternatives, danger for destructive actions.`,
+  propsSchema: ButtonPropsSchema,
 };

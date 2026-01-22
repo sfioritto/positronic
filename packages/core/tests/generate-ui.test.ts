@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { z } from 'zod';
+import { z } from 'zod';  // Still needed for schema in tests
 import { generateUI } from '../src/ui/generate-ui.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
 import type { UIComponent } from '../src/ui/types.js';
@@ -20,33 +20,17 @@ const mockClient: ObjectGenerator = {
 // Simple test components
 const Input: UIComponent<{ name: string; label: string }> = {
   component: () => null,
-  tool: {
-    description: 'A text input field',
-    parameters: z.object({
-      name: z.string(),
-      label: z.string(),
-    }),
-  },
+  description: 'A text input field',
 };
 
 const Button: UIComponent<{ text: string }> = {
   component: () => null,
-  tool: {
-    description: 'A button',
-    parameters: z.object({
-      text: z.string(),
-    }),
-  },
+  description: 'A button',
 };
 
 const Form: UIComponent<{ submitLabel?: string }> = {
   component: () => null,
-  tool: {
-    description: 'A form container',
-    parameters: z.object({
-      submitLabel: z.string().optional(),
-    }),
-  },
+  description: 'A form container',
 };
 
 describe('generateUI', () => {
@@ -457,10 +441,7 @@ This form collects a name.`,
   it('should pass validation when Form has nested Button', async () => {
     const Container: UIComponent<Record<string, never>> = {
       component: () => null,
-      tool: {
-        description: 'A container',
-        parameters: z.object({}),
-      },
+      description: 'A container',
     };
 
     mockStreamText.mockImplementationOnce(async (params) => {
@@ -505,10 +486,7 @@ This form collects a name.`,
   it('should not require Button for non-Form components', async () => {
     const Container: UIComponent<Record<string, never>> = {
       component: () => null,
-      tool: {
-        description: 'A container',
-        parameters: z.object({}),
-      },
+      description: 'A container',
     };
 
     mockStreamText.mockImplementationOnce(async (params) => {

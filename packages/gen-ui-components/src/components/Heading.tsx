@@ -1,10 +1,18 @@
 import type { UIComponent } from '@positronic/core';
 import { z } from 'zod';
 
-export interface HeadingProps {
-  content: string;
+const HeadingPropsSchema = z.object({
+  content: z.string().describe('The heading text'),
+  level: z
+    .enum(['1', '2', '3', '4'])
+    .optional()
+    .describe('Heading level (1-4), defaults to 2. Use 1 for page title.'),
+});
+
+export type HeadingProps = z.infer<typeof HeadingPropsSchema> & {
+  // Allow numeric level for runtime flexibility
   level?: '1' | '2' | '3' | '4' | 1 | 2 | 3 | 4;
-}
+};
 
 const levelClasses = {
   1: 'text-3xl',
@@ -21,14 +29,6 @@ const HeadingComponent = ({ content, level = '2' }: HeadingProps) => {
 
 export const Heading: UIComponent<HeadingProps> = {
   component: HeadingComponent,
-  tool: {
-    description: `A heading/title for sections of the page. Use level 1 for page title, level 2 for major sections, level 3-4 for subsections.`,
-    parameters: z.object({
-      content: z.string().describe('The heading text'),
-      level: z
-        .enum(['1', '2', '3', '4'])
-        .optional()
-        .describe('Heading level (1-4), defaults to 2. Use 1 for page title.'),
-    }),
-  },
+  description: `A heading/title for sections of the page. Use level 1 for page title, level 2 for major sections, level 3-4 for subsections.`,
+  propsSchema: HeadingPropsSchema,
 };
