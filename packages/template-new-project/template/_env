@@ -1,6 +1,10 @@
 # Development Environment
 NODE_ENV=development
 
+# Google AI API Key (required for running brains)
+# Get your API key at https://aistudio.google.com/apikey
+GOOGLE_GENERATIVE_AI_API_KEY=
+
 # Cloudflare R2 Configuration
 R2_BUCKET_NAME=<%= projectName %>
 

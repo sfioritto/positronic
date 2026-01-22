@@ -15,7 +15,8 @@
   "dependencies": {
     "zod": "^3.24.1",
     "@positronic/client-vercel": "<%= positronicClientVercelVersion %>",
-    "@ai-sdk/openai": "^1.3.22",
+    "@ai-sdk/google": "^3.0.13",
+    "ai": "^6.0.48",
     "@positronic/core": "<%= positronicCoreVersion %>",
     "@positronic/gen-ui-components": "<%= positronicGenUIComponentsVersion %>"<% if (backend === 'cloudflare') { %>,
     "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
@@ -27,7 +28,7 @@
     "@jest/globals": "^30.0.4",
     "ts-jest": "^29.2.6",
     "@types/jest": "^30.0.0",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.27.2",
     "@types/react": "^18.2.0"
   }
 }
