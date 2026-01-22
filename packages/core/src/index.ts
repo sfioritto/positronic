@@ -61,7 +61,6 @@ export type {
   LoopTokenLimitEvent,
   LoopWebhookEvent,
   WebhookResponseEvent,
-  HeartbeatEvent,
 } from './dsl/brain.js';
 
 // UI types (only UIComponent is public - used by gen-ui-components)
