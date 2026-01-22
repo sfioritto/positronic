@@ -1,4 +1,4 @@
-import { brain as coreBrain, type BrainFactory } from '@positronic/core';
+import { brain as coreBrain, type BrainConfig } from '@positronic/core';
 import { components } from './components/index.js';
 
 /**
@@ -16,26 +16,16 @@ import { components } from './components/index.js';
  *
  * Example with services:
  * ```typescript
- * interface ProjectServices {
- *   logger: {
- *     info: (message: string) => void;
- *     error: (message: string) => void;
- *   };
- *   api: {
- *     fetch: (endpoint: string) => Promise<any>;
- *   };
- * }
- *
- * export const brain: BrainFactory = (brainConfig) => {
+ * export const brain = (brainConfig: BrainConfig) => {
  *   return coreBrain(brainConfig)
  *     .withComponents(components)
  *     .withServices({
  *       logger: {
- *         info: (msg) => console.log(`[INFO] <%= '${msg}' %>`),
- *         error: (msg) => console.error(`[ERROR] <%= '${msg}' %>`)
+ *         info: (msg: string) => console.log(`[INFO] <%= '${msg}' %>`),
+ *         error: (msg: string) => console.error(`[ERROR] <%= '${msg}' %>`)
  *       },
  *       api: {
- *         fetch: async (endpoint) => {
+ *         fetch: async (endpoint: string) => {
  *           const response = await fetch(`https://api.example.com<%= '${endpoint}' %>`);
  *           return response.json();
  *         }
@@ -69,7 +59,7 @@ import { components } from './components/index.js';
  * Run with custom options from CLI:
  * px brain run my-brain -o environment=dev -o verbose=true
  */
-export const brain: BrainFactory = (brainConfig) => {
+export const brain = (brainConfig: BrainConfig) => {
   // Components are pre-configured for UI generation (forms, inputs, etc.)
   // Add your project-wide services with .withServices() if needed
   return coreBrain(brainConfig).withComponents(components);

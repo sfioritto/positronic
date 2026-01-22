@@ -399,16 +399,11 @@ export interface BrainStructure {
   }>;
 }
 
-// Type for the brain function
-export interface BrainFactory {
-  <
-    TOptions extends JsonObject = JsonObject,
-    TState extends State = object,
-    TServices extends object = object
-  >(
-    brainConfig: string | { title: string; description?: string }
-  ): Brain<TOptions, TState, TServices>;
-}
+/**
+ * Configuration for creating a brain - either a simple string title
+ * or an object with title and optional description.
+ */
+export type BrainConfig = string | { title: string; description?: string };
 
 type StepBlock<
   TStateIn,
@@ -1995,11 +1990,11 @@ class BrainEventStream<
 const brainNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const brainNames = new Set<string>();
-export const brain: BrainFactory = function <
+export const brain = function <
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
   TServices extends object = object
->(brainConfig: string | { title: string; description?: string }) {
+>(brainConfig: BrainConfig) {
   const title =
     typeof brainConfig === 'string' ? brainConfig : brainConfig.title;
   const description =
