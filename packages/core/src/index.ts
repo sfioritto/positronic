@@ -1,4 +1,4 @@
-export { Brain, brain, DEFAULT_ENV } from './dsl/brain.js';
+export { Brain, brain } from './dsl/brain.js';
 export { BrainRunner } from './dsl/brain-runner.js';
 export { STATUS, BRAIN_EVENTS } from './dsl/constants.js';
 export type { Adapter } from './adapters/types.js';
@@ -15,7 +15,8 @@ export type {
   StepCompletedEvent,
   StepRetryEvent,
   BrainStructure,
-  BrainFactory,
+  BrainConfig,
+  GeneratedPage,
 } from './dsl/brain.js';
 export type { ObjectGenerator, Message, ToolMessage } from './clients/types.js';
 export type {
@@ -29,7 +30,7 @@ export type {
   ExtractTerminalInput,
   RetryConfig,
 } from './dsl/types.js';
-export { createPatch, applyPatches } from './dsl/json-patch.js';
+export { applyPatches } from './dsl/json-patch.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer
 // dependency so when not using file://..path/to/package links the version numbers
@@ -63,9 +64,8 @@ export type {
   HeartbeatEvent,
 } from './dsl/brain.js';
 
-// Loop message reconstruction
-export type { LoopResumeContext } from './dsl/loop-messages.js';
-export { reconstructLoopContext } from './dsl/loop-messages.js';
+// UI types (only UIComponent is public - used by gen-ui-components)
+export type { UIComponent } from './ui/types.js';
 
 // Brain state machine
 export {

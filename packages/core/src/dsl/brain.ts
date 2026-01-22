@@ -8,6 +8,32 @@ import type { Resources } from '../resources/resources.js';
 import type { WebhookRegistration, ExtractWebhookResponses, SerializedWebhookRegistration } from './webhook.js';
 import type { PagesService } from './pages.js';
 import type { LoopResumeContext } from './loop-messages.js';
+import type { UIComponent } from '../ui/types.js';
+import { generateUI } from '../ui/generate-ui.js';
+import { generatePageHtml } from '../ui/generate-page-html.js';
+
+/**
+ * Page object available after a .ui() step.
+ * Contains URL to the page and a pre-configured webhook for form submissions.
+ *
+ * Usage:
+ * ```typescript
+ * .ui('Create Form', { template: ..., responseSchema: z.object({ name: z.string() }) })
+ * .step('Notify', async ({ page, slack }) => {
+ *   await slack.post(`Fill out the form: ${page.url}`);
+ *   return { state, waitFor: [page.webhook] };
+ * })
+ * .step('Process', ({ response }) => {
+ *   // response.name is typed from responseSchema
+ * })
+ * ```
+ */
+export type GeneratedPage<TSchema extends z.ZodSchema = z.ZodSchema> = {
+  /** URL where the generated page can be accessed */
+  url: string;
+  /** Pre-configured webhook for form submissions, typed based on responseSchema */
+  webhook: WebhookRegistration<TSchema>;
+};
 
 export type SerializedError = {
   name: string;
@@ -135,7 +161,9 @@ export type StepAction<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWaitFor extends readonly any[] = readonly []
+  TWaitFor extends readonly any[] = readonly [],
+  TResponseOut extends JsonObject | undefined = undefined,
+  TPageIn extends GeneratedPage | undefined = undefined
 > = (
   params: {
     state: TStateIn;
@@ -143,6 +171,7 @@ export type StepAction<
     client: ObjectGenerator;
     resources: Resources;
     response: TResponseIn;
+    page: TPageIn;
     pages?: PagesService;
     env: RuntimeEnv;
   } & TServices
@@ -150,7 +179,9 @@ export type StepAction<
   | TStateOut
   | Promise<TStateOut>
   | { state: TStateOut; waitFor: TWaitFor }
-  | Promise<{ state: TStateOut; waitFor: TWaitFor }>;
+  | Promise<{ state: TStateOut; waitFor: TWaitFor }>
+  | { state: TStateOut; promptResponse: TResponseOut }
+  | Promise<{ state: TStateOut; promptResponse: TResponseOut }>;
 
 // New Event Type System
 // Base event interface with only type and options
@@ -170,7 +201,7 @@ interface BrainBaseEvent<TOptions extends JsonObject = JsonObject>
 export interface BrainStartEvent<TOptions extends JsonObject = JsonObject>
   extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.START | typeof BRAIN_EVENTS.RESTART;
-  initialState: State;
+  initialState?: State; // Only present for START events; RESTART reconstructs state from patches
   status: typeof STATUS.RUNNING;
 }
 
@@ -368,16 +399,11 @@ export interface BrainStructure {
   }>;
 }
 
-// Type for the brain function
-export interface BrainFactory {
-  <
-    TOptions extends JsonObject = JsonObject,
-    TState extends State = object,
-    TServices extends object = object
-  >(
-    brainConfig: string | { title: string; description?: string }
-  ): Brain<TOptions, TState, TServices>;
-}
+/**
+ * Configuration for creating a brain - either a simple string title
+ * or an object with title and optional description.
+ */
+export type BrainConfig = string | { title: string; description?: string };
 
 type StepBlock<
   TStateIn,
@@ -385,7 +411,8 @@ type StepBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWebhooks extends readonly any[] = readonly []
+  TWebhooks extends readonly any[] = readonly [],
+  TPageIn extends GeneratedPage | undefined = undefined
 > = {
   type: 'step';
   title: string;
@@ -395,8 +422,17 @@ type StepBlock<
     TOptions,
     TServices,
     TResponseIn,
-    TWebhooks
+    TWebhooks,
+    JsonObject | undefined,
+    TPageIn
   >;
+  /** If true, this is a UI generation step that requires components configuration */
+  isUIStep?: boolean;
+  /** Configuration for UI generation steps */
+  uiConfig?: {
+    template: (state: TStateIn, resources: Resources) => string | Promise<string>;
+    responseSchema?: z.ZodObject<any>;
+  };
 };
 
 type BrainBlock<
@@ -446,7 +482,8 @@ type Block<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWebhooks extends readonly any[] = readonly []
+  TWebhooks extends readonly any[] = readonly [],
+  TPageIn extends GeneratedPage | undefined = undefined
 > =
   | StepBlock<
       TStateIn,
@@ -454,7 +491,8 @@ type Block<
       TOptions,
       TServices,
       TResponseIn,
-      TWebhooks
+      TWebhooks,
+      TPageIn
     >
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
   | LoopBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>;
@@ -487,12 +525,14 @@ export class Brain<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
   TServices extends object = object,
-  TResponse extends JsonObject | undefined = undefined
+  TResponse extends JsonObject | undefined = undefined,
+  TPage extends GeneratedPage | undefined = undefined
 > {
-  private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
+  private blocks: Block<any, any, TOptions, TServices, any, any, any>[] = [];
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
   private optionsSchema?: z.ZodSchema<any>;
+  private components?: Record<string, UIComponent<any>>;
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -526,8 +566,8 @@ export class Brain<
   // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
-  ): Brain<TOptions, TState, TNewServices, TResponse> {
-    const nextBrain = new Brain<TOptions, TState, TNewServices, TResponse>(
+  ): Brain<TOptions, TState, TNewServices, TResponse, TPage> {
+    const nextBrain = new Brain<TOptions, TState, TNewServices, TResponse, TPage>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -536,20 +576,51 @@ export class Brain<
     nextBrain.services = services;
     // Copy optionsSchema to maintain it through the chain
     nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.components = this.components;
 
     return nextBrain;
   }
 
   withOptionsSchema<TSchema extends z.ZodSchema>(
     schema: TSchema
-  ): Brain<z.infer<TSchema>, TState, TServices, TResponse> {
-    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices, TResponse>(
+  ): Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage> {
+    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
 
     nextBrain.optionsSchema = schema;
     nextBrain.services = this.services;
+    nextBrain.components = this.components;
+
+    return nextBrain;
+  }
+
+  /**
+   * Configure UI components for generative UI steps.
+   *
+   * @param components - Record of component definitions
+   *
+   * @example
+   * ```typescript
+   * import { components } from '@positronic/gen-ui-components';
+   *
+   * const myBrain = brain('my-brain')
+   *   .withComponents(components)
+   *   .ui('Show Form', formPrompt);
+   * ```
+   */
+  withComponents(
+    components: Record<string, UIComponent<any>>
+  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, TPage>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+
+    nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.services = this.services;
+    nextBrain.components = components;
 
     return nextBrain;
   }
@@ -566,6 +637,7 @@ export class Brain<
         client: ObjectGenerator;
         resources: Resources;
         response: TResponse;
+        page: TPage;
         pages?: PagesService;
         env: RuntimeEnv;
       } & TServices
@@ -574,14 +646,15 @@ export class Brain<
       | Promise<TNewState>
       | { state: TNewState; waitFor: TWaitFor }
       | Promise<{ state: TNewState; waitFor: TWaitFor }>
-  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>> {
+  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>, undefined> {
     const stepBlock: StepBlock<
       TState,
       TNewState,
       TOptions,
       TServices,
       TResponse,
-      TWaitFor
+      TWaitFor,
+      TPage
     > = {
       type: 'step',
       title,
@@ -589,16 +662,7 @@ export class Brain<
     };
     this.blocks.push(stepBlock);
 
-    // Create next brain with inferred response type
-    const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
-
-    nextBrain.services = this.services;
-    nextBrain.optionsSchema = this.optionsSchema;
-
-    return nextBrain;
+    return this.nextBrain<TNewState, ExtractWebhookResponses<TWaitFor>, undefined>();
   }
 
   brain<TInnerState extends State, TNewState extends State>(
@@ -646,11 +710,12 @@ export class Brain<
         client: ObjectGenerator;
         resources: Resources;
         response: TResponse;
+        page: TPage;
         pages?: PagesService;
         env: RuntimeEnv;
       } & TServices
     ) => LoopConfig<TTools> | Promise<LoopConfig<TTools>>
-  ): Brain<TOptions, TNewState, TServices, TResponse> {
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined> {
     const loopBlock: LoopBlock<
       TState,
       TNewState,
@@ -665,15 +730,7 @@ export class Brain<
     };
     this.blocks.push(loopBlock);
 
-    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
-
-    nextBrain.services = this.services;
-    nextBrain.optionsSchema = this.optionsSchema;
-
-    return nextBrain;
+    return this.nextBrain<TNewState, TResponse, undefined>();
   }
 
   // TResponseKey:
@@ -701,7 +758,7 @@ export class Brain<
       };
       client?: ObjectGenerator;
     }
-  ): Brain<TOptions, TNewState, TServices, TResponse>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
   // Overload 2: Batch execution - runs prompt for each item in array
   prompt<
@@ -728,14 +785,26 @@ export class Brain<
       retry?: RetryConfig;
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
     }
-  ): Brain<TOptions, TNewState, TServices, TResponse>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+
+  // Overload 3: Schema-less prompt - returns text response for next step
+  prompt(
+    title: string,
+    config: {
+      template: (
+        state: TState,
+        resources: Resources
+      ) => string | Promise<string>;
+      client?: ObjectGenerator;
+    }
+  ): Brain<TOptions, TState, TServices, { text: string }, undefined>;
 
   // Implementation
   prompt(
     title: string,
     config: {
       template: (input: any, resources: Resources) => string | Promise<string>;
-      outputSchema: {
+      outputSchema?: {
         schema: z.ZodObject<any>;
         name: string;
       };
@@ -749,6 +818,41 @@ export class Brain<
       error?: (item: any, error: Error) => any | null;
     }
   ): any {
+    // Schema-less prompt - returns text response for next step
+    if (!config.outputSchema) {
+      const textSchema = z.object({ text: z.string() });
+      const promptBlock: StepBlock<
+        TState,
+        any,
+        TOptions,
+        TServices,
+        TResponse,
+        readonly [],
+        TPage
+      > = {
+        type: 'step',
+        title,
+        action: async ({ state, client: runClient, resources }) => {
+          const { template, client: stepClient } = config;
+          const client = stepClient ?? runClient;
+          const prompt = await template(state, resources);
+          const response = await client.generateObject({
+            schema: textSchema,
+            schemaName: 'TextResponse',
+            prompt,
+          });
+          return {
+            state,
+            promptResponse: response,
+          };
+        },
+      };
+      this.blocks.push(promptBlock);
+      return this.nextBrain<any>();
+    }
+    // At this point, outputSchema is guaranteed to exist (schema-less case returned early)
+    const outputSchema = config.outputSchema!;
+
     if (batchConfig) {
       // Batch mode - run prompt for each item
       const promptBlock: StepBlock<
@@ -757,12 +861,13 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly []
+        readonly [],
+        TPage
       > = {
         type: 'step',
         title,
         action: async ({ state, client: runClient, resources }) => {
-          const { template, outputSchema, client: stepClient } = config;
+          const { template, client: stepClient } = config;
           const { schema, name: schemaName } = outputSchema;
           const client = stepClient ?? runClient;
 
@@ -813,7 +918,7 @@ export class Brain<
 
           return {
             ...state,
-            [config.outputSchema.name]: finalResults,
+            [outputSchema.name]: finalResults,
           };
         },
       };
@@ -827,12 +932,13 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly []
+        readonly [],
+        TPage
       > = {
         type: 'step',
         title,
         action: async ({ state, client: runClient, resources }) => {
-          const { template, outputSchema, client: stepClient } = config;
+          const { template, client: stepClient } = config;
           const { schema, name: schemaName } = outputSchema;
           const client = stepClient ?? runClient;
           const prompt = await template(state, resources);
@@ -843,13 +949,96 @@ export class Brain<
           });
           return {
             ...state,
-            [config.outputSchema.name]: response,
+            [outputSchema.name]: response,
           };
         },
       };
       this.blocks.push(promptBlock);
       return this.nextBrain<any>();
     }
+  }
+
+  /**
+   * Add a UI generation step that creates an interactive page.
+   *
+   * The step:
+   * 1. Calls an LLM agent to generate UI components based on the prompt
+   * 2. Renders the components to an HTML page
+   * 3. Stores the page and makes it available via URL
+   * 4. Creates a webhook for form submissions (typed based on responseSchema)
+   *
+   * The next step receives a `page` object with:
+   * - `url`: URL to the generated page
+   * - `webhook`: Pre-configured WebhookRegistration for form submissions
+   *
+   * The brain author is responsible for notifying users about the page (via Slack,
+   * email, etc.) and using `waitFor` to pause until the form is submitted.
+   * Form data arrives in the `response` parameter of the step after `waitFor`.
+   *
+   * @example
+   * ```typescript
+   * brain('feedback-form')
+   *   .step('Initialize', () => ({ userName: 'John' }))
+   *   .ui('Create Form', {
+   *     template: (state) => `Create a feedback form for ${state.userName}`,
+   *     responseSchema: z.object({
+   *       rating: z.number().min(1).max(5),
+   *       comments: z.string(),
+   *     }),
+   *   })
+   *   .step('Notify and Wait', async ({ state, page, slack }) => {
+   *     // Notify user however you want
+   *     await slack.post('#general', `Please fill out: ${page.url}`);
+   *     // Wait for form submission
+   *     return { state, waitFor: [page.webhook] };
+   *   })
+   *   .step('Process Feedback', ({ state, response }) => ({
+   *     ...state,
+   *     // response is typed: { rating: number, comments: string }
+   *     rating: response.rating,
+   *     comments: response.comments,
+   *   }))
+   * ```
+   */
+  ui<TSchema extends z.ZodObject<any> = z.ZodObject<any>>(
+    title: string,
+    config: {
+      template: (
+        state: TState,
+        resources: Resources
+      ) => string | Promise<string>;
+      responseSchema?: TSchema;
+    }
+  ): Brain<TOptions, TState, TServices, TResponse, GeneratedPage<TSchema>> {
+    const uiBlock: StepBlock<
+      TState,
+      TState,
+      TOptions,
+      TServices,
+      TResponse,
+      readonly [],
+      TPage
+    > = {
+      type: 'step',
+      title,
+      isUIStep: true,
+      uiConfig: {
+        template: config.template as (state: any, resources: Resources) => string | Promise<string>,
+        responseSchema: config.responseSchema,
+      },
+      action: async (params) => {
+        // The actual UI generation is handled by BrainRunner/BrainEventStream
+        // This action is a placeholder that gets replaced during execution
+        // when the runner detects `isUIStep: true` and has components configured
+        throw new Error(
+          `UI step "${title}" requires components to be configured via BrainRunner.withComponents(). ` +
+          `The UI generation is handled by the runner, not the step action directly.`
+        );
+      },
+    };
+    this.blocks.push(uiBlock);
+
+    return this.nextBrain<TState, TResponse, GeneratedPage<TSchema>>();
   }
 
   // Overload signatures
@@ -886,13 +1075,14 @@ export class Brain<
       ...params,
       options: validatedOptions,
       services: this.services,
+      components: this.components,
     });
 
     yield* stream.next();
   }
 
   private withBlocks(
-    blocks: Block<any, any, TOptions, TServices, any, any>[]
+    blocks: Block<any, any, TOptions, TServices, any, any, any>[]
   ): this {
     this.blocks = blocks;
     return this;
@@ -900,10 +1090,11 @@ export class Brain<
 
   private nextBrain<
     TNewState extends State,
-    TResponse extends JsonObject | undefined = undefined
-  >(): Brain<TOptions, TNewState, TServices, TResponse> {
+    TNewResponse extends JsonObject | undefined = undefined,
+    TNewPage extends GeneratedPage | undefined = undefined
+  >(): Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage> {
     // Pass default options to the next brain
-    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse>(
+    const nextBrain = new Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -912,6 +1103,8 @@ export class Brain<
     nextBrain.services = this.services;
     // Copy optionsSchema to the next brain
     nextBrain.optionsSchema = this.optionsSchema;
+    // Copy components to the next brain
+    nextBrain.components = this.components;
 
     return nextBrain;
   }
@@ -969,15 +1162,18 @@ class BrainEventStream<
   private pages?: PagesService;
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
+  private currentPage: GeneratedPage | undefined = undefined;
   private loopResumeContext: LoopResumeContext | null | undefined = undefined;
   private initialCompletedSteps?: SerializedStep[];
+  private components?: Record<string, UIComponent<any>>;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices, any, any>[];
+      blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
+      components?: Record<string, UIComponent<any>>;
     }
   ) {
     const {
@@ -995,11 +1191,13 @@ class BrainEventStream<
       env,
       response,
       loopResumeContext,
+      components,
     } = params as RerunParams<TOptions> & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices, any, any>[];
+      blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
+      components?: Record<string, UIComponent<any>>;
     };
 
     this.initialState = initialState as TState;
@@ -1012,6 +1210,7 @@ class BrainEventStream<
     this.pages = pages;
     this.env = env ?? DEFAULT_ENV;
     this.initialCompletedSteps = initialCompletedSteps;
+    this.components = components;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -1069,7 +1268,8 @@ class BrainEventStream<
         status: STATUS.RUNNING,
         brainTitle,
         brainDescription,
-        initialState: currentState,
+        // Only include initialState for START events; RESTART reconstructs state from patches
+        ...(hasCompletedSteps ? {} : { initialState: currentState }),
         options,
         brainRunId,
       };
@@ -1180,6 +1380,16 @@ class BrainEventStream<
   private async *executeStep(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as Block<any, any, TOptions, TServices, any, any>;
 
+    if (block.type === 'step') {
+      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any, any>;
+
+      // Check if this is a UI step - handle specially
+      if (stepBlock.isUIStep) {
+        yield* this.executeUIStep(step, stepBlock);
+        return;
+      }
+    }
+
     if (block.type === 'brain') {
       const initialState =
         typeof block.initialState === 'function'
@@ -1268,7 +1478,7 @@ class BrainEventStream<
     } else {
       // Get previous state before action
       const prevState = this.currentState;
-      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
+      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any, any>;
 
       // Execute step with automatic retry on failure
       let retries = 0;
@@ -1283,6 +1493,7 @@ class BrainEventStream<
               client: this.client,
               resources: this.resources,
               response: this.currentResponse,
+              page: this.currentPage,
               pages: this.pages,
               env: this.env,
               ...this.services,
@@ -1315,7 +1526,12 @@ class BrainEventStream<
         }
       }
 
-      this.currentState = result && typeof result === 'object' && 'waitFor' in result ? result.state : result;
+      // Extract state from result (handles waitFor and promptResponse cases)
+      if (result && typeof result === 'object' && ('waitFor' in result || 'promptResponse' in result)) {
+        this.currentState = result.state;
+      } else {
+        this.currentState = result;
+      }
       yield* this.completeStep(step, prevState);
 
       if (result && typeof result === 'object' && 'waitFor' in result) {
@@ -1334,6 +1550,14 @@ class BrainEventStream<
           brainRunId: this.brainRunId,
         };
       }
+
+      // Handle promptResponse - set currentResponse for next step
+      if (result && typeof result === 'object' && 'promptResponse' in result) {
+        this.currentResponse = result.promptResponse;
+      }
+
+      // Reset currentPage after step consumes it (page is ephemeral)
+      this.currentPage = undefined;
     }
   }
 
@@ -1348,10 +1572,14 @@ class BrainEventStream<
       client: this.client,
       resources: this.resources,
       response: this.currentResponse,
+      page: this.currentPage,
       pages: this.pages,
       env: this.env,
       ...this.services,
     });
+
+    // Reset currentPage after configFn consumes it (page is ephemeral)
+    this.currentPage = undefined;
 
     // Check if we're resuming from a webhook
     let messages: ToolMessage[];
@@ -1594,6 +1822,104 @@ class BrainEventStream<
     }
   }
 
+  /**
+   * Execute a UI generation step.
+   * Generates UI components, renders to HTML, creates page, and sets up webhook.
+   */
+  private async *executeUIStep(
+    step: Step,
+    stepBlock: StepBlock<any, any, TOptions, TServices, any, any, any>
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const prevState = this.currentState;
+
+    // Validate required configuration
+    if (!this.components) {
+      throw new Error(
+        `UI step "${stepBlock.title}" requires components to be configured via brain.withComponents()`
+      );
+    }
+    if (!this.pages) {
+      throw new Error(
+        `UI step "${stepBlock.title}" requires pages service to be configured`
+      );
+    }
+
+    const uiConfig = stepBlock.uiConfig!;
+
+    // Get the prompt from template (with heartbeat for long-running template functions)
+    const prompt = await uiConfig.template(this.currentState, this.resources);
+
+    // Generate UI components using the LLM (with heartbeat)
+    const uiResult = yield* this.withHeartbeat(
+      generateUI({
+        client: this.client,
+        prompt,
+        components: this.components,
+        schema: uiConfig.responseSchema,
+        data: this.currentState as Record<string, unknown>,
+      }),
+      step
+    );
+
+    if (!uiResult.rootId) {
+      // Provide detailed debug information
+      const placementCount = uiResult.placements.length;
+      const placementInfo = uiResult.placements
+        .map(p => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
+        .join(', ');
+
+      if (placementCount === 0) {
+        throw new Error(
+          `UI generation failed for step "${stepBlock.title}" - no components were placed. ` +
+          `The LLM may not have called any component tools. ` +
+          `LLM response text: ${uiResult.text ?? '(none)'}`
+        );
+      } else {
+        throw new Error(
+          `UI generation failed for step "${stepBlock.title}" - no root component found. ` +
+          `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
+          `The first component should be placed without a parentId to serve as the root.`
+        );
+      }
+    }
+
+    // Create unique identifier for this form submission webhook
+    const webhookIdentifier = `${this.brainRunId}-${step.id}`;
+
+    // Construct form action URL for the webhook
+    const formAction = `${this.env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
+
+    // Generate HTML page
+    const html = generatePageHtml({
+      placements: uiResult.placements,
+      rootId: uiResult.rootId,
+      data: this.currentState as Record<string, unknown>,
+      title: stepBlock.title,
+      formAction,
+    });
+
+    // Store the page (with heartbeat for potential network latency)
+    const page = yield* this.withHeartbeat(this.pages.create(html), step);
+
+    // Create webhook registration for form submissions
+    // Uses a built-in 'ui-form' webhook slug that the backend knows how to handle
+    const webhook: WebhookRegistration = {
+      slug: 'ui-form',
+      identifier: webhookIdentifier,
+      schema: uiConfig.responseSchema ?? z.record(z.unknown()),
+    };
+
+    // Set currentPage for the next step to access
+    this.currentPage = {
+      url: page.url,
+      webhook,
+    };
+
+    // State doesn't change from UI step - it just sets up the page
+    // The next step will receive the page object and can use waitFor
+    yield* this.completeStep(step, prevState);
+  }
+
   private *completeStep(
     step: Step,
     prevState: TState
@@ -1664,11 +1990,11 @@ class BrainEventStream<
 const brainNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const brainNames = new Set<string>();
-export const brain: BrainFactory = function <
+export const brain = function <
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
   TServices extends object = object
->(brainConfig: string | { title: string; description?: string }) {
+>(brainConfig: BrainConfig) {
   const title =
     typeof brainConfig === 'string' ? brainConfig : brainConfig.title;
   const description =

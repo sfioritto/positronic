@@ -182,6 +182,56 @@ brain('validation-example')
 
 Most generated brains should not have try-catch blocks. Only use them when the error state is meaningful to subsequent steps in the workflow.
 
+## UI Steps for Form Generation
+
+When you need to collect user input, use the `.ui()` method. The pattern is:
+1. `.ui()` generates the page
+2. Next step gets `page.url` and `page.webhook`
+3. Notify users and use `waitFor: [page.webhook]`
+4. Step after `waitFor` gets form data in `response`
+
+```typescript
+import { z } from 'zod';
+
+brain('feedback-collector')
+  .step('Initialize', ({ state }) => ({
+    ...state,
+    userName: 'John',
+  }))
+  // Generate the form
+  .ui('Collect Feedback', {
+    template: (state) => <%= '\`' %>
+      Create a feedback form for <%= '${state.userName}' %>:
+      - Rating (1-5)
+      - Comments textarea
+      - Submit button
+    <%= '\`' %>,
+    responseSchema: z.object({
+      rating: z.number().min(1).max(5),
+      comments: z.string(),
+    }),
+  })
+  // Notify and wait for submission
+  .step('Notify', async ({ state, page, slack }) => {
+    await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
+    return { state, waitFor: [page.webhook] };
+  })
+  // Form data comes through response (not page)
+  .step('Process', ({ state, response }) => ({
+    ...state,
+    rating: response.rating,     // Typed from responseSchema
+    comments: response.comments,
+  }));
+```
+
+Key points:
+- `page.url` - where to send users
+- `page.webhook` - use with `waitFor` to pause for submission
+- `response` - form data arrives here (in step after `waitFor`)
+- You control how users are notified (Slack, email, etc.)
+
+See `/docs/brain-dsl-guide.md` for more UI step examples.
+
 ## Service Organization
 
 When implementing services for the project brain, consider creating a `services/` directory at the root of your project to keep service implementations organized and reusable:

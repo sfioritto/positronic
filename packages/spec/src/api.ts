@@ -2923,6 +2923,136 @@ export const webhooks = {
       return false;
     }
   },
+
+  /**
+   * Test POST /webhooks/system/ui-form - Built-in webhook for UI form submissions.
+   * This is used by pages generated via .ui() steps to submit form data.
+   *
+   * The endpoint:
+   * - Accepts form data (application/x-www-form-urlencoded or multipart/form-data)
+   * - Requires an `identifier` query parameter to match the waiting brain
+   * - Returns { received: true, action: 'resumed' | 'not_found', ... }
+   */
+  async uiForm(
+    fetch: Fetch,
+    identifier: string,
+    formData: Record<string, string | string[]>
+  ): Promise<boolean> {
+    try {
+      // Build URLSearchParams from form data
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(formData)) {
+        if (Array.isArray(value)) {
+          for (const v of value) {
+            params.append(`${key}[]`, v);
+          }
+        } else {
+          params.append(key, value);
+        }
+      }
+
+      const request = new Request(
+        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        }
+      );
+
+      const response = await fetch(request);
+
+      // Accept 200 (found and processed) or 404 (no brain waiting)
+      if (response.status !== 200 && response.status !== 404) {
+        console.error(
+          `POST /webhooks/system/ui-form returned ${response.status}, expected 200 or 404`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as {
+        received: boolean;
+        action: string;
+        identifier?: string;
+      };
+
+      // Validate response structure
+      if (typeof data.received !== 'boolean') {
+        console.error(
+          `Expected received to be boolean, got ${typeof data.received}`
+        );
+        return false;
+      }
+
+      if (!data.action || typeof data.action !== 'string') {
+        console.error(
+          `Expected action to be string, got ${typeof data.action}`
+        );
+        return false;
+      }
+
+      // Action should be 'resumed' or 'not_found'
+      if (data.action !== 'resumed' && data.action !== 'not_found') {
+        console.error(
+          `Expected action to be 'resumed' or 'not_found', got '${data.action}'`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to test POST /webhooks/system/ui-form:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Test POST /webhooks/system/ui-form with missing identifier - Should return 400
+   */
+  async uiFormMissingIdentifier(fetch: Fetch): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/webhooks/system/ui-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'test=data',
+      });
+
+      const response = await fetch(request);
+
+      if (response.status !== 400) {
+        console.error(
+          `POST /webhooks/system/ui-form without identifier returned ${response.status}, expected 400`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as { error: string };
+
+      if (!data.error || typeof data.error !== 'string') {
+        console.error(`Expected error to be string, got ${typeof data.error}`);
+        return false;
+      }
+
+      if (!data.error.toLowerCase().includes('identifier')) {
+        console.error(
+          `Expected error message to mention identifier, got: ${data.error}`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Failed to test POST /webhooks/system/ui-form without identifier:',
+        error
+      );
+      return false;
+    }
+  },
 };
 
 export const pages = {
@@ -3442,6 +3572,73 @@ export const pages = {
         `Failed to test DELETE /pages preserves resources:`,
         error
       );
+      return false;
+    }
+  },
+};
+
+/**
+ * Bundle API Tests
+ *
+ * Tests for the /bundle/components.js endpoint which serves the component bundle.
+ *
+ * NOTE: These tests only verify the API endpoint behavior. The bundle build and
+ * upload process is backend-specific and must be tested separately by each
+ * backend implementation.
+ */
+export const bundle = {
+  /**
+   * Test GET /bundle/components.js - Serve the component bundle
+   */
+  async get(fetch: Fetch): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/bundle/components.js', {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      // Bundle may or may not exist depending on project setup
+      // 200 = bundle exists and served correctly
+      // 404 = bundle not found (expected if no components/ directory)
+      if (response.status !== 200 && response.status !== 404) {
+        console.error(
+          `GET /bundle/components.js returned unexpected status ${response.status}`
+        );
+        return false;
+      }
+
+      const contentType = response.headers.get('Content-Type');
+      if (!contentType || !contentType.includes('application/javascript')) {
+        console.error(
+          `Expected Content-Type application/javascript, got ${contentType}`
+        );
+        return false;
+      }
+
+      // If 200, verify we got some content
+      if (response.status === 200) {
+        const content = await response.text();
+        if (!content || content.length === 0) {
+          console.error('Bundle endpoint returned 200 but empty content');
+          return false;
+        }
+      }
+
+      // If 404, verify we got the helpful error message
+      if (response.status === 404) {
+        const content = await response.text();
+        if (!content.includes('Bundle not found')) {
+          console.error(
+            'Bundle 404 response missing helpful error message'
+          );
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /bundle/components.js:`, error);
       return false;
     }
   },

@@ -26,6 +26,7 @@
     { "path": "./packages/client-vercel" },
     { "path": "./packages/cloudflare" },
     { "path": "./packages/shell" },
-    { "path": "./packages/spec" }
+    { "path": "./packages/spec" },
+    { "path": "./packages/gen-ui-components" }
   ]
 }

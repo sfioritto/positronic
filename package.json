@@ -41,6 +41,7 @@
     "packages/shell",
     "packages/client-anthropic",
     "packages/client-vercel",
+    "packages/gen-ui-components",
     "packages/cloudflare",
     "packages/cli"
   ],
