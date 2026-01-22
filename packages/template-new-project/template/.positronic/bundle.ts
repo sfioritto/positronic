@@ -1,13 +1,13 @@
 /**
  * Bundle entry point for client-side rendering.
  *
- * This file is bundled by esbuild into dist/components.js which exposes
+ * This file is bundled by esbuild into .positronic/dist/components.js which exposes
  * React components to window.PositronicComponents for use by generated pages.
  *
- * When you add custom components to ./index.ts, they will automatically
+ * When you add custom components to components/index.ts, they will automatically
  * be included in the bundle.
  */
-import { components } from './index.js';
+import { components } from '../components/index.js';
 
 // Extract the React component from each UIComponent and expose to window
 const PositronicComponents: Record<string, React.ComponentType<any>> = {};
