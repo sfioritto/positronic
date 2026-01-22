@@ -1,7 +1,7 @@
 /**
  * esbuild configuration for bundling UI components.
  *
- * This bundles the components from ./components/bundle.ts into a single
+ * This bundles the components from .positronic/bundle.ts into a single
  * JavaScript file that can be served to the browser.
  *
  * Run: npm run build:components
@@ -10,11 +10,11 @@
 import * as esbuild from 'esbuild';
 
 await esbuild.build({
-  entryPoints: ['components/bundle.ts'],
+  entryPoints: ['.positronic/bundle.ts'],
   bundle: true,
   external: ['react', 'react-dom'],
   format: 'iife',
-  outfile: 'dist/components.js',
+  outfile: '.positronic/dist/components.js',
   jsx: 'transform',
   jsxFactory: 'React.createElement',
   jsxFragment: 'React.Fragment',

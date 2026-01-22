@@ -537,8 +537,9 @@ export class CloudflareDevServer implements PositronicDevServer {
     projectRoot: string,
     options: { local?: boolean } = { local: true }
   ): Promise<void> {
-    const bundleEntryPath = path.join(projectRoot, 'components', 'bundle.ts');
-    const distDir = path.join(projectRoot, 'dist');
+    const serverDir = path.join(projectRoot, '.positronic');
+    const bundleEntryPath = path.join(serverDir, 'bundle.ts');
+    const distDir = path.join(serverDir, 'dist');
     const bundleOutputPath = path.join(distDir, 'components.js');
 
     // Check if components directory exists
@@ -560,7 +561,7 @@ export class CloudflareDevServer implements PositronicDevServer {
       .catch(() => false);
 
     if (!hasBundleEntry) {
-      console.log('📦 No components/bundle.ts found, skipping bundle build');
+      console.log('📦 No .positronic/bundle.ts found, skipping bundle build');
       return;
     }
 
@@ -578,9 +579,6 @@ export class CloudflareDevServer implements PositronicDevServer {
 
       // Read the built bundle
       const bundleContent = await fsPromises.readFile(bundleOutputPath, 'utf-8');
-
-      // Upload to local R2 using wrangler
-      const serverDir = path.join(projectRoot, '.positronic');
 
       // Get bucket name from wrangler config
       const wranglerConfigPath = path.join(serverDir, 'wrangler.jsonc');
