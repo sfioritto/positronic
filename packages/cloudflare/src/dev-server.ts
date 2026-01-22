@@ -578,14 +578,26 @@ export class CloudflareDevServer implements PositronicDevServer {
 
       // Upload to local R2 using wrangler
       const serverDir = path.join(projectRoot, '.positronic');
+
+      // Get bucket name from wrangler config
+      const wranglerConfigPath = path.join(serverDir, 'wrangler.jsonc');
+      const wranglerConfig = JSON.parse(fs.readFileSync(wranglerConfigPath, 'utf-8'));
+      const bucketName = wranglerConfig.r2_buckets?.[0]?.bucket_name;
+
+      if (!bucketName) {
+        console.warn('⚠️  Warning: No R2 bucket configured, skipping bundle upload');
+        return;
+      }
+
       const r2Key = 'bundle/components.js';
+      const r2Path = `${bucketName}/${r2Key}`;
 
       // Write bundle to a temp file for wrangler r2 object put
       const tempBundlePath = path.join(os.tmpdir(), `positronic-bundle-${Date.now()}.js`);
       await fsPromises.writeFile(tempBundlePath, bundleContent);
 
       try {
-        execSync(`npx wrangler r2 object put "${r2Key}" --file="${tempBundlePath}" --local`, {
+        execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}" --local`, {
           cwd: serverDir,
           stdio: 'pipe',
         });

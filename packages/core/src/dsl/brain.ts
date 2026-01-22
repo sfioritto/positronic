@@ -675,6 +675,7 @@ export class Brain<
 
     nextBrain.services = this.services;
     nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.components = this.components;
 
     return nextBrain;
   }
@@ -751,6 +752,7 @@ export class Brain<
 
     nextBrain.services = this.services;
     nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.components = this.components;
 
     return nextBrain;
   }
@@ -1068,6 +1070,7 @@ export class Brain<
 
     nextBrain.services = this.services;
     nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.components = this.components;
 
     return nextBrain;
   }
