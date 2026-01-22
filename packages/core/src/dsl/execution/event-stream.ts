@@ -19,8 +19,7 @@ import type { GeneratedPage } from '../definitions/brain-types.js';
 import type { InitialRunParams, RerunParams } from '../definitions/run-params.js';
 
 import { Step } from '../builder/step.js';
-import { DEFAULT_ENV, HEARTBEAT_INTERVAL_MS, DEFAULT_LOOP_SYSTEM_PROMPT, MAX_RETRIES } from './constants.js';
-import { sleep } from './retry.js';
+import { DEFAULT_ENV, DEFAULT_LOOP_SYSTEM_PROMPT, MAX_RETRIES } from './constants.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -382,8 +381,7 @@ export class BrainEventStream<
             })
           );
 
-          // Use withHeartbeat to emit heartbeat events during long-running operations
-          result = yield* this.withHeartbeat(actionPromise, step);
+          result = await actionPromise;
           break; // Success
         } catch (error) {
           if (retries < MAX_RETRIES) {
@@ -552,15 +550,11 @@ export class BrainEventStream<
         ? `${DEFAULT_LOOP_SYSTEM_PROMPT}\n\n${config.system}`
         : DEFAULT_LOOP_SYSTEM_PROMPT;
 
-      // Call the LLM with heartbeat to keep DO alive during long API calls
-      const response = yield* this.withHeartbeat(
-        this.client.generateText({
-          system: systemPrompt,
-          messages,
-          tools: toolsForClient,
-        }),
-        step
-      );
+      const response = await this.client.generateText({
+        system: systemPrompt,
+        messages,
+        tools: toolsForClient,
+      });
 
       // Track tokens
       totalTokens += response.usage.totalTokens;
@@ -636,12 +630,8 @@ export class BrainEventStream<
           return;
         }
 
-        // Execute non-terminal tool with heartbeat to keep DO alive during long tool executions
         if (tool.execute) {
-          const toolResult = yield* this.withHeartbeat(
-            Promise.resolve(tool.execute(toolCall.args)),
-            step
-          );
+          const toolResult = await tool.execute(toolCall.args);
 
           // Check if tool returned waitFor
           if (
@@ -731,17 +721,13 @@ export class BrainEventStream<
     // Get the prompt from template (with heartbeat for long-running template functions)
     const prompt = await uiConfig.template(this.currentState, this.resources);
 
-    // Generate UI components using the LLM (with heartbeat)
-    const uiResult = yield* this.withHeartbeat(
-      generateUI({
-        client: this.client,
-        prompt,
-        components: this.components,
-        schema: uiConfig.responseSchema,
-        data: this.currentState as Record<string, unknown>,
-      }),
-      step
-    );
+    const uiResult = await generateUI({
+      client: this.client,
+      prompt,
+      components: this.components,
+      schema: uiConfig.responseSchema,
+      data: this.currentState as Record<string, unknown>,
+    });
 
     if (!uiResult.rootId) {
       // Provide detailed debug information
@@ -780,8 +766,7 @@ export class BrainEventStream<
       formAction,
     });
 
-    // Store the page (with heartbeat for potential network latency)
-    const page = yield* this.withHeartbeat(this.pages.create(html), step);
+    const page = await this.pages.create(html);
 
     // Create webhook registration for form submissions
     // Uses a built-in 'ui-form' webhook slug that the backend knows how to handle
@@ -821,50 +806,5 @@ export class BrainEventStream<
       options: this.options ?? ({} as TOptions),
       brainRunId: this.brainRunId,
     };
-  }
-
-  /**
-   * Wraps a promise with heartbeat emission to keep Durable Objects alive during long-running operations.
-   * Emits HEARTBEAT events at regular intervals while waiting for the promise to resolve.
-   */
-  private async *withHeartbeat<T>(
-    promise: Promise<T>,
-    step: Step
-  ): AsyncGenerator<BrainEvent<TOptions>, T> {
-    // Create a deferred to track completion
-    let resolved = false;
-    let result: T;
-    let error: Error | undefined;
-
-    const promiseHandler = promise
-      .then((r) => {
-        resolved = true;
-        result = r;
-      })
-      .catch((e) => {
-        resolved = true;
-        error = e;
-      });
-
-    while (!resolved) {
-      // Race between the promise and the heartbeat interval
-      await Promise.race([promiseHandler, sleep(HEARTBEAT_INTERVAL_MS)]);
-
-      if (!resolved) {
-        yield {
-          type: BRAIN_EVENTS.HEARTBEAT,
-          stepId: step.id,
-          stepTitle: step.block.title,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-      }
-    }
-
-    if (error) {
-      throw error;
-    }
-
-    return result!;
   }
 }

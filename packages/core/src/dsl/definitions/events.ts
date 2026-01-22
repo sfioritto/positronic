@@ -172,14 +172,6 @@ export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
   response: JsonObject;
 }
 
-// Heartbeat Event (emitted during long-running operations to keep DO alive)
-export interface HeartbeatEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.HEARTBEAT;
-  stepId: string;
-  stepTitle: string;
-}
-
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -192,7 +184,6 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepRetryEvent<TOptions>
   | WebhookEvent<TOptions>
   | WebhookResponseEvent<TOptions>
-  | HeartbeatEvent<TOptions>
   | LoopStartEvent<TOptions>
   | LoopIterationEvent<TOptions>
   | LoopToolCallEvent<TOptions>

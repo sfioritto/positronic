@@ -24,7 +24,6 @@ export type {
   LoopTokenLimitEvent,
   LoopWebhookEvent,
   WebhookResponseEvent,
-  HeartbeatEvent,
   BrainEvent,
 } from './definitions/events.js';
 
@@ -48,4 +47,4 @@ export type {
 } from './definitions/run-params.js';
 
 // Execution - Constants
-export { DEFAULT_ENV, HEARTBEAT_INTERVAL_MS } from './execution/constants.js';
+export { DEFAULT_ENV } from './execution/constants.js';

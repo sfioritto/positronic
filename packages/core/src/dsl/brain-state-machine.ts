@@ -907,11 +907,6 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           BRAIN_EVENTS.LOOP_WEBHOOK,
           'running',
           passthrough(BRAIN_EVENTS.LOOP_WEBHOOK)
-        ) as any,
-        transition(
-          BRAIN_EVENTS.HEARTBEAT,
-          'running',
-          passthrough(BRAIN_EVENTS.HEARTBEAT)
         ) as any
       ),
 

@@ -10,12 +10,6 @@ export const DEFAULT_ENV: RuntimeEnv = {
 };
 
 /**
- * Heartbeat interval in milliseconds.
- * Emits heartbeat events during long-running operations to keep Durable Objects alive.
- */
-export const HEARTBEAT_INTERVAL_MS = 5000;
-
-/**
  * Default system prompt prepended to all loop steps.
  * Explains tool execution quirks to the LLM.
  */
