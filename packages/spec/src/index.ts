@@ -133,4 +133,4 @@ export interface PositronicDevServer {
   bulkSecrets(filePath: string): Promise<void>;
 }
 
-export { testStatus, resources, brains, schedules, secrets, webhooks, pages } from './api.js';
+export { testStatus, resources, brains, schedules, secrets, webhooks, pages, bundle } from './api.js';
