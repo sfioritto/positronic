@@ -664,15 +664,11 @@ export class Brain<
 const brainNamesAreUnique = process.env.NODE_ENV !== 'test';
 
 const brainNames = new Set<string>();
-export const brain = function <
-  TOptions extends JsonObject = JsonObject,
-  TState extends State = object,
-  TServices extends object = object
->(brainConfig: BrainConfig) {
-  const title =
-    typeof brainConfig === 'string' ? brainConfig : brainConfig.title;
-  const description =
-    typeof brainConfig === 'string' ? undefined : brainConfig.description;
+
+/**
+ * Helper to register a brain name and check for uniqueness
+ */
+function registerBrainName(title: string): void {
   if (brainNamesAreUnique && brainNames.has(title)) {
     throw new Error(
       `Brain with title "${title}" already exists. Brain titles must be unique.`
@@ -681,5 +677,71 @@ export const brain = function <
   if (brainNamesAreUnique) {
     brainNames.add(title);
   }
-  return new Brain<TOptions, TState, TServices>(title, description);
-};
+}
+
+// Overload 1: Builder pattern with title only
+export function brain<
+  TOptions extends JsonObject = JsonObject,
+  TState extends State = object,
+  TServices extends object = object
+>(title: string): Brain<TOptions, TState, TServices>;
+
+// Overload 2: Builder pattern with config object (title + description)
+export function brain<
+  TOptions extends JsonObject = JsonObject,
+  TState extends State = object,
+  TServices extends object = object
+>(config: { title: string; description?: string }): Brain<TOptions, TState, TServices>;
+
+// Overload 3: Direct agent with config object
+export function brain<
+  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TState extends State = object
+>(
+  title: string,
+  config: AgentConfig<TTools>
+): Brain<JsonObject, TState, object, undefined, undefined>;
+
+// Overload 4: Direct agent with config function
+export function brain<
+  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TState extends State = object
+>(
+  title: string,
+  configFn: (params: {
+    state: object;
+    options: JsonObject;
+    tools: Record<string, AgentTool>;
+    components: Record<string, UIComponent<any>>;
+    client: ObjectGenerator;
+    resources: Resources;
+    response: undefined;
+    page: undefined;
+    pages?: PagesService;
+    env: RuntimeEnv;
+  }) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
+): Brain<JsonObject, TState, object, undefined, undefined>;
+
+// Implementation
+export function brain(
+  titleOrConfig: string | BrainConfig,
+  agentConfig?:
+    | AgentConfig<any>
+    | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>)
+): Brain<any, any, any, any, any> {
+  const title =
+    typeof titleOrConfig === 'string' ? titleOrConfig : titleOrConfig.title;
+  const description =
+    typeof titleOrConfig === 'string' ? undefined : titleOrConfig.description;
+
+  registerBrainName(title);
+
+  const newBrain = new Brain<any, any, any>(title, description);
+
+  // If agentConfig is provided, create a brain with a single 'main' agent step
+  if (agentConfig !== undefined) {
+    return newBrain.brain('main', agentConfig as any);
+  }
+
+  return newBrain;
+}
