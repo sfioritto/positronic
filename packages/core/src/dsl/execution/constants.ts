@@ -10,14 +10,14 @@ export const DEFAULT_ENV: RuntimeEnv = {
 };
 
 /**
- * Default system prompt prepended to all loop steps.
+ * Default system prompt prepended to all agent steps.
  * Explains tool execution quirks to the LLM.
  */
-export const DEFAULT_LOOP_SYSTEM_PROMPT = `## Tool Execution Behavior
+export const DEFAULT_AGENT_SYSTEM_PROMPT = `## Tool Execution Behavior
 - Tools are executed sequentially in the order you call them
 - If a tool triggers a webhook (e.g., human approval), remaining tools in your response will NOT execute - you'll need to call them again after resuming
 - When waiting on multiple webhooks (e.g., Slack + email), the first webhook response received will resume execution
-- Terminal tools end the loop immediately - no further tools or iterations will run
+- Terminal tools end the agent immediately - no further tools or iterations will run
 
 ## Resumption Context
 When resuming after a webhook response, that response appears as the tool result in your conversation history.`;

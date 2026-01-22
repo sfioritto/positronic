@@ -213,7 +213,7 @@ describe('Brain API Error Handling', () => {
 
     it('errored brain shows "running" without SSE watching (expected behavior)', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'loop-error-brain';
+      const brainName = 'agent-error-brain';
 
       setMockError(createAnthropicTooManyTokensError());
 
@@ -252,7 +252,7 @@ describe('Brain API Error Handling', () => {
     });
   });
 
-  describe('API Error in Loop Step (simulating Anthropic "too many tokens")', () => {
+  describe('API Error in Agent Step (simulating Anthropic "too many tokens")', () => {
     /**
      * NOTE: The tests that watch SSE verify the CORRECT behavior.
      * The fire-and-forget tests above verify the EXPECTED race condition.
@@ -269,7 +269,7 @@ describe('Brain API Error Handling', () => {
 
     it('should emit ERROR event and update history status to ERROR when API call fails', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'loop-error-brain';
+      const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an Anthropic-like error
       setMockError(createAnthropicTooManyTokensError());
@@ -375,9 +375,9 @@ describe('Brain API Error Handling', () => {
       expect(ourRun?.completedAt).not.toBeNull();
     });
 
-    it('should show correct step status when error occurs in loop step', async () => {
+    it('should show correct step status when error occurs in agent step', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'loop-error-brain';
+      const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an error
       setMockError(createAnthropicTooManyTokensError());
@@ -433,7 +433,7 @@ describe('Brain API Error Handling', () => {
 
     it('should clean up webhook registrations when brain errors', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'loop-error-brain';
+      const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an error
       setMockError(createAnthropicTooManyTokensError());
@@ -484,7 +484,7 @@ describe('Brain API Error Handling', () => {
 
     it('should not show errored brain in running brains list', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'loop-error-brain';
+      const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an error
       setMockError(createAnthropicTooManyTokensError());

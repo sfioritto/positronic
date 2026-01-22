@@ -1,25 +1,25 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator, ToolMessage } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, LoopTool, LoopConfig, LoopToolWaitFor } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
 import type { Resources } from '../../resources/resources.js';
 import type { WebhookRegistration, SerializedWebhookRegistration } from '../webhook.js';
 import type { PagesService } from '../pages.js';
-import type { LoopResumeContext } from '../loop-messages.js';
+import type { AgentResumeContext } from '../agent-messages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generateUI } from '../../ui/generate-ui.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { SerializedStep } from '../definitions/steps.js';
-import type { Block, StepBlock, BrainBlock, LoopBlock } from '../definitions/blocks.js';
+import type { Block, StepBlock, BrainBlock, AgentBlock } from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
 import type { InitialRunParams, RerunParams } from '../definitions/run-params.js';
 
 import { Step } from '../builder/step.js';
-import { DEFAULT_ENV, DEFAULT_LOOP_SYSTEM_PROMPT, MAX_RETRIES } from './constants.js';
+import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT, MAX_RETRIES } from './constants.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -43,9 +43,10 @@ export class BrainEventStream<
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
   private currentPage: GeneratedPage | undefined = undefined;
-  private loopResumeContext: LoopResumeContext | null | undefined = undefined;
+  private agentResumeContext: AgentResumeContext | null | undefined = undefined;
   private initialCompletedSteps?: SerializedStep[];
   private components?: Record<string, UIComponent<any>>;
+  private defaultTools?: Record<string, AgentTool>;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -54,6 +55,7 @@ export class BrainEventStream<
       blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
       components?: Record<string, UIComponent<any>>;
+      defaultTools?: Record<string, AgentTool>;
     }
   ) {
     const {
@@ -70,14 +72,16 @@ export class BrainEventStream<
       pages,
       env,
       response,
-      loopResumeContext,
+      agentResumeContext,
       components,
+      defaultTools,
     } = params as RerunParams<TOptions> & {
       title: string;
       description?: string;
       blocks: Block<any, any, TOptions, TServices, any, any, any>[];
       services: TServices;
       components?: Record<string, UIComponent<any>>;
+      defaultTools?: Record<string, AgentTool>;
     };
 
     this.initialState = initialState as TState;
@@ -91,6 +95,7 @@ export class BrainEventStream<
     this.env = env ?? DEFAULT_ENV;
     this.initialCompletedSteps = initialCompletedSteps;
     this.components = components;
+    this.defaultTools = defaultTools;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -115,16 +120,16 @@ export class BrainEventStream<
     // Use provided ID if available, otherwise generate one
     this.brainRunId = providedBrainRunId ?? uuidv4();
 
-    // Set loop resume context if provided (for loop webhook restarts)
-    if (loopResumeContext) {
-      this.loopResumeContext = loopResumeContext;
+    // Set agent resume context if provided (for agent webhook restarts)
+    if (agentResumeContext) {
+      this.agentResumeContext = agentResumeContext;
       // Note: We intentionally do NOT set currentResponse here.
-      // For loop resumption, the webhook response should flow through
-      // the messages array (via loopResumeContext), not through the
+      // For agent resumption, the webhook response should flow through
+      // the messages array (via agentResumeContext), not through the
       // config function's response parameter. The config function is
-      // for loop setup, not for processing webhook responses.
+      // for agent setup, not for processing webhook responses.
     } else if (response) {
-      // Set initial response only for non-loop webhook restarts
+      // Set initial response only for non-agent webhook restarts
       this.currentResponse = response;
     }
   }
@@ -354,8 +359,8 @@ export class BrainEventStream<
         this.services
       );
       yield* this.completeStep(step, prevState);
-    } else if (block.type === 'loop') {
-      yield* this.executeLoop(step);
+    } else if (block.type === 'agent') {
+      yield* this.executeAgent(step);
     } else {
       // Get previous state before action
       const prevState = this.currentState;
@@ -441,14 +446,20 @@ export class BrainEventStream<
     }
   }
 
-  private async *executeLoop(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as LoopBlock<any, any, TOptions, TServices, any, any>;
+  private async *executeAgent(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as AgentBlock<any, any, TOptions, TServices, any, any>;
     const prevState = this.currentState;
 
-    // Get loop configuration
+    // Get default tools and components for injection into configFn
+    const defaultTools = this.defaultTools ?? {};
+    const components = this.components ?? {};
+
+    // Get agent configuration - inject tools and components
     const config = await block.configFn({
       state: this.currentState,
       options: this.options ?? ({} as TOptions),
+      tools: defaultTools,
+      components,
       client: this.client,
       resources: this.resources,
       response: this.currentResponse,
@@ -461,10 +472,13 @@ export class BrainEventStream<
     // Reset currentPage after configFn consumes it (page is ephemeral)
     this.currentPage = undefined;
 
+    // Merge tools: step tools override defaults
+    const mergedTools: Record<string, AgentTool> = { ...defaultTools, ...(config.tools ?? {}) };
+
     // Check if we're resuming from a webhook
     let messages: ToolMessage[];
-    if (this.loopResumeContext) {
-      const resumeContext = this.loopResumeContext;
+    if (this.agentResumeContext) {
+      const resumeContext = this.agentResumeContext;
 
       // Emit WEBHOOK_RESPONSE event to record the response
       yield {
@@ -474,9 +488,9 @@ export class BrainEventStream<
         brainRunId: this.brainRunId,
       };
 
-      // Emit LOOP_TOOL_RESULT for the pending tool (webhook response injected as tool result)
+      // Emit AGENT_TOOL_RESULT for the pending tool (webhook response injected as tool result)
       yield {
-        type: BRAIN_EVENTS.LOOP_TOOL_RESULT,
+        type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
         stepTitle: step.block.title,
         stepId: step.id,
         toolCallId: resumeContext.pendingToolCallId,
@@ -490,11 +504,11 @@ export class BrainEventStream<
       messages = resumeContext.messages;
 
       // Clear the context so it's only used once
-      this.loopResumeContext = undefined;
+      this.agentResumeContext = undefined;
     } else {
-      // Emit loop start event (only for fresh starts)
+      // Emit agent start event (only for fresh starts)
       yield {
-        type: BRAIN_EVENTS.LOOP_START,
+        type: BRAIN_EVENTS.AGENT_START,
         stepTitle: step.block.title,
         stepId: step.id,
         prompt: config.prompt,
@@ -511,13 +525,13 @@ export class BrainEventStream<
     let totalTokens = 0;
     let iteration = 0;
 
-    // Main loop
+    // Main agent loop
     while (true) {
       iteration++;
 
       // Emit iteration event
       yield {
-        type: BRAIN_EVENTS.LOOP_ITERATION,
+        type: BRAIN_EVENTS.AGENT_ITERATION,
         stepTitle: step.block.title,
         stepId: step.id,
         iteration,
@@ -528,7 +542,7 @@ export class BrainEventStream<
       // Check if client supports generateText
       if (!this.client.generateText) {
         throw new Error(
-          'Client does not support generateText. Use a client that implements generateText for loop steps.'
+          'Client does not support generateText. Use a client that implements generateText for agent steps.'
         );
       }
 
@@ -537,8 +551,8 @@ export class BrainEventStream<
         string,
         { description: string; inputSchema: z.ZodSchema }
       > = {};
-      for (const [name, toolDef] of Object.entries(config.tools)) {
-        const tool = toolDef as LoopTool;
+      for (const [name, toolDef] of Object.entries(mergedTools)) {
+        const tool = toolDef as AgentTool;
         toolsForClient[name] = {
           description: tool.description,
           inputSchema: tool.inputSchema,
@@ -547,8 +561,8 @@ export class BrainEventStream<
 
       // Prepend default system prompt to user's system prompt
       const systemPrompt = config.system
-        ? `${DEFAULT_LOOP_SYSTEM_PROMPT}\n\n${config.system}`
-        : DEFAULT_LOOP_SYSTEM_PROMPT;
+        ? `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${config.system}`
+        : DEFAULT_AGENT_SYSTEM_PROMPT;
 
       const response = await this.client.generateText({
         system: systemPrompt,
@@ -562,7 +576,7 @@ export class BrainEventStream<
       // Check max tokens limit
       if (config.maxTokens && totalTokens > config.maxTokens) {
         yield {
-          type: BRAIN_EVENTS.LOOP_TOKEN_LIMIT,
+          type: BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
           stepTitle: step.block.title,
           stepId: step.id,
           totalTokens,
@@ -577,7 +591,7 @@ export class BrainEventStream<
       // Handle assistant text response
       if (response.text) {
         yield {
-          type: BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE,
+          type: BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
           stepTitle: step.block.title,
           stepId: step.id,
           content: response.text,
@@ -587,7 +601,7 @@ export class BrainEventStream<
         messages.push({ role: 'assistant', content: response.text });
       }
 
-      // If no tool calls, loop naturally ends
+      // If no tool calls, agent naturally ends
       if (!response.toolCalls || response.toolCalls.length === 0) {
         yield* this.completeStep(step, prevState);
         return;
@@ -596,7 +610,7 @@ export class BrainEventStream<
       // Process tool calls
       for (const toolCall of response.toolCalls) {
         yield {
-          type: BRAIN_EVENTS.LOOP_TOOL_CALL,
+          type: BRAIN_EVENTS.AGENT_TOOL_CALL,
           stepTitle: step.block.title,
           stepId: step.id,
           toolName: toolCall.toolName,
@@ -606,7 +620,7 @@ export class BrainEventStream<
           brainRunId: this.brainRunId,
         };
 
-        const tool = config.tools[toolCall.toolName];
+        const tool = mergedTools[toolCall.toolName];
         if (!tool) {
           throw new Error(`Unknown tool: ${toolCall.toolName}`);
         }
@@ -614,7 +628,7 @@ export class BrainEventStream<
         // Check if this is a terminal tool
         if (tool.terminal) {
           yield {
-            type: BRAIN_EVENTS.LOOP_COMPLETE,
+            type: BRAIN_EVENTS.AGENT_COMPLETE,
             stepTitle: step.block.title,
             stepId: step.id,
             terminalToolName: toolCall.toolName,
@@ -639,16 +653,16 @@ export class BrainEventStream<
             typeof toolResult === 'object' &&
             'waitFor' in toolResult
           ) {
-            const waitForResult = toolResult as LoopToolWaitFor;
+            const waitForResult = toolResult as AgentToolWaitFor;
 
             // Normalize waitFor to array (supports single or multiple webhooks)
             const webhooks = Array.isArray(waitForResult.waitFor)
               ? waitForResult.waitFor
               : [waitForResult.waitFor];
 
-            // Emit loop webhook event first (captures pending tool context)
+            // Emit agent webhook event first (captures pending tool context)
             yield {
-              type: BRAIN_EVENTS.LOOP_WEBHOOK,
+              type: BRAIN_EVENTS.AGENT_WEBHOOK,
               stepTitle: step.block.title,
               stepId: step.id,
               toolCallId: toolCall.toolCallId,
@@ -673,7 +687,7 @@ export class BrainEventStream<
 
           // Normal tool result
           yield {
-            type: BRAIN_EVENTS.LOOP_TOOL_RESULT,
+            type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
             stepTitle: step.block.title,
             stepId: step.id,
             toolName: toolCall.toolName,

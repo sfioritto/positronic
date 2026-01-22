@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, LoopTool, LoopConfig, RetryConfig } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, RetryConfig } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { ExtractWebhookResponses } from '../webhook.js';
 import type { PagesService } from '../pages.js';
@@ -8,7 +8,7 @@ import type { UIComponent } from '../../ui/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
-import type { Block, StepBlock, BrainBlock, LoopBlock, StepAction } from '../definitions/blocks.js';
+import type { Block, StepBlock, BrainBlock, AgentBlock, StepAction } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type { InitialRunParams, RerunParams } from '../definitions/run-params.js';
 
@@ -27,6 +27,7 @@ export class Brain<
   private services: TServices = {} as TServices;
   private optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
+  private defaultTools?: Record<string, AgentTool>;
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -40,9 +41,9 @@ export class Brain<
             type: 'step' as const,
             title: block.title,
           };
-        } else if (block.type === 'loop') {
+        } else if (block.type === 'agent') {
           return {
-            type: 'loop' as const,
+            type: 'agent' as const,
             title: block.title,
           };
         } else {
@@ -71,6 +72,7 @@ export class Brain<
     // Copy optionsSchema to maintain it through the chain
     nextBrain.optionsSchema = this.optionsSchema;
     nextBrain.components = this.components;
+    nextBrain.defaultTools = this.defaultTools;
 
     return nextBrain;
   }
@@ -86,6 +88,7 @@ export class Brain<
     nextBrain.optionsSchema = schema;
     nextBrain.services = this.services;
     nextBrain.components = this.components;
+    nextBrain.defaultTools = this.defaultTools;
 
     return nextBrain;
   }
@@ -115,8 +118,37 @@ export class Brain<
     nextBrain.optionsSchema = this.optionsSchema;
     nextBrain.services = this.services;
     nextBrain.components = components;
+    nextBrain.defaultTools = this.defaultTools;
 
     return nextBrain;
+  }
+
+  /**
+   * Configure default tools for agent steps.
+   * These tools will be automatically available in all agent steps and can be
+   * extended or overridden in individual step configurations.
+   *
+   * @param tools - Record of default tool definitions
+   *
+   * @example
+   * ```typescript
+   * import { defaultTools } from '@positronic/core';
+   *
+   * const myBrain = brain('my-brain')
+   *   .withTools(defaultTools)
+   *   .brain('agent', ({ tools }) => ({
+   *     system: 'You are helpful',
+   *     prompt: 'Do something',
+   *     tools  // uses defaults
+   *   }));
+   * ```
+   */
+  withTools<TTools extends Record<string, AgentTool>>(
+    tools: TTools
+  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+    const next = this.nextBrain<TState, TResponse, TPage>();
+    next.defaultTools = tools;
+    return next;
   }
 
   step<
@@ -159,6 +191,7 @@ export class Brain<
     return this.nextBrain<TNewState, ExtractWebhookResponses<TWaitFor>, undefined>();
   }
 
+  // Overload 1: Nested brain
   brain<TInnerState extends State, TNewState extends State>(
     title: string,
     innerBrain: Brain<TOptions, TInnerState, TServices>,
@@ -168,32 +201,20 @@ export class Brain<
       services: TServices;
     }) => TNewState,
     initialState?: State | ((state: TState) => State)
-  ) {
-    const nestedBlock: BrainBlock<
-      TState,
-      TInnerState,
-      TNewState,
-      TOptions,
-      TServices
-    > = {
-      type: 'brain',
-      title,
-      innerBrain,
-      initialState: initialState || (() => ({} as State)),
-      action: (outerState, innerState, services) =>
-        action({ state: outerState, brainState: innerState, services }),
-    };
-    this.blocks.push(nestedBlock);
-    return this.nextBrain<TNewState>();
-  }
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
-  /**
-   * Add an agentic loop step that runs an LLM with tools.
-   * The loop continues until a terminal tool is called, no tool calls are returned,
-   * or maxTokens is exceeded.
-   */
-  loop<
-    TTools extends Record<string, LoopTool> = Record<string, LoopTool>,
+  // Overload 2: Agent config object
+  brain<
+    TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+    TNewState extends State = TState
+  >(
+    title: string,
+    config: AgentConfig<TTools>
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+
+  // Overload 3: Agent config function
+  brain<
+    TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
     TNewState extends State = TState
   >(
     title: string,
@@ -201,6 +222,8 @@ export class Brain<
       params: {
         state: TState;
         options: TOptions;
+        tools: Record<string, AgentTool>;
+        components: Record<string, UIComponent<any>>;
         client: ObjectGenerator;
         resources: Resources;
         response: TResponse;
@@ -208,23 +231,52 @@ export class Brain<
         pages?: PagesService;
         env: RuntimeEnv;
       } & TServices
-    ) => LoopConfig<TTools> | Promise<LoopConfig<TTools>>
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined> {
-    const loopBlock: LoopBlock<
-      TState,
-      TNewState,
-      TOptions,
-      TServices,
-      TResponse,
-      TTools
-    > = {
-      type: 'loop',
+    ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+
+  // Implementation
+  brain(
+    title: string,
+    innerBrainOrConfig:
+      | Brain<any, any, any, any, any>
+      | AgentConfig<any>
+      | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>),
+    action?: (params: any) => any,
+    initialState?: State | ((state: TState) => State)
+  ): any {
+    // Case 1: Nested brain instance
+    if (
+      innerBrainOrConfig &&
+      typeof innerBrainOrConfig === 'object' &&
+      'type' in innerBrainOrConfig &&
+      innerBrainOrConfig.type === 'brain'
+    ) {
+      const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
+        type: 'brain',
+        title,
+        innerBrain: innerBrainOrConfig,
+        initialState: initialState || (() => ({} as State)),
+        action: (outerState, innerState, services) =>
+          action!({ state: outerState, brainState: innerState, services }),
+      };
+      this.blocks.push(nestedBlock);
+      return this.nextBrain<any>();
+    }
+
+    // Case 2 & 3: Agent config (object or function)
+    const configFn =
+      typeof innerBrainOrConfig === 'function'
+        ? innerBrainOrConfig
+        : () => innerBrainOrConfig as AgentConfig<any>;
+
+    const agentBlock: AgentBlock<TState, any, TOptions, TServices, TResponse, any> = {
+      type: 'agent',
       title,
       configFn: configFn as any,
     };
-    this.blocks.push(loopBlock);
+    this.blocks.push(agentBlock);
 
-    return this.nextBrain<TNewState, TResponse, undefined>();
+    return this.nextBrain<any, TResponse, undefined>();
   }
 
   // TResponseKey:
@@ -572,6 +624,7 @@ export class Brain<
       options: validatedOptions,
       services: this.services,
       components: this.components,
+      defaultTools: this.defaultTools,
     });
 
     yield* stream.next();
@@ -601,6 +654,8 @@ export class Brain<
     nextBrain.optionsSchema = this.optionsSchema;
     // Copy components to the next brain
     nextBrain.components = this.components;
+    // Copy defaultTools to the next brain
+    nextBrain.defaultTools = this.defaultTools;
 
     return nextBrain;
   }
