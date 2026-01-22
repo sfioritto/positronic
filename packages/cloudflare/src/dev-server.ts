@@ -533,7 +533,10 @@ export class CloudflareDevServer implements PositronicDevServer {
    * Build the component bundle and upload it to local R2.
    * Uses esbuild to bundle components/bundle.ts and uploads to R2 for serving.
    */
-  private async buildAndUploadBundle(projectRoot: string): Promise<void> {
+  private async buildAndUploadBundle(
+    projectRoot: string,
+    options: { local?: boolean } = { local: true }
+  ): Promise<void> {
     const bundleEntryPath = path.join(projectRoot, 'components', 'bundle.ts');
     const distDir = path.join(projectRoot, 'dist');
     const bundleOutputPath = path.join(distDir, 'components.js');
@@ -597,11 +600,13 @@ export class CloudflareDevServer implements PositronicDevServer {
       await fsPromises.writeFile(tempBundlePath, bundleContent);
 
       try {
-        execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}" --local`, {
+        const localFlag = options.local ? ' --local' : '';
+        execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}"${localFlag}`, {
           cwd: serverDir,
           stdio: 'pipe',
         });
-        console.log('✅ Component bundle built and uploaded');
+        const target = options.local ? 'local' : 'production';
+        console.log(`✅ Component bundle built and uploaded to ${target}`);
       } finally {
         // Clean up temp file
         await fsPromises.unlink(tempBundlePath).catch(() => {});
@@ -781,6 +786,9 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     // Ensure R2 bucket exists before deploying
     await this.ensureR2BucketExists(bucketName);
+
+    // Build and upload component bundle to production R2
+    await this.buildAndUploadBundle(projectRoot, { local: false });
 
     console.log('🚀 Deploying to Cloudflare Workers (production)...');
 
