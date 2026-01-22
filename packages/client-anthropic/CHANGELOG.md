@@ -1,5 +1,16 @@
 # @positronic/client-anthropic
 
+## 0.0.54
+
+### Patch Changes
+
+- - Update to AI SDK v6 (from v5) for improved AI model support
+  - Move component bundling machinery into .positronic/ directory for cleaner project structure
+  - Switch project template to use Google Gemini as default provider
+  - Add GOOGLE_GENERATIVE_AI_API_KEY to environment template
+- Updated dependencies
+  - @positronic/core@0.0.54
+
 ## 0.0.53
 
 ### Patch Changes
