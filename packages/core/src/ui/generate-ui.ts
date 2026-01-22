@@ -70,7 +70,7 @@ function treeToPlacements(root: ComponentNode): Placement[] {
  * Create the validate_template tool for YAML validation.
  */
 function createValidateTemplateTool(
-  components: Record<string, UIComponent<unknown>>,
+  components: Record<string, UIComponent<any>>,
   schema: FormSchema | undefined,
   data: Record<string, unknown>
 ) {
@@ -216,7 +216,7 @@ function validateFormHasButton(root: ComponentNode): ValidationError[] {
  * Build the system prompt describing the YAML DSL.
  */
 function buildSystemPrompt(
-  components: Record<string, UIComponent<unknown>>,
+  components: Record<string, UIComponent<any>>,
   hasSchema: boolean
 ): string {
   const componentDocs = Object.entries(components)
@@ -362,7 +362,7 @@ Call validate_template after generating your YAML to verify correctness.`;
 export async function generateUI(params: {
   client: ObjectGenerator;
   prompt: string;
-  components: Record<string, UIComponent<unknown>>;
+  components: Record<string, UIComponent<any>>;
   schema?: FormSchema;
   data?: Record<string, unknown>;
   system?: string;

@@ -4,6 +4,13 @@ import { generateUI } from '../src/ui/generate-ui.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
 import type { UIComponent } from '../src/ui/types.js';
 
+// Type for the validation result returned by validate_template tool
+type ValidationResult = {
+  valid: boolean;
+  errors: Array<{ type: string; message: string }>;
+  extractedFields?: Array<{ name: string; type: string }>;
+};
+
 const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 const mockClient: ObjectGenerator = {
   generateObject: jest.fn<ObjectGenerator['generateObject']>(),
@@ -158,7 +165,7 @@ This form collects a name.`,
       expect(params.tools.validate_template.description).toContain('Validate');
 
       // Simulate LLM calling validate_template with valid YAML
-      const validationResult = await params.tools.validate_template.execute!({
+      const validationResult = (await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
     - Input:
@@ -169,7 +176,7 @@ This form collects a name.`,
         label: "Name"
     - Button:
         text: "Submit"`,
-      });
+      })) as ValidationResult;
 
       expect(validationResult.valid).toBe(true);
       expect(validationResult.errors).toHaveLength(0);
@@ -378,13 +385,13 @@ This form collects a name.`,
   it('should fail validation when Form has no Button', async () => {
     mockStreamText.mockImplementationOnce(async (params) => {
       // Form without a Button - should fail validation
-      const result = await params.tools.validate_template.execute!({
+      const result = (await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
     - Input:
         name: "email"
         label: "Email"`,
-      });
+      })) as ValidationResult;
 
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -414,7 +421,7 @@ This form collects a name.`,
   it('should pass validation when Form has a Button', async () => {
     mockStreamText.mockImplementationOnce(async (params) => {
       // Form with a Button - should pass validation
-      const result = await params.tools.validate_template.execute!({
+      const result = (await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
     - Input:
@@ -422,7 +429,7 @@ This form collects a name.`,
         label: "Email"
     - Button:
         text: "Submit"`,
-      });
+      })) as ValidationResult;
 
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -458,7 +465,7 @@ This form collects a name.`,
 
     mockStreamText.mockImplementationOnce(async (params) => {
       // Form with Button nested inside a Container - should pass
-      const result = await params.tools.validate_template.execute!({
+      const result = (await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
     - Input:
@@ -468,7 +475,7 @@ This form collects a name.`,
         children:
           - Button:
               text: "Submit"`,
-      });
+      })) as ValidationResult;
 
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -506,13 +513,13 @@ This form collects a name.`,
 
     mockStreamText.mockImplementationOnce(async (params) => {
       // Container without Form - no Button required
-      const result = await params.tools.validate_template.execute!({
+      const result = (await params.tools.validate_template.execute!({
         yaml: `Container:
   children:
     - Input:
         name: "email"
         label: "Email"`,
-      });
+      })) as ValidationResult;
 
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
