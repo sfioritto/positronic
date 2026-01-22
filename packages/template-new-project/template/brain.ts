@@ -1,66 +1,63 @@
-import { brain as coreBrain, type BrainConfig } from '@positronic/core';
+import { createBrain } from '@positronic/core';
 import { components } from './components/index.js';
 
 /**
- * Base brain factory for this project.
+ * Project-level brain function with pre-configured components.
  *
- * This wrapper allows you to configure services and components once and have
- * them available in all brains throughout your project.
+ * All brains in your project should import from this file:
  *
- * Components are pre-configured for UI generation (forms, inputs, etc.).
- *
- * To add services:
- * 1. Define your service interfaces
- * 2. Create service instances
- * 3. Call .withServices() on the brain before returning it
- *
- * Example with services:
- * ```typescript
- * export const brain = (brainConfig: BrainConfig) => {
- *   return coreBrain(brainConfig)
- *     .withComponents(components)
- *     .withServices({
- *       logger: {
- *         info: (msg: string) => console.log(`[INFO] <%= '${msg}' %>`),
- *         error: (msg: string) => console.error(`[ERROR] <%= '${msg}' %>`)
- *       },
- *       api: {
- *         fetch: async (endpoint: string) => {
- *           const response = await fetch(`https://api.example.com<%= '${endpoint}' %>`);
- *           return response.json();
- *         }
- *       }
- *     });
- * }
- * ```
- *
- * Then in your brain files (in the brains/ directory):
  * ```typescript
  * import { brain } from '../brain.js';
- * import { z } from 'zod';
  *
- * const optionsSchema = z.object({
- *   environment: z.string().default('prod'),
- *   verbose: z.string().default('false')
+ * export default brain('my-brain')
+ *   .step('Do something', ({ state }) => ({ ...state, done: true }));
+ * ```
+ *
+ * To add services (e.g., Slack, Gmail, database clients):
+ *
+ * ```typescript
+ * import { createBrain } from '@positronic/core';
+ * import { components } from './components/index.js';
+ * import slack from './services/slack.js';
+ * import gmail from './services/gmail.js';
+ *
+ * export const brain = createBrain({
+ *   services: { slack, gmail },
+ *   components,
  * });
+ * ```
  *
- * export default brain('My Brain')
- *   .withOptionsSchema(optionsSchema)
- *   .step('Use Services', async ({ state, options, logger, api }) => {
- *     if (options.verbose === 'true') {
- *       logger.info('Fetching data...');
- *     }
- *     const endpoint = options.environment === 'dev' ? '/users/test' : '/users';
- *     const data = await api.fetch(endpoint);
- *     return { users: data };
+ * Then services are available in all brain steps:
+ *
+ * ```typescript
+ * export default brain('notify')
+ *   .step('Send alert', ({ slack }) => {
+ *     slack.postMessage('#alerts', 'Something happened!');
+ *     return { notified: true };
  *   });
  * ```
  *
- * Run with custom options from CLI:
- * px brain run my-brain -o environment=dev -o verbose=true
+ * You can also create agents directly:
+ *
+ * ```typescript
+ * export default brain('my-agent', ({ slack, env }) => ({
+ *   system: 'You are a helpful assistant',
+ *   prompt: 'Help the user with their request',
+ *   tools: {
+ *     notify: {
+ *       description: 'Send a Slack notification',
+ *       inputSchema: z.object({ message: z.string() }),
+ *       execute: ({ message }) => slack.postMessage('#general', message),
+ *     },
+ *     done: {
+ *       description: 'Complete the task',
+ *       inputSchema: z.object({ result: z.string() }),
+ *       terminal: true,
+ *     },
+ *   },
+ * }));
+ * ```
  */
-export const brain = (brainConfig: BrainConfig) => {
-  // Components are pre-configured for UI generation (forms, inputs, etc.)
-  // Add your project-wide services with .withServices() if needed
-  return coreBrain(brainConfig).withComponents(components);
-};
+export const brain = createBrain({
+  components,
+});
