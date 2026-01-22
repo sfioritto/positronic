@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, LoopTool, LoopConfig } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
@@ -84,15 +84,15 @@ export type BrainBlock<
   ) => TNewState;
 };
 
-export type LoopBlock<
+export type AgentBlock<
   TStateIn,
   TStateOut,
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TTools extends Record<string, LoopTool> = Record<string, LoopTool>
+  TTools extends Record<string, AgentTool> = Record<string, AgentTool>
 > = {
-  type: 'loop';
+  type: 'agent';
   title: string;
   configFn: (
     params: {
@@ -104,7 +104,7 @@ export type LoopBlock<
       pages?: PagesService;
       env: RuntimeEnv;
     } & TServices
-  ) => LoopConfig<TTools> | Promise<LoopConfig<TTools>>;
+  ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>;
 };
 
 export type Block<
@@ -126,4 +126,4 @@ export type Block<
       TPageIn
     >
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
-  | LoopBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>;
+  | AgentBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>;

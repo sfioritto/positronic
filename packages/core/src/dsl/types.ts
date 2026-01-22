@@ -52,21 +52,21 @@ export type JsonPatch = {
   from?: string;
 }[];
 
-// Loop step types
+// Agent step types
 
 /**
  * Return type for tools that need to suspend execution and wait for an external event.
  * Supports single webhook or array of webhooks (first response wins).
  */
-export interface LoopToolWaitFor {
+export interface AgentToolWaitFor {
   waitFor: WebhookRegistration<z.ZodSchema> | WebhookRegistration<z.ZodSchema>[];
 }
 
 /**
- * A tool definition for use in loop steps.
+ * A tool definition for use in agent steps.
  * Compatible with Vercel AI SDK tool format, extended with Positronic-specific properties.
  */
-export interface LoopTool<TInput extends z.ZodSchema = z.ZodSchema> {
+export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
   /** Description of what this tool does, helps the LLM understand when to use it */
   description: string;
   /** Zod schema defining the input parameters for this tool */
@@ -78,34 +78,34 @@ export interface LoopTool<TInput extends z.ZodSchema = z.ZodSchema> {
    */
   execute?: (
     input: z.infer<TInput>
-  ) => Promise<unknown | LoopToolWaitFor> | unknown | LoopToolWaitFor;
+  ) => Promise<unknown | AgentToolWaitFor> | unknown | AgentToolWaitFor;
   /**
-   * If true, calling this tool ends the loop.
-   * The tool's input becomes the loop result (merged into state).
+   * If true, calling this tool ends the agent.
+   * The tool's input becomes the agent result (merged into state).
    */
   terminal?: boolean;
 }
 
 /**
- * Configuration for a loop step.
+ * Configuration for an agent step.
  */
-export interface LoopConfig<
-  TTools extends Record<string, LoopTool> = Record<string, LoopTool>
+export interface AgentConfig<
+  TTools extends Record<string, AgentTool> = Record<string, AgentTool>
 > {
   /** System prompt for the LLM */
   system?: string;
   /** Initial user prompt to start the conversation */
   prompt: string;
-  /** Tools available to the LLM */
-  tools: TTools;
+  /** Tools available to the LLM. Optional - merged with withTools defaults */
+  tools?: TTools;
   /** Safety valve - exit if cumulative tokens exceed this limit */
   maxTokens?: number;
 }
 
 /**
- * Represents a single message in the loop conversation.
+ * Represents a single message in the agent conversation.
  */
-export interface LoopMessage {
+export interface AgentMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   /** For tool messages, the ID of the tool call this is responding to */
@@ -118,13 +118,14 @@ export interface LoopMessage {
  * Helper type to extract the terminal tool's input type from a tools object.
  * Used for typing the result that gets merged into state.
  */
-export type ExtractTerminalInput<TTools extends Record<string, LoopTool>> = {
+export type ExtractTerminalInput<TTools extends Record<string, AgentTool>> = {
   [K in keyof TTools]: TTools[K] extends { terminal: true; inputSchema: infer S }
     ? S extends z.ZodSchema
       ? z.infer<S>
       : never
     : never;
 }[keyof TTools];
+
 
 /**
  * Configuration for retry behavior with exponential backoff.

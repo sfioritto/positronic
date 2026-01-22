@@ -23,10 +23,10 @@ export type {
   State,
   RuntimeEnv,
   Secrets,
-  LoopTool,
-  LoopConfig,
-  LoopMessage,
-  LoopToolWaitFor,
+  AgentTool,
+  AgentConfig,
+  AgentMessage,
+  AgentToolWaitFor,
   ExtractTerminalInput,
   RetryConfig,
 } from './dsl/types.js';
@@ -50,18 +50,21 @@ export type {
 } from './resources/resources.js';
 export { RESOURCE_TYPES } from './resources/resources.js';
 
-// Loop step event exports
+// Agent step event exports
 export type {
-  LoopStartEvent,
-  LoopIterationEvent,
-  LoopToolCallEvent,
-  LoopToolResultEvent,
-  LoopAssistantMessageEvent,
-  LoopCompleteEvent,
-  LoopTokenLimitEvent,
-  LoopWebhookEvent,
+  AgentStartEvent,
+  AgentIterationEvent,
+  AgentToolCallEvent,
+  AgentToolResultEvent,
+  AgentAssistantMessageEvent,
+  AgentCompleteEvent,
+  AgentTokenLimitEvent,
+  AgentWebhookEvent,
   WebhookResponseEvent,
-} from './dsl/brain.js';
+} from './dsl/definitions/events.js';
+
+// Default tools
+export { defaultTools, generateUI } from './tools/index.js';
 
 // UI types (only UIComponent is public - used by gen-ui-components)
 export type { UIComponent } from './ui/types.js';

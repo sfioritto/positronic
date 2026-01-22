@@ -867,46 +867,46 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(BRAIN_EVENTS.STEP_STATUS, 'running', stepStatus) as any,
         transition(BRAIN_EVENTS.STEP_RETRY, 'running', stepRetry) as any,
 
-        // Loop events (pass-through with event data)
+        // Agent events (pass-through with event data)
         transition(
-          BRAIN_EVENTS.LOOP_START,
+          BRAIN_EVENTS.AGENT_START,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_START)
+          passthrough(BRAIN_EVENTS.AGENT_START)
         ) as any,
         transition(
-          BRAIN_EVENTS.LOOP_ITERATION,
+          BRAIN_EVENTS.AGENT_ITERATION,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_ITERATION)
+          passthrough(BRAIN_EVENTS.AGENT_ITERATION)
         ) as any,
         transition(
-          BRAIN_EVENTS.LOOP_TOOL_CALL,
+          BRAIN_EVENTS.AGENT_TOOL_CALL,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_TOOL_CALL)
+          passthrough(BRAIN_EVENTS.AGENT_TOOL_CALL)
         ) as any,
         transition(
-          BRAIN_EVENTS.LOOP_TOOL_RESULT,
+          BRAIN_EVENTS.AGENT_TOOL_RESULT,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_TOOL_RESULT)
+          passthrough(BRAIN_EVENTS.AGENT_TOOL_RESULT)
         ) as any,
         transition(
-          BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE,
+          BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_ASSISTANT_MESSAGE)
+          passthrough(BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE)
         ) as any,
         transition(
-          BRAIN_EVENTS.LOOP_COMPLETE,
+          BRAIN_EVENTS.AGENT_COMPLETE,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_COMPLETE)
+          passthrough(BRAIN_EVENTS.AGENT_COMPLETE)
         ) as any,
         transition(
-          BRAIN_EVENTS.LOOP_TOKEN_LIMIT,
+          BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_TOKEN_LIMIT)
+          passthrough(BRAIN_EVENTS.AGENT_TOKEN_LIMIT)
         ) as any,
         transition(
-          BRAIN_EVENTS.LOOP_WEBHOOK,
+          BRAIN_EVENTS.AGENT_WEBHOOK,
           'running',
-          passthrough(BRAIN_EVENTS.LOOP_WEBHOOK)
+          passthrough(BRAIN_EVENTS.AGENT_WEBHOOK)
         ) as any
       ),
 
