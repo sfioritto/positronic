@@ -667,17 +667,7 @@ export class Brain<
     };
     this.blocks.push(stepBlock);
 
-    // Create next brain with inferred response type and reset page to undefined
-    const nextBrain = new Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>, undefined>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
-
-    nextBrain.services = this.services;
-    nextBrain.optionsSchema = this.optionsSchema;
-    nextBrain.components = this.components;
-
-    return nextBrain;
+    return this.nextBrain<TNewState, ExtractWebhookResponses<TWaitFor>, undefined>();
   }
 
   brain<TInnerState extends State, TNewState extends State>(
@@ -745,16 +735,7 @@ export class Brain<
     };
     this.blocks.push(loopBlock);
 
-    const nextBrain = new Brain<TOptions, TNewState, TServices, TResponse, undefined>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
-
-    nextBrain.services = this.services;
-    nextBrain.optionsSchema = this.optionsSchema;
-    nextBrain.components = this.components;
-
-    return nextBrain;
+    return this.nextBrain<TNewState, TResponse, undefined>();
   }
 
   // TResponseKey:
@@ -1062,17 +1043,7 @@ export class Brain<
     };
     this.blocks.push(uiBlock);
 
-    // Return brain with TPage set to GeneratedPage<TSchema>
-    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, GeneratedPage<TSchema>>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
-
-    nextBrain.services = this.services;
-    nextBrain.optionsSchema = this.optionsSchema;
-    nextBrain.components = this.components;
-
-    return nextBrain;
+    return this.nextBrain<TState, TResponse, GeneratedPage<TSchema>>();
   }
 
   // Overload signatures
