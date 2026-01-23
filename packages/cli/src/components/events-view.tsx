@@ -180,6 +180,12 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `Agent webhook: ${event.toolName}`,
         color: 'cyan',
       };
+    case BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE:
+      return {
+        symbol: '[~]',
+        text: `Agent response (iteration ${event.iteration})`,
+        color: 'gray',
+      };
     default:
       return {
         symbol: '[?]',
