@@ -98,6 +98,7 @@ export interface AgentStartEvent<TOptions extends JsonObject = JsonObject>
   stepId: string;
   prompt: string;
   system?: string;
+  tools?: string[];
 }
 
 export interface AgentIterationEvent<TOptions extends JsonObject = JsonObject>
