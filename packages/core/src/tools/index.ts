@@ -218,48 +218,35 @@ RETURNS: The webhook payload when triggered. For UI forms, this contains all for
 };
 
 /**
- * Console log tool - useful for debugging and logging information during agent execution.
+ * Print tool - the simplest way for agents to communicate with users.
+ * Like PRINT in BASIC - outputs a message that users can see.
+ */
+export const print = createTool({
+  description: `Display a message to the user. This is the simplest way to communicate with users.
+
+Use this tool whenever you need to tell the user something - status updates, instructions, results, or any information they should see. The message will be displayed to users watching this workflow.`,
+  inputSchema: z.object({
+    message: z.string().describe('The message to display to the user'),
+  }),
+  execute: ({ message }) => {
+    console.log(`[Print] ${message}`);
+    return { printed: true };
+  },
+});
+
+/**
+ * Console log tool - for internal server-side debugging and logging.
+ * NOT for user communication - use print for that.
  */
 export const consoleLog = createTool({
-  description: `Log a message to the server console for debugging, monitoring, or audit purposes.
-
-PURPOSE: Record information during agent execution that will appear in server logs. Useful for tracking agent progress, debugging issues, or creating an audit trail.
-
-BEHAVIOR:
-- Messages are written to the server's console output immediately
-- Does NOT pause execution - the agent continues after logging
-- Returns { logged: true } to confirm the message was written
-
-WHEN TO USE:
-- Debugging: Track variable values or decision points during development
-- Progress tracking: Log milestones in multi-step workflows
-- Audit trails: Record important actions or decisions
-- Error context: Log additional context before or after errors
-
-WHEN NOT TO USE:
-- To communicate with the user - use a message in your response or generateUI instead
-- For persistent data storage - logs may be ephemeral
-- For return values - use the done tool to return results
-
-LOG LEVELS:
-- info (default): General information, progress updates
-- warn: Potential issues that don't stop execution
-- error: Problems that may affect the outcome`,
+  description: `Write a debug log message to the server console. For internal debugging only - users do not see these messages. Use 'print' to communicate with users.`,
   inputSchema: z.object({
-    message: z.string().describe(
-      'The message to log. Can include dynamic values, status updates, or debugging information. ' +
-      'Keep messages concise but informative. Example: "Processing order #12345, found 3 items"'
-    ),
-    level: z.enum(['info', 'warn', 'error']).optional().describe(
-      'The severity level for the log message. ' +
-      'info: Normal operations and progress (default). ' +
-      'warn: Unexpected but non-fatal conditions. ' +
-      'error: Failures or problems requiring attention.'
-    ),
+    message: z.string().describe('The debug message to log'),
+    level: z.enum(['info', 'warn', 'error']).optional().describe('Log level: info (default), warn, or error'),
   }),
   execute: ({ message, level = 'info' }) => {
     const logFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
-    logFn(`[Agent] ${message}`);
+    logFn(`[Debug] ${message}`);
     return { logged: true };
   },
 });
@@ -309,5 +296,6 @@ export const defaultDoneSchema = z.object({
 export const defaultTools = {
   generateUI,
   waitForWebhook,
+  print,
   consoleLog,
 };

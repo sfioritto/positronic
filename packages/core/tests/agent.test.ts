@@ -660,10 +660,10 @@ describe('agent step', () => {
       const callArgs = mockGenerateText.mock.calls[0][0];
       expect(callArgs.system).toBeDefined();
       const systemPrompt = callArgs.system!;
-      expect(systemPrompt).toContain('## Tool Execution Behavior');
+      expect(systemPrompt).toContain('## You Are a Positronic Brain');
       expect(systemPrompt).toContain('You are a helpful assistant.');
       // Default should come first
-      expect(systemPrompt.indexOf('## Tool Execution Behavior')).toBeLessThan(
+      expect(systemPrompt.indexOf('## You Are a Positronic Brain')).toBeLessThan(
         systemPrompt.indexOf('You are a helpful assistant.')
       );
     });
@@ -699,9 +699,9 @@ describe('agent step', () => {
 
       // Verify default system prompt is used
       const callArgs = mockGenerateText.mock.calls[0][0];
-      expect(callArgs.system).toContain('## Tool Execution Behavior');
-      expect(callArgs.system).toContain('Tools are executed sequentially');
-      expect(callArgs.system).toContain('webhook');
+      expect(callArgs.system).toContain('## You Are a Positronic Brain');
+      expect(callArgs.system).toContain('MUST use tool calls');
+      expect(callArgs.system).toContain('## Tool Execution');
     });
   });
 

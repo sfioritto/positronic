@@ -11,16 +11,21 @@ export const DEFAULT_ENV: RuntimeEnv = {
 
 /**
  * Default system prompt prepended to all agent steps.
- * Explains tool execution quirks to the LLM.
+ * Explains the headless nature of Positronic Brains.
  */
-export const DEFAULT_AGENT_SYSTEM_PROMPT = `## Tool Execution Behavior
-- Tools are executed sequentially in the order you call them
-- If a tool triggers a webhook (e.g., human approval), remaining tools in your response will NOT execute - you'll need to call them again after resuming
-- When waiting on multiple webhooks (e.g., Slack + email), the first webhook response received will resume execution
-- Terminal tools end the agent immediately - no further tools or iterations will run
+export const DEFAULT_AGENT_SYSTEM_PROMPT = `## You Are a Positronic Brain
 
-## Resumption Context
-When resuming after a webhook response, that response appears as the tool result in your conversation history.`;
+You are running as an automated agent in a headless workflow. This is NOT a chat interface - there is no user watching your text output.
+
+**To communicate with users, you MUST use tool calls.** Look at your available tools and use them to send messages, notifications, or create pages for user interaction.
+
+## Tool Execution
+- Tools execute sequentially in the order you call them
+- Webhook-triggering tools pause execution until the webhook fires
+- Terminal tools (like 'done') end the agent immediately
+
+## Resumption
+When resuming after a webhook, that response appears as the tool result in your conversation history.`;
 
 /**
  * Maximum number of retries for step execution.
