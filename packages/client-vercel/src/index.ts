@@ -1,4 +1,4 @@
-import type { ObjectGenerator, Message, ToolMessage } from '@positronic/core';
+import type { ObjectGenerator, Message, ToolMessage, ResponseMessage } from '@positronic/core';
 import {
   generateObject,
   generateText,
@@ -8,11 +8,48 @@ import {
 import { z } from 'zod';
 import type { LanguageModel, ModelMessage } from 'ai';
 
+/**
+ * Creates a tool result message in SDK-native format.
+ * Use this to append tool results to responseMessages before the next generateText call.
+ *
+ * Note: The Vercel AI SDK expects tool outputs to be wrapped in a discriminated union format
+ * with a `type` field. We use `{ type: 'text', value: ... }` for compatibility.
+ */
+export function createToolResultMessage(
+  toolCallId: string,
+  toolName: string,
+  result: unknown
+): ResponseMessage {
+  // Wrap the result in the SDK-expected format
+  // The SDK validates output against a discriminated union requiring a `type` field
+  const outputValue = typeof result === 'string' ? result : JSON.stringify(result);
+
+  return {
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-result',
+        toolCallId,
+        toolName,
+        output: { type: 'text', value: outputValue },
+      },
+    ],
+  } as ResponseMessage;
+}
+
 export class VercelClient implements ObjectGenerator {
   private model: LanguageModel;
 
   constructor(model: LanguageModel) {
     this.model = model;
+  }
+
+  createToolResultMessage(
+    toolCallId: string,
+    toolName: string,
+    result: unknown
+  ): ResponseMessage {
+    return createToolResultMessage(toolCallId, toolName, result);
   }
 
   async generateObject<T extends z.AnyZodObject>(params: {
@@ -71,64 +108,65 @@ export class VercelClient implements ObjectGenerator {
   async generateText(params: {
     system?: string;
     messages: ToolMessage[];
+    responseMessages?: ResponseMessage[];
     tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
   }): Promise<{
     text?: string;
     toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
     usage: { totalTokens: number };
+    responseMessages: ResponseMessage[];
   }> {
-    const { system, messages, tools } = params;
+    const { system, messages, responseMessages, tools } = params;
 
-    // Convert ToolMessage[] to ModelMessage[]
-    const modelMessages: ModelMessage[] = [];
+    // Build the messages to send to the SDK
+    let modelMessages: ModelMessage[];
 
-    if (system) {
-      modelMessages.push({ role: 'system', content: system });
-    }
+    if (responseMessages && responseMessages.length > 0) {
+      // Use the SDK-native messages directly (preserves providerOptions/thoughtSignature)
+      modelMessages = responseMessages as ModelMessage[];
+    } else {
+      // First call - convert our ToolMessage format to SDK format
+      modelMessages = [];
+      for (const msg of messages) {
+        if (msg.role === 'user') {
+          modelMessages.push({ role: 'user', content: msg.content });
+        } else if (msg.role === 'assistant') {
+          const contentParts: Array<
+            | { type: 'text'; text: string }
+            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+          > = [];
 
-    for (const msg of messages) {
-      if (msg.role === 'user') {
-        modelMessages.push({ role: 'user', content: msg.content });
-      } else if (msg.role === 'assistant') {
-        // Build content array for assistant message
-        const contentParts: Array<
-          | { type: 'text'; text: string }
-          | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
-        > = [];
-
-        // Add text if present
-        if (msg.content) {
-          contentParts.push({ type: 'text', text: msg.content });
-        }
-
-        // Add tool calls if present (using 'input' as Vercel SDK expects)
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
-          for (const tc of msg.toolCalls) {
-            contentParts.push({
-              type: 'tool-call',
-              toolCallId: tc.toolCallId,
-              toolName: tc.toolName,
-              input: tc.args,
-            });
+          if (msg.content) {
+            contentParts.push({ type: 'text', text: msg.content });
           }
-        }
 
-        // Push message with content array or string
-        if (contentParts.length > 0) {
-          modelMessages.push({ role: 'assistant', content: contentParts });
+          if (msg.toolCalls && msg.toolCalls.length > 0) {
+            for (const tc of msg.toolCalls) {
+              contentParts.push({
+                type: 'tool-call',
+                toolCallId: tc.toolCallId,
+                toolName: tc.toolName,
+                input: tc.args,
+              });
+            }
+          }
+
+          if (contentParts.length > 0) {
+            modelMessages.push({ role: 'assistant', content: contentParts });
+          }
+        } else if (msg.role === 'tool') {
+          modelMessages.push({
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: msg.toolCallId!,
+                toolName: msg.toolName!,
+                output: { type: 'text', value: msg.content },
+              },
+            ],
+          });
         }
-      } else if (msg.role === 'tool') {
-        modelMessages.push({
-          role: 'tool',
-          content: [
-            {
-              type: 'tool-result',
-              toolCallId: msg.toolCallId!,
-              toolName: msg.toolName!,
-              output: { type: 'text', value: msg.content },
-            },
-          ],
-        });
       }
     }
 
@@ -144,12 +182,16 @@ export class VercelClient implements ObjectGenerator {
       };
     }
 
-    // AI SDK 5 runs a single step by default (no stopWhen = single step)
     const result = await generateText({
       model: this.model,
+      system,
       messages: modelMessages,
       tools: aiTools,
     });
+
+    // Return the updated conversation (input messages + new response messages)
+    // The response.messages contain proper providerOptions for Gemini thoughtSignature etc.
+    const updatedMessages = [...modelMessages, ...result.response.messages];
 
     return {
       text: result.text || undefined,
@@ -161,6 +203,7 @@ export class VercelClient implements ObjectGenerator {
       usage: {
         totalTokens: result.usage?.totalTokens ?? 0,
       },
+      responseMessages: updatedMessages as ResponseMessage[],
     };
   }
 

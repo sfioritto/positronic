@@ -1,4 +1,4 @@
-import type { ObjectGenerator, ToolMessage } from '@positronic/core';
+import type { ObjectGenerator, ToolMessage, ResponseMessage } from '@positronic/core';
 import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from 'llm-polyglot';
 import Anthropic from '@anthropic-ai/sdk';
@@ -29,6 +29,24 @@ export class AnthropicClient implements ObjectGenerator {
     this.anthropicSdk = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
+  }
+
+  createToolResultMessage(
+    toolCallId: string,
+    toolName: string,
+    result: unknown
+  ): ResponseMessage {
+    // Anthropic uses a "user" message with tool_result content blocks
+    return {
+      role: 'user',
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: toolCallId,
+          content: typeof result === 'string' ? result : JSON.stringify(result),
+        },
+      ],
+    } as ResponseMessage;
   }
 
   async generateObject<T extends z.AnyZodObject>(params: {
@@ -77,57 +95,62 @@ export class AnthropicClient implements ObjectGenerator {
   async generateText(params: {
     system?: string;
     messages: ToolMessage[];
+    responseMessages?: ResponseMessage[];
     tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
   }): Promise<{
     text?: string;
     toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
     usage: { totalTokens: number };
+    responseMessages: ResponseMessage[];
   }> {
-    const { system, messages, tools } = params;
+    const { system, messages, responseMessages, tools } = params;
 
-    // Convert ToolMessage[] to Anthropic message format
-    const anthropicMessages: Anthropic.MessageParam[] = [];
+    // Build the messages to send
+    let anthropicMessages: Anthropic.MessageParam[];
 
-    for (const msg of messages) {
-      if (msg.role === 'user') {
-        anthropicMessages.push({ role: 'user', content: msg.content });
-      } else if (msg.role === 'assistant') {
-        // Build content blocks for assistant message
-        const contentBlocks: Anthropic.ContentBlockParam[] = [];
+    if (responseMessages && responseMessages.length > 0) {
+      // Use the native Anthropic messages directly (preserves conversation state)
+      anthropicMessages = responseMessages as Anthropic.MessageParam[];
+    } else {
+      // First call - convert our ToolMessage format to Anthropic format
+      anthropicMessages = [];
 
-        // Add text if present and non-empty
-        if (msg.content) {
-          contentBlocks.push({ type: 'text', text: msg.content });
-        }
+      for (const msg of messages) {
+        if (msg.role === 'user') {
+          anthropicMessages.push({ role: 'user', content: msg.content });
+        } else if (msg.role === 'assistant') {
+          const contentBlocks: Anthropic.ContentBlockParam[] = [];
 
-        // Add tool_use blocks if present
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
-          for (const tc of msg.toolCalls) {
-            contentBlocks.push({
-              type: 'tool_use',
-              id: tc.toolCallId,
-              name: tc.toolName,
-              input: tc.args as Record<string, unknown>,
-            });
+          if (msg.content) {
+            contentBlocks.push({ type: 'text', text: msg.content });
           }
-        }
 
-        // Only add message if there's content
-        if (contentBlocks.length > 0) {
-          anthropicMessages.push({ role: 'assistant', content: contentBlocks });
+          if (msg.toolCalls && msg.toolCalls.length > 0) {
+            for (const tc of msg.toolCalls) {
+              contentBlocks.push({
+                type: 'tool_use',
+                id: tc.toolCallId,
+                name: tc.toolName,
+                input: tc.args as Record<string, unknown>,
+              });
+            }
+          }
+
+          if (contentBlocks.length > 0) {
+            anthropicMessages.push({ role: 'assistant', content: contentBlocks });
+          }
+        } else if (msg.role === 'tool') {
+          anthropicMessages.push({
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: msg.toolCallId!,
+                content: msg.content,
+              },
+            ],
+          });
         }
-      } else if (msg.role === 'tool') {
-        // Add user message with tool_result
-        anthropicMessages.push({
-          role: 'user',
-          content: [
-            {
-              type: 'tool_result',
-              tool_use_id: msg.toolCallId!,
-              content: msg.content,
-            },
-          ],
-        });
       }
     }
 
@@ -164,12 +187,22 @@ export class AnthropicClient implements ObjectGenerator {
       }
     }
 
+    // Build assistant message from response for the conversation history
+    const assistantMessage: Anthropic.MessageParam = {
+      role: 'assistant',
+      content: response.content,
+    };
+
+    // Return updated conversation (input messages + new assistant response)
+    const updatedMessages = [...anthropicMessages, assistantMessage];
+
     return {
       text: text || undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       usage: {
         totalTokens: response.usage.input_tokens + response.usage.output_tokens,
       },
+      responseMessages: updatedMessages as ResponseMessage[],
     };
   }
 

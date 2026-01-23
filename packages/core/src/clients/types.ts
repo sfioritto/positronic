@@ -34,6 +34,13 @@ export type ToolMessage = {
 };
 
 /**
+ * Opaque message type returned by the AI SDK.
+ * This preserves provider-specific metadata (like Gemini's thoughtSignature)
+ * that must be passed back in subsequent calls.
+ */
+export type ResponseMessage = unknown;
+
+/**
  * Interface for AI model interactions, focused on generating structured objects
  * and potentially other types of content in the future.
  */
@@ -78,14 +85,32 @@ export interface ObjectGenerator {
   }): Promise<z.infer<T>>;
 
   /**
+   * Creates a tool result message in the SDK-native format.
+   * Use this to append tool results to responseMessages before the next generateText call.
+   */
+  createToolResultMessage?(
+    toolCallId: string,
+    toolName: string,
+    result: unknown
+  ): ResponseMessage;
+
+  /**
    * Generates text with optional tool calling support.
    * Used by loop steps for agentic workflows.
    */
   generateText?(params: {
     /** System prompt for the LLM */
     system?: string;
-    /** Conversation messages (including tool messages) */
+    /**
+     * Conversation messages for initial setup (used on first call only).
+     */
     messages: ToolMessage[];
+    /**
+     * Messages returned from a previous generateText call.
+     * These preserve provider-specific metadata (like Gemini's thoughtSignature)
+     * and should be used for subsequent calls in a conversation.
+     */
+    responseMessages?: ResponseMessage[];
     /** Available tools for the LLM to call */
     tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
   }): Promise<{
@@ -99,6 +124,11 @@ export interface ObjectGenerator {
     }>;
     /** Token usage information */
     usage: { totalTokens: number };
+    /**
+     * Response messages from the SDK that preserve provider metadata.
+     * Pass these back in the next call via responseMessages parameter.
+     */
+    responseMessages: ResponseMessage[];
   }>;
 
   /**

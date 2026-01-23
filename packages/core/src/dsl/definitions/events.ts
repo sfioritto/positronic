@@ -2,6 +2,7 @@ import type { BRAIN_EVENTS, STATUS } from '../constants.js';
 import type { JsonObject, JsonPatch } from '../types.js';
 import type { SerializedStepStatus } from './steps.js';
 import type { SerializedWebhookRegistration } from '../webhook.js';
+import type { ResponseMessage } from '../../clients/types.js';
 
 export type SerializedError = {
   name: string;
@@ -179,6 +180,8 @@ export interface AgentWebhookEvent<TOptions extends JsonObject = JsonObject>
   toolCallId: string;
   toolName: string;
   input: JsonObject;
+  /** SDK-native messages preserving provider metadata (e.g., Gemini's thoughtSignature) */
+  responseMessages: ResponseMessage[];
 }
 
 export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
