@@ -8,6 +8,9 @@ import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
+import { EventsView, type StoredEvent } from './events-view.js';
+
+type ViewMode = 'progress' | 'events';
 
 // Get the index of the currently running step (or last completed if none running)
 const getCurrentStepIndex = (steps: StepInfo[]): number => {
@@ -174,11 +177,16 @@ interface WatchProps {
   runId: string;
   manageScreenBuffer?: boolean;
   footer?: string;
+  startWithEvents?: boolean;
 }
 
-export const Watch = ({ runId, manageScreenBuffer = true, footer = 'x kill • esc quit' }: WatchProps) => {
+export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvents = false }: WatchProps) => {
   const { write } = useStdout();
   const { exit } = useApp();
+
+  // View mode state (progress view vs events log)
+  const [viewMode, setViewMode] = useState<ViewMode>(startWithEvents ? 'events' : 'progress');
+  const [events, setEvents] = useState<StoredEvent[]>([]);
 
   // Use state machine to track brain execution state
   // Machine is recreated when runId changes, giving us fresh context
@@ -242,6 +250,12 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer = 'x kill • e
       try {
         const eventData = JSON.parse(event.data) as BrainEvent;
 
+        // Store event for events view (keep last 500 events to prevent memory issues)
+        setEvents((prev) => {
+          const newEvents = [...prev, { timestamp: new Date(), event: eventData }];
+          return newEvents.slice(-500);
+        });
+
         // Send event to state machine - useMachine handles re-renders automatically
         // Use ref to ensure we always call the latest send function
         sendRef.current(eventData);
@@ -286,7 +300,12 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer = 'x kill • e
         setConfirmingKill(false);
       }
     } else {
-      if (input === 'x' && !isKilling && !isKilled && !isComplete) {
+      // View toggle
+      if (input === 'e') {
+        setViewMode('events');
+      } else if (input === 'w') {
+        setViewMode('progress');
+      } else if (input === 'x' && !isKilling && !isKilled && !isComplete) {
         setConfirmingKill(true);
       } else if ((input === 'q' || key.escape) && manageScreenBuffer) {
         // Only handle quit when standalone (manageScreenBuffer=true)
@@ -309,10 +328,21 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer = 'x kill • e
     ? { title: 'Kill Error', message: killError.message, details: killError.details }
     : null;
 
+  // Dynamic footer showing view toggle hint
+  const viewToggle = viewMode === 'progress' ? 'e events' : 'w progress';
+  const defaultFooter = `${viewToggle} | x kill | esc quit`;
+  const displayFooter = footer ?? defaultFooter;
+
   return (
     <Box flexDirection="column">
       {!isConnected && !rootBrain ? (
         <Text>Connecting to watch service...</Text>
+      ) : viewMode === 'events' ? (
+        <>
+          <EventsView events={events} />
+          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
+        </>
       ) : !rootBrain ? (
         <Text>Waiting for brain to start...</Text>
       ) : (
@@ -345,7 +375,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer = 'x kill • e
         </>
       )}
       <Box marginTop={1}>
-        <Text dimColor>{footer}</Text>
+        <Text dimColor>{displayFooter}</Text>
       </Box>
     </Box>
   );
