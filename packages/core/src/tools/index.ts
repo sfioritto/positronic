@@ -39,12 +39,17 @@ export function createTool<T extends z.ZodSchema>(config: {
 
 const generateUIInputSchema = z.object({
   prompt: z.string().describe(
-    'Instructions for what UI to generate. Describe the layout and purpose. ' +
-    'Be specific about what you want to display or collect from the user.'
+    'Natural language instructions describing the UI to generate. ' +
+    'Include: (1) the purpose of the page, (2) what information to display from state data, ' +
+    '(3) what input fields are needed if collecting data, (4) labels and placeholders for fields, ' +
+    '(5) any specific layout preferences. Example: "Create a form to collect user feedback with ' +
+    'fields for rating (1-5 scale), comments (text area), and email. Show the product name from state at the top."'
   ),
   hasForm: z.boolean().optional().describe(
-    'If true (default), creates a form with a webhook for submission. ' +
-    'Set to false for display-only pages.'
+    'Whether to include a form that can be submitted. Defaults to true. ' +
+    'Set to true when: collecting user input, approval workflows, any interactive data entry. ' +
+    'Set to false when: displaying read-only information, confirmation pages, dashboards. ' +
+    'When true, the tool returns webhook info that must be used with waitForWebhook to receive the submission.'
   ),
 });
 
@@ -65,12 +70,34 @@ const generateUIInputSchema = z.object({
  * The description is enriched at runtime with available component information.
  */
 export const generateUI: AgentTool<typeof generateUIInputSchema> = {
-  description: 'Generate a UI page to display to the user. ' +
-    'Returns a URL and optional webhook info. ' +
-    'IMPORTANT: This does NOT pause execution. ' +
-    'If the page has a form (hasForm: true, the default), you must: ' +
-    '1) Tell the user the page URL so they can access it, then ' +
-    '2) Call waitForWebhook with the returned webhook info to pause and wait for submission.',
+  description: `Generate a dynamic UI page using AI-powered component selection and layout.
+
+PURPOSE: Create interactive web pages for user interaction - forms, displays, dashboards, approval workflows.
+
+RETURNS: { url: string, webhook: { slug: string, identifier: string } | null }
+- url: The URL where the generated page can be accessed. YOU MUST COMMUNICATE THIS URL TO THE USER.
+- webhook: Present only when hasForm=true. Required for waitForWebhook to receive form submissions.
+
+⚠️ CRITICAL REQUIREMENTS FOR FORMS (hasForm=true):
+
+1. YOU MUST TELL THE USER THE PAGE URL - The user has no other way to discover it. Include the full URL in your response text, a message, or another communication channel available to you.
+
+2. YOU MUST CALL waitForWebhook AFTER telling the user the URL - This pauses execution until the form is submitted.
+
+3. FAILURE MODE: If you call waitForWebhook without first communicating the URL to the user, the job will freeze indefinitely. The user cannot submit a form they cannot find, and there is no easy recovery.
+
+CORRECT WORKFLOW FOR FORMS:
+1. Call generateUI with your prompt
+2. In your response, clearly show the user the returned URL (e.g., "Please fill out the form at: {url}")
+3. Call waitForWebhook with the webhook slug and identifier
+4. Execution pauses until user submits, then resumes with form data
+
+WORKFLOW FOR DISPLAY-ONLY PAGES (hasForm=false):
+1. Call generateUI with hasForm: false
+2. Tell the user the page URL
+3. Continue with other tasks (no waiting required)
+
+WHAT THE AI GENERATES: Based on your prompt, an AI selects and arranges UI components (text, inputs, buttons, layouts) to create the page. Be descriptive in your prompt about what you need.`,
   inputSchema: generateUIInputSchema,
   async execute(input, context): Promise<{ url: string; webhook: { slug: string; identifier: string } | null }> {
     const { components, pages, client, state, env, brainRunId, stepId } = context;
@@ -147,8 +174,16 @@ export const generateUI: AgentTool<typeof generateUIInputSchema> = {
 };
 
 const waitForWebhookInputSchema = z.object({
-  slug: z.string().describe('The webhook slug from generateUI (e.g., "ui-form")'),
-  identifier: z.string().describe('The unique webhook identifier from generateUI'),
+  slug: z.string().describe(
+    'The webhook slug that identifies the type of webhook. ' +
+    'For generateUI forms, this is always "ui-form". ' +
+    'Use the exact slug value returned by the tool that created the webhook.'
+  ),
+  identifier: z.string().describe(
+    'The unique identifier for this specific webhook instance. ' +
+    'This is returned by generateUI in webhook.identifier. ' +
+    'Each generateUI call creates a unique identifier - use the one from the specific page you want to wait for.'
+  ),
 });
 
 /**
@@ -161,10 +196,32 @@ const waitForWebhookInputSchema = z.object({
  * so they can access and submit the form.
  */
 export const waitForWebhook: AgentTool<typeof waitForWebhookInputSchema> = {
-  description: 'Pause execution and wait for a webhook response (e.g., form submission). ' +
-    'Call this after generating a UI page with a form. ' +
-    'IMPORTANT: Ensure the user knows the page URL before calling this, ' +
-    'otherwise they will not be able to access the form.',
+  description: `Pause agent execution and wait for an external event (webhook response).
+
+PURPOSE: Suspend the agent until a user action occurs, such as submitting a form generated by generateUI.
+
+⚠️ CRITICAL - BEFORE CALLING THIS TOOL:
+You MUST have already communicated the page URL to the user in your response. The user has no other way to discover the URL. If you call this tool without first telling the user where to go, the job will freeze indefinitely with no easy recovery.
+
+CORRECT SEQUENCE:
+1. Call generateUI to create the page
+2. In your response text, tell the user the URL (e.g., "Please complete the form at: {url}")
+3. THEN call waitForWebhook
+
+BEHAVIOR:
+- Calling this tool immediately pauses execution
+- The agent will NOT continue until the webhook receives data
+- This pause is indefinite - there is no timeout
+- When the webhook fires, execution resumes with the webhook payload as this tool's result
+- The form data will be available as key-value pairs (e.g., { name: "John", email: "john@example.com" })
+
+WHEN TO USE:
+- After generateUI with hasForm=true, to wait for form submission
+- Any workflow requiring human input or approval before continuing
+
+FAILURE MODE: If the user doesn't know the URL, they cannot submit the form, and the agent waits forever. The only recovery is to kill the job or manually inspect the event stream for the URL.
+
+RETURNS: The webhook payload when triggered. For UI forms, this contains all form field values as an object.`,
   inputSchema: waitForWebhookInputSchema,
   execute(input): AgentToolWaitFor {
     const webhook: WebhookRegistration = {
@@ -183,10 +240,41 @@ export const waitForWebhook: AgentTool<typeof waitForWebhookInputSchema> = {
  * Console log tool - useful for debugging and logging information during agent execution.
  */
 export const consoleLog = createTool({
-  description: 'Log a message to the console for debugging or informational purposes',
+  description: `Log a message to the server console for debugging, monitoring, or audit purposes.
+
+PURPOSE: Record information during agent execution that will appear in server logs. Useful for tracking agent progress, debugging issues, or creating an audit trail.
+
+BEHAVIOR:
+- Messages are written to the server's console output immediately
+- Does NOT pause execution - the agent continues after logging
+- Returns { logged: true } to confirm the message was written
+
+WHEN TO USE:
+- Debugging: Track variable values or decision points during development
+- Progress tracking: Log milestones in multi-step workflows
+- Audit trails: Record important actions or decisions
+- Error context: Log additional context before or after errors
+
+WHEN NOT TO USE:
+- To communicate with the user - use a message in your response or generateUI instead
+- For persistent data storage - logs may be ephemeral
+- For return values - use the done tool to return results
+
+LOG LEVELS:
+- info (default): General information, progress updates
+- warn: Potential issues that don't stop execution
+- error: Problems that may affect the outcome`,
   inputSchema: z.object({
-    message: z.string().describe('The message to log'),
-    level: z.enum(['info', 'warn', 'error']).optional().describe('Log level (defaults to info)'),
+    message: z.string().describe(
+      'The message to log. Can include dynamic values, status updates, or debugging information. ' +
+      'Keep messages concise but informative. Example: "Processing order #12345, found 3 items"'
+    ),
+    level: z.enum(['info', 'warn', 'error']).optional().describe(
+      'The severity level for the log message. ' +
+      'info: Normal operations and progress (default). ' +
+      'warn: Unexpected but non-fatal conditions. ' +
+      'error: Failures or problems requiring attention.'
+    ),
   }),
   execute: ({ message, level = 'info' }) => {
     const logFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
@@ -200,7 +288,11 @@ export const consoleLog = createTool({
  * Used internally by the framework.
  */
 export const defaultDoneSchema = z.object({
-  result: z.string().describe('The final result or summary of the completed task'),
+  result: z.string().describe(
+    'A clear summary of what was accomplished. ' +
+    'Include: key outcomes, any important values or findings, and confirmation that the task is complete. ' +
+    'Be specific but concise. Example: "Successfully processed 15 orders totaling $1,234.56. All items shipped."'
+  ),
 });
 
 /**

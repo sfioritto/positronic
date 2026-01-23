@@ -481,13 +481,53 @@ export class BrainEventStream<
     if (config.outputSchema) {
       const { schema, name } = config.outputSchema;
       mergedTools['done'] = {
-        description: `Complete the task with the ${name} result`,
+        description: `Signal that the task is complete and provide the final ${name} result.
+
+PURPOSE: End agent execution and return structured output to the calling system.
+
+BEHAVIOR:
+- This is a TERMINAL tool - calling it immediately ends the agent
+- No further tools will execute after this
+- No further iterations will occur
+- The input you provide becomes the agent's final output
+
+WHEN TO CALL:
+- When you have completed the assigned task
+- When you have gathered all required information
+- When you have the final answer or result ready
+
+DO NOT CALL IF:
+- You still need to gather more information
+- You are waiting for user input (use waitForWebhook instead)
+- The task is not yet complete
+
+The schema for this result is: ${name}`,
         inputSchema: schema,
         terminal: true,
       };
     } else {
       mergedTools['done'] = {
-        description: 'Complete the task and return a result',
+        description: `Signal that the task is complete and provide a summary of what was accomplished.
+
+PURPOSE: End agent execution and return a result string to the calling system.
+
+BEHAVIOR:
+- This is a TERMINAL tool - calling it immediately ends the agent
+- No further tools will execute after this
+- No further iterations will occur
+- The result string you provide becomes the agent's final output
+
+WHEN TO CALL:
+- When you have completed the assigned task
+- When you have gathered all required information
+- When you have the final answer ready to report
+
+DO NOT CALL IF:
+- You still need to gather more information
+- You are waiting for user input (use waitForWebhook instead)
+- The task is not yet complete
+
+Provide a clear, concise summary of the outcome in the 'result' field.`,
         inputSchema: defaultDoneSchema,
         terminal: true,
       };
@@ -593,10 +633,35 @@ export class BrainEventStream<
             })
             .join('\n');
 
-          description = `Generate a UI page to display to the user and wait for their response.\n\n` +
-            `Available components:\n${componentList}\n\n` +
-            `Call this tool with a prompt describing the UI you want to create. ` +
-            `The system will use an LLM to generate the appropriate component layout.`;
+          description = `Generate a dynamic UI page using AI-powered component selection and layout.
+
+PURPOSE: Create interactive web pages for user interaction - forms, displays, dashboards, approval workflows.
+
+AVAILABLE COMPONENTS:
+${componentList}
+
+RETURNS: { url: string, webhook: { slug: string, identifier: string } | null }
+- url: The URL where the generated page can be accessed. YOU MUST COMMUNICATE THIS URL TO THE USER.
+- webhook: Present only when hasForm=true. Required for waitForWebhook to receive form submissions.
+
+⚠️ CRITICAL REQUIREMENTS FOR FORMS (hasForm=true):
+
+1. YOU MUST TELL THE USER THE PAGE URL - The user has no other way to discover it. Include the full URL in your response text, a message, or another communication channel available to you.
+
+2. YOU MUST CALL waitForWebhook AFTER telling the user the URL - This pauses execution until the form is submitted.
+
+3. FAILURE MODE: If you call waitForWebhook without first communicating the URL to the user, the job will freeze indefinitely. The user cannot submit a form they cannot find, and there is no easy recovery.
+
+CORRECT WORKFLOW FOR FORMS:
+1. Call generateUI with your prompt
+2. In your response, clearly show the user the returned URL (e.g., "Please fill out the form at: {url}")
+3. Call waitForWebhook with the webhook slug and identifier
+4. Execution pauses until user submits, then resumes with form data
+
+WORKFLOW FOR DISPLAY-ONLY PAGES (hasForm=false):
+1. Call generateUI with hasForm: false
+2. Tell the user the page URL
+3. Continue with other tasks (no waiting required)`;
         }
 
         toolsForClient[name] = {
