@@ -950,21 +950,10 @@ brain('Entity Extractor')
 ```
 
 Key points about `outputSchema`:
-- The agent automatically gets a `complete` tool (or custom name via `toolName`)
+- The agent automatically gets a `done` tool that uses your schema
 - The result is stored under `state[name]` (e.g., `state.entities`)
 - Full TypeScript type inference flows to subsequent steps
 - Use `as const` on the name for proper type narrowing
-
-You can also customize the generated tool:
-
-```typescript
-outputSchema: {
-  schema: z.object({ result: z.string() }),
-  name: 'output' as const,
-  toolName: 'finalize',           // Custom tool name (default: 'complete')
-  toolDescription: 'Finalize the analysis',  // Custom description
-}
-```
 
 ## Environment and Pages Service
 

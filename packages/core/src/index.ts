@@ -69,7 +69,7 @@ export type {
 } from './dsl/definitions/events.js';
 
 // Default tools
-export { createTool, defaultTools, generateUI, waitForWebhook, consoleLog, done } from './tools/index.js';
+export { createTool, defaultTools, defaultDoneSchema, generateUI, waitForWebhook, consoleLog } from './tools/index.js';
 
 // UI types (only UIComponent is public - used by gen-ui-components)
 export type { UIComponent } from './ui/types.js';

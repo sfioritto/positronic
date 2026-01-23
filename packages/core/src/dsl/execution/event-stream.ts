@@ -20,6 +20,7 @@ import type { InitialRunParams, RerunParams } from '../definitions/run-params.js
 
 import { Step } from '../builder/step.js';
 import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT, MAX_RETRIES } from './constants.js';
+import { defaultDoneSchema } from '../../tools/index.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -475,21 +476,21 @@ export class BrainEventStream<
     // Merge tools: step tools override defaults
     const mergedTools: Record<string, AgentTool> = { ...defaultTools, ...(config.tools ?? {}) };
 
-    // Generate terminal tool from outputSchema if provided
-    let outputSchemaToolName: string | undefined;
+    // Always generate a 'done' terminal tool for every agent
+    // If outputSchema is provided, use that schema; otherwise use defaultDoneSchema
     if (config.outputSchema) {
-      const { schema, name, toolName, toolDescription } = config.outputSchema;
-      const generatedToolName = toolName ?? 'complete';
-      outputSchemaToolName = generatedToolName;
-
-      const generatedTool: AgentTool = {
-        description: toolDescription ?? `Complete the task with the ${name} result`,
+      const { schema, name } = config.outputSchema;
+      mergedTools['done'] = {
+        description: `Complete the task with the ${name} result`,
         inputSchema: schema,
         terminal: true,
       };
-
-      // Add to merged tools (overrides any existing tool with same name)
-      mergedTools[generatedToolName] = generatedTool;
+    } else {
+      mergedTools['done'] = {
+        description: 'Complete the task and return a result',
+        inputSchema: defaultDoneSchema,
+        terminal: true,
+      };
     }
 
     // Check if we're resuming from a webhook
@@ -698,14 +699,15 @@ export class BrainEventStream<
           };
 
           // Merge terminal result into state
-          if (config.outputSchema && toolCall.toolName === outputSchemaToolName) {
+          // Only namespace under outputSchema.name when 'done' tool is called with outputSchema
+          if (config.outputSchema && toolCall.toolName === 'done') {
             // Namespace result under outputSchema.name
             this.currentState = {
               ...this.currentState,
               [config.outputSchema.name]: toolCall.args,
             };
           } else {
-            // Legacy behavior: spread into state root
+            // Default behavior: spread into state root (for other terminal tools)
             this.currentState = { ...this.currentState, ...(toolCall.args as JsonObject) };
           }
           yield* this.completeStep(step, prevState);
