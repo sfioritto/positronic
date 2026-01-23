@@ -1,8 +1,12 @@
 import type { BrainEvent, BrainStartEvent, StepCompletedEvent } from '@positronic/core';
 import { applyPatches, BRAIN_EVENTS } from '@positronic/core';
-import type { StoredEvent } from '../components/events-view.js';
 
 type JsonObject = { [key: string]: unknown };
+
+export interface StoredEvent {
+  timestamp: Date;
+  event: BrainEvent;
+}
 
 /**
  * Reconstructs the brain state at a specific event index by:

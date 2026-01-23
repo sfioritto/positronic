@@ -199,6 +199,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   const [stateScrollOffset, setStateScrollOffset] = useState(0);
   const [previousViewMode, setPreviousViewMode] = useState<'progress' | 'events'>('progress');
 
+  // Track selected event index so it persists across view changes
+  const [eventsSelectedIndex, setEventsSelectedIndex] = useState<number | null>(null);
+
   // Use state machine to track brain execution state
   // Machine is recreated when runId changes, giving us fresh context
   const [current, send] = useBrainMachine(runId);
@@ -296,6 +299,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
 
   // Handler for viewing state at a specific event index (called from EventsView)
   const handleViewStateAtEvent = (eventIndex: number) => {
+    setEventsSelectedIndex(eventIndex);  // Preserve selection for when we return
     const state = reconstructStateAtEvent(events, eventIndex);
     setStateSnapshot(state);
     setStateTitle(`State at event #${eventIndex + 1}`);
@@ -409,6 +413,8 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
             isActive={viewMode === 'events'}
             onModeChange={setEventsViewMode}
             onViewState={handleViewStateAtEvent}
+            selectedIndex={eventsSelectedIndex}
+            onSelectedIndexChange={setEventsSelectedIndex}
           />
           {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}

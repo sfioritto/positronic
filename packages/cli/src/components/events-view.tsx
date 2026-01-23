@@ -3,11 +3,9 @@ import { Text, Box, useStdout, useInput } from 'ink';
 import type { BrainEvent } from '@positronic/core';
 import { BRAIN_EVENTS } from '@positronic/core';
 import { EventDetail } from './event-detail.js';
+import type { StoredEvent } from '../utils/state-reconstruction.js';
 
-export interface StoredEvent {
-  timestamp: Date;
-  event: BrainEvent;
-}
+export type { StoredEvent };
 
 export type EventsViewMode = 'auto' | 'navigating' | 'detail';
 
@@ -17,6 +15,8 @@ interface EventsViewProps {
   isActive?: boolean;
   onModeChange?: (mode: EventsViewMode) => void;
   onViewState?: (eventIndex: number) => void;
+  selectedIndex?: number | null;
+  onSelectedIndexChange?: (index: number | null) => void;
 }
 
 type InternalMode = 'list' | 'detail';
@@ -236,15 +236,35 @@ const EventLine = ({ stored, isSelected }: EventLineProps) => {
   );
 };
 
-export const EventsView = ({ events, totalTokens = 0, isActive = true, onModeChange, onViewState }: EventsViewProps) => {
+export const EventsView = ({
+  events,
+  totalTokens = 0,
+  isActive = true,
+  onModeChange,
+  onViewState,
+  selectedIndex: controlledSelectedIndex,
+  onSelectedIndexChange,
+}: EventsViewProps) => {
   const { stdout } = useStdout();
   const terminalHeight = stdout?.rows || 24;
   // Reserve lines for header, footer, margins, token total
   const maxVisible = Math.max(5, terminalHeight - 8);
 
   const [mode, setMode] = useState<InternalMode>('list');
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [internalSelectedIndex, setInternalSelectedIndex] = useState<number | null>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
+
+  // Use controlled value if provided, otherwise use internal state
+  const isControlled = controlledSelectedIndex !== undefined;
+  const selectedIndex = isControlled ? controlledSelectedIndex : internalSelectedIndex;
+
+  const setSelectedIndex = (index: number | null) => {
+    if (isControlled) {
+      onSelectedIndexChange?.(index);
+    } else {
+      setInternalSelectedIndex(index);
+    }
+  };
 
   // Notify parent of mode changes
   useEffect(() => {
