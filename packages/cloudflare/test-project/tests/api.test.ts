@@ -1655,10 +1655,13 @@ describe('Hono API Tests', () => {
       });
 
       // Should have AGENT_TOOL_RESULT with the webhook response
+      // Note: There are two AGENT_TOOL_RESULT events - one before pause (with status: 'waiting_for_webhook')
+      // and one after resume (with the actual webhook response). We want the latter.
       const agentToolResultEvent = resumeEvents.find(
         (e): e is AgentToolResultEvent<any> =>
           e.type === BRAIN_EVENTS.AGENT_TOOL_RESULT &&
-          e.toolName === 'escalate'
+          e.toolName === 'escalate' &&
+          (e.result as any)?.approved !== undefined
       );
       expect(agentToolResultEvent).toBeDefined();
       expect(agentToolResultEvent?.result).toEqual({

@@ -1032,8 +1032,8 @@ describe('CLI Integration: positronic brain commands', () => {
           // Press 's' to switch to state view
           instance.stdin.write('s');
 
-          // Should show state view footer
-          const foundFooter = await waitForOutput(/j\/k scroll \| b back/, 30);
+          // Should show state view footer (includes paging hint)
+          const foundFooter = await waitForOutput(/j\/k scroll.*b back/, 30);
           expect(foundFooter).toBe(true);
 
           instance.unmount();
@@ -1075,8 +1075,8 @@ describe('CLI Integration: positronic brain commands', () => {
           // Press 's' to view state at selected event
           instance.stdin.write('s');
 
-          // Should show state view footer
-          const foundStateFooter = await waitForOutput(/j\/k scroll \| b back/, 30);
+          // Should show state view footer (includes paging hint)
+          const foundStateFooter = await waitForOutput(/j\/k scroll.*b back/, 30);
           expect(foundStateFooter).toBe(true);
 
           instance.unmount();

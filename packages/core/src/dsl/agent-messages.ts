@@ -45,8 +45,8 @@ export function reconstructAgentContext(
     );
   }
 
-  // Collect all raw response message events and reconstruct the conversation
-  // Each event contains only the new messages from that iteration (patch pattern)
+  // Collect all raw response message events
+  // Each event now contains a single message
   const rawResponseEvents = events.filter(
     (e): e is AgentRawResponseMessageEvent =>
       e.type === BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE
@@ -58,9 +58,10 @@ export function reconstructAgentContext(
     );
   }
 
-  // Reconstruct full conversation by replaying all events
-  const responseMessages = rawResponseEvents.flatMap(
-    (e) => e.rawResponse.responseMessages
+  // Reconstruct full conversation by concatenating all messages from all events
+  // No filtering needed - webhook tools no longer add placeholder messages
+  const responseMessages: ResponseMessage[] = rawResponseEvents.map(
+    (event) => event.message
   );
 
   return {
