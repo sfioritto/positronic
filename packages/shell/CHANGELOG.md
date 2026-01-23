@@ -1,5 +1,15 @@
 # @positronic/shell
 
+## 0.0.55
+
+### Patch Changes
+
+- - Add `createTool` helper function for creating tools with proper type inference
+  - Add `consoleLog` and `done` default tools for debugging and task completion
+  - Make agent `prompt` optional, defaulting to "Begin." when not provided
+  - Add hello example brain demonstrating agent usage with default tools
+  - Fix template project documentation to match current API
+
 ## 0.0.54
 
 ### Patch Changes
