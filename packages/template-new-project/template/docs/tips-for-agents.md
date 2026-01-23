@@ -247,22 +247,20 @@ services/
 Then in your `brain.ts` (at the project root):
 
 ```typescript
+import { createBrain } from '@positronic/core';
 import gmail from './services/gmail.js';
 import slack from './services/slack.js';
 import database from './services/database.js';
 import analytics from './services/analytics.js';
 
-export function brain(
-  brainConfig: string | { title: string; description?: string }
-) {
-  return coreBrain(brainConfig)
-    .withServices({
-      gmail,
-      slack,
-      database,
-      analytics
-    });
-}
+export const brain = createBrain({
+  services: {
+    gmail,
+    slack,
+    database,
+    analytics
+  }
+});
 ```
 
 This keeps your service implementations separate from your brain logic and makes them easier to test and maintain.
@@ -452,7 +450,7 @@ describe('FeedbackProcessor', () => {
 });
 
 // Step 2: Create minimal brain implementation
-import { brain } from '@positronic/core';
+import { brain } from '../brain.js';
 import { z } from 'zod';
 
 const feedbackBrain = brain('feedback-processor')

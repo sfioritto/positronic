@@ -42,10 +42,10 @@ import { brain } from '@positronic/core';
 
 ### Configuring Services
 
-To add project-wide services, modify the `brain.ts` file in the root directory:
+To add project-wide services, modify the `brain.ts` file in the root directory using `createBrain()`:
 
 ```typescript
-import { brain as coreBrain, type Brain } from '@positronic/core';
+import { createBrain } from '@positronic/core';
 
 // Define your services
 interface ProjectServices {
@@ -59,28 +59,25 @@ interface ProjectServices {
   };
 }
 
-// Export the wrapped brain function
-export function brain(
-  brainConfig: string | { title: string; description?: string }
-) {
-  return coreBrain(brainConfig)
-    .withServices({
-      logger: {
-        info: (msg) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),
-        error: (msg) => console.error(`[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`)
+// Export the project brain factory
+export const brain = createBrain({
+  services: {
+    logger: {
+      info: (msg) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),
+      error: (msg) => console.error(`[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`)
+    },
+    database: {
+      get: async (key) => {
+        // Your database implementation
+        return localStorage.getItem(key);
       },
-      database: {
-        get: async (key) => {
-          // Your database implementation
-          return localStorage.getItem(key);
-        },
-        set: async (key, value) => {
-          // Your database implementation
-          localStorage.setItem(key, JSON.stringify(value));
-        }
+      set: async (key, value) => {
+        // Your database implementation
+        localStorage.setItem(key, JSON.stringify(value));
       }
-    });
-}
+    }
+  }
+});
 ```
 
 Now all brains automatically have access to these services:
@@ -158,9 +155,9 @@ Use `.env` files for configuration:
 ANTHROPIC_API_KEY=your-key-here
 OPENAI_API_KEY=your-key-here
 
-# Backend-specific
-<% if (backend === 'cloudflare') { %>CLOUDFLARE_ACCOUNT_ID=your-account-id
-CLOUDFLARE_API_TOKEN=your-api-token<% } %>
+# Backend-specific (Cloudflare example)
+CLOUDFLARE_ACCOUNT_ID=your-account-id
+CLOUDFLARE_API_TOKEN=your-api-token
 ```
 
 ## Best Practices
@@ -224,7 +221,7 @@ const api = {
   post: async (path: string, data: any) => {
     const response = await fetch(`https://api.example.com<%= '${path}' %>`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Authorization': `Bearer <%= '${process.env.API_KEY}' %>`,
         'Content-Type': 'application/json'
       },

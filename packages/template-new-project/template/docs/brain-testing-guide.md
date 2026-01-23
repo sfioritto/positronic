@@ -56,7 +56,7 @@ const result = await runBrainTest(brain, {
   client: mockClient,           // Optional: defaults to createMockClient()
   initialState: { count: 0 },   // Optional: initial state
   resources: resourceLoader,    // Optional: resources
-  brainOptions: { mode: 'test' } // Optional: brain-specific options
+  options: { mode: 'test' } // Optional: brain-specific options
 });
 ```
 
@@ -64,9 +64,9 @@ const result = await runBrainTest(brain, {
 - `completed: boolean` - Whether the brain completed successfully
 - `error: Error | null` - Any error that occurred
 - `finalState: State` - The final state after all steps
-- `steps: string[]` - Names of executed steps in order
+- `events: BrainEvent[]` - All emitted events during execution
 
-## MockObjectGenerator API
+## MockClient API
 
 ### Creating a Mock Client
 
@@ -76,44 +76,42 @@ const mockClient = createMockClient();
 
 ### Mocking Responses
 
-#### Single Response
-```typescript
-mockClient.mockNextResponse({
-  answer: 'The capital of France is Paris',
-  confidence: 0.95
-});
-```
+Queue responses that will be consumed in order by `generateObject` calls:
 
-#### Multiple Responses
 ```typescript
+// Queue one or more responses
 mockClient.mockResponses(
   { step1: 'completed' },
   { step2: 'processed' },
   { finalResult: 'success' }
 );
-```
 
-#### Error Responses
-```typescript
-mockClient.mockNextError('API rate limit exceeded');
-// or
-mockClient.mockNextError(new Error('Connection timeout'));
+// Clear all mocked responses
+mockClient.clearMocks();
 ```
 
 ### Assertions
 
+Use standard Jest assertions on the mock:
+
 ```typescript
 // Check call count
-mockClient.expectCallCount(3);
+expect(mockClient.generateObject).toHaveBeenCalledTimes(3);
 
 // Check call parameters
-mockClient.expectCalledWith({
-  prompt: 'Generate a summary',
-  schemaName: 'summarySchema'
-});
+expect(mockClient.generateObject).toHaveBeenCalledWith(
+  expect.objectContaining({
+    prompt: expect.stringContaining('Generate a summary')
+  })
+);
 
-// Get call history
-const calls = mockClient.getCalls();
+// Check specific call (0-indexed)
+expect(mockClient.generateObject).toHaveBeenNthCalledWith(
+  1,
+  expect.objectContaining({
+    prompt: expect.stringContaining('first prompt')
+  })
+);
 ```
 
 ## Testing Patterns
@@ -145,13 +143,19 @@ it('should generate personalized recommendations', async () => {
 
 ### Testing Error Cases
 
+To test error handling, create a mock client that throws:
+
 ```typescript
 it('should handle API failures gracefully', async () => {
-  // Arrange
-  mockClient.mockNextError('Service temporarily unavailable');
+  // Arrange - create a mock that throws on the first call
+  const errorClient = {
+    generateObject: jest.fn().mockRejectedValue(
+      new Error('Service temporarily unavailable')
+    )
+  };
 
   // Act
-  const result = await runBrainTest(processingBrain, { client: mockClient });
+  const result = await runBrainTest(processingBrain, { client: errorClient });
 
   // Assert
   expect(result.completed).toBe(false);
@@ -167,6 +171,7 @@ Verify that data flows correctly through your brain:
 it('should use customer data to generate personalized content', async () => {
   // Arrange
   const customerName = 'Alice';
+  const mockClient = createMockClient();
   mockClient.mockResponses(
     { greeting: 'Hello Alice!', tone: 'friendly' },
     { email: 'Personalized email content...' }
@@ -179,8 +184,11 @@ it('should use customer data to generate personalized content', async () => {
   });
 
   // Assert that the AI used the customer data
-  const calls = mockClient.getCalls();
-  expect(calls[0].params.prompt).toContain(customerName);
+  expect(mockClient.generateObject).toHaveBeenCalledWith(
+    expect.objectContaining({
+      prompt: expect.stringContaining(customerName)
+    })
+  );
   expect(result.finalState.email).toContain('Personalized email content');
 });
 ```
@@ -227,28 +235,23 @@ Following testing best practices, avoid testing:
 ## Complete Example
 
 ```typescript
-import { createMockClient, runBrainTest } from '@positronic/core';
-import analysisBrain from './analysis-brain.js';
+import { createMockClient, runBrainTest } from './test-utils.js';
+import analysisBrain from '../brains/analysis-brain.js';
 
 describe('analysis-brain', () => {
-  let mockClient;
-
-  beforeEach(() => {
-    mockClient = createMockClient();
-  });
-
   it('should analyze customer feedback and generate insights', async () => {
     // Arrange: Set up AI to return analysis
-    mockClient.mockNextResponse({
+    const mockClient = createMockClient();
+    mockClient.mockResponses({
       sentiment: 'positive',
       keywords: ['innovation', 'quality', 'service'],
       summary: 'Customers appreciate product quality and innovation'
     });
 
     // Act: Run analysis on customer feedback
-    const result = await runBrainTest(analysisBrain, { 
+    const result = await runBrainTest(analysisBrain, {
       client: mockClient,
-      initialState: { 
+      initialState: {
         feedback: 'Your product is innovative and high quality...'
       }
     });
@@ -265,14 +268,18 @@ describe('analysis-brain', () => {
 
   it('should handle analysis service outages', async () => {
     // Arrange: Simulate service failure
-    mockClient.mockNextError('Analysis service unavailable');
+    const errorClient = {
+      generateObject: jest.fn().mockRejectedValue(
+        new Error('Analysis service unavailable')
+      )
+    };
 
     // Act: Attempt analysis
-    const result = await runBrainTest(analysisBrain, { 
-      client: mockClient,
+    const result = await runBrainTest(analysisBrain, {
+      client: errorClient,
       initialState: { feedback: 'Some feedback...' }
     });
-    
+
     // Assert: Verify graceful failure
     expect(result.completed).toBe(false);
     expect(result.error?.message).toBe('Analysis service unavailable');
@@ -300,12 +307,12 @@ expect(result.finalState.myProperty).toBe('value');
 ### Debugging Tips
 
 ```typescript
-// See what prompts are being sent to AI
-const calls = mockClient.getCalls();
-console.log('AI prompts:', calls.map(c => c.params.prompt));
+// See what prompts were sent to AI
+const calls = mockClient.generateObject.mock.calls;
+console.log('AI prompts:', calls.map(c => c[0].prompt));
 
-// Check execution order
-console.log('Steps executed:', result.steps);
+// Check events that occurred during execution
+console.log('Events:', result.events.map(e => e.type));
 ```
 
 ## Next Steps

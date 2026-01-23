@@ -165,7 +165,11 @@ Each step receives these parameters:
 - `client` - AI client for generating structured objects
 - `resources` - Loaded resources (files, documents, etc.)
 - `options` - Runtime options passed to the brain
-- Custom services (if configured with `.withServices()`)
+- `response` - Webhook response data (available after `waitFor` completes)
+- `page` - Generated page object (available after `.ui()` step)
+- `pages` - Pages service for HTML page management
+- `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
+- Custom services (if configured with `.withServices()` or `createBrain()`)
 
 ## Configuration Methods
 
@@ -473,15 +477,141 @@ expect(result.finalState.data).toEqual({ id: '123', name: 'Test' });
 - Services are not serialized - they're for side effects and external interactions
 - Each brain instance maintains its own service references
 
+### Tool Configuration with `withTools()`
+
+The `withTools()` method registers tools that can be used by agent steps:
+
+```typescript
+import { z } from 'zod';
+
+const brainWithTools = brain('Tool Brain')
+  .withTools({
+    fetchData: {
+      description: 'Fetch data from an external API',
+      inputSchema: z.object({
+        endpoint: z.string(),
+        params: z.record(z.string()).optional()
+      }),
+      execute: async ({ endpoint, params }) => {
+        const url = new URL(endpoint);
+        if (params) {
+          Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+        }
+        const response = await fetch(url);
+        return response.json();
+      }
+    },
+    saveToDatabase: {
+      description: 'Save data to the database',
+      inputSchema: z.object({
+        table: z.string(),
+        data: z.any()
+      }),
+      execute: async ({ table, data }) => {
+        // Database save logic
+        return { success: true, id: 'generated-id' };
+      }
+    }
+  })
+  .brain('Data Agent', {
+    system: 'You can fetch and save data.',
+    prompt: 'Fetch user data and save the summary.'
+    // Tools defined with withTools() are automatically available
+  });
+```
+
+### Component Configuration with `withComponents()`
+
+The `withComponents()` method registers custom UI components for use in `.ui()` steps:
+
+```typescript
+const brainWithComponents = brain('Custom UI Brain')
+  .withComponents({
+    CustomCard: {
+      description: 'A styled card component for displaying content',
+      props: z.object({
+        title: z.string(),
+        content: z.string(),
+        variant: z.enum(['default', 'highlighted', 'warning']).default('default')
+      }),
+      render: (props) => `
+        <div class="card card-<%= '${props.variant}' %>">
+          <h3><%= '${props.title}' %></h3>
+          <p><%= '${props.content}' %></p>
+        </div>
+      `
+    },
+    DataTable: {
+      description: 'A table for displaying structured data',
+      props: z.object({
+        headers: z.array(z.string()),
+        rows: z.array(z.array(z.string()))
+      }),
+      render: (props) => {
+        // Build table HTML from headers and rows
+        const headerRow = props.headers.map(h => '<th>' + h + '</th>').join('');
+        const bodyRows = props.rows.map(row =>
+          '<tr>' + row.map(cell => '<td>' + cell + '</td>').join('') + '</tr>'
+        ).join('');
+        return '<table><thead><tr>' + headerRow + '</tr></thead><tbody>' + bodyRows + '</tbody></table>';
+      }
+    }
+  })
+  .ui('Dashboard', {
+    template: (state) => `
+      Create a dashboard using CustomCard components to display:
+      - User name: <%= '${state.userName}' %>
+      - Account status: <%= '${state.status}' %>
+      Use DataTable to show recent activity.
+    `,
+    responseSchema: z.object({
+      acknowledged: z.boolean()
+    })
+  });
+```
+
+### Using `createBrain()` for Project Configuration
+
+For project-wide configuration, use `createBrain()` in your `brain.ts` file:
+
+```typescript
+// brain.ts
+import { createBrain } from '@positronic/core';
+import { z } from 'zod';
+
+export const brain = createBrain({
+  services: {
+    logger: console,
+    api: apiClient
+  },
+  tools: {
+    search: {
+      description: 'Search the web',
+      inputSchema: z.object({ query: z.string() }),
+      execute: async ({ query }) => searchWeb(query)
+    }
+  },
+  components: {
+    Alert: {
+      description: 'Alert banner',
+      props: z.object({ message: z.string(), type: z.enum(['info', 'warning', 'error']) }),
+      render: (props) => `<div class="alert alert-<%= '${props.type}' %>"><%= '${props.message}' %></div>`
+    }
+  }
+});
+```
+
+All brains created with this factory will have access to the configured services, tools, and components.
+
 ## Running Brains
 
 ### Basic Execution
 
 ```typescript
-const brain = brain('Simple').step('Process', () => ({ result: 'done' }));
+const myBrain = brain('Simple').step('Process', () => ({ result: 'done' }));
 
 // Run and collect events
-for await (const event of brain.run({ client: aiClient })) {
+for await (const event of myBrain.run({ client: aiClient })) {
   console.log(event.type); // START, STEP_START, STEP_COMPLETE, etc.
 }
 ```
@@ -677,6 +807,178 @@ Extract prompts to separate files when:
 - You need to load resources or templates
 - The prompt might be reused in other brains
 - You want to test the prompt logic separately
+
+## Batch Prompt Mode
+
+When you need to run the same prompt over multiple items, use batch mode with the `over` option:
+
+```typescript
+brain('Batch Processor')
+  .step('Initialize', () => ({
+    items: [
+      { id: 1, title: 'First item' },
+      { id: 2, title: 'Second item' },
+      { id: 3, title: 'Third item' }
+    ]
+  }))
+  .prompt('Summarize Items', {
+    template: (item) => `Summarize this item: <%= '${item.title}' %>`,
+    outputSchema: {
+      schema: z.object({ summary: z.string() }),
+      name: 'summaries' as const
+    }
+  }, {
+    over: (state) => state.items,  // Array to iterate over
+    concurrency: 10,               // Parallel requests (default: 10)
+    stagger: 100,                  // Delay between requests in ms
+    retry: {
+      maxRetries: 3,
+      backoff: 'exponential',
+      initialDelay: 1000,
+      maxDelay: 30000,
+    },
+    error: (item, error) => ({ summary: 'Failed to summarize' })  // Fallback on error
+  })
+  .step('Process Results', ({ state }) => ({
+    ...state,
+    // summaries is [item, response][] - array of tuples
+    processedSummaries: state.summaries.map(([item, response]) => ({
+      id: item.id,
+      summary: response.summary
+    }))
+  }));
+```
+
+### Batch Options
+
+- `over: (state) => T[]` - Function returning the array to iterate over
+- `concurrency: number` - Maximum parallel requests (default: 10)
+- `stagger: number` - Milliseconds to wait between starting requests
+- `retry: RetryConfig` - Retry configuration for failed requests
+- `error: (item, error) => Response` - Fallback function when a request fails
+
+### Result Format
+
+The result is stored as an array of `[item, response]` tuples, preserving the relationship between each input item and its generated response.
+
+## Agent Steps
+
+For complex AI workflows that require tool use, use the `.brain()` method with an agent configuration:
+
+```typescript
+brain('Research Assistant')
+  .step('Initialize', () => ({
+    query: 'What are the latest developments in AI?'
+  }))
+  .brain('Research Agent', {
+    system: 'You are a helpful research assistant with access to search tools.',
+    prompt: ({ query }) => `Research this topic: <%= '${query}' %>`,
+    tools: {
+      search: {
+        description: 'Search the web for information',
+        inputSchema: z.object({
+          query: z.string().describe('The search query')
+        }),
+        execute: async ({ query }) => {
+          // Implement search logic
+          const results = await searchWeb(query);
+          return { results };
+        }
+      },
+      summarize: {
+        description: 'Summarize a piece of text',
+        inputSchema: z.object({
+          text: z.string().describe('Text to summarize')
+        }),
+        execute: async ({ text }) => {
+          return { summary: text.slice(0, 100) + '...' };
+        }
+      }
+    },
+    maxTokens: 10000,
+  })
+  .step('Format Results', ({ state, brainState }) => ({
+    ...state,
+    researchResults: brainState.response
+  }));
+```
+
+### Agent Configuration Options
+
+- `system: string` - System prompt for the agent
+- `prompt: string | ((state) => string)` - User prompt (can be a function)
+- `tools: Record<string, ToolDefinition>` - Tools available to the agent
+- `maxTokens: number` - Maximum tokens for the agent response
+
+### Tool Definition
+
+Each tool requires:
+- `description: string` - What the tool does
+- `inputSchema: ZodSchema` - Zod schema for the tool's input
+- `execute: (input) => Promise<any>` - Function to execute when the tool is called
+
+## Environment and Pages Service
+
+### The `env` Parameter
+
+Steps have access to the runtime environment via the `env` parameter:
+
+```typescript
+brain('Environment Example')
+  .step('Use Environment', ({ state, env }) => {
+    // env.origin - Base URL of the deployment
+    console.log('Running at:', env.origin);
+
+    // env.secrets - Type-augmented secrets object
+    const apiKey = env.secrets.EXTERNAL_API_KEY;
+
+    return {
+      ...state,
+      baseUrl: env.origin,
+      configured: true
+    };
+  });
+```
+
+### The `pages` Service
+
+The `pages` service allows you to create and manage HTML pages programmatically:
+
+```typescript
+brain('Page Creator')
+  .step('Create Custom Page', async ({ state, pages, env }) => {
+    // Create a page with HTML content
+    const page = await pages.create(
+      `<html>
+        <body>
+          <h1>Hello, <%= '${state.userName}' %>!</h1>
+          <p>Your dashboard is ready.</p>
+        </body>
+      </html>`,
+      { persist: true }  // Keep the page after brain completes
+    );
+
+    return {
+      ...state,
+      dashboardUrl: page.url,      // URL where users can view the page
+      pageWebhook: page.webhook    // Webhook for form submissions (if any)
+    };
+  })
+  .step('Notify User', async ({ state, slack }) => {
+    await slack.post('#general', `Your dashboard: <%= '${state.dashboardUrl}' %>`);
+    return state;
+  });
+```
+
+### Page Options
+
+- `persist: boolean` - If true, the page remains accessible after the brain completes
+
+### Page Object
+
+The created page object contains:
+- `url: string` - Public URL to access the page
+- `webhook: WebhookConfig` - Webhook configuration for handling form submissions
 
 ## UI Steps
 
