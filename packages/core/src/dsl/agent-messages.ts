@@ -2,15 +2,14 @@ import { BRAIN_EVENTS } from './constants.js';
 import type {
   BrainEvent,
   AgentStartEvent,
-  AgentAssistantMessageEvent,
-  AgentToolResultEvent,
   AgentWebhookEvent,
 } from './definitions/events.js';
-import type { ToolMessage } from '../clients/types.js';
+import type { ResponseMessage } from '../clients/types.js';
 import type { JsonObject } from './types.js';
 
 export interface AgentResumeContext {
-  messages: ToolMessage[];
+  /** SDK-native messages preserving provider metadata (e.g., Gemini's thoughtSignature) */
+  responseMessages: ResponseMessage[];
   pendingToolCallId: string;
   pendingToolName: string;
   prompt: string;
@@ -45,40 +44,10 @@ export function reconstructAgentContext(
     );
   }
 
-  const messages: ToolMessage[] = [];
-
-  // Add initial user message from the prompt
-  messages.push({ role: 'user', content: agentStartEvent.prompt });
-
-  // Process events in order to rebuild conversation
-  for (const event of events) {
-    if (event.type === BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE) {
-      const assistantEvent = event as AgentAssistantMessageEvent;
-      messages.push({
-        role: 'assistant',
-        content: assistantEvent.content,
-      });
-    } else if (event.type === BRAIN_EVENTS.AGENT_TOOL_RESULT) {
-      const toolResultEvent = event as AgentToolResultEvent;
-      messages.push({
-        role: 'tool',
-        content: JSON.stringify(toolResultEvent.result),
-        toolCallId: toolResultEvent.toolCallId,
-        toolName: toolResultEvent.toolName,
-      });
-    }
-  }
-
-  // Add the webhook response as the pending tool's result
-  messages.push({
-    role: 'tool',
-    content: JSON.stringify(webhookResponse),
-    toolCallId: agentWebhookEvent.toolCallId,
-    toolName: agentWebhookEvent.toolName,
-  });
-
+  // Use the responseMessages from the AGENT_WEBHOOK event directly
+  // These preserve SDK-specific metadata (like Gemini's thoughtSignature)
   return {
-    messages,
+    responseMessages: agentWebhookEvent.responseMessages,
     pendingToolCallId: agentWebhookEvent.toolCallId,
     pendingToolName: agentWebhookEvent.toolName,
     prompt: agentStartEvent.prompt,

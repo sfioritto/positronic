@@ -1013,6 +1013,12 @@ describe('agent step', () => {
             toolCallId: 'call-2',
             toolName: 'escalate',
             input: { summary: 'Need approval' },
+            // responseMessages preserves SDK-native format with providerOptions
+            responseMessages: [
+              { role: 'user', content: 'Handle the request' },
+              { role: 'assistant', content: 'Let me help you with that' },
+              { role: 'tool', toolCallId: 'call-1', toolName: 'search', output: { found: true } },
+            ],
             options: {},
             brainRunId: 'run-1',
           },
@@ -1027,35 +1033,25 @@ describe('agent step', () => {
         expect(result!.pendingToolCallId).toBe('call-2');
         expect(result!.pendingToolName).toBe('escalate');
 
-        // Check messages array
-        expect(result!.messages).toHaveLength(4);
+        // Check responseMessages array (SDK-native format, preserves providerOptions)
+        expect(result!.responseMessages).toHaveLength(3);
 
-        // First message: initial user prompt
-        expect(result!.messages[0]).toEqual({
+        // The responseMessages are passed through directly from the event
+        expect(result!.responseMessages[0]).toEqual({
           role: 'user',
           content: 'Handle the request',
         });
 
-        // Second message: assistant response
-        expect(result!.messages[1]).toEqual({
+        expect(result!.responseMessages[1]).toEqual({
           role: 'assistant',
           content: 'Let me help you with that',
         });
 
-        // Third message: first tool result
-        expect(result!.messages[2]).toEqual({
+        expect(result!.responseMessages[2]).toEqual({
           role: 'tool',
-          content: JSON.stringify({ found: true }),
           toolCallId: 'call-1',
           toolName: 'search',
-        });
-
-        // Fourth message: webhook response as tool result
-        expect(result!.messages[3]).toEqual({
-          role: 'tool',
-          content: JSON.stringify(webhookResponse),
-          toolCallId: 'call-2',
-          toolName: 'escalate',
+          output: { found: true },
         });
       });
     });

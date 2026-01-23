@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { ObjectGenerator, ToolMessage } from '../../clients/types.js';
+import type { ObjectGenerator, ToolMessage, ResponseMessage } from '../../clients/types.js';
 import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, StepContext } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
@@ -533,8 +533,12 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
       };
     }
 
+    // Track conversation using SDK-native messages (preserves providerOptions like thoughtSignature)
+    let responseMessages: ResponseMessage[] | undefined;
+    // Initial messages for first call (will be converted by client)
+    let initialMessages: ToolMessage[];
+
     // Check if we're resuming from a webhook
-    let messages: ToolMessage[];
     if (this.agentResumeContext) {
       const resumeContext = this.agentResumeContext;
 
@@ -558,8 +562,22 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
         brainRunId: this.brainRunId,
       };
 
-      // Use restored messages from the resume context
-      messages = resumeContext.messages;
+      // Use restored responseMessages from the resume context (preserves providerOptions)
+      // Append the webhook response as a tool result
+      if (this.client.createToolResultMessage) {
+        const toolResultMessage = this.client.createToolResultMessage(
+          resumeContext.pendingToolCallId,
+          resumeContext.pendingToolName,
+          resumeContext.webhookResponse
+        );
+        responseMessages = [...resumeContext.responseMessages, toolResultMessage];
+      } else {
+        // Fallback if client doesn't support createToolResultMessage
+        responseMessages = resumeContext.responseMessages;
+      }
+
+      // Set empty initial messages since we're using responseMessages
+      initialMessages = [];
 
       // Clear the context so it's only used once
       this.agentResumeContext = undefined;
@@ -580,7 +598,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
       };
 
       // Initialize messages for fresh start
-      messages = [{ role: 'user', content: prompt }];
+      initialMessages = [{ role: 'user', content: prompt }];
     }
 
     // Initialize token tracking
@@ -660,9 +678,13 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
       const response = await this.client.generateText({
         system: systemPrompt,
-        messages,
+        messages: initialMessages,
+        responseMessages,
         tools: toolsForClient,
       });
+
+      // Update responseMessages for next iteration (preserves providerOptions)
+      responseMessages = response.responseMessages;
 
       // Track tokens
       const tokensThisIteration = response.usage.totalTokens;
@@ -710,32 +732,11 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         };
       }
 
-      // If no tool calls, add text-only assistant message and end
+      // If no tool calls, agent is done
       if (!response.toolCalls || response.toolCalls.length === 0) {
-        if (response.text) {
-          messages.push({ role: 'assistant', content: response.text });
-        }
         yield* this.completeStep(step, prevState);
         return;
       }
-
-      // Add assistant message with tool_use blocks
-      // This is critical: we must store the actual tool call arguments so the LLM
-      // knows what it called on the next iteration. Just storing text like
-      // "[Used tools: X]" loses the arguments, causing the LLM to not understand
-      // what it did previously.
-      const toolUseBlocks = response.toolCalls.map((tc) => ({
-        type: 'tool_use' as const,
-        toolCallId: tc.toolCallId,
-        toolName: tc.toolName,
-        args: tc.args,
-      }));
-
-      messages.push({
-        role: 'assistant',
-        content: response.text || '',
-        toolCalls: toolUseBlocks,
-      });
 
       // Process tool calls
       for (const toolCall of response.toolCalls) {
@@ -815,7 +816,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               ? waitForResult.waitFor
               : [waitForResult.waitFor];
 
-            // Emit agent webhook event first (captures pending tool context)
+            // Emit agent webhook event first (captures pending tool context and conversation state)
             yield {
               type: BRAIN_EVENTS.AGENT_WEBHOOK,
               stepTitle: step.block.title,
@@ -823,6 +824,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               toolCallId: toolCall.toolCallId,
               toolName: toolCall.toolName,
               input: toolCall.args as JsonObject,
+              responseMessages: responseMessages ?? [],
               options: this.options ?? ({} as TOptions),
               brainRunId: this.brainRunId,
             };
@@ -852,12 +854,15 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             brainRunId: this.brainRunId,
           };
 
-          messages.push({
-            role: 'tool',
-            content: JSON.stringify(toolResult),
-            toolCallId: toolCall.toolCallId,
-            toolName: toolCall.toolName,
-          });
+          // Append tool result using SDK-native format (preserves providerOptions)
+          if (this.client.createToolResultMessage && responseMessages) {
+            const toolResultMessage = this.client.createToolResultMessage(
+              toolCall.toolCallId,
+              toolCall.toolName,
+              toolResult
+            );
+            responseMessages = [...responseMessages, toolResultMessage];
+          }
         }
       }
     }
