@@ -304,7 +304,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
       // View toggle
       if (input === 'e') {
         setViewMode('events');
-      } else if (input === 'w') {
+      } else if (input === 'w' || (input === 'b' && viewMode === 'events' && eventsViewMode !== 'detail')) {
+        // 'b' in events list mode goes back to progress view
+        // 'b' in events detail mode is handled by EventsView to go back to list
         setViewMode('progress');
       } else if (input === 'x' && !isKilling && !isKilled && !isComplete) {
         setConfirmingKill(true);
@@ -333,11 +335,11 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   const getFooter = () => {
     if (viewMode === 'events') {
       if (eventsViewMode === 'detail') {
-        return 'j/k scroll • esc back';
+        return 'j/k scroll • b back';
       } else if (eventsViewMode === 'navigating') {
-        return 'j/k select • Enter detail • esc auto-scroll • w progress';
+        return 'j/k select • Enter detail • b back • esc auto-scroll';
       } else {
-        return 'j/k select • w progress | x kill | esc quit';
+        return 'j/k select • b back | x kill | esc quit';
       }
     } else {
       return 'e events | x kill | esc quit';

@@ -882,9 +882,9 @@ describe('CLI Integration: positronic brain commands', () => {
           // Switch to events view
           instance.stdin.write('e');
 
-          // In events view, footer should show 'w progress'
-          const foundProgressHint = await waitForOutput(/w progress/, 30);
-          expect(foundProgressHint).toBe(true);
+          // In events view, footer should show 'b back'
+          const foundBackHint = await waitForOutput(/b back/, 30);
+          expect(foundBackHint).toBe(true);
 
           instance.unmount();
         } finally {
