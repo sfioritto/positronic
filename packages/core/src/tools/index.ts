@@ -196,15 +196,11 @@ export const consoleLog = createTool({
 });
 
 /**
- * Done tool - a simple terminal tool for completing agent execution.
- * The result becomes part of the brain state.
+ * Default schema for the auto-generated 'done' tool when no outputSchema is provided.
+ * Used internally by the framework.
  */
-export const done = createTool({
-  description: 'Complete the task and return a result',
-  inputSchema: z.object({
-    result: z.string().describe('The final result or summary of the completed task'),
-  }),
-  terminal: true,
+export const defaultDoneSchema = z.object({
+  result: z.string().describe('The final result or summary of the completed task'),
 });
 
 /**
@@ -213,6 +209,10 @@ export const done = createTool({
  * Use with createBrain's defaultTools option or .withTools() to include
  * standard tools in your brain. Tools can be extended or overridden in
  * individual agent steps.
+ *
+ * Note: A 'done' terminal tool is automatically generated for every agent.
+ * If you provide an outputSchema, 'done' will use that schema. Otherwise,
+ * it uses a default schema expecting { result: string }.
  *
  * @example
  * ```typescript
@@ -237,5 +237,4 @@ export const defaultTools = {
   generateUI,
   waitForWebhook,
   consoleLog,
-  done,
 };

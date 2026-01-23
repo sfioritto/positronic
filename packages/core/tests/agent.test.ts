@@ -1223,7 +1223,7 @@ describe('agent step', () => {
         toolCalls: [
           {
             toolCallId: 'call-1',
-            toolName: 'complete',
+            toolName: 'done',
             args: { summary: 'Done', score: 95 },
           },
         ],
@@ -1243,11 +1243,11 @@ describe('agent step', () => {
         events.push(event);
       }
 
-      // Verify generated tool was available
+      // Verify generated tool was available with 'done' name
       expect(mockGenerateText).toHaveBeenCalledWith(
         expect.objectContaining({
           tools: expect.objectContaining({
-            complete: expect.objectContaining({
+            done: expect.objectContaining({
               description: expect.stringContaining('analysis'),
             }),
           }),
@@ -1269,65 +1269,13 @@ describe('agent step', () => {
       expect(finalState.summary).toBeUndefined();
     });
 
-    it('should use custom tool name from outputSchema', async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: undefined,
-        toolCalls: [
-          {
-            toolCallId: 'call-1',
-            toolName: 'finalize',
-            args: { result: 'done' },
-          },
-        ],
-        usage: { totalTokens: 100 },
-      });
-
-      const testBrain = brain('test-custom-tool-name').brain('Process', {
-        prompt: 'Do something',
-        outputSchema: {
-          schema: z.object({ result: z.string() }),
-          name: 'output' as const,
-          toolName: 'finalize',
-          toolDescription: 'Finalize the processing',
-        },
-      });
-
-      const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
-        events.push(event);
-      }
-
-      // Verify custom tool name and description were used
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tools: expect.objectContaining({
-            finalize: expect.objectContaining({
-              description: 'Finalize the processing',
-            }),
-          }),
-        })
-      );
-
-      // Verify state was namespaced correctly
-      let finalState: any = {};
-      for (const event of events) {
-        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-          finalState = applyPatches(finalState, [event.patch]);
-        }
-      }
-
-      expect(finalState).toEqual({
-        output: { result: 'done' },
-      });
-    });
-
     it('should work with config function pattern', async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
         toolCalls: [
           {
             toolCallId: 'call-1',
-            toolName: 'complete',
+            toolName: 'done',
             args: { message: 'Hello back' },
           },
         ],
@@ -1414,7 +1362,7 @@ describe('agent step', () => {
         toolCalls: [
           {
             toolCallId: 'call-1',
-            toolName: 'complete',
+            toolName: 'done',
             args: { entities: ['apple', 'banana'], count: 2 },
           },
         ],
@@ -1466,7 +1414,7 @@ describe('agent step', () => {
         toolCalls: [
           {
             toolCallId: 'call-1',
-            toolName: 'complete',
+            toolName: 'done',
             args: { userName: 'Alice', greeting: 'Welcome!' },
           },
         ],

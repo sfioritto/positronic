@@ -139,10 +139,6 @@ export interface AgentOutputSchema<
   schema: TSchema;
   /** Key name to store the result under in state (use `as const` for type inference) */
   name: TName;
-  /** Optional name for the generated terminal tool (defaults to "complete") */
-  toolName?: string;
-  /** Optional description for the generated terminal tool */
-  toolDescription?: string;
 }
 
 /**
