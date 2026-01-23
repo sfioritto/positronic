@@ -16,6 +16,7 @@ interface EventsViewProps {
   totalTokens?: number;
   isActive?: boolean;
   onModeChange?: (mode: EventsViewMode) => void;
+  onViewState?: (eventIndex: number) => void;
 }
 
 type InternalMode = 'list' | 'detail';
@@ -235,7 +236,7 @@ const EventLine = ({ stored, isSelected }: EventLineProps) => {
   );
 };
 
-export const EventsView = ({ events, totalTokens = 0, isActive = true, onModeChange }: EventsViewProps) => {
+export const EventsView = ({ events, totalTokens = 0, isActive = true, onModeChange, onViewState }: EventsViewProps) => {
   const { stdout } = useStdout();
   const terminalHeight = stdout?.rows || 24;
   // Reserve lines for header, footer, margins, token total
@@ -293,6 +294,9 @@ export const EventsView = ({ events, totalTokens = 0, isActive = true, onModeCha
         } else if (key.return && selectedIndex !== null && events.length > 0) {
           setMode('detail');
           setScrollOffset(0);
+        } else if (input === 's' && selectedIndex !== null && onViewState) {
+          // View state at selected event
+          onViewState(selectedIndex);
         } else if (key.escape && selectedIndex !== null) {
           // Return to auto-scroll mode
           setSelectedIndex(null);
