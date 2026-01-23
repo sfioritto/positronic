@@ -9,6 +9,7 @@ import {
   type AgentToolResultEvent,
   type AgentCompleteEvent,
   type AgentTokenLimitEvent,
+  type AgentIterationLimitEvent,
   type AgentWebhookEvent,
   type WebhookResponseEvent,
 } from '../src/dsl/brain.js';
@@ -30,8 +31,8 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
 
 describe('agent step', () => {
   beforeEach(() => {
-    mockGenerateObject.mockClear();
-    mockGenerateText.mockClear();
+    mockGenerateObject.mockReset();
+    mockGenerateText.mockReset();
   });
 
   describe('basic agent with terminal tool', () => {
@@ -87,6 +88,7 @@ describe('agent step', () => {
       ) as AgentCompleteEvent;
       expect(agentCompleteEvent.terminalToolName).toBe('resolve');
       expect(agentCompleteEvent.result).toEqual({ resolution: 'Issue fixed' });
+      expect(agentCompleteEvent.totalTokens).toBe(100);
 
       // Verify final state has terminal tool result merged
       let finalState = {};
@@ -281,6 +283,173 @@ describe('agent step', () => {
 
       // Agent should still complete
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+    });
+  });
+
+  describe('agent with maxIterations limit', () => {
+    it('should stop agent when maxIterations exceeded', async () => {
+      // Each call returns a tool call, never completing
+      mockGenerateText
+        .mockResolvedValueOnce({
+          text: 'Working...',
+          toolCalls: [
+            { toolCallId: 'call-1', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 50 },
+        })
+        .mockResolvedValueOnce({
+          text: 'Still working...',
+          toolCalls: [
+            { toolCallId: 'call-2', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 50 },
+        })
+        .mockResolvedValueOnce({
+          text: 'More work...',
+          toolCalls: [
+            { toolCallId: 'call-3', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 50 },
+        })
+        .mockResolvedValueOnce({
+          text: 'Even more work...',
+          toolCalls: [
+            { toolCallId: 'call-4', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 50 },
+        });
+
+      const testBrain = brain('test-max-iterations').brain('Long Task', () => ({
+        prompt: 'Do lots of work',
+        tools: {
+          doWork: {
+            description: 'Do some work',
+            inputSchema: z.object({}),
+            execute: async () => 'done',
+          },
+          resolve: {
+            description: 'Finish',
+            inputSchema: z.object({}),
+            terminal: true,
+          },
+        },
+        maxIterations: 3, // Limit at 3 iterations
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Should emit iteration limit event
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT)).toBe(
+        true
+      );
+
+      const iterationLimitEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT
+      ) as AgentIterationLimitEvent;
+      expect(iterationLimitEvent.iteration).toBe(3);
+      expect(iterationLimitEvent.maxIterations).toBe(3);
+      expect(iterationLimitEvent.totalTokens).toBe(150); // 3 iterations * 50 tokens
+
+      // Agent should still complete
+      expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+    });
+
+    it('should use default maxIterations of 100', async () => {
+      // Verify default by checking iteration count
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          { toolCallId: 'call-1', toolName: 'done', args: {} },
+        ],
+        usage: { totalTokens: 50 },
+      });
+
+      const testBrain = brain('test-default-max-iterations').brain('Task', () => ({
+        prompt: 'Do something',
+        tools: {
+          done: {
+            description: 'Done',
+            inputSchema: z.object({}),
+            terminal: true,
+          },
+        },
+        // No maxIterations specified - should default to 100
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Should complete normally (1 iteration < 100 default)
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE)).toBe(true);
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT)).toBe(false);
+    });
+  });
+
+  describe('agent iteration event includes token info', () => {
+    it('should include tokensThisIteration and totalTokens in iteration events', async () => {
+      mockGenerateText
+        .mockResolvedValueOnce({
+          text: undefined,
+          toolCalls: [
+            { toolCallId: 'call-1', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 100 },
+        })
+        .mockResolvedValueOnce({
+          text: undefined,
+          toolCalls: [
+            { toolCallId: 'call-2', toolName: 'done', args: {} },
+          ],
+          usage: { totalTokens: 150 },
+        });
+
+      const testBrain = brain('test-iteration-tokens').brain('Task', () => ({
+        prompt: 'Do task',
+        tools: {
+          doWork: {
+            description: 'Do work',
+            inputSchema: z.object({}),
+            execute: async () => 'done',
+          },
+          done: {
+            description: 'Done',
+            inputSchema: z.object({}),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      const iterationEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.AGENT_ITERATION
+      ) as AgentIterationEvent[];
+
+      expect(iterationEvents.length).toBe(2);
+
+      // First iteration
+      expect(iterationEvents[0].iteration).toBe(1);
+      expect(iterationEvents[0].tokensThisIteration).toBe(100);
+      expect(iterationEvents[0].totalTokens).toBe(100);
+
+      // Second iteration
+      expect(iterationEvents[1].iteration).toBe(2);
+      expect(iterationEvents[1].tokensThisIteration).toBe(150);
+      expect(iterationEvents[1].totalTokens).toBe(250);
+
+      // Agent complete should also have totalTokens
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE
+      ) as AgentCompleteEvent;
+      expect(completeEvent.totalTokens).toBe(250);
     });
   });
 
@@ -768,6 +937,7 @@ describe('agent step', () => {
             terminalToolName: 'resolve',
             result: {},
             totalIterations: 1,
+            totalTokens: 100,
             options: {},
             brainRunId: 'run-1',
           },
@@ -793,6 +963,8 @@ describe('agent step', () => {
             stepTitle: 'Test',
             stepId: 'step-1',
             iteration: 1,
+            tokensThisIteration: 100,
+            totalTokens: 100,
             options: {},
             brainRunId: 'run-1',
           },
