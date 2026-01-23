@@ -695,7 +695,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         return;
       }
 
-      // Handle assistant text response
+      // Handle assistant text response (emit event and log)
       if (response.text) {
         // Log assistant messages to console as fallback (users shouldn't rely on this)
         console.log(`[Assistant] ${response.text}`);
@@ -708,21 +708,34 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
-        messages.push({ role: 'assistant', content: response.text });
       }
 
-      // If no tool calls, agent naturally ends
+      // If no tool calls, add text-only assistant message and end
       if (!response.toolCalls || response.toolCalls.length === 0) {
+        if (response.text) {
+          messages.push({ role: 'assistant', content: response.text });
+        }
         yield* this.completeStep(step, prevState);
         return;
       }
 
-      // Add assistant message noting tool usage (if no text was already added)
-      // Use neutral language so the LLM doesn't mimic this format
-      if (!response.text) {
-        const toolNames = response.toolCalls.map((tc) => tc.toolName).join(', ');
-        messages.push({ role: 'assistant', content: `[Used tools: ${toolNames}]` });
-      }
+      // Add assistant message with tool_use blocks
+      // This is critical: we must store the actual tool call arguments so the LLM
+      // knows what it called on the next iteration. Just storing text like
+      // "[Used tools: X]" loses the arguments, causing the LLM to not understand
+      // what it did previously.
+      const toolUseBlocks = response.toolCalls.map((tc) => ({
+        type: 'tool_use' as const,
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        args: tc.args,
+      }));
+
+      messages.push({
+        role: 'assistant',
+        content: response.text || '',
+        toolCalls: toolUseBlocks,
+      });
 
       // Process tool calls
       for (const toolCall of response.toolCalls) {
