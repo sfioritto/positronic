@@ -1,8 +1,8 @@
-import { createBrain } from '@positronic/core';
+import { createBrain, defaultTools } from '@positronic/core';
 import { components } from './components/index.js';
 
 /**
- * Project-level brain function with pre-configured components.
+ * Project-level brain function with pre-configured components and tools.
  *
  * All brains in your project should import from this file:
  *
@@ -13,10 +13,15 @@ import { components } from './components/index.js';
  *   .step('Do something', ({ state }) => ({ ...state, done: true }));
  * ```
  *
+ * Default tools available in agent steps:
+ * - generateUI: Generate interactive UI components
+ * - consoleLog: Log messages for debugging
+ * - done: Complete the agent and return a result
+ *
  * To add services (e.g., Slack, Gmail, database clients):
  *
  * ```typescript
- * import { createBrain } from '@positronic/core';
+ * import { createBrain, defaultTools } from '@positronic/core';
  * import { components } from './components/index.js';
  * import slack from './services/slack.js';
  * import gmail from './services/gmail.js';
@@ -24,6 +29,7 @@ import { components } from './components/index.js';
  * export const brain = createBrain({
  *   services: { slack, gmail },
  *   components,
+ *   defaultTools,
  * });
  * ```
  *
@@ -37,22 +43,18 @@ import { components } from './components/index.js';
  *   });
  * ```
  *
- * You can also create agents directly:
+ * You can also create agents directly with access to default tools:
  *
  * ```typescript
- * export default brain('my-agent', ({ slack, env }) => ({
+ * export default brain('my-agent', ({ slack, tools }) => ({
  *   system: 'You are a helpful assistant',
  *   prompt: 'Help the user with their request',
  *   tools: {
+ *     ...tools, // includes generateUI, consoleLog, done
  *     notify: {
  *       description: 'Send a Slack notification',
  *       inputSchema: z.object({ message: z.string() }),
  *       execute: ({ message }) => slack.postMessage('#general', message),
- *     },
- *     done: {
- *       description: 'Complete the task',
- *       inputSchema: z.object({ result: z.string() }),
- *       terminal: true,
  *     },
  *   },
  * }));
@@ -60,4 +62,5 @@ import { components } from './components/index.js';
  */
 export const brain = createBrain({
   components,
+  defaultTools,
 });
