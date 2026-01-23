@@ -1,5 +1,15 @@
 # @positronic/client-anthropic
 
+## 0.0.56
+
+### Patch Changes
+
+- - Add events view to watch command for real-time monitoring of brain events
+  - Fix generateUI tool to properly generate UI pages
+  - Fix AgentTool type variance issue in createBrain
+- Updated dependencies
+  - @positronic/core@0.0.56
+
 ## 0.0.55
 
 ### Patch Changes
