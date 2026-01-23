@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { BRAIN_EVENTS } from '@positronic/core';
 import { reconstructStateAtEvent } from '../src/utils/state-reconstruction.js';
-import type { StoredEvent } from '../src/components/events-view.js';
+import type { StoredEvent } from '../src/utils/state-reconstruction.js';
 
 // Helper to create a StoredEvent
 function createStoredEvent(event: any, timestampOffset = 0): StoredEvent {
