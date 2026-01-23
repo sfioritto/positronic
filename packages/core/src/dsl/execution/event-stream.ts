@@ -640,27 +640,21 @@ PURPOSE: Create interactive web pages for user interaction - forms, displays, da
 AVAILABLE COMPONENTS:
 ${componentList}
 
-RETURNS: { url: string, webhook: { slug: string, identifier: string } | null }
-- url: The URL where the generated page can be accessed. YOU MUST COMMUNICATE THIS URL TO THE USER.
-- webhook: Present only when hasForm=true. Required for waitForWebhook to receive form submissions.
+RETURNS on success: { success: true, message: string, url: string, webhook: { slug: string, identifier: string } | null }
+- success: Always true when the page was created successfully
+- message: Instructions for what to do next
+- url: The URL where the generated page can be accessed
+- webhook: Present only when hasForm=true. Use with waitForWebhook to receive form submissions.
 
-⚠️ CRITICAL REQUIREMENTS FOR FORMS (hasForm=true):
-
-1. YOU MUST TELL THE USER THE PAGE URL - The user has no other way to discover it. Include the full URL in your response text, a message, or another communication channel available to you.
-
-2. YOU MUST CALL waitForWebhook AFTER telling the user the URL - This pauses execution until the form is submitted.
-
-3. FAILURE MODE: If you call waitForWebhook without first communicating the URL to the user, the job will freeze indefinitely. The user cannot submit a form they cannot find, and there is no easy recovery.
-
-CORRECT WORKFLOW FOR FORMS:
-1. Call generateUI with your prompt
-2. In your response, clearly show the user the returned URL (e.g., "Please fill out the form at: {url}")
-3. Call waitForWebhook with the webhook slug and identifier
-4. Execution pauses until user submits, then resumes with form data
+CORRECT WORKFLOW FOR FORMS (hasForm=true):
+1. Call generateUI with your prompt - you will receive success: true and a url
+2. Communicate the URL to the user using the best available tool (e.g., Slack, email, consoleLog)
+3. Call waitForWebhook with the webhook.slug and webhook.identifier from the result
+4. Execution pauses until user submits the form, then resumes with form data
 
 WORKFLOW FOR DISPLAY-ONLY PAGES (hasForm=false):
 1. Call generateUI with hasForm: false
-2. Tell the user the page URL
+2. Communicate the URL to the user
 3. Continue with other tasks (no waiting required)`;
         }
 
