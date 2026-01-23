@@ -3,6 +3,7 @@ import type {
   BrainEvent,
   AgentStartEvent,
   AgentWebhookEvent,
+  AgentRawResponseMessageEvent,
 } from './definitions/events.js';
 import type { ResponseMessage } from '../clients/types.js';
 import type { JsonObject } from './types.js';
@@ -44,10 +45,26 @@ export function reconstructAgentContext(
     );
   }
 
-  // Use the responseMessages from the AGENT_WEBHOOK event directly
-  // These preserve SDK-specific metadata (like Gemini's thoughtSignature)
+  // Collect all raw response message events and reconstruct the conversation
+  // Each event contains only the new messages from that iteration (patch pattern)
+  const rawResponseEvents = events.filter(
+    (e): e is AgentRawResponseMessageEvent =>
+      e.type === BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE
+  );
+
+  if (rawResponseEvents.length === 0) {
+    throw new Error(
+      'AGENT_RAW_RESPONSE_MESSAGE event not found but AGENT_WEBHOOK exists - invalid event sequence'
+    );
+  }
+
+  // Reconstruct full conversation by replaying all events
+  const responseMessages = rawResponseEvents.flatMap(
+    (e) => e.rawResponse.responseMessages
+  );
+
   return {
-    responseMessages: agentWebhookEvent.responseMessages,
+    responseMessages,
     pendingToolCallId: agentWebhookEvent.toolCallId,
     pendingToolName: agentWebhookEvent.toolName,
     prompt: agentStartEvent.prompt,

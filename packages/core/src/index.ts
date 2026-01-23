@@ -65,6 +65,7 @@ export type {
   AgentTokenLimitEvent,
   AgentIterationLimitEvent,
   AgentWebhookEvent,
+  AgentRawResponseMessageEvent,
   WebhookResponseEvent,
 } from './dsl/definitions/events.js';
 

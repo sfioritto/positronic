@@ -20,6 +20,7 @@ export const BRAIN_EVENTS = {
   AGENT_TOKEN_LIMIT: 'agent:token_limit',
   AGENT_ITERATION_LIMIT: 'agent:iteration_limit',
   AGENT_WEBHOOK: 'agent:webhook',
+  AGENT_RAW_RESPONSE_MESSAGE: 'agent:raw_response_message',
 } as const;
 
 export const STATUS = {

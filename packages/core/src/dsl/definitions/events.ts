@@ -180,8 +180,23 @@ export interface AgentWebhookEvent<TOptions extends JsonObject = JsonObject>
   toolCallId: string;
   toolName: string;
   input: JsonObject;
-  /** SDK-native messages preserving provider metadata (e.g., Gemini's thoughtSignature) */
-  responseMessages: ResponseMessage[];
+}
+
+export interface AgentRawResponseMessageEvent<
+  TOptions extends JsonObject = JsonObject
+> extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE;
+  stepTitle: string;
+  stepId: string;
+  iteration: number;
+  /** The exact response from generateText() - model-specific format */
+  rawResponse: {
+    text?: string;
+    toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
+    usage: { totalTokens: number };
+    /** SDK-native messages preserving provider metadata (e.g., Gemini's thoughtSignature) */
+    responseMessages: ResponseMessage[];
+  };
 }
 
 export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
@@ -210,4 +225,5 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | AgentCompleteEvent<TOptions>
   | AgentTokenLimitEvent<TOptions>
   | AgentIterationLimitEvent<TOptions>
-  | AgentWebhookEvent<TOptions>;
+  | AgentWebhookEvent<TOptions>
+  | AgentRawResponseMessageEvent<TOptions>;

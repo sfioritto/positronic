@@ -11,6 +11,7 @@ import {
   type AgentTokenLimitEvent,
   type AgentIterationLimitEvent,
   type AgentWebhookEvent,
+  type AgentRawResponseMessageEvent,
   type WebhookResponseEvent,
 } from '../src/dsl/brain.js';
 import { z } from 'zod';
@@ -799,6 +800,7 @@ describe('agent step', () => {
         BRAIN_EVENTS.STEP_START,
         BRAIN_EVENTS.STEP_STATUS, // running status during step
         BRAIN_EVENTS.AGENT_START,
+        BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE, // raw LLM response captured
         BRAIN_EVENTS.AGENT_ITERATION,
         BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
         BRAIN_EVENTS.AGENT_TOOL_CALL,
@@ -807,6 +809,110 @@ describe('agent step', () => {
         BRAIN_EVENTS.STEP_STATUS, // running -> complete
         BRAIN_EVENTS.COMPLETE,
       ]);
+    });
+  });
+
+  describe('agent raw response message event', () => {
+    it('should emit agent:raw_response_message immediately after generateText', async () => {
+      mockGenerateText
+        .mockResolvedValueOnce({
+          text: 'Thinking...',
+          toolCalls: [
+            { toolCallId: 'call-1', toolName: 'doWork', args: { task: 'test' } },
+          ],
+          usage: { totalTokens: 100 },
+          responseMessages: [
+            { role: 'user', content: 'Do task' },
+            { role: 'assistant', content: 'Thinking...' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          text: 'Done!',
+          toolCalls: [
+            { toolCallId: 'call-2', toolName: 'done', args: { result: 'completed' } },
+          ],
+          usage: { totalTokens: 150 },
+          responseMessages: [
+            { role: 'user', content: 'Do task' },
+            { role: 'assistant', content: 'Thinking...' },
+            { role: 'tool', toolCallId: 'call-1', content: 'work done' },
+            { role: 'assistant', content: 'Done!' },
+          ],
+        });
+
+      const doWorkMock = jest.fn().mockResolvedValue('work done');
+
+      const testBrain = brain('test-raw-response').brain('Task', () => ({
+        prompt: 'Do task',
+        tools: {
+          doWork: {
+            description: 'Do work',
+            inputSchema: z.object({ task: z.string() }),
+            execute: doWorkMock,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Find raw response events
+      const rawResponseEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE
+      ) as AgentRawResponseMessageEvent[];
+
+      // Should have 2 raw response events (one per iteration)
+      expect(rawResponseEvents.length).toBe(2);
+
+      // First raw response
+      expect(rawResponseEvents[0].iteration).toBe(1);
+      expect(rawResponseEvents[0].rawResponse.text).toBe('Thinking...');
+      expect(rawResponseEvents[0].rawResponse.toolCalls).toHaveLength(1);
+      expect(rawResponseEvents[0].rawResponse.toolCalls![0].toolName).toBe('doWork');
+      expect(rawResponseEvents[0].rawResponse.usage.totalTokens).toBe(100);
+      expect(rawResponseEvents[0].rawResponse.responseMessages).toHaveLength(2);
+
+      // Second raw response - should only contain the NEW messages from this iteration (delta pattern)
+      expect(rawResponseEvents[1].iteration).toBe(2);
+      expect(rawResponseEvents[1].rawResponse.text).toBe('Done!');
+      expect(rawResponseEvents[1].rawResponse.responseMessages).toHaveLength(2);
+      // The delta contains only the tool result and assistant response from this iteration
+      expect(rawResponseEvents[1].rawResponse.responseMessages[0].role).toBe('tool');
+      expect(rawResponseEvents[1].rawResponse.responseMessages[1].role).toBe('assistant');
+    });
+
+    it('should emit raw response before iteration event', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          { toolCallId: 'call-1', toolName: 'done', args: {} },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [{ role: 'user', content: 'Do task' }],
+      });
+
+      const testBrain = brain('test-event-order-raw').brain('Task', () => ({
+        prompt: 'Do task',
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      const rawResponseIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE
+      );
+      const iterationIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.AGENT_ITERATION
+      );
+
+      // Raw response should come before iteration
+      expect(rawResponseIndex).toBeGreaterThan(-1);
+      expect(iterationIndex).toBeGreaterThan(-1);
+      expect(rawResponseIndex).toBeLessThan(iterationIndex);
     });
   });
 
@@ -959,6 +1065,28 @@ describe('agent step', () => {
             brainRunId: 'run-1',
           },
           {
+            type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+            stepTitle: 'Test',
+            stepId: 'step-1',
+            iteration: 1,
+            rawResponse: {
+              text: 'Let me help you with that',
+              toolCalls: [
+                { toolCallId: 'call-1', toolName: 'search', args: { query: 'test' } },
+                { toolCallId: 'call-2', toolName: 'escalate', args: { summary: 'Need approval' } },
+              ],
+              usage: { totalTokens: 100 },
+              // responseMessages preserves SDK-native format with providerOptions
+              responseMessages: [
+                { role: 'user', content: 'Handle the request' },
+                { role: 'assistant', content: 'Let me help you with that' },
+                { role: 'tool', toolCallId: 'call-1', toolName: 'search', output: { found: true } },
+              ],
+            },
+            options: {},
+            brainRunId: 'run-1',
+          },
+          {
             type: BRAIN_EVENTS.AGENT_ITERATION,
             stepTitle: 'Test',
             stepId: 'step-1',
@@ -1013,12 +1141,6 @@ describe('agent step', () => {
             toolCallId: 'call-2',
             toolName: 'escalate',
             input: { summary: 'Need approval' },
-            // responseMessages preserves SDK-native format with providerOptions
-            responseMessages: [
-              { role: 'user', content: 'Handle the request' },
-              { role: 'assistant', content: 'Let me help you with that' },
-              { role: 'tool', toolCallId: 'call-1', toolName: 'search', output: { found: true } },
-            ],
             options: {},
             brainRunId: 'run-1',
           },
@@ -1036,7 +1158,7 @@ describe('agent step', () => {
         // Check responseMessages array (SDK-native format, preserves providerOptions)
         expect(result!.responseMessages).toHaveLength(3);
 
-        // The responseMessages are passed through directly from the event
+        // The responseMessages are passed through directly from the raw response event
         expect(result!.responseMessages[0]).toEqual({
           role: 'user',
           content: 'Handle the request',
