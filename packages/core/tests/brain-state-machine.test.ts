@@ -5,6 +5,169 @@ import {
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 
 describe('brain-state-machine', () => {
+  describe('token tracking', () => {
+    it('should track total tokens from AGENT_COMPLETE events', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      // Start brain
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'agent-brain',
+        initialState: {},
+      });
+
+      // Agent completes with 500 tokens
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_COMPLETE,
+        brainRunId,
+        stepTitle: 'Generate content',
+        stepId: 'step-1',
+        terminalToolName: 'finish',
+        result: {},
+        totalIterations: 1,
+        totalTokens: 500,
+      });
+
+      expect(machine.context.totalTokens).toBe(500);
+    });
+
+    it('should sum tokens from multiple AGENT_COMPLETE events', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'multi-agent-brain',
+        initialState: {},
+      });
+
+      // First agent completes with 500 tokens
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_COMPLETE,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        terminalToolName: 'finish',
+        result: {},
+        totalIterations: 1,
+        totalTokens: 500,
+      });
+
+      // Second agent completes with 1000 tokens
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_COMPLETE,
+        brainRunId,
+        stepTitle: 'Step 2',
+        stepId: 'step-2',
+        terminalToolName: 'finish',
+        result: {},
+        totalIterations: 2,
+        totalTokens: 1000,
+      });
+
+      expect(machine.context.totalTokens).toBe(1500);
+    });
+
+    it('should track tokens from AGENT_TOKEN_LIMIT events', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'token-limit-brain',
+        initialState: {},
+      });
+
+      // Agent hits token limit
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        totalTokens: 10000,
+        maxTokens: 10000,
+      });
+
+      expect(machine.context.totalTokens).toBe(10000);
+    });
+
+    it('should track tokens from AGENT_ITERATION_LIMIT events', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'iter-limit-brain',
+        initialState: {},
+      });
+
+      // Agent hits iteration limit
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        iteration: 10,
+        maxIterations: 10,
+        totalTokens: 5000,
+      });
+
+      expect(machine.context.totalTokens).toBe(5000);
+    });
+
+    it('should sum tokens from mixed terminal events', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'mixed-brain',
+        initialState: {},
+      });
+
+      // First agent completes normally
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_COMPLETE,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        terminalToolName: 'finish',
+        result: {},
+        totalIterations: 1,
+        totalTokens: 500,
+      });
+
+      // Second agent hits token limit
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
+        brainRunId,
+        stepTitle: 'Step 2',
+        stepId: 'step-2',
+        totalTokens: 10000,
+        maxTokens: 10000,
+      });
+
+      // Third agent hits iteration limit
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
+        brainRunId,
+        stepTitle: 'Step 3',
+        stepId: 'step-3',
+        iteration: 10,
+        maxIterations: 10,
+        totalTokens: 3000,
+      });
+
+      expect(machine.context.totalTokens).toBe(13500);
+    });
+  });
+
   describe('brain restart (webhook resume)', () => {
     it('should replace brain on stack when same brain restarts after webhook (not add duplicate)', () => {
       // This test simulates the event sequence that occurs when:
