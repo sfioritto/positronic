@@ -151,6 +151,11 @@ function getEventDetailContent(event: BrainEvent): string {
         `Step: ${event.stepTitle}`,
         `Step ID: ${event.stepId}`,
         '',
+        'Tools:',
+        ...(event.tools && event.tools.length > 0
+          ? event.tools.map((t) => `  • ${t}`)
+          : ['  (none)']),
+        '',
         'Prompt:',
         event.prompt,
         ...(event.system ? ['', 'System Prompt:', event.system] : []),

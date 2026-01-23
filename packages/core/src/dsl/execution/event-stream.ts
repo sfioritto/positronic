@@ -533,6 +533,7 @@ export class BrainEventStream<
         stepId: step.id,
         prompt,
         system: config.system,
+        tools: Object.keys(mergedTools),
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
       };
