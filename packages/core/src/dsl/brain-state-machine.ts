@@ -93,6 +93,9 @@ export interface BrainExecutionContext {
 
   // Step counter for top-level steps
   topLevelStepCount: number;
+
+  // Total tokens used across all agent steps
+  totalTokens: number;
 }
 
 export type ExecutionState =
@@ -291,6 +294,7 @@ const createInitialContext = (
   isError: false,
   isCancelled: false,
   topLevelStepCount: 0,
+  totalTokens: 0,
 });
 
 // ============================================================================
@@ -795,6 +799,24 @@ const passthrough = (eventType: string) =>
     };
   });
 
+// Reducer for agent terminal events that also tracks tokens
+const agentTerminal = (eventType: string) =>
+  reduce<BrainExecutionContext, any>((ctx, ev) => {
+    const { brainRunId, options, totalTokens } = ctx;
+    const { type: _actionType, ...eventData } = ev;
+
+    return {
+      ...ctx,
+      totalTokens: totalTokens + (ev.totalTokens ?? 0),
+      currentEvent: {
+        type: eventType,
+        brainRunId: brainRunId!,
+        options,
+        ...eventData,
+      },
+    };
+  });
+
 // ============================================================================
 // Guards - Conditional transitions
 // ============================================================================
@@ -896,17 +918,17 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(
           BRAIN_EVENTS.AGENT_COMPLETE,
           'running',
-          passthrough(BRAIN_EVENTS.AGENT_COMPLETE)
+          agentTerminal(BRAIN_EVENTS.AGENT_COMPLETE)
         ) as any,
         transition(
           BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
           'running',
-          passthrough(BRAIN_EVENTS.AGENT_TOKEN_LIMIT)
+          agentTerminal(BRAIN_EVENTS.AGENT_TOKEN_LIMIT)
         ) as any,
         transition(
           BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
           'running',
-          passthrough(BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
+          agentTerminal(BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
         ) as any,
         transition(
           BRAIN_EVENTS.AGENT_WEBHOOK,

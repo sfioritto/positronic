@@ -8,7 +8,7 @@ import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
-import { EventsView, type StoredEvent } from './events-view.js';
+import { EventsView, type StoredEvent, type EventsViewMode } from './events-view.js';
 
 type ViewMode = 'progress' | 'events';
 
@@ -187,6 +187,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   // View mode state (progress view vs events log)
   const [viewMode, setViewMode] = useState<ViewMode>(startWithEvents ? 'events' : 'progress');
   const [events, setEvents] = useState<StoredEvent[]>([]);
+  const [eventsViewMode, setEventsViewMode] = useState<EventsViewMode>('auto');
 
   // Use state machine to track brain execution state
   // Machine is recreated when runId changes, giving us fresh context
@@ -328,10 +329,22 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
     ? { title: 'Kill Error', message: killError.message, details: killError.details }
     : null;
 
-  // Dynamic footer showing view toggle hint
-  const viewToggle = viewMode === 'progress' ? 'e events' : 'w progress';
-  const defaultFooter = `${viewToggle} | x kill | esc quit`;
-  const displayFooter = footer ?? defaultFooter;
+  // Build footer based on current mode
+  const getFooter = () => {
+    if (viewMode === 'events') {
+      if (eventsViewMode === 'detail') {
+        return 'j/k scroll • esc back';
+      } else if (eventsViewMode === 'navigating') {
+        return 'j/k select • Enter detail • esc auto-scroll • w progress';
+      } else {
+        return 'j/k select • w progress | x kill | esc quit';
+      }
+    } else {
+      return 'e events | x kill | esc quit';
+    }
+  };
+
+  const displayFooter = footer ?? getFooter();
 
   return (
     <Box flexDirection="column">
@@ -339,7 +352,12 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         <Text>Connecting to watch service...</Text>
       ) : viewMode === 'events' ? (
         <>
-          <EventsView events={events} />
+          <EventsView
+            events={events}
+            totalTokens={current.context.totalTokens}
+            isActive={viewMode === 'events'}
+            onModeChange={setEventsViewMode}
+          />
           {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
