@@ -697,6 +697,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
       // Handle assistant text response
       if (response.text) {
+        // Log assistant messages to console as fallback (users shouldn't rely on this)
+        console.log(`[Assistant] ${response.text}`);
+
         yield {
           type: BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
           stepTitle: step.block.title,
@@ -712,6 +715,15 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       if (!response.toolCalls || response.toolCalls.length === 0) {
         yield* this.completeStep(step, prevState);
         return;
+      }
+
+      // Add assistant message describing tool calls (if no text was already added)
+      // This is important for the LLM to see what it did in its conversation history
+      if (!response.text) {
+        const toolCallSummary = response.toolCalls
+          .map((tc) => `Called ${tc.toolName} with: ${JSON.stringify(tc.args)}`)
+          .join('\n');
+        messages.push({ role: 'assistant', content: toolCallSummary });
       }
 
       // Process tool calls
