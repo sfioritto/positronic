@@ -633,29 +633,25 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
             })
             .join('\n');
 
-          description = `Generate a dynamic UI page using AI-powered component selection and layout.
+          description = `Create a web page for collecting user input via forms.
 
-PURPOSE: Create interactive web pages for user interaction - forms, displays, dashboards, approval workflows.
+PURPOSE: Generate interactive forms to collect information from users - input forms, approval workflows, surveys, data entry.
+
+NOTE: This tool creates pages, it does NOT send messages. To notify users about the page URL, use a different tool (Slack, email, consoleLog, etc).
 
 AVAILABLE COMPONENTS:
 ${componentList}
 
-RETURNS on success: { success: true, message: string, url: string, webhook: { slug: string, identifier: string } | null }
-- success: Always true when the page was created successfully
-- message: Instructions for what to do next
-- url: The URL where the generated page can be accessed
-- webhook: Present only when hasForm=true. Use with waitForWebhook to receive form submissions.
+RETURNS: { success: true, url: string, webhook: object | null, nextStep: string | null }
+- success: true when page was created
+- url: The page URL to share with users
+- webhook: Contains slug and identifier needed for waitForWebhook (only when hasForm=true)
+- nextStep: What to call next (only when hasForm=true)
 
-CORRECT WORKFLOW FOR FORMS (hasForm=true):
-1. Call generateUI with your prompt - you will receive success: true and a url
-2. Communicate the URL to the user using the best available tool (e.g., Slack, email, consoleLog)
-3. Call waitForWebhook with the webhook.slug and webhook.identifier from the result
-4. Execution pauses until user submits the form, then resumes with form data
-
-WORKFLOW FOR DISPLAY-ONLY PAGES (hasForm=false):
-1. Call generateUI with hasForm: false
-2. Communicate the URL to the user
-3. Continue with other tasks (no waiting required)`;
+WORKFLOW:
+1. Call generateUI to create the form page
+2. Share the returned URL with the user via another tool
+3. If hasForm=true: call waitForWebhook (see nextStep in response) to pause until form submission`;
         }
 
         toolsForClient[name] = {
