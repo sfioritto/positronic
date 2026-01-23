@@ -563,20 +563,36 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
       };
 
       // Use restored responseMessages from the resume context (preserves providerOptions)
-      // Append the webhook response as a tool result
+      // Prepend the user message and append the webhook response
+      // Note: reconstructed messages don't include the placeholder (we don't emit events for it),
+      // so we just append the real webhook response here.
+      const userMessage: ResponseMessage = { role: 'user', content: resumeContext.prompt };
+
       if (this.client.createToolResultMessage) {
         const toolResultMessage = this.client.createToolResultMessage(
           resumeContext.pendingToolCallId,
           resumeContext.pendingToolName,
           resumeContext.webhookResponse
         );
-        responseMessages = [...resumeContext.responseMessages, toolResultMessage];
+
+        responseMessages = [userMessage, ...resumeContext.responseMessages, toolResultMessage];
+
+        // Emit event for this tool result message (for reconstruction if there's another pause)
+        yield {
+          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          iteration: 0, // Special iteration for resumed webhook response
+          message: toolResultMessage,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
       } else {
         // Fallback if client doesn't support createToolResultMessage
-        responseMessages = resumeContext.responseMessages;
+        responseMessages = [userMessage, ...resumeContext.responseMessages];
       }
 
-      // Set empty initial messages since we're using responseMessages
+      // Set empty initial messages since user message is in responseMessages
       initialMessages = [];
 
       // Clear the context so it's only used once
@@ -676,9 +692,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         ? `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${config.system}`
         : DEFAULT_AGENT_SYSTEM_PROMPT;
 
-      // Track message count before the call to extract only new messages
-      const previousMessageCount = responseMessages?.length ?? 0;
-
       const response = await this.client.generateText({
         system: systemPrompt,
         messages: initialMessages,
@@ -686,28 +699,24 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         tools: toolsForClient,
       });
 
-      // Extract only the new messages from this iteration (delta, not accumulated)
-      const newMessages = response.responseMessages?.slice(previousMessageCount) ?? [];
-
       // Update responseMessages for next iteration (preserves providerOptions)
       responseMessages = response.responseMessages;
 
-      // Emit raw response message event with only the new messages from this iteration
-      // Following the patch pattern: each event contains only the delta, replay to reconstruct
-      yield {
-        type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-        stepTitle: step.block.title,
-        stepId: step.id,
-        iteration,
-        rawResponse: {
-          text: response.text,
-          toolCalls: response.toolCalls,
-          usage: response.usage,
-          responseMessages: newMessages,
-        },
-        options: this.options ?? ({} as TOptions),
-        brainRunId: this.brainRunId,
-      };
+      // Get the new assistant message (the last one added by generateText)
+      const newAssistantMessage = response.responseMessages?.at(-1);
+
+      // Emit event for the assistant message
+      if (newAssistantMessage) {
+        yield {
+          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          iteration,
+          message: newAssistantMessage,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+      }
 
       // Track tokens
       const tokensThisIteration = response.usage.totalTokens;
@@ -760,6 +769,15 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield* this.completeStep(step, prevState);
         return;
       }
+
+      // Track pending webhook if any tool returns waitFor
+      // We process ALL tool calls first, then pause for webhook at the end
+      let pendingWebhook: {
+        toolCallId: string;
+        toolName: string;
+        input: JsonObject;
+        webhooks: Array<{ slug: string; identifier: string }>;
+      } | null = null;
 
       // Process tool calls
       for (const toolCall of response.toolCalls) {
@@ -839,32 +857,48 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               ? waitForResult.waitFor
               : [waitForResult.waitFor];
 
-            // Note: responseMessages are captured in agent:raw_response_message events
-            yield {
-              type: BRAIN_EVENTS.AGENT_WEBHOOK,
-              stepTitle: step.block.title,
-              stepId: step.id,
+            // Store webhook info - we'll emit the events after processing all tool calls
+            // This ensures all other tool results are processed before pausing
+            pendingWebhook = {
               toolCallId: toolCall.toolCallId,
               toolName: toolCall.toolName,
               input: toolCall.args as JsonObject,
-              options: this.options ?? ({} as TOptions),
-              brainRunId: this.brainRunId,
-            };
-
-            // Then emit webhook event with all webhooks (first response wins)
-            yield {
-              type: BRAIN_EVENTS.WEBHOOK,
-              waitFor: webhooks.map((w) => ({
+              webhooks: webhooks.map((w) => ({
                 slug: w.slug,
                 identifier: w.identifier,
               })),
+            };
+
+            // Emit tool result event for debugging/visibility (with pending status)
+            yield {
+              type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
+              stepTitle: step.block.title,
+              stepId: step.id,
+              toolName: toolCall.toolName,
+              toolCallId: toolCall.toolCallId,
+              result: { status: 'waiting_for_webhook', webhooks: pendingWebhook.webhooks },
               options: this.options ?? ({} as TOptions),
               brainRunId: this.brainRunId,
             };
-            return;
+
+            // Add placeholder to responseMessages locally so the conversation stays valid
+            // for any subsequent generateText calls in this execution.
+            // We DON'T emit an event for it - on resume, we reconstruct from events
+            // and append the real webhook response.
+            if (this.client.createToolResultMessage && responseMessages) {
+              const placeholderMessage = this.client.createToolResultMessage(
+                toolCall.toolCallId,
+                toolCall.toolName,
+                { status: 'waiting_for_webhook', webhooks: pendingWebhook.webhooks }
+              );
+              responseMessages = [...responseMessages, placeholderMessage];
+            }
+
+            // Continue processing other tool calls - don't return yet
+            continue;
           }
 
-          // Normal tool result
+          // Emit tool result event for debugging/visibility
           yield {
             type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
             stepTitle: step.block.title,
@@ -876,7 +910,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             brainRunId: this.brainRunId,
           };
 
-          // Append tool result using SDK-native format (preserves providerOptions)
+          // Create tool result message using SDK-native format (preserves providerOptions)
           if (this.client.createToolResultMessage && responseMessages) {
             const toolResultMessage = this.client.createToolResultMessage(
               toolCall.toolCallId,
@@ -884,8 +918,43 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               toolResult
             );
             responseMessages = [...responseMessages, toolResultMessage];
+
+            // Emit event for this tool result message
+            yield {
+              type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+              stepTitle: step.block.title,
+              stepId: step.id,
+              iteration,
+              message: toolResultMessage,
+              options: this.options ?? ({} as TOptions),
+              brainRunId: this.brainRunId,
+            };
           }
         }
+      }
+
+      // After processing all tool calls, check if we need to pause for a webhook
+      if (pendingWebhook) {
+        // Emit AGENT_WEBHOOK event
+        yield {
+          type: BRAIN_EVENTS.AGENT_WEBHOOK,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          toolCallId: pendingWebhook.toolCallId,
+          toolName: pendingWebhook.toolName,
+          input: pendingWebhook.input,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+
+        // Emit WEBHOOK event with all webhooks (first response wins)
+        yield {
+          type: BRAIN_EVENTS.WEBHOOK,
+          waitFor: pendingWebhook.webhooks,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+        return;
       }
     }
   }

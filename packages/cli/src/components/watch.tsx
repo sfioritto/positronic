@@ -10,11 +10,14 @@ import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { EventsView, type StoredEvent, type EventsViewMode } from './events-view.js';
 import { StateView } from './state-view.js';
+import { AgentChatView } from './agent-chat-view.js';
+import { SelectList } from './select-list.js';
 import { reconstructStateAtEvent } from '../utils/state-reconstruction.js';
+import { getAgentLoops } from '../utils/agent-utils.js';
 
 type JsonObject = { [key: string]: unknown };
 
-type ViewMode = 'progress' | 'events' | 'state';
+type ViewMode = 'progress' | 'events' | 'state' | 'agent-picker' | 'agent-chat';
 
 // Get the index of the currently running step (or last completed if none running)
 const getCurrentStepIndex = (steps: StepInfo[]): number => {
@@ -199,6 +202,10 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   const [stateScrollOffset, setStateScrollOffset] = useState(0);
   const [previousViewMode, setPreviousViewMode] = useState<'progress' | 'events'>('progress');
 
+  // Agent chat view state
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [agentChatScrollOffset, setAgentChatScrollOffset] = useState(0);
+
   // Track selected event index so it persists across view changes
   const [eventsSelectedIndex, setEventsSelectedIndex] = useState<number | null>(null);
 
@@ -331,6 +338,19 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         setStateSnapshot(null);
       }
       // j/k scrolling is handled by StateView component
+    } else if (viewMode === 'agent-chat') {
+      // Agent chat view: 'b' or escape goes back to previous view
+      if (input === 'b' || key.escape) {
+        setViewMode(previousViewMode);
+        setSelectedAgentId(null);
+      }
+      // j/k scrolling is handled by AgentChatView component
+    } else if (viewMode === 'agent-picker') {
+      // Agent picker: 'b' or escape goes back to previous view
+      // SelectList handles its own navigation (up/down/enter)
+      if (input === 'b' || key.escape) {
+        setViewMode(previousViewMode);
+      }
     } else {
       // View toggle
       if (input === 'e') {
@@ -349,6 +369,24 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         setViewMode('state');
       } else if (input === 'x' && !isKilling && !isKilled && !isComplete) {
         setConfirmingKill(true);
+      } else if (input === 'a' || input === 'A') {
+        // Show agent chat view
+        const brainTitle = current.context.rootBrain?.brainTitle;
+        const agentLoops = getAgentLoops(events, brainTitle);
+        if (agentLoops.length === 0) {
+          return; // No agents - ignore keypress
+        }
+        if (agentLoops.length === 1) {
+          // Go directly to chat view for single agent
+          setSelectedAgentId(agentLoops[0].stepId);
+          setAgentChatScrollOffset(0);
+          setPreviousViewMode(viewMode === 'events' ? 'events' : 'progress');
+          setViewMode('agent-chat');
+        } else {
+          // Show picker for multiple agents
+          setPreviousViewMode(viewMode === 'events' ? 'events' : 'progress');
+          setViewMode('agent-picker');
+        }
       } else if ((input === 'q' || key.escape) && manageScreenBuffer) {
         // Only handle quit when standalone (manageScreenBuffer=true)
         // When embedded, parent handles q/escape
@@ -373,17 +411,21 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   // Build footer based on current mode
   const getFooter = () => {
     if (viewMode === 'state') {
-      return 'j/k scroll | b back';
+      return 'j/k scroll | space/shift+space page | b back';
+    } else if (viewMode === 'agent-chat') {
+      return 'j/k scroll | space/shift+space page | b back';
+    } else if (viewMode === 'agent-picker') {
+      return 'j/k select | Enter view | b back';
     } else if (viewMode === 'events') {
       if (eventsViewMode === 'detail') {
         return 'j/k scroll • b back';
       } else if (eventsViewMode === 'navigating') {
-        return 'j/k select | Enter detail | s state | b back | esc auto-scroll';
+        return 'j/k select | Enter detail | s state | a agents | b back | esc auto-scroll';
       } else {
-        return 'j/k select | b back | x kill | esc quit';
+        return 'j/k select | a agents | b back | x kill | esc quit';
       }
     } else {
-      return 's state | e events | x kill | esc quit';
+      return 's state | e events | a agents | x kill | esc quit';
     }
   };
 
@@ -405,6 +447,55 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
           {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
+      ) : viewMode === 'agent-picker' ? (
+        (() => {
+          const brainTitle = current.context.rootBrain?.brainTitle;
+          const agentLoops = getAgentLoops(events, brainTitle);
+          return (
+            <>
+              <SelectList
+                items={agentLoops.map((agent) => ({
+                  id: agent.stepId,
+                  label: agent.label,
+                  description: `${agent.rawResponseEvents.length} response(s)`,
+                }))}
+                header="Select an agent to view:"
+                onSelect={(item) => {
+                  setSelectedAgentId(item.id);
+                  setAgentChatScrollOffset(0);
+                  setViewMode('agent-chat');
+                }}
+                onCancel={() => setViewMode(previousViewMode)}
+                footer="j/k select | Enter view | b back"
+              />
+              {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+              {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
+            </>
+          );
+        })()
+      ) : viewMode === 'agent-chat' && selectedAgentId ? (
+        (() => {
+          const brainTitle = current.context.rootBrain?.brainTitle;
+          const agentLoops = getAgentLoops(events, brainTitle);
+          const selectedAgent = agentLoops.find((a) => a.stepId === selectedAgentId);
+          if (!selectedAgent) {
+            return <Text>Agent not found</Text>;
+          }
+          return (
+            <>
+              <AgentChatView
+                label={selectedAgent.label}
+                agentStartEvent={selectedAgent.startEvent}
+                rawResponseEvents={selectedAgent.rawResponseEvents}
+                scrollOffset={agentChatScrollOffset}
+                onScrollChange={setAgentChatScrollOffset}
+                isActive={viewMode === 'agent-chat'}
+              />
+              {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+              {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
+            </>
+          );
+        })()
       ) : viewMode === 'events' ? (
         <>
           <EventsView

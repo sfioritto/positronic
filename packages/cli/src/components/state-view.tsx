@@ -27,6 +27,8 @@ export const StateView = ({
   const lines = content.split('\n');
   const totalLines = lines.length;
   const maxScroll = Math.max(0, totalLines - maxLines);
+  // Page size keeps 2 lines of context
+  const pageSize = Math.max(1, maxLines - 2);
 
   // Handle scrolling
   useInput(
@@ -37,6 +39,12 @@ export const StateView = ({
         onScrollChange(Math.max(0, scrollOffset - 1));
       } else if (key.downArrow || input === 'j') {
         onScrollChange(Math.min(maxScroll, scrollOffset + 1));
+      } else if (input === ' ' && !key.shift) {
+        // Space = page down
+        onScrollChange(Math.min(maxScroll, scrollOffset + pageSize));
+      } else if (input === ' ' && key.shift) {
+        // Shift+Space = page up
+        onScrollChange(Math.max(0, scrollOffset - pageSize));
       }
     },
     { isActive }

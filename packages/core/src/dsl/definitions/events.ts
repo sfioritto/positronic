@@ -189,14 +189,8 @@ export interface AgentRawResponseMessageEvent<
   stepTitle: string;
   stepId: string;
   iteration: number;
-  /** The exact response from generateText() - model-specific format */
-  rawResponse: {
-    text?: string;
-    toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
-    usage: { totalTokens: number };
-    /** SDK-native messages preserving provider metadata (e.g., Gemini's thoughtSignature) */
-    responseMessages: ResponseMessage[];
-  };
+  /** A single SDK-native message preserving provider metadata (e.g., Gemini's thoughtSignature) */
+  message: ResponseMessage;
 }
 
 export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>

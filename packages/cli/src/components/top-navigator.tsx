@@ -170,8 +170,9 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
         exit();
       }
     } else if (mode === 'detail') {
-      // Detail mode navigation - b or escape goes back to list
-      if (input === 'b' || key.escape) {
+      // Detail mode navigation - only escape goes back to list
+      // 'b' is reserved for Watch internal navigation (back from agent-chat, state view, etc.)
+      if (key.escape) {
         setSelectedRunId(null);
         setMode('list');
       }
@@ -204,7 +205,7 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
       <Watch
         runId={selectedRunId}
         manageScreenBuffer={false}
-        footer="e events • b back • x kill"
+        footer="s state | e events | a agents | x kill | esc list"
       />
     );
   }
