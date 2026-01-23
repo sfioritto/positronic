@@ -70,24 +70,17 @@ const generateUIInputSchema = z.object({
  * The description is enriched at runtime with available component information.
  */
 export const generateUI: AgentTool<typeof generateUIInputSchema> = {
-  description: `Create a web page for collecting user input via forms.
+  description: `Generate a web page for displaying rich content or collecting user input.
 
-PURPOSE: Generate interactive forms to collect information from users - input forms, approval workflows, surveys, data entry.
+Sometimes you need more than simple notifications to communicate with users. This tool creates web pages that can display formatted content, dashboards, or forms to collect information.
 
-NOTE: This tool creates pages, it does NOT send messages. To notify users about the page URL, use a different tool (Slack, email, consoleLog, etc).
+RETURNS: { url: string, webhook: { slug: string, identifier: string } | null }
+- url: The page URL
+- webhook: For forms (hasForm=true), contains slug and identifier that can be passed to waitForWebhook to pause execution until the user submits the form
 
-RETURNS: { success: true, url: string, webhook: object | null, nextStep: string | null }
-- success: true when page was created
-- url: The page URL to share with users
-- webhook: Contains slug and identifier needed for waitForWebhook (only when hasForm=true)
-- nextStep: What to call next (only when hasForm=true)
-
-WORKFLOW:
-1. Call generateUI to create the form page
-2. Share the returned URL with the user via another tool
-3. If hasForm=true: call waitForWebhook (see nextStep in response) to pause until form submission`,
+IMPORTANT: Users have no way to discover the page URL on their own. After generating a page, you must tell them the URL using whatever communication tools are available.`,
   inputSchema: generateUIInputSchema,
-  async execute(input, context): Promise<{ success: true; url: string; webhook: { slug: string; identifier: string } | null; nextStep: string | null }> {
+  async execute(input, context): Promise<{ url: string; webhook: { slug: string; identifier: string } | null }> {
     const { components, pages, client, state, env, brainRunId, stepId } = context;
     const hasForm = input.hasForm ?? true;
 
@@ -155,12 +148,8 @@ WORKFLOW:
 
     // Return URL and webhook info (no waitFor - does not pause)
     return {
-      success: true,
       url: page.url,
       webhook: webhookInfo,
-      nextStep: hasForm
-        ? `Call waitForWebhook with slug="${webhookInfo!.slug}" and identifier="${webhookInfo!.identifier}"`
-        : null,
     };
   },
 };
