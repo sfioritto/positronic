@@ -908,7 +908,9 @@ brain('Research Assistant')
 - `system: string` - System prompt for the agent
 - `prompt: string | ((state) => string)` - User prompt (can be a function)
 - `tools: Record<string, ToolDefinition>` - Tools available to the agent
+- `outputSchema: { schema, name }` - Structured output schema (see below)
 - `maxTokens: number` - Maximum tokens for the agent response
+- `maxIterations: number` - Maximum agent loop iterations (default: 100)
 
 ### Tool Definition
 
@@ -916,6 +918,53 @@ Each tool requires:
 - `description: string` - What the tool does
 - `inputSchema: ZodSchema` - Zod schema for the tool's input
 - `execute: (input) => Promise<any>` - Function to execute when the tool is called
+
+### Agent Output Schema
+
+Use `outputSchema` to get structured, typed output from agent steps. This generates a terminal tool that the agent must call to complete, ensuring the output matches your schema:
+
+```typescript
+brain('Entity Extractor')
+  .brain('Extract Entities', {
+    system: 'You are an entity extraction assistant.',
+    prompt: 'Extract all people and organizations from the provided text.',
+    outputSchema: {
+      schema: z.object({
+        people: z.array(z.string()).describe('Names of people mentioned'),
+        organizations: z.array(z.string()).describe('Organization names'),
+        confidence: z.number().min(0).max(1).describe('Confidence score'),
+      }),
+      name: 'entities' as const,  // Use 'as const' for type inference
+    },
+  })
+  .step('Use Extracted Data', ({ state }) => {
+    // TypeScript knows state.entities has people, organizations, and confidence
+    console.log('Found ' + state.entities.people.length + ' people');
+    console.log('Found ' + state.entities.organizations.length + ' organizations');
+    return {
+      ...state,
+      summary: 'Extracted ' + state.entities.people.length + ' people and ' +
+               state.entities.organizations.length + ' organizations',
+    };
+  });
+```
+
+Key points about `outputSchema`:
+- The agent automatically gets a `complete` tool (or custom name via `toolName`)
+- The result is stored under `state[name]` (e.g., `state.entities`)
+- Full TypeScript type inference flows to subsequent steps
+- Use `as const` on the name for proper type narrowing
+
+You can also customize the generated tool:
+
+```typescript
+outputSchema: {
+  schema: z.object({ result: z.string() }),
+  name: 'output' as const,
+  toolName: 'finalize',           // Custom tool name (default: 'complete')
+  toolDescription: 'Finalize the analysis',  // Custom description
+}
+```
 
 ## Environment and Pages Service
 

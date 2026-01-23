@@ -27,6 +27,7 @@ export type {
   Secrets,
   AgentTool,
   AgentConfig,
+  AgentOutputSchema,
   AgentMessage,
   AgentToolWaitFor,
   StepContext,

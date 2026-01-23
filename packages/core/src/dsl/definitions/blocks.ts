@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentOutputSchema } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
@@ -90,7 +90,8 @@ export type AgentBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TTools extends Record<string, AgentTool> = Record<string, AgentTool>
+  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TOutputSchema extends AgentOutputSchema | undefined = undefined
 > = {
   type: 'agent';
   title: string;
@@ -104,7 +105,7 @@ export type AgentBlock<
       pages?: PagesService;
       env: RuntimeEnv;
     } & TServices
-  ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>;
+  ) => AgentConfig<TTools, TOutputSchema> | Promise<AgentConfig<TTools, TOutputSchema>>;
 };
 
 export type Block<
