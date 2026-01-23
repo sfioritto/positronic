@@ -1,5 +1,6 @@
+import { z } from 'zod';
 import { brain as coreBrain, Brain } from './builder/brain.js';
-import type { AgentConfig, AgentTool, StepContext } from './types.js';
+import type { AgentConfig, AgentTool, AgentOutputSchema, StepContext, State } from './types.js';
 import type { UIComponent } from '../ui/types.js';
 
 /**
@@ -75,29 +76,51 @@ export function createBrain<
   // Return type for the brain function
   type BrainReturn = Brain<{}, object, TServices, undefined, undefined>;
 
-  // Overload 1: Direct agent with config function
+  // Overload 1: Direct agent with config object WITH outputSchema
+  function brain<
+    T extends Record<string, AgentTool>,
+    TName extends string & { readonly brand?: unique symbol },
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = { [K in TName]: z.infer<TSchema> }
+  >(
+    title: string,
+    config: AgentConfig<T, AgentOutputSchema<TSchema, TName>>
+  ): Brain<{}, TNewState, TServices, undefined, undefined>;
+
+  // Overload 2: Direct agent with config function WITH outputSchema
+  function brain<
+    T extends Record<string, AgentTool>,
+    TName extends string & { readonly brand?: unique symbol },
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = { [K in TName]: z.infer<TSchema> }
+  >(
+    title: string,
+    configFn: (params: AgentParams) => AgentConfig<T, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<T, AgentOutputSchema<TSchema, TName>>>
+  ): Brain<{}, TNewState, TServices, undefined, undefined>;
+
+  // Overload 3: Direct agent with config function (no outputSchema)
   function brain<T extends Record<string, AgentTool>>(
     title: string,
     configFn: (params: AgentParams) => AgentConfig<T> | Promise<AgentConfig<T>>
   ): BrainReturn;
 
-  // Overload 2: Direct agent with config object
+  // Overload 4: Direct agent with config object (no outputSchema)
   function brain<T extends Record<string, AgentTool>>(
     title: string,
     config: AgentConfig<T>
   ): BrainReturn;
 
-  // Overload 3: Builder pattern with title string
+  // Overload 5: Builder pattern with title string
   function brain(title: string): BrainReturn;
 
-  // Overload 4: Builder pattern with config object
+  // Overload 6: Builder pattern with config object
   function brain(config: { title: string; description?: string }): BrainReturn;
 
   // Implementation
   function brain(
     titleOrConfig: string | { title: string; description?: string },
-    agentConfig?: AgentConfig<any> | ((params: AgentParams) => AgentConfig<any> | Promise<AgentConfig<any>>)
-  ): BrainReturn {
+    agentConfig?: AgentConfig<any, any> | ((params: AgentParams) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
+  ): any {
     let base = coreBrain(titleOrConfig as any);
 
     if (components) {

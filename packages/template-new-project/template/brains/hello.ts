@@ -18,9 +18,8 @@ import { z } from 'zod';
  *
  * Run with: px brain run hello
  */
-export default brain('hello')
-  .brain('Greet User', {
-    system: `
+export default brain('hello', {
+  system: `
 You are a friendly greeter for the Positronic framework.
 
 Your job is to welcome new users and make them feel excited about building AI workflows.
@@ -29,14 +28,14 @@ You have access to a few different tools, you should definitely generateUI to cr
 
 Once you have the user's name, use the complete tool to finish with their name and a personalized greeting.
 `,
-    outputSchema: {
-      schema: z.object({
-        userName: z.string().describe('The name the user provided'),
-        greeting: z.string().describe('A personalized welcome message for the user'),
-      }),
-      name: 'welcome' as const,
-    },
-  })
+  outputSchema: {
+    schema: z.object({
+      userName: z.string().describe('The name the user provided'),
+      greeting: z.string().describe('A personalized welcome message for the user'),
+    }),
+    name: 'welcome' as const,
+  },
+})
   .step('Log Welcome', ({ state }) => {
     // TypeScript knows state.welcome has userName and greeting
     console.log('\n✨ ' + state.welcome.greeting);
