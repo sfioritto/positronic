@@ -90,7 +90,33 @@ export class VercelClient implements ObjectGenerator {
       if (msg.role === 'user') {
         modelMessages.push({ role: 'user', content: msg.content });
       } else if (msg.role === 'assistant') {
-        modelMessages.push({ role: 'assistant', content: msg.content });
+        // Build content array for assistant message
+        const contentParts: Array<
+          | { type: 'text'; text: string }
+          | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+        > = [];
+
+        // Add text if present
+        if (msg.content) {
+          contentParts.push({ type: 'text', text: msg.content });
+        }
+
+        // Add tool calls if present (using 'input' as Vercel SDK expects)
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          for (const tc of msg.toolCalls) {
+            contentParts.push({
+              type: 'tool-call',
+              toolCallId: tc.toolCallId,
+              toolName: tc.toolName,
+              input: tc.args,
+            });
+          }
+        }
+
+        // Push message with content array or string
+        if (contentParts.length > 0) {
+          modelMessages.push({ role: 'assistant', content: contentParts });
+        }
       } else if (msg.role === 'tool') {
         modelMessages.push({
           role: 'tool',
@@ -176,7 +202,33 @@ export class VercelClient implements ObjectGenerator {
         if (msg.role === 'user') {
           modelMessages.push({ role: 'user', content: msg.content });
         } else if (msg.role === 'assistant') {
-          modelMessages.push({ role: 'assistant', content: msg.content });
+          // Build content array for assistant message
+          const contentParts: Array<
+            | { type: 'text'; text: string }
+            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+          > = [];
+
+          // Add text if present
+          if (msg.content) {
+            contentParts.push({ type: 'text', text: msg.content });
+          }
+
+          // Add tool calls if present (using 'input' as Vercel SDK expects)
+          if (msg.toolCalls && msg.toolCalls.length > 0) {
+            for (const tc of msg.toolCalls) {
+              contentParts.push({
+                type: 'tool-call',
+                toolCallId: tc.toolCallId,
+                toolName: tc.toolName,
+                input: tc.args,
+              });
+            }
+          }
+
+          // Push message with content array or string
+          if (contentParts.length > 0) {
+            modelMessages.push({ role: 'assistant', content: contentParts });
+          }
         } else if (msg.role === 'tool') {
           modelMessages.push({
             role: 'tool',

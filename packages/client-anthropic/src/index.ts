@@ -92,48 +92,31 @@ export class AnthropicClient implements ObjectGenerator {
       if (msg.role === 'user') {
         anthropicMessages.push({ role: 'user', content: msg.content });
       } else if (msg.role === 'assistant') {
-        // Check if the last message is also assistant - need to merge content blocks
-        const lastMsg = anthropicMessages[anthropicMessages.length - 1];
-        if (lastMsg && lastMsg.role === 'assistant') {
-          // Merge text content into existing assistant message
-          if (typeof lastMsg.content === 'string') {
-            lastMsg.content = [
-              { type: 'text', text: lastMsg.content },
-              { type: 'text', text: msg.content },
-            ];
-          } else if (Array.isArray(lastMsg.content)) {
-            lastMsg.content.push({ type: 'text', text: msg.content });
-          }
-        } else {
-          anthropicMessages.push({ role: 'assistant', content: msg.content });
+        // Build content blocks for assistant message
+        const contentBlocks: Anthropic.ContentBlockParam[] = [];
+
+        // Add text if present and non-empty
+        if (msg.content) {
+          contentBlocks.push({ type: 'text', text: msg.content });
         }
-      } else if (msg.role === 'tool') {
-        // Tool results need to follow an assistant message with tool_use
-        // Find or create the assistant message that had the tool call
-        const lastAssistant = anthropicMessages[anthropicMessages.length - 1];
-        if (lastAssistant && lastAssistant.role === 'assistant') {
-          // Add tool_use block to assistant message if not present
-          if (typeof lastAssistant.content === 'string') {
-            lastAssistant.content = [
-              { type: 'text', text: lastAssistant.content },
-              { type: 'tool_use', id: msg.toolCallId!, name: msg.toolName!, input: {} },
-            ];
-          } else if (Array.isArray(lastAssistant.content)) {
-            // Check if tool_use already exists
-            const hasToolUse = lastAssistant.content.some(
-              (block) => block.type === 'tool_use' && block.id === msg.toolCallId
-            );
-            if (!hasToolUse) {
-              lastAssistant.content.push({
-                type: 'tool_use',
-                id: msg.toolCallId!,
-                name: msg.toolName!,
-                input: {},
-              });
-            }
+
+        // Add tool_use blocks if present
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          for (const tc of msg.toolCalls) {
+            contentBlocks.push({
+              type: 'tool_use',
+              id: tc.toolCallId,
+              name: tc.toolName,
+              input: tc.args as Record<string, unknown>,
+            });
           }
         }
 
+        // Only add message if there's content
+        if (contentBlocks.length > 0) {
+          anthropicMessages.push({ role: 'assistant', content: contentBlocks });
+        }
+      } else if (msg.role === 'tool') {
         // Add user message with tool_result
         anthropicMessages.push({
           role: 'user',

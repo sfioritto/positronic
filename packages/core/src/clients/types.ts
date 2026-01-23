@@ -9,14 +9,28 @@ export type Message = {
 };
 
 /**
+ * Represents a tool call made by the assistant.
+ */
+export type ToolCall = {
+  type: 'tool_use';
+  toolCallId: string;
+  toolName: string;
+  args: unknown;
+};
+
+/**
  * Represents a message in a tool-calling conversation.
- * Extends Message to include tool messages.
+ * Extends Message to include tool messages and assistant tool calls.
  */
 export type ToolMessage = {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  /** For 'tool' role: the ID of the tool call this is a result for */
   toolCallId?: string;
+  /** For 'tool' role: the name of the tool */
   toolName?: string;
+  /** For 'assistant' role: tool calls made by the assistant */
+  toolCalls?: ToolCall[];
 };
 
 /**
