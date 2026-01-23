@@ -94,8 +94,8 @@ export interface AgentConfig<
 > {
   /** System prompt for the LLM */
   system?: string;
-  /** Initial user prompt to start the conversation */
-  prompt: string;
+  /** Initial user prompt to start the conversation. If omitted, uses "Begin." */
+  prompt?: string;
   /** Tools available to the LLM. Optional - merged with withTools defaults */
   tools?: TTools;
   /** Safety valve - exit if cumulative tokens exceed this limit */
