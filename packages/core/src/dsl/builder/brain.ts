@@ -703,7 +703,33 @@ export function brain<
   TServices extends object = object
 >(config: { title: string; description?: string }): Brain<TOptions, TState, TServices>;
 
-// Overload 3: Direct agent with config object
+// Overload 3: Direct agent with config object WITH outputSchema
+export function brain<
+  TTools extends Record<string, AgentTool>,
+  TName extends string & { readonly brand?: unique symbol },
+  TSchema extends z.ZodObject<any>,
+  TNewState extends State = { [K in TName]: z.infer<TSchema> }
+>(
+  title: string,
+  config: AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
+): Brain<JsonObject, TNewState, object, undefined, undefined>;
+
+// Overload 4: Direct agent with config function WITH outputSchema
+export function brain<
+  TTools extends Record<string, AgentTool>,
+  TName extends string & { readonly brand?: unique symbol },
+  TSchema extends z.ZodObject<any>,
+  TNewState extends State = { [K in TName]: z.infer<TSchema> }
+>(
+  title: string,
+  configFn: (
+    params: StepContext<object, JsonObject, undefined, undefined> & {
+      tools: Record<string, AgentTool>;
+    }
+  ) => AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>
+): Brain<JsonObject, TNewState, object, undefined, undefined>;
+
+// Overload 5: Direct agent with config object (no outputSchema)
 export function brain<
   TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
   TState extends State = object
@@ -712,7 +738,7 @@ export function brain<
   config: AgentConfig<TTools>
 ): Brain<JsonObject, TState, object, undefined, undefined>;
 
-// Overload 4: Direct agent with config function
+// Overload 6: Direct agent with config function (no outputSchema)
 export function brain<
   TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
   TState extends State = object
@@ -729,8 +755,8 @@ export function brain<
 export function brain(
   titleOrConfig: string | BrainConfig,
   agentConfig?:
-    | AgentConfig<any>
-    | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>)
+    | AgentConfig<any, any>
+    | ((params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
 ): Brain<any, any, any, any, any> {
   const title =
     typeof titleOrConfig === 'string' ? titleOrConfig : titleOrConfig.title;

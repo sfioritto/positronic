@@ -1459,5 +1459,51 @@ describe('agent step', () => {
         total: 2,
       });
     });
+
+    it('should work with top-level brain() function', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'complete',
+            args: { userName: 'Alice', greeting: 'Welcome!' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      // Using top-level brain() with config object directly (not .brain() step method)
+      const testBrain = brain('direct-agent', {
+        system: 'You are a friendly greeter',
+        outputSchema: {
+          schema: z.object({
+            userName: z.string(),
+            greeting: z.string(),
+          }),
+          name: 'welcome' as const,
+        },
+      });
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify brain completed successfully
+      expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+
+      // Verify state was namespaced correctly
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(finalState).toEqual({
+        welcome: { userName: 'Alice', greeting: 'Welcome!' },
+      });
+    });
   });
 });
