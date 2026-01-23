@@ -506,19 +506,22 @@ export class BrainEventStream<
       // Clear the context so it's only used once
       this.agentResumeContext = undefined;
     } else {
+      // Use "Begin." as default prompt if not provided
+      const prompt = config.prompt ?? 'Begin.';
+
       // Emit agent start event (only for fresh starts)
       yield {
         type: BRAIN_EVENTS.AGENT_START,
         stepTitle: step.block.title,
         stepId: step.id,
-        prompt: config.prompt,
+        prompt,
         system: config.system,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
       };
 
       // Initialize messages for fresh start
-      messages = [{ role: 'user', content: config.prompt }];
+      messages = [{ role: 'user', content: prompt }];
     }
 
     // Initialize token tracking
