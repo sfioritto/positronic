@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, RetryConfig, StepContext } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentOutputSchema, RetryConfig, StepContext } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { ExtractWebhookResponses } from '../webhook.js';
 import type { PagesService } from '../pages.js';
@@ -194,7 +194,34 @@ export class Brain<
     initialState?: State | ((state: TState) => State)
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
-  // Overload 2: Agent config object
+  // Overload 2: Agent config object WITH outputSchema
+  brain<
+    TTools extends Record<string, AgentTool>,
+    TName extends string & { readonly brand?: unique symbol },
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & { [K in TName]: z.infer<TSchema> }
+  >(
+    title: string,
+    config: AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+
+  // Overload 3: Agent config function WITH outputSchema
+  brain<
+    TTools extends Record<string, AgentTool>,
+    TName extends string & { readonly brand?: unique symbol },
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & { [K in TName]: z.infer<TSchema> }
+  >(
+    title: string,
+    configFn: (
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & {
+        /** Default tools available for agent steps */
+        tools: Record<string, AgentTool>;
+      }
+    ) => AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+
+  // Overload 4: Agent config object (no outputSchema)
   brain<
     TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
     TNewState extends State = TState
@@ -203,7 +230,7 @@ export class Brain<
     config: AgentConfig<TTools>
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
-  // Overload 3: Agent config function
+  // Overload 5: Agent config function (no outputSchema)
   brain<
     TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
     TNewState extends State = TState
@@ -222,8 +249,8 @@ export class Brain<
     title: string,
     innerBrainOrConfig:
       | Brain<any, any, any, any, any>
-      | AgentConfig<any>
-      | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>),
+      | AgentConfig<any, any>
+      | ((params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
     action?: (params: any) => any,
     initialState?: State | ((state: TState) => State)
   ): any {
@@ -250,9 +277,9 @@ export class Brain<
     const configFn =
       typeof innerBrainOrConfig === 'function'
         ? innerBrainOrConfig
-        : () => innerBrainOrConfig as AgentConfig<any>;
+        : () => innerBrainOrConfig as AgentConfig<any, any>;
 
-    const agentBlock: AgentBlock<TState, any, TOptions, TServices, TResponse, any> = {
+    const agentBlock: AgentBlock<TState, any, TOptions, TServices, TResponse, any, any> = {
       type: 'agent',
       title,
       configFn: configFn as any,

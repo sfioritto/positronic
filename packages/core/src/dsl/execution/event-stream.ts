@@ -447,7 +447,7 @@ export class BrainEventStream<
   }
 
   private async *executeAgent(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as AgentBlock<any, any, TOptions, TServices, any, any>;
+    const block = step.block as AgentBlock<any, any, TOptions, TServices, any, any, any>;
     const prevState = this.currentState;
 
     // Get default tools and components for injection into configFn
@@ -474,6 +474,23 @@ export class BrainEventStream<
 
     // Merge tools: step tools override defaults
     const mergedTools: Record<string, AgentTool> = { ...defaultTools, ...(config.tools ?? {}) };
+
+    // Generate terminal tool from outputSchema if provided
+    let outputSchemaToolName: string | undefined;
+    if (config.outputSchema) {
+      const { schema, name, toolName, toolDescription } = config.outputSchema;
+      const generatedToolName = toolName ?? 'complete';
+      outputSchemaToolName = generatedToolName;
+
+      const generatedTool: AgentTool = {
+        description: toolDescription ?? `Complete the task with the ${name} result`,
+        inputSchema: schema,
+        terminal: true,
+      };
+
+      // Add to merged tools (overrides any existing tool with same name)
+      mergedTools[generatedToolName] = generatedTool;
+    }
 
     // Check if we're resuming from a webhook
     let messages: ToolMessage[];
@@ -680,7 +697,16 @@ export class BrainEventStream<
           };
 
           // Merge terminal result into state
-          this.currentState = { ...this.currentState, ...(toolCall.args as JsonObject) };
+          if (config.outputSchema && toolCall.toolName === outputSchemaToolName) {
+            // Namespace result under outputSchema.name
+            this.currentState = {
+              ...this.currentState,
+              [config.outputSchema.name]: toolCall.args,
+            };
+          } else {
+            // Legacy behavior: spread into state root
+            this.currentState = { ...this.currentState, ...(toolCall.args as JsonObject) };
+          }
           yield* this.completeStep(step, prevState);
           return;
         }

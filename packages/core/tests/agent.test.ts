@@ -1215,4 +1215,249 @@ describe('agent step', () => {
       expect(configFnCalls[1].response).not.toEqual(webhookResponse);
     });
   });
+
+  describe('agent with outputSchema', () => {
+    it('should namespace agent output under schema name', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'complete',
+            args: { summary: 'Done', score: 95 },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-output-schema').brain('Process', {
+        prompt: 'Analyze the data',
+        outputSchema: {
+          schema: z.object({ summary: z.string(), score: z.number() }),
+          name: 'analysis' as const,
+        },
+      });
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify generated tool was available
+      expect(mockGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.objectContaining({
+            complete: expect.objectContaining({
+              description: expect.stringContaining('analysis'),
+            }),
+          }),
+        })
+      );
+
+      // Verify state was namespaced correctly
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // Result under 'analysis' key, NOT spread at root
+      expect(finalState).toEqual({
+        analysis: { summary: 'Done', score: 95 },
+      });
+      expect(finalState.summary).toBeUndefined();
+    });
+
+    it('should use custom tool name from outputSchema', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'finalize',
+            args: { result: 'done' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-custom-tool-name').brain('Process', {
+        prompt: 'Do something',
+        outputSchema: {
+          schema: z.object({ result: z.string() }),
+          name: 'output' as const,
+          toolName: 'finalize',
+          toolDescription: 'Finalize the processing',
+        },
+      });
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // Verify custom tool name and description were used
+      expect(mockGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.objectContaining({
+            finalize: expect.objectContaining({
+              description: 'Finalize the processing',
+            }),
+          }),
+        })
+      );
+
+      // Verify state was namespaced correctly
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(finalState).toEqual({
+        output: { result: 'done' },
+      });
+    });
+
+    it('should work with config function pattern', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'complete',
+            args: { message: 'Hello back' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-config-fn-output')
+        .step('Init', () => ({ name: 'Alice' }))
+        .brain('Greet', ({ state }) => ({
+          prompt: `Greet ${state.name}`,
+          outputSchema: {
+            schema: z.object({ message: z.string() }),
+            name: 'greeting' as const,
+          },
+        }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(finalState).toEqual({
+        name: 'Alice',
+        greeting: { message: 'Hello back' },
+      });
+    });
+
+    it('should allow other terminal tools alongside outputSchema tool', async () => {
+      // LLM calls user-defined terminal tool (abort) instead of generated one
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'abort',
+            args: { reason: 'Invalid data' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-multiple-terminal').brain('Process', {
+        prompt: 'Process data',
+        tools: {
+          abort: {
+            description: 'Abort processing',
+            inputSchema: z.object({ reason: z.string() }),
+            terminal: true,
+          },
+        },
+        outputSchema: {
+          schema: z.object({ result: z.string() }),
+          name: 'output' as const,
+        },
+      });
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      // User-defined terminal tool should spread at root (backward compatible)
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      // abort tool spreads at root, not under a key
+      expect(finalState).toEqual({ reason: 'Invalid data' });
+    });
+
+    it('should work with subsequent steps that access the typed output', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'complete',
+            args: { entities: ['apple', 'banana'], count: 2 },
+          },
+        ],
+        usage: { totalTokens: 100 },
+      });
+
+      const testBrain = brain('test-output-schema-flow')
+        .brain('Extract', {
+          prompt: 'Extract entities',
+          outputSchema: {
+            schema: z.object({
+              entities: z.array(z.string()),
+              count: z.number(),
+            }),
+            name: 'extracted' as const,
+          },
+        })
+        .step('Process', ({ state }) => {
+          // This step can access state.extracted with proper types
+          return {
+            ...state,
+            processed: state.extracted.entities.join(', '),
+            total: state.extracted.count,
+          };
+        });
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+
+      expect(finalState).toEqual({
+        extracted: { entities: ['apple', 'banana'], count: 2 },
+        processed: 'apple, banana',
+        total: 2,
+      });
+    });
+  });
 });

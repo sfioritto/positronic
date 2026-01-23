@@ -127,10 +127,30 @@ export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
 }
 
 /**
+ * Configuration for agent output schema.
+ * When provided, generates a terminal tool from the schema and
+ * namespaces the result in state under the specified key.
+ */
+export interface AgentOutputSchema<
+  TSchema extends z.ZodObject<any> = z.ZodObject<any>,
+  TName extends string = string
+> {
+  /** Zod schema defining the agent's output structure */
+  schema: TSchema;
+  /** Key name to store the result under in state (use `as const` for type inference) */
+  name: TName;
+  /** Optional name for the generated terminal tool (defaults to "complete") */
+  toolName?: string;
+  /** Optional description for the generated terminal tool */
+  toolDescription?: string;
+}
+
+/**
  * Configuration for an agent step.
  */
 export interface AgentConfig<
-  TTools extends Record<string, AgentTool> = Record<string, AgentTool>
+  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TOutputSchema extends AgentOutputSchema | undefined = undefined
 > {
   /** System prompt for the LLM */
   system?: string;
@@ -142,6 +162,12 @@ export interface AgentConfig<
   maxTokens?: number;
   /** Maximum number of agent loop iterations. Default: 100 */
   maxIterations?: number;
+  /**
+   * Output schema for structured agent output.
+   * When provided, generates a terminal tool that validates output against the schema
+   * and stores the result under state[outputSchema.name].
+   */
+  outputSchema?: TOutputSchema;
 }
 
 /**
