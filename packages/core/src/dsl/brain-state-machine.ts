@@ -799,15 +799,32 @@ const passthrough = (eventType: string) =>
     };
   });
 
-// Reducer for agent terminal events that also tracks tokens
+// Reducer for agent iteration events that tracks tokens per-iteration
+// This ensures tokens are counted even if the agent doesn't complete (e.g., webhook interruption)
+const agentIteration = reduce<BrainExecutionContext, any>((ctx, ev) => {
+  const { brainRunId, options, totalTokens } = ctx;
+  const { type: _actionType, ...eventData } = ev;
+
+  return {
+    ...ctx,
+    totalTokens: totalTokens + (ev.tokensThisIteration ?? 0),
+    currentEvent: {
+      type: BRAIN_EVENTS.AGENT_ITERATION,
+      brainRunId: brainRunId!,
+      options,
+      ...eventData,
+    },
+  };
+});
+
+// Reducer for agent terminal events - tokens already tracked via iterations
 const agentTerminal = (eventType: string) =>
   reduce<BrainExecutionContext, any>((ctx, ev) => {
-    const { brainRunId, options, totalTokens } = ctx;
+    const { brainRunId, options } = ctx;
     const { type: _actionType, ...eventData } = ev;
 
     return {
       ...ctx,
-      totalTokens: totalTokens + (ev.totalTokens ?? 0),
       currentEvent: {
         type: eventType,
         brainRunId: brainRunId!,
@@ -898,7 +915,7 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(
           BRAIN_EVENTS.AGENT_ITERATION,
           'running',
-          passthrough(BRAIN_EVENTS.AGENT_ITERATION)
+          agentIteration
         ) as any,
         transition(
           BRAIN_EVENTS.AGENT_TOOL_CALL,

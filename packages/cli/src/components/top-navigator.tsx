@@ -204,7 +204,7 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
       <Watch
         runId={selectedRunId}
         manageScreenBuffer={false}
-        footer="b back • x kill"
+        footer="e events • b back • x kill"
       />
     );
   }
