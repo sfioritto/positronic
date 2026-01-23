@@ -7,7 +7,7 @@
   "scripts": {
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "typecheck": "tsc --noEmit",
-    "build:components": "node esbuild.config.mjs"
+    "build:components": "node .positronic/esbuild.config.mjs"
   },
   "keywords": [],
   "author": "",
