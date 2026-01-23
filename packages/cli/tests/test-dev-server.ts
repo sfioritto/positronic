@@ -556,6 +556,64 @@ export class TestDevServer implements PositronicDevServer {
           } else if (runId === 'test-connection-error') {
             // Simulate connection error by returning error
             throw new Error('ECONNREFUSED');
+          } else if (runId === 'test-state-view') {
+            // Scenario for testing state view with proper initialState and patches
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'State View Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: { count: 0, name: 'initial' },
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'step-1', title: 'Step One', status: 'running' },
+                  { id: 'step-2', title: 'Step Two', status: 'pending' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:complete',
+                brainRunId: runId,
+                stepTitle: 'Step One',
+                stepId: 'step-1',
+                options: {},
+                status: 'running',
+                patch: [{ op: 'replace', path: '/count', value: 1 }],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'step-1', title: 'Step One', status: 'complete' },
+                  { id: 'step-2', title: 'Step Two', status: 'running' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:complete',
+                brainRunId: runId,
+                stepTitle: 'Step Two',
+                stepId: 'step-2',
+                options: {},
+                status: 'running',
+                patch: [
+                  { op: 'replace', path: '/count', value: 2 },
+                  { op: 'replace', path: '/name', value: 'completed' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'brain:complete',
+                brainRunId: runId,
+                brainTitle: 'State View Brain',
+                options: {},
+                status: 'complete',
+              })}\n\n`,
+            ].join('');
           } else {
             // Default scenario
             const mockEvents = [

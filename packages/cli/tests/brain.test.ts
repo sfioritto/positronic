@@ -849,6 +849,42 @@ describe('CLI Integration: positronic brain commands', () => {
         }
       });
 
+      it('should show footer with correct toggle hint including state option', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrain({
+          filename: 'test-brain',
+          title: 'test-brain',
+          description: 'A test brain for testing',
+          createdAt: Date.now(),
+          lastModified: Date.now(),
+        });
+
+        server.addBrainRun({
+          brainRunId: 'run-123',
+          brainTitle: 'test-brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-brain']);
+
+          // In progress view, footer should show 's state | e events'
+          const foundStateHint = await waitForOutput(/s state/, 30);
+          expect(foundStateHint).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
       it('should show footer with correct toggle hint based on view', async () => {
         const env = await createTestEnv();
         const { server } = env;
@@ -885,6 +921,200 @@ describe('CLI Integration: positronic brain commands', () => {
           // In events view, footer should show 'b back'
           const foundBackHint = await waitForOutput(/b back/, 30);
           expect(foundBackHint).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+    });
+
+    describe('state view', () => {
+      it('should show current state when pressing s from progress view', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        // Use the test-state-view scenario that has initialState and patches
+        server.addBrainRun({
+          brainRunId: 'test-state-view',
+          brainTitle: 'State View Brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-state-view']);
+
+          // Wait for the brain to load
+          const foundBrain = await waitForOutput(/State View Brain/, 30);
+          expect(foundBrain).toBe(true);
+
+          // Press 's' to switch to state view
+          instance.stdin.write('s');
+
+          // Should show "Current State" title
+          const foundStateTitle = await waitForOutput(/Current State/, 30);
+          expect(foundStateTitle).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should show state view with JSON content and state view footer', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrainRun({
+          brainRunId: 'test-state-view',
+          brainTitle: 'State View Brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-state-view']);
+
+          // Wait for the brain to load
+          await waitForOutput(/State View Brain/, 30);
+
+          // Press 's' to switch to state view
+          instance.stdin.write('s');
+
+          // Should be in state view - check for state view footer (j/k scroll | b back)
+          const foundStateFooter = await waitForOutput(/j\/k scroll/, 30);
+          expect(foundStateFooter).toBe(true);
+
+          // Should show Current State title
+          const foundCurrentState = await waitForOutput(/Current State/, 30);
+          expect(foundCurrentState).toBe(true);
+
+          // Should show JSON content with state values
+          const foundJsonContent = await waitForOutput(/"count"/, 30);
+          expect(foundJsonContent).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should show state footer with correct options in state view', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrainRun({
+          brainRunId: 'test-state-view',
+          brainTitle: 'State View Brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-state-view']);
+
+          // Wait for the brain to load
+          await waitForOutput(/State View Brain/, 30);
+
+          // Press 's' to switch to state view
+          instance.stdin.write('s');
+
+          // Should show state view footer
+          const foundFooter = await waitForOutput(/j\/k scroll \| b back/, 30);
+          expect(foundFooter).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should show state at selected event when pressing s from events view', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        // Use the test-state-view scenario that has initialState and patches
+        server.addBrainRun({
+          brainRunId: 'test-state-view',
+          brainTitle: 'State View Brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-state-view', '--events']);
+
+          // Wait for events to appear
+          const foundEvents = await waitForOutput(/Events/, 30);
+          expect(foundEvents).toBe(true);
+
+          // Press 'j' to select an event (start navigation mode - j goes down from auto-scroll)
+          instance.stdin.write('j');
+
+          // Wait for selection mode - navigating footer shows 's state'
+          const foundNav = await waitForOutput(/s state/, 30);
+          expect(foundNav).toBe(true);
+
+          // Press 's' to view state at selected event
+          instance.stdin.write('s');
+
+          // Should show state view footer
+          const foundStateFooter = await waitForOutput(/j\/k scroll \| b back/, 30);
+          expect(foundStateFooter).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should show state footer hint in events navigating mode', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrainRun({
+          brainRunId: 'test-state-view',
+          brainTitle: 'State View Brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-state-view', '--events']);
+
+          // Wait for events view
+          await waitForOutput(/Events/, 30);
+
+          // Press 'k' to enter navigation mode
+          instance.stdin.write('k');
+
+          // Wait for selection
+          await waitForOutput(/Selected:/, 30);
+
+          // Footer should show 's state' option
+          const foundStateHint = await waitForOutput(/s state/, 30);
+          expect(foundStateHint).toBe(true);
 
           instance.unmount();
         } finally {

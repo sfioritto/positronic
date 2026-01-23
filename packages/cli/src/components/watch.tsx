@@ -9,8 +9,12 @@ import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { EventsView, type StoredEvent, type EventsViewMode } from './events-view.js';
+import { StateView } from './state-view.js';
+import { reconstructStateAtEvent } from '../utils/state-reconstruction.js';
 
-type ViewMode = 'progress' | 'events';
+type JsonObject = { [key: string]: unknown };
+
+type ViewMode = 'progress' | 'events' | 'state';
 
 // Get the index of the currently running step (or last completed if none running)
 const getCurrentStepIndex = (steps: StepInfo[]): number => {
@@ -184,10 +188,16 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   const { write } = useStdout();
   const { exit } = useApp();
 
-  // View mode state (progress view vs events log)
+  // View mode state (progress view vs events log vs state view)
   const [viewMode, setViewMode] = useState<ViewMode>(startWithEvents ? 'events' : 'progress');
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const [eventsViewMode, setEventsViewMode] = useState<EventsViewMode>('auto');
+
+  // State view state
+  const [stateSnapshot, setStateSnapshot] = useState<JsonObject | null>(null);
+  const [stateTitle, setStateTitle] = useState<string>('');
+  const [stateScrollOffset, setStateScrollOffset] = useState(0);
+  const [previousViewMode, setPreviousViewMode] = useState<'progress' | 'events'>('progress');
 
   // Use state machine to track brain execution state
   // Machine is recreated when runId changes, giving us fresh context
@@ -284,6 +294,16 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
     };
   }, [runId]);
 
+  // Handler for viewing state at a specific event index (called from EventsView)
+  const handleViewStateAtEvent = (eventIndex: number) => {
+    const state = reconstructStateAtEvent(events, eventIndex);
+    setStateSnapshot(state);
+    setStateTitle(`State at event #${eventIndex + 1}`);
+    setStateScrollOffset(0);
+    setPreviousViewMode('events');
+    setViewMode('state');
+  };
+
   // Keyboard handling
   useInput((input, key) => {
     if (confirmingKill) {
@@ -300,6 +320,13 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
       } else if (input === 'n' || key.escape) {
         setConfirmingKill(false);
       }
+    } else if (viewMode === 'state') {
+      // State view: 'b' goes back to previous view
+      if (input === 'b') {
+        setViewMode(previousViewMode);
+        setStateSnapshot(null);
+      }
+      // j/k scrolling is handled by StateView component
     } else {
       // View toggle
       if (input === 'e') {
@@ -308,6 +335,14 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         // 'b' in events list mode goes back to progress view
         // 'b' in events detail mode is handled by EventsView to go back to list
         setViewMode('progress');
+      } else if (input === 's' && viewMode === 'progress') {
+        // 's' from progress view: show current state
+        const currentState = current.context.currentState ?? {};
+        setStateSnapshot(currentState);
+        setStateTitle('Current State');
+        setStateScrollOffset(0);
+        setPreviousViewMode('progress');
+        setViewMode('state');
       } else if (input === 'x' && !isKilling && !isKilled && !isComplete) {
         setConfirmingKill(true);
       } else if ((input === 'q' || key.escape) && manageScreenBuffer) {
@@ -333,16 +368,18 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
 
   // Build footer based on current mode
   const getFooter = () => {
-    if (viewMode === 'events') {
+    if (viewMode === 'state') {
+      return 'j/k scroll | b back';
+    } else if (viewMode === 'events') {
       if (eventsViewMode === 'detail') {
         return 'j/k scroll • b back';
       } else if (eventsViewMode === 'navigating') {
-        return 'j/k select • Enter detail • b back • esc auto-scroll';
+        return 'j/k select | Enter detail | s state | b back | esc auto-scroll';
       } else {
-        return 'j/k select • b back | x kill | esc quit';
+        return 'j/k select | b back | x kill | esc quit';
       }
     } else {
-      return 'e events | x kill | esc quit';
+      return 's state | e events | x kill | esc quit';
     }
   };
 
@@ -352,6 +389,18 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
     <Box flexDirection="column">
       {!isConnected && !rootBrain ? (
         <Text>Connecting to watch service...</Text>
+      ) : viewMode === 'state' && stateSnapshot !== null ? (
+        <>
+          <StateView
+            state={stateSnapshot}
+            title={stateTitle}
+            scrollOffset={stateScrollOffset}
+            onScrollChange={setStateScrollOffset}
+            isActive={viewMode === 'state'}
+          />
+          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
+        </>
       ) : viewMode === 'events' ? (
         <>
           <EventsView
@@ -359,6 +408,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
             totalTokens={current.context.totalTokens}
             isActive={viewMode === 'events'}
             onModeChange={setEventsViewMode}
+            onViewState={handleViewStateAtEvent}
           />
           {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
