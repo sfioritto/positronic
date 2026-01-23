@@ -11,7 +11,7 @@ import type { UIComponent } from '../ui/types.js';
 export interface CreateBrainConfig<
   TServices extends object = {},
   TComponents extends Record<string, UIComponent<any>> = {},
-  TTools extends Record<string, AgentTool> = {}
+  TTools extends Record<string, AgentTool<any>> = {}
 > {
   /** Services available to all brains (e.g., slack, gmail, database clients) */
   services?: TServices;
@@ -66,7 +66,7 @@ export interface CreateBrainConfig<
 export function createBrain<
   TServices extends object = {},
   TComponents extends Record<string, UIComponent<any>> = {},
-  TTools extends Record<string, AgentTool> = {}
+  TTools extends Record<string, AgentTool<any>> = {}
 >(config: CreateBrainConfig<TServices, TComponents, TTools>) {
   const { services, components, defaultTools } = config;
 
