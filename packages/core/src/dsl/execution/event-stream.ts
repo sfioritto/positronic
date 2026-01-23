@@ -676,6 +676,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         ? `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${config.system}`
         : DEFAULT_AGENT_SYSTEM_PROMPT;
 
+      // Track message count before the call to extract only new messages
+      const previousMessageCount = responseMessages?.length ?? 0;
+
       const response = await this.client.generateText({
         system: systemPrompt,
         messages: initialMessages,
@@ -683,8 +686,28 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         tools: toolsForClient,
       });
 
+      // Extract only the new messages from this iteration (delta, not accumulated)
+      const newMessages = response.responseMessages?.slice(previousMessageCount) ?? [];
+
       // Update responseMessages for next iteration (preserves providerOptions)
       responseMessages = response.responseMessages;
+
+      // Emit raw response message event with only the new messages from this iteration
+      // Following the patch pattern: each event contains only the delta, replay to reconstruct
+      yield {
+        type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        iteration,
+        rawResponse: {
+          text: response.text,
+          toolCalls: response.toolCalls,
+          usage: response.usage,
+          responseMessages: newMessages,
+        },
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
 
       // Track tokens
       const tokensThisIteration = response.usage.totalTokens;
@@ -816,7 +839,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               ? waitForResult.waitFor
               : [waitForResult.waitFor];
 
-            // Emit agent webhook event first (captures pending tool context and conversation state)
+            // Note: responseMessages are captured in agent:raw_response_message events
             yield {
               type: BRAIN_EVENTS.AGENT_WEBHOOK,
               stepTitle: step.block.title,
@@ -824,7 +847,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               toolCallId: toolCall.toolCallId,
               toolName: toolCall.toolName,
               input: toolCall.args as JsonObject,
-              responseMessages: responseMessages ?? [],
               options: this.options ?? ({} as TOptions),
               brainRunId: this.brainRunId,
             };
