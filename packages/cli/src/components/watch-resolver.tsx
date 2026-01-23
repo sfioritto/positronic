@@ -275,6 +275,7 @@ const createResolverMachine = (identifier: string) =>
 
 interface WatchResolverProps {
   identifier: string;
+  startWithEvents?: boolean;
 }
 
 /**
@@ -286,7 +287,7 @@ interface WatchResolverProps {
  * 2. If no brain matches, try as a run ID
  * 3. If neither works, show an error
  */
-export const WatchResolver = ({ identifier }: WatchResolverProps) => {
+export const WatchResolver = ({ identifier, startWithEvents }: WatchResolverProps) => {
   const machine = useMemo(() => createResolverMachine(identifier), [identifier]);
   const [current, send] = useMachine(machine);
 
@@ -373,7 +374,7 @@ export const WatchResolver = ({ identifier }: WatchResolverProps) => {
       return error ? <ErrorComponent error={error} /> : null;
 
     case 'resolved':
-      return resolvedRunId ? <Watch runId={resolvedRunId} /> : null;
+      return resolvedRunId ? <Watch runId={resolvedRunId} startWithEvents={startWithEvents} /> : null;
 
     default:
       return null;

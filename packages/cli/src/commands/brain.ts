@@ -35,6 +35,7 @@ interface BrainRunArgs {
 }
 interface BrainWatchArgs {
   identifier: string;
+  events?: boolean;
 }
 interface BrainKillArgs {
   runId: string;
@@ -113,8 +114,9 @@ export class BrainCommand {
 
   watch({
     identifier,
+    events,
   }: ArgumentsCamelCase<BrainWatchArgs>): React.ReactElement {
-    return React.createElement(WatchResolver, { identifier });
+    return React.createElement(WatchResolver, { identifier, startWithEvents: events });
   }
 
   kill({

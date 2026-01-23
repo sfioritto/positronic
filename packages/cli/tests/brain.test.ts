@@ -653,6 +653,246 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
+    describe('events view', () => {
+      it('should start in events view with --events flag', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrain({
+          filename: 'test-brain',
+          title: 'test-brain',
+          description: 'A test brain for testing',
+          createdAt: Date.now(),
+          lastModified: Date.now(),
+        });
+
+        server.addBrainRun({
+          brainRunId: 'run-123',
+          brainTitle: 'test-brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-brain', '--events']);
+
+          // Should show events header
+          const foundEvents = await waitForOutput(/Events \(\d+ total\)/, 30);
+          expect(foundEvents).toBe(true);
+
+          // Should show brain:start event
+          const foundStart = await waitForOutput(/\[>\].*Brain started/, 30);
+          expect(foundStart).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should start in events view with short -e flag', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrain({
+          filename: 'test-brain',
+          title: 'test-brain',
+          description: 'A test brain for testing',
+          createdAt: Date.now(),
+          lastModified: Date.now(),
+        });
+
+        server.addBrainRun({
+          brainRunId: 'run-123',
+          brainTitle: 'test-brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-brain', '-e']);
+
+          // Should show events header
+          const foundEvents = await waitForOutput(/Events/, 30);
+          expect(foundEvents).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should toggle to events view with e key', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrain({
+          filename: 'test-brain',
+          title: 'test-brain',
+          description: 'A test brain for testing',
+          createdAt: Date.now(),
+          lastModified: Date.now(),
+        });
+
+        server.addBrainRun({
+          brainRunId: 'run-123',
+          brainTitle: 'test-brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-brain']);
+
+          // Should start in progress view (shows step info)
+          const foundProgress = await waitForOutput(/Test Step 1/, 30);
+          expect(foundProgress).toBe(true);
+
+          // Press 'e' to switch to events view
+          instance.stdin.write('e');
+
+          // Should now show events header
+          const foundEvents = await waitForOutput(/Events/, 30);
+          expect(foundEvents).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should toggle back to progress view with w key', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrain({
+          filename: 'test-brain',
+          title: 'test-brain',
+          description: 'A test brain for testing',
+          createdAt: Date.now(),
+          lastModified: Date.now(),
+        });
+
+        server.addBrainRun({
+          brainRunId: 'run-123',
+          brainTitle: 'test-brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-brain', '--events']);
+
+          // Should start in events view
+          const foundEvents = await waitForOutput(/Events/, 30);
+          expect(foundEvents).toBe(true);
+
+          // Press 'w' to switch back to progress view
+          instance.stdin.write('w');
+
+          // Should show progress view (step info)
+          const foundProgress = await waitForOutput(/Test Step 1/, 30);
+          expect(foundProgress).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should display different event types with correct formatting', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        // Use test-multi-status which emits brain:start and step:status events
+        server.addBrainRun({
+          brainRunId: 'test-multi-status',
+          brainTitle: 'Multi Status Brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-multi-status', '--events']);
+
+          // Should show brain:start event with [>] symbol
+          const foundStart = await waitForOutput(/\[>\].*Brain started/, 30);
+          expect(foundStart).toBe(true);
+
+          // Should show step:status event with [-] symbol
+          const foundStatus = await waitForOutput(/\[-\].*Step status/, 30);
+          expect(foundStatus).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+
+      it('should show footer with correct toggle hint based on view', async () => {
+        const env = await createTestEnv();
+        const { server } = env;
+
+        server.addBrain({
+          filename: 'test-brain',
+          title: 'test-brain',
+          description: 'A test brain for testing',
+          createdAt: Date.now(),
+          lastModified: Date.now(),
+        });
+
+        server.addBrainRun({
+          brainRunId: 'run-123',
+          brainTitle: 'test-brain',
+          type: 'START',
+          status: STATUS.RUNNING,
+          createdAt: Date.now(),
+          startedAt: Date.now(),
+        });
+
+        const px = await env.start();
+
+        try {
+          const { waitForOutput, instance } = await px(['watch', 'test-brain']);
+
+          // In progress view, footer should show 'e events'
+          const foundEventsHint = await waitForOutput(/e events/, 30);
+          expect(foundEventsHint).toBe(true);
+
+          // Switch to events view
+          instance.stdin.write('e');
+
+          // In events view, footer should show 'w progress'
+          const foundProgressHint = await waitForOutput(/w progress/, 30);
+          expect(foundProgressHint).toBe(true);
+
+          instance.unmount();
+        } finally {
+          await env.stopAndCleanup();
+        }
+      });
+    });
+
   });
 
   describe('brain list command', () => {

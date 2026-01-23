@@ -447,6 +447,12 @@ export function buildCli(options: CliOptions) {
           type: 'string',
           demandOption: true,
         })
+        .option('events', {
+          describe: 'Start in events view instead of progress view',
+          type: 'boolean',
+          alias: 'e',
+          default: false,
+        })
         .example(
           '$0 watch my-brain',
           "Watch the latest run of the brain named 'my-brain'"
@@ -454,6 +460,10 @@ export function buildCli(options: CliOptions) {
         .example(
           '$0 watch abc123def',
           'Watch a specific brain run by its ID'
+        )
+        .example(
+          '$0 watch my-brain --events',
+          'Watch with events log view'
         );
     },
     (argv) => {
@@ -645,6 +655,12 @@ export function buildCli(options: CliOptions) {
               type: 'string',
               demandOption: true,
             })
+            .option('events', {
+              describe: 'Start in events view instead of progress view',
+              type: 'boolean',
+              alias: 'e',
+              default: false,
+            })
             .example(
               '$0 brain watch my-brain',
               "Watch the latest run of the brain named 'my-brain'"
@@ -652,6 +668,10 @@ export function buildCli(options: CliOptions) {
             .example(
               '$0 brain watch abc123def',
               'Watch a specific brain run by its ID'
+            )
+            .example(
+              '$0 brain watch my-brain --events',
+              'Watch with events log view'
             );
         },
         (argv) => {
