@@ -70,30 +70,24 @@ const generateUIInputSchema = z.object({
  * The description is enriched at runtime with available component information.
  */
 export const generateUI: AgentTool<typeof generateUIInputSchema> = {
-  description: `Generate a dynamic UI page using AI-powered component selection and layout.
+  description: `Create a web page for collecting user input via forms.
 
-PURPOSE: Create interactive web pages for user interaction - forms, displays, dashboards, approval workflows.
+PURPOSE: Generate interactive forms to collect information from users - input forms, approval workflows, surveys, data entry.
 
-RETURNS on success: { success: true, message: string, url: string, webhook: { slug: string, identifier: string } | null }
-- success: Always true when the page was created successfully
-- message: Instructions for what to do next
-- url: The URL where the generated page can be accessed
-- webhook: Present only when hasForm=true. Use with waitForWebhook to receive form submissions.
+NOTE: This tool creates pages, it does NOT send messages. To notify users about the page URL, use a different tool (Slack, email, consoleLog, etc).
 
-CORRECT WORKFLOW FOR FORMS (hasForm=true):
-1. Call generateUI with your prompt - you will receive success: true and a url
-2. Communicate the URL to the user using the best available tool (e.g., Slack, email, consoleLog)
-3. Call waitForWebhook with the webhook.slug and webhook.identifier from the result
-4. Execution pauses until user submits the form, then resumes with form data
+RETURNS: { success: true, url: string, webhook: object | null, nextStep: string | null }
+- success: true when page was created
+- url: The page URL to share with users
+- webhook: Contains slug and identifier needed for waitForWebhook (only when hasForm=true)
+- nextStep: What to call next (only when hasForm=true)
 
-WORKFLOW FOR DISPLAY-ONLY PAGES (hasForm=false):
-1. Call generateUI with hasForm: false
-2. Communicate the URL to the user
-3. Continue with other tasks (no waiting required)
-
-WHAT THE AI GENERATES: Based on your prompt, an AI selects and arranges UI components (text, inputs, buttons, layouts) to create the page. Be descriptive in your prompt about what you need.`,
+WORKFLOW:
+1. Call generateUI to create the form page
+2. Share the returned URL with the user via another tool
+3. If hasForm=true: call waitForWebhook (see nextStep in response) to pause until form submission`,
   inputSchema: generateUIInputSchema,
-  async execute(input, context): Promise<{ success: true; message: string; url: string; webhook: { slug: string; identifier: string } | null }> {
+  async execute(input, context): Promise<{ success: true; url: string; webhook: { slug: string; identifier: string } | null; nextStep: string | null }> {
     const { components, pages, client, state, env, brainRunId, stepId } = context;
     const hasForm = input.hasForm ?? true;
 
@@ -160,15 +154,13 @@ WHAT THE AI GENERATES: Based on your prompt, an AI selects and arranges UI compo
     const page = await pages.create(html);
 
     // Return URL and webhook info (no waitFor - does not pause)
-    const message = hasForm
-      ? `Page created successfully! Tell the user to visit the URL, then call waitForWebhook with slug="${webhookInfo!.slug}" and identifier="${webhookInfo!.identifier}" to wait for their submission.`
-      : `Page created successfully! Tell the user to visit the URL.`;
-
     return {
       success: true,
-      message,
       url: page.url,
       webhook: webhookInfo,
+      nextStep: hasForm
+        ? `Call waitForWebhook with slug="${webhookInfo!.slug}" and identifier="${webhookInfo!.identifier}"`
+        : null,
     };
   },
 };
