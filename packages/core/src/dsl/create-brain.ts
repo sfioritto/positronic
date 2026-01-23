@@ -1,8 +1,5 @@
 import { brain as coreBrain, Brain } from './builder/brain.js';
-import type { AgentConfig, AgentTool, RuntimeEnv } from './types.js';
-import type { ObjectGenerator } from '../clients/types.js';
-import type { Resources } from '../resources/resources.js';
-import type { PagesService } from './pages.js';
+import type { AgentConfig, AgentTool, StepContext } from './types.js';
 import type { UIComponent } from '../ui/types.js';
 
 /**
@@ -70,19 +67,10 @@ export function createBrain<
 >(config: CreateBrainConfig<TServices, TComponents, TTools>) {
   const { services, components, defaultTools } = config;
 
-  // The params available in agent config functions
-  type AgentParams = {
-    state: object;
-    options: {};
+  // The params available in agent config functions - uses StepContext for consistency
+  type AgentParams = StepContext<object, {}, undefined, undefined> & TServices & {
     tools: TTools extends {} ? Record<string, AgentTool> : TTools;
-    components: TComponents extends {} ? Record<string, UIComponent<any>> : TComponents;
-    client: ObjectGenerator;
-    resources: Resources;
-    response: undefined;
-    page: undefined;
-    pages?: PagesService;
-    env: RuntimeEnv;
-  } & TServices;
+  };
 
   // Return type for the brain function
   type BrainReturn = Brain<{}, object, TServices, undefined, undefined>;

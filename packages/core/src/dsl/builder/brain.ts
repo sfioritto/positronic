@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, RetryConfig } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, RetryConfig, StepContext } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { ExtractWebhookResponses } from '../webhook.js';
 import type { PagesService } from '../pages.js';
@@ -157,16 +157,7 @@ export class Brain<
   >(
     title: string,
     action: (
-      params: {
-        state: TState;
-        options: TOptions;
-        client: ObjectGenerator;
-        resources: Resources;
-        response: TResponse;
-        page: TPage;
-        pages?: PagesService;
-        env: RuntimeEnv;
-      } & TServices
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices
     ) =>
       | TNewState
       | Promise<TNewState>
@@ -219,18 +210,10 @@ export class Brain<
   >(
     title: string,
     configFn: (
-      params: {
-        state: TState;
-        options: TOptions;
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & {
+        /** Default tools available for agent steps */
         tools: Record<string, AgentTool>;
-        components: Record<string, UIComponent<any>>;
-        client: ObjectGenerator;
-        resources: Resources;
-        response: TResponse;
-        page: TPage;
-        pages?: PagesService;
-        env: RuntimeEnv;
-      } & TServices
+      }
     ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
@@ -708,18 +691,11 @@ export function brain<
   TState extends State = object
 >(
   title: string,
-  configFn: (params: {
-    state: object;
-    options: JsonObject;
-    tools: Record<string, AgentTool>;
-    components: Record<string, UIComponent<any>>;
-    client: ObjectGenerator;
-    resources: Resources;
-    response: undefined;
-    page: undefined;
-    pages?: PagesService;
-    env: RuntimeEnv;
-  }) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
+  configFn: (
+    params: StepContext<object, JsonObject, undefined, undefined> & {
+      tools: Record<string, AgentTool>;
+    }
+  ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
 ): Brain<JsonObject, TState, object, undefined, undefined>;
 
 // Implementation
