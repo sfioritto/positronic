@@ -904,6 +904,11 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           passthrough(BRAIN_EVENTS.AGENT_TOKEN_LIMIT)
         ) as any,
         transition(
+          BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
+          'running',
+          passthrough(BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
+        ) as any,
+        transition(
           BRAIN_EVENTS.AGENT_WEBHOOK,
           'running',
           passthrough(BRAIN_EVENTS.AGENT_WEBHOOK)

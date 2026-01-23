@@ -106,6 +106,8 @@ export interface AgentIterationEvent<TOptions extends JsonObject = JsonObject>
   stepTitle: string;
   stepId: string;
   iteration: number;
+  tokensThisIteration: number;
+  totalTokens: number;
 }
 
 export interface AgentToolCallEvent<TOptions extends JsonObject = JsonObject>
@@ -145,6 +147,7 @@ export interface AgentCompleteEvent<TOptions extends JsonObject = JsonObject>
   terminalToolName: string;
   result: JsonObject;
   totalIterations: number;
+  totalTokens: number;
 }
 
 export interface AgentTokenLimitEvent<TOptions extends JsonObject = JsonObject>
@@ -154,6 +157,17 @@ export interface AgentTokenLimitEvent<TOptions extends JsonObject = JsonObject>
   stepId: string;
   totalTokens: number;
   maxTokens: number;
+}
+
+export interface AgentIterationLimitEvent<
+  TOptions extends JsonObject = JsonObject
+> extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.AGENT_ITERATION_LIMIT;
+  stepTitle: string;
+  stepId: string;
+  iteration: number;
+  maxIterations: number;
+  totalTokens: number;
 }
 
 export interface AgentWebhookEvent<TOptions extends JsonObject = JsonObject>
@@ -191,4 +205,5 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | AgentAssistantMessageEvent<TOptions>
   | AgentCompleteEvent<TOptions>
   | AgentTokenLimitEvent<TOptions>
+  | AgentIterationLimitEvent<TOptions>
   | AgentWebhookEvent<TOptions>;

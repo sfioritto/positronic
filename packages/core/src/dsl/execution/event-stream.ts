@@ -527,20 +527,27 @@ export class BrainEventStream<
     // Initialize token tracking
     let totalTokens = 0;
     let iteration = 0;
+    const maxIterations = config.maxIterations ?? 100;
 
     // Main agent loop
     while (true) {
       iteration++;
 
-      // Emit iteration event
-      yield {
-        type: BRAIN_EVENTS.AGENT_ITERATION,
-        stepTitle: step.block.title,
-        stepId: step.id,
-        iteration,
-        options: this.options ?? ({} as TOptions),
-        brainRunId: this.brainRunId,
-      };
+      // Check max iterations limit BEFORE making the LLM call
+      if (iteration > maxIterations) {
+        yield {
+          type: BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          iteration: iteration - 1, // Report the last completed iteration
+          maxIterations,
+          totalTokens,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+        yield* this.completeStep(step, prevState);
+        return;
+      }
 
       // Check if client supports generateText
       if (!this.client.generateText) {
@@ -591,7 +598,20 @@ export class BrainEventStream<
       });
 
       // Track tokens
-      totalTokens += response.usage.totalTokens;
+      const tokensThisIteration = response.usage.totalTokens;
+      totalTokens += tokensThisIteration;
+
+      // Emit iteration event (after LLM call so we have token info)
+      yield {
+        type: BRAIN_EVENTS.AGENT_ITERATION,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        iteration,
+        tokensThisIteration,
+        totalTokens,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
 
       // Check max tokens limit
       if (config.maxTokens && totalTokens > config.maxTokens) {
@@ -654,6 +674,7 @@ export class BrainEventStream<
             terminalToolName: toolCall.toolName,
             result: toolCall.args as JsonObject,
             totalIterations: iteration,
+            totalTokens,
             options: this.options ?? ({} as TOptions),
             brainRunId: this.brainRunId,
           };

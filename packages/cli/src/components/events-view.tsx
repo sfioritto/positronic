@@ -121,7 +121,7 @@ function formatEvent(event: BrainEvent): FormattedEvent {
     case BRAIN_EVENTS.AGENT_ITERATION:
       return {
         symbol: '[#]',
-        text: `Agent iteration ${event.iteration}`,
+        text: `Agent iteration ${event.iteration} (${event.tokensThisIteration} tokens, ${event.totalTokens} total)`,
         color: 'gray',
       };
     case BRAIN_EVENTS.AGENT_TOOL_CALL:
@@ -145,13 +145,19 @@ function formatEvent(event: BrainEvent): FormattedEvent {
     case BRAIN_EVENTS.AGENT_COMPLETE:
       return {
         symbol: '[A]',
-        text: `Agent completed: "${event.terminalToolName}" (${event.totalIterations} iterations)`,
+        text: `Agent completed: "${event.terminalToolName}" (${event.totalIterations} iterations, ${event.totalTokens} tokens)`,
         color: 'green',
       };
     case BRAIN_EVENTS.AGENT_TOKEN_LIMIT:
       return {
         symbol: '[!]',
         text: `Token limit reached: ${event.totalTokens}/${event.maxTokens}`,
+        color: 'red',
+      };
+    case BRAIN_EVENTS.AGENT_ITERATION_LIMIT:
+      return {
+        symbol: '[!]',
+        text: `Iteration limit reached: ${event.iteration}/${event.maxIterations} (${event.totalTokens} tokens)`,
         color: 'red',
       };
     case BRAIN_EVENTS.AGENT_WEBHOOK:

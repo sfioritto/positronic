@@ -140,6 +140,8 @@ export interface AgentConfig<
   tools?: TTools;
   /** Safety valve - exit if cumulative tokens exceed this limit */
   maxTokens?: number;
+  /** Maximum number of agent loop iterations. Default: 100 */
+  maxIterations?: number;
 }
 
 /**

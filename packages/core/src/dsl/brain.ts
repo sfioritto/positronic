@@ -22,6 +22,7 @@ export type {
   AgentAssistantMessageEvent,
   AgentCompleteEvent,
   AgentTokenLimitEvent,
+  AgentIterationLimitEvent,
   AgentWebhookEvent,
   WebhookResponseEvent,
   BrainEvent,
