@@ -717,13 +717,11 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         return;
       }
 
-      // Add assistant message describing tool calls (if no text was already added)
-      // This is important for the LLM to see what it did in its conversation history
+      // Add assistant message noting tool usage (if no text was already added)
+      // Use neutral language so the LLM doesn't mimic this format
       if (!response.text) {
-        const toolCallSummary = response.toolCalls
-          .map((tc) => `Called ${tc.toolName} with: ${JSON.stringify(tc.args)}`)
-          .join('\n');
-        messages.push({ role: 'assistant', content: toolCallSummary });
+        const toolNames = response.toolCalls.map((tc) => tc.toolName).join(', ');
+        messages.push({ role: 'assistant', content: `[Used tools: ${toolNames}]` });
       }
 
       // Process tool calls
