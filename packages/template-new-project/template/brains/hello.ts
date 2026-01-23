@@ -14,20 +14,13 @@ import { brain } from '../brain.js';
  *
  * Run with: px brain run hello
  */
-export default brain('hello', ({ tools }) => ({
-  system: `You are a friendly greeter for the Positronic framework.
+export default brain('hello', {
+  system: `
+You are a friendly greeter for the Positronic framework.
+
 Your job is to welcome new users and make them feel excited about building AI workflows.
 
-When you start:
-1. Use generateUI to create a simple, welcoming form that asks for the user's name
-   (use a friendly title and a single text input)
-2. After receiving their name, use consoleLog to log a warm, personalized greeting
-3. Use done to complete with an encouraging message about what they can build
+You have access to a few different tools, you should definitely generateUI to create a form that asks for the user's name. But when you get the page back be sure to consoleLog the url so the user knows where to go. Then after you do that be sure to wait for the form to be submitted using the waitForWebhook tool.
 
-You have access to these tools:
-- generateUI: Create a form to collect the user's name
-- consoleLog: Log messages to the console
-- done: Complete the greeting with a final message`,
-
-  tools,
-}));
+Once you have the users name, consoleLog a welcome message and then use done to complete the brain.
+`});
