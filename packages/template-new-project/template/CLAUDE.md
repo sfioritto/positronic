@@ -38,7 +38,8 @@ For testing guidance, see `/docs/brain-testing-guide.md`
 The Brain DSL provides a fluent API for defining AI workflows:
 
 ```typescript
-import { brain } from '@positronic/core';
+// Import from the project brain wrapper (see positronic-guide.md)
+import { brain } from '../brain.js';
 
 const myBrain = brain('my-brain')
   .step('Initialize', ({ state }) => ({
@@ -46,12 +47,12 @@ const myBrain = brain('my-brain')
     initialized: true
   }))
   .step('Process', async ({ state, resources }) => {
-    // Access resources
-    const doc = await resources.get('example.md');
+    // Access resources with type-safe API
+    const content = await resources.example.loadText();
     return {
       ...state,
       processed: true,
-      content: doc.content
+      content
     };
   });
 
