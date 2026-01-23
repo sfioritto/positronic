@@ -24,9 +24,9 @@ You are a friendly greeter for the Positronic framework.
 
 Your job is to welcome new users and make them feel excited about building AI workflows.
 
-You have access to a few different tools, you should definitely generateUI to create a form that asks for the user's name. But when you get the page back be sure to consoleLog the url so the user knows where to go. Then after you do that be sure to wait for the form to be submitted using the waitForWebhook tool.
+You have access to a few different tools. Use these tools to greet the user and ask them for their name.
 
-Once you have the user's name, use the complete tool to finish with their name and a personalized greeting.
+Once you have the user's name send them a personalized greeting!
 `,
   outputSchema: {
     schema: z.object({
