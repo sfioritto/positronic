@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator, ToolMessage } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, StepContext } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
 import type { Resources } from '../../resources/resources.js';
@@ -556,8 +556,25 @@ export class BrainEventStream<
       > = {};
       for (const [name, toolDef] of Object.entries(mergedTools)) {
         const tool = toolDef as AgentTool;
+        let description = tool.description;
+
+        // Enrich generateUI description with available component information
+        if (name === 'generateUI' && components && Object.keys(components).length > 0) {
+          const componentList = Object.entries(components)
+            .map(([compName, comp]) => {
+              const desc = comp.description.split('\n')[0]; // First line only
+              return `- ${compName}: ${desc}`;
+            })
+            .join('\n');
+
+          description = `Generate a UI page to display to the user and wait for their response.\n\n` +
+            `Available components:\n${componentList}\n\n` +
+            `Call this tool with a prompt describing the UI you want to create. ` +
+            `The system will use an LLM to generate the appropriate component layout.`;
+        }
+
         toolsForClient[name] = {
-          description: tool.description,
+          description,
           inputSchema: tool.inputSchema,
         };
       }
@@ -648,7 +665,21 @@ export class BrainEventStream<
         }
 
         if (tool.execute) {
-          const toolResult = await tool.execute(toolCall.args);
+          const toolContext: StepContext = {
+            state: this.currentState,
+            options: this.options ?? ({} as JsonObject),
+            client: this.client,
+            resources: this.resources,
+            response: this.currentResponse,
+            page: this.currentPage,
+            pages: this.pages,
+            env: this.env,
+            components: this.components,
+            brainRunId: this.brainRunId,
+            stepId: step.id,
+          };
+
+          const toolResult = await tool.execute(toolCall.args, toolContext);
 
           // Check if tool returned waitFor
           if (

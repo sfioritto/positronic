@@ -29,6 +29,7 @@ export type {
   AgentConfig,
   AgentMessage,
   AgentToolWaitFor,
+  StepContext,
   ExtractTerminalInput,
   RetryConfig,
 } from './dsl/types.js';

@@ -63,6 +63,43 @@ export interface AgentToolWaitFor {
 }
 
 /**
+ * Context passed to step actions, agent config functions, and tool execute functions.
+ * This is the same context available throughout brain execution.
+ *
+ * Generic parameters allow type-safe access to state, options, response, and page.
+ * For tools (which are defined statically), use the non-generic defaults.
+ */
+export interface StepContext<
+  TState = object,
+  TOptions = JsonObject,
+  TResponse = JsonObject | undefined,
+  TPage = import('./definitions/brain-types.js').GeneratedPage | undefined
+> {
+  /** Current brain state */
+  state: TState;
+  /** Brain options */
+  options: TOptions;
+  /** The LLM client for making AI calls */
+  client: import('../clients/types.js').ObjectGenerator;
+  /** Resource loader for accessing brain resources */
+  resources: import('../resources/resources.js').Resources;
+  /** Webhook response data (when resuming after a webhook) */
+  response: TResponse;
+  /** Generated page from a previous UI step */
+  page: TPage;
+  /** Page service for creating UI pages */
+  pages?: import('./pages.js').PagesService;
+  /** Runtime environment (origin, secrets) */
+  env: RuntimeEnv;
+  /** UI components available for generateUI */
+  components?: Record<string, import('../ui/types.js').UIComponent<any>>;
+  /** Current brain run ID (for creating unique webhook identifiers) */
+  brainRunId: string;
+  /** Current step ID (for creating unique webhook identifiers) */
+  stepId: string;
+}
+
+/**
  * A tool definition for use in agent steps.
  * Compatible with Vercel AI SDK tool format, extended with Positronic-specific properties.
  */
@@ -75,9 +112,12 @@ export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
    * Execute function for the tool.
    * Can return a result directly, or { waitFor: webhook(...) } to suspend execution.
    * Not required for terminal tools.
+   * @param input - The validated input from the LLM
+   * @param context - Runtime context with access to client, pages, state, etc.
    */
   execute?: (
-    input: z.infer<TInput>
+    input: z.infer<TInput>,
+    context: StepContext
   ) => Promise<unknown | AgentToolWaitFor> | unknown | AgentToolWaitFor;
   /**
    * If true, calling this tool ends the agent.

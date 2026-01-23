@@ -154,8 +154,11 @@ describe('agent step', () => {
         events.push(event);
       }
 
-      // Verify tool was executed
-      expect(lookupOrderMock).toHaveBeenCalledWith({ orderId: '123' });
+      // Verify tool was executed with correct input (context is the second arg)
+      expect(lookupOrderMock).toHaveBeenCalledWith(
+        { orderId: '123' },
+        expect.objectContaining({ client: expect.anything(), state: expect.anything() })
+      );
 
       // Verify tool result event was emitted
       const toolResultEvents = events.filter(
