@@ -103,6 +103,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
   private brainRunId: string;
   private eventStreamAdapter = new EventStreamAdapter();
   private abortController: AbortController | null = null;
+  private pageAdapter: PageAdapter | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -266,7 +267,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       return { success: false, message: 'Brain run is not active or already completed' };
     }
 
-    // Emit CANCELLED event to MonitorDO
+    // Emit CANCELLED event
     const cancelledEvent: BrainEvent<any> = {
       type: BRAIN_EVENTS.CANCELLED,
       status: STATUS.CANCELLED,
@@ -275,6 +276,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
       brainRunId: actualBrainRunId,
       options: startEvent?.options || {},
     };
+
+    // Dispatch to PageAdapter for cleanup (deletes non-persistent pages from R2)
+    // This is needed because when a brain is paused (waiting for webhook), the BrainRunner
+    // has already returned and adapters aren't receiving events through the normal pipeline.
+    // For zombie brains (server restarted), pageAdapter may be null, so we create one on the fly.
+    const pageAdapter = this.pageAdapter ?? new PageAdapter(monitorStub, this.env.RESOURCES_BUCKET);
+    await pageAdapter.dispatch(cancelledEvent);
 
     await monitorStub.handleBrainEvent(cancelledEvent);
 
@@ -325,7 +333,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
     );
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
-    const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
+    this.pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
     // Create runtime environment with origin and secrets
     const env = this.buildRuntimeEnv();
@@ -369,7 +377,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         monitorAdapter,
         scheduleAdapter,
         webhookAdapter,
-        pageAdapter,
+        this.pageAdapter,
       ])
       .run(brainToRun, {
         initialState,
@@ -479,7 +487,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
     );
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
-    const pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
+    this.pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
     // Create runtime environment with origin and secrets
     const env = this.buildRuntimeEnv();
@@ -517,7 +525,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         monitorAdapter,
         scheduleAdapter,
         webhookAdapter,
-        pageAdapter,
+        this.pageAdapter,
       ])
       .run(brainToRun, {
         initialState,
