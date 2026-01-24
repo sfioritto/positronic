@@ -192,4 +192,99 @@ describe('Brain Kill API', () => {
     const runData = await getRunResponse.json() as { status: string };
     expect(runData.status).toBe(STATUS.CANCELLED);
   });
+
+  it('should clean up non-persistent pages when killing a suspended brain', async () => {
+    const testEnv = env as TestEnv;
+    const ctx = createExecutionContext();
+
+    // Step 1: Start the page-webhook-brain (creates a page and waits for webhook)
+    const createRequest = new Request('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'page-webhook-brain' }),
+    });
+
+    const createResponse = await worker.fetch(createRequest, testEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(createResponse.status).toBe(201);
+
+    const { brainRunId } = await createResponse.json() as { brainRunId: string };
+
+    // Step 2: Watch until WEBHOOK event (brain suspends after creating page)
+    const watchRequest = new Request(`http://example.com/brains/runs/${brainRunId}/watch`);
+    const watchResponse = await worker.fetch(watchRequest, testEnv, ctx);
+    expect(watchResponse.ok).toBe(true);
+
+    let foundWebhookEvent = false;
+    let pageSlug: string | null = null;
+
+    if (watchResponse.body) {
+      const reader = watchResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (!foundWebhookEvent) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          let eventEndIndex;
+          while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+            const message = buffer.substring(0, eventEndIndex);
+            buffer = buffer.substring(eventEndIndex + 2);
+
+            if (message.startsWith('data: ')) {
+              const event = JSON.parse(message.substring(6));
+
+              // Capture the page slug from STEP_COMPLETE event
+              if (event.type === BRAIN_EVENTS.STEP_COMPLETE && event.patch) {
+                // The patch might contain the pageSlug
+                for (const op of event.patch) {
+                  if (op.path === '/pageSlug' && op.op === 'add') {
+                    pageSlug = op.value;
+                  }
+                }
+              }
+
+              if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                foundWebhookEvent = true;
+                break;
+              }
+              if (event.type === BRAIN_EVENTS.COMPLETE || event.type === BRAIN_EVENTS.ERROR) {
+                throw new Error(`Brain completed/errored before WEBHOOK: ${event.type}`);
+              }
+            }
+          }
+        }
+      } finally {
+        await reader.cancel();
+      }
+    }
+
+    expect(foundWebhookEvent).toBe(true);
+    expect(pageSlug).not.toBeNull();
+
+    // Step 3: Verify the page exists in R2 before killing
+    const pageExistsRequest = new Request(`http://example.com/pages/${pageSlug}`);
+    const pageExistsResponse = await worker.fetch(pageExistsRequest, testEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(pageExistsResponse.status).toBe(200);
+
+    // Step 4: Kill the suspended brain
+    const killRequest = new Request(`http://example.com/brains/runs/${brainRunId}`, {
+      method: 'DELETE',
+    });
+
+    const killResponse = await worker.fetch(killRequest, testEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(killResponse.status).toBe(204);
+
+    // Step 5: Verify the page has been cleaned up from R2
+    const pageDeletedRequest = new Request(`http://example.com/pages/${pageSlug}`);
+    const pageDeletedResponse = await worker.fetch(pageDeletedRequest, testEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(pageDeletedResponse.status).toBe(404);
+  });
 });

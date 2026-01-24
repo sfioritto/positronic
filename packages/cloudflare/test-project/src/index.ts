@@ -238,6 +238,27 @@ const fixedSlugBrain = brain({ title: 'fixed-slug-brain', description: 'A brain 
     };
   });
 
+// Brain that creates a non-persistent page and waits for a webhook (for testing page cleanup on kill)
+const pageWebhookBrain = brain({ title: 'page-webhook-brain', description: 'A brain that creates a page and waits for a webhook' })
+  .step('Create page', async ({ state, pages }) => {
+    // Create a non-persistent page (default behavior)
+    const page = await pages!.create('<html><body><h1>Page for webhook test</h1></body></html>');
+    return {
+      ...state,
+      pageSlug: page.slug,
+      pageUrl: page.url,
+    };
+  })
+  .step('Wait for webhook', ({ state }) => ({
+    state: { ...state, waiting: true },
+    waitFor: [testWebhook('page-webhook-test')],
+  }))
+  .step('After webhook', ({ state, response }) => ({
+    ...state,
+    waiting: false,
+    webhookResponse: response,
+  }));
+
 // Brain with an agent step that uses webhooks for escalation
 const agentWebhookBrain = brain({ title: 'agent-webhook-brain', description: 'A brain that uses agent with webhook escalation' })
   .brain('Process with escalation', ({ state }) => ({
@@ -333,6 +354,11 @@ const brainManifest = {
     filename: 'fixed-slug-brain',
     path: 'brains/fixed-slug-brain.ts',
     brain: fixedSlugBrain,
+  },
+  'page-webhook-brain': {
+    filename: 'page-webhook-brain',
+    path: 'brains/page-webhook-brain.ts',
+    brain: pageWebhookBrain,
   },
   'agent-webhook-brain': {
     filename: 'agent-webhook-brain',
