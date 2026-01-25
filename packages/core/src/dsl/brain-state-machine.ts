@@ -73,14 +73,6 @@ export interface AgentContext {
   pendingToolName: string | null;
 }
 
-// The event structure that gets yielded
-export interface BrainEvent {
-  type: string;
-  brainRunId: string;
-  options: JsonObject;
-  [key: string]: unknown;
-}
-
 export interface BrainExecutionContext {
   // Core tracking - tree structure (primary)
   rootBrain: RunningBrain | null;
@@ -96,10 +88,7 @@ export interface BrainExecutionContext {
   // The current brain state (with patches applied for top-level)
   currentState: JsonObject;
 
-  // The event that was just produced (yield this after sendAction)
-  currentEvent: BrainEvent | null;
-
-  // Options to include in every event
+  // Options passed to the brain run (stored for context, not used for event creation)
   options: JsonObject;
 
   // Agent context - tracks agent execution state for pause/resume
@@ -314,7 +303,6 @@ const createInitialContext = (
   error: null,
   pendingWebhooks: null,
   currentState: opts?.initialState ?? {},
-  currentEvent: null,
   options: opts?.options ?? {},
   agentContext: null,
   status: STATUS.PENDING,
@@ -396,7 +384,6 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
       depth,
       brainRunId: existingBrainRunId,
       currentState,
-      options,
     } = ctx;
 
     const newDepth = depth + 1;
@@ -423,15 +410,6 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
       brainRunId: existingBrainRunId ?? brainRunId,
       currentState:
         newDepth === 1 ? initialState ?? currentState : currentState,
-      currentEvent: {
-        type: BRAIN_EVENTS.START,
-        brainTitle,
-        brainDescription,
-        brainRunId,
-        initialState: initialState ?? {},
-        status: STATUS.RUNNING,
-        options,
-      },
     };
 
     return updateDerivedState(newCtx, 'running');
@@ -439,13 +417,12 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
 );
 
 const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
-  (ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
+  (ctx, { brainRunId, brainTitle, brainDescription }) => {
     const {
       currentStepId,
       rootBrain,
       depth,
       brainRunId: existingBrainRunId,
-      options,
     } = ctx;
 
     // brain:restart can be either:
@@ -474,15 +451,6 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
           brainStack: treeToStack(newRootBrain),
           // depth stays the same - we're replacing, not nesting
           brainRunId: existingBrainRunId ?? brainRunId,
-          currentEvent: {
-            type: BRAIN_EVENTS.RESTART,
-            brainTitle,
-            brainDescription,
-            brainRunId,
-            initialState: initialState ?? {},
-            status: STATUS.RUNNING,
-            options,
-          },
         };
 
         return updateDerivedState(newCtx, 'running');
@@ -508,15 +476,6 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
         brainStack: treeToStack(newRootBrain),
         depth: newDepth,
         brainRunId: existingBrainRunId ?? brainRunId,
-        currentEvent: {
-          type: BRAIN_EVENTS.RESTART,
-          brainTitle,
-          brainDescription,
-          brainRunId,
-          initialState: initialState ?? {},
-          status: STATUS.RUNNING,
-          options,
-        },
       };
 
       return updateDerivedState(newCtx, 'running');
@@ -539,15 +498,6 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
       brainStack: treeToStack(newBrain),
       depth: 1,
       brainRunId: existingBrainRunId ?? brainRunId,
-      currentEvent: {
-        type: BRAIN_EVENTS.RESTART,
-        brainTitle,
-        brainDescription,
-        brainRunId,
-        initialState: initialState ?? {},
-        status: STATUS.RUNNING,
-        options,
-      },
     };
 
     return updateDerivedState(newCtx, 'running');
@@ -555,7 +505,7 @@ const restartBrain = reduce<BrainExecutionContext, StartBrainPayload>(
 );
 
 const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  const { rootBrain, depth, brainRunId, options } = ctx;
+  const { rootBrain, depth } = ctx;
 
   if (!rootBrain) return ctx;
 
@@ -576,14 +526,6 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
     rootBrain: newRootBrain,
     brainStack: treeToStack(newRootBrain),
     depth: newDepth,
-    currentEvent: {
-      type: BRAIN_EVENTS.COMPLETE,
-      brainTitle: completedBrain.brainTitle,
-      brainDescription: completedBrain.brainDescription,
-      brainRunId: brainRunId!,
-      status: STATUS.COMPLETE,
-      options,
-    },
   };
 
   return updateDerivedState(newCtx, isOuterBrainComplete ? 'complete' : 'running');
@@ -591,21 +533,9 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
 
 const errorBrain = reduce<BrainExecutionContext, ErrorPayload>(
   (ctx, { error }) => {
-    const { rootBrain, brainRunId, options } = ctx;
-    const currentBrain = getDeepestBrain(rootBrain);
-
     const newCtx: BrainExecutionContext = {
       ...ctx,
       error,
-      currentEvent: {
-        type: BRAIN_EVENTS.ERROR,
-        brainTitle: currentBrain?.brainTitle,
-        brainDescription: currentBrain?.brainDescription,
-        brainRunId: brainRunId!,
-        error,
-        status: STATUS.ERROR,
-        options,
-      },
     };
 
     return updateDerivedState(newCtx, 'error');
@@ -613,27 +543,12 @@ const errorBrain = reduce<BrainExecutionContext, ErrorPayload>(
 );
 
 const cancelBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  const { rootBrain, brainRunId, options } = ctx;
-  const currentBrain = getDeepestBrain(rootBrain);
-
-  const newCtx: BrainExecutionContext = {
-    ...ctx,
-    currentEvent: {
-      type: BRAIN_EVENTS.CANCELLED,
-      brainTitle: currentBrain?.brainTitle,
-      brainDescription: currentBrain?.brainDescription,
-      brainRunId: brainRunId!,
-      status: STATUS.CANCELLED,
-      options,
-    },
-  };
-
-  return updateDerivedState(newCtx, 'cancelled');
+  return updateDerivedState(ctx, 'cancelled');
 });
 
 const startStep = reduce<BrainExecutionContext, StartStepPayload>(
   (ctx, { stepId, stepTitle }) => {
-    const { rootBrain, brainRunId, options } = ctx;
+    const { rootBrain } = ctx;
 
     // Add step to current brain's steps if not already there
     let newRootBrain = rootBrain;
@@ -662,27 +577,17 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
       brainStack: treeToStack(newRootBrain),
       currentStepId: stepId,
       currentStepTitle: stepTitle,
-      currentEvent: {
-        type: BRAIN_EVENTS.STEP_START,
-        brainRunId: brainRunId!,
-        stepId,
-        stepTitle,
-        status: STATUS.RUNNING,
-        options,
-      },
     };
   }
 );
 
 const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
-  (ctx, { stepId, stepTitle, patch }) => {
+  (ctx, { stepId, patch }) => {
     const {
       rootBrain,
       depth,
       currentState,
       topLevelStepCount,
-      brainRunId,
-      options,
     } = ctx;
 
     let newRootBrain = rootBrain;
@@ -710,32 +615,15 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       brainStack: treeToStack(newRootBrain),
       currentState: newState,
       topLevelStepCount: newStepCount,
-      currentEvent: {
-        type: BRAIN_EVENTS.STEP_COMPLETE,
-        brainRunId: brainRunId!,
-        stepId,
-        stepTitle,
-        patch,
-        status: STATUS.RUNNING,
-        options,
-      },
     };
   }
 );
 
 const webhookPause = reduce<BrainExecutionContext, WebhookPayload>(
   (ctx, { waitFor }) => {
-    const { brainRunId, options } = ctx;
-
     const newCtx: BrainExecutionContext = {
       ...ctx,
       pendingWebhooks: waitFor,
-      currentEvent: {
-        type: BRAIN_EVENTS.WEBHOOK,
-        brainRunId: brainRunId!,
-        waitFor,
-        options,
-      },
     };
 
     return updateDerivedState(newCtx, 'waiting');
@@ -743,37 +631,14 @@ const webhookPause = reduce<BrainExecutionContext, WebhookPayload>(
 );
 
 const pauseBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  const { rootBrain, brainRunId, options } = ctx;
-  const currentBrain = getDeepestBrain(rootBrain);
-
-  const newCtx: BrainExecutionContext = {
-    ...ctx,
-    currentEvent: {
-      type: BRAIN_EVENTS.PAUSED,
-      brainTitle: currentBrain?.brainTitle,
-      brainDescription: currentBrain?.brainDescription,
-      brainRunId: brainRunId!,
-      status: STATUS.PAUSED,
-      options,
-    },
-  };
-
-  return updateDerivedState(newCtx, 'paused');
+  return updateDerivedState(ctx, 'paused');
 });
 
 const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
-  (ctx, { response }) => {
-    const { brainRunId, options } = ctx;
-
+  (ctx) => {
     const newCtx: BrainExecutionContext = {
       ...ctx,
       pendingWebhooks: null,
-      currentEvent: {
-        type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
-        brainRunId: brainRunId!,
-        response,
-        options,
-      },
     };
 
     return updateDerivedState(newCtx, 'running');
@@ -781,8 +646,8 @@ const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
 );
 
 const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
-  (ctx, { brainRunId: eventBrainRunId, steps }) => {
-    const { brainRunId, rootBrain, options } = ctx;
+  (ctx, { steps }) => {
+    const { rootBrain } = ctx;
 
     if (!rootBrain) return ctx;
 
@@ -813,86 +678,33 @@ const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
       ...ctx,
       rootBrain: newRootBrain,
       brainStack: treeToStack(newRootBrain),
-      currentEvent: {
-        type: BRAIN_EVENTS.STEP_STATUS,
-        brainRunId: brainRunId!,
-        steps,
-        options,
-      },
     };
   }
 );
 
-const stepRetry = reduce<BrainExecutionContext, StepRetryPayload>(
-  (ctx, { stepId, stepTitle, error, attempt }) => {
-    const { brainRunId, options } = ctx;
+// stepRetry is a no-op - we just let the event pass through
+const stepRetry = reduce<BrainExecutionContext, StepRetryPayload>((ctx) => ctx);
 
-    return {
-      ...ctx,
-      currentEvent: {
-        type: BRAIN_EVENTS.STEP_RETRY,
-        brainRunId: brainRunId!,
-        stepId,
-        stepTitle,
-        error,
-        attempt,
-        options,
-      },
-    };
-  }
-);
-
-const passthrough = (eventType: string) =>
-  reduce<BrainExecutionContext, any>((ctx, ev) => {
-    const { brainRunId, options } = ctx;
-    // Destructure to exclude 'type' (the action name) from being spread into currentEvent
-    const { type: _actionType, ...eventData } = ev;
-
-    return {
-      ...ctx,
-      currentEvent: {
-        type: eventType,
-        brainRunId: brainRunId!,
-        options,
-        ...eventData,
-      },
-    };
-  });
+// passthrough is now a no-op - we just let the event pass through
+const passthrough = () => reduce<BrainExecutionContext, any>((ctx) => ctx);
 
 // Reducer for agent iteration events that tracks tokens per-iteration
 // This ensures tokens are counted even if the agent doesn't complete (e.g., webhook interruption)
 const agentIteration = reduce<BrainExecutionContext, any>((ctx, ev) => {
-  const { brainRunId, options, totalTokens } = ctx;
-  const { type: _actionType, ...eventData } = ev;
+  const { totalTokens } = ctx;
 
   return {
     ...ctx,
     totalTokens: totalTokens + (ev.tokensThisIteration ?? 0),
-    currentEvent: {
-      type: BRAIN_EVENTS.AGENT_ITERATION,
-      brainRunId: brainRunId!,
-      options,
-      ...eventData,
-    },
   };
 });
 
-// Reducer for agent terminal events - tokens already tracked via iterations
-// Clears agentContext since the agent has completed
-const agentTerminal = (eventType: string) =>
-  reduce<BrainExecutionContext, any>((ctx, ev) => {
-    const { brainRunId, options } = ctx;
-    const { type: _actionType, ...eventData } = ev;
-
+// Reducer for agent terminal events - clears agentContext since the agent has completed
+const agentTerminal = () =>
+  reduce<BrainExecutionContext, any>((ctx) => {
     return {
       ...ctx,
       agentContext: null, // Clear agent context on completion
-      currentEvent: {
-        type: eventType,
-        brainRunId: brainRunId!,
-        options,
-        ...eventData,
-      },
     };
   });
 
@@ -926,9 +738,7 @@ interface AgentWebhookPayload {
 
 // Reducer for AGENT_START - initializes agentContext
 const agentStart = reduce<BrainExecutionContext, AgentStartPayload>(
-  (ctx, { stepId, stepTitle, prompt, system, tools }) => {
-    const { brainRunId, options } = ctx;
-
+  (ctx, { stepId, stepTitle, prompt, system }) => {
     const newCtx: BrainExecutionContext = {
       ...ctx,
       agentContext: {
@@ -940,16 +750,6 @@ const agentStart = reduce<BrainExecutionContext, AgentStartPayload>(
         pendingToolCallId: null,
         pendingToolName: null,
       },
-      currentEvent: {
-        type: BRAIN_EVENTS.AGENT_START,
-        brainRunId: brainRunId!,
-        stepId,
-        stepTitle,
-        prompt,
-        system,
-        tools,
-        options,
-      },
     };
 
     return updateDerivedState(newCtx, 'agentLoop');
@@ -960,8 +760,8 @@ const agentStart = reduce<BrainExecutionContext, AgentStartPayload>(
 const agentRawResponseMessage = reduce<
   BrainExecutionContext,
   AgentRawResponseMessagePayload
->((ctx, { stepId, stepTitle, iteration, message }) => {
-  const { brainRunId, options, agentContext } = ctx;
+>((ctx, { message }) => {
+  const { agentContext } = ctx;
 
   // Accumulate the message in agentContext
   const updatedAgentContext = agentContext
@@ -974,22 +774,13 @@ const agentRawResponseMessage = reduce<
   return {
     ...ctx,
     agentContext: updatedAgentContext,
-    currentEvent: {
-      type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-      brainRunId: brainRunId!,
-      stepId,
-      stepTitle,
-      iteration,
-      message,
-      options,
-    },
   };
 });
 
 // Reducer for AGENT_WEBHOOK - records pending tool call in agentContext
 const agentWebhook = reduce<BrainExecutionContext, AgentWebhookPayload>(
-  (ctx, { stepId, stepTitle, toolCallId, toolName, input }) => {
-    const { brainRunId, options, agentContext } = ctx;
+  (ctx, { toolCallId, toolName }) => {
+    const { agentContext } = ctx;
 
     // Update agentContext with pending tool info
     const updatedAgentContext = agentContext
@@ -1003,35 +794,12 @@ const agentWebhook = reduce<BrainExecutionContext, AgentWebhookPayload>(
     return {
       ...ctx,
       agentContext: updatedAgentContext,
-      currentEvent: {
-        type: BRAIN_EVENTS.AGENT_WEBHOOK,
-        brainRunId: brainRunId!,
-        stepId,
-        stepTitle,
-        toolCallId,
-        toolName,
-        input,
-        options,
-      },
     };
   }
 );
 
-// Reducer for AGENT_USER_MESSAGE - passthrough that stays in agentLoop
-const agentUserMessage = reduce<BrainExecutionContext, any>((ctx, ev) => {
-  const { brainRunId, options } = ctx;
-  const { type: _actionType, ...eventData } = ev;
-
-  return {
-    ...ctx,
-    currentEvent: {
-      type: BRAIN_EVENTS.AGENT_USER_MESSAGE,
-      brainRunId: brainRunId!,
-      options,
-      ...eventData,
-    },
-  };
-});
+// Reducer for AGENT_USER_MESSAGE - no-op, just stays in agentLoop
+const agentUserMessage = reduce<BrainExecutionContext, any>((ctx) => ctx);
 
 // ============================================================================
 // Guards - Conditional transitions
@@ -1064,17 +832,17 @@ const agentLoopTransitions = [
   transition(
     BRAIN_EVENTS.AGENT_TOOL_CALL,
     'agentLoop',
-    passthrough(BRAIN_EVENTS.AGENT_TOOL_CALL)
+    passthrough()
   ) as any,
   transition(
     BRAIN_EVENTS.AGENT_TOOL_RESULT,
     'agentLoop',
-    passthrough(BRAIN_EVENTS.AGENT_TOOL_RESULT)
+    passthrough()
   ) as any,
   transition(
     BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
     'agentLoop',
-    passthrough(BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE)
+    passthrough()
   ) as any,
   transition(BRAIN_EVENTS.AGENT_USER_MESSAGE, 'agentLoop', agentUserMessage) as any,
   // AGENT_WEBHOOK records pending tool call but stays in agentLoop
@@ -1155,17 +923,17 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(
           BRAIN_EVENTS.AGENT_COMPLETE,
           'running',
-          agentTerminal(BRAIN_EVENTS.AGENT_COMPLETE)
+          agentTerminal()
         ) as any,
         transition(
           BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
           'running',
-          agentTerminal(BRAIN_EVENTS.AGENT_TOKEN_LIMIT)
+          agentTerminal()
         ) as any,
         transition(
           BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
           'running',
-          agentTerminal(BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
+          agentTerminal()
         ) as any,
 
         // Interruption handling - can pause or wait from agentLoop
