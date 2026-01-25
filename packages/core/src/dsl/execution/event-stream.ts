@@ -119,6 +119,15 @@ export class BrainEventStream<
     this.brainRunId = providedBrainRunId ?? uuidv4();
   }
 
+  /**
+   * Find webhookResponse anywhere in the resumeContext tree (for nested brain resumes)
+   */
+  private findWebhookResponseInResumeContext(context: ResumeContext | undefined): JsonObject | undefined {
+    if (!context) return undefined;
+    if (context.webhookResponse) return context.webhookResponse;
+    return this.findWebhookResponseInResumeContext(context.innerResumeContext);
+  }
+
   async *next(): AsyncGenerator<BrainEvent<TOptions>> {
     const {
       steps,
@@ -130,28 +139,42 @@ export class BrainEventStream<
     } = this;
 
     try {
-      // Always emit START event with current state
-      // The state machine and consumers don't need to distinguish "fresh" vs "resume"
-      yield {
-        type: BRAIN_EVENTS.START,
-        status: STATUS.RUNNING,
-        brainTitle,
-        brainDescription,
-        initialState: currentState,
-        options,
-        brainRunId,
-      };
+      // Only emit START event for fresh runs, not resumes
+      // Resumed brains already have a historical START event
+      if (!this.resumeContext) {
+        yield {
+          type: BRAIN_EVENTS.START,
+          status: STATUS.RUNNING,
+          brainTitle,
+          brainDescription,
+          initialState: currentState,
+          options,
+          brainRunId,
+        };
 
-      // Emit initial step status after brain starts
-      yield {
-        type: BRAIN_EVENTS.STEP_STATUS,
-        steps: steps.map((step) => {
-          const { patch, ...rest } = step.serialized;
-          return rest;
-        }),
-        options,
-        brainRunId,
-      };
+        // Emit initial step status after brain starts
+        yield {
+          type: BRAIN_EVENTS.STEP_STATUS,
+          steps: steps.map((step) => {
+            const { patch, ...rest } = step.serialized;
+            return rest;
+          }),
+          options,
+          brainRunId,
+        };
+      } else {
+        // Check for webhookResponse anywhere in the resumeContext tree (including nested inner brains)
+        const webhookResponse = this.findWebhookResponseInResumeContext(this.resumeContext);
+        if (webhookResponse) {
+          // Emit WEBHOOK_RESPONSE to transition state machine from 'waiting' to 'running'
+          yield {
+            type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
+            brainRunId,
+            response: webhookResponse,
+            options: options ?? ({} as TOptions),
+          };
+        }
+      }
 
       // Process each step
       while (this.currentStepIndex < steps.length) {
@@ -345,7 +368,9 @@ export class BrainEventStream<
       }
 
       // Apply collected patches to get final inner state
-      const innerState = applyPatches(initialState, patches);
+      // When resuming, use the resumed state as base; otherwise use initialState
+      const baseState = innerResumeContext?.state ?? initialState;
+      const innerState = applyPatches(baseState, patches);
 
       // Get previous state before action
       const prevState = this.currentState;

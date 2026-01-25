@@ -1,6 +1,7 @@
 import { BrainRunner } from '../src/dsl/brain-runner.js';
 import { brain, type SerializedStep } from '../src/dsl/brain.js';
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
+import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { ObjectGenerator } from '../src/clients/types.js';
 import { Adapter } from '../src/adapters/types.js';
@@ -299,6 +300,29 @@ describe('BrainRunner', () => {
         message: `${state.name} completed`,
       }));
 
+    // Create a state machine with historical events that simulate steps 0 and 1 completing
+    const machine = createBrainExecutionMachine();
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.START,
+      brainRunId: 'test-run-123',
+      brainTitle: 'Test Brain',
+      initialState: {},
+    });
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.STEP_COMPLETE,
+      brainRunId: 'test-run-123',
+      stepId: 'step-0',
+      stepTitle: 'First Step',
+      patch: [{ op: 'add', path: '/count', value: 10 }],
+    });
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.STEP_COMPLETE,
+      brainRunId: 'test-run-123',
+      stepId: 'step-1',
+      stepTitle: 'Second Step',
+      patch: [{ op: 'add', path: '/name', value: 'test' }],
+    });
+
     // Resume from step index 2 (Third Step) with state as if first two steps completed
     const result = await runner.resume(testBrain, {
       resumeContext: {
@@ -306,6 +330,7 @@ describe('BrainRunner', () => {
         state: { count: 10, name: 'test' }, // State after first two steps
       },
       brainRunId: 'test-run-123',
+      machine,
     });
 
     // Verify the final state includes resumed state plus third step
@@ -479,6 +504,34 @@ describe('BrainRunner', () => {
     // Clear mock calls for clarity
     mockAdapter.dispatch.mockClear();
 
+    // Create a state machine with historical events from the first run
+    const machine = createBrainExecutionMachine();
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.START,
+      brainRunId,
+      brainTitle: 'Webhook Resume Brain',
+      initialState: {},
+    });
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.STEP_COMPLETE,
+      brainRunId,
+      stepId: 'step-0',
+      stepTitle: 'Initial Step',
+      patch: [{ op: 'add', path: '/count', value: 1 }],
+    });
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.STEP_COMPLETE,
+      brainRunId,
+      stepId: 'step-1',
+      stepTitle: 'Webhook Step',
+      patch: [{ op: 'add', path: '/webhookSent', value: true }],
+    });
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.WEBHOOK,
+      brainRunId,
+      waitFor: [{ name: 'user-input-webhook', identifier: 'user-id' }],
+    });
+
     // Resume with webhook response using resumeContext
     const finalState = await runner.resume(testBrain, {
       resumeContext: {
@@ -487,6 +540,7 @@ describe('BrainRunner', () => {
         webhookResponse: { userInput: 'Hello from webhook!' },
       },
       brainRunId,
+      machine,
     });
 
     expect(finalState).toEqual({

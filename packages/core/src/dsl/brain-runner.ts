@@ -1,5 +1,5 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
-import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
+import { createBrainExecutionMachine, sendEvent, type BrainStateMachine } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type Brain, type BrainEvent, type ResumeContext } from './brain.js';
 import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
@@ -107,21 +107,25 @@ export class BrainRunner {
 
   /**
    * Resume a brain from a previous execution point.
+   * If a state machine is provided, it will be used instead of creating a new one.
+   * This allows the caller to pass a machine that already has historical events replayed.
    */
   async resume<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     options: {
       resumeContext: ResumeContext;
       brainRunId: string;
+      machine?: BrainStateMachine;
       options?: TOptions;
       endAfter?: number;
       signal?: AbortSignal;
     }
   ): Promise<TState> {
-    const { resumeContext, brainRunId, options: brainOptions, endAfter, signal } = options;
+    const { resumeContext, brainRunId, machine, options: brainOptions, endAfter, signal } = options;
 
     return this.execute(brain, {
       resumeContext,
+      machine,
       options: brainOptions,
       brainRunId,
       endAfter,
@@ -138,6 +142,7 @@ export class BrainRunner {
     params: {
       initialState?: TState;
       resumeContext?: ResumeContext;
+      machine?: BrainStateMachine;
       options?: TOptions;
       brainRunId?: string;
       endAfter?: number;
@@ -147,15 +152,12 @@ export class BrainRunner {
   ): Promise<TState> {
     const { adapters, client, resources, pages, env, signalProvider } = this.options;
     const resolvedEnv = env ?? DEFAULT_ENV;
-    const { initialState, resumeContext, options, brainRunId, endAfter, signal, initialStepCount } = params;
+    const { initialState, resumeContext, machine: providedMachine, options, brainRunId, endAfter, signal, initialStepCount } = params;
 
-    // Determine initial state for the state machine
-    // If resuming, use the state from resumeContext; otherwise use initialState
-    const machineInitialState: JsonObject = resumeContext?.state ?? initialState ?? {};
-
-    // Create state machine with pre-populated state for runtime tracking.
-    const machine = createBrainExecutionMachine({
-      initialState: machineInitialState,
+    // Use provided state machine if available (for resumes with historical events),
+    // otherwise create a new one
+    const machine = providedMachine ?? createBrainExecutionMachine({
+      initialState: resumeContext?.state ?? initialState ?? {},
     });
 
     const brainRun = resumeContext
