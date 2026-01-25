@@ -3,6 +3,8 @@ import {
   BRAIN_EVENTS,
   STATUS,
   createBrainExecutionMachine,
+  sendEvent,
+  type BrainStateMachine,
 } from '@positronic/core';
 import type { BrainEvent } from '@positronic/core';
 
@@ -13,6 +15,8 @@ export interface Env {
 export class MonitorDO extends DurableObject<Env> {
   private readonly storage: SqlStorage;
   private eventStreamHandler = new EventStreamHandler();
+  // Keep state machines in memory for O(1) status lookups
+  private machines = new Map<string, BrainStateMachine>();
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -99,16 +103,33 @@ export class MonitorDO extends DurableObject<Env> {
         currentTime
       );
 
-      // Load all events for this brain run and create state machine with history
-      const storedEvents = this.storage
-        .exec(
-          `SELECT event_data FROM brain_events WHERE run_id = ? ORDER BY id`,
-          brainRunId
-        )
-        .toArray() as Array<{ event_data: string }>;
+      // Get or create state machine for this brain run - O(1) for most cases
+      let machine = this.machines.get(brainRunId);
+      if (!machine) {
+        // Machine not in memory - either fresh start or DO woke up from hibernation
+        if (event.type === BRAIN_EVENTS.START) {
+          // Fresh start - create empty machine
+          machine = createBrainExecutionMachine();
+        } else {
+          // DO hibernation recovery - hydrate from stored events
+          const storedEvents = this.storage
+            .exec(
+              `SELECT event_data FROM brain_events WHERE run_id = ? ORDER BY id`,
+              brainRunId
+            )
+            .toArray() as Array<{ event_data: string }>;
 
-      const events = storedEvents.map(({ event_data }) => JSON.parse(event_data));
-      const machine = createBrainExecutionMachine({ events });
+          machine = createBrainExecutionMachine();
+          // Replay historical events (excluding current one, we'll send it below)
+          for (let i = 0; i < storedEvents.length - 1; i++) {
+            sendEvent(machine, JSON.parse(storedEvents[i].event_data));
+          }
+        }
+        this.machines.set(brainRunId, machine);
+      }
+
+      // Send the current event to the machine - O(1)
+      sendEvent(machine, event);
 
       // Use the state machine's computed status (depth-aware)
       const { status } = machine.context;
@@ -151,9 +172,10 @@ export class MonitorDO extends DurableObject<Env> {
         completeTime
       );
 
-      // Clean up registrations when brain terminates
+      // Clean up registrations and in-memory state when brain terminates
       if (isTerminalStatus) {
         this.clearWebhookRegistrations(brainRunId);
+        this.machines.delete(brainRunId); // Free memory
         // Note: Non-persistent page cleanup is handled by PageAdapter which has access to R2
         // We just track pages here, actual R2 deletion happens in the adapter
       }
