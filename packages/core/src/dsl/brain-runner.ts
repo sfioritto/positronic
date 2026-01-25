@@ -4,7 +4,7 @@ import { reconstructAgentContext } from './agent-messages.js';
 import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
-import type { State, JsonObject, RuntimeEnv } from './types.js';
+import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
@@ -17,6 +17,7 @@ export class BrainRunner {
       resources?: Resources;
       pages?: PagesService;
       env?: RuntimeEnv;
+      signalProvider?: SignalProvider;
     }
   ) {}
 
@@ -56,6 +57,13 @@ export class BrainRunner {
     });
   }
 
+  withSignalProvider(signalProvider: SignalProvider): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      signalProvider,
+    });
+  }
+
   async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     {
@@ -78,7 +86,7 @@ export class BrainRunner {
       agentEvents?: BrainEvent[];
     } = {}
   ): Promise<TState> {
-    const { adapters, client, resources, pages, env } = this.options;
+    const { adapters, client, resources, pages, env, signalProvider } = this.options;
     const resolvedEnv = env ?? DEFAULT_ENV;
 
     // Apply any patches from completed steps to get the initial state
@@ -115,6 +123,7 @@ export class BrainRunner {
             env: resolvedEnv,
             response,
             agentResumeContext,
+            signalProvider,
           })
         : brain.run({
             initialState,
@@ -124,6 +133,7 @@ export class BrainRunner {
             resources: resources ?? {},
             pages,
             env: resolvedEnv,
+            signalProvider,
           });
 
     try {
@@ -155,8 +165,8 @@ export class BrainRunner {
           }
         }
 
-        // Stop execution when machine enters paused state (webhook)
-        if (machine.context.isPaused) {
+        // Stop execution when machine enters paused or waiting state
+        if (machine.context.isPaused || machine.context.isWaiting) {
           // Cast is safe: state started as TState and patches maintain the structure
           return machine.context.currentState as TState;
         }

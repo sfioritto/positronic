@@ -1,5 +1,5 @@
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, SignalProvider } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { SerializedStep } from './steps.js';
@@ -11,6 +11,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   options?: TOptions;
   pages?: PagesService;
   env?: RuntimeEnv;
+  signalProvider?: SignalProvider;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
