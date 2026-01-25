@@ -86,6 +86,7 @@ export {
   createBrainExecutionMachine,
   createBrainMachine,
   sendEvent,
+  reconstructBrainTree,
 } from './dsl/brain-state-machine.js';
 export type {
   BrainStateMachine,

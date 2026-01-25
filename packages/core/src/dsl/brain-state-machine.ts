@@ -113,12 +113,6 @@ export interface BrainExecutionContext {
   brainIdStack: string[];                  // Stack of active brain IDs (current = last)
   executionStack: ExecutionStackEntry[];   // Stack of execution state per nesting level
 
-  // === Computed structures (derived from flat storage) ===
-  // These are computed on each event for backwards compatibility with consumers.
-  executionTree: ExecutionNode | null;    // Tree view of executionStack
-  rootBrain: RunningBrain | null;          // Tree view of brains (for UI rendering)
-  brainStack: BrainStackEntry[];           // Flat list view of brains
-
   // === Core state ===
   depth: number;
   brainRunId: string | null;
@@ -204,14 +198,15 @@ export interface StepRetryPayload {
 }
 
 // ============================================================================
-// Flat Structure Helper Functions
+// Tree Reconstruction Helper (for consumers who need tree representation)
 // ============================================================================
 
 /**
  * Reconstruct the RunningBrain tree from flat brains map and stack.
- * This is used for backwards compatibility with consumers that expect rootBrain.
+ * Use this when you need a tree representation for UI rendering or debugging.
+ * The flat structures (brains, brainIdStack) are the source of truth.
  */
-function reconstructBrainTree(
+export function reconstructBrainTree(
   brains: Record<string, BrainEntry>,
   brainIdStack: string[]
 ): RunningBrain | null {
@@ -239,47 +234,6 @@ function reconstructBrainTree(
   return innerBrain;
 }
 
-/**
- * Convert executionStack to ExecutionNode tree for backwards compat.
- */
-function executionStackToTree(stack: ExecutionStackEntry[]): ExecutionNode | null {
-  if (stack.length === 0) return null;
-
-  let innerNode: ExecutionNode | undefined = undefined;
-
-  // Build from deepest to root (reverse iteration)
-  for (let i = stack.length - 1; i >= 0; i--) {
-    const entry = stack[i];
-    innerNode = {
-      state: entry.state,
-      stepIndex: entry.stepIndex,
-      innerNode,
-    };
-  }
-
-  return innerNode ?? null;
-}
-
-/**
- * Compute brainStack from flat structures.
- * This replaces treeToStack for backwards compatibility.
- */
-function computeBrainStack(
-  brains: Record<string, BrainEntry>,
-  brainIdStack: string[]
-): BrainStackEntry[] {
-  return brainIdStack.map((brainId) => {
-    const entry = brains[brainId];
-    return {
-      brainRunId: entry.brainRunId,
-      brainTitle: entry.brainTitle,
-      brainDescription: entry.brainDescription,
-      parentStepId: entry.parentStepId,
-      steps: entry.steps,
-    };
-  });
-}
-
 // ============================================================================
 // Context Factory
 // ============================================================================
@@ -294,15 +248,11 @@ export interface CreateMachineOptions {
 const createInitialContext = (
   opts?: CreateMachineOptions
 ): BrainExecutionContext => ({
-  // NEW: Flat storage
+  // Flat storage (source of truth)
   brains: {},
   brainIdStack: [],
   executionStack: [],
 
-  // LEGACY: Tree storage (will be removed)
-  executionTree: null,
-  rootBrain: null,
-  brainStack: [],
   depth: 0,
   brainRunId: null,
   currentStepId: null,
@@ -414,20 +364,11 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
     const newBrainIdStack = [...brainIdStack, brainTitle];
     const newExecutionStack = [...executionStack, { state: brainInitialState, stepIndex: 0 }];
 
-    // === Compute tree structures from flat for backwards compat ===
-    const newRootBrain = reconstructBrainTree(newBrains, newBrainIdStack);
-    const newExecutionTree = executionStackToTree(newExecutionStack);
-
     const newCtx: BrainExecutionContext = {
       ...ctx,
-      // NEW flat structures
       brains: newBrains,
       brainIdStack: newBrainIdStack,
       executionStack: newExecutionStack,
-      // Computed tree structures
-      executionTree: newExecutionTree,
-      rootBrain: newRootBrain,
-      brainStack: computeBrainStack(newBrains, newBrainIdStack),
       depth: newDepth,
       brainRunId: existingBrainRunId ?? brainRunId,
       currentState: newDepth === 1 ? brainInitialState : currentState,
@@ -478,20 +419,11 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
   }
   // If outer brain complete, keep everything as-is for final state display
 
-  // === Compute tree structures from flat for backwards compat ===
-  const newRootBrain = reconstructBrainTree(newBrains, newBrainIdStack);
-  const newExecutionTree = executionStackToTree(newExecutionStack);
-
   const newCtx: BrainExecutionContext = {
     ...ctx,
-    // NEW flat structures
     brains: newBrains,
     brainIdStack: newBrainIdStack,
     executionStack: newExecutionStack,
-    // Computed tree structures
-    executionTree: newExecutionTree,
-    rootBrain: newRootBrain,
-    brainStack: computeBrainStack(newBrains, newBrainIdStack),
     depth: newDepth,
   };
 
@@ -542,19 +474,10 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
       ? [...executionStack.slice(0, -1), { ...executionStack[executionStack.length - 1], stepIndex }]
       : executionStack;
 
-    // === Compute tree structures from flat for backwards compat ===
-    const newRootBrain = reconstructBrainTree(newBrains, brainIdStack);
-    const newExecutionTree = executionStackToTree(newExecutionStack);
-
     return {
       ...ctx,
-      // NEW flat structures
       brains: newBrains,
       executionStack: newExecutionStack,
-      // Computed tree structures
-      executionTree: newExecutionTree,
-      rootBrain: newRootBrain,
-      brainStack: computeBrainStack(newBrains, brainIdStack),
       currentStepId: stepId,
       currentStepTitle: stepTitle,
     };
@@ -605,19 +528,10 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       newStepCount = topLevelStepCount + 1;
     }
 
-    // === Compute tree structures from flat for backwards compat ===
-    const newRootBrain = reconstructBrainTree(newBrains, brainIdStack);
-    const newExecutionTree = executionStackToTree(newExecutionStack);
-
     return {
       ...ctx,
-      // NEW flat structures
       brains: newBrains,
       executionStack: newExecutionStack,
-      // Computed tree structures
-      executionTree: newExecutionTree,
-      rootBrain: newRootBrain,
-      brainStack: computeBrainStack(newBrains, brainIdStack),
       currentState: newState,
       topLevelStepCount: newStepCount,
     };
@@ -680,16 +594,9 @@ const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
       [currentBrainId]: { ...currentBrain, steps: newSteps },
     };
 
-    // === Compute tree structures from flat for backwards compat ===
-    const newRootBrain = reconstructBrainTree(newBrains, brainIdStack);
-
     return {
       ...ctx,
-      // NEW flat structures
       brains: newBrains,
-      // Computed tree structures
-      rootBrain: newRootBrain,
-      brainStack: computeBrainStack(newBrains, brainIdStack),
     };
   }
 );

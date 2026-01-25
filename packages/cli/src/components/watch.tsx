@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
-import { BRAIN_EVENTS, STATUS } from '@positronic/core';
+import { BRAIN_EVENTS, STATUS, reconstructBrainTree } from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
@@ -222,7 +222,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   }, [send]);
 
   // Read brain state directly from machine context - useMachine handles re-renders
-  const { rootBrain, isComplete } = current.context;
+  const { brains, brainIdStack, isComplete } = current.context;
+  // Reconstruct the tree for UI display - this is O(depth) but depth is tiny
+  const rootBrain = reconstructBrainTree(brains, brainIdStack);
 
   // Additional state for connection and errors (not part of the brain state machine)
   const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
@@ -371,7 +373,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         setConfirmingKill(true);
       } else if (input === 'a' || input === 'A') {
         // Show agent chat view
-        const brainTitle = current.context.rootBrain?.brainTitle;
+        const brainTitle = rootBrain?.brainTitle;
         const agentLoops = getAgentLoops(events, brainTitle);
         if (agentLoops.length === 0) {
           return; // No agents - ignore keypress
@@ -449,7 +451,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         </>
       ) : viewMode === 'agent-picker' ? (
         (() => {
-          const brainTitle = current.context.rootBrain?.brainTitle;
+          const brainTitle = rootBrain?.brainTitle;
           const agentLoops = getAgentLoops(events, brainTitle);
           return (
             <>
@@ -475,7 +477,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         })()
       ) : viewMode === 'agent-chat' && selectedAgentId ? (
         (() => {
-          const brainTitle = current.context.rootBrain?.brainTitle;
+          const brainTitle = rootBrain?.brainTitle;
           const agentLoops = getAgentLoops(events, brainTitle);
           const selectedAgent = agentLoops.find((a) => a.stepId === selectedAgentId);
           if (!selectedAgent) {
