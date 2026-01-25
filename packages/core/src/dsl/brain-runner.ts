@@ -1,9 +1,7 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
-import { applyPatches } from './json-patch.js';
 import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
-import type { AgentResumeContext } from './agent-messages.js';
 import type { Adapter } from '../adapters/types.js';
-import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
+import { DEFAULT_ENV, type Brain, type BrainEvent, type ResumeContext } from './brain.js';
 import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
@@ -87,67 +85,53 @@ export class BrainRunner {
     {
       initialState = {} as TState,
       options,
-      initialCompletedSteps,
+      resumeContext,
       brainRunId,
       endAfter,
       signal,
-      response,
-      agentResumeContext,
     }: {
       initialState?: TState;
       options?: TOptions;
-      initialCompletedSteps?: SerializedStep[] | never;
-      brainRunId?: string | never;
+      resumeContext?: ResumeContext;
+      brainRunId?: string;
       endAfter?: number;
       signal?: AbortSignal;
-      response?: JsonObject;
-      agentResumeContext?: AgentResumeContext | null;
     } = {}
   ): Promise<TState> {
     const { adapters, client, resources, pages, env, signalProvider } = this.options;
     const resolvedEnv = env ?? DEFAULT_ENV;
 
-    // Apply any patches from completed steps to get the initial state
-    // for the state machine. The machine will then track all subsequent state changes.
-    let machineInitialState: JsonObject = initialState ?? {};
-    let initialStepCount = 0;
-    initialCompletedSteps?.forEach((step) => {
-      if (step.patch) {
-        machineInitialState = applyPatches(machineInitialState, [step.patch]) as JsonObject;
-        initialStepCount++;
-      }
-    });
+    // Determine initial state for the state machine
+    // If resuming, use the state from resumeContext; otherwise use initialState
+    const machineInitialState: JsonObject = resumeContext?.state ?? initialState ?? {};
+    const initialStepCount = resumeContext?.stepIndex ?? 0;
 
     // Create state machine with pre-populated state for runtime tracking.
     const machine = createBrainExecutionMachine({
       initialState: machineInitialState,
     });
 
-    const brainRun =
-      brainRunId && initialCompletedSteps
-        ? brain.run({
-            initialState,
-            initialCompletedSteps,
-            brainRunId,
-            options,
-            client,
-            resources: resources ?? {},
-            pages,
-            env: resolvedEnv,
-            response,
-            agentResumeContext,
-            signalProvider,
-          })
-        : brain.run({
-            initialState,
-            options,
-            client,
-            brainRunId,
-            resources: resources ?? {},
-            pages,
-            env: resolvedEnv,
-            signalProvider,
-          });
+    const brainRun = resumeContext
+      ? brain.run({
+          resumeContext,
+          brainRunId: brainRunId!,
+          options,
+          client,
+          resources: resources ?? {},
+          pages,
+          env: resolvedEnv,
+          signalProvider,
+        })
+      : brain.run({
+          initialState,
+          options,
+          client,
+          brainRunId,
+          resources: resources ?? {},
+          pages,
+          env: resolvedEnv,
+          signalProvider,
+        });
 
     try {
       for await (const event of brainRun) {

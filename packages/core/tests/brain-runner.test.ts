@@ -284,39 +284,11 @@ describe('BrainRunner', () => {
     expect(result.generated).toBe('from new client');
   });
 
-  it('should apply patches from initialCompletedSteps and continue from correct state', async () => {
+  it('should resume from resumeContext and continue from correct state', async () => {
     const runner = new BrainRunner({
       adapters: [mockAdapter],
       client: mockClient,
     });
-
-    // Simulate completed steps with patches
-    const completedSteps: SerializedStep[] = [
-      {
-        id: 'step-1',
-        title: 'First Step',
-        status: STATUS.COMPLETE,
-        patch: [
-          {
-            op: 'add',
-            path: '/count',
-            value: 10,
-          },
-        ],
-      },
-      {
-        id: 'step-2',
-        title: 'Second Step',
-        status: STATUS.COMPLETE,
-        patch: [
-          {
-            op: 'add',
-            path: '/name',
-            value: 'test',
-          },
-        ],
-      },
-    ];
 
     const testBrain = brain('Test Brain')
       .step('First Step', () => ({ count: 10 }))
@@ -327,26 +299,29 @@ describe('BrainRunner', () => {
         message: `${state.name} completed`,
       }));
 
+    // Resume from step index 2 (Third Step) with state as if first two steps completed
     const result = await runner.run(testBrain, {
-      initialCompletedSteps: completedSteps,
+      resumeContext: {
+        stepIndex: 2, // Start at Third Step
+        state: { count: 10, name: 'test' }, // State after first two steps
+      },
       brainRunId: 'test-run-123',
     });
 
-    // Verify the final state includes patches from completed steps
+    // Verify the final state includes resumed state plus third step
     expect(result).toEqual({
       count: 15,
       name: 'test',
       message: 'test completed',
     });
 
-    // Verify that the brain runner applied the patches correctly
-    // The runner should have seen all steps execute, but the first two were already completed
+    // Verify only the third step was executed
     const stepCompleteEvents = mockAdapter.dispatch.mock.calls.filter(
       (call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE
     );
 
-    // All steps will emit complete events in the current implementation
-    expect(stepCompleteEvents.length).toBeGreaterThanOrEqual(1);
+    expect(stepCompleteEvents.length).toBe(1);
+    expect(stepCompleteEvents[0][0].stepTitle).toBe('Third Step');
   });
 
   it('should stop execution after specified number of steps with endAfter parameter', async () => {
@@ -458,7 +433,7 @@ describe('BrainRunner', () => {
     expect(completeEvents.length).toBe(0);
   });
 
-  it('should restart brain with webhook response', async () => {
+  it('should resume brain with webhook response', async () => {
     // Define a test webhook
     const userInputWebhook = createWebhook(
       'user-input-webhook',
@@ -475,7 +450,7 @@ describe('BrainRunner', () => {
       client: mockClient,
     });
 
-    const testBrain = brain('Webhook Restart Brain')
+    const testBrain = brain('Webhook Resume Brain')
       .step('Initial Step', () => ({ count: 1 }))
       .step('Webhook Step', ({ state }) => ({
         state: { ...state, webhookSent: true },
@@ -489,23 +464,11 @@ describe('BrainRunner', () => {
 
     // First run - should stop at webhook
     const firstRunState = await runner.run(testBrain);
-    
-    expect(firstRunState).toEqual({ 
-      count: 1, 
-      webhookSent: true 
+
+    expect(firstRunState).toEqual({
+      count: 1,
+      webhookSent: true
     });
-
-    // Get the completed steps from the first run
-    const stepCompleteEvents = mockAdapter.dispatch.mock.calls
-      .filter((call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
-      .map((call) => call[0] as any);
-
-    const completedSteps: SerializedStep[] = stepCompleteEvents.map((event) => ({
-      id: event.stepId,
-      title: event.stepTitle,
-      status: STATUS.COMPLETE,
-      patch: event.patch,
-    }));
 
     // Get the brain run ID from the first run
     const startEvent = mockAdapter.dispatch.mock.calls.find(
@@ -516,12 +479,14 @@ describe('BrainRunner', () => {
     // Clear mock calls for clarity
     mockAdapter.dispatch.mockClear();
 
-    // Restart with webhook response
+    // Resume with webhook response using resumeContext
     const finalState = await runner.run(testBrain, {
-      initialState: firstRunState,
-      initialCompletedSteps: completedSteps,
+      resumeContext: {
+        stepIndex: 2, // Resume at Process Response step
+        state: firstRunState,
+        webhookResponse: { userInput: 'Hello from webhook!' },
+      },
       brainRunId,
-      response: { userInput: 'Hello from webhook!' },
     });
 
     expect(finalState).toEqual({
@@ -531,12 +496,12 @@ describe('BrainRunner', () => {
       processed: true,
     });
 
-    // Verify only the Process Response step ran in the restart
-    const restartStepCompleteEvents = mockAdapter.dispatch.mock.calls
+    // Verify only the Process Response step ran in the resume
+    const resumeStepCompleteEvents = mockAdapter.dispatch.mock.calls
       .filter((call) => call[0].type === BRAIN_EVENTS.STEP_COMPLETE)
       .map((call) => (call[0] as any).stepTitle);
 
-    expect(restartStepCompleteEvents).toEqual(['Process Response']);
+    expect(resumeStepCompleteEvents).toEqual(['Process Response']);
 
     // Verify the brain completed this time
     const completeEvents = mockAdapter.dispatch.mock.calls.filter(

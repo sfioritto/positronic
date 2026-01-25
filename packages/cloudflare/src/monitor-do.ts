@@ -83,7 +83,6 @@ export class MonitorDO extends DurableObject<Env> {
   handleBrainEvent(event: BrainEvent<any>) {
     if (
       event.type === BRAIN_EVENTS.START ||
-      event.type === BRAIN_EVENTS.RESTART ||
       event.type === BRAIN_EVENTS.COMPLETE ||
       event.type === BRAIN_EVENTS.ERROR ||
       event.type === BRAIN_EVENTS.CANCELLED
@@ -115,9 +114,7 @@ export class MonitorDO extends DurableObject<Env> {
       const { status } = machine.context;
 
       const startTime =
-        event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART
-          ? currentTime
-          : null;
+        event.type === BRAIN_EVENTS.START ? currentTime : null;
 
       // Only set completedAt when status is terminal
       const isTerminalStatus =

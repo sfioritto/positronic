@@ -42,8 +42,6 @@ function getEventSymbol(event: BrainEvent): { symbol: string; color: string } {
   switch (event.type) {
     case BRAIN_EVENTS.START:
       return { symbol: '[>]', color: 'yellow' };
-    case BRAIN_EVENTS.RESTART:
-      return { symbol: '[>>]', color: 'yellow' };
     case BRAIN_EVENTS.COMPLETE:
       return { symbol: '[ok]', color: 'green' };
     case BRAIN_EVENTS.ERROR:
@@ -162,7 +160,6 @@ function getEventDetailContent(event: BrainEvent): string {
       ].join('\n');
 
     case BRAIN_EVENTS.START:
-    case BRAIN_EVENTS.RESTART:
       return [
         `Brain: ${event.brainTitle}`,
         ...(event.brainDescription ? [`Description: ${event.brainDescription}`] : []),

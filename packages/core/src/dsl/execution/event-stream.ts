@@ -7,16 +7,14 @@ import { createPatch, applyPatches } from '../json-patch.js';
 import type { Resources } from '../../resources/resources.js';
 import type { WebhookRegistration, SerializedWebhookRegistration } from '../webhook.js';
 import type { PagesService } from '../pages.js';
-import type { AgentResumeContext } from '../agent-messages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generateUI } from '../../ui/generate-ui.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
 
 import type { BrainEvent } from '../definitions/events.js';
-import type { SerializedStep } from '../definitions/steps.js';
 import type { Block, StepBlock, BrainBlock, AgentBlock } from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
-import type { InitialRunParams, RerunParams } from '../definitions/run-params.js';
+import type { InitialRunParams, ResumeRunParams, ResumeContext } from '../definitions/run-params.js';
 
 import { Step } from '../builder/step.js';
 import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT, MAX_RETRIES } from './constants.js';
@@ -32,7 +30,6 @@ export class BrainEventStream<
   private currentState: TState;
   private steps: Step[];
   private currentStepIndex: number = 0;
-  private initialState: TState;
   private brainRunId: string;
   private title: string;
   private description?: string;
@@ -44,14 +41,13 @@ export class BrainEventStream<
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
   private currentPage: GeneratedPage | undefined = undefined;
-  private agentResumeContext: AgentResumeContext | null | undefined = undefined;
-  private initialCompletedSteps?: SerializedStep[];
+  private resumeContext?: ResumeContext;
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool>;
   private signalProvider?: SignalProvider;
 
   constructor(
-    params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
+    params: (InitialRunParams<TOptions> | ResumeRunParams<TOptions>) & {
       title: string;
       description?: string;
       blocks: Block<any, any, TOptions, TServices, any, any, any>[];
@@ -61,8 +57,6 @@ export class BrainEventStream<
     }
   ) {
     const {
-      initialState = {} as TState,
-      initialCompletedSteps,
       blocks,
       title,
       description,
@@ -73,22 +67,16 @@ export class BrainEventStream<
       resources = {} as Resources,
       pages,
       env,
-      response,
-      agentResumeContext,
       components,
       defaultTools,
       signalProvider,
-    } = params as RerunParams<TOptions> & {
-      title: string;
-      description?: string;
-      blocks: Block<any, any, TOptions, TServices, any, any, any>[];
-      services: TServices;
-      components?: Record<string, UIComponent<any>>;
-      defaultTools?: Record<string, AgentTool>;
-      signalProvider?: SignalProvider;
-    };
+    } = params;
 
-    this.initialState = initialState as TState;
+    // Check if this is a resume run or fresh start
+    const resumeParams = params as ResumeRunParams<TOptions>;
+    const initialParams = params as InitialRunParams<TOptions>;
+    const resumeContext = resumeParams.resumeContext;
+
     this.title = title;
     this.description = description;
     this.client = client;
@@ -97,46 +85,38 @@ export class BrainEventStream<
     this.resources = resources;
     this.pages = pages;
     this.env = env ?? DEFAULT_ENV;
-    this.initialCompletedSteps = initialCompletedSteps;
+    this.resumeContext = resumeContext;
     this.components = components;
     this.defaultTools = defaultTools;
     this.signalProvider = signalProvider;
-    // Initialize steps array with UUIDs and pending status
-    this.steps = blocks.map((block, index) => {
-      const completedStep = initialCompletedSteps?.[index];
-      if (completedStep) {
-        return new Step(block, completedStep.id)
-          .withStatus(completedStep.status)
-          .withPatch(completedStep.patch);
-      }
-      return new Step(block);
-    });
 
-    this.currentState = clone(this.initialState);
+    // Initialize steps - all start as pending (fresh UUIDs)
+    this.steps = blocks.map((block) => new Step(block));
 
-    for (const step of this.steps) {
-      if (step.serialized.status === STATUS.COMPLETE && step.serialized.patch) {
-        this.currentState = applyPatches(this.currentState, [
-          step.serialized.patch,
-        ]) as TState;
+    if (resumeContext) {
+      // Resume: use state and stepIndex directly from resumeContext
+      this.currentState = clone(resumeContext.state) as TState;
+      this.currentStepIndex = resumeContext.stepIndex;
+
+      // Mark steps before stepIndex as complete (they won't be re-executed)
+      for (let i = 0; i < resumeContext.stepIndex; i++) {
+        this.steps[i].withStatus(STATUS.COMPLETE);
       }
+
+      // Handle webhook response at deepest level
+      if (resumeContext.webhookResponse && !resumeContext.agentContext) {
+        // Non-agent webhook: set as currentResponse for step to consume
+        this.currentResponse = resumeContext.webhookResponse;
+      }
+      // Agent webhook response is handled via resumeContext.agentContext
+    } else {
+      // Fresh start: use initialState or empty object
+      this.currentState = clone(initialParams.initialState ?? {}) as TState;
+      this.currentStepIndex = 0;
     }
 
     // Use provided ID if available, otherwise generate one
     this.brainRunId = providedBrainRunId ?? uuidv4();
-
-    // Set agent resume context if provided (for agent webhook restarts)
-    if (agentResumeContext) {
-      this.agentResumeContext = agentResumeContext;
-      // Note: We intentionally do NOT set currentResponse here.
-      // For agent resumption, the webhook response should flow through
-      // the messages array (via agentResumeContext), not through the
-      // config function's response parameter. The config function is
-      // for agent setup, not for processing webhook responses.
-    } else if (response) {
-      // Set initial response only for non-agent webhook restarts
-      this.currentResponse = response;
-    }
   }
 
   async *next(): AsyncGenerator<BrainEvent<TOptions>> {
@@ -150,16 +130,14 @@ export class BrainEventStream<
     } = this;
 
     try {
-      const hasCompletedSteps = steps.some(
-        (step) => step.serialized.status !== STATUS.PENDING
-      );
+      // Always emit START event with current state
+      // The state machine and consumers don't need to distinguish "fresh" vs "resume"
       yield {
-        type: hasCompletedSteps ? BRAIN_EVENTS.RESTART : BRAIN_EVENTS.START,
+        type: BRAIN_EVENTS.START,
         status: STATUS.RUNNING,
         brainTitle,
         brainDescription,
-        // Only include initialState for START events; RESTART reconstructs state from patches
-        ...(hasCompletedSteps ? {} : { initialState: currentState }),
+        initialState: currentState,
         options,
         brainRunId,
       };
@@ -219,6 +197,7 @@ export class BrainEventStream<
           status: STATUS.RUNNING,
           stepTitle: step.block.title,
           stepId: step.id,
+          stepIndex: this.currentStepIndex,
           options,
           brainRunId,
         };
@@ -316,38 +295,23 @@ export class BrainEventStream<
           ? brainBlock.initialState(this.currentState)
           : brainBlock.initialState;
 
-      // Check if this inner brain step has completed inner steps (for resume)
-      const stepIndex = this.steps.indexOf(step);
-      const completedStepEntry = this.initialCompletedSteps?.[stepIndex];
-      const innerCompletedSteps = completedStepEntry?.innerSteps;
+      // Check if we're resuming and if there's an inner resume context
+      const innerResumeContext = this.resumeContext?.innerResumeContext;
 
       // Run inner brain and yield all its events
       // Pass brainRunId so inner brain shares outer brain's run ID
-      // Pass innerSteps and response for resume scenarios
       let patches: any[] = [];
 
-      // If resuming, include patches from already-completed inner steps
-      // These won't be re-emitted as STEP_COMPLETE events
-      if (innerCompletedSteps) {
-        for (const completedStep of innerCompletedSteps) {
-          if (completedStep.patch) {
-            patches.push(completedStep.patch);
-          }
-        }
-      }
-
       let innerBrainPaused = false;
-      const innerRun = innerCompletedSteps
+      const innerRun = innerResumeContext
         ? brainBlock.innerBrain.run({
             resources: this.resources,
             client: this.client,
-            initialState,
-            initialCompletedSteps: innerCompletedSteps,
+            resumeContext: innerResumeContext,
             options: this.options ?? ({} as TOptions),
             pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
-            response: this.currentResponse,
           })
         : brainBlock.innerBrain.run({
             resources: this.resources,
@@ -572,17 +536,18 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
     let initialMessages: ToolMessage[];
 
     // Check if we're resuming from a previous agent execution
-    if (this.agentResumeContext) {
-      const resumeContext = this.agentResumeContext;
+    const agentContext = this.resumeContext?.agentContext;
+    const webhookResponse = this.resumeContext?.webhookResponse;
 
+    if (agentContext) {
       // Check if this is a webhook resume (has webhook response) or pause resume
-      if (resumeContext.webhookResponse && resumeContext.pendingToolCallId && resumeContext.pendingToolName) {
+      if (webhookResponse && agentContext.pendingToolCallId && agentContext.pendingToolName) {
         // WEBHOOK RESUME: Agent was waiting for a webhook response
 
         // Emit WEBHOOK_RESPONSE event to record the response
         yield {
           type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
-          response: resumeContext.webhookResponse,
+          response: webhookResponse,
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
@@ -592,27 +557,27 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
           type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
           stepTitle: step.block.title,
           stepId: step.id,
-          toolCallId: resumeContext.pendingToolCallId,
-          toolName: resumeContext.pendingToolName,
-          result: resumeContext.webhookResponse,
+          toolCallId: agentContext.pendingToolCallId,
+          toolName: agentContext.pendingToolName,
+          result: webhookResponse,
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
 
-        // Use restored responseMessages from the resume context (preserves providerOptions)
+        // Use restored responseMessages from the agent context (preserves providerOptions)
         // Prepend the user message and append the webhook response
         // Note: reconstructed messages don't include the placeholder (we don't emit events for it),
         // so we just append the real webhook response here.
-        const userMessage: ResponseMessage = { role: 'user', content: resumeContext.prompt };
+        const userMessage: ResponseMessage = { role: 'user', content: agentContext.prompt };
 
         if (this.client.createToolResultMessage) {
           const toolResultMessage = this.client.createToolResultMessage(
-            resumeContext.pendingToolCallId,
-            resumeContext.pendingToolName,
-            resumeContext.webhookResponse
+            agentContext.pendingToolCallId,
+            agentContext.pendingToolName,
+            webhookResponse
           );
 
-          responseMessages = [userMessage, ...resumeContext.responseMessages, toolResultMessage];
+          responseMessages = [userMessage, ...agentContext.responseMessages, toolResultMessage];
 
           // Emit event for this tool result message (for reconstruction if there's another pause)
           yield {
@@ -626,7 +591,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
           };
         } else {
           // Fallback if client doesn't support createToolResultMessage
-          responseMessages = [userMessage, ...resumeContext.responseMessages];
+          responseMessages = [userMessage, ...agentContext.responseMessages];
         }
 
         // Set empty initial messages since user message is in responseMessages
@@ -635,15 +600,15 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
         // PAUSE RESUME: Agent was paused mid-execution (no pending webhook)
         // Restore conversation history and continue from where we left off
 
-        const userMessage: ResponseMessage = { role: 'user', content: resumeContext.prompt };
-        responseMessages = [userMessage, ...resumeContext.responseMessages];
+        const userMessage: ResponseMessage = { role: 'user', content: agentContext.prompt };
+        responseMessages = [userMessage, ...agentContext.responseMessages];
         initialMessages = [];
 
         // No events to emit for pause resume - we just continue the conversation
       }
 
-      // Clear the context so it's only used once
-      this.agentResumeContext = undefined;
+      // Clear the resume context so it's only used once
+      this.resumeContext = undefined;
     } else {
       // Use "Begin." as default prompt if not provided
       const prompt = config.prompt ?? 'Begin.';

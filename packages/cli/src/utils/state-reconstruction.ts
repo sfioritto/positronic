@@ -10,7 +10,7 @@ export interface StoredEvent {
 
 /**
  * Reconstructs the brain state at a specific event index by:
- * 1. Finding the most recent brain:start or brain:restart event at or before the target index
+ * 1. Finding the most recent brain:start event at or before the target index
  * 2. Extracting the initialState from that event
  * 3. Applying all step:complete patches from that point up to and including the target index
  *
@@ -29,13 +29,13 @@ export function reconstructStateAtEvent(
   // Clamp targetIndex to valid range
   const effectiveIndex = Math.min(targetIndex, events.length - 1);
 
-  // Find the most recent brain:start or brain:restart at or before targetIndex
+  // Find the most recent brain:start at or before targetIndex
   let startIndex = -1;
   let initialState: JsonObject = {};
 
   for (let i = effectiveIndex; i >= 0; i--) {
     const event = events[i].event;
-    if (event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART) {
+    if (event.type === BRAIN_EVENTS.START) {
       startIndex = i;
       const startEvent = event as BrainStartEvent;
       initialState = (startEvent.initialState as JsonObject) ?? {};

@@ -26,8 +26,8 @@ interface BrainBaseEvent<TOptions extends JsonObject = JsonObject>
 
 export interface BrainStartEvent<TOptions extends JsonObject = JsonObject>
   extends BrainBaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.START | typeof BRAIN_EVENTS.RESTART;
-  initialState?: object;
+  type: typeof BRAIN_EVENTS.START;
+  initialState: object;  // Always included now (no longer optional)
   status: typeof STATUS.RUNNING;
 }
 
@@ -70,6 +70,7 @@ export interface StepStartedEvent<TOptions extends JsonObject = JsonObject>
   status: typeof STATUS.RUNNING;
   stepTitle: string;
   stepId: string;
+  stepIndex: number;  // 0-based index of the step within the current brain
 }
 
 export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>

@@ -62,12 +62,6 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `Brain started: "${event.brainTitle}"`,
         color: 'yellow',
       };
-    case BRAIN_EVENTS.RESTART:
-      return {
-        symbol: '[>>]',
-        text: `Brain restarted: "${event.brainTitle}"`,
-        color: 'yellow',
-      };
     case BRAIN_EVENTS.COMPLETE:
       return {
         symbol: '[ok]',

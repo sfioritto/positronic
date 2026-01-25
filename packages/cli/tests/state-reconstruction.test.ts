@@ -135,7 +135,7 @@ describe('reconstructStateAtEvent', () => {
     expect(reconstructStateAtEvent(events, 2)).toEqual({ name: 'Alice', age: 30 });
   });
 
-  it('should handle brain:restart by resetting state', () => {
+  it('should handle multiple step completions', () => {
     const events: StoredEvent[] = [
       createStoredEvent({
         type: BRAIN_EVENTS.START,
@@ -155,14 +155,6 @@ describe('reconstructStateAtEvent', () => {
         patch: [{ op: 'replace', path: '/count', value: 5 }],
       }, 100),
       createStoredEvent({
-        type: BRAIN_EVENTS.RESTART,
-        brainTitle: 'Test Brain',
-        brainRunId: 'run-1',
-        options: {},
-        status: 'running',
-        initialState: { count: 10 },  // Different initial state on restart
-      }, 200),
-      createStoredEvent({
         type: BRAIN_EVENTS.STEP_COMPLETE,
         brainRunId: 'run-1',
         stepTitle: 'Step 2',
@@ -170,17 +162,14 @@ describe('reconstructStateAtEvent', () => {
         options: {},
         status: 'running',
         patch: [{ op: 'replace', path: '/count', value: 15 }],
-      }, 300),
+      }, 200),
     ];
 
-    // Before restart, state should be after first step
+    // After first step
     expect(reconstructStateAtEvent(events, 1)).toEqual({ count: 5 });
 
-    // At restart, state resets to new initialState
-    expect(reconstructStateAtEvent(events, 2)).toEqual({ count: 10 });
-
-    // After step following restart, state includes new patch
-    expect(reconstructStateAtEvent(events, 3)).toEqual({ count: 15 });
+    // After second step
+    expect(reconstructStateAtEvent(events, 2)).toEqual({ count: 15 });
   });
 
   it('should skip non-step events when applying patches', () => {

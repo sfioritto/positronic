@@ -8,7 +8,8 @@ export type {
   BrainEvent,
   SerializedStep,
   InitialRunParams,
-  RerunParams,
+  ResumeRunParams,
+  ResumeContext,
   BrainStartEvent,
   BrainCompleteEvent,
   BrainErrorEvent,
@@ -85,7 +86,6 @@ export {
   createBrainExecutionMachine,
   createBrainMachine,
   sendEvent,
-  getCompletedSteps,
 } from './dsl/brain-state-machine.js';
 export type {
   BrainStateMachine,
@@ -96,5 +96,6 @@ export type {
   ExecutionState,
   CreateMachineOptions,
   AgentContext,
+  ExecutionNode,
 } from './dsl/brain-state-machine.js';
 export type { AgentResumeContext } from './dsl/agent-messages.js';
