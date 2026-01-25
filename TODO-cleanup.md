@@ -15,33 +15,7 @@ Events are the source of truth. The machine can reconstruct any state by replayi
 
 ## High Priority
 
-### 1. Delete `state-reconstruction.ts` (CLI)
-
-**Location:** `packages/cli/src/utils/state-reconstruction.ts`
-
-**Problem:** Manual utility `reconstructStateAtEvent` iterates over events and applies patches with `fast-json-patch`. This duplicates exactly what `BrainStateMachine` does. If the machine changes how it handles state (e.g., new event types), this utility will break silently.
-
-**Fix:** Delete the file. In `Watch.tsx` and other CLI components that need state at a point in time:
-```typescript
-// Instead of:
-// const state = reconstructStateAtEvent(events, index);
-
-// Do this:
-const machine = createBrainExecutionMachine();
-for (const event of events.slice(0, index + 1)) {
-  sendEvent(machine, event);
-}
-const state = machine.context.currentState;
-```
-
-**Files to update:**
-- Delete `packages/cli/src/utils/state-reconstruction.ts`
-- Update `packages/cli/src/components/Watch.tsx` (or wherever it's used)
-- Update/delete `packages/cli/tests/state-reconstruction.test.ts`
-
----
-
-### 2. Simplify `MonitorDO` Event Processing (O(N²) → O(1))
+### 1. Simplify `MonitorDO` Event Processing (O(N²) → O(1))
 
 **Location:** `packages/cloudflare/src/monitor-do.ts`
 
@@ -62,7 +36,7 @@ This replays the *entire* history for every event just to get the current status
 
 ---
 
-### 3. Abstract the "Event Store" Pattern
+### 2. Abstract the "Event Store" Pattern
 
 **Location:** `packages/cloudflare/src/brain-runner-do.ts`
 
@@ -88,7 +62,7 @@ interface EventStore {
 
 ## To Investigate
 
-### 4. `innerResumeContext` Nesting Pattern
+### 3. `innerResumeContext` Nesting Pattern
 
 **Location:** `packages/core/src/dsl/brain-runner.ts` (executionStackToResumeContext)
 
@@ -106,7 +80,7 @@ ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  /
 
 ---
 
-### 5. `findWebhookResponseInResumeContext` in event-stream.ts
+### 4. `findWebhookResponseInResumeContext` in event-stream.ts
 
 **Location:** `packages/core/src/dsl/execution/event-stream.ts`
 
@@ -119,7 +93,7 @@ ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  /
 
 ---
 
-### 6. BrainEventStream vs BrainStateMachine State Tracking
+### 5. BrainEventStream vs BrainStateMachine State Tracking
 
 **Location:** `packages/core/src/dsl/execution/event-stream.ts`
 
@@ -136,6 +110,10 @@ ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  /
 
 ## Done
 
+- [x] **Delete `state-reconstruction.ts` (CLI)**
+  - Deleted `packages/cli/src/utils/state-reconstruction.ts` and its tests
+  - `watch.tsx` now uses `createBrainExecutionMachine` + `sendEvent` to reconstruct state
+  - Moved `StoredEvent` type to `events-view.tsx`
 - [x] **`readSseStream` test utility** - Already uses state machine correctly
 - [x] **Move `executionStackToResumeContext` into BrainRunner**
   - Now private to BrainRunner

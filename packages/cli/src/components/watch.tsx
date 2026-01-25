@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
-import { BRAIN_EVENTS, STATUS, reconstructBrainTree } from '@positronic/core';
+import { BRAIN_EVENTS, STATUS, reconstructBrainTree, createBrainExecutionMachine, sendEvent } from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
@@ -12,7 +12,6 @@ import { EventsView, type StoredEvent, type EventsViewMode } from './events-view
 import { StateView } from './state-view.js';
 import { AgentChatView } from './agent-chat-view.js';
 import { SelectList } from './select-list.js';
-import { reconstructStateAtEvent } from '../utils/state-reconstruction.js';
 import { getAgentLoops } from '../utils/agent-utils.js';
 
 type JsonObject = { [key: string]: unknown };
@@ -309,8 +308,12 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   // Handler for viewing state at a specific event index (called from EventsView)
   const handleViewStateAtEvent = (eventIndex: number) => {
     setEventsSelectedIndex(eventIndex);  // Preserve selection for when we return
-    const state = reconstructStateAtEvent(events, eventIndex);
-    setStateSnapshot(state);
+    // Use the state machine to reconstruct state at this point
+    const machine = createBrainExecutionMachine();
+    for (let i = 0; i <= eventIndex && i < events.length; i++) {
+      sendEvent(machine, events[i].event);
+    }
+    setStateSnapshot(machine.context.currentState);
     setStateTitle(`State at event #${eventIndex + 1}`);
     setStateScrollOffset(0);
     setPreviousViewMode('events');
