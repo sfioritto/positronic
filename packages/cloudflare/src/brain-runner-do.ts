@@ -1,4 +1,4 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type SerializedStep, createBrainExecutionMachine, sendEvent, getCompletedSteps } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type SerializedStep, type AgentResumeContext, createBrainExecutionMachine, sendEvent, getCompletedSteps } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
@@ -466,16 +466,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Get the reconstructed step hierarchy from the state machine
     const initialCompletedSteps: SerializedStep[] = getCompletedSteps(machine);
 
-    // Load AGENT_* events for potential agent resume
-    const agentEventsResult = sql
-      .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events WHERE event_type LIKE 'agent:%' ORDER BY event_id ASC`
-      )
-      .toArray();
-
-    const agentEvents = agentEventsResult.map((row) =>
-      JSON.parse(row.serialized_event)
-    );
+    // Get agent context directly from the machine (already populated from all events)
+    const { agentContext } = machine.context;
+    const agentResumeContext: AgentResumeContext | null = agentContext
+      ? { ...agentContext, webhookResponse }
+      : null;
 
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
@@ -533,7 +528,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         brainRunId,
         response: webhookResponse,
         signal: this.abortController.signal,
-        agentEvents,
+        agentResumeContext,
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner resume failed:`, err);

@@ -92,7 +92,7 @@ export class BrainRunner {
       endAfter,
       signal,
       response,
-      agentEvents,
+      agentResumeContext,
     }: {
       initialState?: TState;
       options?: TOptions;
@@ -101,7 +101,7 @@ export class BrainRunner {
       endAfter?: number;
       signal?: AbortSignal;
       response?: JsonObject;
-      agentEvents?: BrainEvent[];
+      agentResumeContext?: AgentResumeContext | null;
     } = {}
   ): Promise<TState> {
     const { adapters, client, resources, pages, env, signalProvider } = this.options;
@@ -118,20 +118,10 @@ export class BrainRunner {
       }
     });
 
-    // Create state machine with pre-populated state and replay agent events if provided.
-    // This restores the machine's agentContext so we can properly resume paused agents.
+    // Create state machine with pre-populated state for runtime tracking.
     const machine = createBrainExecutionMachine({
       initialState: machineInitialState,
-      // Type assertion needed because BrainEvent union types don't have index signatures
-      events: agentEvents as Array<{ type: string } & Record<string, unknown>> | undefined,
     });
-
-    // Build agent resume context directly from machine state.
-    // The state machine is the source of truth - just spread and add webhookResponse.
-    const { agentContext } = machine.context;
-    const agentResumeContext: AgentResumeContext | null = agentContext
-      ? { ...agentContext, webhookResponse: response }
-      : null;
 
     const brainRun =
       brainRunId && initialCompletedSteps
