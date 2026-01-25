@@ -1,7 +1,7 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
-import { reconstructAgentContext } from './agent-messages.js';
 import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
+import type { AgentResumeContext } from './agent-messages.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
 import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
@@ -118,15 +118,20 @@ export class BrainRunner {
       }
     });
 
-    // Create state machine with pre-populated state
-    // The machine tracks: currentState, isTopLevel, topLevelStepCount, etc.
-    const machine = createBrainExecutionMachine({ initialState: machineInitialState });
+    // Create state machine with pre-populated state and replay agent events if provided.
+    // This restores the machine's agentContext so we can properly resume paused agents.
+    const machine = createBrainExecutionMachine({
+      initialState: machineInitialState,
+      // Type assertion needed because BrainEvent union types don't have index signatures
+      events: agentEvents as Array<{ type: string } & Record<string, unknown>> | undefined,
+    });
 
-    // If agentEvents and response are provided, reconstruct agent context
-    const agentResumeContext =
-      agentEvents && response
-        ? reconstructAgentContext(agentEvents, response)
-        : null;
+    // Build agent resume context directly from machine state.
+    // The state machine is the source of truth - just spread and add webhookResponse.
+    const { agentContext } = machine.context;
+    const agentResumeContext: AgentResumeContext | null = agentContext
+      ? { ...agentContext, webhookResponse: response }
+      : null;
 
     const brainRun =
       brainRunId && initialCompletedSteps

@@ -18,7 +18,7 @@ import { z } from 'zod';
 import { jest } from '@jest/globals';
 import type { ObjectGenerator, ToolMessage } from '../src/clients/types.js';
 import { createWebhook } from '../src/dsl/webhook.js';
-import { reconstructAgentContext } from '../src/dsl/agent-messages.js';
+import { createBrainExecutionMachine } from '../src/dsl/brain-state-machine.js';
 
 // Mock ObjectGenerator with generateText support
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -1064,155 +1064,6 @@ describe('agent step', () => {
       expect(agentWebhookEvent.input).toEqual({ summary: 'Customer needs help' });
     });
 
-    describe('reconstructAgentContext', () => {
-      it('should return null when no AGENT_WEBHOOK event exists', () => {
-        const events: BrainEvent[] = [
-          {
-            type: BRAIN_EVENTS.AGENT_START,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            prompt: 'Hello',
-            options: {},
-            brainRunId: 'run-1',
-          },
-          {
-            type: BRAIN_EVENTS.AGENT_COMPLETE,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            terminalToolName: 'resolve',
-            result: {},
-            totalIterations: 1,
-            totalTokens: 100,
-            options: {},
-            brainRunId: 'run-1',
-          },
-        ];
-
-        const result = reconstructAgentContext(events, { response: 'test' });
-        expect(result).toBeNull();
-      });
-
-      it('should reconstruct messages from AGENT events', () => {
-        // Each AGENT_RAW_RESPONSE_MESSAGE event now contains a single message
-        const events: BrainEvent[] = [
-          {
-            type: BRAIN_EVENTS.AGENT_START,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            prompt: 'Handle the request',
-            system: 'You are helpful',
-            options: {},
-            brainRunId: 'run-1',
-          },
-          // First message: assistant response
-          {
-            type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            iteration: 1,
-            message: { role: 'assistant', content: 'Let me help you with that' },
-            options: {},
-            brainRunId: 'run-1',
-          },
-          {
-            type: BRAIN_EVENTS.AGENT_ITERATION,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            iteration: 1,
-            tokensThisIteration: 100,
-            totalTokens: 100,
-            options: {},
-            brainRunId: 'run-1',
-          },
-          {
-            type: BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            content: 'Let me help you with that',
-            options: {},
-            brainRunId: 'run-1',
-          },
-          {
-            type: BRAIN_EVENTS.AGENT_TOOL_CALL,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            toolCallId: 'call-1',
-            toolName: 'search',
-            input: { query: 'test' },
-            options: {},
-            brainRunId: 'run-1',
-          },
-          {
-            type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            toolCallId: 'call-1',
-            toolName: 'search',
-            result: { found: true },
-            options: {},
-            brainRunId: 'run-1',
-          },
-          // Second message: tool result for search
-          {
-            type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            iteration: 1,
-            message: { role: 'tool', toolCallId: 'call-1', toolName: 'search', output: { found: true } },
-            options: {},
-            brainRunId: 'run-1',
-          },
-          {
-            type: BRAIN_EVENTS.AGENT_TOOL_CALL,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            toolCallId: 'call-2',
-            toolName: 'escalate',
-            input: { summary: 'Need approval' },
-            options: {},
-            brainRunId: 'run-1',
-          },
-          // Note: No AGENT_RAW_RESPONSE_MESSAGE for escalate - webhook tools don't add placeholder
-          {
-            type: BRAIN_EVENTS.AGENT_WEBHOOK,
-            stepTitle: 'Test',
-            stepId: 'step-1',
-            toolCallId: 'call-2',
-            toolName: 'escalate',
-            input: { summary: 'Need approval' },
-            options: {},
-            brainRunId: 'run-1',
-          },
-        ];
-
-        const webhookResponse = { approved: true, comment: 'Looks good' };
-        const result = reconstructAgentContext(events, webhookResponse);
-
-        expect(result).not.toBeNull();
-        expect(result!.prompt).toBe('Handle the request');
-        expect(result!.system).toBe('You are helpful');
-        expect(result!.pendingToolCallId).toBe('call-2');
-        expect(result!.pendingToolName).toBe('escalate');
-
-        // Check responseMessages array - now simple concatenation of all messages
-        expect(result!.responseMessages).toHaveLength(2);
-
-        // First message: assistant response
-        expect(result!.responseMessages[0]).toEqual({
-          role: 'assistant',
-          content: 'Let me help you with that',
-        });
-
-        // Second message: tool result for search
-        expect(result!.responseMessages[1]).toEqual({
-          role: 'tool',
-          toolCallId: 'call-1',
-          toolName: 'search',
-          output: { found: true },
-        });
-      });
-    });
-
     it('should not pass webhook response as response parameter to config function on resumption', async () => {
       // This test verifies that the agent config function receives the previous step's
       // response (not the webhook response) when resuming from a webhook.
@@ -1307,8 +1158,14 @@ describe('agent step', () => {
       expect(configFnCalls[0].response).toBeUndefined();
 
       // Now resume from webhook with a webhook response
+      // Use the state machine to reconstruct agent context from events
       const webhookResponse = { ticketId: 'ticket-456', approved: true };
-      const agentContext = reconstructAgentContext(events, webhookResponse);
+      const machine = createBrainExecutionMachine({
+        events: events as Array<{ type: string } & Record<string, unknown>>,
+      });
+      const agentContext = machine.context.agentContext
+        ? { ...machine.context.agentContext, webhookResponse }
+        : null;
       expect(agentContext).not.toBeNull();
 
       // Create a new brain instance to resume

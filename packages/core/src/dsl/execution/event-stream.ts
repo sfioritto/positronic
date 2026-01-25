@@ -571,62 +571,76 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
     // Initial messages for first call (will be converted by client)
     let initialMessages: ToolMessage[];
 
-    // Check if we're resuming from a webhook
+    // Check if we're resuming from a previous agent execution
     if (this.agentResumeContext) {
       const resumeContext = this.agentResumeContext;
 
-      // Emit WEBHOOK_RESPONSE event to record the response
-      yield {
-        type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
-        response: resumeContext.webhookResponse,
-        options: this.options ?? ({} as TOptions),
-        brainRunId: this.brainRunId,
-      };
+      // Check if this is a webhook resume (has webhook response) or pause resume
+      if (resumeContext.webhookResponse && resumeContext.pendingToolCallId && resumeContext.pendingToolName) {
+        // WEBHOOK RESUME: Agent was waiting for a webhook response
 
-      // Emit AGENT_TOOL_RESULT for the pending tool (webhook response injected as tool result)
-      yield {
-        type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
-        stepTitle: step.block.title,
-        stepId: step.id,
-        toolCallId: resumeContext.pendingToolCallId,
-        toolName: resumeContext.pendingToolName,
-        result: resumeContext.webhookResponse,
-        options: this.options ?? ({} as TOptions),
-        brainRunId: this.brainRunId,
-      };
-
-      // Use restored responseMessages from the resume context (preserves providerOptions)
-      // Prepend the user message and append the webhook response
-      // Note: reconstructed messages don't include the placeholder (we don't emit events for it),
-      // so we just append the real webhook response here.
-      const userMessage: ResponseMessage = { role: 'user', content: resumeContext.prompt };
-
-      if (this.client.createToolResultMessage) {
-        const toolResultMessage = this.client.createToolResultMessage(
-          resumeContext.pendingToolCallId,
-          resumeContext.pendingToolName,
-          resumeContext.webhookResponse
-        );
-
-        responseMessages = [userMessage, ...resumeContext.responseMessages, toolResultMessage];
-
-        // Emit event for this tool result message (for reconstruction if there's another pause)
+        // Emit WEBHOOK_RESPONSE event to record the response
         yield {
-          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-          stepTitle: step.block.title,
-          stepId: step.id,
-          iteration: 0, // Special iteration for resumed webhook response
-          message: toolResultMessage,
+          type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
+          response: resumeContext.webhookResponse,
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
-      } else {
-        // Fallback if client doesn't support createToolResultMessage
-        responseMessages = [userMessage, ...resumeContext.responseMessages];
-      }
 
-      // Set empty initial messages since user message is in responseMessages
-      initialMessages = [];
+        // Emit AGENT_TOOL_RESULT for the pending tool (webhook response injected as tool result)
+        yield {
+          type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
+          stepTitle: step.block.title,
+          stepId: step.id,
+          toolCallId: resumeContext.pendingToolCallId,
+          toolName: resumeContext.pendingToolName,
+          result: resumeContext.webhookResponse,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+
+        // Use restored responseMessages from the resume context (preserves providerOptions)
+        // Prepend the user message and append the webhook response
+        // Note: reconstructed messages don't include the placeholder (we don't emit events for it),
+        // so we just append the real webhook response here.
+        const userMessage: ResponseMessage = { role: 'user', content: resumeContext.prompt };
+
+        if (this.client.createToolResultMessage) {
+          const toolResultMessage = this.client.createToolResultMessage(
+            resumeContext.pendingToolCallId,
+            resumeContext.pendingToolName,
+            resumeContext.webhookResponse
+          );
+
+          responseMessages = [userMessage, ...resumeContext.responseMessages, toolResultMessage];
+
+          // Emit event for this tool result message (for reconstruction if there's another pause)
+          yield {
+            type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+            stepTitle: step.block.title,
+            stepId: step.id,
+            iteration: 0, // Special iteration for resumed webhook response
+            message: toolResultMessage,
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+          };
+        } else {
+          // Fallback if client doesn't support createToolResultMessage
+          responseMessages = [userMessage, ...resumeContext.responseMessages];
+        }
+
+        // Set empty initial messages since user message is in responseMessages
+        initialMessages = [];
+      } else {
+        // PAUSE RESUME: Agent was paused mid-execution (no pending webhook)
+        // Restore conversation history and continue from where we left off
+
+        const userMessage: ResponseMessage = { role: 'user', content: resumeContext.prompt };
+        responseMessages = [userMessage, ...resumeContext.responseMessages];
+        initialMessages = [];
+
+        // No events to emit for pause resume - we just continue the conversation
+      }
 
       // Clear the context so it's only used once
       this.agentResumeContext = undefined;
