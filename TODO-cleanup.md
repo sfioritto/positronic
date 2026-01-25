@@ -15,38 +15,7 @@ Events are the source of truth. The machine can reconstruct any state by replayi
 
 ## To Investigate
 
-### 1. `innerResumeContext` Nesting Pattern
-
-**Location:** `packages/core/src/dsl/brain-runner.ts` (executionStackToResumeContext)
-
-**Question:** We convert flat `executionStack` array into nested `ResumeContext` tree, then the event stream traverses via `innerResumeContext`. Could the event stream just read from `executionStack[depth]` directly?
-
-**Current flow:**
-```
-executionStack: [{ state, stepIndex }, { state, stepIndex }]  // flat
-    ↓ executionStackToResumeContext()
-ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  // nested tree
-    ↓ event-stream traverses via innerResumeContext
-```
-
-**Potential simplification:** Pass machine to event stream, let it read `executionStack[depth]` based on current depth.
-
----
-
-### 2. `findWebhookResponseInResumeContext` in event-stream.ts
-
-**Location:** `packages/core/src/dsl/execution/event-stream.ts`
-
-**Problem:** Searches through resumeContext tree to find webhookResponse at deepest level. This is a symptom of the nested tree structure.
-
-**Possible fixes:**
-- If we simplify innerResumeContext pattern (#1), this might become trivial
-- Could use `machine.context.isWaiting` to know if resuming from webhook
-- Or add `webhookResponse` to machine context directly
-
----
-
-### 3. BrainEventStream vs BrainStateMachine State Tracking
+### 1. BrainEventStream vs BrainStateMachine State Tracking
 
 **Location:** `packages/core/src/dsl/execution/event-stream.ts`
 
@@ -63,6 +32,7 @@ ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  /
 
 ## Done
 
+- [x] **`innerResumeContext` Nesting Pattern** - Reviewed, well-designed. Recursive data structure matches recursive brain execution. Each brain peels off one layer and passes the rest down.
 - [x] **Simplify `MonitorDO` Event Processing (O(N²) → O(1))**
   - Keep state machines in memory via `Map<string, BrainStateMachine>`
   - Only hydrate from stored events when DO wakes from hibernation
