@@ -18,6 +18,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // Start agent step (transitions to agentLoop state)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Generate content',
+        stepId: 'step-1',
+        prompt: 'Generate some content',
+      });
+
       // Agent iteration with 500 tokens
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
@@ -55,6 +64,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // First agent - start (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'First prompt',
+      });
+
       // First agent - 1 iteration with 500 tokens
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
@@ -75,6 +93,15 @@ describe('brain-state-machine', () => {
         result: {},
         totalIterations: 1,
         totalTokens: 500,
+      });
+
+      // Second agent - start (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 2',
+        stepId: 'step-2',
+        prompt: 'Second prompt',
       });
 
       // Second agent - 2 iterations: 400 + 600 = 1000 tokens
@@ -123,6 +150,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // Start agent (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'Generate tokens',
+      });
+
       // Agent runs 5 iterations before hitting token limit
       for (let i = 1; i <= 5; i++) {
         sendEvent(machine, {
@@ -158,6 +194,15 @@ describe('brain-state-machine', () => {
         brainRunId,
         brainTitle: 'iter-limit-brain',
         initialState: {},
+      });
+
+      // Start agent (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'Run many iterations',
       });
 
       // Agent runs 10 iterations before hitting limit
@@ -200,6 +245,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // Start agent (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'Generate with webhook',
+      });
+
       // First agent runs 2 iterations before being interrupted by webhook
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
@@ -221,7 +275,7 @@ describe('brain-state-machine', () => {
         totalTokens: 1669,
       });
 
-      // Webhook pause - agent never completes!
+      // Webhook pause - agent is interrupted but agentContext preserved
       sendEvent(machine, {
         type: BRAIN_EVENTS.WEBHOOK,
         brainRunId,
@@ -231,7 +285,7 @@ describe('brain-state-machine', () => {
       // Tokens should still be tracked from iterations
       expect(machine.context.totalTokens).toBe(1669);
 
-      // Brain restarts after webhook
+      // Brain restarts after webhook - goes back to agentLoop since agentContext exists
       sendEvent(machine, {
         type: BRAIN_EVENTS.RESTART,
         brainRunId,
@@ -239,15 +293,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
-      // Second agent runs and completes
+      // Agent resumes and continues iterating
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
         brainRunId,
         stepTitle: 'Step 1',
         stepId: 'step-1',
-        iteration: 1,
+        iteration: 3,
         tokensThisIteration: 1392,
-        totalTokens: 1392,
+        totalTokens: 3061,
       });
 
       sendEvent(machine, {
@@ -257,11 +311,11 @@ describe('brain-state-machine', () => {
         stepId: 'step-1',
         terminalToolName: 'done',
         result: {},
-        totalIterations: 1,
-        totalTokens: 1392,
+        totalIterations: 3,
+        totalTokens: 3061,
       });
 
-      // Total should be sum of both agents
+      // Total should be sum of all iterations
       expect(machine.context.totalTokens).toBe(1669 + 1392);
     });
   });

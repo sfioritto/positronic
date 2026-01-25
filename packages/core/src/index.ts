@@ -93,6 +93,7 @@ export {
   getExecutionState,
   getPendingWebhooks,
   getError,
+  getAgentContext,
   getCompletedSteps,
 } from './dsl/brain-state-machine.js';
 export type {
@@ -103,4 +104,5 @@ export type {
   StepInfo,
   ExecutionState,
   CreateMachineOptions,
+  AgentContext,
 } from './dsl/brain-state-machine.js';

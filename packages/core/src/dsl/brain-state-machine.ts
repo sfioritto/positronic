@@ -6,6 +6,7 @@ const { createMachine, state, transition, reduce, guard, interpret } = robot3;
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { JsonPatch, JsonObject } from './types.js';
+import type { ResponseMessage } from '../clients/types.js';
 
 // ============================================================================
 // Types
@@ -52,6 +53,26 @@ export interface WebhookRegistration {
   identifier: string;
 }
 
+/**
+ * Context for tracking agent execution state.
+ * This allows the state machine to preserve agent context across pauses/resumes.
+ */
+export interface AgentContext {
+  /** The step that started this agent */
+  stepId: string;
+  stepTitle: string;
+  /** Initial prompt from AGENT_START */
+  prompt: string;
+  /** System prompt from AGENT_START (optional) */
+  system?: string;
+  /** SDK-native messages accumulated from AGENT_RAW_RESPONSE_MESSAGE events */
+  responseMessages: ResponseMessage[];
+  /** Tool call ID when agent is waiting for webhook response */
+  pendingToolCallId: string | null;
+  /** Tool name when agent is waiting for webhook response */
+  pendingToolName: string | null;
+}
+
 // The event structure that gets yielded
 export interface BrainEvent {
   type: string;
@@ -81,6 +102,10 @@ export interface BrainExecutionContext {
   // Options to include in every event
   options: JsonObject;
 
+  // Agent context - tracks agent execution state for pause/resume
+  // Non-null when we're inside an agent loop (or paused from one)
+  agentContext: AgentContext | null;
+
   // Derived state (updated by reducers)
   // The authoritative status (depth-aware) - use this instead of checking event.status
   status: (typeof STATUS)[keyof typeof STATUS];
@@ -91,6 +116,8 @@ export interface BrainExecutionContext {
   isWaiting: boolean;
   isError: boolean;
   isCancelled: boolean;
+  // True when execution is inside an agent loop
+  isInAgentLoop: boolean;
 
   // Step counter for top-level steps
   topLevelStepCount: number;
@@ -102,6 +129,7 @@ export interface BrainExecutionContext {
 export type ExecutionState =
   | 'idle'
   | 'running'
+  | 'agentLoop'
   | 'paused'
   | 'waiting'
   | 'complete'
@@ -288,6 +316,7 @@ const createInitialContext = (
   currentState: opts?.initialState ?? {},
   currentEvent: null,
   options: opts?.options ?? {},
+  agentContext: null,
   status: STATUS.PENDING,
   isTopLevel: false,
   isRunning: false,
@@ -296,6 +325,7 @@ const createInitialContext = (
   isWaiting: false,
   isError: false,
   isCancelled: false,
+  isInAgentLoop: false,
   topLevelStepCount: 0,
   totalTokens: 0,
 });
@@ -309,6 +339,7 @@ const updateDerivedState = (
   executionState: ExecutionState
 ): BrainExecutionContext => {
   // Map ExecutionState to STATUS - this gives consumers the authoritative status
+  // Note: agentLoop maps to RUNNING publicly (consumers don't need to know the difference)
   let status: (typeof STATUS)[keyof typeof STATUS];
   switch (executionState) {
     case 'idle':
@@ -316,6 +347,9 @@ const updateDerivedState = (
       break;
     case 'running':
       status = STATUS.RUNNING;
+      break;
+    case 'agentLoop':
+      status = STATUS.RUNNING; // Publicly still "running"
       break;
     case 'paused':
       status = STATUS.PAUSED;
@@ -340,12 +374,13 @@ const updateDerivedState = (
     ...ctx,
     status,
     isTopLevel: ctx.depth === 1,
-    isRunning: executionState === 'running',
+    isRunning: executionState === 'running' || executionState === 'agentLoop',
     isComplete: executionState === 'complete',
     isPaused: executionState === 'paused',
     isWaiting: executionState === 'waiting',
     isError: executionState === 'error',
     isCancelled: executionState === 'cancelled',
+    isInAgentLoop: executionState === 'agentLoop',
   };
 };
 
@@ -843,6 +878,7 @@ const agentIteration = reduce<BrainExecutionContext, any>((ctx, ev) => {
 });
 
 // Reducer for agent terminal events - tokens already tracked via iterations
+// Clears agentContext since the agent has completed
 const agentTerminal = (eventType: string) =>
   reduce<BrainExecutionContext, any>((ctx, ev) => {
     const { brainRunId, options } = ctx;
@@ -850,6 +886,7 @@ const agentTerminal = (eventType: string) =>
 
     return {
       ...ctx,
+      agentContext: null, // Clear agent context on completion
       currentEvent: {
         type: eventType,
         brainRunId: brainRunId!,
@@ -858,6 +895,143 @@ const agentTerminal = (eventType: string) =>
       },
     };
   });
+
+// ============================================================================
+// Agent Loop Reducers - Manage agentContext for the explicit agent state
+// ============================================================================
+
+// Payload types for agent events
+interface AgentStartPayload {
+  stepId: string;
+  stepTitle: string;
+  prompt: string;
+  system?: string;
+  tools?: string[];
+}
+
+interface AgentRawResponseMessagePayload {
+  stepId: string;
+  stepTitle: string;
+  iteration: number;
+  message: ResponseMessage;
+}
+
+interface AgentWebhookPayload {
+  stepId: string;
+  stepTitle: string;
+  toolCallId: string;
+  toolName: string;
+  input: JsonObject;
+}
+
+// Reducer for AGENT_START - initializes agentContext
+const agentStart = reduce<BrainExecutionContext, AgentStartPayload>(
+  (ctx, { stepId, stepTitle, prompt, system, tools }) => {
+    const { brainRunId, options } = ctx;
+
+    const newCtx: BrainExecutionContext = {
+      ...ctx,
+      agentContext: {
+        stepId,
+        stepTitle,
+        prompt,
+        system,
+        responseMessages: [],
+        pendingToolCallId: null,
+        pendingToolName: null,
+      },
+      currentEvent: {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId: brainRunId!,
+        stepId,
+        stepTitle,
+        prompt,
+        system,
+        tools,
+        options,
+      },
+    };
+
+    return updateDerivedState(newCtx, 'agentLoop');
+  }
+);
+
+// Reducer for AGENT_RAW_RESPONSE_MESSAGE - accumulates messages in agentContext
+const agentRawResponseMessage = reduce<
+  BrainExecutionContext,
+  AgentRawResponseMessagePayload
+>((ctx, { stepId, stepTitle, iteration, message }) => {
+  const { brainRunId, options, agentContext } = ctx;
+
+  // Accumulate the message in agentContext
+  const updatedAgentContext = agentContext
+    ? {
+        ...agentContext,
+        responseMessages: [...agentContext.responseMessages, message],
+      }
+    : null;
+
+  return {
+    ...ctx,
+    agentContext: updatedAgentContext,
+    currentEvent: {
+      type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+      brainRunId: brainRunId!,
+      stepId,
+      stepTitle,
+      iteration,
+      message,
+      options,
+    },
+  };
+});
+
+// Reducer for AGENT_WEBHOOK - records pending tool call in agentContext
+const agentWebhook = reduce<BrainExecutionContext, AgentWebhookPayload>(
+  (ctx, { stepId, stepTitle, toolCallId, toolName, input }) => {
+    const { brainRunId, options, agentContext } = ctx;
+
+    // Update agentContext with pending tool info
+    const updatedAgentContext = agentContext
+      ? {
+          ...agentContext,
+          pendingToolCallId: toolCallId,
+          pendingToolName: toolName,
+        }
+      : null;
+
+    return {
+      ...ctx,
+      agentContext: updatedAgentContext,
+      currentEvent: {
+        type: BRAIN_EVENTS.AGENT_WEBHOOK,
+        brainRunId: brainRunId!,
+        stepId,
+        stepTitle,
+        toolCallId,
+        toolName,
+        input,
+        options,
+      },
+    };
+  }
+);
+
+// Reducer for AGENT_USER_MESSAGE - passthrough that stays in agentLoop
+const agentUserMessage = reduce<BrainExecutionContext, any>((ctx, ev) => {
+  const { brainRunId, options } = ctx;
+  const { type: _actionType, ...eventData } = ev;
+
+  return {
+    ...ctx,
+    currentEvent: {
+      type: BRAIN_EVENTS.AGENT_USER_MESSAGE,
+      brainRunId: brainRunId!,
+      options,
+      ...eventData,
+    },
+  };
+});
 
 // ============================================================================
 // Guards - Conditional transitions
@@ -869,10 +1043,43 @@ const isOuterBrain = guard<BrainExecutionContext, object>(
 const isInnerBrain = guard<BrainExecutionContext, object>(
   (ctx) => ctx.depth > 1
 );
+// Guard to check if we have agentContext (for resuming to agentLoop)
+const hasAgentContext = guard<BrainExecutionContext, object>(
+  (ctx) => ctx.agentContext !== null
+);
 
 // ============================================================================
 // State Machine Definition
 // ============================================================================
+
+// Define agent loop transitions as a reusable array for cleaner code
+const agentLoopTransitions = [
+  // Agent micro-events that stay in agentLoop
+  transition(BRAIN_EVENTS.AGENT_ITERATION, 'agentLoop', agentIteration) as any,
+  transition(
+    BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+    'agentLoop',
+    agentRawResponseMessage
+  ) as any,
+  transition(
+    BRAIN_EVENTS.AGENT_TOOL_CALL,
+    'agentLoop',
+    passthrough(BRAIN_EVENTS.AGENT_TOOL_CALL)
+  ) as any,
+  transition(
+    BRAIN_EVENTS.AGENT_TOOL_RESULT,
+    'agentLoop',
+    passthrough(BRAIN_EVENTS.AGENT_TOOL_RESULT)
+  ) as any,
+  transition(
+    BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
+    'agentLoop',
+    passthrough(BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE)
+  ) as any,
+  transition(BRAIN_EVENTS.AGENT_USER_MESSAGE, 'agentLoop', agentUserMessage) as any,
+  // AGENT_WEBHOOK records pending tool call but stays in agentLoop
+  transition(BRAIN_EVENTS.AGENT_WEBHOOK, 'agentLoop', agentWebhook) as any,
+];
 
 // Internal machine factory - called with pre-built context
 const makeBrainMachine = (initialContext: BrainExecutionContext) =>
@@ -884,6 +1091,7 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(BRAIN_EVENTS.RESTART, 'running', restartBrain) as any
       ),
 
+      // Standard step execution state
       running: state(
         // Nested brain lifecycle
         transition(BRAIN_EVENTS.START, 'running', startBrain),
@@ -918,10 +1126,10 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         // Paused (by signal)
         transition(BRAIN_EVENTS.PAUSED, 'paused', pauseBrain) as any,
 
-        // Webhook -> waiting
+        // Webhook -> waiting (for non-agent webhooks)
         transition(BRAIN_EVENTS.WEBHOOK, 'waiting', webhookPause) as any,
 
-        // Webhook response (for resume from webhook - machine is already running)
+        // Webhook response (for resume from non-agent webhook)
         transition(
           BRAIN_EVENTS.WEBHOOK_RESPONSE,
           'running',
@@ -934,32 +1142,16 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(BRAIN_EVENTS.STEP_STATUS, 'running', stepStatus) as any,
         transition(BRAIN_EVENTS.STEP_RETRY, 'running', stepRetry) as any,
 
-        // Agent events (pass-through with event data)
-        transition(
-          BRAIN_EVENTS.AGENT_START,
-          'running',
-          passthrough(BRAIN_EVENTS.AGENT_START)
-        ) as any,
-        transition(
-          BRAIN_EVENTS.AGENT_ITERATION,
-          'running',
-          agentIteration
-        ) as any,
-        transition(
-          BRAIN_EVENTS.AGENT_TOOL_CALL,
-          'running',
-          passthrough(BRAIN_EVENTS.AGENT_TOOL_CALL)
-        ) as any,
-        transition(
-          BRAIN_EVENTS.AGENT_TOOL_RESULT,
-          'running',
-          passthrough(BRAIN_EVENTS.AGENT_TOOL_RESULT)
-        ) as any,
-        transition(
-          BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
-          'running',
-          passthrough(BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE)
-        ) as any,
+        // AGENT_START transitions to the agentLoop state
+        transition(BRAIN_EVENTS.AGENT_START, 'agentLoop', agentStart) as any
+      ),
+
+      // Explicit agent loop state - isolates agent execution logic
+      agentLoop: state(
+        // Spread agent micro-transitions
+        ...agentLoopTransitions,
+
+        // Exit strategies - agent terminal events return to running
         transition(
           BRAIN_EVENTS.AGENT_COMPLETE,
           'running',
@@ -975,28 +1167,53 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           'running',
           agentTerminal(BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
         ) as any,
+
+        // Interruption handling - can pause or wait from agentLoop
+        transition(BRAIN_EVENTS.PAUSED, 'paused', pauseBrain) as any,
+        transition(BRAIN_EVENTS.WEBHOOK, 'waiting', webhookPause) as any,
+
+        // Error handling
         transition(
-          BRAIN_EVENTS.AGENT_WEBHOOK,
-          'running',
-          passthrough(BRAIN_EVENTS.AGENT_WEBHOOK)
+          BRAIN_EVENTS.ERROR,
+          'error',
+          isOuterBrain,
+          errorBrain
         ) as any,
-        transition(
-          BRAIN_EVENTS.AGENT_USER_MESSAGE,
-          'running',
-          passthrough(BRAIN_EVENTS.AGENT_USER_MESSAGE)
-        ) as any
+        transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any
       ),
 
       paused: state(
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
         // RESTART happens when resuming from pause
+        // If we have agentContext, resume to agentLoop; otherwise to running
+        transition(
+          BRAIN_EVENTS.RESTART,
+          'agentLoop',
+          hasAgentContext,
+          restartBrain
+        ) as any,
         transition(BRAIN_EVENTS.RESTART, 'running', restartBrain) as any
       ),
 
       waiting: state(
+        // Webhook response - if we have agentContext, go back to agentLoop
+        transition(
+          BRAIN_EVENTS.WEBHOOK_RESPONSE,
+          'agentLoop',
+          hasAgentContext,
+          webhookResponse
+        ) as any,
+        // Otherwise go to running
         transition(BRAIN_EVENTS.WEBHOOK_RESPONSE, 'running', webhookResponse),
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
         // RESTART happens when resuming from webhook
+        // If we have agentContext, resume to agentLoop; otherwise to running
+        transition(
+          BRAIN_EVENTS.RESTART,
+          'agentLoop',
+          hasAgentContext,
+          restartBrain
+        ) as any,
         transition(BRAIN_EVENTS.RESTART, 'running', restartBrain) as any
       ),
 
@@ -1104,6 +1321,14 @@ export function getPendingWebhooks(
 
 export function getError(machine: BrainStateMachine): SerializedError | null {
   return machine.context.error;
+}
+
+/**
+ * Get the current agent context if execution is inside an agent loop.
+ * Returns null if not currently executing an agent step.
+ */
+export function getAgentContext(machine: BrainStateMachine): AgentContext | null {
+  return machine.context.agentContext;
 }
 
 /**
