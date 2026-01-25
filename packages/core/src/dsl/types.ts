@@ -205,3 +205,34 @@ export interface RetryConfig {
   /** Maximum delay in ms between retries. Default: 30000 */
   maxDelay?: number;
 }
+
+// Signal types for brain interruption
+
+/**
+ * Signal types that can be sent to a running brain.
+ * Signals are processed in priority order: KILL > PAUSE > USER_MESSAGE
+ */
+export type SignalType = 'KILL' | 'PAUSE' | 'USER_MESSAGE';
+
+/**
+ * A signal that can be injected into a running brain's execution.
+ */
+export type BrainSignal =
+  | { type: 'KILL' }
+  | { type: 'PAUSE' }
+  | { type: 'USER_MESSAGE'; content: string };
+
+/**
+ * Interface for providing signals to a running brain.
+ * Implementations are backend-specific (in-memory, database, KV store, etc.)
+ */
+export interface SignalProvider {
+  /**
+   * Get pending signals for the current brain run.
+   * Signals should be consumed (deleted) when returned.
+   *
+   * @param filter - 'CONTROL' returns only KILL/PAUSE, 'ALL' includes USER_MESSAGE
+   * @returns Array of signals in priority order (KILL first, then PAUSE, then USER_MESSAGE)
+   */
+  getSignals(filter: 'CONTROL' | 'ALL'): Promise<BrainSignal[]>;
+}
