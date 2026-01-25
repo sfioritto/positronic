@@ -1048,49 +1048,6 @@ export function sendEvent(
   machine.send(event);
 }
 
-// ============================================================================
-// Query Helpers (kept for backwards compatibility, but context is now preferred)
-// ============================================================================
-
-export function getDepth(machine: BrainStateMachine): number {
-  return machine.context.depth;
-}
-
-export function isTopLevel(machine: BrainStateMachine): boolean {
-  return machine.context.isTopLevel;
-}
-
-export function getCurrentStep(machine: BrainStateMachine): StepInfo | null {
-  const { rootBrain, currentStepId } = machine.context;
-
-  if (!rootBrain || !currentStepId) return null;
-
-  const currentBrain = getDeepestBrain(rootBrain);
-  return currentBrain?.steps.find((s) => s.id === currentStepId) ?? null;
-}
-
-export function getBrainStack(machine: BrainStateMachine): BrainStackEntry[] {
-  return machine.context.brainStack;
-}
-
-export function getBrainRunId(machine: BrainStateMachine): string | null {
-  return machine.context.brainRunId;
-}
-
-export function getExecutionState(machine: BrainStateMachine): ExecutionState {
-  return machine.machine.current as ExecutionState;
-}
-
-export function getPendingWebhooks(
-  machine: BrainStateMachine
-): WebhookRegistration[] | null {
-  return machine.context.pendingWebhooks;
-}
-
-export function getError(machine: BrainStateMachine): SerializedError | null {
-  return machine.context.error;
-}
-
 /**
  * Get the completed steps from the state machine in the format needed for resume.
  * This reconstructs the nested step hierarchy from the brain tree.

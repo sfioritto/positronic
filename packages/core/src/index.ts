@@ -85,14 +85,6 @@ export {
   createBrainExecutionMachine,
   createBrainMachine,
   sendEvent,
-  getDepth,
-  isTopLevel,
-  getCurrentStep,
-  getBrainStack,
-  getBrainRunId,
-  getExecutionState,
-  getPendingWebhooks,
-  getError,
   getCompletedSteps,
 } from './dsl/brain-state-machine.js';
 export type {
