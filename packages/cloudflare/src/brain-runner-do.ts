@@ -1,4 +1,4 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type ResumeContext, createBrainExecutionMachine, sendEvent, type ExecutionStackEntry, type AgentContext } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, createBrainExecutionMachine, sendEvent } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
@@ -12,44 +12,6 @@ import { PositronicManifest } from './manifest.js';
 import { CloudflareR2Loader } from './r2-loader.js';
 import { createResources, type ResourceManifest } from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
-
-/**
- * Convert executionStack to ResumeContext, adding webhook response and agent context
- * to the deepest level.
- */
-function executionStackToResumeContext(
-  stack: ExecutionStackEntry[],
-  webhookResponse: Record<string, any>,
-  agentContext: AgentContext | null
-): ResumeContext {
-  if (stack.length === 0) {
-    throw new Error('Cannot convert empty execution stack to ResumeContext');
-  }
-
-  // Build from bottom of stack up (deepest to root)
-  let context: ResumeContext | undefined;
-  for (let i = stack.length - 1; i >= 0; i--) {
-    const entry = stack[i];
-    if (i === stack.length - 1) {
-      // Deepest level - add webhook response and agent context
-      context = {
-        stepIndex: entry.stepIndex,
-        state: entry.state,
-        webhookResponse,
-        agentContext: agentContext ?? undefined,
-      };
-    } else {
-      // Outer level - wrap inner context
-      context = {
-        stepIndex: entry.stepIndex,
-        state: entry.state,
-        innerResumeContext: context,
-      };
-    }
-  }
-
-  return context!;
-}
 
 let manifest: PositronicManifest | null = null;
 export function setManifest(generatedManifest: PositronicManifest) {
@@ -498,17 +460,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
       sendEvent(machine, event);
     }
 
-    // Get the execution stack and agent context from the machine
-    const { executionStack, agentContext } = machine.context;
-
-    // Convert execution stack to ResumeContext, adding webhook response and agent context
-    // to the deepest level
-    const resumeContext = executionStackToResumeContext(
-      executionStack,
-      webhookResponse,
-      agentContext
-    );
-
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
     const monitorDOStub = this.env.MONITOR_DO.get(
@@ -560,9 +511,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
         this.pageAdapter,
       ])
       .resume(brainToRun, {
-        resumeContext,
-        brainRunId,
         machine,
+        brainRunId,
+        webhookResponse,
         signal: this.abortController.signal,
       })
       .catch((err: any) => {
