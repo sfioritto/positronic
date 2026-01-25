@@ -91,6 +91,8 @@ export type {
   BrainStateMachine,
   BrainExecutionContext,
   BrainStackEntry,
+  BrainEntry,
+  ExecutionStackEntry,
   RunningBrain,
   StepInfo,
   ExecutionState,

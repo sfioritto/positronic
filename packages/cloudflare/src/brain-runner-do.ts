@@ -1,4 +1,4 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type ResumeContext, createBrainExecutionMachine, sendEvent, type ExecutionNode, type AgentContext } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type ResumeContext, createBrainExecutionMachine, sendEvent, type ExecutionStackEntry, type AgentContext } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
@@ -14,29 +14,41 @@ import { createResources, type ResourceManifest } from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
 /**
- * Convert ExecutionNode to ResumeContext, adding webhook response and agent context
+ * Convert executionStack to ResumeContext, adding webhook response and agent context
  * to the deepest level.
  */
-function executionTreeToResumeContext(
-  node: ExecutionNode,
+function executionStackToResumeContext(
+  stack: ExecutionStackEntry[],
   webhookResponse: Record<string, any>,
   agentContext: AgentContext | null
 ): ResumeContext {
-  if (!node.innerNode) {
-    // This is the deepest level - add webhook response and agent context
-    return {
-      stepIndex: node.stepIndex,
-      state: node.state,
-      webhookResponse,
-      agentContext: agentContext ?? undefined,
-    };
+  if (stack.length === 0) {
+    throw new Error('Cannot convert empty execution stack to ResumeContext');
   }
-  // Recurse to find the deepest level
-  return {
-    stepIndex: node.stepIndex,
-    state: node.state,
-    innerResumeContext: executionTreeToResumeContext(node.innerNode, webhookResponse, agentContext),
-  };
+
+  // Build from bottom of stack up (deepest to root)
+  let context: ResumeContext | undefined;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
+    if (i === stack.length - 1) {
+      // Deepest level - add webhook response and agent context
+      context = {
+        stepIndex: entry.stepIndex,
+        state: entry.state,
+        webhookResponse,
+        agentContext: agentContext ?? undefined,
+      };
+    } else {
+      // Outer level - wrap inner context
+      context = {
+        stepIndex: entry.stepIndex,
+        state: entry.state,
+        innerResumeContext: context,
+      };
+    }
+  }
+
+  return context!;
 }
 
 let manifest: PositronicManifest | null = null;
@@ -486,13 +498,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
       sendEvent(machine, event);
     }
 
-    // Get the execution tree and agent context from the machine
-    const { executionTree, agentContext } = machine.context;
+    // Get the execution stack and agent context from the machine
+    const { executionStack, agentContext } = machine.context;
 
-    // Convert ExecutionNode to ResumeContext, adding webhook response and agent context
+    // Convert execution stack to ResumeContext, adding webhook response and agent context
     // to the deepest level
-    const resumeContext = executionTreeToResumeContext(
-      executionTree!,
+    const resumeContext = executionStackToResumeContext(
+      executionStack,
       webhookResponse,
       agentContext
     );

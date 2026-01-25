@@ -31,6 +31,29 @@ export interface BrainStackEntry {
 }
 
 /**
+ * Flat brain entry for the normalized brains map.
+ * This is the source of truth - rootBrain tree is computed from this.
+ */
+export interface BrainEntry {
+  brainRunId: string;
+  brainTitle: string;
+  brainDescription?: string;
+  parentStepId: string | null;
+  parentBrainId: string | null;  // For tree reconstruction
+  steps: StepInfo[];
+  depth: number;
+}
+
+/**
+ * Execution state entry for the execution stack.
+ * Replaces the ExecutionNode tree with a flat stack.
+ */
+export interface ExecutionStackEntry {
+  state: JsonObject;
+  stepIndex: number;
+}
+
+/**
  * Represents a running brain in a nested tree structure.
  * Each brain can have at most one inner brain running at a time.
  */
@@ -84,26 +107,27 @@ export interface AgentContext {
 }
 
 export interface BrainExecutionContext {
-  // THE tree - state + position at all nesting levels
-  executionTree: ExecutionNode | null;
+  // === Flat storage (source of truth) ===
+  // These are the authoritative data structures. O(1) access to current brain.
+  brains: Record<string, BrainEntry>;     // All brains by ID (brainTitle used as key)
+  brainIdStack: string[];                  // Stack of active brain IDs (current = last)
+  executionStack: ExecutionStackEntry[];   // Stack of execution state per nesting level
 
-  // Core tracking - tree structure for UI display (metadata - titles, descriptions)
-  rootBrain: RunningBrain | null;
-  // Flat stack (computed from tree for backwards compatibility)
-  brainStack: BrainStackEntry[];
+  // === Computed structures (derived from flat storage) ===
+  // These are computed on each event for backwards compatibility with consumers.
+  executionTree: ExecutionNode | null;    // Tree view of executionStack
+  rootBrain: RunningBrain | null;          // Tree view of brains (for UI rendering)
+  brainStack: BrainStackEntry[];           // Flat list view of brains
+
+  // === Core state ===
   depth: number;
   brainRunId: string | null;
   currentStepId: string | null;
   currentStepTitle: string | null;
   error: SerializedError | null;
   pendingWebhooks: WebhookRegistration[] | null;
-
-  // The current brain state - derived from executionTree.state for outer brain (depth 1)
-  // Kept for backwards compatibility with consumers
-  currentState: JsonObject;
-
-  // Options passed to the brain run (stored for context, not used for event creation)
-  options: JsonObject;
+  currentState: JsonObject;                // State at outer brain level (depth 1)
+  options: JsonObject;                     // Options passed to the brain run
 
   // Agent context - tracks agent execution state for pause/resume
   // Non-null when we're inside an agent loop (or paused from one)
@@ -180,174 +204,80 @@ export interface StepRetryPayload {
 }
 
 // ============================================================================
-// Tree Helper Functions
+// Flat Structure Helper Functions
 // ============================================================================
 
 /**
- * Get the deepest (currently executing) brain in the tree.
+ * Reconstruct the RunningBrain tree from flat brains map and stack.
+ * This is used for backwards compatibility with consumers that expect rootBrain.
  */
-function getDeepestBrain(root: RunningBrain | null): RunningBrain | null {
-  if (!root) return null;
-  let current = root;
-  while (current.innerBrain) {
-    current = current.innerBrain;
+function reconstructBrainTree(
+  brains: Record<string, BrainEntry>,
+  brainIdStack: string[]
+): RunningBrain | null {
+  if (brainIdStack.length === 0) return null;
+
+  let innerBrain: RunningBrain | null = null;
+
+  // Build from deepest to root (reverse iteration)
+  for (let i = brainIdStack.length - 1; i >= 0; i--) {
+    const brainId = brainIdStack[i];
+    const entry = brains[brainId];
+    if (!entry) continue;
+
+    innerBrain = {
+      brainRunId: entry.brainRunId,
+      brainTitle: entry.brainTitle,
+      brainDescription: entry.brainDescription,
+      parentStepId: entry.parentStepId,
+      steps: entry.steps,
+      innerBrain,
+      depth: entry.depth,
+    };
   }
-  return current;
+
+  return innerBrain;
 }
 
 /**
- * Clone tree with a new innerBrain attached to the deepest node.
+ * Convert executionStack to ExecutionNode tree for backwards compat.
  */
-function cloneTreeWithNewInner(
-  root: RunningBrain,
-  newInner: RunningBrain
-): RunningBrain {
-  if (!root.innerBrain) {
-    return { ...root, innerBrain: newInner };
+function executionStackToTree(stack: ExecutionStackEntry[]): ExecutionNode | null {
+  if (stack.length === 0) return null;
+
+  let innerNode: ExecutionNode | undefined = undefined;
+
+  // Build from deepest to root (reverse iteration)
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
+    innerNode = {
+      state: entry.state,
+      stepIndex: entry.stepIndex,
+      innerNode,
+    };
   }
-  return {
-    ...root,
-    innerBrain: cloneTreeWithNewInner(root.innerBrain, newInner),
-  };
+
+  return innerNode ?? null;
 }
 
 /**
- * Clone tree replacing the deepest brain.
+ * Compute brainStack from flat structures.
+ * This replaces treeToStack for backwards compatibility.
  */
-function cloneTreeReplacingDeepest(
-  root: RunningBrain,
-  replacement: RunningBrain
-): RunningBrain {
-  if (!root.innerBrain) {
-    return replacement;
-  }
-  return {
-    ...root,
-    innerBrain: cloneTreeReplacingDeepest(root.innerBrain, replacement),
-  };
-}
-
-/**
- * Clone tree updating steps on the deepest brain.
- */
-function cloneTreeUpdatingDeepestSteps(
-  root: RunningBrain,
-  newSteps: StepInfo[]
-): RunningBrain {
-  if (!root.innerBrain) {
-    return { ...root, steps: newSteps };
-  }
-  return {
-    ...root,
-    innerBrain: cloneTreeUpdatingDeepestSteps(root.innerBrain, newSteps),
-  };
-}
-
-/**
- * Clone tree removing the deepest brain and attaching its steps to parent step.
- * Returns null if root is the deepest (no parent).
- */
-function cloneTreeRemovingDeepest(root: RunningBrain): RunningBrain | null {
-  if (!root.innerBrain) {
-    // Root is the deepest - can't remove, return null
-    return null;
-  }
-
-  if (!root.innerBrain.innerBrain) {
-    // root.innerBrain is the deepest - remove it and attach steps to parent step
-    const completedBrain = root.innerBrain;
-    const updatedSteps = root.steps.map((step) => {
-      if (step.id === completedBrain.parentStepId) {
-        return {
-          ...step,
-          innerSteps: completedBrain.steps,
-          status: STATUS.COMPLETE as StepInfo['status'],
-        };
-      }
-      return step;
-    });
-    return { ...root, steps: updatedSteps, innerBrain: null };
-  }
-
-  // Recurse down
-  return {
-    ...root,
-    innerBrain: cloneTreeRemovingDeepest(root.innerBrain),
-  };
-}
-
-/**
- * Convert tree to flat array (for backwards compatibility).
- */
-function treeToStack(root: RunningBrain | null): BrainStackEntry[] {
-  const stack: BrainStackEntry[] = [];
-  let current = root;
-  while (current) {
-    stack.push({
-      brainRunId: current.brainRunId,
-      brainTitle: current.brainTitle,
-      brainDescription: current.brainDescription,
-      parentStepId: current.parentStepId,
-      steps: current.steps,
-    });
-    current = current.innerBrain;
-  }
-  return stack;
-}
-
-// ============================================================================
-// ExecutionNode Tree Helper Functions
-// ============================================================================
-
-/**
- * Add an inner node to the deepest position in the tree.
- */
-function addInnerExecutionNode(tree: ExecutionNode, state: JsonObject): ExecutionNode {
-  if (!tree.innerNode) {
-    return { ...tree, innerNode: { state, stepIndex: 0 } };
-  }
-  return { ...tree, innerNode: addInnerExecutionNode(tree.innerNode, state) };
-}
-
-/**
- * Update stepIndex on the deepest node in the tree.
- */
-function updateDeepestStepIndex(tree: ExecutionNode, index: number): ExecutionNode {
-  if (!tree.innerNode) {
-    return { ...tree, stepIndex: index };
-  }
-  return { ...tree, innerNode: updateDeepestStepIndex(tree.innerNode, index) };
-}
-
-/**
- * Apply a patch to the state on the deepest node.
- */
-function applyPatchToDeepest(tree: ExecutionNode, patch: JsonPatch): ExecutionNode {
-  if (!tree.innerNode) {
-    return { ...tree, state: applyPatches(tree.state, [patch]) as JsonObject };
-  }
-  return { ...tree, innerNode: applyPatchToDeepest(tree.innerNode, patch) };
-}
-
-/**
- * Remove the deepest inner node from the tree.
- * Returns null if tree has no innerNode (root is the deepest).
- */
-function removeDeepestInnerNode(tree: ExecutionNode): ExecutionNode | null {
-  if (!tree.innerNode) {
-    return null;  // This was the root, tree should be nulled by caller
-  }
-  if (!tree.innerNode.innerNode) {
-    return { ...tree, innerNode: undefined };  // Remove leaf
-  }
-  return { ...tree, innerNode: removeDeepestInnerNode(tree.innerNode) ?? undefined };
-}
-
-/**
- * Get the state from the root of the execution tree.
- */
-function getRootState(tree: ExecutionNode | null): JsonObject {
-  return tree?.state ?? {};
+function computeBrainStack(
+  brains: Record<string, BrainEntry>,
+  brainIdStack: string[]
+): BrainStackEntry[] {
+  return brainIdStack.map((brainId) => {
+    const entry = brains[brainId];
+    return {
+      brainRunId: entry.brainRunId,
+      brainTitle: entry.brainTitle,
+      brainDescription: entry.brainDescription,
+      parentStepId: entry.parentStepId,
+      steps: entry.steps,
+    };
+  });
 }
 
 // ============================================================================
@@ -364,6 +294,12 @@ export interface CreateMachineOptions {
 const createInitialContext = (
   opts?: CreateMachineOptions
 ): BrainExecutionContext => ({
+  // NEW: Flat storage
+  brains: {},
+  brainIdStack: [],
+  executionStack: [],
+
+  // LEGACY: Tree storage (will be removed)
   executionTree: null,
   rootBrain: null,
   brainStack: [],
@@ -451,44 +387,50 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
   (ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
     const {
       currentStepId,
-      rootBrain,
-      executionTree,
       depth,
       brainRunId: existingBrainRunId,
       currentState,
+      brains,
+      brainIdStack,
+      executionStack,
     } = ctx;
 
     const newDepth = depth + 1;
-    const newBrain: RunningBrain = {
+    const brainInitialState = initialState ?? currentState;
+
+    // === NEW: Update flat structures ===
+    const parentBrainId = brainIdStack.length > 0 ? brainIdStack[brainIdStack.length - 1] : null;
+    const newBrainEntry: BrainEntry = {
       brainRunId,
       brainTitle,
       brainDescription,
       parentStepId: currentStepId,
+      parentBrainId,
       steps: [],
-      innerBrain: null,
       depth: newDepth,
     };
 
-    // Build tree: if no root, this is root; else attach to deepest
-    const newRootBrain = rootBrain
-      ? cloneTreeWithNewInner(rootBrain, newBrain)
-      : newBrain;
+    const newBrains = { ...brains, [brainTitle]: newBrainEntry };
+    const newBrainIdStack = [...brainIdStack, brainTitle];
+    const newExecutionStack = [...executionStack, { state: brainInitialState, stepIndex: 0 }];
 
-    // Build execution tree: if null, create root node; else add inner node
-    const brainInitialState = initialState ?? currentState;
-    const newExecutionTree: ExecutionNode = executionTree
-      ? addInnerExecutionNode(executionTree, brainInitialState)
-      : { state: brainInitialState, stepIndex: 0 };
+    // === Compute tree structures from flat for backwards compat ===
+    const newRootBrain = reconstructBrainTree(newBrains, newBrainIdStack);
+    const newExecutionTree = executionStackToTree(newExecutionStack);
 
     const newCtx: BrainExecutionContext = {
       ...ctx,
+      // NEW flat structures
+      brains: newBrains,
+      brainIdStack: newBrainIdStack,
+      executionStack: newExecutionStack,
+      // Computed tree structures
       executionTree: newExecutionTree,
       rootBrain: newRootBrain,
-      brainStack: treeToStack(newRootBrain),
+      brainStack: computeBrainStack(newBrains, newBrainIdStack),
       depth: newDepth,
       brainRunId: existingBrainRunId ?? brainRunId,
-      currentState:
-        newDepth === 1 ? brainInitialState : currentState,
+      currentState: newDepth === 1 ? brainInitialState : currentState,
     };
 
     return updateDerivedState(newCtx, 'running');
@@ -496,34 +438,60 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
 );
 
 const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
-  const { rootBrain, executionTree, depth } = ctx;
+  const { depth, brains, brainIdStack, executionStack } = ctx;
 
-  if (!rootBrain) return ctx;
-
-  const completedBrain = getDeepestBrain(rootBrain);
-  if (!completedBrain) return ctx;
+  if (brainIdStack.length === 0) return ctx;
 
   const newDepth = depth - 1;
   const isOuterBrainComplete = newDepth === 0;
 
-  // When the outer brain completes, keep rootBrain so we can still display
-  // the final state. Only remove inner brains (attaching their steps to parent).
-  const newRootBrain = isOuterBrainComplete
-    ? rootBrain
-    : cloneTreeRemovingDeepest(rootBrain);
+  // === NEW: Update flat structures ===
+  let newBrains = brains;
+  let newBrainIdStack = brainIdStack;
+  let newExecutionStack = executionStack;
 
-  // Remove deepest inner node from executionTree
-  // If outer brain completes, keep the tree as is (final state)
-  // If inner brain completes, remove its node
-  const newExecutionTree = isOuterBrainComplete
-    ? executionTree
-    : (executionTree ? removeDeepestInnerNode(executionTree) : null);
+  if (!isOuterBrainComplete) {
+    // Pop the completed brain from stack
+    const completedBrainId = brainIdStack[brainIdStack.length - 1];
+    const completedBrain = brains[completedBrainId];
+    newBrainIdStack = brainIdStack.slice(0, -1);
+    newExecutionStack = executionStack.slice(0, -1);
+
+    // Attach completed brain's steps to parent step
+    if (completedBrain && newBrainIdStack.length > 0) {
+      const parentBrainId = newBrainIdStack[newBrainIdStack.length - 1];
+      const parentBrain = brains[parentBrainId];
+      if (parentBrain && completedBrain.parentStepId) {
+        const updatedSteps = parentBrain.steps.map((step) => {
+          if (step.id === completedBrain.parentStepId) {
+            return {
+              ...step,
+              innerSteps: completedBrain.steps,
+              status: STATUS.COMPLETE as StepInfo['status'],
+            };
+          }
+          return step;
+        });
+        newBrains = { ...brains, [parentBrainId]: { ...parentBrain, steps: updatedSteps } };
+      }
+    }
+  }
+  // If outer brain complete, keep everything as-is for final state display
+
+  // === Compute tree structures from flat for backwards compat ===
+  const newRootBrain = reconstructBrainTree(newBrains, newBrainIdStack);
+  const newExecutionTree = executionStackToTree(newExecutionStack);
 
   const newCtx: BrainExecutionContext = {
     ...ctx,
+    // NEW flat structures
+    brains: newBrains,
+    brainIdStack: newBrainIdStack,
+    executionStack: newExecutionStack,
+    // Computed tree structures
     executionTree: newExecutionTree,
     rootBrain: newRootBrain,
-    brainStack: treeToStack(newRootBrain),
+    brainStack: computeBrainStack(newBrains, newBrainIdStack),
     depth: newDepth,
   };
 
@@ -547,39 +515,46 @@ const cancelBrain = reduce<BrainExecutionContext, object>((ctx) => {
 
 const startStep = reduce<BrainExecutionContext, StartStepPayload>(
   (ctx, { stepId, stepTitle, stepIndex }) => {
-    const { rootBrain, executionTree } = ctx;
+    const { brains, brainIdStack, executionStack } = ctx;
 
-    // Add step to current brain's steps if not already there
-    let newRootBrain = rootBrain;
-    if (rootBrain) {
-      const currentBrain = getDeepestBrain(rootBrain);
-      if (currentBrain) {
-        const existingStep = currentBrain.steps.find((s) => s.id === stepId);
-        let newSteps: StepInfo[];
-        if (!existingStep) {
-          newSteps = [
-            ...currentBrain.steps,
-            { id: stepId, title: stepTitle, status: STATUS.RUNNING },
-          ];
-        } else {
-          newSteps = currentBrain.steps.map((s) =>
-            s.id === stepId ? { ...s, status: STATUS.RUNNING } : s
-          );
-        }
-        newRootBrain = cloneTreeUpdatingDeepestSteps(rootBrain, newSteps);
-      }
-    }
+    if (brainIdStack.length === 0) return ctx;
 
-    // Update stepIndex on the deepest node in executionTree if provided
-    const newExecutionTree = executionTree && stepIndex !== undefined
-      ? updateDeepestStepIndex(executionTree, stepIndex)
-      : executionTree;
+    // === NEW: Update flat structures ===
+    const currentBrainId = brainIdStack[brainIdStack.length - 1];
+    const currentBrain = brains[currentBrainId];
+    if (!currentBrain) return ctx;
+
+    // Update current brain's steps
+    const existingStep = currentBrain.steps.find((s) => s.id === stepId);
+    const newSteps = existingStep
+      ? currentBrain.steps.map((s) =>
+          s.id === stepId ? { ...s, status: STATUS.RUNNING as StepInfo['status'] } : s
+        )
+      : [...currentBrain.steps, { id: stepId, title: stepTitle, status: STATUS.RUNNING as StepInfo['status'] }];
+
+    const newBrains = {
+      ...brains,
+      [currentBrainId]: { ...currentBrain, steps: newSteps },
+    };
+
+    // Update stepIndex in execution stack if provided
+    const newExecutionStack = stepIndex !== undefined && executionStack.length > 0
+      ? [...executionStack.slice(0, -1), { ...executionStack[executionStack.length - 1], stepIndex }]
+      : executionStack;
+
+    // === Compute tree structures from flat for backwards compat ===
+    const newRootBrain = reconstructBrainTree(newBrains, brainIdStack);
+    const newExecutionTree = executionStackToTree(newExecutionStack);
 
     return {
       ...ctx,
+      // NEW flat structures
+      brains: newBrains,
+      executionStack: newExecutionStack,
+      // Computed tree structures
       executionTree: newExecutionTree,
       rootBrain: newRootBrain,
-      brainStack: treeToStack(newRootBrain),
+      brainStack: computeBrainStack(newBrains, brainIdStack),
       currentStepId: stepId,
       currentStepTitle: stepTitle,
     };
@@ -589,28 +564,38 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
 const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
   (ctx, { stepId, patch }) => {
     const {
-      rootBrain,
-      executionTree,
+      brains,
+      brainIdStack,
+      executionStack,
       depth,
       currentState,
       topLevelStepCount,
     } = ctx;
 
-    let newRootBrain = rootBrain;
-    if (rootBrain) {
-      const currentBrain = getDeepestBrain(rootBrain);
-      if (currentBrain) {
-        const newSteps = currentBrain.steps.map((s) =>
-          s.id === stepId ? { ...s, status: STATUS.COMPLETE as StepInfo['status'], patch } : s
-        );
-        newRootBrain = cloneTreeUpdatingDeepestSteps(rootBrain, newSteps);
-      }
-    }
+    if (brainIdStack.length === 0) return ctx;
 
-    // Apply patch to the deepest node's state in executionTree
-    const newExecutionTree = executionTree && patch
-      ? applyPatchToDeepest(executionTree, patch)
-      : executionTree;
+    // === NEW: Update flat structures ===
+    const currentBrainId = brainIdStack[brainIdStack.length - 1];
+    const currentBrain = brains[currentBrainId];
+    if (!currentBrain) return ctx;
+
+    // Update step status
+    const newSteps = currentBrain.steps.map((s) =>
+      s.id === stepId ? { ...s, status: STATUS.COMPLETE as StepInfo['status'], patch } : s
+    );
+
+    const newBrains = {
+      ...brains,
+      [currentBrainId]: { ...currentBrain, steps: newSteps },
+    };
+
+    // Apply patch to execution stack if provided
+    let newExecutionStack = executionStack;
+    if (patch && executionStack.length > 0) {
+      const topEntry = executionStack[executionStack.length - 1];
+      const newState = applyPatches(topEntry.state, [patch]) as JsonObject;
+      newExecutionStack = [...executionStack.slice(0, -1), { ...topEntry, state: newState }];
+    }
 
     // Apply patch to currentState only for top-level brain (for backwards compat)
     let newState = currentState;
@@ -620,11 +605,19 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       newStepCount = topLevelStepCount + 1;
     }
 
+    // === Compute tree structures from flat for backwards compat ===
+    const newRootBrain = reconstructBrainTree(newBrains, brainIdStack);
+    const newExecutionTree = executionStackToTree(newExecutionStack);
+
     return {
       ...ctx,
+      // NEW flat structures
+      brains: newBrains,
+      executionStack: newExecutionStack,
+      // Computed tree structures
       executionTree: newExecutionTree,
       rootBrain: newRootBrain,
-      brainStack: treeToStack(newRootBrain),
+      brainStack: computeBrainStack(newBrains, brainIdStack),
       currentState: newState,
       topLevelStepCount: newStepCount,
     };
@@ -659,15 +652,13 @@ const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
 
 const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
   (ctx, { steps }) => {
-    const { rootBrain } = ctx;
+    const { brains, brainIdStack } = ctx;
 
-    if (!rootBrain) return ctx;
+    if (brainIdStack.length === 0) return ctx;
 
-    // Only update the current (deepest) brain in the tree.
-    // STEP_STATUS is emitted by the currently executing brain, which is always
-    // the deepest one. We can't match by brainRunId because nested brains share
-    // the same brainRunId, which would incorrectly update all nested brains.
-    const currentBrain = getDeepestBrain(rootBrain);
+    // === NEW: Update flat structures ===
+    const currentBrainId = brainIdStack[brainIdStack.length - 1];
+    const currentBrain = brains[currentBrainId];
     if (!currentBrain) return ctx;
 
     // Create a map of existing steps to preserve their patches
@@ -684,12 +675,21 @@ const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
       };
     });
 
-    const newRootBrain = cloneTreeUpdatingDeepestSteps(rootBrain, newSteps);
+    const newBrains = {
+      ...brains,
+      [currentBrainId]: { ...currentBrain, steps: newSteps },
+    };
+
+    // === Compute tree structures from flat for backwards compat ===
+    const newRootBrain = reconstructBrainTree(newBrains, brainIdStack);
 
     return {
       ...ctx,
+      // NEW flat structures
+      brains: newBrains,
+      // Computed tree structures
       rootBrain: newRootBrain,
-      brainStack: treeToStack(newRootBrain),
+      brainStack: computeBrainStack(newBrains, brainIdStack),
     };
   }
 );
