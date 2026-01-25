@@ -106,3 +106,4 @@ export type {
   CreateMachineOptions,
   AgentContext,
 } from './dsl/brain-state-machine.js';
+export type { AgentResumeContext } from './dsl/agent-messages.js';
