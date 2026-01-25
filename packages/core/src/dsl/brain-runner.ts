@@ -1,4 +1,4 @@
-import { BRAIN_EVENTS } from './constants.js';
+import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import { reconstructAgentContext } from './agent-messages.js';
 import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
@@ -8,6 +8,24 @@ import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
+import type { BrainCancelledEvent } from './definitions/events.js';
+
+/**
+ * Create a CANCELLED event for when the brain is aborted via signal.
+ * This is synthesized by the runner, not yielded from the brain's event stream.
+ */
+function createCancelledEvent<TOptions extends JsonObject>(
+  brainRunId: string,
+  options: TOptions
+): BrainCancelledEvent<TOptions> {
+  return {
+    type: BRAIN_EVENTS.CANCELLED,
+    brainRunId,
+    brainTitle: '',
+    status: STATUS.CANCELLED,
+    options,
+  };
+}
 
 export class BrainRunner {
   constructor(
@@ -140,9 +158,10 @@ export class BrainRunner {
       for await (const event of brainRun) {
         // Check if we've been cancelled
         if (signal?.aborted) {
-          // Use state machine to create cancelled event
-          sendEvent(machine, { type: BRAIN_EVENTS.CANCELLED });
-          const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
+          const cancelledEvent = createCancelledEvent(
+            machine.context.brainRunId ?? '',
+            (options ?? {}) as TOptions
+          );
           await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
           // Cast is safe: state started as TState and patches maintain the structure
           return machine.context.currentState as TState;
@@ -174,8 +193,10 @@ export class BrainRunner {
     } catch (error) {
       // If aborted while awaiting, check signal and emit cancelled event
       if (signal?.aborted) {
-        sendEvent(machine, { type: BRAIN_EVENTS.CANCELLED });
-        const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
+        const cancelledEvent = createCancelledEvent(
+          machine.context.brainRunId ?? '',
+          (options ?? {}) as TOptions
+        );
         await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
         // Cast is safe: state started as TState and patches maintain the structure
         return machine.context.currentState as TState;
