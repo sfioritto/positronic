@@ -13,35 +13,9 @@ Events are the source of truth. The machine can reconstruct any state by replayi
 
 ---
 
-## High Priority
-
-### 1. Abstract the "Event Store" Pattern
-
-**Location:** `packages/cloudflare/src/brain-runner-do.ts`
-
-**Problem:** Raw SQL queries for fetching events are hardcoded:
-```typescript
-this.sql.exec(`SELECT serialized_event FROM brain_events...`)
-```
-This couples the Runner to SQLite. The `BrainRunSQLiteAdapter` handles writing, but reading is hardcoded.
-
-**Fix:** Create an `EventStore` interface in `@positronic/core`:
-```typescript
-interface EventStore {
-  getEvents(brainRunId: string): Promise<BrainEvent[]>;
-  // Maybe: getEventsSince(brainRunId: string, afterEventId: string): Promise<BrainEvent[]>;
-}
-```
-- `BrainRunnerDO` uses this interface to get events for resume
-- Aligns with event sourcing: Runner just needs events, doesn't care about storage
-
-**Benefit:** Could swap SQLite for JSON files (CLI), Postgres, etc. without changing Runner logic.
-
----
-
 ## To Investigate
 
-### 2. `innerResumeContext` Nesting Pattern
+### 1. `innerResumeContext` Nesting Pattern
 
 **Location:** `packages/core/src/dsl/brain-runner.ts` (executionStackToResumeContext)
 
@@ -59,20 +33,20 @@ ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  /
 
 ---
 
-### 3. `findWebhookResponseInResumeContext` in event-stream.ts
+### 2. `findWebhookResponseInResumeContext` in event-stream.ts
 
 **Location:** `packages/core/src/dsl/execution/event-stream.ts`
 
 **Problem:** Searches through resumeContext tree to find webhookResponse at deepest level. This is a symptom of the nested tree structure.
 
 **Possible fixes:**
-- If we simplify innerResumeContext pattern (#2), this might become trivial
+- If we simplify innerResumeContext pattern (#1), this might become trivial
 - Could use `machine.context.isWaiting` to know if resuming from webhook
 - Or add `webhookResponse` to machine context directly
 
 ---
 
-### 4. BrainEventStream vs BrainStateMachine State Tracking
+### 3. BrainEventStream vs BrainStateMachine State Tracking
 
 **Location:** `packages/core/src/dsl/execution/event-stream.ts`
 
