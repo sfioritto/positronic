@@ -6,7 +6,7 @@ import {
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
-import { BRAIN_EVENTS, STATUS } from '@positronic/core';
+import { BRAIN_EVENTS, STATUS, createBrainExecutionMachine, sendEvent } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import type {
   BrainEvent,
@@ -63,7 +63,7 @@ describe('Hono API Tests', () => {
   }
 
   // Helper function to read the entire SSE stream and collect events
-  // Tracks brain nesting depth to only return when the outermost brain completes
+  // Uses the state machine to track brain state and know when execution is complete
   async function readSseStream(
     stream: ReadableStream<Uint8Array>
   ): Promise<BrainEvent[]> {
@@ -71,7 +71,7 @@ describe('Hono API Tests', () => {
     const decoder = new TextDecoder();
     let buffer = '';
     const events: BrainEvent[] = [];
-    let brainDepth = 0; // Track nesting depth for inner brains
+    const machine = createBrainExecutionMachine();
 
     while (true) {
       const { value, done } = await reader.read();
@@ -81,6 +81,7 @@ describe('Hono API Tests', () => {
           const event = parseSseEvent(buffer);
           if (event) {
             events.push(event);
+            sendEvent(machine, event);
           }
         }
         break; // Exit loop when stream is done
@@ -97,35 +98,22 @@ describe('Hono API Tests', () => {
           const event = parseSseEvent(message);
           if (event) {
             events.push(event);
+            sendEvent(machine, event);
 
-            // Track brain nesting depth
-            // Only count START, not RESTART - RESTART continues an already-counted brain
-            if (event.type === BRAIN_EVENTS.START) {
-              brainDepth++;
+            // Use state machine to determine when brain is complete
+            if (machine.context.isComplete) {
+              reader.cancel('Brain completed');
+              return events;
             }
 
-            if (event.type === BRAIN_EVENTS.COMPLETE) {
-              brainDepth--;
-              // Only return when the outermost brain completes (depth reaches 0)
-              if (brainDepth <= 0) {
-                reader.cancel(`Received terminal event: ${event.type}`);
-                return events;
-              }
-            }
-            // Note: WEBHOOK is NOT treated as terminal here because:
-            // 1. Tests that need to stop at WEBHOOK use their own read loops
-            // 2. When watching a resumed brain, we need to read past the historical
-            //    WEBHOOK to see the RESTART and completion events
-            if (event.type === BRAIN_EVENTS.ERROR) {
+            if (machine.context.isError) {
               console.error(
                 'Received BRAIN_EVENTS.ERROR. Event details:',
                 event
               );
-              reader.cancel(`Received terminal event: ${event.type}`);
+              reader.cancel('Brain errored');
               throw new Error(
-                `Received terminal event: ${
-                  event.type
-                }. Details: ${JSON.stringify(event)}`
+                `Brain errored. Details: ${JSON.stringify(event)}`
               );
             }
           }

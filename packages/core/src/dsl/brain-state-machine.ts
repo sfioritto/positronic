@@ -512,12 +512,19 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       [currentBrainId]: { ...currentBrain, steps: newSteps },
     };
 
-    // Apply patch to execution stack if provided
+    // Apply patch to execution stack and increment stepIndex
     let newExecutionStack = executionStack;
-    if (patch && executionStack.length > 0) {
+    if (executionStack.length > 0) {
       const topEntry = executionStack[executionStack.length - 1];
-      const newState = applyPatches(topEntry.state, [patch]) as JsonObject;
-      newExecutionStack = [...executionStack.slice(0, -1), { ...topEntry, state: newState }];
+      const newState = patch
+        ? applyPatches(topEntry.state, [patch]) as JsonObject
+        : topEntry.state;
+      // Increment stepIndex so resume knows to start from the NEXT step
+      newExecutionStack = [...executionStack.slice(0, -1), {
+        ...topEntry,
+        state: newState,
+        stepIndex: topEntry.stepIndex + 1,
+      }];
     }
 
     // Apply patch to currentState only for top-level brain (for backwards compat)

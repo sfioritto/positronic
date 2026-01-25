@@ -562,6 +562,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       .resume(brainToRun, {
         resumeContext,
         brainRunId,
+        machine,
         signal: this.abortController.signal,
       })
       .catch((err: any) => {
