@@ -338,7 +338,7 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
       expect(machine.context.isComplete).toBe(false);
 
@@ -397,7 +397,7 @@ describe('brain-state-machine', () => {
       });
 
       expect(machine.context.isWaiting).toBe(true);
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
 
       // === WEBHOOK TRIGGERED - RESUME ===
 
@@ -409,9 +409,9 @@ describe('brain-state-machine', () => {
       });
 
       // Brain should be running again
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
-      expect(machine.context.brainStack[0].brainTitle).toBe(brainTitle);
+      expect(machine.context.brainIdStack[0]).toBe(brainTitle);
       expect(machine.context.isWaiting).toBe(false);
       expect(machine.context.isRunning).toBe(true);
 
@@ -455,7 +455,7 @@ describe('brain-state-machine', () => {
       // CRITICAL ASSERTION: brain should be complete
       // rootBrain is preserved after completion so we can display final state
       expect(machine.context.isComplete).toBe(true);
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(0);
     });
 
@@ -476,7 +476,7 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
 
       // Outer brain step starts (which will run inner brain)
@@ -504,10 +504,10 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
-      expect(machine.context.brainStack.length).toBe(2);
+      expect(machine.context.brainIdStack.length).toBe(2);
       expect(machine.context.depth).toBe(2);
-      expect(machine.context.brainStack[0].brainTitle).toBe(outerBrainTitle);
-      expect(machine.context.brainStack[1].brainTitle).toBe(innerBrainTitle);
+      expect(machine.context.brainIdStack[0]).toBe(outerBrainTitle);
+      expect(machine.context.brainIdStack[1]).toBe(innerBrainTitle);
 
       // Inner brain waits for webhook
       sendEvent(machine, {
@@ -517,7 +517,7 @@ describe('brain-state-machine', () => {
       });
 
       expect(machine.context.isWaiting).toBe(true);
-      expect(machine.context.brainStack.length).toBe(2);
+      expect(machine.context.brainIdStack.length).toBe(2);
 
       // Inner brain resumes after webhook via WEBHOOK_RESPONSE
       sendEvent(machine, {
@@ -527,10 +527,10 @@ describe('brain-state-machine', () => {
       });
 
       // Stack should still be length 2: [outer, inner]
-      expect(machine.context.brainStack.length).toBe(2);
+      expect(machine.context.brainIdStack.length).toBe(2);
       expect(machine.context.depth).toBe(2);
-      expect(machine.context.brainStack[0].brainTitle).toBe(outerBrainTitle);
-      expect(machine.context.brainStack[1].brainTitle).toBe(innerBrainTitle);
+      expect(machine.context.brainIdStack[0]).toBe(outerBrainTitle);
+      expect(machine.context.brainIdStack[1]).toBe(innerBrainTitle);
       expect(machine.context.isWaiting).toBe(false);
       expect(machine.context.isRunning).toBe(true);
 
@@ -542,7 +542,7 @@ describe('brain-state-machine', () => {
         status: STATUS.COMPLETE,
       });
 
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
       expect(machine.context.isComplete).toBe(false); // Outer brain not complete yet
 
@@ -555,7 +555,7 @@ describe('brain-state-machine', () => {
       });
 
       // rootBrain is preserved after completion so we can display final state
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(0);
       expect(machine.context.isComplete).toBe(true);
     });

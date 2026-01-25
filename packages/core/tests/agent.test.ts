@@ -1199,27 +1199,34 @@ describe('agent step', () => {
       const startEvent = events.find((e) => e.type === BRAIN_EVENTS.START) as any;
       const brainRunId = startEvent.brainRunId;
 
-      // Build resumeContext from the execution tree
-      const executionTree = machine.context.executionTree!;
+      // Build resumeContext from the execution stack
+      const executionStack = machine.context.executionStack;
 
-      // Helper to convert ExecutionNode to ResumeContext (adds webhookResponse and agentContext at deepest level)
-      function toResumeContext(node: typeof executionTree): ResumeContext {
-        if (!node.innerNode) {
-          return {
-            stepIndex: node.stepIndex,
-            state: node.state,
-            webhookResponse,
-            agentContext: agentContext ?? undefined,
-          };
+      // Helper to convert executionStack to ResumeContext (adds webhookResponse and agentContext at deepest level)
+      function toResumeContext(stack: typeof executionStack): ResumeContext {
+        let context: ResumeContext | undefined;
+        for (let i = stack.length - 1; i >= 0; i--) {
+          const entry = stack[i];
+          if (i === stack.length - 1) {
+            // Deepest level gets the webhook response and agent context
+            context = {
+              stepIndex: entry.stepIndex,
+              state: entry.state,
+              webhookResponse,
+              agentContext: agentContext ?? undefined,
+            };
+          } else {
+            context = {
+              stepIndex: entry.stepIndex,
+              state: entry.state,
+              innerResumeContext: context,
+            };
+          }
         }
-        return {
-          stepIndex: node.stepIndex,
-          state: node.state,
-          innerResumeContext: toResumeContext(node.innerNode),
-        };
+        return context!;
       }
 
-      const resumeContext = toResumeContext(executionTree);
+      const resumeContext = toResumeContext(executionStack);
 
       // Resume the brain with the webhook response
       const resumeEvents: BrainEvent[] = [];
