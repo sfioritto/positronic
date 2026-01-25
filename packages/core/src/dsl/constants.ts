@@ -8,6 +8,7 @@ export const BRAIN_EVENTS = {
   ERROR: 'brain:error',
   COMPLETE: 'brain:complete',
   CANCELLED: 'brain:cancelled',
+  PAUSED: 'brain:paused',
   WEBHOOK: 'brain:webhook',
   WEBHOOK_RESPONSE: 'brain:webhook_response',
   // Agent step events
@@ -21,6 +22,7 @@ export const BRAIN_EVENTS = {
   AGENT_ITERATION_LIMIT: 'agent:iteration_limit',
   AGENT_WEBHOOK: 'agent:webhook',
   AGENT_RAW_RESPONSE_MESSAGE: 'agent:raw_response_message',
+  AGENT_USER_MESSAGE: 'agent:user_message',
 } as const;
 
 export const STATUS = {
@@ -29,4 +31,6 @@ export const STATUS = {
   COMPLETE: 'complete',
   ERROR: 'error',
   CANCELLED: 'cancelled',
+  WAITING: 'waiting',
+  PAUSED: 'paused',
 } as const;

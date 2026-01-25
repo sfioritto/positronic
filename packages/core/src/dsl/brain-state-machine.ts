@@ -88,6 +88,7 @@ export interface BrainExecutionContext {
   isRunning: boolean;
   isComplete: boolean;
   isPaused: boolean;
+  isWaiting: boolean;
   isError: boolean;
   isCancelled: boolean;
 
@@ -102,6 +103,7 @@ export type ExecutionState =
   | 'idle'
   | 'running'
   | 'paused'
+  | 'waiting'
   | 'complete'
   | 'error'
   | 'cancelled';
@@ -291,6 +293,7 @@ const createInitialContext = (
   isRunning: false,
   isComplete: false,
   isPaused: false,
+  isWaiting: false,
   isError: false,
   isCancelled: false,
   topLevelStepCount: 0,
@@ -316,7 +319,11 @@ const updateDerivedState = (
       break;
     case 'paused':
       // Paused brains are still considered "running" in terms of database status
+      // Phase 3 will change this to STATUS.PAUSED when signal pausing is implemented
       status = STATUS.RUNNING;
+      break;
+    case 'waiting':
+      status = STATUS.WAITING;
       break;
     case 'complete':
       status = STATUS.COMPLETE;
@@ -338,6 +345,7 @@ const updateDerivedState = (
     isRunning: executionState === 'running',
     isComplete: executionState === 'complete',
     isPaused: executionState === 'paused',
+    isWaiting: executionState === 'waiting',
     isError: executionState === 'error',
     isCancelled: executionState === 'cancelled',
   };

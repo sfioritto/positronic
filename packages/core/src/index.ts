@@ -33,6 +33,9 @@ export type {
   StepContext,
   ExtractTerminalInput,
   RetryConfig,
+  SignalType,
+  BrainSignal,
+  SignalProvider,
 } from './dsl/types.js';
 export { applyPatches } from './dsl/json-patch.js';
 
@@ -66,7 +69,9 @@ export type {
   AgentIterationLimitEvent,
   AgentWebhookEvent,
   AgentRawResponseMessageEvent,
+  AgentUserMessageEvent,
   WebhookResponseEvent,
+  BrainPausedEvent,
 } from './dsl/definitions/events.js';
 
 // Default tools

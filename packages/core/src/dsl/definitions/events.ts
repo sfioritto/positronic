@@ -50,6 +50,12 @@ export interface BrainCancelledEvent<TOptions extends JsonObject = JsonObject>
   status: typeof STATUS.CANCELLED;
 }
 
+export interface BrainPausedEvent<TOptions extends JsonObject = JsonObject>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PAUSED;
+  status: typeof STATUS.PAUSED;
+}
+
 // Step Status Event (just steps array and base event properties)
 export interface StepStatusEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
@@ -193,6 +199,15 @@ export interface AgentRawResponseMessageEvent<
   message: ResponseMessage;
 }
 
+export interface AgentUserMessageEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.AGENT_USER_MESSAGE;
+  stepTitle: string;
+  stepId: string;
+  /** The user-injected message content */
+  content: string;
+}
+
 export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK_RESPONSE;
@@ -205,6 +220,7 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainCompleteEvent<TOptions>
   | BrainErrorEvent<TOptions>
   | BrainCancelledEvent<TOptions>
+  | BrainPausedEvent<TOptions>
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>
@@ -220,4 +236,5 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | AgentTokenLimitEvent<TOptions>
   | AgentIterationLimitEvent<TOptions>
   | AgentWebhookEvent<TOptions>
-  | AgentRawResponseMessageEvent<TOptions>;
+  | AgentRawResponseMessageEvent<TOptions>
+  | AgentUserMessageEvent<TOptions>;
