@@ -1855,7 +1855,7 @@ describe('type inference', () => {
       }
 
       // Track brain nesting depth
-      if (event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART) {
+      if (event.type === BRAIN_EVENTS.START) {
         brainDepth++;
       }
 
@@ -1974,7 +1974,7 @@ describe('type inference', () => {
       client: mockClient,
     })) {
       // Track brain nesting depth
-      if (event.type === BRAIN_EVENTS.START || event.type === BRAIN_EVENTS.RESTART) {
+      if (event.type === BRAIN_EVENTS.START) {
         brainDepth++;
       }
       if (

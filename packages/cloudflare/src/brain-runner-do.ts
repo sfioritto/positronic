@@ -547,7 +547,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         webhookAdapter,
         this.pageAdapter,
       ])
-      .run(brainToRun, {
+      .resume(brainToRun, {
         resumeContext,
         brainRunId,
         signal: this.abortController.signal,
