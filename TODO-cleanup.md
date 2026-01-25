@@ -15,28 +15,7 @@ Events are the source of truth. The machine can reconstruct any state by replayi
 
 ## High Priority
 
-### 1. Simplify `MonitorDO` Event Processing (O(N²) → O(1))
-
-**Location:** `packages/cloudflare/src/monitor-do.ts`
-
-**Problem:** In `handleBrainEvent`, for every new event:
-```typescript
-const storedEvents = this.storage.exec(...).toArray(); // Fetch ALL history
-const machine = createBrainExecutionMachine({ events: storedEvents }); // Replay ALL history
-const { status } = machine.context;
-```
-This replays the *entire* history for every event just to get the current status. For long-running agents, this is O(N²) over the life of the run.
-
-**Fix:** Durable Objects stay alive - keep the machine instance in memory:
-1. Store `private machine: BrainStateMachine` on the class
-2. In `handleBrainEvent`, just call `sendEvent(this.machine, event)` - O(1)
-3. Only fetch/replay history in the constructor (or `blockConcurrencyWhile`) when the DO first wakes up (hydration)
-
-**Benefit:** Status lookups become instant. No SQL queries or replay needed for each event.
-
----
-
-### 2. Abstract the "Event Store" Pattern
+### 1. Abstract the "Event Store" Pattern
 
 **Location:** `packages/cloudflare/src/brain-runner-do.ts`
 
@@ -62,7 +41,7 @@ interface EventStore {
 
 ## To Investigate
 
-### 3. `innerResumeContext` Nesting Pattern
+### 2. `innerResumeContext` Nesting Pattern
 
 **Location:** `packages/core/src/dsl/brain-runner.ts` (executionStackToResumeContext)
 
@@ -80,20 +59,20 @@ ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  /
 
 ---
 
-### 4. `findWebhookResponseInResumeContext` in event-stream.ts
+### 3. `findWebhookResponseInResumeContext` in event-stream.ts
 
 **Location:** `packages/core/src/dsl/execution/event-stream.ts`
 
 **Problem:** Searches through resumeContext tree to find webhookResponse at deepest level. This is a symptom of the nested tree structure.
 
 **Possible fixes:**
-- If we simplify innerResumeContext pattern (#4), this might become trivial
+- If we simplify innerResumeContext pattern (#2), this might become trivial
 - Could use `machine.context.isWaiting` to know if resuming from webhook
 - Or add `webhookResponse` to machine context directly
 
 ---
 
-### 5. BrainEventStream vs BrainStateMachine State Tracking
+### 4. BrainEventStream vs BrainStateMachine State Tracking
 
 **Location:** `packages/core/src/dsl/execution/event-stream.ts`
 
@@ -110,6 +89,10 @@ ResumeContext: { state, stepIndex, innerResumeContext: { state, stepIndex } }  /
 
 ## Done
 
+- [x] **Simplify `MonitorDO` Event Processing (O(N²) → O(1))**
+  - Keep state machines in memory via `Map<string, BrainStateMachine>`
+  - Only hydrate from stored events when DO wakes from hibernation
+  - Clean up machines on terminal status to free memory
 - [x] **Delete `state-reconstruction.ts` (CLI)**
   - Deleted `packages/cli/src/utils/state-reconstruction.ts` and its tests
   - `watch.tsx` now uses `createBrainExecutionMachine` + `sendEvent` to reconstruct state
