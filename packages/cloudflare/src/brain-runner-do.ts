@@ -1,4 +1,4 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type SerializedStep, type AgentResumeContext, createBrainExecutionMachine, sendEvent, getCompletedSteps } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type ResumeContext, createBrainExecutionMachine, sendEvent, type ExecutionNode, type AgentContext } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
@@ -12,6 +12,32 @@ import { PositronicManifest } from './manifest.js';
 import { CloudflareR2Loader } from './r2-loader.js';
 import { createResources, type ResourceManifest } from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
+
+/**
+ * Convert ExecutionNode to ResumeContext, adding webhook response and agent context
+ * to the deepest level.
+ */
+function executionTreeToResumeContext(
+  node: ExecutionNode,
+  webhookResponse: Record<string, any>,
+  agentContext: AgentContext | null
+): ResumeContext {
+  if (!node.innerNode) {
+    // This is the deepest level - add webhook response and agent context
+    return {
+      stepIndex: node.stepIndex,
+      state: node.state,
+      webhookResponse,
+      agentContext: agentContext ?? undefined,
+    };
+  }
+  // Recurse to find the deepest level
+  return {
+    stepIndex: node.stepIndex,
+    state: node.state,
+    innerResumeContext: executionTreeToResumeContext(node.innerNode, webhookResponse, agentContext),
+  };
+}
 
 let manifest: PositronicManifest | null = null;
 export function setManifest(generatedManifest: PositronicManifest) {
@@ -234,9 +260,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
       try {
         const startEventResult = sql
           .exec<{ serialized_event: string }>(
-            `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
-            BRAIN_EVENTS.START,
-            BRAIN_EVENTS.RESTART
+            `SELECT serialized_event FROM brain_events WHERE event_type = ? ORDER BY event_id DESC LIMIT 1`,
+            BRAIN_EVENTS.START
           )
           .toArray();
 
@@ -405,18 +430,16 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('Runtime manifest not initialized');
     }
 
-    // Get the initial state and brain title by loading the FIRST START or RESTART event
-    // (the outer brain's event, not an inner brain's)
+    // Get the brain title by loading the FIRST START event
     const startEventResult = sql
       .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id ASC LIMIT 1`,
-        BRAIN_EVENTS.START,
-        BRAIN_EVENTS.RESTART
+        `SELECT serialized_event FROM brain_events WHERE event_type = ? ORDER BY event_id ASC LIMIT 1`,
+        BRAIN_EVENTS.START
       )
       .toArray();
 
     if (startEventResult.length === 0) {
-      throw new Error(`No START or RESTART event found for brain run ${brainRunId}`);
+      throw new Error(`No START event found for brain run ${brainRunId}`);
     }
 
     const startEvent = JSON.parse(startEventResult[0].serialized_event);
@@ -424,7 +447,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const initialState = startEvent.initialState || {};
 
     if (!brainTitle) {
-      throw new Error(`Brain title not found in START/RESTART event for brain run ${brainRunId}`);
+      throw new Error(`Brain title not found in START event for brain run ${brainRunId}`);
     }
 
     // Resolve the brain using the title
@@ -449,28 +472,30 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
     }
 
-    // Load all events and feed them to the state machine to build nested initialCompletedSteps
+    // Load all events and feed them to the state machine to reconstruct execution tree
     const allEventsResult = sql
       .exec<{ serialized_event: string }>(
         `SELECT serialized_event FROM brain_events ORDER BY event_id ASC`
       )
       .toArray();
 
-    // Create state machine and feed all historical events to reconstruct step hierarchy
+    // Create state machine and feed all historical events to reconstruct execution state
     const machine = createBrainExecutionMachine({ initialState: initialState });
     for (const row of allEventsResult) {
       const event = JSON.parse(row.serialized_event);
       sendEvent(machine, event);
     }
 
-    // Get the reconstructed step hierarchy from the state machine
-    const initialCompletedSteps: SerializedStep[] = getCompletedSteps(machine);
+    // Get the execution tree and agent context from the machine
+    const { executionTree, agentContext } = machine.context;
 
-    // Get agent context directly from the machine (already populated from all events)
-    const { agentContext } = machine.context;
-    const agentResumeContext: AgentResumeContext | null = agentContext
-      ? { ...agentContext, webhookResponse }
-      : null;
+    // Convert ExecutionNode to ResumeContext, adding webhook response and agent context
+    // to the deepest level
+    const resumeContext = executionTreeToResumeContext(
+      executionTree!,
+      webhookResponse,
+      agentContext
+    );
 
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
@@ -523,12 +548,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
         this.pageAdapter,
       ])
       .run(brainToRun, {
-        initialState,
-        initialCompletedSteps,
+        resumeContext,
         brainRunId,
-        response: webhookResponse,
         signal: this.abortController.signal,
-        agentResumeContext,
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner resume failed:`, err);

@@ -7,6 +7,7 @@ import {
   type BrainErrorEvent,
   type SerializedStep,
   type SerializedStepStatus,
+  type ResumeContext,
 } from '../src/dsl/brain.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
@@ -955,7 +956,7 @@ describe('brain resumption', () => {
     streamText: jest.fn(),
   };
 
-  it('should resume brain from the correct step when given initialCompletedSteps', async () => {
+  it('should resume brain from the correct step when given resumeContext', async () => {
     const executedSteps: string[] = [];
     const threeStepBrain = brain('Three Step Brain')
       .step('Step 1', ({ state }) => {
@@ -972,35 +973,19 @@ describe('brain resumption', () => {
       });
 
     // First run to get the first step completed with initial state
-    let initialCompletedSteps: SerializedStep[] = []; // Use the correct type
     const initialState = { initialValue: true };
-    let firstStepState: State = initialState;
-    let allStepsInfo: SerializedStepStatus[] = []; // Explicit type annotation needed
+    let stateAfterStep1: State = initialState;
 
     // Run brain until we get the first step completed
     for await (const event of threeStepBrain.run({
       client: mockClient as ObjectGenerator,
       initialState,
     })) {
-      // Capture the full step list from the first status event
-      if (event.type === BRAIN_EVENTS.STEP_STATUS) {
-        allStepsInfo = event.steps; // Direct assignment, type is SerializedStepStatus[]
-      }
-
       if (
         event.type === BRAIN_EVENTS.STEP_COMPLETE &&
         event.stepTitle === 'Step 1'
       ) {
-        firstStepState = applyPatches(firstStepState, [event.patch]);
-        // Construct initialCompletedSteps with the full data for completed steps
-        initialCompletedSteps = allStepsInfo.map((stepInfo, index) => {
-          if (index === 0) {
-            // If it's Step 1
-            return { ...stepInfo, status: STATUS.COMPLETE, patch: event.patch };
-          } else {
-            return { ...stepInfo, status: STATUS.PENDING, patch: undefined };
-          }
-        });
+        stateAfterStep1 = applyPatches(stateAfterStep1, [event.patch]);
         break; // Stop after first step
       }
     }
@@ -1008,23 +993,16 @@ describe('brain resumption', () => {
     // Clear executed steps array
     executedSteps.length = 0;
 
-    // Resume brain with first step completed
-    if (!initialCompletedSteps)
-      throw new Error('Expected initialCompletedSteps');
-
-    // Start with initial state and apply patches from already-completed steps
-    // (RESTART events don't include initialState; state is reconstructed from patches)
-    let resumedState: State = initialState;
-    for (const step of initialCompletedSteps) {
-      if (step.patch) {
-        resumedState = applyPatches(resumedState, [step.patch]);
-      }
-    }
+    // Resume brain from step 1 (stepIndex = 1 means we start at step 2)
+    // with the state after step 1 completed
+    let resumedState: State = stateAfterStep1;
 
     for await (const event of threeStepBrain.run({
       client: mockClient as ObjectGenerator,
-      initialState,
-      initialCompletedSteps,
+      resumeContext: {
+        stepIndex: 1, // Resume from step index 1 (Step 2)
+        state: stateAfterStep1,
+      },
       brainRunId: 'test-run-id',
     })) {
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
@@ -1617,68 +1595,25 @@ describe('nested brains', () => {
     );
     expect(outerCompleteEvent).toBeUndefined();
 
-    // Build nested initialCompletedSteps from events
-    // Outer step 1 is complete
-    const outerStep1Complete = firstRunEvents.find(
-      (e) =>
-        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        'stepTitle' in e &&
-        e.stepTitle === 'Outer step 1'
-    ) as any;
-
-    // Inner brain step 1 and step 2 (wait for webhook) are complete
-    const innerStep1Complete = firstRunEvents.find(
-      (e) =>
-        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        'stepTitle' in e &&
-        e.stepTitle === 'Inner step 1'
-    ) as any;
-
-    const innerStep2Complete = firstRunEvents.find(
-      (e) =>
-        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        'stepTitle' in e &&
-        e.stepTitle === 'Wait for webhook'
-    ) as any;
-
-    const initialCompletedSteps: SerializedStep[] = [
-      {
-        id: outerStep1Complete.stepId,
-        title: outerStep1Complete.stepTitle,
-        status: STATUS.COMPLETE,
-        patch: outerStep1Complete.patch,
+    // Build resumeContext from events using the new tree structure
+    // Outer brain: at step 1 (the inner brain step), state after step 0
+    // Inner brain: at step 2 (Process webhook), state after steps 0 and 1
+    const resumeContext: ResumeContext = {
+      stepIndex: 1, // Outer brain is at step 1 (Run inner brain)
+      state: { prefix: 'outer-' }, // State after outer step 1
+      innerResumeContext: {
+        stepIndex: 2, // Inner brain resumes at step 2 (Process webhook)
+        state: { count: 1, waiting: true }, // State after inner steps 0 and 1
+        webhookResponse: { data: 'hello from webhook!' },
       },
-      {
-        // Inner brain step is NOT complete - it's still waiting for webhook
-        id: 'inner-brain-step-id',
-        title: 'Run inner brain',
-        status: STATUS.RUNNING, // Still running, waiting on inner brain
-        patch: undefined,
-        innerSteps: [
-          {
-            id: innerStep1Complete.stepId,
-            title: innerStep1Complete.stepTitle,
-            status: STATUS.COMPLETE,
-            patch: innerStep1Complete.patch,
-          },
-          {
-            id: innerStep2Complete.stepId,
-            title: innerStep2Complete.stepTitle,
-            status: STATUS.COMPLETE,
-            patch: innerStep2Complete.patch,
-          },
-        ],
-      },
-    ];
+    };
 
     // Resume with webhook response
     const resumeEvents: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
       client: mockClient,
       brainRunId: 'test-run-id',
-      initialCompletedSteps,
-      initialState: {}, // Will be reconstructed from patches
-      response: { data: 'hello from webhook!' },
+      resumeContext,
     })) {
       resumeEvents.push(event);
     }

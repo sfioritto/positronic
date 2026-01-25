@@ -10,7 +10,7 @@ import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
 import type { Block, StepBlock, BrainBlock, AgentBlock, StepAction } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
-import type { InitialRunParams, RerunParams } from '../definitions/run-params.js';
+import type { InitialRunParams, ResumeRunParams } from '../definitions/run-params.js';
 
 import { BrainEventStream } from '../execution/event-stream.js';
 import { Semaphore, normalizeRetryConfig, executeWithRetry } from '../execution/retry.js';
@@ -601,11 +601,11 @@ export class Brain<
 
   // Overload signatures
   run(params: InitialRunParams<TOptions>): AsyncGenerator<BrainEvent<TOptions>>;
-  run(params: RerunParams<TOptions>): AsyncGenerator<BrainEvent<TOptions>>;
+  run(params: ResumeRunParams<TOptions>): AsyncGenerator<BrainEvent<TOptions>>;
 
   // Implementation signature
   async *run(
-    params: InitialRunParams<TOptions> | RerunParams<TOptions>
+    params: InitialRunParams<TOptions> | ResumeRunParams<TOptions>
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const { title, description, blocks } = this;
 
