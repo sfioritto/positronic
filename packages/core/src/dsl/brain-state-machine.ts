@@ -1092,14 +1092,6 @@ export function getError(machine: BrainStateMachine): SerializedError | null {
 }
 
 /**
- * Get the current agent context if execution is inside an agent loop.
- * Returns null if not currently executing an agent step.
- */
-export function getAgentContext(machine: BrainStateMachine): AgentContext | null {
-  return machine.context.agentContext;
-}
-
-/**
  * Get the completed steps from the state machine in the format needed for resume.
  * This reconstructs the nested step hierarchy from the brain tree.
  * Returns a deep copy to avoid mutating the state machine's context.
