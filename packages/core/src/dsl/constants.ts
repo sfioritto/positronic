@@ -33,4 +33,7 @@ export const STATUS = {
   CANCELLED: 'cancelled',
   WAITING: 'waiting',
   PAUSED: 'paused',
+  // Internal status for tracking when execution is inside an agent loop.
+  // Publicly this maps to RUNNING for consumers.
+  AGENT_LOOP: 'agent_loop',
 } as const;
