@@ -323,14 +323,10 @@ describe('BrainRunner', () => {
       patch: [{ op: 'add', path: '/name', value: 'test' }],
     });
 
-    // Resume from step index 2 (Third Step) with state as if first two steps completed
+    // Resume - the machine's execution stack already has stepIndex: 2 and correct state
     const result = await runner.resume(testBrain, {
-      resumeContext: {
-        stepIndex: 2, // Start at Third Step
-        state: { count: 10, name: 'test' }, // State after first two steps
-      },
-      brainRunId: 'test-run-123',
       machine,
+      brainRunId: 'test-run-123',
     });
 
     // Verify the final state includes resumed state plus third step
@@ -532,15 +528,11 @@ describe('BrainRunner', () => {
       waitFor: [{ name: 'user-input-webhook', identifier: 'user-id' }],
     });
 
-    // Resume with webhook response using resumeContext
+    // Resume with webhook response - machine has execution state, we just add the response
     const finalState = await runner.resume(testBrain, {
-      resumeContext: {
-        stepIndex: 2, // Resume at Process Response step
-        state: firstRunState,
-        webhookResponse: { userInput: 'Hello from webhook!' },
-      },
-      brainRunId,
       machine,
+      brainRunId,
+      webhookResponse: { userInput: 'Hello from webhook!' },
     });
 
     expect(finalState).toEqual({

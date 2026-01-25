@@ -1,5 +1,5 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
-import { createBrainExecutionMachine, sendEvent, type BrainStateMachine } from './brain-state-machine.js';
+import { createBrainExecutionMachine, sendEvent, type BrainStateMachine, type ExecutionStackEntry, type AgentContext } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type Brain, type BrainEvent, type ResumeContext } from './brain.js';
 import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
@@ -7,6 +7,45 @@ import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
 import type { BrainCancelledEvent } from './definitions/events.js';
+
+/**
+ * Convert execution stack to ResumeContext tree.
+ * Adds webhook response and agent context to the deepest level.
+ * This is internal to BrainRunner - external consumers don't need to know about ResumeContext.
+ */
+function executionStackToResumeContext(
+  stack: ExecutionStackEntry[],
+  webhookResponse: JsonObject | undefined,
+  agentContext: AgentContext | null
+): ResumeContext {
+  if (stack.length === 0) {
+    throw new Error('Cannot convert empty execution stack to ResumeContext');
+  }
+
+  // Build from bottom of stack up (deepest to root)
+  let context: ResumeContext | undefined;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
+    if (i === stack.length - 1) {
+      // Deepest level - add webhook response and agent context
+      context = {
+        stepIndex: entry.stepIndex,
+        state: entry.state,
+        webhookResponse,
+        agentContext: agentContext ?? undefined,
+      };
+    } else {
+      // Outer level - wrap inner context
+      context = {
+        stepIndex: entry.stepIndex,
+        state: entry.state,
+        innerResumeContext: context,
+      };
+    }
+  }
+
+  return context!;
+}
 
 /**
  * Create a CANCELLED event for when the brain is aborted via signal.
@@ -107,21 +146,25 @@ export class BrainRunner {
 
   /**
    * Resume a brain from a previous execution point.
-   * If a state machine is provided, it will be used instead of creating a new one.
-   * This allows the caller to pass a machine that already has historical events replayed.
+   * The machine should have historical events already replayed to reconstruct execution state.
+   * The BrainRunner will derive the ResumeContext from the machine's execution stack.
    */
   async resume<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     options: {
-      resumeContext: ResumeContext;
+      machine: BrainStateMachine;
       brainRunId: string;
-      machine?: BrainStateMachine;
+      webhookResponse?: JsonObject;
       options?: TOptions;
       endAfter?: number;
       signal?: AbortSignal;
     }
   ): Promise<TState> {
-    const { resumeContext, brainRunId, machine, options: brainOptions, endAfter, signal } = options;
+    const { machine, brainRunId, webhookResponse, options: brainOptions, endAfter, signal } = options;
+
+    // Build ResumeContext from machine's execution stack
+    const { executionStack, agentContext } = machine.context;
+    const resumeContext = executionStackToResumeContext(executionStack, webhookResponse, agentContext);
 
     return this.execute(brain, {
       resumeContext,
