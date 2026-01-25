@@ -80,31 +80,78 @@ export class BrainRunner {
     });
   }
 
+  /**
+   * Run a brain from the beginning with fresh state.
+   */
   async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
-    {
-      initialState = {} as TState,
-      options,
-      resumeContext,
-      brainRunId,
-      endAfter,
-      signal,
-    }: {
+    options?: {
       initialState?: TState;
       options?: TOptions;
-      resumeContext?: ResumeContext;
       brainRunId?: string;
       endAfter?: number;
       signal?: AbortSignal;
-    } = {}
+    }
+  ): Promise<TState> {
+    const { initialState = {} as TState, options: brainOptions, brainRunId, endAfter, signal } = options ?? {};
+
+    return this.execute(brain, {
+      initialState,
+      options: brainOptions,
+      brainRunId,
+      endAfter,
+      signal,
+      initialStepCount: 0,
+    });
+  }
+
+  /**
+   * Resume a brain from a previous execution point.
+   */
+  async resume<TOptions extends JsonObject = {}, TState extends State = {}>(
+    brain: Brain<TOptions, TState, any>,
+    options: {
+      resumeContext: ResumeContext;
+      brainRunId: string;
+      options?: TOptions;
+      endAfter?: number;
+      signal?: AbortSignal;
+    }
+  ): Promise<TState> {
+    const { resumeContext, brainRunId, options: brainOptions, endAfter, signal } = options;
+
+    return this.execute(brain, {
+      resumeContext,
+      options: brainOptions,
+      brainRunId,
+      endAfter,
+      signal,
+      initialStepCount: resumeContext.stepIndex,
+    });
+  }
+
+  /**
+   * Internal execution method shared by run() and resume().
+   */
+  private async execute<TOptions extends JsonObject = {}, TState extends State = {}>(
+    brain: Brain<TOptions, TState, any>,
+    params: {
+      initialState?: TState;
+      resumeContext?: ResumeContext;
+      options?: TOptions;
+      brainRunId?: string;
+      endAfter?: number;
+      signal?: AbortSignal;
+      initialStepCount: number;
+    }
   ): Promise<TState> {
     const { adapters, client, resources, pages, env, signalProvider } = this.options;
     const resolvedEnv = env ?? DEFAULT_ENV;
+    const { initialState, resumeContext, options, brainRunId, endAfter, signal, initialStepCount } = params;
 
     // Determine initial state for the state machine
     // If resuming, use the state from resumeContext; otherwise use initialState
     const machineInitialState: JsonObject = resumeContext?.state ?? initialState ?? {};
-    const initialStepCount = resumeContext?.stepIndex ?? 0;
 
     // Create state machine with pre-populated state for runtime tracking.
     const machine = createBrainExecutionMachine({
@@ -123,7 +170,7 @@ export class BrainRunner {
           signalProvider,
         })
       : brain.run({
-          initialState,
+          initialState: initialState ?? ({} as TState),
           options,
           client,
           brainRunId,

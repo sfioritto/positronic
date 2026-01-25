@@ -300,7 +300,7 @@ describe('BrainRunner', () => {
       }));
 
     // Resume from step index 2 (Third Step) with state as if first two steps completed
-    const result = await runner.run(testBrain, {
+    const result = await runner.resume(testBrain, {
       resumeContext: {
         stepIndex: 2, // Start at Third Step
         state: { count: 10, name: 'test' }, // State after first two steps
@@ -321,7 +321,7 @@ describe('BrainRunner', () => {
     );
 
     expect(stepCompleteEvents.length).toBe(1);
-    expect(stepCompleteEvents[0][0].stepTitle).toBe('Third Step');
+    expect((stepCompleteEvents[0][0] as any).stepTitle).toBe('Third Step');
   });
 
   it('should stop execution after specified number of steps with endAfter parameter', async () => {
@@ -480,7 +480,7 @@ describe('BrainRunner', () => {
     mockAdapter.dispatch.mockClear();
 
     // Resume with webhook response using resumeContext
-    const finalState = await runner.run(testBrain, {
+    const finalState = await runner.resume(testBrain, {
       resumeContext: {
         stepIndex: 2, // Resume at Process Response step
         state: firstRunState,

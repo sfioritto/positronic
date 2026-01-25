@@ -12,6 +12,7 @@ import {
   type AgentIterationLimitEvent,
   type AgentWebhookEvent,
   type WebhookResponseEvent,
+  type ResumeContext,
 } from '../src/dsl/brain.js';
 import type { AgentRawResponseMessageEvent } from '../src/dsl/definitions/events.js';
 import { z } from 'zod';
@@ -1161,7 +1162,7 @@ describe('agent step', () => {
       // Use the state machine to reconstruct agent context from events
       const webhookResponse = { ticketId: 'ticket-456', approved: true };
       const machine = createBrainExecutionMachine({
-        events: events as Array<{ type: string } & Record<string, unknown>>,
+        events: events as unknown as Array<{ type: string } & Record<string, unknown>>,
       });
       const agentContext = machine.context.agentContext
         ? { ...machine.context.agentContext, webhookResponse }
@@ -1194,29 +1195,38 @@ describe('agent step', () => {
           };
         });
 
-      // Get step completion events to reconstruct state
-      const stepCompleteEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
-      );
-
       // Get the brain run ID from the START event
       const startEvent = events.find((e) => e.type === BRAIN_EVENTS.START) as any;
       const brainRunId = startEvent.brainRunId;
+
+      // Build resumeContext from the execution tree
+      const executionTree = machine.context.executionTree!;
+
+      // Helper to convert ExecutionNode to ResumeContext (adds webhookResponse and agentContext at deepest level)
+      function toResumeContext(node: typeof executionTree): ResumeContext {
+        if (!node.innerNode) {
+          return {
+            stepIndex: node.stepIndex,
+            state: node.state,
+            webhookResponse,
+            agentContext: agentContext ?? undefined,
+          };
+        }
+        return {
+          stepIndex: node.stepIndex,
+          state: node.state,
+          innerResumeContext: toResumeContext(node.innerNode),
+        };
+      }
+
+      const resumeContext = toResumeContext(executionTree);
 
       // Resume the brain with the webhook response
       const resumeEvents: BrainEvent[] = [];
       for await (const event of resumedBrain.run({
         client: mockClient,
-        response: webhookResponse,
-        agentResumeContext: agentContext!,
-        initialState: {},
+        resumeContext,
         brainRunId,
-        initialCompletedSteps: stepCompleteEvents.map((e: any) => ({
-          id: e.stepId,
-          title: e.stepTitle,
-          status: STATUS.COMPLETE,
-          patch: e.patch,
-        })),
       })) {
         resumeEvents.push(event);
       }
