@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator, ToolMessage, ResponseMessage } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, StepContext } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, StepContext, SignalProvider } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
 import type { Resources } from '../../resources/resources.js';
@@ -48,6 +48,7 @@ export class BrainEventStream<
   private initialCompletedSteps?: SerializedStep[];
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool>;
+  private signalProvider?: SignalProvider;
 
   constructor(
     params: (InitialRunParams<TOptions> | RerunParams<TOptions>) & {
@@ -76,6 +77,7 @@ export class BrainEventStream<
       agentResumeContext,
       components,
       defaultTools,
+      signalProvider,
     } = params as RerunParams<TOptions> & {
       title: string;
       description?: string;
@@ -83,6 +85,7 @@ export class BrainEventStream<
       services: TServices;
       components?: Record<string, UIComponent<any>>;
       defaultTools?: Record<string, AgentTool>;
+      signalProvider?: SignalProvider;
     };
 
     this.initialState = initialState as TState;
@@ -97,6 +100,7 @@ export class BrainEventStream<
     this.initialCompletedSteps = initialCompletedSteps;
     this.components = components;
     this.defaultTools = defaultTools;
+    this.signalProvider = signalProvider;
     // Initialize steps array with UUIDs and pending status
     this.steps = blocks.map((block, index) => {
       const completedStep = initialCompletedSteps?.[index];
@@ -173,6 +177,35 @@ export class BrainEventStream<
 
       // Process each step
       while (this.currentStepIndex < steps.length) {
+        // Check for CONTROL signals before each step
+        if (this.signalProvider) {
+          const signals = await this.signalProvider.getSignals('CONTROL');
+          for (const signal of signals) {
+            if (signal.type === 'KILL') {
+              yield {
+                type: BRAIN_EVENTS.CANCELLED,
+                status: STATUS.CANCELLED,
+                brainTitle,
+                brainDescription,
+                brainRunId,
+                options,
+              };
+              return;
+            }
+            if (signal.type === 'PAUSE') {
+              yield {
+                type: BRAIN_EVENTS.PAUSED,
+                status: STATUS.PAUSED,
+                brainTitle,
+                brainDescription,
+                brainRunId,
+                options,
+              };
+              return;
+            }
+          }
+        }
+
         const step = steps[this.currentStepIndex];
 
         // Skip completed steps
@@ -625,6 +658,54 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
     // Main agent loop
     while (true) {
       iteration++;
+
+      // Check for ALL signals at start of iteration
+      if (this.signalProvider) {
+        const signals = await this.signalProvider.getSignals('ALL');
+        for (const signal of signals) {
+          if (signal.type === 'KILL') {
+            yield {
+              type: BRAIN_EVENTS.CANCELLED,
+              status: STATUS.CANCELLED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options,
+            };
+            return;
+          }
+          if (signal.type === 'PAUSE') {
+            yield {
+              type: BRAIN_EVENTS.PAUSED,
+              status: STATUS.PAUSED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options,
+            };
+            return;
+          }
+          if (signal.type === 'USER_MESSAGE') {
+            // Emit event for user message injection
+            yield {
+              type: BRAIN_EVENTS.AGENT_USER_MESSAGE,
+              stepTitle: step.block.title,
+              stepId: step.id,
+              content: signal.content,
+              options: this.options,
+              brainRunId: this.brainRunId,
+            };
+
+            // Inject as user message into conversation
+            const userMessage: ResponseMessage = { role: 'user', content: signal.content };
+            if (responseMessages) {
+              responseMessages = [...responseMessages, userMessage];
+            } else {
+              initialMessages = [...initialMessages, { role: 'user', content: signal.content }];
+            }
+          }
+        }
+      }
 
       // Check max iterations limit BEFORE making the LLM call
       if (iteration > maxIterations) {

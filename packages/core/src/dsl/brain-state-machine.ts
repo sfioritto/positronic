@@ -318,9 +318,7 @@ const updateDerivedState = (
       status = STATUS.RUNNING;
       break;
     case 'paused':
-      // Paused brains are still considered "running" in terms of database status
-      // Phase 3 will change this to STATUS.PAUSED when signal pausing is implemented
-      status = STATUS.RUNNING;
+      status = STATUS.PAUSED;
       break;
     case 'waiting':
       status = STATUS.WAITING;
@@ -705,9 +703,28 @@ const webhookPause = reduce<BrainExecutionContext, WebhookPayload>(
       },
     };
 
-    return updateDerivedState(newCtx, 'paused');
+    return updateDerivedState(newCtx, 'waiting');
   }
 );
+
+const pauseBrain = reduce<BrainExecutionContext, object>((ctx) => {
+  const { rootBrain, brainRunId, options } = ctx;
+  const currentBrain = getDeepestBrain(rootBrain);
+
+  const newCtx: BrainExecutionContext = {
+    ...ctx,
+    currentEvent: {
+      type: BRAIN_EVENTS.PAUSED,
+      brainTitle: currentBrain?.brainTitle,
+      brainDescription: currentBrain?.brainDescription,
+      brainRunId: brainRunId!,
+      status: STATUS.PAUSED,
+      options,
+    },
+  };
+
+  return updateDerivedState(newCtx, 'paused');
+});
 
 const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
   (ctx, { response }) => {
@@ -898,8 +915,11 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         // Cancelled
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
 
-        // Webhook -> paused
-        transition(BRAIN_EVENTS.WEBHOOK, 'paused', webhookPause) as any,
+        // Paused (by signal)
+        transition(BRAIN_EVENTS.PAUSED, 'paused', pauseBrain) as any,
+
+        // Webhook -> waiting
+        transition(BRAIN_EVENTS.WEBHOOK, 'waiting', webhookPause) as any,
 
         // Webhook response (for resume from webhook - machine is already running)
         transition(
@@ -959,10 +979,21 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           BRAIN_EVENTS.AGENT_WEBHOOK,
           'running',
           passthrough(BRAIN_EVENTS.AGENT_WEBHOOK)
+        ) as any,
+        transition(
+          BRAIN_EVENTS.AGENT_USER_MESSAGE,
+          'running',
+          passthrough(BRAIN_EVENTS.AGENT_USER_MESSAGE)
         ) as any
       ),
 
       paused: state(
+        transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
+        // RESTART happens when resuming from pause
+        transition(BRAIN_EVENTS.RESTART, 'running', restartBrain) as any
+      ),
+
+      waiting: state(
         transition(BRAIN_EVENTS.WEBHOOK_RESPONSE, 'running', webhookResponse),
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
         // RESTART happens when resuming from webhook

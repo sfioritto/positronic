@@ -338,14 +338,14 @@ describe('brain-state-machine', () => {
         patch: [],
       });
 
-      // Event 7: brain:webhook (brain pauses)
+      // Event 7: brain:webhook (brain waits for webhook)
       sendEvent(machine, {
         type: BRAIN_EVENTS.WEBHOOK,
         brainRunId,
         waitFor: [{ name: 'webhook-brain', identifier: 'test-123' }],
       });
 
-      expect(machine.context.isPaused).toBe(true);
+      expect(machine.context.isWaiting).toBe(true);
       expect(machine.context.brainStack.length).toBe(1);
 
       // === WEBHOOK TRIGGERED - RESUME ===
@@ -459,14 +459,14 @@ describe('brain-state-machine', () => {
       expect(machine.context.brainStack[0].brainTitle).toBe(outerBrainTitle);
       expect(machine.context.brainStack[1].brainTitle).toBe(innerBrainTitle);
 
-      // Inner brain pauses for webhook
+      // Inner brain waits for webhook
       sendEvent(machine, {
         type: BRAIN_EVENTS.WEBHOOK,
         brainRunId: outerBrainRunId,
         waitFor: [{ name: 'inner-webhook', identifier: 'inner-123' }],
       });
 
-      expect(machine.context.isPaused).toBe(true);
+      expect(machine.context.isWaiting).toBe(true);
       expect(machine.context.brainStack.length).toBe(2);
 
       // Inner brain restarts after webhook
