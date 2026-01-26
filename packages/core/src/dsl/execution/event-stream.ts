@@ -167,8 +167,9 @@ export class BrainEventStream<
         let webhookResponse: JsonObject | undefined;
 
         if (this.signalProvider) {
-          // Outer brain: consume ALL signals at resume start to find WEBHOOK_RESPONSE
-          const signals = await this.signalProvider.getSignals('ALL');
+          // Outer brain: consume only WEBHOOK signals at resume start
+          // Other signals (USER_MESSAGE, CONTROL) remain in queue for processing in step/agent loops
+          const signals = await this.signalProvider.getSignals('WEBHOOK');
           const webhookSignal = signals.find(s => s.type === 'WEBHOOK_RESPONSE');
 
           if (webhookSignal && webhookSignal.type === 'WEBHOOK_RESPONSE') {

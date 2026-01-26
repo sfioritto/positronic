@@ -1,5 +1,8 @@
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
+import { createWebhook } from '../src/dsl/webhook.js';
+import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
+import type { ResumeContext } from '../src/dsl/definitions/run-params.js';
 import { MockSignalProvider } from './mock-signal-provider.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
@@ -534,6 +537,159 @@ describe('signal handling', () => {
         (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
       );
       expect(stepCompleteEvents.length).toBe(2);
+    });
+  });
+
+  describe('USER_MESSAGE preservation during webhook resume', () => {
+    it('should preserve USER_MESSAGE signals when resuming from webhook', async () => {
+      // This test verifies that USER_MESSAGE signals queued while the brain
+      // is waiting for a webhook are NOT lost when the webhook response arrives.
+      // The fix: only consume WEBHOOK_RESPONSE signals during resume, leaving
+      // USER_MESSAGE signals in the queue for the agent loop to process.
+
+      const supportWebhook = createWebhook(
+        'support-response',
+        z.object({ response: z.string() }),
+        async () => ({
+          type: 'webhook' as const,
+          identifier: 'ticket-123',
+          response: { response: 'Support response' },
+        })
+      );
+
+      // First LLM call: calls escalate tool which triggers webhook
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'escalate',
+            args: { summary: 'Need help' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+        responseMessages: [
+          { role: 'assistant', content: 'Escalating...' },
+        ],
+      });
+
+      const testBrain = brain('test-webhook-message').brain(
+        'Handle Request',
+        () => ({
+          prompt: 'Handle the request',
+          tools: {
+            escalate: {
+              description: 'Escalate to support',
+              inputSchema: z.object({ summary: z.string() }),
+              execute: async () => ({
+                waitFor: supportWebhook('ticket-123'),
+              }),
+            },
+            resolve: {
+              description: 'Resolve the issue',
+              inputSchema: z.object({ resolution: z.string() }),
+              terminal: true,
+            },
+          },
+        })
+      );
+
+      // First run - should stop at webhook
+      const firstRunEvents: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        firstRunEvents.push(event);
+      }
+
+      // Verify we hit the webhook
+      expect(firstRunEvents.some((e) => e.type === BRAIN_EVENTS.WEBHOOK)).toBe(true);
+
+      // Build resumeContext from the execution stack
+      const startEvent = firstRunEvents.find((e) => e.type === BRAIN_EVENTS.START) as any;
+      const brainRunId = startEvent.brainRunId;
+
+      // Use state machine to reconstruct context
+      const machine = createBrainExecutionMachine({
+        events: firstRunEvents as unknown as Array<{ type: string } & Record<string, unknown>>,
+      });
+      const executionStack = machine.context.executionStack;
+
+      // Build resume context with agent context from the state machine
+      const webhookResponse = { response: 'Support said to do X' };
+      const agentContext = machine.context.agentContext
+        ? { ...machine.context.agentContext, webhookResponse }
+        : null;
+
+      function toResumeContext(stack: typeof executionStack): ResumeContext {
+        let context: ResumeContext | undefined;
+        for (let i = stack.length - 1; i >= 0; i--) {
+          const entry = stack[i];
+          if (i === stack.length - 1) {
+            context = {
+              stepIndex: entry.stepIndex,
+              state: entry.state,
+              webhookResponse,
+              agentContext: agentContext ?? undefined,
+            };
+          } else {
+            context = {
+              stepIndex: entry.stepIndex,
+              state: entry.state,
+              innerResumeContext: context,
+            };
+          }
+        }
+        return context!;
+      }
+
+      const resumeContext = toResumeContext(executionStack);
+
+      // Set up mock for the resumed agent loop
+      // Second call after resumption with user message: should process message and call terminal tool
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-2',
+            toolName: 'resolve',
+            args: { resolution: 'Called them banana as requested!' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+        responseMessages: [],
+      });
+
+      // Create signal provider with BOTH webhook response AND user message
+      // This simulates the scenario where user sends a message while brain is waiting
+      const resumeSignalProvider = new MockSignalProvider();
+      resumeSignalProvider.queueSignal({
+        type: 'WEBHOOK_RESPONSE',
+        response: webhookResponse,
+      });
+      resumeSignalProvider.queueSignal({
+        type: 'USER_MESSAGE',
+        content: 'Call them banana as a joke!',
+      });
+
+      // Resume the brain - the USER_MESSAGE should be preserved and processed
+      const resumeEvents: BrainEvent[] = [];
+      for await (const event of testBrain.run({
+        client: mockClient,
+        resumeContext,
+        brainRunId,
+        signalProvider: resumeSignalProvider,
+      })) {
+        resumeEvents.push(event);
+      }
+
+      // THE KEY ASSERTION: USER_MESSAGE should have been processed by the agent loop
+      const userMessageEvents = resumeEvents.filter(
+        (e) => e.type === BRAIN_EVENTS.AGENT_USER_MESSAGE
+      );
+      expect(userMessageEvents.length).toBe(1);
+      expect((userMessageEvents[0] as any).content).toBe('Call them banana as a joke!');
+
+      // Brain should complete successfully
+      expect(resumeEvents.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
     });
   });
 
