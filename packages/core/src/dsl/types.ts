@@ -210,9 +210,9 @@ export interface RetryConfig {
 
 /**
  * Signal types that can be sent to a running brain.
- * Signals are processed in priority order: KILL > PAUSE > USER_MESSAGE
+ * Signals are processed in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
  */
-export type SignalType = 'KILL' | 'PAUSE' | 'USER_MESSAGE';
+export type SignalType = 'KILL' | 'PAUSE' | 'USER_MESSAGE' | 'RESUME' | 'WEBHOOK_RESPONSE';
 
 /**
  * A signal that can be injected into a running brain's execution.
@@ -220,7 +220,9 @@ export type SignalType = 'KILL' | 'PAUSE' | 'USER_MESSAGE';
 export type BrainSignal =
   | { type: 'KILL' }
   | { type: 'PAUSE' }
-  | { type: 'USER_MESSAGE'; content: string };
+  | { type: 'USER_MESSAGE'; content: string }
+  | { type: 'RESUME' }
+  | { type: 'WEBHOOK_RESPONSE'; response: JsonObject };
 
 /**
  * Interface for providing signals to a running brain.

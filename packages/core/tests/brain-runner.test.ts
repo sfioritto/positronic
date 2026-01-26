@@ -9,6 +9,7 @@ import { createResources, type Resources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
 import { createWebhook } from '../src/index.js';
 import { z } from 'zod';
+import { MockSignalProvider } from './mock-signal-provider.js';
 
 describe('BrainRunner', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -528,11 +529,18 @@ describe('BrainRunner', () => {
       waitFor: [{ name: 'user-input-webhook', identifier: 'user-id' }],
     });
 
-    // Resume with webhook response - machine has execution state, we just add the response
-    const finalState = await runner.resume(testBrain, {
+    // Create a signal provider with the WEBHOOK_RESPONSE signal
+    const signalProvider = new MockSignalProvider();
+    signalProvider.queueSignal({
+      type: 'WEBHOOK_RESPONSE',
+      response: { userInput: 'Hello from webhook!' },
+    });
+
+    // Resume with signal provider - webhook response comes from signal, not parameter
+    const runnerWithSignals = runner.withSignalProvider(signalProvider);
+    const finalState = await runnerWithSignals.resume(testBrain, {
       machine,
       brainRunId,
-      webhookResponse: { userInput: 'Hello from webhook!' },
     });
 
     expect(finalState).toEqual({

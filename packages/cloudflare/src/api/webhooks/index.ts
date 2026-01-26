@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { getWebhookManifest } from '../../brain-runner-do.js';
 import type { Bindings } from '../types.js';
-import { findAndResumeBrain } from './coordination.js';
+import { queueWebhookAndWakeUp } from './coordination.js';
 import system from './system.js';
 
 const webhooks = new Hono<{ Bindings: Bindings }>();
@@ -43,8 +43,8 @@ webhooks.post('/:slug', async (context: Context) => {
       return context.json({ challenge: handlerResult.challenge });
     }
 
-    // Normal webhook processing - use shared coordination logic
-    const result = await findAndResumeBrain(
+    // Normal webhook processing - queue signal and wake up brain
+    const result = await queueWebhookAndWakeUp(
       context,
       slug,
       handlerResult.identifier,

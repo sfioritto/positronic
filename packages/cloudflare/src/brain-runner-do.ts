@@ -134,15 +134,21 @@ export class BrainRunnerDO extends DurableObject<Env> {
   /**
    * Queue a signal for this brain run.
    * Returns the queued signal with timestamp.
+   * For WEBHOOK_RESPONSE signals, the response object is JSON-stringified and stored in content.
    */
-  async queueSignal(signal: { type: string; content?: string }): Promise<{ type: string; queuedAt: number }> {
+  async queueSignal(signal: { type: string; content?: string; response?: Record<string, unknown> }): Promise<{ type: string; queuedAt: number }> {
     this.initializeSignalsTable();
+
+    // For WEBHOOK_RESPONSE, store the response as JSON in the content field
+    const content = signal.type === 'WEBHOOK_RESPONSE' && signal.response
+      ? JSON.stringify(signal.response)
+      : signal.content ?? null;
 
     const queuedAt = Date.now();
     this.sql.exec(
       `INSERT INTO brain_signals (signal_type, content, queued_at) VALUES (?, ?, ?)`,
       signal.type,
-      signal.content ?? null,
+      content,
       queuedAt
     );
 
@@ -151,8 +157,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
   /**
    * Get and consume (delete) pending signals.
-   * Signals are returned in priority order: KILL > PAUSE > USER_MESSAGE
-   * @param filter 'CONTROL' returns only KILL/PAUSE, 'ALL' includes USER_MESSAGE
+   * Signals are returned in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
+   * @param filter 'CONTROL' returns only KILL/PAUSE, 'ALL' includes all signal types
    */
   getAndConsumeSignals(filter: 'CONTROL' | 'ALL'): BrainSignal[] {
     this.initializeSignalsTable();
@@ -169,7 +175,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
          ORDER BY CASE signal_type
            WHEN 'KILL' THEN 1
            WHEN 'PAUSE' THEN 2
-           WHEN 'USER_MESSAGE' THEN 3
+           WHEN 'WEBHOOK_RESPONSE' THEN 3
+           WHEN 'RESUME' THEN 4
+           WHEN 'USER_MESSAGE' THEN 5
          END`
       )
       .toArray();
@@ -186,6 +194,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
     return results.map(r => {
       if (r.signal_type === 'USER_MESSAGE') {
         return { type: 'USER_MESSAGE' as const, content: r.content ?? '' };
+      }
+      if (r.signal_type === 'WEBHOOK_RESPONSE') {
+        return { type: 'WEBHOOK_RESPONSE' as const, response: JSON.parse(r.content ?? '{}') };
+      }
+      if (r.signal_type === 'RESUME') {
+        return { type: 'RESUME' as const };
       }
       return { type: r.signal_type as 'KILL' | 'PAUSE' };
     });
@@ -479,10 +493,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
       });
   }
 
-  async resume(
-    brainRunId: string,
-    webhookResponse: Record<string, any>
-  ) {
+  /**
+   * Wake up (resume) a brain from a previous execution point.
+   * Webhook response data comes from signals, not as a parameter.
+   * This method reconstructs state and calls BrainRunner.resume().
+   */
+  async wakeUp(brainRunId: string) {
     const { sql } = this;
 
     if (!manifest) {
@@ -584,6 +600,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
 
     // Add signal provider for signal handling
+    // Webhook response comes from signals, consumed by the brain during execution
     const signalProvider = new CloudflareSignalProvider(
       (filter) => this.getAndConsumeSignals(filter)
     );
@@ -604,11 +621,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
       .resume(brainToRun, {
         machine,
         brainRunId,
-        webhookResponse,
         signal: this.abortController.signal,
       })
       .catch((err: any) => {
-        console.error(`[DO ${brainRunId}] BrainRunner resume failed:`, err);
+        console.error(`[DO ${brainRunId}] BrainRunner wakeUp failed:`, err);
         throw err;
       })
       .finally(() => {
