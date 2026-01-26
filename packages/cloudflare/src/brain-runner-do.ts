@@ -1,7 +1,8 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, type SerializedStep, createBrainExecutionMachine, sendEvent, getCompletedSteps } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, createBrainExecutionMachine, sendEvent, type BrainSignal } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
+import { CloudflareSignalProvider } from './signal-provider.js';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import { WebhookAdapter } from './webhook-adapter.js';
 import { PageAdapter } from './page-adapter.js';
@@ -98,18 +99,112 @@ class ScheduleAdapter implements Adapter {
   }
 }
 
+// SQL to initialize the signals table
+const signalsTableSQL = `
+CREATE TABLE IF NOT EXISTS brain_signals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  signal_type TEXT NOT NULL,
+  content TEXT,
+  queued_at INTEGER NOT NULL
+);
+`;
+
 export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private brainRunId: string;
   private eventStreamAdapter = new EventStreamAdapter();
   private abortController: AbortController | null = null;
   private pageAdapter: PageAdapter | null = null;
+  private signalsTableInitialized = false;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
     this.sql = state.storage.sql;
     this.brainRunId = state.id.toString();
     this.env = env;
+  }
+
+  private initializeSignalsTable() {
+    if (!this.signalsTableInitialized) {
+      this.sql.exec(signalsTableSQL);
+      this.signalsTableInitialized = true;
+    }
+  }
+
+  /**
+   * Queue a signal for this brain run.
+   * Returns the queued signal with timestamp.
+   * For WEBHOOK_RESPONSE signals, the response object is JSON-stringified and stored in content.
+   */
+  async queueSignal(signal: { type: string; content?: string; response?: Record<string, unknown> }): Promise<{ type: string; queuedAt: number }> {
+    this.initializeSignalsTable();
+
+    // For WEBHOOK_RESPONSE, store the response as JSON in the content field
+    const content = signal.type === 'WEBHOOK_RESPONSE' && signal.response
+      ? JSON.stringify(signal.response)
+      : signal.content ?? null;
+
+    const queuedAt = Date.now();
+    this.sql.exec(
+      `INSERT INTO brain_signals (signal_type, content, queued_at) VALUES (?, ?, ?)`,
+      signal.type,
+      content,
+      queuedAt
+    );
+
+    return { type: signal.type, queuedAt };
+  }
+
+  /**
+   * Get and consume (delete) pending signals.
+   * Signals are returned in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
+   * @param filter 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
+   */
+  getAndConsumeSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): BrainSignal[] {
+    this.initializeSignalsTable();
+
+    // Query signals ordered by priority
+    let whereClause = '';
+    if (filter === 'CONTROL') {
+      whereClause = `WHERE signal_type IN ('KILL', 'PAUSE')`;
+    } else if (filter === 'WEBHOOK') {
+      whereClause = `WHERE signal_type = 'WEBHOOK_RESPONSE'`;
+    }
+
+    const results = this.sql
+      .exec<{ id: number; signal_type: string; content: string | null }>(
+        `SELECT id, signal_type, content FROM brain_signals ${whereClause}
+         ORDER BY CASE signal_type
+           WHEN 'KILL' THEN 1
+           WHEN 'PAUSE' THEN 2
+           WHEN 'WEBHOOK_RESPONSE' THEN 3
+           WHEN 'RESUME' THEN 4
+           WHEN 'USER_MESSAGE' THEN 5
+         END`
+      )
+      .toArray();
+
+    if (results.length === 0) {
+      return [];
+    }
+
+    // Delete the returned signals (consume them)
+    const ids = results.map(r => r.id);
+    this.sql.exec(`DELETE FROM brain_signals WHERE id IN (${ids.join(',')})`);
+
+    // Convert to BrainSignal format
+    return results.map(r => {
+      if (r.signal_type === 'USER_MESSAGE') {
+        return { type: 'USER_MESSAGE' as const, content: r.content ?? '' };
+      }
+      if (r.signal_type === 'WEBHOOK_RESPONSE') {
+        return { type: 'WEBHOOK_RESPONSE' as const, response: JSON.parse(r.content ?? '{}') };
+      }
+      if (r.signal_type === 'RESUME') {
+        return { type: 'RESUME' as const };
+      }
+      return { type: r.signal_type as 'KILL' | 'PAUSE' };
+    });
   }
 
   private async loadResourcesFromR2(): Promise<Resources | null> {
@@ -234,9 +329,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
       try {
         const startEventResult = sql
           .exec<{ serialized_event: string }>(
-            `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id DESC LIMIT 1`,
-            BRAIN_EVENTS.START,
-            BRAIN_EVENTS.RESTART
+            `SELECT serialized_event FROM brain_events WHERE event_type = ? ORDER BY event_id DESC LIMIT 1`,
+            BRAIN_EVENTS.START
           )
           .toArray();
 
@@ -363,6 +457,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Add pages service and runtime env
     runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
 
+    // Add signal provider for signal handling
+    const signalProvider = new CloudflareSignalProvider(
+      (filter) => this.getAndConsumeSignals(filter)
+    );
+    runnerWithResources = runnerWithResources.withSignalProvider(signalProvider);
+
     // Extract options from initialData if present
     const options = initialData?.options;
     const initialState = initialData && !initialData.options ? initialData : {};
@@ -395,28 +495,28 @@ export class BrainRunnerDO extends DurableObject<Env> {
       });
   }
 
-  async resume(
-    brainRunId: string,
-    webhookResponse: Record<string, any>
-  ) {
+  /**
+   * Wake up (resume) a brain from a previous execution point.
+   * Webhook response data comes from signals, not as a parameter.
+   * This method reconstructs state and calls BrainRunner.resume().
+   */
+  async wakeUp(brainRunId: string) {
     const { sql } = this;
 
     if (!manifest) {
       throw new Error('Runtime manifest not initialized');
     }
 
-    // Get the initial state and brain title by loading the FIRST START or RESTART event
-    // (the outer brain's event, not an inner brain's)
+    // Get the brain title by loading the FIRST START event
     const startEventResult = sql
       .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events WHERE event_type IN (?, ?) ORDER BY event_id ASC LIMIT 1`,
-        BRAIN_EVENTS.START,
-        BRAIN_EVENTS.RESTART
+        `SELECT serialized_event FROM brain_events WHERE event_type = ? ORDER BY event_id ASC LIMIT 1`,
+        BRAIN_EVENTS.START
       )
       .toArray();
 
     if (startEventResult.length === 0) {
-      throw new Error(`No START or RESTART event found for brain run ${brainRunId}`);
+      throw new Error(`No START event found for brain run ${brainRunId}`);
     }
 
     const startEvent = JSON.parse(startEventResult[0].serialized_event);
@@ -424,7 +524,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const initialState = startEvent.initialState || {};
 
     if (!brainTitle) {
-      throw new Error(`Brain title not found in START/RESTART event for brain run ${brainRunId}`);
+      throw new Error(`Brain title not found in START event for brain run ${brainRunId}`);
     }
 
     // Resolve the brain using the title
@@ -449,33 +549,19 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
     }
 
-    // Load all events and feed them to the state machine to build nested initialCompletedSteps
+    // Load all events and feed them to the state machine to reconstruct execution tree
     const allEventsResult = sql
       .exec<{ serialized_event: string }>(
         `SELECT serialized_event FROM brain_events ORDER BY event_id ASC`
       )
       .toArray();
 
-    // Create state machine and feed all historical events to reconstruct step hierarchy
+    // Create state machine and feed all historical events to reconstruct execution state
     const machine = createBrainExecutionMachine({ initialState: initialState });
     for (const row of allEventsResult) {
       const event = JSON.parse(row.serialized_event);
       sendEvent(machine, event);
     }
-
-    // Get the reconstructed step hierarchy from the state machine
-    const initialCompletedSteps: SerializedStep[] = getCompletedSteps(machine);
-
-    // Load AGENT_* events for potential agent resume
-    const agentEventsResult = sql
-      .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events WHERE event_type LIKE 'agent:%' ORDER BY event_id ASC`
-      )
-      .toArray();
-
-    const agentEvents = agentEventsResult.map((row) =>
-      JSON.parse(row.serialized_event)
-    );
 
     const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
     const { eventStreamAdapter } = this;
@@ -515,6 +601,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Add pages service and runtime env
     runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
 
+    // Add signal provider for signal handling
+    // Webhook response comes from signals, consumed by the brain during execution
+    const signalProvider = new CloudflareSignalProvider(
+      (filter) => this.getAndConsumeSignals(filter)
+    );
+    runnerWithResources = runnerWithResources.withSignalProvider(signalProvider);
+
     // Create abort controller for this run
     this.abortController = new AbortController();
 
@@ -527,16 +620,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
         webhookAdapter,
         this.pageAdapter,
       ])
-      .run(brainToRun, {
-        initialState,
-        initialCompletedSteps,
+      .resume(brainToRun, {
+        machine,
         brainRunId,
-        response: webhookResponse,
         signal: this.abortController.signal,
-        agentEvents,
       })
       .catch((err: any) => {
-        console.error(`[DO ${brainRunId}] BrainRunner resume failed:`, err);
+        console.error(`[DO ${brainRunId}] BrainRunner wakeUp failed:`, err);
         throw err;
       })
       .finally(() => {

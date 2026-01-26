@@ -3,7 +3,7 @@ import type {
   AgentStartEvent,
   AgentRawResponseMessageEvent,
 } from '@positronic/core';
-import type { StoredEvent } from './state-reconstruction.js';
+import type { StoredEvent } from '../components/events-view.js';
 
 export interface AgentLoopInfo {
   stepId: string;

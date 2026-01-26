@@ -8,7 +8,8 @@ export type {
   BrainEvent,
   SerializedStep,
   InitialRunParams,
-  RerunParams,
+  ResumeRunParams,
+  ResumeContext,
   BrainStartEvent,
   BrainCompleteEvent,
   BrainErrorEvent,
@@ -33,6 +34,9 @@ export type {
   StepContext,
   ExtractTerminalInput,
   RetryConfig,
+  SignalType,
+  BrainSignal,
+  SignalProvider,
 } from './dsl/types.js';
 export { applyPatches } from './dsl/json-patch.js';
 
@@ -66,7 +70,9 @@ export type {
   AgentIterationLimitEvent,
   AgentWebhookEvent,
   AgentRawResponseMessageEvent,
+  AgentUserMessageEvent,
   WebhookResponseEvent,
+  BrainPausedEvent,
 } from './dsl/definitions/events.js';
 
 // Default tools
@@ -80,22 +86,30 @@ export {
   createBrainExecutionMachine,
   createBrainMachine,
   sendEvent,
-  getDepth,
-  isTopLevel,
-  getCurrentStep,
-  getBrainStack,
-  getBrainRunId,
-  getExecutionState,
-  getPendingWebhooks,
-  getError,
-  getCompletedSteps,
+  reconstructBrainTree,
+  brainMachineDefinition,
 } from './dsl/brain-state-machine.js';
+
+// Signal validation
+export {
+  isSignalValid,
+  getValidSignals,
+} from './dsl/signal-validation.js';
+export type {
+  MachineStateDefinition,
+  SignalValidationResult,
+} from './dsl/signal-validation.js';
 export type {
   BrainStateMachine,
   BrainExecutionContext,
   BrainStackEntry,
+  BrainEntry,
+  ExecutionStackEntry,
   RunningBrain,
   StepInfo,
   ExecutionState,
   CreateMachineOptions,
+  AgentContext,
+  ExecutionNode,
 } from './dsl/brain-state-machine.js';
+export type { AgentResumeContext } from './dsl/agent-messages.js';

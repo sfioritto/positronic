@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
 import { parseCronExpression } from 'cron-schedule';
 import Fuse from 'fuse.js';
+import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 import { getManifest } from '../brain-runner-do.js';
 import type { Bindings, CreateBrainRunRequest, CreateBrainRunResponse } from './types.js';
 
@@ -180,6 +181,79 @@ brains.delete('/runs/:runId', async (context: Context) => {
     console.error(`Error killing brain run ${runId}:`, error);
     return context.json({ error: 'Failed to kill brain run' }, 500);
   }
+});
+
+// Signal endpoint - queue KILL, PAUSE, USER_MESSAGE, RESUME, or WEBHOOK_RESPONSE signals
+brains.post('/runs/:runId/signals', async (context: Context) => {
+  const runId = context.req.param('runId');
+  const body = await context.req.json<{ type: string; content?: string; response?: Record<string, unknown> }>();
+
+  // Validate signal type
+  if (!['KILL', 'PAUSE', 'USER_MESSAGE', 'RESUME', 'WEBHOOK_RESPONSE'].includes(body.type)) {
+    return context.json({ error: 'Invalid signal type' }, 400);
+  }
+
+  // Check if the run exists in MonitorDO
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+  const run = await monitorStub.getRun(runId);
+
+  if (!run) {
+    return context.json({ error: 'Brain run not found' }, 404);
+  }
+
+  // Validate control signals against current brain state using state machine definition
+  // USER_MESSAGE is a data signal that gets queued and processed during agent execution,
+  // so it doesn't need state validation - it can always be queued
+  if (body.type !== 'USER_MESSAGE') {
+    const validation = isSignalValid(brainMachineDefinition, run.status, body.type);
+    if (!validation.valid) {
+      return context.json({ error: validation.reason }, 409);
+    }
+  }
+
+  // Get BrainRunnerDO stub and queue the signal
+  const namespace = context.env.BRAIN_RUNNER_DO;
+  const doId = namespace.idFromName(runId);
+  const stub = namespace.get(doId);
+
+  const signal = await stub.queueSignal(body);
+
+  return context.json({
+    success: true,
+    signal: { type: signal.type, queuedAt: signal.queuedAt }
+  }, 202);
+});
+
+// Resume endpoint - resume a paused brain using signal-based approach
+brains.post('/runs/:runId/resume', async (context: Context) => {
+  const runId = context.req.param('runId');
+
+  // Check if the run exists and is paused via MonitorDO
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+  const run = await monitorStub.getRun(runId);
+
+  if (!run) {
+    return context.json({ error: 'Brain run not found' }, 404);
+  }
+
+  if (run.status !== 'paused') {
+    return context.json({
+      error: `Cannot resume brain in '${run.status}' state. Only paused brains can be resumed.`
+    }, 409);
+  }
+
+  // Queue RESUME signal and wake up the brain
+  const namespace = context.env.BRAIN_RUNNER_DO;
+  const doId = namespace.idFromName(runId);
+  const stub = namespace.get(doId);
+
+  // Queue the RESUME signal first, then wake up the brain
+  await stub.queueSignal({ type: 'RESUME' });
+  await stub.wakeUp(runId);
+
+  return context.json({ success: true, action: 'resumed' }, 202);
 });
 
 brains.get('/:identifier/history', async (context: Context) => {

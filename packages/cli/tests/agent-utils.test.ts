@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { BRAIN_EVENTS } from '@positronic/core';
 import { getAgentLoops, getAgentLabel } from '../src/utils/agent-utils.js';
-import type { StoredEvent } from '../src/utils/state-reconstruction.js';
+import type { StoredEvent } from '../src/components/types.js';
 
 // Helper to create a StoredEvent
 function createStoredEvent(event: any, timestampOffset = 0): StoredEvent {

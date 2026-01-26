@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import type { Bindings } from '../types.js';
-import { findAndResumeBrain, parseFormData } from './coordination.js';
+import { queueWebhookAndWakeUp, parseFormData } from './coordination.js';
 
 const system = new Hono<{ Bindings: Bindings }>();
 
@@ -22,7 +22,7 @@ system.post('/ui-form', async (context: Context) => {
     const formData = await context.req.formData();
     const response = parseFormData(formData);
 
-    const result = await findAndResumeBrain(context, 'ui-form', identifier, response);
+    const result = await queueWebhookAndWakeUp(context, 'ui-form', identifier, response);
 
     // Return 404 if no brain was waiting
     if (result.action === 'not_found') {

@@ -26,8 +26,8 @@ interface BrainBaseEvent<TOptions extends JsonObject = JsonObject>
 
 export interface BrainStartEvent<TOptions extends JsonObject = JsonObject>
   extends BrainBaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.START | typeof BRAIN_EVENTS.RESTART;
-  initialState?: object;
+  type: typeof BRAIN_EVENTS.START;
+  initialState: object;  // Always included now (no longer optional)
   status: typeof STATUS.RUNNING;
 }
 
@@ -50,6 +50,18 @@ export interface BrainCancelledEvent<TOptions extends JsonObject = JsonObject>
   status: typeof STATUS.CANCELLED;
 }
 
+export interface BrainPausedEvent<TOptions extends JsonObject = JsonObject>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PAUSED;
+  status: typeof STATUS.PAUSED;
+}
+
+export interface BrainResumedEvent<TOptions extends JsonObject = JsonObject>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.RESUMED;
+  status: typeof STATUS.RUNNING;
+}
+
 // Step Status Event (just steps array and base event properties)
 export interface StepStatusEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
@@ -64,6 +76,7 @@ export interface StepStartedEvent<TOptions extends JsonObject = JsonObject>
   status: typeof STATUS.RUNNING;
   stepTitle: string;
   stepId: string;
+  stepIndex: number;  // 0-based index of the step within the current brain
 }
 
 export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
@@ -193,6 +206,15 @@ export interface AgentRawResponseMessageEvent<
   message: ResponseMessage;
 }
 
+export interface AgentUserMessageEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.AGENT_USER_MESSAGE;
+  stepTitle: string;
+  stepId: string;
+  /** The user-injected message content */
+  content: string;
+}
+
 export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK_RESPONSE;
@@ -205,6 +227,8 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainCompleteEvent<TOptions>
   | BrainErrorEvent<TOptions>
   | BrainCancelledEvent<TOptions>
+  | BrainPausedEvent<TOptions>
+  | BrainResumedEvent<TOptions>
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>
@@ -220,4 +244,5 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | AgentTokenLimitEvent<TOptions>
   | AgentIterationLimitEvent<TOptions>
   | AgentWebhookEvent<TOptions>
-  | AgentRawResponseMessageEvent<TOptions>;
+  | AgentRawResponseMessageEvent<TOptions>
+  | AgentUserMessageEvent<TOptions>;

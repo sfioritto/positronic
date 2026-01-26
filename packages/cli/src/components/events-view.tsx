@@ -3,11 +3,9 @@ import { Text, Box, useStdout, useInput } from 'ink';
 import type { BrainEvent } from '@positronic/core';
 import { BRAIN_EVENTS } from '@positronic/core';
 import { EventDetail } from './event-detail.js';
-import type { StoredEvent } from '../utils/state-reconstruction.js';
+import type { StoredEvent, EventsViewMode } from './types.js';
 
-export type { StoredEvent };
-
-export type EventsViewMode = 'auto' | 'navigating' | 'detail';
+export type { StoredEvent, EventsViewMode };
 
 interface EventsViewProps {
   events: StoredEvent[];
@@ -60,12 +58,6 @@ function formatEvent(event: BrainEvent): FormattedEvent {
       return {
         symbol: '[>]',
         text: `Brain started: "${event.brainTitle}"`,
-        color: 'yellow',
-      };
-    case BRAIN_EVENTS.RESTART:
-      return {
-        symbol: '[>>]',
-        text: `Brain restarted: "${event.brainTitle}"`,
         color: 'yellow',
       };
     case BRAIN_EVENTS.COMPLETE:
