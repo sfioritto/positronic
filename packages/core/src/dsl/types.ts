@@ -205,3 +205,36 @@ export interface RetryConfig {
   /** Maximum delay in ms between retries. Default: 30000 */
   maxDelay?: number;
 }
+
+// Signal types for brain interruption
+
+/**
+ * Signal types that can be sent to a running brain.
+ * Signals are processed in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
+ */
+export type SignalType = 'KILL' | 'PAUSE' | 'USER_MESSAGE' | 'RESUME' | 'WEBHOOK_RESPONSE';
+
+/**
+ * A signal that can be injected into a running brain's execution.
+ */
+export type BrainSignal =
+  | { type: 'KILL' }
+  | { type: 'PAUSE' }
+  | { type: 'USER_MESSAGE'; content: string }
+  | { type: 'RESUME' }
+  | { type: 'WEBHOOK_RESPONSE'; response: JsonObject };
+
+/**
+ * Interface for providing signals to a running brain.
+ * Implementations are backend-specific (in-memory, database, KV store, etc.)
+ */
+export interface SignalProvider {
+  /**
+   * Get pending signals for the current brain run.
+   * Signals should be consumed (deleted) when returned.
+   *
+   * @param filter - 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
+   * @returns Array of signals in priority order (KILL first, then PAUSE, then WEBHOOK_RESPONSE, then RESUME, then USER_MESSAGE)
+   */
+  getSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): Promise<BrainSignal[]>;
+}

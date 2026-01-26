@@ -1,75 +1,12 @@
-import { BRAIN_EVENTS } from './constants.js';
-import type {
-  BrainEvent,
-  AgentStartEvent,
-  AgentWebhookEvent,
-  AgentRawResponseMessageEvent,
-} from './definitions/events.js';
-import type { ResponseMessage } from '../clients/types.js';
 import type { JsonObject } from './types.js';
-
-export interface AgentResumeContext {
-  /** SDK-native messages preserving provider metadata (e.g., Gemini's thoughtSignature) */
-  responseMessages: ResponseMessage[];
-  pendingToolCallId: string;
-  pendingToolName: string;
-  prompt: string;
-  system?: string;
-  /** The raw webhook response for event emission */
-  webhookResponse: JsonObject;
-}
+import type { AgentContext } from './brain-state-machine.js';
 
 /**
- * Reconstructs the agent context from stored events and a webhook response.
- * Returns null if this is not an agent resume (no AGENT_WEBHOOK event found).
+ * Context for resuming an agent execution.
+ * Extends the state machine's AgentContext with an optional webhook response.
+ * The webhook response is only present when resuming from a webhook (vs a pause).
  */
-export function reconstructAgentContext(
-  events: BrainEvent[],
-  webhookResponse: JsonObject
-): AgentResumeContext | null {
-  // Find AGENT_WEBHOOK event - if not present, this is not an agent resume
-  const agentWebhookEvent = events.find(
-    (e): e is AgentWebhookEvent => e.type === BRAIN_EVENTS.AGENT_WEBHOOK
-  );
-  if (!agentWebhookEvent) {
-    return null;
-  }
-
-  // Find AGENT_START to get the initial prompt and system
-  const agentStartEvent = events.find(
-    (e): e is AgentStartEvent => e.type === BRAIN_EVENTS.AGENT_START
-  );
-  if (!agentStartEvent) {
-    throw new Error(
-      'AGENT_START event not found but AGENT_WEBHOOK exists - invalid event sequence'
-    );
-  }
-
-  // Collect all raw response message events
-  // Each event now contains a single message
-  const rawResponseEvents = events.filter(
-    (e): e is AgentRawResponseMessageEvent =>
-      e.type === BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE
-  );
-
-  if (rawResponseEvents.length === 0) {
-    throw new Error(
-      'AGENT_RAW_RESPONSE_MESSAGE event not found but AGENT_WEBHOOK exists - invalid event sequence'
-    );
-  }
-
-  // Reconstruct full conversation by concatenating all messages from all events
-  // No filtering needed - webhook tools no longer add placeholder messages
-  const responseMessages: ResponseMessage[] = rawResponseEvents.map(
-    (event) => event.message
-  );
-
-  return {
-    responseMessages,
-    pendingToolCallId: agentWebhookEvent.toolCallId,
-    pendingToolName: agentWebhookEvent.toolName,
-    prompt: agentStartEvent.prompt,
-    system: agentStartEvent.system,
-    webhookResponse,
-  };
+export interface AgentResumeContext extends AgentContext {
+  /** The raw webhook response - only present for webhook resume, not pause resume */
+  webhookResponse?: JsonObject;
 }

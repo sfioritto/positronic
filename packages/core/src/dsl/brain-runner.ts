@@ -1,13 +1,67 @@
-import { BRAIN_EVENTS } from './constants.js';
-import { applyPatches } from './json-patch.js';
-import { reconstructAgentContext } from './agent-messages.js';
-import { createBrainExecutionMachine, sendEvent } from './brain-state-machine.js';
+import { BRAIN_EVENTS, STATUS } from './constants.js';
+import { createBrainExecutionMachine, sendEvent, type BrainStateMachine, type ExecutionStackEntry, type AgentContext } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
-import { DEFAULT_ENV, type SerializedStep, type Brain, type BrainEvent } from './brain.js';
-import type { State, JsonObject, RuntimeEnv } from './types.js';
+import { DEFAULT_ENV, type Brain, type BrainEvent, type ResumeContext } from './brain.js';
+import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
+import type { BrainCancelledEvent } from './definitions/events.js';
+
+/**
+ * Convert execution stack to ResumeContext tree.
+ * Adds agent context to the deepest level.
+ * Webhook response is no longer passed here - it comes from signals during execution.
+ * This is internal to BrainRunner - external consumers don't need to know about ResumeContext.
+ */
+function executionStackToResumeContext(
+  stack: ExecutionStackEntry[],
+  agentContext: AgentContext | null
+): ResumeContext {
+  if (stack.length === 0) {
+    throw new Error('Cannot convert empty execution stack to ResumeContext');
+  }
+
+  // Build from bottom of stack up (deepest to root)
+  let context: ResumeContext | undefined;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
+    if (i === stack.length - 1) {
+      // Deepest level - add agent context (webhook response comes from signals now)
+      context = {
+        stepIndex: entry.stepIndex,
+        state: entry.state,
+        agentContext: agentContext ?? undefined,
+      };
+    } else {
+      // Outer level - wrap inner context
+      context = {
+        stepIndex: entry.stepIndex,
+        state: entry.state,
+        innerResumeContext: context,
+      };
+    }
+  }
+
+  return context!;
+}
+
+/**
+ * Create a CANCELLED event for when the brain is aborted via signal.
+ * This is synthesized by the runner, not yielded from the brain's event stream.
+ */
+function createCancelledEvent<TOptions extends JsonObject>(
+  brainRunId: string,
+  options: TOptions
+): BrainCancelledEvent<TOptions> {
+  return {
+    type: BRAIN_EVENTS.CANCELLED,
+    brainRunId,
+    brainTitle: '',
+    status: STATUS.CANCELLED,
+    options,
+  };
+}
 
 export class BrainRunner {
   constructor(
@@ -17,6 +71,7 @@ export class BrainRunner {
       resources?: Resources;
       pages?: PagesService;
       env?: RuntimeEnv;
+      signalProvider?: SignalProvider;
     }
   ) {}
 
@@ -56,83 +111,128 @@ export class BrainRunner {
     });
   }
 
+  withSignalProvider(signalProvider: SignalProvider): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      signalProvider,
+    });
+  }
+
+  /**
+   * Run a brain from the beginning with fresh state.
+   */
   async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
-    {
-      initialState = {} as TState,
-      options,
-      initialCompletedSteps,
+    options?: {
+      initialState?: TState;
+      options?: TOptions;
+      brainRunId?: string;
+      endAfter?: number;
+      signal?: AbortSignal;
+    }
+  ): Promise<TState> {
+    const { initialState = {} as TState, options: brainOptions, brainRunId, endAfter, signal } = options ?? {};
+
+    return this.execute(brain, {
+      initialState,
+      options: brainOptions,
       brainRunId,
       endAfter,
       signal,
-      response,
-      agentEvents,
-    }: {
-      initialState?: TState;
+      initialStepCount: 0,
+    });
+  }
+
+  /**
+   * Resume a brain from a previous execution point.
+   * The machine should have historical events already replayed to reconstruct execution state.
+   * The BrainRunner will derive the ResumeContext from the machine's execution stack.
+   * Webhook response data comes from signals, not as a parameter.
+   */
+  async resume<TOptions extends JsonObject = {}, TState extends State = {}>(
+    brain: Brain<TOptions, TState, any>,
+    options: {
+      machine: BrainStateMachine;
+      brainRunId: string;
       options?: TOptions;
-      initialCompletedSteps?: SerializedStep[] | never;
-      brainRunId?: string | never;
       endAfter?: number;
       signal?: AbortSignal;
-      response?: JsonObject;
-      agentEvents?: BrainEvent[];
-    } = {}
+    }
   ): Promise<TState> {
-    const { adapters, client, resources, pages, env } = this.options;
-    const resolvedEnv = env ?? DEFAULT_ENV;
+    const { machine, brainRunId, options: brainOptions, endAfter, signal } = options;
 
-    // Apply any patches from completed steps to get the initial state
-    // for the state machine. The machine will then track all subsequent state changes.
-    let machineInitialState: JsonObject = initialState ?? {};
-    let initialStepCount = 0;
-    initialCompletedSteps?.forEach((step) => {
-      if (step.patch) {
-        machineInitialState = applyPatches(machineInitialState, [step.patch]) as JsonObject;
-        initialStepCount++;
-      }
+    // Build ResumeContext from machine's execution stack
+    // Webhook response comes from signals during execution, not from resume parameters
+    const { executionStack, agentContext } = machine.context;
+    const resumeContext = executionStackToResumeContext(executionStack, agentContext);
+
+    return this.execute(brain, {
+      resumeContext,
+      machine,
+      options: brainOptions,
+      brainRunId,
+      endAfter,
+      signal,
+      initialStepCount: resumeContext.stepIndex,
+    });
+  }
+
+  /**
+   * Internal execution method shared by run() and resume().
+   */
+  private async execute<TOptions extends JsonObject = {}, TState extends State = {}>(
+    brain: Brain<TOptions, TState, any>,
+    params: {
+      initialState?: TState;
+      resumeContext?: ResumeContext;
+      machine?: BrainStateMachine;
+      options?: TOptions;
+      brainRunId?: string;
+      endAfter?: number;
+      signal?: AbortSignal;
+      initialStepCount: number;
+    }
+  ): Promise<TState> {
+    const { adapters, client, resources, pages, env, signalProvider } = this.options;
+    const resolvedEnv = env ?? DEFAULT_ENV;
+    const { initialState, resumeContext, machine: providedMachine, options, brainRunId, endAfter, signal, initialStepCount } = params;
+
+    // Use provided state machine if available (for resumes with historical events),
+    // otherwise create a new one
+    const machine = providedMachine ?? createBrainExecutionMachine({
+      initialState: resumeContext?.state ?? initialState ?? {},
     });
 
-    // Create state machine with pre-populated state
-    // The machine tracks: currentState, isTopLevel, topLevelStepCount, etc.
-    const machine = createBrainExecutionMachine({ initialState: machineInitialState });
-
-    // If agentEvents and response are provided, reconstruct agent context
-    const agentResumeContext =
-      agentEvents && response
-        ? reconstructAgentContext(agentEvents, response)
-        : null;
-
-    const brainRun =
-      brainRunId && initialCompletedSteps
-        ? brain.run({
-            initialState,
-            initialCompletedSteps,
-            brainRunId,
-            options,
-            client,
-            resources: resources ?? {},
-            pages,
-            env: resolvedEnv,
-            response,
-            agentResumeContext,
-          })
-        : brain.run({
-            initialState,
-            options,
-            client,
-            brainRunId,
-            resources: resources ?? {},
-            pages,
-            env: resolvedEnv,
-          });
+    const brainRun = resumeContext
+      ? brain.run({
+          resumeContext,
+          brainRunId: brainRunId!,
+          options,
+          client,
+          resources: resources ?? {},
+          pages,
+          env: resolvedEnv,
+          signalProvider,
+        })
+      : brain.run({
+          initialState: initialState ?? ({} as TState),
+          options,
+          client,
+          brainRunId,
+          resources: resources ?? {},
+          pages,
+          env: resolvedEnv,
+          signalProvider,
+        });
 
     try {
       for await (const event of brainRun) {
         // Check if we've been cancelled
         if (signal?.aborted) {
-          // Use state machine to create cancelled event
-          sendEvent(machine, { type: BRAIN_EVENTS.CANCELLED });
-          const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
+          const cancelledEvent = createCancelledEvent(
+            machine.context.brainRunId ?? '',
+            (options ?? {}) as TOptions
+          );
           await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
           // Cast is safe: state started as TState and patches maintain the structure
           return machine.context.currentState as TState;
@@ -155,8 +255,8 @@ export class BrainRunner {
           }
         }
 
-        // Stop execution when machine enters paused state (webhook)
-        if (machine.context.isPaused) {
+        // Stop execution when machine enters paused or waiting state
+        if (machine.context.isPaused || machine.context.isWaiting) {
           // Cast is safe: state started as TState and patches maintain the structure
           return machine.context.currentState as TState;
         }
@@ -164,8 +264,10 @@ export class BrainRunner {
     } catch (error) {
       // If aborted while awaiting, check signal and emit cancelled event
       if (signal?.aborted) {
-        sendEvent(machine, { type: BRAIN_EVENTS.CANCELLED });
-        const cancelledEvent = machine.context.currentEvent as unknown as BrainEvent<TOptions>;
+        const cancelledEvent = createCancelledEvent(
+          machine.context.brainRunId ?? '',
+          (options ?? {}) as TOptions
+        );
         await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
         // Cast is safe: state started as TState and patches maintain the structure
         return machine.context.currentState as TState;

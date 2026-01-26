@@ -46,7 +46,8 @@
       "WebFetch(domain:blog.logrocket.com)",
       "WebFetch(domain:regularhuman.dev)",
       "WebFetch(domain:planningforaliens.com)",
-      "WebFetch(domain:vercel.com)"
+      "WebFetch(domain:vercel.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": []
   }

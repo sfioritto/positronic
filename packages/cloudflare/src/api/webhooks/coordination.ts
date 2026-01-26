@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 
 /**
  * Result from a webhook handler.
@@ -9,32 +10,53 @@ export type WebhookHandlerResult =
   | { type?: undefined; identifier: string; response: Record<string, unknown> };
 
 /**
- * Find a brain waiting for a webhook and resume it if found.
+ * Find a brain waiting for a webhook, queue the WEBHOOK_RESPONSE signal, and wake it up.
  * Returns a JSON response object suitable for returning from a webhook endpoint.
+ *
+ * This is the signal-based approach: webhook response data flows through the signal queue
+ * rather than being passed directly to the resume method.
  */
-export async function findAndResumeBrain(
+export async function queueWebhookAndWakeUp(
   context: Context,
   slug: string,
   identifier: string,
   response: Record<string, unknown>
 ): Promise<{
   received: boolean;
-  action: 'resumed' | 'not_found' | 'queued';
+  action: 'resumed' | 'not_found' | 'queued' | 'ignored';
   identifier: string;
   brainRunId?: string;
   message?: string;
+  reason?: string;
 }> {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
   const brainRunId = await monitorStub.findWaitingBrain(slug, identifier);
 
   if (brainRunId) {
-    // Found a brain waiting - resume it
+    // Found a brain - verify it can receive webhook response
+    const run = await monitorStub.getRun(brainRunId);
+    if (run) {
+      const validation = isSignalValid(brainMachineDefinition, run.status, 'WEBHOOK_RESPONSE');
+      if (!validation.valid) {
+        return {
+          received: true,
+          action: 'ignored',
+          identifier,
+          brainRunId,
+          reason: validation.reason,
+        };
+      }
+    }
+
+    // Queue WEBHOOK_RESPONSE signal and wake up the brain
     const namespace = context.env.BRAIN_RUNNER_DO;
     const doId = namespace.idFromName(brainRunId);
     const stub = namespace.get(doId);
 
-    await stub.resume(brainRunId, response);
+    // Queue the signal first, then wake up the brain
+    await stub.queueSignal({ type: 'WEBHOOK_RESPONSE', response });
+    await stub.wakeUp(brainRunId);
 
     return {
       received: true,

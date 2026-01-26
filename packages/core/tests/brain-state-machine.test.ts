@@ -18,6 +18,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // Start agent step (transitions to agentLoop state)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Generate content',
+        stepId: 'step-1',
+        prompt: 'Generate some content',
+      });
+
       // Agent iteration with 500 tokens
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
@@ -55,6 +64,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // First agent - start (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'First prompt',
+      });
+
       // First agent - 1 iteration with 500 tokens
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
@@ -75,6 +93,15 @@ describe('brain-state-machine', () => {
         result: {},
         totalIterations: 1,
         totalTokens: 500,
+      });
+
+      // Second agent - start (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 2',
+        stepId: 'step-2',
+        prompt: 'Second prompt',
       });
 
       // Second agent - 2 iterations: 400 + 600 = 1000 tokens
@@ -123,6 +150,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // Start agent (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'Generate tokens',
+      });
+
       // Agent runs 5 iterations before hitting token limit
       for (let i = 1; i <= 5; i++) {
         sendEvent(machine, {
@@ -158,6 +194,15 @@ describe('brain-state-machine', () => {
         brainRunId,
         brainTitle: 'iter-limit-brain',
         initialState: {},
+      });
+
+      // Start agent (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'Run many iterations',
       });
 
       // Agent runs 10 iterations before hitting limit
@@ -200,6 +245,15 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
+      // Start agent (transitions to agentLoop)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.AGENT_START,
+        brainRunId,
+        stepTitle: 'Step 1',
+        stepId: 'step-1',
+        prompt: 'Generate with webhook',
+      });
+
       // First agent runs 2 iterations before being interrupted by webhook
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
@@ -221,7 +275,7 @@ describe('brain-state-machine', () => {
         totalTokens: 1669,
       });
 
-      // Webhook pause - agent never completes!
+      // Webhook pause - agent is interrupted but agentContext preserved
       sendEvent(machine, {
         type: BRAIN_EVENTS.WEBHOOK,
         brainRunId,
@@ -231,23 +285,22 @@ describe('brain-state-machine', () => {
       // Tokens should still be tracked from iterations
       expect(machine.context.totalTokens).toBe(1669);
 
-      // Brain restarts after webhook
+      // Brain resumes after webhook via WEBHOOK_RESPONSE - goes back to agentLoop since agentContext exists
       sendEvent(machine, {
-        type: BRAIN_EVENTS.RESTART,
+        type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
         brainRunId,
-        brainTitle: 'webhook-brain',
-        initialState: {},
+        response: { data: 'webhook data' },
       });
 
-      // Second agent runs and completes
+      // Agent resumes and continues iterating
       sendEvent(machine, {
         type: BRAIN_EVENTS.AGENT_ITERATION,
         brainRunId,
         stepTitle: 'Step 1',
         stepId: 'step-1',
-        iteration: 1,
+        iteration: 3,
         tokensThisIteration: 1392,
-        totalTokens: 1392,
+        totalTokens: 3061,
       });
 
       sendEvent(machine, {
@@ -257,24 +310,20 @@ describe('brain-state-machine', () => {
         stepId: 'step-1',
         terminalToolName: 'done',
         result: {},
-        totalIterations: 1,
-        totalTokens: 1392,
+        totalIterations: 3,
+        totalTokens: 3061,
       });
 
-      // Total should be sum of both agents
+      // Total should be sum of all iterations
       expect(machine.context.totalTokens).toBe(1669 + 1392);
     });
   });
 
-  describe('brain restart (webhook resume)', () => {
-    it('should replace brain on stack when same brain restarts after webhook (not add duplicate)', () => {
+  describe('webhook resume', () => {
+    it('should resume from waiting state via WEBHOOK_RESPONSE', () => {
       // This test simulates the event sequence that occurs when:
       // 1. A brain runs and pauses for a webhook
-      // 2. The webhook is triggered and the brain resumes
-      // 3. The watch client receives all historical events including the restart
-      //
-      // The bug was: restart added a NEW brain to the stack instead of replacing,
-      // causing depth to be 2 instead of 1, and isComplete to never become true.
+      // 2. The webhook is triggered and the brain resumes via WEBHOOK_RESPONSE
 
       const machine = createBrainExecutionMachine();
       const brainRunId = 'test-run-123';
@@ -289,7 +338,7 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
       expect(machine.context.isComplete).toBe(false);
 
@@ -310,6 +359,7 @@ describe('brain-state-machine', () => {
         brainRunId,
         stepId: 'step-1',
         stepTitle: 'Setup',
+        stepIndex: 0,
       });
 
       // Event 4: step:complete
@@ -327,6 +377,7 @@ describe('brain-state-machine', () => {
         brainRunId,
         stepId: 'step-2',
         stepTitle: 'Wait for webhook',
+        stepIndex: 1,
       });
 
       // Event 6: step:complete (webhook step completes before webhook)
@@ -338,33 +389,30 @@ describe('brain-state-machine', () => {
         patch: [],
       });
 
-      // Event 7: brain:webhook (brain pauses)
+      // Event 7: brain:webhook (brain waits for webhook)
       sendEvent(machine, {
         type: BRAIN_EVENTS.WEBHOOK,
         brainRunId,
         waitFor: [{ name: 'webhook-brain', identifier: 'test-123' }],
       });
 
-      expect(machine.context.isPaused).toBe(true);
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.isWaiting).toBe(true);
+      expect(machine.context.brainIdStack.length).toBe(1);
 
       // === WEBHOOK TRIGGERED - RESUME ===
 
-      // Event 8: brain:restart (brain resumes after webhook)
-      // THIS IS THE KEY TEST: brainStack should still be length 1, not 2
+      // Event 8: webhook:response (brain resumes after webhook)
       sendEvent(machine, {
-        type: BRAIN_EVENTS.RESTART,
+        type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
         brainRunId,
-        brainTitle, // Same title as original brain
-        brainDescription: 'A brain that uses webhooks',
-        initialState: { setup: true },
+        response: { data: 'test' },
       });
 
-      // CRITICAL ASSERTION: brainStack should have 1 entry (replaced), not 2 (added)
-      expect(machine.context.brainStack.length).toBe(1);
+      // Brain should be running again
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
-      expect(machine.context.brainStack[0].brainTitle).toBe(brainTitle);
-      expect(machine.context.isPaused).toBe(false);
+      expect(machine.context.brainIdStack[0]).toBe(brainTitle);
+      expect(machine.context.isWaiting).toBe(false);
       expect(machine.context.isRunning).toBe(true);
 
       // Event 9: step:status (after resume)
@@ -384,6 +432,7 @@ describe('brain-state-machine', () => {
         brainRunId,
         stepId: 'step-3',
         stepTitle: 'Process response',
+        stepIndex: 2,
       });
 
       // Event 11: step:complete (final step)
@@ -406,13 +455,13 @@ describe('brain-state-machine', () => {
       // CRITICAL ASSERTION: brain should be complete
       // rootBrain is preserved after completion so we can display final state
       expect(machine.context.isComplete).toBe(true);
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(0);
     });
 
-    it('should add to stack when different (nested) brain restarts', () => {
-      // This tests that nested inner brains still work correctly
-      // When an inner brain restarts, it should be ADDED to the stack (not replace outer)
+    it('should handle nested brain with webhook', () => {
+      // This tests that nested inner brains with webhooks work correctly
+      // Using WEBHOOK_RESPONSE to resume
 
       const machine = createBrainExecutionMachine();
       const outerBrainRunId = 'outer-run-123';
@@ -427,7 +476,7 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
 
       // Outer brain step starts (which will run inner brain)
@@ -444,6 +493,7 @@ describe('brain-state-machine', () => {
         brainRunId: outerBrainRunId,
         stepId: 'outer-step-1',
         stepTitle: 'Run inner brain',
+        stepIndex: 0,
       });
 
       // Inner brain starts (nested)
@@ -454,38 +504,35 @@ describe('brain-state-machine', () => {
         initialState: {},
       });
 
-      expect(machine.context.brainStack.length).toBe(2);
+      expect(machine.context.brainIdStack.length).toBe(2);
       expect(machine.context.depth).toBe(2);
-      expect(machine.context.brainStack[0].brainTitle).toBe(outerBrainTitle);
-      expect(machine.context.brainStack[1].brainTitle).toBe(innerBrainTitle);
+      expect(machine.context.brainIdStack[0]).toBe(outerBrainTitle);
+      expect(machine.context.brainIdStack[1]).toBe(innerBrainTitle);
 
-      // Inner brain pauses for webhook
+      // Inner brain waits for webhook
       sendEvent(machine, {
         type: BRAIN_EVENTS.WEBHOOK,
         brainRunId: outerBrainRunId,
         waitFor: [{ name: 'inner-webhook', identifier: 'inner-123' }],
       });
 
-      expect(machine.context.isPaused).toBe(true);
-      expect(machine.context.brainStack.length).toBe(2);
+      expect(machine.context.isWaiting).toBe(true);
+      expect(machine.context.brainIdStack.length).toBe(2);
 
-      // Inner brain restarts after webhook
-      // Since it has a DIFFERENT title than the last brain on stack (inner-brain),
-      // wait no - it has the SAME title. Let me reconsider...
-      // Actually the inner brain is on top of the stack with title 'inner-brain',
-      // so when inner brain restarts with title 'inner-brain', it should REPLACE (not add).
+      // Inner brain resumes after webhook via WEBHOOK_RESPONSE
       sendEvent(machine, {
-        type: BRAIN_EVENTS.RESTART,
+        type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
         brainRunId: outerBrainRunId,
-        brainTitle: innerBrainTitle, // Same as inner brain - should REPLACE inner brain
-        initialState: {},
+        response: { data: 'webhook data' },
       });
 
-      // Stack should still be length 2: [outer, inner-restarted]
-      expect(machine.context.brainStack.length).toBe(2);
+      // Stack should still be length 2: [outer, inner]
+      expect(machine.context.brainIdStack.length).toBe(2);
       expect(machine.context.depth).toBe(2);
-      expect(machine.context.brainStack[0].brainTitle).toBe(outerBrainTitle);
-      expect(machine.context.brainStack[1].brainTitle).toBe(innerBrainTitle);
+      expect(machine.context.brainIdStack[0]).toBe(outerBrainTitle);
+      expect(machine.context.brainIdStack[1]).toBe(innerBrainTitle);
+      expect(machine.context.isWaiting).toBe(false);
+      expect(machine.context.isRunning).toBe(true);
 
       // Inner brain completes
       sendEvent(machine, {
@@ -495,7 +542,7 @@ describe('brain-state-machine', () => {
         status: STATUS.COMPLETE,
       });
 
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(1);
       expect(machine.context.isComplete).toBe(false); // Outer brain not complete yet
 
@@ -508,44 +555,9 @@ describe('brain-state-machine', () => {
       });
 
       // rootBrain is preserved after completion so we can display final state
-      expect(machine.context.brainStack.length).toBe(1);
+      expect(machine.context.brainIdStack.length).toBe(1);
       expect(machine.context.depth).toBe(0);
       expect(machine.context.isComplete).toBe(true);
-    });
-
-    it('should handle restart from idle state (no brain on stack)', () => {
-      // This tests the edge case where brain:restart is the first event
-      // (e.g., watch client connects after brain already resumed)
-
-      const machine = createBrainExecutionMachine();
-      const brainRunId = 'test-run-123';
-      const brainTitle = 'restarted-brain';
-
-      // First event is brain:restart (no brain:start before it)
-      sendEvent(machine, {
-        type: BRAIN_EVENTS.RESTART,
-        brainRunId,
-        brainTitle,
-        brainDescription: 'A restarted brain',
-        initialState: { previousState: true },
-      });
-
-      expect(machine.context.brainStack.length).toBe(1);
-      expect(machine.context.depth).toBe(1);
-      expect(machine.context.brainStack[0].brainTitle).toBe(brainTitle);
-      expect(machine.context.isRunning).toBe(true);
-
-      // Brain completes
-      sendEvent(machine, {
-        type: BRAIN_EVENTS.COMPLETE,
-        brainRunId,
-        brainTitle,
-        status: STATUS.COMPLETE,
-      });
-
-      // rootBrain is preserved after completion so we can display final state
-      expect(machine.context.isComplete).toBe(true);
-      expect(machine.context.brainStack.length).toBe(1);
     });
   });
 });

@@ -1,440 +1,15 @@
 import { STATUS, BRAIN_EVENTS } from '@positronic/core';
-
-type Fetch = (request: Request) => Promise<Response>;
-
-export async function testStatus(fetch: Fetch): Promise<boolean> {
-  try {
-    const request = new Request('http://example.com/status', {
-      method: 'GET',
-    });
-
-    const response = await fetch(request);
-
-    if (!response.ok) {
-      console.error(`Status endpoint returned ${response.status}`);
-      return false;
-    }
-
-    const data = await response.json() as { ready: boolean };
-
-    if (data.ready !== true) {
-      console.error(`Expected { ready: true }, got ${JSON.stringify(data)}`);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error(`Failed to test status endpoint:`, error);
-    return false;
-  }
-}
-
-export const resources = {
-  /**
-   * Test GET /resources - List all resources
-   */
-  async list(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/resources', {
-        method: 'GET',
-      });
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(`GET /resources returned ${response.status}`);
-        return false;
-      }
-
-      const data = await response.json() as {
-        resources: Array<{
-          key: string;
-          type: string;
-          size: number;
-          lastModified: string;
-          local: boolean;
-        }>;
-        truncated: boolean;
-        count: number;
-      };
-
-      // Validate response structure
-      if (!Array.isArray(data.resources)) {
-        console.error(
-          `Expected resources to be an array, got ${typeof data.resources}`
-        );
-        return false;
-      }
-
-      if (typeof data.truncated !== 'boolean') {
-        console.error(
-          `Expected truncated to be boolean, got ${typeof data.truncated}`
-        );
-        return false;
-      }
-
-      if (typeof data.count !== 'number') {
-        console.error(`Expected count to be number, got ${typeof data.count}`);
-        return false;
-      }
-
-      // Validate each resource has required fields
-      for (const resource of data.resources) {
-        if (
-          !resource.key ||
-          !resource.type ||
-          typeof resource.size !== 'number' ||
-          !resource.lastModified ||
-          typeof resource.local !== 'boolean'
-        ) {
-          console.error(
-            `Resource missing required fields: ${JSON.stringify(resource)}`
-          );
-          return false;
-        }
-
-        if (!['text', 'binary'].includes(resource.type)) {
-          console.error(`Invalid resource type: ${resource.type}`);
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /resources:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /resources - Upload a resource
-   */
-  async upload(fetch: Fetch): Promise<boolean> {
-    try {
-      const formData = new FormData();
-      formData.append(
-        'file',
-        new Blob(['test content'], { type: 'text/plain' }),
-        'test.txt'
-      );
-      formData.append('type', 'text');
-      formData.append('key', 'test-resource.txt');
-      formData.append('local', 'false');
-
-      const request = new Request('http://example.com/resources', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const response = await fetch(request);
-
-      if (response.status !== 201) {
-        console.error(
-          `POST /resources returned ${response.status}, expected 201`
-        );
-        return false;
-      }
-
-      const data = await response.json() as {
-        key: string;
-        type: string;
-        size: number;
-        lastModified: string;
-        local: boolean;
-      };
-
-      // Validate response has required fields
-      if (
-        !data.key ||
-        !data.type ||
-        typeof data.size !== 'number' ||
-        !data.lastModified ||
-        typeof data.local !== 'boolean'
-      ) {
-        console.error(
-          `Response missing required fields: ${JSON.stringify(data)}`
-        );
-        return false;
-      }
-
-      if (data.key !== 'test-resource.txt') {
-        console.error(
-          `Expected key to be 'test-resource.txt', got ${data.key}`
-        );
-        return false;
-      }
-
-      if (data.type !== 'text') {
-        console.error(`Expected type to be 'text', got ${data.type}`);
-        return false;
-      }
-
-      if (data.local !== false) {
-        console.error(`Expected local to be false, got ${data.local}`);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test POST /resources:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test DELETE /resources/:key - Delete a specific resource
-   */
-  async delete(fetch: Fetch, key: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/resources/${encodeURIComponent(key)}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status !== 204) {
-        console.error(
-          `DELETE /resources/${key} returned ${response.status}, expected 204`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test DELETE /resources/${key}:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test DELETE /resources - Bulk delete all resources (dev mode only)
-   */
-  async deleteAll(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/resources', {
-        method: 'DELETE',
-      });
-
-      const response = await fetch(request);
-
-      // In production mode, this should return 403
-      if (response.status === 403) {
-        const data = await response.json() as { error: string };
-        if (
-          data.error === 'Bulk delete is only available in development mode'
-        ) {
-          // This is expected behavior in production
-          return true;
-        }
-      }
-
-      if (response.status !== 200) {
-        console.error(
-          `DELETE /resources returned ${response.status}, expected 200 or 403`
-        );
-        return false;
-      }
-
-      const data = await response.json() as { deletedCount: number };
-
-      if (typeof data.deletedCount !== 'number') {
-        console.error(
-          `Expected deletedCount to be number, got ${typeof data.deletedCount}`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test DELETE /resources:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test DELETE /resources preserves pages - bulk delete should not delete pages
-   */
-  async deleteAllPreservesPages(fetch: Fetch): Promise<boolean> {
-    try {
-      // First create a page
-      const pageSlug = `spec-test-page-${Date.now()}`;
-      const pageHtml = '<html><body>Test page for spec</body></html>';
-      const brainRunId = 'spec-test-brain-run-id';
-
-      const createPageRequest = new Request('http://example.com/pages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          slug: pageSlug,
-          html: pageHtml,
-          brainRunId,
-        }),
-      });
-
-      const createPageResponse = await fetch(createPageRequest);
-      if (createPageResponse.status !== 201) {
-        console.error(
-          `Failed to create test page: ${createPageResponse.status}`
-        );
-        return false;
-      }
-
-      // Now bulk delete all resources
-      const deleteRequest = new Request('http://example.com/resources', {
-        method: 'DELETE',
-      });
-
-      const deleteResponse = await fetch(deleteRequest);
-
-      // Skip test if in production mode (403)
-      if (deleteResponse.status === 403) {
-        // Clean up the page we created
-        await fetch(
-          new Request(
-            `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
-            { method: 'DELETE' }
-          )
-        );
-        console.log(
-          'Skipping deleteAllPreservesPages test - bulk delete not available in production'
-        );
-        return true;
-      }
-
-      if (deleteResponse.status !== 200) {
-        console.error(
-          `DELETE /resources returned ${deleteResponse.status}, expected 200`
-        );
-        return false;
-      }
-
-      // Verify the page still exists
-      const getPageRequest = new Request(
-        `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
-        { method: 'GET' }
-      );
-
-      const getPageResponse = await fetch(getPageRequest);
-
-      if (getPageResponse.status === 404) {
-        console.error(
-          'DELETE /resources incorrectly deleted pages - page not found after bulk delete'
-        );
-        return false;
-      }
-
-      if (!getPageResponse.ok) {
-        console.error(
-          `GET /pages/${pageSlug} returned ${getPageResponse.status}`
-        );
-        return false;
-      }
-
-      // Clean up: delete the test page
-      await fetch(
-        new Request(
-          `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
-          { method: 'DELETE' }
-        )
-      );
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test DELETE /resources preserves pages:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /resources/presigned-link - Generate presigned URL for upload
-   */
-  async generatePresignedLink(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request(
-        'http://example.com/resources/presigned-link',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            key: 'test-files/large-video.mp4',
-            type: 'binary',
-            size: 150 * 1024 * 1024, // 150MB - larger than Worker limit
-          }),
-        }
-      );
-
-      const response = await fetch(request);
-
-      // If credentials are not configured, expect 400
-      if (response.status === 400) {
-        const data = await response.json() as { error?: string };
-        // This is acceptable - implementation may not have credentials configured
-        console.log(
-          'Presigned URL generation not available - this is acceptable'
-        );
-        return true;
-      }
-
-      if (response.status !== 200) {
-        console.error(
-          `POST /resources/presigned-link returned ${response.status}, expected 200 or 400`
-        );
-        return false;
-      }
-
-      const data = await response.json() as {
-        url: string;
-        method: string;
-        expiresIn: number;
-      };
-
-      // Validate response structure (backend-agnostic)
-      if (!data.url || typeof data.url !== 'string') {
-        console.error(`Expected url to be string, got ${typeof data.url}`);
-        return false;
-      }
-
-      if (!data.method || data.method !== 'PUT') {
-        console.error(`Expected method to be 'PUT', got ${data.method}`);
-        return false;
-      }
-
-      if (typeof data.expiresIn !== 'number' || data.expiresIn <= 0) {
-        console.error(
-          `Expected expiresIn to be positive number, got ${data.expiresIn}`
-        );
-        return false;
-      }
-
-      // Basic URL validation - just ensure it's a valid URL
-      try {
-        new URL(data.url);
-        console.log('Presigned URL structure validated successfully');
-      } catch (error) {
-        console.error(`Invalid URL returned: ${data.url}`);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test POST /resources/presigned-link:`, error);
-      return false;
-    }
-  },
-};
+import type { Fetch } from './types.js';
 
 export const brains = {
   /**
    * Test POST /brains/runs - Create a new brain run
    */
-  async run(fetch: Fetch, identifier: string, options?: Record<string, string>): Promise<string | null> {
+  async run(
+    fetch: Fetch,
+    identifier: string,
+    options?: Record<string, string>
+  ): Promise<string | null> {
     try {
       const body: any = { identifier };
       if (options && Object.keys(options).length > 0) {
@@ -458,7 +33,7 @@ export const brains = {
         return null;
       }
 
-      const data = await response.json() as { brainRunId: string };
+      const data = (await response.json()) as { brainRunId: string };
 
       if (!data.brainRunId || typeof data.brainRunId !== 'string') {
         console.error(
@@ -500,7 +75,7 @@ export const brains = {
         return null;
       }
 
-      const data = await response.json() as { brainRunId: string };
+      const data = (await response.json()) as { brainRunId: string };
 
       if (!data.brainRunId || typeof data.brainRunId !== 'string') {
         console.error(
@@ -541,7 +116,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json() as { error: string };
+      const data = (await response.json()) as { error: string };
 
       if (!data.error || typeof data.error !== 'string') {
         console.error(`Expected error to be string, got ${typeof data.error}`);
@@ -668,7 +243,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         runs: Array<{
           brainRunId: string;
           brainTitle: string;
@@ -778,7 +353,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         brains: Array<{
           filename: string;
           title: string;
@@ -832,7 +407,10 @@ export const brains = {
    * The matching algorithm is implementation-defined; the spec only verifies
    * the response structure and that results are relevant to the query.
    */
-  async search(fetch: Fetch, query: string): Promise<{
+  async search(
+    fetch: Fetch,
+    query: string
+  ): Promise<{
     brains: Array<{
       title: string;
       description: string;
@@ -854,7 +432,7 @@ export const brains = {
         return null;
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         brains: Array<{
           title: string;
           description: string;
@@ -927,7 +505,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         title: string;
         steps: Array<{
           type: string;
@@ -1019,7 +597,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         runs: Array<{
           brainRunId: string;
           brainTitle: string;
@@ -1165,7 +743,10 @@ export const brains = {
   /**
    * Test GET /brains/runs/:runId with non-existent run - Should return 404
    */
-  async getRunNotFound(fetch: Fetch, nonExistentRunId: string): Promise<boolean> {
+  async getRunNotFound(
+    fetch: Fetch,
+    nonExistentRunId: string
+  ): Promise<boolean> {
     try {
       const request = new Request(
         `http://example.com/brains/runs/${encodeURIComponent(nonExistentRunId)}`,
@@ -1219,7 +800,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         matchType: 'multiple';
         candidates: Array<{
           title: string;
@@ -1245,7 +826,10 @@ export const brains = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test GET /brains/${ambiguousIdentifier} with ambiguous identifier:`, error);
+      console.error(
+        `Failed to test GET /brains/${ambiguousIdentifier} with ambiguous identifier:`,
+        error
+      );
       return false;
     }
   },
@@ -1276,7 +860,7 @@ export const brains = {
         return false;
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         matchType: 'multiple';
         candidates: Array<{
           title: string;
@@ -1314,7 +898,10 @@ export const brains = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test POST /brains/runs with ambiguous identifier:`, error);
+      console.error(
+        `Failed to test POST /brains/runs with ambiguous identifier:`,
+        error
+      );
       return false;
     }
   },
@@ -1352,7 +939,7 @@ export const brains = {
         return null;
       }
 
-      const data = await response.json() as { brainRunId: string };
+      const data = (await response.json()) as { brainRunId: string };
 
       if (!data.brainRunId || typeof data.brainRunId !== 'string') {
         console.error(
@@ -1423,7 +1010,9 @@ export const brains = {
         return false;
       }
 
-      const { brainRunId } = (await runResponse.json()) as { brainRunId: string };
+      const { brainRunId } = (await runResponse.json()) as {
+        brainRunId: string;
+      };
 
       // Step 2: Watch until WEBHOOK event (brain pauses)
       const watchRequest = new Request(
@@ -1572,7 +1161,9 @@ export const brains = {
         return false;
       }
 
-      const finalRunData = (await finalCheckResponse.json()) as { status: string };
+      const finalRunData = (await finalCheckResponse.json()) as {
+        status: string;
+      };
       if (finalRunData.status !== STATUS.CANCELLED) {
         console.error(
           `Final status check: expected '${STATUS.CANCELLED}', got '${finalRunData.status}'`
@@ -1621,7 +1212,9 @@ export const brains = {
         return false;
       }
 
-      const { brainRunId } = (await runResponse.json()) as { brainRunId: string };
+      const { brainRunId } = (await runResponse.json()) as {
+        brainRunId: string;
+      };
 
       // Watch the brain run
       const watchRequest = new Request(
@@ -1696,7 +1289,10 @@ export const brains = {
       const agentStartEvent = events.find(
         (e) => e.type === BRAIN_EVENTS.AGENT_START
       );
-      if (!agentStartEvent.prompt || typeof agentStartEvent.prompt !== 'string') {
+      if (
+        !agentStartEvent.prompt ||
+        typeof agentStartEvent.prompt !== 'string'
+      ) {
         console.error('AGENT_START event missing prompt field');
         return false;
       }
@@ -1746,7 +1342,10 @@ export const brains = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test agent events for ${agentBrainIdentifier}:`, error);
+      console.error(
+        `Failed to test agent events for ${agentBrainIdentifier}:`,
+        error
+      );
       return false;
     }
   },
@@ -1784,7 +1383,9 @@ export const brains = {
         return false;
       }
 
-      const { brainRunId } = (await runResponse.json()) as { brainRunId: string };
+      const { brainRunId } = (await runResponse.json()) as {
+        brainRunId: string;
+      };
 
       // Step 2: Watch until WEBHOOK event (brain pauses)
       const watchRequest = new Request(
@@ -2160,9 +1761,7 @@ export const brains = {
 
       const resumeWatchResponse = await fetch(resumeWatchRequest);
       if (!resumeWatchResponse.ok) {
-        console.error(
-          `Resume watch returned ${resumeWatchResponse.status}`
-        );
+        console.error(`Resume watch returned ${resumeWatchResponse.status}`);
         return false;
       }
 
@@ -2241,1404 +1840,6 @@ export const brains = {
         `Failed to test inner brain complete status for ${outerBrainIdentifier}:`,
         error
       );
-      return false;
-    }
-  },
-};
-
-export const schedules = {
-  /**
-   * Test POST /brains/schedules - Create a new schedule
-   */
-  async create(
-    fetch: Fetch,
-    identifier: string,
-    cronExpression: string
-  ): Promise<string | null> {
-    try {
-      const request = new Request('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ identifier, cronExpression }),
-      });
-
-      const response = await fetch(request);
-
-      if (response.status !== 201) {
-        console.error(
-          `POST /brains/schedules returned ${response.status}, expected 201`
-        );
-        return null;
-      }
-
-      const data = await response.json() as {
-        id: string;
-        brainTitle: string;
-        cronExpression: string;
-        enabled: boolean;
-        createdAt: number;
-      };
-
-      // Validate response structure
-      if (!data.id || typeof data.id !== 'string') {
-        console.error(`Expected id to be string, got ${typeof data.id}`);
-        return null;
-      }
-
-      // TODO: Once backend is updated, validate that the returned brain matches the identifier
-      // For now, we accept any valid response
-
-      if (data.cronExpression !== cronExpression) {
-        console.error(
-          `Expected cronExpression to be '${cronExpression}', got ${data.cronExpression}`
-        );
-        return null;
-      }
-
-      if (typeof data.enabled !== 'boolean') {
-        console.error(
-          `Expected enabled to be boolean, got ${typeof data.enabled}`
-        );
-        return null;
-      }
-
-      if (typeof data.createdAt !== 'number') {
-        console.error(
-          `Expected createdAt to be number, got ${typeof data.createdAt}`
-        );
-        return null;
-      }
-
-      return data.id;
-    } catch (error) {
-      console.error(`Failed to test POST /brains/schedules:`, error);
-      return null;
-    }
-  },
-
-  /**
-   * Test GET /brains/schedules - List all schedules
-   */
-  async list(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/brains/schedules', {
-        method: 'GET',
-      });
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(`GET /brains/schedules returned ${response.status}`);
-        return false;
-      }
-
-      const data = await response.json() as {
-        schedules: Array<{
-          id: string;
-          brainTitle: string;
-          cronExpression: string;
-          enabled: boolean;
-          createdAt: number;
-        }>;
-        count: number;
-      };
-
-      // Validate response structure
-      if (!Array.isArray(data.schedules)) {
-        console.error(
-          `Expected schedules to be an array, got ${typeof data.schedules}`
-        );
-        return false;
-      }
-
-      if (typeof data.count !== 'number') {
-        console.error(`Expected count to be number, got ${typeof data.count}`);
-        return false;
-      }
-
-      // Validate each schedule has required fields
-      for (const schedule of data.schedules) {
-        if (
-          !schedule.id ||
-          !schedule.brainTitle ||
-          !schedule.cronExpression ||
-          typeof schedule.enabled !== 'boolean' ||
-          typeof schedule.createdAt !== 'number'
-        ) {
-          console.error(
-            `Schedule missing required fields: ${JSON.stringify(schedule)}`
-          );
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /brains/schedules:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test DELETE /brains/schedules/:scheduleId - Delete a schedule
-   */
-  async delete(fetch: Fetch, scheduleId: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/brains/schedules/${scheduleId}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status !== 204) {
-        console.error(
-          `DELETE /brains/schedules/${scheduleId} returned ${response.status}, expected 204`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        `Failed to test DELETE /brains/schedules/${scheduleId}:`,
-        error
-      );
-      return false;
-    }
-  },
-
-  /**
-   * Test GET /brains/schedules/runs - Get history of scheduled runs
-   */
-  async runs(
-    fetch: Fetch,
-    scheduleId?: string,
-    limit?: number
-  ): Promise<boolean> {
-    try {
-      const url = new URL('http://example.com/brains/schedules/runs');
-      if (scheduleId !== undefined) {
-        url.searchParams.set('scheduleId', scheduleId);
-      }
-      if (limit !== undefined) {
-        url.searchParams.set('limit', limit.toString());
-      }
-
-      const request = new Request(url.toString(), {
-        method: 'GET',
-      });
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(`GET /brains/schedules/runs returned ${response.status}`);
-        return false;
-      }
-
-      const data = await response.json() as {
-        runs: Array<{
-          id: string;
-          scheduleId: string;
-          status: string;
-          ranAt: number;
-        }>;
-        count: number;
-      };
-
-      // Validate response structure
-      if (!Array.isArray(data.runs)) {
-        console.error(`Expected runs to be an array, got ${typeof data.runs}`);
-        return false;
-      }
-
-      if (typeof data.count !== 'number') {
-        console.error(`Expected count to be number, got ${typeof data.count}`);
-        return false;
-      }
-
-      // Validate each run has required fields
-      for (const run of data.runs) {
-        if (
-          !run.id ||
-          !run.scheduleId ||
-          !run.status ||
-          typeof run.ranAt !== 'number'
-        ) {
-          console.error(
-            `Scheduled run missing required fields: ${JSON.stringify(run)}`
-          );
-          return false;
-        }
-
-        if (!['triggered', 'failed'].includes(run.status)) {
-          console.error(`Invalid run status: ${run.status}`);
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /brains/schedules/runs:`, error);
-      return false;
-    }
-  },
-};
-
-export const secrets = {
-  /**
-   * Test POST /secrets - Create or update a secret
-   */
-  async create(fetch: Fetch, name: string, value: string): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/secrets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, value }),
-      });
-
-      const response = await fetch(request);
-
-      if (response.status !== 201) {
-        console.error(
-          `POST /secrets returned ${response.status}, expected 201`
-        );
-        return false;
-      }
-
-      const data = await response.json() as {
-        name: string;
-        createdAt: string;
-        updatedAt: string;
-      };
-
-      // Validate response structure
-      if (!data.name || typeof data.name !== 'string') {
-        console.error(`Expected name to be string, got ${typeof data.name}`);
-        return false;
-      }
-
-      if (data.name !== name) {
-        console.error(`Expected name to be '${name}', got ${data.name}`);
-        return false;
-      }
-
-      if (typeof data.createdAt !== 'string') {
-        console.error(
-          `Expected createdAt to be string, got ${typeof data.createdAt}`
-        );
-        return false;
-      }
-
-      if (typeof data.updatedAt !== 'string') {
-        console.error(
-          `Expected updatedAt to be string, got ${typeof data.updatedAt}`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test POST /secrets:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test GET /secrets - List all secrets (names only, not values)
-   */
-  async list(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/secrets', {
-        method: 'GET',
-      });
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(`GET /secrets returned ${response.status}`);
-        return false;
-      }
-
-      const data = await response.json() as {
-        secrets: Array<{
-          name: string;
-          createdAt: string;
-          updatedAt: string;
-        }>;
-        count: number;
-      };
-
-      // Validate response structure
-      if (!Array.isArray(data.secrets)) {
-        console.error(
-          `Expected secrets to be an array, got ${typeof data.secrets}`
-        );
-        return false;
-      }
-
-      if (typeof data.count !== 'number') {
-        console.error(`Expected count to be number, got ${typeof data.count}`);
-        return false;
-      }
-
-      // Validate each secret has required fields (but NOT the value)
-      for (const secret of data.secrets) {
-        if (
-          !secret.name ||
-          typeof secret.name !== 'string' ||
-          typeof secret.createdAt !== 'string' ||
-          typeof secret.updatedAt !== 'string'
-        ) {
-          console.error(
-            `Secret missing required fields: ${JSON.stringify(secret)}`
-          );
-          return false;
-        }
-
-        // Ensure value is NOT included
-        if ('value' in secret) {
-          console.error(
-            `Secret should not include value field: ${JSON.stringify(secret)}`
-          );
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /secrets:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test DELETE /secrets/:name - Delete a specific secret
-   */
-  async delete(fetch: Fetch, name: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/secrets/${encodeURIComponent(name)}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status !== 204) {
-        console.error(
-          `DELETE /secrets/${name} returned ${response.status}, expected 204`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test DELETE /secrets/${name}:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test GET /secrets/:name/exists - Check if a secret exists
-   */
-  async exists(fetch: Fetch, name: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/secrets/${encodeURIComponent(name)}/exists`,
-        {
-          method: 'GET',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(
-          `GET /secrets/${name}/exists returned ${response.status}`
-        );
-        return false;
-      }
-
-      const data = await response.json() as { exists: boolean };
-
-      // Validate response structure
-      if (typeof data.exists !== 'boolean') {
-        console.error(
-          `Expected exists to be boolean, got ${typeof data.exists}`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /secrets/${name}/exists:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /secrets/bulk - Create multiple secrets
-   */
-  async bulk(
-    fetch: Fetch,
-    secrets: Array<{ name: string; value: string }>
-  ): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/secrets/bulk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ secrets }),
-      });
-
-      const response = await fetch(request);
-
-      if (response.status !== 201) {
-        console.error(
-          `POST /secrets/bulk returned ${response.status}, expected 201`
-        );
-        return false;
-      }
-
-      const data = await response.json() as {
-        created: number;
-        updated: number;
-      };
-
-      // Validate response structure
-      if (typeof data.created !== 'number') {
-        console.error(
-          `Expected created to be number, got ${typeof data.created}`
-        );
-        return false;
-      }
-
-      if (typeof data.updated !== 'number') {
-        console.error(
-          `Expected updated to be number, got ${typeof data.updated}`
-        );
-        return false;
-      }
-
-      // Total should match input
-      if (data.created + data.updated !== secrets.length) {
-        console.error(
-          `Expected total (${
-            data.created + data.updated
-          }) to match input length (${secrets.length})`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test POST /secrets/bulk:`, error);
-      return false;
-    }
-  },
-};
-
-export const webhooks = {
-  /**
-   * Test GET /webhooks - List all available webhook handlers
-   */
-  async list(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/webhooks', {
-        method: 'GET',
-      });
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(`GET /webhooks returned ${response.status}`);
-        return false;
-      }
-
-      const data = await response.json() as {
-        webhooks: Array<{
-          slug: string;
-          description?: string;
-        }>;
-        count: number;
-      };
-
-      // Validate response structure
-      if (!Array.isArray(data.webhooks)) {
-        console.error(
-          `Expected webhooks to be an array, got ${typeof data.webhooks}`
-        );
-        return false;
-      }
-
-      if (typeof data.count !== 'number') {
-        console.error(`Expected count to be number, got ${typeof data.count}`);
-        return false;
-      }
-
-      // Validate each webhook has required fields
-      for (const webhook of data.webhooks) {
-        if (!webhook.slug || typeof webhook.slug !== 'string') {
-          console.error(
-            `Webhook missing slug or has invalid type: ${JSON.stringify(
-              webhook
-            )}`
-          );
-          return false;
-        }
-
-        // Description is optional
-        if (
-          webhook.description !== undefined &&
-          typeof webhook.description !== 'string'
-        ) {
-          console.error(
-            `Webhook description has invalid type: ${JSON.stringify(webhook)}`
-          );
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /webhooks:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /webhooks/:slug - Receive an incoming webhook from an external service
-   */
-  async receive(
-    fetch: Fetch,
-    slug: string,
-    payload: any
-  ): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/webhooks/${encodeURIComponent(slug)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const response = await fetch(request);
-
-      // Accept either 200 (OK) or 202 (Accepted)
-      if (response.status !== 200 && response.status !== 202) {
-        console.error(
-          `POST /webhooks/${slug} returned ${response.status}, expected 200 or 202`
-        );
-        return false;
-      }
-
-      const data = await response.json() as {
-        received: boolean;
-        action?: 'resumed' | 'started' | 'queued' | 'no-match';
-      };
-
-      // Validate response structure
-      if (typeof data.received !== 'boolean') {
-        console.error(
-          `Expected received to be boolean, got ${typeof data.received}`
-        );
-        return false;
-      }
-
-      // Action field is optional
-      if (
-        data.action !== undefined &&
-        !['resumed', 'started', 'queued', 'no-match'].includes(data.action)
-      ) {
-        console.error(`Invalid action value: ${data.action}`);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test POST /webhooks/${slug}:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /webhooks/:slug with non-existent webhook - Should return 404
-   */
-  async notFound(fetch: Fetch, slug: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/webhooks/${encodeURIComponent(slug)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({}),
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status !== 404) {
-        console.error(
-          `POST /webhooks/${slug} with non-existent webhook returned ${response.status}, expected 404`
-        );
-        return false;
-      }
-
-      const data = await response.json() as { error: string };
-
-      if (!data.error || typeof data.error !== 'string') {
-        console.error(`Expected error to be string, got ${typeof data.error}`);
-        return false;
-      }
-
-      // Verify error message mentions the webhook slug
-      if (!data.error.toLowerCase().includes('webhook')) {
-        console.error(
-          `Expected error message to mention webhook, got: ${data.error}`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        `Failed to test POST /webhooks/${slug} with non-existent webhook:`,
-        error
-      );
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /webhooks/system/ui-form - Built-in webhook for UI form submissions.
-   * This is used by pages generated via .ui() steps to submit form data.
-   *
-   * The endpoint:
-   * - Accepts form data (application/x-www-form-urlencoded or multipart/form-data)
-   * - Requires an `identifier` query parameter to match the waiting brain
-   * - Returns { received: true, action: 'resumed' | 'not_found', ... }
-   */
-  async uiForm(
-    fetch: Fetch,
-    identifier: string,
-    formData: Record<string, string | string[]>
-  ): Promise<boolean> {
-    try {
-      // Build URLSearchParams from form data
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(formData)) {
-        if (Array.isArray(value)) {
-          for (const v of value) {
-            params.append(`${key}[]`, v);
-          }
-        } else {
-          params.append(key, value);
-        }
-      }
-
-      const request = new Request(
-        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: params.toString(),
-        }
-      );
-
-      const response = await fetch(request);
-
-      // Accept 200 (found and processed) or 404 (no brain waiting)
-      if (response.status !== 200 && response.status !== 404) {
-        console.error(
-          `POST /webhooks/system/ui-form returned ${response.status}, expected 200 or 404`
-        );
-        return false;
-      }
-
-      const data = (await response.json()) as {
-        received: boolean;
-        action: string;
-        identifier?: string;
-      };
-
-      // Validate response structure
-      if (typeof data.received !== 'boolean') {
-        console.error(
-          `Expected received to be boolean, got ${typeof data.received}`
-        );
-        return false;
-      }
-
-      if (!data.action || typeof data.action !== 'string') {
-        console.error(
-          `Expected action to be string, got ${typeof data.action}`
-        );
-        return false;
-      }
-
-      // Action should be 'resumed' or 'not_found'
-      if (data.action !== 'resumed' && data.action !== 'not_found') {
-        console.error(
-          `Expected action to be 'resumed' or 'not_found', got '${data.action}'`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Failed to test POST /webhooks/system/ui-form:', error);
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /webhooks/system/ui-form with missing identifier - Should return 400
-   */
-  async uiFormMissingIdentifier(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/webhooks/system/ui-form', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'test=data',
-      });
-
-      const response = await fetch(request);
-
-      if (response.status !== 400) {
-        console.error(
-          `POST /webhooks/system/ui-form without identifier returned ${response.status}, expected 400`
-        );
-        return false;
-      }
-
-      const data = (await response.json()) as { error: string };
-
-      if (!data.error || typeof data.error !== 'string') {
-        console.error(`Expected error to be string, got ${typeof data.error}`);
-        return false;
-      }
-
-      if (!data.error.toLowerCase().includes('identifier')) {
-        console.error(
-          `Expected error message to mention identifier, got: ${data.error}`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        'Failed to test POST /webhooks/system/ui-form without identifier:',
-        error
-      );
-      return false;
-    }
-  },
-};
-
-export const pages = {
-  /**
-   * Test GET /pages - List all pages
-   */
-  async list(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/pages', {
-        method: 'GET',
-      });
-
-      const response = await fetch(request);
-
-      if (!response.ok) {
-        console.error(`GET /pages returned ${response.status}`);
-        return false;
-      }
-
-      const data = (await response.json()) as {
-        pages: Array<{
-          slug: string;
-          url: string;
-          brainRunId: string;
-          persist: boolean;
-          ttl?: number;
-          createdAt: string;
-          size: number;
-        }>;
-        count: number;
-      };
-
-      // Validate response structure
-      if (!Array.isArray(data.pages)) {
-        console.error(
-          `Expected pages to be an array, got ${typeof data.pages}`
-        );
-        return false;
-      }
-
-      if (typeof data.count !== 'number') {
-        console.error(`Expected count to be number, got ${typeof data.count}`);
-        return false;
-      }
-
-      // Validate each page has required fields
-      for (const page of data.pages) {
-        if (
-          !page.slug ||
-          typeof page.slug !== 'string' ||
-          !page.url ||
-          typeof page.url !== 'string' ||
-          !page.brainRunId ||
-          typeof page.brainRunId !== 'string' ||
-          typeof page.persist !== 'boolean' ||
-          !page.createdAt ||
-          typeof page.createdAt !== 'string' ||
-          typeof page.size !== 'number'
-        ) {
-          console.error(
-            `Page missing required fields or has invalid types: ${JSON.stringify(
-              page
-            )}`
-          );
-          return false;
-        }
-
-        // ttl is optional
-        if (page.ttl !== undefined && typeof page.ttl !== 'number') {
-          console.error(`Page ttl has invalid type: ${typeof page.ttl}`);
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /pages:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test POST /pages - Create a new page
-   */
-  async create(
-    fetch: Fetch,
-    slug: string,
-    html: string,
-    brainRunId: string,
-    options?: { persist?: boolean; ttl?: number }
-  ): Promise<string | null> {
-    try {
-      const body: {
-        slug: string;
-        html: string;
-        brainRunId: string;
-        persist?: boolean;
-        ttl?: number;
-      } = { slug, html, brainRunId };
-      if (options?.persist !== undefined) {
-        body.persist = options.persist;
-      }
-      if (options?.ttl !== undefined) {
-        body.ttl = options.ttl;
-      }
-
-      const request = new Request('http://example.com/pages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      const response = await fetch(request);
-
-      if (response.status !== 201) {
-        console.error(`POST /pages returned ${response.status}, expected 201`);
-        return null;
-      }
-
-      const data = (await response.json()) as {
-        slug: string;
-        url: string;
-        brainRunId: string;
-        persist: boolean;
-        ttl?: number;
-        createdAt: string;
-      };
-
-      // Validate response structure
-      if (!data.slug || typeof data.slug !== 'string') {
-        console.error(`Expected slug to be string, got ${typeof data.slug}`);
-        return null;
-      }
-
-      if (data.slug !== slug) {
-        console.error(`Expected slug to be '${slug}', got ${data.slug}`);
-        return null;
-      }
-
-      if (!data.url || typeof data.url !== 'string') {
-        console.error(`Expected url to be string, got ${typeof data.url}`);
-        return null;
-      }
-
-      if (!data.brainRunId || typeof data.brainRunId !== 'string') {
-        console.error(
-          `Expected brainRunId to be string, got ${typeof data.brainRunId}`
-        );
-        return null;
-      }
-
-      if (typeof data.persist !== 'boolean') {
-        console.error(
-          `Expected persist to be boolean, got ${typeof data.persist}`
-        );
-        return null;
-      }
-
-      if (!data.createdAt || typeof data.createdAt !== 'string') {
-        console.error(
-          `Expected createdAt to be string, got ${typeof data.createdAt}`
-        );
-        return null;
-      }
-
-      return data.slug;
-    } catch (error) {
-      console.error(`Failed to test POST /pages:`, error);
-      return null;
-    }
-  },
-
-  /**
-   * Test GET /pages/:slug - Get page HTML content
-   */
-  async get(fetch: Fetch, slug: string): Promise<string | null> {
-    try {
-      const request = new Request(
-        `http://example.com/pages/${encodeURIComponent(slug)}`,
-        {
-          method: 'GET',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        console.error(`GET /pages/${slug} returned ${response.status}`);
-        return null;
-      }
-
-      // Check content type is HTML
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('text/html')) {
-        console.error(
-          `Expected content-type to be text/html, got ${contentType}`
-        );
-        return null;
-      }
-
-      const html = await response.text();
-      return html;
-    } catch (error) {
-      console.error(`Failed to test GET /pages/${slug}:`, error);
-      return null;
-    }
-  },
-
-  /**
-   * Test GET /pages/:slug/meta - Get page metadata
-   */
-  async getMeta(
-    fetch: Fetch,
-    slug: string
-  ): Promise<{
-    slug: string;
-    brainRunId: string;
-    persist: boolean;
-    ttl?: number;
-    createdAt: string;
-    size: number;
-  } | null> {
-    try {
-      const request = new Request(
-        `http://example.com/pages/${encodeURIComponent(slug)}/meta`,
-        {
-          method: 'GET',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        console.error(`GET /pages/${slug}/meta returned ${response.status}`);
-        return null;
-      }
-
-      const data = (await response.json()) as {
-        slug: string;
-        brainRunId: string;
-        persist: boolean;
-        ttl?: number;
-        createdAt: string;
-        size: number;
-      };
-
-      // Validate response structure
-      if (
-        !data.slug ||
-        typeof data.slug !== 'string' ||
-        !data.brainRunId ||
-        typeof data.brainRunId !== 'string' ||
-        typeof data.persist !== 'boolean' ||
-        !data.createdAt ||
-        typeof data.createdAt !== 'string' ||
-        typeof data.size !== 'number'
-      ) {
-        console.error(
-          `Page metadata missing required fields: ${JSON.stringify(data)}`
-        );
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error(`Failed to test GET /pages/${slug}/meta:`, error);
-      return null;
-    }
-  },
-
-  /**
-   * Test PUT /pages/:slug - Update page HTML content
-   */
-  async update(fetch: Fetch, slug: string, html: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/pages/${encodeURIComponent(slug)}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ html }),
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status === 404) {
-        console.error(`PUT /pages/${slug} returned 404 - page not found`);
-        return false;
-      }
-
-      if (!response.ok) {
-        console.error(`PUT /pages/${slug} returned ${response.status}`);
-        return false;
-      }
-
-      const data = (await response.json()) as {
-        slug: string;
-        url: string;
-        updatedAt: string;
-      };
-
-      // Validate response structure
-      if (!data.slug || data.slug !== slug) {
-        console.error(`Expected slug to be '${slug}', got ${data.slug}`);
-        return false;
-      }
-
-      if (!data.url || typeof data.url !== 'string') {
-        console.error(`Expected url to be string, got ${typeof data.url}`);
-        return false;
-      }
-
-      if (!data.updatedAt || typeof data.updatedAt !== 'string') {
-        console.error(
-          `Expected updatedAt to be string, got ${typeof data.updatedAt}`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test PUT /pages/${slug}:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test DELETE /pages/:slug - Delete a page
-   */
-  async delete(fetch: Fetch, slug: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/pages/${encodeURIComponent(slug)}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status !== 204) {
-        console.error(
-          `DELETE /pages/${slug} returned ${response.status}, expected 204`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test DELETE /pages/${slug}:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Test GET /pages/:slug with non-existent page - Should return 404
-   */
-  async notFound(fetch: Fetch, slug: string): Promise<boolean> {
-    try {
-      const request = new Request(
-        `http://example.com/pages/${encodeURIComponent(slug)}`,
-        {
-          method: 'GET',
-        }
-      );
-
-      const response = await fetch(request);
-
-      if (response.status !== 404) {
-        console.error(
-          `GET /pages/${slug} with non-existent page returned ${response.status}, expected 404`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        `Failed to test GET /pages/${slug} with non-existent page:`,
-        error
-      );
-      return false;
-    }
-  },
-
-  /**
-   * Test DELETE /pages/:slug preserves resources - deleting a page should not delete resources
-   */
-  async deletePreservesResources(fetch: Fetch): Promise<boolean> {
-    try {
-      // First create a resource
-      const formData = new FormData();
-      formData.append(
-        'file',
-        new Blob(['test content for spec'], { type: 'text/plain' }),
-        'spec-test-resource.txt'
-      );
-      formData.append('type', 'text');
-      formData.append('key', 'spec-test-resource.txt');
-      formData.append('local', 'false');
-
-      const createResourceRequest = new Request('http://example.com/resources', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const createResourceResponse = await fetch(createResourceRequest);
-      if (createResourceResponse.status !== 201) {
-        console.error(
-          `Failed to create test resource: ${createResourceResponse.status}`
-        );
-        return false;
-      }
-
-      // Create a page to delete
-      const pageSlug = `spec-test-page-${Date.now()}`;
-      const createPageRequest = new Request('http://example.com/pages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          slug: pageSlug,
-          html: '<html><body>Test page</body></html>',
-          brainRunId: 'spec-test-brain-run-id',
-        }),
-      });
-
-      const createPageResponse = await fetch(createPageRequest);
-      if (createPageResponse.status !== 201) {
-        console.error(
-          `Failed to create test page: ${createPageResponse.status}`
-        );
-        // Clean up resource
-        await fetch(
-          new Request(
-            'http://example.com/resources/spec-test-resource.txt',
-            { method: 'DELETE' }
-          )
-        );
-        return false;
-      }
-
-      // Delete the page
-      const deletePageRequest = new Request(
-        `http://example.com/pages/${encodeURIComponent(pageSlug)}`,
-        { method: 'DELETE' }
-      );
-
-      const deletePageResponse = await fetch(deletePageRequest);
-      if (deletePageResponse.status !== 204) {
-        console.error(
-          `DELETE /pages/${pageSlug} returned ${deletePageResponse.status}, expected 204`
-        );
-        // Clean up resource
-        await fetch(
-          new Request(
-            'http://example.com/resources/spec-test-resource.txt',
-            { method: 'DELETE' }
-          )
-        );
-        return false;
-      }
-
-      // Verify the resource still exists
-      const listResourcesRequest = new Request('http://example.com/resources', {
-        method: 'GET',
-      });
-
-      const listResourcesResponse = await fetch(listResourcesRequest);
-      if (!listResourcesResponse.ok) {
-        console.error(
-          `GET /resources returned ${listResourcesResponse.status}`
-        );
-        return false;
-      }
-
-      const resourcesData = (await listResourcesResponse.json()) as {
-        resources: Array<{ key: string }>;
-      };
-
-      const resourceExists = resourcesData.resources.some(
-        (r) => r.key === 'spec-test-resource.txt'
-      );
-
-      if (!resourceExists) {
-        console.error(
-          'DELETE /pages incorrectly deleted resources - resource not found after page delete'
-        );
-        return false;
-      }
-
-      // Clean up: delete the test resource
-      await fetch(
-        new Request(
-          'http://example.com/resources/spec-test-resource.txt',
-          { method: 'DELETE' }
-        )
-      );
-
-      return true;
-    } catch (error) {
-      console.error(
-        `Failed to test DELETE /pages preserves resources:`,
-        error
-      );
-      return false;
-    }
-  },
-};
-
-/**
- * Bundle API Tests
- *
- * Tests for the /bundle/components.js endpoint which serves the component bundle.
- *
- * NOTE: These tests only verify the API endpoint behavior. The bundle build and
- * upload process is backend-specific and must be tested separately by each
- * backend implementation.
- */
-export const bundle = {
-  /**
-   * Test GET /bundle/components.js - Serve the component bundle
-   */
-  async get(fetch: Fetch): Promise<boolean> {
-    try {
-      const request = new Request('http://example.com/bundle/components.js', {
-        method: 'GET',
-      });
-
-      const response = await fetch(request);
-
-      // Bundle may or may not exist depending on project setup
-      // 200 = bundle exists and served correctly
-      // 404 = bundle not found (expected if no components/ directory)
-      if (response.status !== 200 && response.status !== 404) {
-        console.error(
-          `GET /bundle/components.js returned unexpected status ${response.status}`
-        );
-        return false;
-      }
-
-      const contentType = response.headers.get('Content-Type');
-      if (!contentType || !contentType.includes('application/javascript')) {
-        console.error(
-          `Expected Content-Type application/javascript, got ${contentType}`
-        );
-        return false;
-      }
-
-      // If 200, verify we got some content
-      if (response.status === 200) {
-        const content = await response.text();
-        if (!content || content.length === 0) {
-          console.error('Bundle endpoint returned 200 but empty content');
-          return false;
-        }
-      }
-
-      // If 404, verify we got the helpful error message
-      if (response.status === 404) {
-        const content = await response.text();
-        if (!content.includes('Bundle not found')) {
-          console.error(
-            'Bundle 404 response missing helpful error message'
-          );
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`Failed to test GET /bundle/components.js:`, error);
       return false;
     }
   },

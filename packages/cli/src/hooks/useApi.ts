@@ -93,7 +93,7 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
           body,
         });
 
-        if (response.status === 200 || response.status === 201) {
+        if (response.status === 200 || response.status === 201 || response.status === 202) {
           const result = (await response.json()) as T;
           setData(result);
           return result;

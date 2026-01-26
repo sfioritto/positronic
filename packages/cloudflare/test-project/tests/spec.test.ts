@@ -6,7 +6,7 @@ import {
   fetchMock,
 } from 'cloudflare:test';
 import worker from '../src/index';
-import { testStatus, resources, brains, schedules, webhooks, pages, secrets } from '@positronic/spec';
+import { testStatus, resources, brains, schedules, webhooks, pages, secrets, signals } from '@positronic/spec';
 import { resetMockState } from '../src/runner';
 
 describe('Positronic Spec', () => {
@@ -248,6 +248,102 @@ describe('Positronic Spec', () => {
   describe('Pages', () => {
     it('passes DELETE /pages preserves resources test', async () => {
       const result = await pages.deletePreservesResources(createFetch());
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('Signals', () => {
+    it('passes POST /brains/runs/:runId/signals PAUSE test', async () => {
+      // First create a brain run
+      const brainRunId = await brains.run(createFetch(), 'basic-brain');
+      expect(brainRunId).toBeTruthy();
+
+      const result = await signals.pause(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs/:runId/signals KILL test', async () => {
+      // First create a brain run
+      const brainRunId = await brains.run(createFetch(), 'basic-brain');
+      expect(brainRunId).toBeTruthy();
+
+      const result = await signals.kill(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs/:runId/signals USER_MESSAGE test', async () => {
+      // First create a brain run (needs an agent brain for this to work properly)
+      const brainRunId = await brains.run(createFetch(), 'basic-brain');
+      expect(brainRunId).toBeTruthy();
+
+      const result = await signals.sendMessage(createFetch(), brainRunId!, 'Hello from test');
+      expect(result).toBe(true);
+    });
+
+    // Note: sendMessageNoAgent test removed - USER_MESSAGE signals are now always queued
+    // regardless of agent state, and are simply ignored if no agent loop is active.
+
+    it('passes POST /brains/runs/:runId/resume test', async () => {
+      // Use delayed-brain which has a 1.5s delay - gives time for PAUSE to be processed
+      const brainRunId = await brains.run(createFetch(), 'delayed-brain');
+      expect(brainRunId).toBeTruthy();
+
+      // Pause the brain - signal will be queued and processed between steps
+      await signals.pause(createFetch(), brainRunId!);
+
+      // Wait for the brain to enter paused state (after first step completes)
+      // The delayed-brain has a 1.5s delay in its first step, and PAUSE is checked before second step
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Then resume it
+      const result = await signals.resume(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs/:runId/signals RESUME test', async () => {
+      // Use delayed-brain which has a 1.5s delay - gives time for PAUSE to be processed
+      const brainRunId = await brains.run(createFetch(), 'delayed-brain');
+      expect(brainRunId).toBeTruthy();
+
+      // Pause the brain - signal will be queued and processed between steps
+      await signals.pause(createFetch(), brainRunId!);
+
+      // Wait for the brain to enter paused state (after first step completes)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Then resume using the RESUME signal (alternative to /resume endpoint)
+      const result = await signals.resumeSignal(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs/:runId/signals WEBHOOK_RESPONSE test', async () => {
+      // Use webhook-brain which waits for a webhook
+      const brainRunId = await brains.run(createFetch(), 'webhook-brain');
+      expect(brainRunId).toBeTruthy();
+
+      // Wait for the brain to enter waiting state (after first step completes and emits WEBHOOK event)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Send webhook response via signal endpoint
+      const result = await signals.webhookResponse(createFetch(), brainRunId!, {
+        message: 'Hello from signal test',
+        value: 42,
+      });
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs/:runId/resume wrong state (409) test', async () => {
+      // Create a brain run but don't pause it
+      const brainRunId = await brains.run(createFetch(), 'basic-brain');
+      expect(brainRunId).toBeTruthy();
+
+      // Try to resume without pausing first - should get 409
+      const result = await signals.resumeWrongState(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs/:runId/signals not found (404) test', async () => {
+      const result = await signals.signalNotFound(createFetch(), 'non-existent-run-id');
       expect(result).toBe(true);
     });
   });
