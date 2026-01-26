@@ -1800,4 +1800,77 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
   });
+
+  describe('watch message feature', () => {
+    it('should show m message option in footer when agent loops exist and brain is running', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      // Add brain run for agent scenario (note: uses test-agent-brain SSE scenario)
+      server.addBrainRun({
+        brainRunId: 'test-agent-brain',
+        brainTitle: 'Agent Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-agent-brain']);
+
+        // Wait for brain to load with agent event
+        const foundBrain = await waitForOutput(/Agent Brain/, 30);
+        expect(foundBrain).toBe(true);
+
+        // Footer should show 'm message' option since agent exists and brain is running
+        const foundMessageOption = await waitForOutput(/m message/, 30);
+        expect(foundMessageOption).toBe(true);
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should enter message input mode when pressing m with agent loops', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-agent-brain',
+        brainTitle: 'Agent Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-agent-brain']);
+
+        // Wait for brain to load
+        await waitForOutput(/Agent Brain/, 30);
+
+        // Press 'm' to enter message input mode
+        instance.stdin.write('m');
+
+        // Should show message input prompt
+        const foundPrompt = await waitForOutput(/Send message to agent/, 30);
+        expect(foundPrompt).toBe(true);
+
+        // Footer should show message input controls
+        const foundControls = await waitForOutput(/Enter send.*Esc cancel/, 30);
+        expect(foundControls).toBe(true);
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
 });
