@@ -748,6 +748,17 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
             } else {
               initialMessages = [...initialMessages, { role: 'user', content: signal.content }];
             }
+
+            // Emit raw response message event so it shows up in agent chat view
+            yield {
+              type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+              stepTitle: step.block.title,
+              stepId: step.id,
+              iteration,
+              message: userMessage,
+              options: this.options ?? ({} as TOptions),
+              brainRunId: this.brainRunId,
+            };
           }
         }
       }
