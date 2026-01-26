@@ -22,13 +22,17 @@ export class MockSignalProvider implements SignalProvider {
 
   /**
    * Get pending signals, consuming them in the process.
-   * @param filter - 'CONTROL' returns only KILL/PAUSE, 'ALL' includes all signal types
+   * @param filter - 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
    */
-  async getSignals(filter: 'CONTROL' | 'ALL'): Promise<BrainSignal[]> {
-    const result =
-      filter === 'ALL'
-        ? [...this.signals]
-        : this.signals.filter((s) => s.type === 'KILL' || s.type === 'PAUSE');
+  async getSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): Promise<BrainSignal[]> {
+    let result: BrainSignal[];
+    if (filter === 'ALL') {
+      result = [...this.signals];
+    } else if (filter === 'WEBHOOK') {
+      result = this.signals.filter((s) => s.type === 'WEBHOOK_RESPONSE');
+    } else {
+      result = this.signals.filter((s) => s.type === 'KILL' || s.type === 'PAUSE');
+    }
 
     // Consume signals (delete after returning)
     this.signals = this.signals.filter((s) => !result.includes(s));

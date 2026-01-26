@@ -6,10 +6,10 @@ import type { SignalProvider, BrainSignal } from '@positronic/core';
  */
 export class CloudflareSignalProvider implements SignalProvider {
   constructor(
-    private getAndConsumeSignals: (filter: 'CONTROL' | 'ALL') => BrainSignal[]
+    private getAndConsumeSignals: (filter: 'CONTROL' | 'WEBHOOK' | 'ALL') => BrainSignal[]
   ) {}
 
-  async getSignals(filter: 'CONTROL' | 'ALL'): Promise<BrainSignal[]> {
+  async getSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): Promise<BrainSignal[]> {
     return this.getAndConsumeSignals(filter);
   }
 }

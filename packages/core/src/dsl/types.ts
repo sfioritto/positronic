@@ -233,8 +233,8 @@ export interface SignalProvider {
    * Get pending signals for the current brain run.
    * Signals should be consumed (deleted) when returned.
    *
-   * @param filter - 'CONTROL' returns only KILL/PAUSE, 'ALL' includes USER_MESSAGE
-   * @returns Array of signals in priority order (KILL first, then PAUSE, then USER_MESSAGE)
+   * @param filter - 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
+   * @returns Array of signals in priority order (KILL first, then PAUSE, then WEBHOOK_RESPONSE, then RESUME, then USER_MESSAGE)
    */
-  getSignals(filter: 'CONTROL' | 'ALL'): Promise<BrainSignal[]>;
+  getSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): Promise<BrainSignal[]>;
 }

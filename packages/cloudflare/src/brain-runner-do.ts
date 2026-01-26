@@ -158,15 +158,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
   /**
    * Get and consume (delete) pending signals.
    * Signals are returned in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
-   * @param filter 'CONTROL' returns only KILL/PAUSE, 'ALL' includes all signal types
+   * @param filter 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
    */
-  getAndConsumeSignals(filter: 'CONTROL' | 'ALL'): BrainSignal[] {
+  getAndConsumeSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): BrainSignal[] {
     this.initializeSignalsTable();
 
     // Query signals ordered by priority
     let whereClause = '';
     if (filter === 'CONTROL') {
       whereClause = `WHERE signal_type IN ('KILL', 'PAUSE')`;
+    } else if (filter === 'WEBHOOK') {
+      whereClause = `WHERE signal_type = 'WEBHOOK_RESPONSE'`;
     }
 
     const results = this.sql
