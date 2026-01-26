@@ -103,12 +103,12 @@ export class BrainEventStream<
         this.steps[i].withStatus(STATUS.COMPLETE);
       }
 
-      // Handle webhook response at deepest level
-      if (resumeContext.webhookResponse && !resumeContext.agentContext) {
-        // Non-agent webhook: set as currentResponse for step to consume
+      // For inner brains (no signalProvider), check resumeContext for webhookResponse
+      // The outer brain will have set this from the signal
+      if (!signalProvider && resumeContext.webhookResponse && !resumeContext.agentContext) {
         this.currentResponse = resumeContext.webhookResponse;
       }
-      // Agent webhook response is handled via resumeContext.agentContext
+      // Agent webhook response is handled via agentContext (checked in executeAgent)
     } else {
       // Fresh start: use initialState or empty object
       this.currentState = clone(initialParams.initialState ?? {}) as TState;
@@ -163,8 +163,38 @@ export class BrainEventStream<
           brainRunId,
         };
       } else {
-        // Check for webhookResponse anywhere in the resumeContext tree (including nested inner brains)
-        const webhookResponse = this.findWebhookResponseInResumeContext(this.resumeContext);
+        // Resuming - check for WEBHOOK_RESPONSE signal or fall back to resumeContext
+        let webhookResponse: JsonObject | undefined;
+
+        if (this.signalProvider) {
+          // Outer brain: consume ALL signals at resume start to find WEBHOOK_RESPONSE
+          const signals = await this.signalProvider.getSignals('ALL');
+          const webhookSignal = signals.find(s => s.type === 'WEBHOOK_RESPONSE');
+
+          if (webhookSignal && webhookSignal.type === 'WEBHOOK_RESPONSE') {
+            webhookResponse = webhookSignal.response;
+
+            // Set currentResponse for step consumption (non-agent webhooks)
+            this.currentResponse = webhookResponse;
+
+            // Set webhookResponse at the deepest level of the resumeContext tree
+            // This is needed for:
+            // 1. Agent webhook resumes (via resumeContext.webhookResponse)
+            // 2. Nested brain resumes (inner brain accesses via innerResumeContext)
+            if (this.resumeContext) {
+              let deepest = this.resumeContext;
+              while (deepest.innerResumeContext) {
+                deepest = deepest.innerResumeContext;
+              }
+              deepest.webhookResponse = webhookResponse;
+            }
+          }
+        } else {
+          // Inner brain (no signalProvider): check resumeContext for webhookResponse
+          // The outer brain will have set this from the signal
+          webhookResponse = this.findWebhookResponseInResumeContext(this.resumeContext);
+        }
+
         if (webhookResponse) {
           // Emit WEBHOOK_RESPONSE to transition state machine from 'waiting' to 'running'
           yield {
@@ -174,7 +204,7 @@ export class BrainEventStream<
             options: options ?? ({} as TOptions),
           };
         } else {
-          // Resuming from pause (no webhook response) - emit RESUMED to transition state machine
+          // RESUME signal or default resume behavior - emit RESUMED to transition state machine
           yield {
             type: BRAIN_EVENTS.RESUMED,
             status: STATUS.RUNNING,

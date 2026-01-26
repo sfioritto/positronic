@@ -183,13 +183,13 @@ brains.delete('/runs/:runId', async (context: Context) => {
   }
 });
 
-// Signal endpoint - queue KILL, PAUSE, or USER_MESSAGE signals
+// Signal endpoint - queue KILL, PAUSE, USER_MESSAGE, RESUME, or WEBHOOK_RESPONSE signals
 brains.post('/runs/:runId/signals', async (context: Context) => {
   const runId = context.req.param('runId');
-  const body = await context.req.json<{ type: string; content?: string }>();
+  const body = await context.req.json<{ type: string; content?: string; response?: Record<string, unknown> }>();
 
   // Validate signal type
-  if (!['KILL', 'PAUSE', 'USER_MESSAGE'].includes(body.type)) {
+  if (!['KILL', 'PAUSE', 'USER_MESSAGE', 'RESUME', 'WEBHOOK_RESPONSE'].includes(body.type)) {
     return context.json({ error: 'Invalid signal type' }, 400);
   }
 
@@ -225,7 +225,7 @@ brains.post('/runs/:runId/signals', async (context: Context) => {
   }, 202);
 });
 
-// Resume endpoint - resume a paused brain
+// Resume endpoint - resume a paused brain using signal-based approach
 brains.post('/runs/:runId/resume', async (context: Context) => {
   const runId = context.req.param('runId');
 
@@ -244,11 +244,14 @@ brains.post('/runs/:runId/resume', async (context: Context) => {
     }, 409);
   }
 
-  // Resume via BrainRunnerDO
+  // Queue RESUME signal and wake up the brain
   const namespace = context.env.BRAIN_RUNNER_DO;
   const doId = namespace.idFromName(runId);
   const stub = namespace.get(doId);
-  await stub.resume(runId, {});
+
+  // Queue the RESUME signal first, then wake up the brain
+  await stub.queueSignal({ type: 'RESUME' });
+  await stub.wakeUp(runId);
 
   return context.json({ success: true, action: 'resumed' }, 202);
 });

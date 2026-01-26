@@ -3255,6 +3255,116 @@ export const signals = {
   },
 
   /**
+   * Test POST /brains/runs/:runId/signals - Queue RESUME signal
+   * Expects 202 Accepted with signal confirmation
+   * Note: This is an alternative to POST /brains/runs/:runId/resume
+   * The brain must be in PAUSED state for RESUME signal to be valid
+   */
+  async resumeSignal(fetch: Fetch, runId: string): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/brains/runs/${encodeURIComponent(runId)}/signals`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'RESUME' }),
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (response.status !== 202) {
+        console.error(
+          `POST /brains/runs/${runId}/signals returned ${response.status}, expected 202`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as {
+        success: boolean;
+        signal: { type: string; queuedAt: number };
+      };
+
+      if (!data.success) {
+        console.error(`Expected success: true, got ${JSON.stringify(data)}`);
+        return false;
+      }
+
+      if (data.signal?.type !== 'RESUME') {
+        console.error(
+          `Expected signal.type to be 'RESUME', got '${data.signal?.type}'`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test POST /brains/runs/${runId}/signals (RESUME):`,
+        error
+      );
+      return false;
+    }
+  },
+
+  /**
+   * Test POST /brains/runs/:runId/signals - Queue WEBHOOK_RESPONSE signal
+   * Expects 202 Accepted with signal confirmation
+   * Note: This is an alternative to sending webhooks via POST /webhooks/:slug
+   * The brain must be in WAITING state for WEBHOOK_RESPONSE signal to be valid
+   */
+  async webhookResponse(
+    fetch: Fetch,
+    runId: string,
+    response: Record<string, unknown>
+  ): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/brains/runs/${encodeURIComponent(runId)}/signals`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'WEBHOOK_RESPONSE', response }),
+        }
+      );
+
+      const fetchResponse = await fetch(request);
+
+      if (fetchResponse.status !== 202) {
+        console.error(
+          `POST /brains/runs/${runId}/signals returned ${fetchResponse.status}, expected 202`
+        );
+        return false;
+      }
+
+      const data = (await fetchResponse.json()) as {
+        success: boolean;
+        signal: { type: string; queuedAt: number };
+      };
+
+      if (!data.success) {
+        console.error(`Expected success: true, got ${JSON.stringify(data)}`);
+        return false;
+      }
+
+      if (data.signal?.type !== 'WEBHOOK_RESPONSE') {
+        console.error(
+          `Expected signal.type to be 'WEBHOOK_RESPONSE', got '${data.signal?.type}'`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test POST /brains/runs/${runId}/signals (WEBHOOK_RESPONSE):`,
+        error
+      );
+      return false;
+    }
+  },
+
+  /**
    * Test POST /brains/runs/:runId/resume - Resume a PAUSED brain
    * Expects 202 Accepted with resumed confirmation
    */

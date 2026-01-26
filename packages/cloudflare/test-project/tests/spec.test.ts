@@ -300,6 +300,38 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
+    it('passes POST /brains/runs/:runId/signals RESUME test', async () => {
+      // Use delayed-brain which has a 1.5s delay - gives time for PAUSE to be processed
+      const brainRunId = await brains.run(createFetch(), 'delayed-brain');
+      expect(brainRunId).toBeTruthy();
+
+      // Pause the brain - signal will be queued and processed between steps
+      await signals.pause(createFetch(), brainRunId!);
+
+      // Wait for the brain to enter paused state (after first step completes)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Then resume using the RESUME signal (alternative to /resume endpoint)
+      const result = await signals.resumeSignal(createFetch(), brainRunId!);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs/:runId/signals WEBHOOK_RESPONSE test', async () => {
+      // Use webhook-brain which waits for a webhook
+      const brainRunId = await brains.run(createFetch(), 'webhook-brain');
+      expect(brainRunId).toBeTruthy();
+
+      // Wait for the brain to enter waiting state (after first step completes and emits WEBHOOK event)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Send webhook response via signal endpoint
+      const result = await signals.webhookResponse(createFetch(), brainRunId!, {
+        message: 'Hello from signal test',
+        value: 42,
+      });
+      expect(result).toBe(true);
+    });
+
     it('passes POST /brains/runs/:runId/resume wrong state (409) test', async () => {
       // Create a brain run but don't pause it
       const brainRunId = await brains.run(createFetch(), 'basic-brain');

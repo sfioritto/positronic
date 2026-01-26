@@ -10,12 +10,12 @@ import type { BrainCancelledEvent } from './definitions/events.js';
 
 /**
  * Convert execution stack to ResumeContext tree.
- * Adds webhook response and agent context to the deepest level.
+ * Adds agent context to the deepest level.
+ * Webhook response is no longer passed here - it comes from signals during execution.
  * This is internal to BrainRunner - external consumers don't need to know about ResumeContext.
  */
 function executionStackToResumeContext(
   stack: ExecutionStackEntry[],
-  webhookResponse: JsonObject | undefined,
   agentContext: AgentContext | null
 ): ResumeContext {
   if (stack.length === 0) {
@@ -27,11 +27,10 @@ function executionStackToResumeContext(
   for (let i = stack.length - 1; i >= 0; i--) {
     const entry = stack[i];
     if (i === stack.length - 1) {
-      // Deepest level - add webhook response and agent context
+      // Deepest level - add agent context (webhook response comes from signals now)
       context = {
         stepIndex: entry.stepIndex,
         state: entry.state,
-        webhookResponse,
         agentContext: agentContext ?? undefined,
       };
     } else {
@@ -148,23 +147,24 @@ export class BrainRunner {
    * Resume a brain from a previous execution point.
    * The machine should have historical events already replayed to reconstruct execution state.
    * The BrainRunner will derive the ResumeContext from the machine's execution stack.
+   * Webhook response data comes from signals, not as a parameter.
    */
   async resume<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     options: {
       machine: BrainStateMachine;
       brainRunId: string;
-      webhookResponse?: JsonObject;
       options?: TOptions;
       endAfter?: number;
       signal?: AbortSignal;
     }
   ): Promise<TState> {
-    const { machine, brainRunId, webhookResponse, options: brainOptions, endAfter, signal } = options;
+    const { machine, brainRunId, options: brainOptions, endAfter, signal } = options;
 
     // Build ResumeContext from machine's execution stack
+    // Webhook response comes from signals during execution, not from resume parameters
     const { executionStack, agentContext } = machine.context;
-    const resumeContext = executionStackToResumeContext(executionStack, webhookResponse, agentContext);
+    const resumeContext = executionStackToResumeContext(executionStack, agentContext);
 
     return this.execute(brain, {
       resumeContext,
