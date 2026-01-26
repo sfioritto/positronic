@@ -606,6 +606,19 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
     const webhookResponse = this.resumeContext?.webhookResponse;
 
     if (agentContext) {
+      // Emit AGENT_START on resume so the client can track this agent's messages
+      // (stepId changes on each resume, so we need a new AGENT_START)
+      yield {
+        type: BRAIN_EVENTS.AGENT_START,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        prompt: agentContext.prompt,
+        system: agentContext.system,
+        tools: Object.keys(mergedTools),
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+
       // Check if this is a webhook resume (has webhook response) or pause resume
       if (webhookResponse && agentContext.pendingToolCallId && agentContext.pendingToolName) {
         // WEBHOOK RESUME: Agent was waiting for a webhook response
