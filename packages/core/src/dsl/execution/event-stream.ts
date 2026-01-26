@@ -605,19 +605,11 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
     const agentContext = this.resumeContext?.agentContext;
     const webhookResponse = this.resumeContext?.webhookResponse;
 
+    // Use preserved stepId from agentContext when resuming, or step.id for fresh start
+    // This ensures all events for the same agent use the same stepId across resumes
+    const effectiveStepId = agentContext?.stepId ?? step.id;
+
     if (agentContext) {
-      // Emit AGENT_START on resume so the client can track this agent's messages
-      // (stepId changes on each resume, so we need a new AGENT_START)
-      yield {
-        type: BRAIN_EVENTS.AGENT_START,
-        stepTitle: step.block.title,
-        stepId: step.id,
-        prompt: agentContext.prompt,
-        system: agentContext.system,
-        tools: Object.keys(mergedTools),
-        options: this.options ?? ({} as TOptions),
-        brainRunId: this.brainRunId,
-      };
 
       // Check if this is a webhook resume (has webhook response) or pause resume
       if (webhookResponse && agentContext.pendingToolCallId && agentContext.pendingToolName) {
@@ -635,7 +627,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
         yield {
           type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
           stepTitle: step.block.title,
-          stepId: step.id,
+          stepId: effectiveStepId,
           toolCallId: agentContext.pendingToolCallId,
           toolName: agentContext.pendingToolName,
           result: webhookResponse,
@@ -662,7 +654,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
           yield {
             type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
             stepTitle: step.block.title,
-            stepId: step.id,
+            stepId: effectiveStepId,
             iteration: 0, // Special iteration for resumed webhook response
             message: toolResultMessage,
             options: this.options ?? ({} as TOptions),
@@ -696,7 +688,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
       yield {
         type: BRAIN_EVENTS.AGENT_START,
         stepTitle: step.block.title,
-        stepId: step.id,
+        stepId: effectiveStepId,
         prompt,
         system: config.system,
         tools: Object.keys(mergedTools),
@@ -748,7 +740,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
             yield {
               type: BRAIN_EVENTS.AGENT_USER_MESSAGE,
               stepTitle: step.block.title,
-              stepId: step.id,
+              stepId: effectiveStepId,
               content: signal.content,
               options: this.options,
               brainRunId: this.brainRunId,
@@ -766,7 +758,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
             yield {
               type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
               stepTitle: step.block.title,
-              stepId: step.id,
+              stepId: effectiveStepId,
               iteration,
               message: userMessage,
               options: this.options ?? ({} as TOptions),
@@ -781,7 +773,7 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
         yield {
           type: BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
           stepTitle: step.block.title,
-          stepId: step.id,
+          stepId: effectiveStepId,
           iteration: iteration - 1, // Report the last completed iteration
           maxIterations,
           totalTokens,
@@ -860,7 +852,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield {
           type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
           stepTitle: step.block.title,
-          stepId: step.id,
+          stepId: effectiveStepId,
           iteration,
           message: newAssistantMessage,
           options: this.options ?? ({} as TOptions),
@@ -876,7 +868,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       yield {
         type: BRAIN_EVENTS.AGENT_ITERATION,
         stepTitle: step.block.title,
-        stepId: step.id,
+        stepId: effectiveStepId,
         iteration,
         tokensThisIteration,
         totalTokens,
@@ -889,7 +881,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield {
           type: BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
           stepTitle: step.block.title,
-          stepId: step.id,
+          stepId: effectiveStepId,
           totalTokens,
           maxTokens: config.maxTokens,
           options: this.options ?? ({} as TOptions),
@@ -907,7 +899,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield {
           type: BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
           stepTitle: step.block.title,
-          stepId: step.id,
+          stepId: effectiveStepId,
           content: response.text,
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
@@ -934,7 +926,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield {
           type: BRAIN_EVENTS.AGENT_TOOL_CALL,
           stepTitle: step.block.title,
-          stepId: step.id,
+          stepId: effectiveStepId,
           toolName: toolCall.toolName,
           toolCallId: toolCall.toolCallId,
           input: toolCall.args as JsonObject,
@@ -952,7 +944,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           yield {
             type: BRAIN_EVENTS.AGENT_COMPLETE,
             stepTitle: step.block.title,
-            stepId: step.id,
+            stepId: effectiveStepId,
             terminalToolName: toolCall.toolName,
             result: toolCall.args as JsonObject,
             totalIterations: iteration,
@@ -989,7 +981,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             env: this.env,
             components: this.components,
             brainRunId: this.brainRunId,
-            stepId: step.id,
+            stepId: effectiveStepId,
           };
 
           const toolResult = await tool.execute(toolCall.args, toolContext);
@@ -1023,7 +1015,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             yield {
               type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
               stepTitle: step.block.title,
-              stepId: step.id,
+              stepId: effectiveStepId,
               toolName: toolCall.toolName,
               toolCallId: toolCall.toolCallId,
               result: { status: 'waiting_for_webhook', webhooks: pendingWebhook.webhooks },
@@ -1052,7 +1044,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           yield {
             type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
             stepTitle: step.block.title,
-            stepId: step.id,
+            stepId: effectiveStepId,
             toolName: toolCall.toolName,
             toolCallId: toolCall.toolCallId,
             result: toolResult,
@@ -1073,7 +1065,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             yield {
               type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
               stepTitle: step.block.title,
-              stepId: step.id,
+              stepId: effectiveStepId,
               iteration,
               message: toolResultMessage,
               options: this.options ?? ({} as TOptions),
@@ -1089,7 +1081,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield {
           type: BRAIN_EVENTS.AGENT_WEBHOOK,
           stepTitle: step.block.title,
-          stepId: step.id,
+          stepId: effectiveStepId,
           toolCallId: pendingWebhook.toolCallId,
           toolName: pendingWebhook.toolName,
           input: pendingWebhook.input,
