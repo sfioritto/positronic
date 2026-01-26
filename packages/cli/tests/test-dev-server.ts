@@ -383,6 +383,26 @@ export class TestDevServer implements PositronicDevServer {
       return [404, { error: 'Invalid brain run ID' }];
     });
 
+    // POST /brains/runs/:runId/signals
+    nockInstance.post(/^\/brains\/runs\/(.+)\/signals$/).reply((uri, requestBody) => {
+      const match = uri.match(/^\/brains\/runs\/(.+)\/signals$/);
+      if (match) {
+        const runId = decodeURIComponent(match[1]);
+        const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+
+        this.logCall('sendSignal', [runId, body]);
+
+        return [202, {
+          success: true,
+          signal: {
+            type: body.type,
+            queuedAt: new Date().toISOString(),
+          },
+        }];
+      }
+      return [404, { error: 'Invalid brain run ID' }];
+    });
+
     // GET /brains/runs/:runId (get single run details)
     // Must be before the watch endpoint to avoid conflicts
     nockInstance.get(/^\/brains\/runs\/([^/]+)$/).reply((uri) => {
@@ -610,6 +630,106 @@ export class TestDevServer implements PositronicDevServer {
                 type: 'brain:complete',
                 brainRunId: runId,
                 brainTitle: 'State View Brain',
+                options: {},
+                status: 'complete',
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-agent-brain') {
+            // Scenario for testing agent loops with agent:start event
+            // Note: This scenario does NOT complete, allowing interactive testing
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Agent Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'agent-step-1', title: 'AI Agent', status: 'running' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:start',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'AI Agent',
+                stepId: 'agent-step-1',
+                prompt: 'Hello, I am an AI agent',
+                system: 'You are helpful',
+                tools: ['search', 'calculate'],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:raw_response_message',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'AI Agent',
+                stepId: 'agent-step-1',
+                iteration: 1,
+                message: {
+                  role: 'assistant',
+                  content: [{ type: 'text', text: 'I am thinking...' }],
+                },
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-agent-brain-complete') {
+            // Scenario for testing agent loops that completes
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Agent Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'agent-step-1', title: 'AI Agent', status: 'running' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:start',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'AI Agent',
+                stepId: 'agent-step-1',
+                prompt: 'Hello, I am an AI agent',
+                system: 'You are helpful',
+                tools: ['search', 'calculate'],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:raw_response_message',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'AI Agent',
+                stepId: 'agent-step-1',
+                iteration: 1,
+                message: {
+                  role: 'assistant',
+                  content: [{ type: 'text', text: 'I am thinking...' }],
+                },
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'agent-step-1', title: 'AI Agent', status: 'complete' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'brain:complete',
+                brainRunId: runId,
+                brainTitle: 'Agent Brain',
                 options: {},
                 status: 'complete',
               })}\n\n`,

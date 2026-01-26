@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
+import TextInput from 'ink-text-input';
 import { EventSource } from 'eventsource';
 import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
 import { BRAIN_EVENTS, STATUS, reconstructBrainTree, createBrainExecutionMachine, sendEvent } from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useBrainMachine } from '../hooks/useBrainMachine.js';
-import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
+import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
 import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { EventsView, type StoredEvent, type EventsViewMode } from './events-view.js';
@@ -16,7 +17,7 @@ import { getAgentLoops } from '../utils/agent-utils.js';
 
 type JsonObject = { [key: string]: unknown };
 
-type ViewMode = 'progress' | 'events' | 'state' | 'agent-picker' | 'agent-chat';
+type ViewMode = 'progress' | 'events' | 'state' | 'agent-picker' | 'agent-chat' | 'message-input';
 
 // Get the index of the currently running step (or last completed if none running)
 const getCurrentStepIndex = (steps: StepInfo[]): number => {
@@ -205,6 +206,11 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [agentChatScrollOffset, setAgentChatScrollOffset] = useState(0);
 
+  // Message input state
+  const [messageText, setMessageText] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [messageSentFeedback, setMessageSentFeedback] = useState<'success' | 'error' | null>(null);
+
   // Track selected event index so it persists across view changes
   const [eventsSelectedIndex, setEventsSelectedIndex] = useState<number | null>(null);
 
@@ -320,6 +326,40 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
     setViewMode('state');
   };
 
+  // Handler for sending a USER_MESSAGE signal
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim() || isSendingMessage) return;
+
+    setIsSendingMessage(true);
+    setMessageSentFeedback(null);
+
+    try {
+      const response = await apiClient.fetch(`/brains/runs/${runId}/signals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: 'USER_MESSAGE', content: text.trim() }),
+      });
+
+      if (response.status === 202) {
+        setMessageSentFeedback('success');
+        setMessageText('');
+        // Brief feedback then return to previous view
+        setTimeout(() => {
+          setMessageSentFeedback(null);
+          setViewMode(previousViewMode);
+        }, 1000);
+      } else {
+        setMessageSentFeedback('error');
+      }
+    } catch {
+      setMessageSentFeedback('error');
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   // Keyboard handling
   useInput((input, key) => {
     if (confirmingKill) {
@@ -354,6 +394,13 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
       // Agent picker: 'b' or escape goes back to previous view
       // SelectList handles its own navigation (up/down/enter)
       if (input === 'b' || key.escape) {
+        setViewMode(previousViewMode);
+      }
+    } else if (viewMode === 'message-input') {
+      // Message input mode: Escape cancels
+      // TextInput handles its own input and Enter (onSubmit)
+      if (key.escape) {
+        setMessageText('');
         setViewMode(previousViewMode);
       }
     } else {
@@ -392,6 +439,14 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
           setPreviousViewMode(viewMode === 'events' ? 'events' : 'progress');
           setViewMode('agent-picker');
         }
+      } else if (input === 'm' && !isComplete) {
+        // Enter message input mode (only when brain is running and has agent loops)
+        const brainTitle = rootBrain?.brainTitle;
+        const agentLoops = getAgentLoops(events, brainTitle);
+        if (agentLoops.length > 0) {
+          setPreviousViewMode(viewMode === 'events' ? 'events' : 'progress');
+          setViewMode('message-input');
+        }
       } else if ((input === 'q' || key.escape) && manageScreenBuffer) {
         // Only handle quit when standalone (manageScreenBuffer=true)
         // When embedded, parent handles q/escape
@@ -415,22 +470,32 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
 
   // Build footer based on current mode
   const getFooter = () => {
+    const brainTitle = rootBrain?.brainTitle;
+    const agentLoops = getAgentLoops(events, brainTitle);
+    const hasAgents = agentLoops.length > 0;
+    const canSendMessage = hasAgents && !isComplete;
+
     if (viewMode === 'state') {
       return 'j/k scroll | space/shift+space page | b back';
     } else if (viewMode === 'agent-chat') {
       return 'j/k scroll | space/shift+space page | b back';
     } else if (viewMode === 'agent-picker') {
       return 'j/k select | Enter view | b back';
+    } else if (viewMode === 'message-input') {
+      return 'Enter send | Esc cancel';
     } else if (viewMode === 'events') {
       if (eventsViewMode === 'detail') {
         return 'j/k scroll • b back';
       } else if (eventsViewMode === 'navigating') {
-        return 'j/k select | Enter detail | s state | a agents | b back | esc auto-scroll';
+        const msgPart = canSendMessage ? ' | m message' : '';
+        return `j/k select | Enter detail | s state | a agents${msgPart} | b back | esc auto-scroll`;
       } else {
-        return 'j/k select | a agents | b back | x kill | esc quit';
+        const msgPart = canSendMessage ? ' | m message' : '';
+        return `j/k select | a agents${msgPart} | b back | x kill | esc quit`;
       }
     } else {
-      return 's state | e events | a agents | x kill | esc quit';
+      const msgPart = canSendMessage ? ' | m message' : '';
+      return `s state | e events | a agents${msgPart} | x kill | esc quit`;
     }
   };
 
@@ -515,6 +580,38 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
           {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
+      ) : viewMode === 'message-input' ? (
+        <Box flexDirection="column">
+          <Box marginBottom={1}>
+            <Text bold>Send message to agent:</Text>
+          </Box>
+          <Box>
+            <Text color="cyan">&gt; </Text>
+            <TextInput
+              value={messageText}
+              onChange={setMessageText}
+              onSubmit={handleSendMessage}
+              focus={true}
+            />
+          </Box>
+          {isSendingMessage && (
+            <Box marginTop={1}>
+              <Text color="yellow">Sending...</Text>
+            </Box>
+          )}
+          {messageSentFeedback === 'success' && (
+            <Box marginTop={1}>
+              <Text color="green">Message sent!</Text>
+            </Box>
+          )}
+          {messageSentFeedback === 'error' && (
+            <Box marginTop={1}>
+              <Text color="red">Failed to send message</Text>
+            </Box>
+          )}
+          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
+        </Box>
       ) : !rootBrain ? (
         <Text>Waiting for brain to start...</Text>
       ) : (
