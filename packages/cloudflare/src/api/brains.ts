@@ -182,6 +182,66 @@ brains.delete('/runs/:runId', async (context: Context) => {
   }
 });
 
+// Signal endpoint - queue KILL, PAUSE, or USER_MESSAGE signals
+brains.post('/runs/:runId/signals', async (context: Context) => {
+  const runId = context.req.param('runId');
+  const body = await context.req.json<{ type: string; content?: string }>();
+
+  // Validate signal type
+  if (!['KILL', 'PAUSE', 'USER_MESSAGE'].includes(body.type)) {
+    return context.json({ error: 'Invalid signal type' }, 400);
+  }
+
+  // Check if the run exists in MonitorDO
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+  const run = await monitorStub.getRun(runId);
+
+  if (!run) {
+    return context.json({ error: 'Brain run not found' }, 404);
+  }
+
+  // Get BrainRunnerDO stub and queue the signal
+  const namespace = context.env.BRAIN_RUNNER_DO;
+  const doId = namespace.idFromName(runId);
+  const stub = namespace.get(doId);
+
+  const signal = await stub.queueSignal(body);
+
+  return context.json({
+    success: true,
+    signal: { type: signal.type, queuedAt: signal.queuedAt }
+  }, 202);
+});
+
+// Resume endpoint - resume a paused brain
+brains.post('/runs/:runId/resume', async (context: Context) => {
+  const runId = context.req.param('runId');
+
+  // Check if the run exists and is paused via MonitorDO
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+  const run = await monitorStub.getRun(runId);
+
+  if (!run) {
+    return context.json({ error: 'Brain run not found' }, 404);
+  }
+
+  if (run.status !== 'paused') {
+    return context.json({
+      error: `Cannot resume brain in '${run.status}' state. Only paused brains can be resumed.`
+    }, 409);
+  }
+
+  // Resume via BrainRunnerDO
+  const namespace = context.env.BRAIN_RUNNER_DO;
+  const doId = namespace.idFromName(runId);
+  const stub = namespace.get(doId);
+  await stub.resume(runId, {});
+
+  return context.json({ success: true, action: 'resumed' }, 202);
+});
+
 brains.get('/:identifier/history', async (context: Context) => {
   const identifier = context.req.param('identifier');
   const limit = Number(context.req.query('limit') || '10');
