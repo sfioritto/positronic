@@ -1,7 +1,8 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, createBrainExecutionMachine, sendEvent } from '@positronic/core';
+import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, createBrainExecutionMachine, sendEvent, type BrainSignal } from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
+import { CloudflareSignalProvider } from './signal-provider.js';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import { WebhookAdapter } from './webhook-adapter.js';
 import { PageAdapter } from './page-adapter.js';
@@ -98,18 +99,96 @@ class ScheduleAdapter implements Adapter {
   }
 }
 
+// SQL to initialize the signals table
+const signalsTableSQL = `
+CREATE TABLE IF NOT EXISTS brain_signals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  signal_type TEXT NOT NULL,
+  content TEXT,
+  queued_at INTEGER NOT NULL
+);
+`;
+
 export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private brainRunId: string;
   private eventStreamAdapter = new EventStreamAdapter();
   private abortController: AbortController | null = null;
   private pageAdapter: PageAdapter | null = null;
+  private signalsTableInitialized = false;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
     this.sql = state.storage.sql;
     this.brainRunId = state.id.toString();
     this.env = env;
+  }
+
+  private initializeSignalsTable() {
+    if (!this.signalsTableInitialized) {
+      this.sql.exec(signalsTableSQL);
+      this.signalsTableInitialized = true;
+    }
+  }
+
+  /**
+   * Queue a signal for this brain run.
+   * Returns the queued signal with timestamp.
+   */
+  async queueSignal(signal: { type: string; content?: string }): Promise<{ type: string; queuedAt: number }> {
+    this.initializeSignalsTable();
+
+    const queuedAt = Date.now();
+    this.sql.exec(
+      `INSERT INTO brain_signals (signal_type, content, queued_at) VALUES (?, ?, ?)`,
+      signal.type,
+      signal.content ?? null,
+      queuedAt
+    );
+
+    return { type: signal.type, queuedAt };
+  }
+
+  /**
+   * Get and consume (delete) pending signals.
+   * Signals are returned in priority order: KILL > PAUSE > USER_MESSAGE
+   * @param filter 'CONTROL' returns only KILL/PAUSE, 'ALL' includes USER_MESSAGE
+   */
+  getAndConsumeSignals(filter: 'CONTROL' | 'ALL'): BrainSignal[] {
+    this.initializeSignalsTable();
+
+    // Query signals ordered by priority
+    let whereClause = '';
+    if (filter === 'CONTROL') {
+      whereClause = `WHERE signal_type IN ('KILL', 'PAUSE')`;
+    }
+
+    const results = this.sql
+      .exec<{ id: number; signal_type: string; content: string | null }>(
+        `SELECT id, signal_type, content FROM brain_signals ${whereClause}
+         ORDER BY CASE signal_type
+           WHEN 'KILL' THEN 1
+           WHEN 'PAUSE' THEN 2
+           WHEN 'USER_MESSAGE' THEN 3
+         END`
+      )
+      .toArray();
+
+    if (results.length === 0) {
+      return [];
+    }
+
+    // Delete the returned signals (consume them)
+    const ids = results.map(r => r.id);
+    this.sql.exec(`DELETE FROM brain_signals WHERE id IN (${ids.join(',')})`);
+
+    // Convert to BrainSignal format
+    return results.map(r => {
+      if (r.signal_type === 'USER_MESSAGE') {
+        return { type: 'USER_MESSAGE' as const, content: r.content ?? '' };
+      }
+      return { type: r.signal_type as 'KILL' | 'PAUSE' };
+    });
   }
 
   private async loadResourcesFromR2(): Promise<Resources | null> {
@@ -362,6 +441,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Add pages service and runtime env
     runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
 
+    // Add signal provider for signal handling
+    const signalProvider = new CloudflareSignalProvider(
+      (filter) => this.getAndConsumeSignals(filter)
+    );
+    runnerWithResources = runnerWithResources.withSignalProvider(signalProvider);
+
     // Extract options from initialData if present
     const options = initialData?.options;
     const initialState = initialData && !initialData.options ? initialData : {};
@@ -497,6 +582,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // Add pages service and runtime env
     runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
+
+    // Add signal provider for signal handling
+    const signalProvider = new CloudflareSignalProvider(
+      (filter) => this.getAndConsumeSignals(filter)
+    );
+    runnerWithResources = runnerWithResources.withSignalProvider(signalProvider);
 
     // Create abort controller for this run
     this.abortController = new AbortController();

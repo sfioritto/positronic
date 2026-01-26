@@ -89,7 +89,8 @@ export class MonitorDO extends DurableObject<Env> {
       event.type === BRAIN_EVENTS.START ||
       event.type === BRAIN_EVENTS.COMPLETE ||
       event.type === BRAIN_EVENTS.ERROR ||
-      event.type === BRAIN_EVENTS.CANCELLED
+      event.type === BRAIN_EVENTS.CANCELLED ||
+      event.type === BRAIN_EVENTS.PAUSED
     ) {
       const { brainRunId } = event;
       const currentTime = Date.now();
