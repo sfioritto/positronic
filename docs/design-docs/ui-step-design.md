@@ -59,8 +59,8 @@ const summaryPrompt = prompt({
 ```typescript
 .ui('ShowDigest', digestPrompt)
 .step('NotifyAndWait', ({ state, page }) => {
-  // page: { link: string, webhook: WebhookRegistration<Schema> }
-  sendNtfy(page.link);
+  // page: { url: string, webhook: WebhookRegistration<Schema> }
+  sendNtfy(page.url);
   return { state, waitFor: [page.webhook] };
 })
 .step('Archive', ({ state, response }) => {
@@ -72,8 +72,8 @@ const summaryPrompt = prompt({
 ```typescript
 .ui('Dashboard', summaryPrompt)
 .step('Notify', ({ state, page }) => {
-  // page: { link: string, webhook: null }
-  sendNtfy(page.link);
+  // page: { url: string, webhook: null }
+  sendNtfy(page.url);
   return state;
 })
 ```
@@ -86,7 +86,7 @@ const summaryPrompt = prompt({
 |-------|------------------------|------|
 | `.prompt()` with schema | merged into state | `state[name]: z.infer<Schema>` |
 | `.prompt()` without schema | response (ephemeral) | `{ text: string }` |
-| `.ui()` | page (ephemeral) | `{ link: string, webhook: WebhookRegistration<Schema> \| null }` |
+| `.ui()` | page (ephemeral) | `{ url: string, webhook: WebhookRegistration<Schema> \| null }` |
 | `waitFor: [webhook]` | response (ephemeral) | `z.infer<WebhookSchema>` |
 
 `page` follows the same pattern as `response` - new type parameter on Brain (`TPage`) that:
@@ -158,10 +158,10 @@ brain('email-digest')
   .ui('ShowDigest', digestPrompt)
 
   .step('NotifyAndWait', ({ state, page }) => {
-    // page.link: URL to the generated page
+    // page.url: URL to the generated page
     // page.webhook: WebhookRegistration<Schema>
 
-    sendNtfy(`Your digest is ready: ${page.link}`);
+    sendNtfy(`Your digest is ready: ${page.url}`);
 
     return {
       state,

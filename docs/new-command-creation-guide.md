@@ -212,7 +212,7 @@ In `packages/cli/src/cli.ts`:
 
 #### 4.1 Add Mock Support
 
-In `packages/cli/src/test/test-dev-server.ts`:
+In `packages/cli/tests/test-dev-server.ts`:
 
 ```typescript
 // Add interface for mock data

@@ -45,6 +45,7 @@ The project uses npm workspaces with the following packages:
 - **`/packages/cloudflare`** - Cloudflare Workers backend with Durable Objects and R2 storage
 - **`/packages/client-anthropic`** - Anthropic AI client integration
 - **`/packages/client-vercel`** - Vercel client integration
+- **`/packages/gen-ui-components`** - AI-generated UI component library for dynamic form generation
 - **`/packages/shell`** - Shell execution utilities
 - **`/packages/template-new-project`** - Project scaffolding template
 
