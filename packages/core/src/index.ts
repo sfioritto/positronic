@@ -87,7 +87,18 @@ export {
   createBrainMachine,
   sendEvent,
   reconstructBrainTree,
+  brainMachineDefinition,
 } from './dsl/brain-state-machine.js';
+
+// Signal validation
+export {
+  isSignalValid,
+  getValidSignals,
+} from './dsl/signal-validation.js';
+export type {
+  MachineStateDefinition,
+  SignalValidationResult,
+} from './dsl/signal-validation.js';
 export type {
   BrainStateMachine,
   BrainExecutionContext,

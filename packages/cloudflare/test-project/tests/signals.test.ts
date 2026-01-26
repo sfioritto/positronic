@@ -126,6 +126,87 @@ describe('Signal API Tests', () => {
       expect(body.error).toBe('Invalid signal type');
     });
 
+    it('should return 409 when PAUSE signal sent to completed brain', async () => {
+      const testEnv = env as TestEnv;
+
+      // Create a brain run (fast brain that will complete quickly)
+      const createRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'basic-brain' }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      await waitOnExecutionContext(createContext);
+
+      // Wait for brain to complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Verify brain is complete
+      const getRunRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}`,
+        { method: 'GET' }
+      );
+      const getRunContext = createExecutionContext();
+      const getRunResponse = await worker.fetch(getRunRequest, testEnv, getRunContext);
+      await waitOnExecutionContext(getRunContext);
+      const runDetails = await getRunResponse.json<{ status: string }>();
+      expect(runDetails.status).toBe('complete');
+
+      // Now send PAUSE signal - should be rejected
+      const signalRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/signals`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'PAUSE' }),
+        }
+      );
+      const signalContext = createExecutionContext();
+      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      await waitOnExecutionContext(signalContext);
+
+      expect(signalResponse.status).toBe(409);
+      const body = await signalResponse.json<{ error: string }>();
+      expect(body.error).toContain("Cannot PAUSE brain in 'complete' state");
+    });
+
+    it('should return 409 when KILL signal sent to completed brain', async () => {
+      const testEnv = env as TestEnv;
+
+      // Create a brain run (fast brain that will complete quickly)
+      const createRequest = new Request('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'basic-brain' }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      await waitOnExecutionContext(createContext);
+
+      // Wait for brain to complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Now send KILL signal - should be rejected
+      const signalRequest = new Request(
+        `http://example.com/brains/runs/${brainRunId}/signals`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'KILL' }),
+        }
+      );
+      const signalContext = createExecutionContext();
+      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      await waitOnExecutionContext(signalContext);
+
+      expect(signalResponse.status).toBe(409);
+      const body = await signalResponse.json<{ error: string }>();
+      expect(body.error).toContain("Cannot KILL brain in 'complete' state");
+    });
+
     it('should return 404 for non-existent run', async () => {
       const testEnv = env as TestEnv;
 
