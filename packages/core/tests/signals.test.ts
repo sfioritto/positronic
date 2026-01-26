@@ -491,4 +491,145 @@ describe('signal handling', () => {
       expect(stepCompleteEvents.length).toBe(2);
     });
   });
+
+  describe('USER_MESSAGE to non-agent brain', () => {
+    it('should ignore USER_MESSAGE signals in non-agent steps (main loop only checks CONTROL signals)', async () => {
+      const testBrain = brain('test-message-no-agent')
+        .step('Step 1', () => ({ step1: true }))
+        .step('Step 2', () => ({ step2: true }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({
+        client: mockClient,
+        signalProvider,
+      })) {
+        events.push(event);
+
+        // Queue USER_MESSAGE after step 1
+        if (
+          event.type === BRAIN_EVENTS.STEP_COMPLETE &&
+          (event as any).stepTitle === 'Step 1'
+        ) {
+          signalProvider.queueSignal({
+            type: 'USER_MESSAGE',
+            content: 'Hello agent!',
+          });
+        }
+      }
+
+      // Brain should complete normally (USER_MESSAGE ignored in main loop)
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+
+      // Should NOT have AGENT_USER_MESSAGE event (no agent to receive it)
+      const userMessageEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.AGENT_USER_MESSAGE
+      );
+      expect(userMessageEvent).toBeUndefined();
+
+      // Both steps should complete
+      const stepCompleteEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
+      );
+      expect(stepCompleteEvents.length).toBe(2);
+    });
+  });
+
+  describe('multiple USER_MESSAGE signals', () => {
+    it('should process all queued USER_MESSAGE signals in a single iteration', async () => {
+      const lookupMock = jest
+        .fn<(input: { id: string }) => Promise<{ id: string; found: boolean }>>()
+        .mockResolvedValue({ id: '123', found: true });
+
+      // First LLM call - calls a non-terminal tool
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'lookup',
+            args: { id: '123' },
+          },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [{ role: 'assistant', content: 'Looking up...' }],
+      });
+
+      // Second LLM call after messages injection
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-2',
+            toolName: 'done',
+            args: { result: 'done' },
+          },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [],
+      });
+
+      const testBrain = brain('test-multi-message').brain('Agent Step', () => ({
+        prompt: 'Do something',
+        tools: {
+          lookup: {
+            description: 'Lookup something',
+            inputSchema: z.object({ id: z.string() }),
+            execute: lookupMock,
+          },
+          done: {
+            description: 'Mark as done',
+            inputSchema: z.object({ result: z.string() }),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      let iterationCount = 0;
+
+      for await (const event of testBrain.run({
+        client: mockClient,
+        signalProvider,
+      })) {
+        events.push(event);
+
+        // After first iteration, queue multiple USER_MESSAGE signals
+        if (event.type === BRAIN_EVENTS.AGENT_ITERATION) {
+          iterationCount++;
+          if (iterationCount === 1) {
+            signalProvider.queueSignal({
+              type: 'USER_MESSAGE',
+              content: 'Message 1',
+            });
+            signalProvider.queueSignal({
+              type: 'USER_MESSAGE',
+              content: 'Message 2',
+            });
+            signalProvider.queueSignal({
+              type: 'USER_MESSAGE',
+              content: 'Message 3',
+            });
+          }
+        }
+      }
+
+      // Should have 3 AGENT_USER_MESSAGE events (one for each message)
+      const userMessageEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.AGENT_USER_MESSAGE
+      );
+      expect(userMessageEvents.length).toBe(3);
+      expect((userMessageEvents[0] as any).content).toBe('Message 1');
+      expect((userMessageEvents[1] as any).content).toBe('Message 2');
+      expect((userMessageEvents[2] as any).content).toBe('Message 3');
+
+      // Should complete successfully
+      const agentCompleteEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE
+      );
+      expect(agentCompleteEvent).toBeDefined();
+    });
+  });
 });
