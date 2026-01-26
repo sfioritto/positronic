@@ -876,8 +876,16 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
 
       paused: state(
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
-        // START happens when resuming from pause
+        // RESUMED transitions out of paused state without creating a new brain
         // If we have agentContext, resume to agentLoop; otherwise to running
+        transition(
+          BRAIN_EVENTS.RESUMED,
+          'agentLoop',
+          hasAgentContext,
+          passthrough()
+        ) as any,
+        transition(BRAIN_EVENTS.RESUMED, 'running', passthrough()) as any,
+        // START is kept for backwards compatibility but RESUMED is preferred
         transition(
           BRAIN_EVENTS.START,
           'agentLoop',

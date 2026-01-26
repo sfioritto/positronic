@@ -173,6 +173,16 @@ export class BrainEventStream<
             response: webhookResponse,
             options: options ?? ({} as TOptions),
           };
+        } else {
+          // Resuming from pause (no webhook response) - emit RESUMED to transition state machine
+          yield {
+            type: BRAIN_EVENTS.RESUMED,
+            status: STATUS.RUNNING,
+            brainTitle,
+            brainDescription,
+            brainRunId,
+            options: options ?? ({} as TOptions),
+          };
         }
       }
 

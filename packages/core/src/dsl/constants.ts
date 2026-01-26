@@ -11,6 +11,7 @@ export const BRAIN_EVENTS = {
   COMPLETE: 'brain:complete',
   CANCELLED: 'brain:cancelled',
   PAUSED: 'brain:paused',
+  RESUMED: 'brain:resumed',
   WEBHOOK: 'brain:webhook',
   WEBHOOK_RESPONSE: 'brain:webhook_response',
   // Agent step events

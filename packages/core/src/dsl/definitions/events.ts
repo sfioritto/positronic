@@ -56,6 +56,12 @@ export interface BrainPausedEvent<TOptions extends JsonObject = JsonObject>
   status: typeof STATUS.PAUSED;
 }
 
+export interface BrainResumedEvent<TOptions extends JsonObject = JsonObject>
+  extends BrainBaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.RESUMED;
+  status: typeof STATUS.RUNNING;
+}
+
 // Step Status Event (just steps array and base event properties)
 export interface StepStatusEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
@@ -222,6 +228,7 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainErrorEvent<TOptions>
   | BrainCancelledEvent<TOptions>
   | BrainPausedEvent<TOptions>
+  | BrainResumedEvent<TOptions>
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>
