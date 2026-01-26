@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 
 /**
  * Result from a webhook handler.
@@ -19,16 +20,32 @@ export async function findAndResumeBrain(
   response: Record<string, unknown>
 ): Promise<{
   received: boolean;
-  action: 'resumed' | 'not_found' | 'queued';
+  action: 'resumed' | 'not_found' | 'queued' | 'ignored';
   identifier: string;
   brainRunId?: string;
   message?: string;
+  reason?: string;
 }> {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
   const brainRunId = await monitorStub.findWaitingBrain(slug, identifier);
 
   if (brainRunId) {
+    // Found a brain - verify it can receive webhook response
+    const run = await monitorStub.getRun(brainRunId);
+    if (run) {
+      const validation = isSignalValid(brainMachineDefinition, run.status, 'WEBHOOK_RESPONSE');
+      if (!validation.valid) {
+        return {
+          received: true,
+          action: 'ignored',
+          identifier,
+          brainRunId,
+          reason: validation.reason,
+        };
+      }
+    }
+
     // Found a brain waiting - resume it
     const namespace = context.env.BRAIN_RUNNER_DO;
     const doId = namespace.idFromName(brainRunId);

@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
 import { parseCronExpression } from 'cron-schedule';
 import Fuse from 'fuse.js';
+import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 import { getManifest } from '../brain-runner-do.js';
 import type { Bindings, CreateBrainRunRequest, CreateBrainRunResponse } from './types.js';
 
@@ -199,6 +200,16 @@ brains.post('/runs/:runId/signals', async (context: Context) => {
 
   if (!run) {
     return context.json({ error: 'Brain run not found' }, 404);
+  }
+
+  // Validate control signals against current brain state using state machine definition
+  // USER_MESSAGE is a data signal that gets queued and processed during agent execution,
+  // so it doesn't need state validation - it can always be queued
+  if (body.type !== 'USER_MESSAGE') {
+    const validation = isSignalValid(brainMachineDefinition, run.status, body.type);
+    if (!validation.valid) {
+      return context.json({ error: validation.reason }, 409);
+    }
   }
 
   // Get BrainRunnerDO stub and queue the signal

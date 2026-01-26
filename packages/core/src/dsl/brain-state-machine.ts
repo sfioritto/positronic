@@ -896,6 +896,9 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
       ),
 
       waiting: state(
+        // TODO: Could add PAUSED transition here to allow pausing a waiting brain.
+        // This would require queueing webhook responses (similar to USER_MESSAGE signals)
+        // so they can be processed when the brain is resumed.
         // Webhook response - if we have agentContext, go back to agentLoop
         transition(
           BRAIN_EVENTS.WEBHOOK_RESPONSE,
@@ -979,4 +982,11 @@ export function sendEvent(
 ): void {
   machine.send(event);
 }
+
+/**
+ * Export a machine instance for signal validation.
+ * This is created once and used to query valid transitions.
+ * The machine is created with default initial context - only the state definitions matter for validation.
+ */
+export const brainMachineDefinition = makeBrainMachine(createInitialContext());
 
