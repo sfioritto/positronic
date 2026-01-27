@@ -734,6 +734,93 @@ export class TestDevServer implements PositronicDevServer {
                 status: 'complete',
               })}\n\n`,
             ].join('');
+          } else if (runId === 'test-multi-agent-brain') {
+            // Scenario for testing multiple agent loops (picker flow)
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Multi Agent Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'agent-step-1', title: 'Research Agent', status: 'complete' },
+                  { id: 'agent-step-2', title: 'Analysis Agent', status: 'running' },
+                ],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:start',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'Research Agent',
+                stepId: 'agent-step-1',
+                prompt: 'Research the topic',
+                system: 'You are a research agent',
+                tools: ['search'],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:raw_response_message',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'Research Agent',
+                stepId: 'agent-step-1',
+                iteration: 1,
+                message: {
+                  role: 'assistant',
+                  content: [{ type: 'text', text: 'Researching...' }],
+                },
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:start',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'Analysis Agent',
+                stepId: 'agent-step-2',
+                prompt: 'Analyze the data',
+                system: 'You are an analysis agent',
+                tools: ['calculate'],
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'agent:raw_response_message',
+                brainRunId: runId,
+                options: {},
+                stepTitle: 'Analysis Agent',
+                stepId: 'agent-step-2',
+                iteration: 1,
+                message: {
+                  role: 'assistant',
+                  content: [{ type: 'text', text: 'Analyzing...' }],
+                },
+              })}\n\n`,
+            ].join('');
+          } else if (runId === 'test-running-brain') {
+            // Scenario for a brain that stays running (doesn't complete)
+            // Used for testing kill, pause, message features
+            return [
+              `data: ${JSON.stringify({
+                type: 'brain:start',
+                brainTitle: 'Running Brain',
+                brainRunId: runId,
+                options: {},
+                status: 'running',
+                initialState: {},
+              })}\n\n`,
+              `data: ${JSON.stringify({
+                type: 'step:status',
+                brainRunId: runId,
+                options: {},
+                steps: [
+                  { id: 'step-1', title: 'Long Running Step', status: 'running' },
+                  { id: 'step-2', title: 'Pending Step', status: 'pending' },
+                ],
+              })}\n\n`,
+            ].join('');
           } else {
             // Default scenario
             const mockEvents = [

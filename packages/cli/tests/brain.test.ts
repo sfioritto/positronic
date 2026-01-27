@@ -1873,4 +1873,274 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
   });
+
+  describe('watch kill feature', () => {
+    it('should show kill confirmation when pressing x', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-running-brain',
+        brainTitle: 'Running Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-running-brain']);
+
+        // Wait for brain to load
+        await waitForOutput(/Running Brain/, 30);
+
+        // Press 'x' to initiate kill
+        instance.stdin.write('x');
+
+        // Should show kill confirmation
+        const foundConfirm = await waitForOutput(/Kill brain\? \(y\/n\)/, 30);
+        expect(foundConfirm).toBe(true);
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+  });
+
+  describe('watch pause/resume feature', () => {
+    it('should send pause signal when pressing p on running brain', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-running-brain',
+        brainTitle: 'Running Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-running-brain']);
+
+        // Wait for brain to load
+        await waitForOutput(/Running Brain/, 30);
+
+        // Press 'p' to pause
+        instance.stdin.write('p');
+
+        // Should show pause feedback
+        const foundPause = await waitForOutput(/Pause signal sent/, 30);
+        expect(foundPause).toBe(true);
+
+        // Verify API call
+        const calls = server.getLogs();
+        const signalCall = calls.find(c => c.method === 'sendSignal' && c.args[1]?.type === 'PAUSE');
+        expect(signalCall).toBeDefined();
+        expect(signalCall?.args[0]).toBe('test-running-brain');
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show pause option in footer when brain is running', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-running-brain',
+        brainTitle: 'Running Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-running-brain']);
+
+        // Wait for brain to load
+        await waitForOutput(/Running Brain/, 30);
+
+        // Footer should show pause option
+        const foundPauseOption = await waitForOutput(/p pause/, 30);
+        expect(foundPauseOption).toBe(true);
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('watch completion feature', () => {
+    it('should recognize brain completion and update footer', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-complete-flow',
+        brainTitle: 'Complete Flow Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-complete-flow']);
+
+        // Wait for brain to load
+        await waitForOutput(/Complete Flow Brain/, 30);
+
+        // Wait for both steps to show as complete
+        const foundStepsComplete = await waitForOutput(/2\/2 steps/, 30);
+        expect(foundStepsComplete).toBe(true);
+
+        // The footer should NOT have "p pause" since brain is complete
+        // Give time for all SSE events to process
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const output = instance.lastFrame() || '';
+        expect(output).not.toContain('p pause');
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('watch agent picker feature', () => {
+    it('should show agent picker when pressing a with multiple agents', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-multi-agent-brain',
+        brainTitle: 'Multi Agent Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-multi-agent-brain']);
+
+        // Wait for brain to load
+        await waitForOutput(/Multi Agent Brain/, 30);
+
+        // Press 'a' to open agent picker
+        instance.stdin.write('a');
+
+        // Should show agent picker header
+        const foundPicker = await waitForOutput(/Select an agent to view/, 30);
+        expect(foundPicker).toBe(true);
+
+        // Should show both agents
+        const foundResearch = await waitForOutput(/Research Agent/, 30);
+        expect(foundResearch).toBe(true);
+
+        const foundAnalysis = await waitForOutput(/Analysis Agent/, 30);
+        expect(foundAnalysis).toBe(true);
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should navigate to agent chat when selecting from picker', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-multi-agent-brain',
+        brainTitle: 'Multi Agent Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-multi-agent-brain']);
+
+        // Wait for brain to load
+        await waitForOutput(/Multi Agent Brain/, 30);
+
+        // Press 'a' to open agent picker
+        instance.stdin.write('a');
+
+        // Wait for picker
+        await waitForOutput(/Select an agent to view/, 30);
+
+        // Press Enter to select first agent
+        instance.stdin.write('\r');
+
+        // Should navigate to agent chat view - shows agent label and content
+        const foundAgentChat = await waitForOutput(/Research Agent|Researching/, 30);
+        expect(foundAgentChat).toBe(true);
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+  });
+
+  describe('watch agent chat view', () => {
+    it('should show agent chat when pressing a with single agent', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrainRun({
+        brainRunId: 'test-agent-brain',
+        brainTitle: 'Agent Brain',
+        type: 'START',
+        status: STATUS.RUNNING,
+        createdAt: Date.now(),
+        startedAt: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['watch', 'test-agent-brain']);
+
+        // Wait for brain to load with agent
+        await waitForOutput(/Agent Brain/, 30);
+
+        // Press 'a' to view agent chat (single agent goes directly to chat)
+        instance.stdin.write('a');
+
+        // Should show agent content
+        const foundAgentContent = await waitForOutput(/I am thinking/, 30);
+        expect(foundAgentContent).toBe(true);
+
+        instance.unmount();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+  });
 });
