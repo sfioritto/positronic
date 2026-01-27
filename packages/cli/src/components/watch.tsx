@@ -242,6 +242,14 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   const [isKilled, setIsKilled] = useState(false);
   const { execute: killBrain, error: killError } = useApiDelete('brain');
 
+  // Pause/resume state
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [pauseResumeMessage, setPauseResumeMessage] = useState<string | null>(null);
+
+  // Track paused status from state machine
+  const isPaused = current.context.status === STATUS.PAUSED;
+
   // Enter alternate screen buffer on mount, exit on unmount
   // Skip in test environment or when parent manages screen buffer
   useEffect(() => {
@@ -370,6 +378,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
           .then(() => {
             setIsKilled(true);
           })
+          .catch(() => {
+            // Error is already captured in killError state from useApiDelete hook
+          })
           .finally(() => {
             setIsKilling(false);
           });
@@ -447,6 +458,42 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
           setPreviousViewMode(viewMode === 'events' ? 'events' : 'progress');
           setViewMode('message-input');
         }
+      } else if (input === 'p' && !isComplete && !isPaused && !isPausing) {
+        // Pause the brain
+        setIsPausing(true);
+        apiClient.fetch(`/brains/runs/${runId}/signals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'PAUSE' }),
+        })
+          .then((res) => {
+            if (res.status === 202) {
+              setPauseResumeMessage('Pause signal sent');
+              setTimeout(() => setPauseResumeMessage(null), 2000);
+            }
+          })
+          .catch(() => {
+            // Silently ignore - user can retry
+          })
+          .finally(() => setIsPausing(false));
+      } else if (input === 'r' && isPaused && !isResuming) {
+        // Resume the brain
+        setIsResuming(true);
+        apiClient.fetch(`/brains/runs/${runId}/signals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'RESUME' }),
+        })
+          .then((res) => {
+            if (res.status === 202) {
+              setPauseResumeMessage('Resume signal sent');
+              setTimeout(() => setPauseResumeMessage(null), 2000);
+            }
+          })
+          .catch(() => {
+            // Silently ignore - user can retry
+          })
+          .finally(() => setIsResuming(false));
       } else if ((input === 'q' || key.escape) && manageScreenBuffer) {
         // Only handle quit when standalone (manageScreenBuffer=true)
         // When embedded, parent handles q/escape
@@ -495,7 +542,8 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
       }
     } else {
       const msgPart = canSendMessage ? ' | m message' : '';
-      return `s state | e events | a agents${msgPart} | x kill | esc quit`;
+      const pauseResumePart = isPaused ? ' | r resume' : (!isComplete ? ' | p pause' : '');
+      return `s state | e events | a agents${pauseResumePart}${msgPart} | x kill | esc quit`;
     }
   };
 
@@ -631,6 +679,26 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
           {isKilled && (
             <Box marginTop={1} borderStyle="round" borderColor="red" paddingX={1}>
               <Text color="red">Brain killed.</Text>
+            </Box>
+          )}
+          {isPaused && !isKilled && (
+            <Box marginTop={1} borderStyle="round" borderColor="cyan" paddingX={1}>
+              <Text color="cyan">Brain paused. Press 'r' to resume.</Text>
+            </Box>
+          )}
+          {isPausing && (
+            <Box marginTop={1}>
+              <Text color="yellow">Sending pause signal...</Text>
+            </Box>
+          )}
+          {isResuming && (
+            <Box marginTop={1}>
+              <Text color="yellow">Sending resume signal...</Text>
+            </Box>
+          )}
+          {pauseResumeMessage && !isPausing && !isResuming && (
+            <Box marginTop={1}>
+              <Text color="cyan">{pauseResumeMessage}</Text>
             </Box>
           )}
           {isComplete && !connectionError && !brainError && !isKilled && (

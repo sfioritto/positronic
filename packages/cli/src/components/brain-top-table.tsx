@@ -71,6 +71,10 @@ const getStatusColor = (status: string) => {
       return 'yellow';
     case STATUS.CANCELLED:
       return 'gray';
+    case STATUS.PAUSED:
+      return 'cyan';
+    case STATUS.WAITING:
+      return 'magenta';
     default:
       return 'white';
   }

@@ -219,6 +219,11 @@ brains.post('/runs/:runId/signals', async (context: Context) => {
 
   const signal = await stub.queueSignal(body);
 
+  // For RESUME signals, also wake up the brain since it's not actively polling when paused
+  if (body.type === 'RESUME') {
+    await stub.wakeUp(runId);
+  }
+
   return context.json({
     success: true,
     signal: { type: signal.type, queuedAt: signal.queuedAt }

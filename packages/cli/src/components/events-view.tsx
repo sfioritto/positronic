@@ -178,6 +178,18 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `Agent response (iteration ${event.iteration})`,
         color: 'gray',
       };
+    case BRAIN_EVENTS.PAUSED:
+      return {
+        symbol: '[||]',
+        text: `Brain paused: "${event.brainTitle}"`,
+        color: 'cyan',
+      };
+    case BRAIN_EVENTS.RESUMED:
+      return {
+        symbol: '[>]',
+        text: `Brain resumed: "${event.brainTitle}"`,
+        color: 'green',
+      };
     default:
       return {
         symbol: '[?]',

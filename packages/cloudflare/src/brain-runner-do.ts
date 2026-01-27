@@ -357,7 +357,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     // If already completed/cancelled/errored, nothing to do
-    if (existingRun.status !== STATUS.RUNNING) {
+    // Active statuses that can be killed: RUNNING, PAUSED, WAITING
+    const activeStatuses: string[] = [STATUS.RUNNING, STATUS.PAUSED, STATUS.WAITING];
+    if (!activeStatuses.includes(existingRun.status as string)) {
       return { success: false, message: 'Brain run is not active or already completed' };
     }
 

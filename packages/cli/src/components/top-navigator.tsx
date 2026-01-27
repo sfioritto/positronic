@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
-import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
+import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
+import { STATUS } from '@positronic/core';
 import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { BrainTopTable, type RunningBrain } from './brain-top-table.js';
@@ -37,6 +38,12 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
   const [isKilling, setIsKilling] = useState(false);
   const [killMessage, setKillMessage] = useState<string | null>(null);
   const { execute: killBrain, error: killError } = useApiDelete('brain');
+
+  // Pause/resume state (for list mode)
+  const [isPausing, setIsPausing] = useState(false);
+  const [pauseMessage, setPauseMessage] = useState<string | null>(null);
+  const [isResuming, setIsResuming] = useState(false);
+  const [resumeMessage, setResumeMessage] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const hasReceivedDataRef = useRef(false);
@@ -166,6 +173,46 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
         }
       } else if (input === 'x' && filteredBrains.length > 0 && !isKilling) {
         setConfirmingKill(true);
+      } else if (input === 'p' && filteredBrains.length > 0 && !isPausing) {
+        const brain = filteredBrains[selectedIndex];
+        if (brain && brain.status === STATUS.RUNNING) {
+          setIsPausing(true);
+          apiClient.fetch(`/brains/runs/${brain.brainRunId}/signals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'PAUSE' }),
+          })
+            .then((res) => {
+              if (res.status === 202) {
+                setPauseMessage(`Paused: ${brain.brainTitle}`);
+                setTimeout(() => setPauseMessage(null), 2000);
+              }
+            })
+            .catch(() => {
+              // Silently ignore - user can retry
+            })
+            .finally(() => setIsPausing(false));
+        }
+      } else if (input === 'r' && filteredBrains.length > 0 && !isResuming) {
+        const brain = filteredBrains[selectedIndex];
+        if (brain && brain.status === STATUS.PAUSED) {
+          setIsResuming(true);
+          apiClient.fetch(`/brains/runs/${brain.brainRunId}/signals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'RESUME' }),
+          })
+            .then((res) => {
+              if (res.status === 202) {
+                setResumeMessage(`Resumed: ${brain.brainTitle}`);
+                setTimeout(() => setResumeMessage(null), 2000);
+              }
+            })
+            .catch(() => {
+              // Silently ignore - user can retry
+            })
+            .finally(() => setIsResuming(false));
+        }
       } else if (input === 'q' || key.escape) {
         exit();
       }
@@ -220,10 +267,19 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
   }
 
   // Build footer based on state
-  let listFooter = 'j/k or ↑/↓ select • Enter watch • x kill • esc quit';
+  let listFooter: string;
   if (confirmingKill) {
     const brain = filteredBrains[selectedIndex];
     listFooter = `Kill "${brain?.brainTitle}"? (y/n)`;
+  } else {
+    const selectedBrain = filteredBrains[selectedIndex];
+    let pauseResumeAction = '';
+    if (selectedBrain?.status === STATUS.RUNNING) {
+      pauseResumeAction = 'p pause • ';
+    } else if (selectedBrain?.status === STATUS.PAUSED) {
+      pauseResumeAction = 'r resume • ';
+    }
+    listFooter = `j/k or ↑/↓ select • Enter watch • ${pauseResumeAction}x kill • esc quit`;
   }
 
   // List mode - show table
@@ -244,6 +300,26 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
       {killMessage && (
         <Box>
           <Text color="green">{killMessage}</Text>
+        </Box>
+      )}
+      {isPausing && (
+        <Box>
+          <Text color="yellow">Pausing brain...</Text>
+        </Box>
+      )}
+      {pauseMessage && (
+        <Box>
+          <Text color="cyan">{pauseMessage}</Text>
+        </Box>
+      )}
+      {isResuming && (
+        <Box>
+          <Text color="yellow">Resuming brain...</Text>
+        </Box>
+      )}
+      {resumeMessage && (
+        <Box>
+          <Text color="green">{resumeMessage}</Text>
         </Box>
       )}
       {killError && <ErrorComponent error={killError} />}

@@ -560,6 +560,14 @@ const pauseBrain = reduce<BrainExecutionContext, object>((ctx) => {
   return updateDerivedState(ctx, 'paused');
 });
 
+const resumeBrain = reduce<BrainExecutionContext, object>((ctx) => {
+  return updateDerivedState(ctx, 'running');
+});
+
+const resumeToAgentLoop = reduce<BrainExecutionContext, object>((ctx) => {
+  return updateDerivedState(ctx, 'agentLoop');
+});
+
 const webhookResponse = reduce<BrainExecutionContext, { response: JsonObject }>(
   (ctx) => {
     const newCtx: BrainExecutionContext = {
@@ -882,9 +890,9 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           BRAIN_EVENTS.RESUMED,
           'agentLoop',
           hasAgentContext,
-          passthrough()
+          resumeToAgentLoop
         ) as any,
-        transition(BRAIN_EVENTS.RESUMED, 'running', passthrough()) as any,
+        transition(BRAIN_EVENTS.RESUMED, 'running', resumeBrain) as any,
         // START is kept for backwards compatibility but RESUMED is preferred
         transition(
           BRAIN_EVENTS.START,
