@@ -92,7 +92,8 @@ export class MonitorDO extends DurableObject<Env> {
       event.type === BRAIN_EVENTS.CANCELLED ||
       event.type === BRAIN_EVENTS.PAUSED ||
       event.type === BRAIN_EVENTS.RESUMED ||
-      event.type === BRAIN_EVENTS.WEBHOOK
+      event.type === BRAIN_EVENTS.WEBHOOK ||
+      event.type === BRAIN_EVENTS.WEBHOOK_RESPONSE
     ) {
       const { brainRunId } = event;
       const currentTime = Date.now();
@@ -151,8 +152,8 @@ export class MonitorDO extends DurableObject<Env> {
         event.type === BRAIN_EVENTS.ERROR ? JSON.stringify(event.error) : null;
 
       // Update the brain_runs summary table
-      // WEBHOOK events don't have brainTitle/brainDescription, so just update status
-      if (event.type === BRAIN_EVENTS.WEBHOOK) {
+      // WEBHOOK and WEBHOOK_RESPONSE events don't have brainTitle/brainDescription, so just update status
+      if (event.type === BRAIN_EVENTS.WEBHOOK || event.type === BRAIN_EVENTS.WEBHOOK_RESPONSE) {
         this.storage.exec(
           `UPDATE brain_runs SET status = ? WHERE run_id = ?`,
           status,
