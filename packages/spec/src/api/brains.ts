@@ -1726,10 +1726,11 @@ export const brains = {
         return false;
       }
 
-      // KEY ASSERTION: Status should be RUNNING despite inner brain COMPLETE event
-      if (ourRun.status !== STATUS.RUNNING) {
+      // KEY ASSERTION: Status should be WAITING (for webhook) despite inner brain COMPLETE event
+      // The outer brain emitted a WEBHOOK event, so it should be WAITING, not COMPLETE
+      if (ourRun.status !== STATUS.WAITING) {
         console.error(
-          `Expected status '${STATUS.RUNNING}' but got '${ourRun.status}'. ` +
+          `Expected status '${STATUS.WAITING}' but got '${ourRun.status}'. ` +
             `Bug: Inner brain COMPLETE event overwrote outer brain status!`
         );
         return false;
