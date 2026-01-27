@@ -1,5 +1,5 @@
 import sshpk from 'sshpk';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { createPublicKey, JsonWebKey } from 'crypto';
@@ -8,6 +8,109 @@ export interface SSHKeyInfo {
   jwk: JsonWebKey;
   fingerprint: string;
   algorithm: string;
+}
+
+export interface DiscoveredKey {
+  path: string;
+  fingerprint: string;
+  algorithm: string;
+  comment?: string;
+}
+
+/**
+ * Discover available SSH keys in the ~/.ssh directory
+ * Scans for common key files and returns metadata about each key
+ */
+export function discoverSSHKeys(): DiscoveredKey[] {
+  const sshDir = join(homedir(), '.ssh');
+
+  if (!existsSync(sshDir)) {
+    return [];
+  }
+
+  const discoveredKeys: DiscoveredKey[] = [];
+  const processedPaths = new Set<string>();
+
+  // Common private key filenames to look for
+  const commonKeyNames = ['id_rsa', 'id_ed25519', 'id_ecdsa', 'id_dsa'];
+
+  // First, check common key names
+  for (const keyName of commonKeyNames) {
+    const privateKeyPath = join(sshDir, keyName);
+    const publicKeyPath = join(sshDir, `${keyName}.pub`);
+
+    if (existsSync(privateKeyPath) && !processedPaths.has(privateKeyPath)) {
+      const keyInfo = tryLoadKeyInfo(privateKeyPath, publicKeyPath);
+      if (keyInfo) {
+        discoveredKeys.push(keyInfo);
+        processedPaths.add(privateKeyPath);
+      }
+    }
+  }
+
+  // Also scan for any .pub files and infer private key path
+  try {
+    const files = readdirSync(sshDir);
+    for (const file of files) {
+      if (file.endsWith('.pub')) {
+        const privateKeyName = file.slice(0, -4); // Remove .pub
+        const privateKeyPath = join(sshDir, privateKeyName);
+        const publicKeyPath = join(sshDir, file);
+
+        if (existsSync(privateKeyPath) && !processedPaths.has(privateKeyPath)) {
+          const keyInfo = tryLoadKeyInfo(privateKeyPath, publicKeyPath);
+          if (keyInfo) {
+            discoveredKeys.push(keyInfo);
+            processedPaths.add(privateKeyPath);
+          }
+        }
+      }
+    }
+  } catch {
+    // If we can't read the directory, just return what we have
+  }
+
+  return discoveredKeys;
+}
+
+/**
+ * Try to load key info from a private/public key pair
+ */
+function tryLoadKeyInfo(privateKeyPath: string, publicKeyPath: string): DiscoveredKey | null {
+  try {
+    // Try to read the public key to get fingerprint and algorithm
+    if (existsSync(publicKeyPath)) {
+      const pubContent = readFileSync(publicKeyPath, 'utf-8').trim();
+      const sshKey = sshpk.parseKey(pubContent, 'auto');
+      const fingerprint = sshKey.fingerprint('sha256').toString();
+
+      // Extract comment from public key (usually the third part after algorithm and key data)
+      const parts = pubContent.split(' ');
+      const comment = parts.length > 2 ? parts.slice(2).join(' ') : undefined;
+
+      return {
+        path: privateKeyPath,
+        fingerprint,
+        algorithm: sshKey.type.toUpperCase(),
+        comment,
+      };
+    }
+
+    // If no public key, try to derive info from private key
+    const privateContent = readFileSync(privateKeyPath, 'utf-8');
+    const privateKey = sshpk.parsePrivateKey(privateContent, 'auto');
+    const publicKey = privateKey.toPublic();
+    const fingerprint = publicKey.fingerprint('sha256').toString();
+
+    return {
+      path: privateKeyPath,
+      fingerprint,
+      algorithm: privateKey.type.toUpperCase(),
+    };
+  } catch {
+    // Key couldn't be parsed, skip it
+    return null;
+  }
 }
 
 /**
@@ -86,9 +189,11 @@ export function signWithPrivateKey(
 }
 
 /**
- * Resolve the private key path from environment or default
+ * Resolve the private key path from environment, config, or default
+ * @param configuredPath - Optional configured path from ProjectConfigManager
  */
-export function resolvePrivateKeyPath(): string {
+export function resolvePrivateKeyPath(configuredPath?: string | null): string {
+  // Priority 1: Environment variable (highest)
   const envPath = process.env.POSITRONIC_PRIVATE_KEY;
   if (envPath) {
     if (envPath.startsWith('~')) {
@@ -96,5 +201,25 @@ export function resolvePrivateKeyPath(): string {
     }
     return envPath;
   }
+
+  // Priority 2: Configured path from config manager
+  if (configuredPath) {
+    if (configuredPath.startsWith('~')) {
+      return join(homedir(), configuredPath.slice(1));
+    }
+    return configuredPath;
+  }
+
+  // Priority 3: Default fallback
   return join(homedir(), '.ssh', 'id_rsa');
+}
+
+/**
+ * Expand a path that may contain ~ to the full path
+ */
+export function expandPath(keyPath: string): string {
+  if (keyPath.startsWith('~')) {
+    return join(homedir(), keyPath.slice(1));
+  }
+  return keyPath;
 }

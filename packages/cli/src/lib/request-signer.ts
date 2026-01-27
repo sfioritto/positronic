@@ -6,6 +6,7 @@ import {
 } from './ssh-key-utils.js';
 import type sshpk from 'sshpk';
 import { existsSync } from 'fs';
+import { ProjectConfigManager } from '../commands/project-config-manager.js';
 
 export type SignedHeaders = {
   Signature: string;
@@ -28,11 +29,15 @@ export class RequestSigner {
 
   private initialize() {
     try {
-      const keyPath = resolvePrivateKeyPath();
+      // Get configured path from project config manager
+      const configManager = new ProjectConfigManager();
+      const configuredPath = configManager.getPrivateKeyPath();
+
+      const keyPath = resolvePrivateKeyPath(configuredPath);
 
       if (!existsSync(keyPath)) {
         this.initError = new Error(
-          `Private key not found at ${keyPath}. Set POSITRONIC_PRIVATE_KEY environment variable to specify the path.`
+          `Private key not found at ${keyPath}. Run 'px auth login' to configure your SSH key, or set POSITRONIC_PRIVATE_KEY environment variable.`
         );
         return;
       }
@@ -145,6 +150,14 @@ export function getRequestSigner(): RequestSigner {
     signerInstance = new RequestSigner();
   }
   return signerInstance;
+}
+
+/**
+ * Reset the request signer singleton
+ * Call this after auth config changes to force reinitialization with new key
+ */
+export function resetRequestSigner(): void {
+  signerInstance = null;
 }
 
 /**

@@ -9,6 +9,7 @@ import { ScheduleCommand } from './commands/schedule.js';
 import { SecretCommand } from './commands/secret.js';
 import { PagesCommand } from './commands/pages.js';
 import { UsersCommand } from './commands/users.js';
+import { AuthCommand } from './commands/auth.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -1349,6 +1350,99 @@ export function buildCli(options: CliOptions) {
       return yargsUsers;
     }
   );
+
+  // --- Auth Commands (Global Mode Only) ---
+  if (!isLocalDevMode) {
+    const authCommand = new AuthCommand();
+    cli = cli.command(
+      'auth',
+      'Manage authentication configuration\n',
+      (yargsAuth) => {
+        yargsAuth
+          .command(
+            'status',
+            'Show current auth configuration\n',
+            () => {},
+            () => {
+              const element = authCommand.status();
+              render(element);
+            }
+          )
+          .command(
+            'login',
+            'Configure SSH key for authentication\n',
+            (yargsLogin) => {
+              return yargsLogin
+                .option('path', {
+                  describe: 'Path to SSH private key',
+                  type: 'string',
+                  alias: 'p',
+                })
+                .option('project', {
+                  describe: 'Set key for current project instead of global',
+                  type: 'boolean',
+                  default: false,
+                })
+                .example('$0 auth login', 'Interactive key selection')
+                .example(
+                  '$0 auth login --path ~/.ssh/id_ed25519',
+                  'Set key directly'
+                )
+                .example(
+                  '$0 auth login --project',
+                  'Set key for current project'
+                );
+            },
+            (argv) => {
+              const element = authCommand.login(argv as any);
+              render(element);
+            }
+          )
+          .command(
+            'logout',
+            'Clear SSH key configuration\n',
+            (yargsLogout) => {
+              return yargsLogout
+                .option('project', {
+                  describe: 'Clear key for current project only',
+                  type: 'boolean',
+                  default: false,
+                })
+                .example('$0 auth logout', 'Clear global key configuration')
+                .example(
+                  '$0 auth logout --project',
+                  'Clear project-specific key'
+                );
+            },
+            (argv) => {
+              const element = authCommand.logout(argv as any);
+              render(element);
+            }
+          )
+          .command(
+            'list',
+            'List available SSH keys\n',
+            () => {},
+            () => {
+              const element = authCommand.list();
+              render(element);
+            }
+          )
+          .command(
+            '$0',
+            false, // Hidden command - default action
+            () => {},
+            () => {
+              // Default to status when just 'px auth' is run
+              const element = authCommand.status();
+              render(element);
+            }
+          );
+
+        return yargsAuth;
+      }
+    );
+  }
 
   cli = cli.epilogue('For more information, visit https://positronic.sh');
 
