@@ -51,6 +51,11 @@ const generateUIInputSchema = z.object({
     'Set to false when: displaying read-only information, confirmation pages, dashboards. ' +
     'When true, the tool returns webhook info that must be used with waitForWebhook to receive the submission.'
   ),
+  persist: z.boolean().optional().describe(
+    'Whether to keep the page after the brain run completes. Defaults to false. ' +
+    'Set to false (default): Page is automatically cleaned up when the brain run finishes. Use for one-time forms, approvals, or temporary displays. ' +
+    'Set to true: Page survives brain completion and remains accessible. Use for shared dashboards, permanent reference pages, or pages that need to outlive the workflow.'
+  ),
 });
 
 /**
@@ -144,7 +149,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     });
 
     // Create the page
-    const page = await pages.create(html);
+    const page = await pages.create(html, { persist: input.persist });
 
     // Return URL and webhook info (no waitFor - does not pause)
     return {
