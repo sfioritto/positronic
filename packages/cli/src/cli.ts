@@ -8,6 +8,7 @@ import { ResourcesCommand } from './commands/resources.js';
 import { ScheduleCommand } from './commands/schedule.js';
 import { SecretCommand } from './commands/secret.js';
 import { PagesCommand } from './commands/pages.js';
+import { UsersCommand } from './commands/users.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -67,6 +68,7 @@ export function buildCli(options: CliOptions) {
   const scheduleCommand = new ScheduleCommand();
   const secretCommand = new SecretCommand();
   const pagesCommand = new PagesCommand();
+  const usersCommand = new UsersCommand();
 
   // Main CLI definition
   let cli = yargs(argv)
@@ -1182,6 +1184,169 @@ export function buildCli(options: CliOptions) {
         .demandCommand(1, 'You need to specify a subcommand');
 
       return yargsSecret;
+    }
+  );
+
+  // --- User Management Commands ---
+  cli = cli.command(
+    'users',
+    'Manage users and SSH keys for authentication\n',
+    (yargsUsers) => {
+      yargsUsers
+        .command(
+          'list',
+          'List all users\n',
+          {},
+          () => {
+            const element = usersCommand.list();
+            render(element);
+          }
+        )
+        .command(
+          'create <name>',
+          'Create a new user\n',
+          (yargsCreate) => {
+            return yargsCreate
+              .positional('name', {
+                describe: 'Name of the user',
+                type: 'string',
+                demandOption: true,
+              })
+              .example('$0 users create admin', 'Create a user named admin');
+          },
+          (argv) => {
+            const element = usersCommand.create(argv);
+            render(element);
+          }
+        )
+        .command(
+          'delete <id>',
+          'Delete a user\n',
+          (yargsDelete) => {
+            return yargsDelete
+              .positional('id', {
+                describe: 'ID of the user to delete',
+                type: 'string',
+                demandOption: true,
+              })
+              .option('force', {
+                describe: 'Skip confirmation prompt',
+                type: 'boolean',
+                alias: 'f',
+                default: false,
+              })
+              .example('$0 users delete abc123', 'Delete a user')
+              .example(
+                '$0 users delete abc123 --force',
+                'Delete without confirmation'
+              );
+          },
+          (argv) => {
+            const element = usersCommand.delete(argv as any);
+            render(element);
+          }
+        )
+        .command(
+          'keys',
+          'Manage SSH keys for users\n',
+          (yargsKeys) => {
+            return yargsKeys
+              .command(
+                'list <user-id>',
+                'List keys for a user\n',
+                (yargsKeysList) => {
+                  return yargsKeysList
+                    .positional('user-id', {
+                      describe: 'User ID',
+                      type: 'string',
+                      demandOption: true,
+                    })
+                    .example('$0 users keys list abc123', 'List keys for a user');
+                },
+                (argv) => {
+                  const element = usersCommand.keysList({ id: argv.userId as string } as any);
+                  render(element);
+                }
+              )
+              .command(
+                'add <user-id> <pubkey-path>',
+                'Add an SSH public key to a user\n',
+                (yargsAdd) => {
+                  return yargsAdd
+                    .positional('user-id', {
+                      describe: 'User ID',
+                      type: 'string',
+                      demandOption: true,
+                    })
+                    .positional('pubkey-path', {
+                      describe: 'Path to the SSH public key file',
+                      type: 'string',
+                      demandOption: true,
+                    })
+                    .option('label', {
+                      describe: 'Label for the key (e.g., "laptop", "desktop")',
+                      type: 'string',
+                      alias: 'l',
+                    })
+                    .example(
+                      '$0 users keys add abc123 ~/.ssh/id_rsa.pub',
+                      'Add RSA public key'
+                    )
+                    .example(
+                      '$0 users keys add abc123 ~/.ssh/id_ed25519.pub --label laptop',
+                      'Add key with label'
+                    );
+                },
+                (argv) => {
+                  const element = usersCommand.keysAdd({
+                    id: argv.userId as string,
+                    pubkeyPath: argv.pubkeyPath as string,
+                    label: argv.label as string | undefined,
+                  } as any);
+                  render(element);
+                }
+              )
+              .command(
+                'remove <user-id> <fingerprint>',
+                'Remove a key from a user\n',
+                (yargsRemove) => {
+                  return yargsRemove
+                    .positional('user-id', {
+                      describe: 'User ID',
+                      type: 'string',
+                      demandOption: true,
+                    })
+                    .positional('fingerprint', {
+                      describe: 'Fingerprint of the key to remove',
+                      type: 'string',
+                      demandOption: true,
+                    })
+                    .option('force', {
+                      describe: 'Skip confirmation prompt',
+                      type: 'boolean',
+                      alias: 'f',
+                      default: false,
+                    })
+                    .example(
+                      '$0 users keys remove abc123 SHA256:...',
+                      'Remove a key'
+                    );
+                },
+                (argv) => {
+                  const element = usersCommand.keysRemove({
+                    id: argv.userId as string,
+                    fingerprint: argv.fingerprint as string,
+                    force: argv.force as boolean,
+                  } as any);
+                  render(element);
+                }
+              )
+              .demandCommand(1, 'You need to specify a keys command (list, add, remove)');
+          }
+        )
+        .demandCommand(1, 'You need to specify a users command (list, create, delete, keys)');
+
+      return yargsUsers;
     }
   );
 
