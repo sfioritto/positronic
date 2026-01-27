@@ -10,6 +10,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import { createRequire } from 'module';
 import * as dotenv from 'dotenv';
+import { maybeSignRequest } from '../lib/request-signer.js';
 
 // Progress callback types
 export interface ProgressInfo {
@@ -75,7 +76,39 @@ export const apiClient = {
       apiPath.startsWith('/') ? apiPath : '/' + apiPath
     }`;
 
-    return fetch(fullUrl, options);
+    // Sign requests when not in local dev mode
+    let requestOptions = options || {};
+    if (!isLocalDevMode) {
+      const method = (options?.method || 'GET').toUpperCase();
+      const existingHeaders = options?.headers || {};
+      const headersObj: Record<string, string> = {};
+
+      // Convert headers to plain object
+      if (existingHeaders instanceof Headers) {
+        existingHeaders.forEach((value, key) => {
+          headersObj[key] = value;
+        });
+      } else if (Array.isArray(existingHeaders)) {
+        existingHeaders.forEach(([key, value]) => {
+          headersObj[key] = value;
+        });
+      } else {
+        Object.assign(headersObj, existingHeaders);
+      }
+
+      const bodyStr = options?.body ? String(options.body) : undefined;
+      const signatureHeaders = maybeSignRequest(method, fullUrl, headersObj, bodyStr);
+
+      requestOptions = {
+        ...options,
+        headers: {
+          ...headersObj,
+          ...signatureHeaders,
+        },
+      };
+    }
+
+    return fetch(fullUrl, requestOptions);
   },
 };
 
