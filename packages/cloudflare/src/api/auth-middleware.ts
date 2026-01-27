@@ -1,11 +1,21 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Bindings } from './types.js';
 import type { AuthDO } from '../auth-do.js';
-import * as jose from 'jose';
 
 export interface AuthContext {
   userId: string | null;
   isRoot: boolean;
+}
+
+// JWK type for SubtleCrypto
+interface JWK {
+  kty: string;
+  crv?: string;
+  alg?: string;
+  n?: string;
+  e?: string;
+  x?: string;
+  y?: string;
 }
 
 // Extend the Hono context to include auth info
@@ -91,70 +101,9 @@ function createSignatureBase(
 }
 
 /**
- * Verify an HTTP message signature using the provided JWK
+ * Get the SubtleCrypto algorithm parameters for a JWK
  */
-async function verifySignature(
-  request: Request,
-  signature: string,
-  signatureInput: string,
-  jwkString: string
-): Promise<boolean> {
-  try {
-    const jwk = JSON.parse(jwkString);
-    const signatureBase = createSignatureBase(request, signatureInput);
-    const signatureBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
-
-    // Import the public key
-    const publicKey = await jose.importJWK(jwk, getAlgorithmFromJwk(jwk));
-
-    // Verify the signature
-    const encoder = new TextEncoder();
-    const data = encoder.encode(signatureBase);
-
-    const isValid = await jose.compactVerify(
-      `${btoa(signatureBase)}.${signature}`,
-      publicKey
-    ).then(() => true).catch(() => false);
-
-    // If compactVerify fails, try raw verification
-    if (!isValid) {
-      // Use SubtleCrypto for raw signature verification
-      const algorithm = getSubtleCryptoAlgorithm(jwk);
-      const cryptoKey = await crypto.subtle.importKey(
-        'jwk',
-        jwk,
-        algorithm,
-        true,
-        ['verify']
-      );
-
-      return await crypto.subtle.verify(
-        algorithm,
-        cryptoKey,
-        signatureBytes,
-        data
-      );
-    }
-
-    return isValid;
-  } catch (error) {
-    console.error('Signature verification failed:', error);
-    return false;
-  }
-}
-
-function getAlgorithmFromJwk(jwk: jose.JWK): string {
-  if (jwk.kty === 'RSA') {
-    return jwk.alg || 'RS256';
-  } else if (jwk.kty === 'EC') {
-    return jwk.alg || 'ES256';
-  } else if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
-    return 'EdDSA';
-  }
-  return 'RS256';
-}
-
-function getSubtleCryptoAlgorithm(jwk: jose.JWK): AlgorithmIdentifier | RsaPssParams | EcdsaParams {
+function getSubtleCryptoAlgorithm(jwk: JWK): AlgorithmIdentifier | RsaPssParams | EcdsaParams {
   if (jwk.kty === 'RSA') {
     return {
       name: 'RSASSA-PKCS1-v1_5',
@@ -172,35 +121,61 @@ function getSubtleCryptoAlgorithm(jwk: jose.JWK): AlgorithmIdentifier | RsaPssPa
 }
 
 /**
- * Try to parse ROOT_PUBLIC_KEY as JWK or convert from SSH format
+ * Verify an HTTP message signature using the provided JWK
+ * Uses Web Crypto API (SubtleCrypto) for signature verification
  */
-function parseRootPublicKey(rootPublicKey: string): string | null {
-  // Try parsing as JWK first
+async function verifySignature(
+  request: Request,
+  signature: string,
+  signatureInput: string,
+  jwkString: string
+): Promise<boolean> {
   try {
-    const parsed = JSON.parse(rootPublicKey);
-    if (parsed.kty) {
-      return rootPublicKey; // Already JWK
-    }
-  } catch {
-    // Not JSON, might be SSH format
-  }
+    const jwk = JSON.parse(jwkString) as JWK;
+    const signatureBase = createSignatureBase(request, signatureInput);
+    const signatureBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
 
-  // SSH format not supported on backend - must be JWK
-  // The CLI converts SSH keys to JWK before upload
-  console.warn('ROOT_PUBLIC_KEY must be in JWK format');
-  return null;
+    // Import the public key using Web Crypto API
+    const algorithm = getSubtleCryptoAlgorithm(jwk);
+    const cryptoKey = await crypto.subtle.importKey(
+      'jwk',
+      jwk,
+      algorithm,
+      true,
+      ['verify']
+    );
+
+    // Verify the signature using Web Crypto API
+    const encoder = new TextEncoder();
+    const data = encoder.encode(signatureBase);
+
+    return await crypto.subtle.verify(
+      algorithm,
+      cryptoKey,
+      signatureBytes,
+      data
+    );
+  } catch (error) {
+    console.error('Signature verification failed:', error);
+    return false;
+  }
 }
 
 /**
- * Calculate fingerprint from JWK (SHA256 of public key)
+ * Try to parse ROOT_PUBLIC_KEY as JWK
  */
-async function calculateFingerprintFromJwk(jwkString: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(jwkString);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const base64Hash = btoa(String.fromCharCode(...hashArray));
-  return `SHA256:${base64Hash}`;
+function parseRootPublicKey(rootPublicKey: string): string | null {
+  try {
+    const parsed = JSON.parse(rootPublicKey);
+    if (parsed.kty) {
+      return rootPublicKey; // Valid JWK
+    }
+  } catch {
+    // Not valid JSON
+  }
+
+  console.warn('ROOT_PUBLIC_KEY must be in JWK format');
+  return null;
 }
 
 /**
@@ -260,26 +235,19 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
       return next();
     }
 
-    // Key not found in database, check ROOT_PUBLIC_KEY
+    // Key not found in database, try ROOT_PUBLIC_KEY
+    // We skip fingerprint comparison and just try to verify - if it works, the key is valid
     if (c.env.ROOT_PUBLIC_KEY) {
       const rootJwk = parseRootPublicKey(c.env.ROOT_PUBLIC_KEY);
       if (rootJwk) {
-        // Calculate the fingerprint of the root key to compare
-        const rootFingerprint = await calculateFingerprintFromJwk(rootJwk);
+        const isValid = await verifySignature(
+          c.req.raw,
+          signatureValue,
+          signatureInputHeader,
+          rootJwk
+        );
 
-        if (keyId === rootFingerprint) {
-          // Verify signature with root key
-          const isValid = await verifySignature(
-            c.req.raw,
-            signatureValue,
-            signatureInputHeader,
-            rootJwk
-          );
-
-          if (!isValid) {
-            return c.json({ error: 'Invalid signature' }, 401);
-          }
-
+        if (isValid) {
           c.set('auth', { userId: null, isRoot: true });
           return next();
         }
