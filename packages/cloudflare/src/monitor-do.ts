@@ -90,7 +90,9 @@ export class MonitorDO extends DurableObject<Env> {
       event.type === BRAIN_EVENTS.COMPLETE ||
       event.type === BRAIN_EVENTS.ERROR ||
       event.type === BRAIN_EVENTS.CANCELLED ||
-      event.type === BRAIN_EVENTS.PAUSED
+      event.type === BRAIN_EVENTS.PAUSED ||
+      event.type === BRAIN_EVENTS.RESUMED ||
+      event.type === BRAIN_EVENTS.WEBHOOK
     ) {
       const { brainRunId } = event;
       const currentTime = Date.now();
@@ -149,29 +151,40 @@ export class MonitorDO extends DurableObject<Env> {
         event.type === BRAIN_EVENTS.ERROR ? JSON.stringify(event.error) : null;
 
       // Update the brain_runs summary table
-      this.storage.exec(
-        `
-        INSERT INTO brain_runs (
-          run_id, brain_title, brain_description, type, status,
-          options, error, created_at, started_at, completed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(run_id) DO UPDATE SET
-          type = excluded.type,
-          status = excluded.status,
-          error = excluded.error,
-          completed_at = excluded.completed_at
-      `,
-        brainRunId,
-        event.brainTitle,
-        event.brainDescription || null,
-        event.type,
-        status,
-        JSON.stringify(event.options || {}),
-        error,
-        currentTime,
-        startTime,
-        completeTime
-      );
+      // WEBHOOK events don't have brainTitle/brainDescription, so just update status
+      if (event.type === BRAIN_EVENTS.WEBHOOK) {
+        this.storage.exec(
+          `UPDATE brain_runs SET status = ? WHERE run_id = ?`,
+          status,
+          brainRunId
+        );
+      } else {
+        // All other events have brainTitle/brainDescription (BrainBaseEvent types)
+        const brainEvent = event as { brainTitle: string; brainDescription?: string };
+        this.storage.exec(
+          `
+          INSERT INTO brain_runs (
+            run_id, brain_title, brain_description, type, status,
+            options, error, created_at, started_at, completed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(run_id) DO UPDATE SET
+            type = excluded.type,
+            status = excluded.status,
+            error = excluded.error,
+            completed_at = excluded.completed_at
+        `,
+          brainRunId,
+          brainEvent.brainTitle,
+          brainEvent.brainDescription || null,
+          event.type,
+          status,
+          JSON.stringify(event.options || {}),
+          error,
+          currentTime,
+          startTime,
+          completeTime
+        );
+      }
 
       // Clean up registrations and in-memory state when brain terminates
       if (isTerminalStatus) {
@@ -201,10 +214,12 @@ export class MonitorDO extends DurableObject<Env> {
         started_at as startedAt,
         completed_at as completedAt
       FROM brain_runs
-      WHERE status = ?
+      WHERE status IN (?, ?, ?)
       ORDER BY created_at DESC
     `,
-        STATUS.RUNNING
+        STATUS.RUNNING,
+        STATUS.PAUSED,
+        STATUS.WAITING
       )
       .toArray();
 
@@ -239,10 +254,12 @@ export class MonitorDO extends DurableObject<Env> {
                 started_at as startedAt,
                 completed_at as completedAt
               FROM brain_runs
-              WHERE status = ?
+              WHERE status IN (?, ?, ?)
               ORDER BY created_at DESC
             `,
-                STATUS.RUNNING
+                STATUS.RUNNING,
+                STATUS.PAUSED,
+                STATUS.WAITING
               )
               .toArray();
 
@@ -358,7 +375,7 @@ export class MonitorDO extends DurableObject<Env> {
       .toArray(); // Use renamed parameter
   }
 
-  // Get active/running brain runs for a specific brain
+  // Get active brain runs for a specific brain (running, paused, or waiting)
   activeRuns(brainTitle: string) {
     return this.storage
       .exec(
@@ -375,11 +392,13 @@ export class MonitorDO extends DurableObject<Env> {
         started_at as startedAt,
         completed_at as completedAt
       FROM brain_runs
-      WHERE brain_title = ? AND status = ?
+      WHERE brain_title = ? AND status IN (?, ?, ?)
       ORDER BY created_at DESC
     `,
         brainTitle,
-        STATUS.RUNNING
+        STATUS.RUNNING,
+        STATUS.PAUSED,
+        STATUS.WAITING
       )
       .toArray();
   }
