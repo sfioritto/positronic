@@ -2,124 +2,35 @@ import sshpk from 'sshpk';
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { createHash } from 'crypto';
+import { createPublicKey, JsonWebKey } from 'crypto';
 
 export interface SSHKeyInfo {
-  jwk: object;
+  jwk: JsonWebKey;
   fingerprint: string;
   algorithm: string;
 }
 
 /**
  * Convert an SSH public key file to JWK format
+ * Uses sshpk for SSH parsing and Node.js crypto for PEM → JWK conversion
  */
 export function convertSSHPubKeyToJWK(pubKeyPath: string): SSHKeyInfo {
   const content = readFileSync(pubKeyPath, 'utf-8').trim();
-  const key = sshpk.parseKey(content, 'auto');
+  const sshKey = sshpk.parseKey(content, 'auto');
 
-  // Get the fingerprint using SHA256
-  const fingerprint = key.fingerprint('sha256').toString();
+  // Get the fingerprint using SHA256 (sshpk's job)
+  const fingerprint = sshKey.fingerprint('sha256').toString();
 
-  // Convert to JWK format
-  // sshpk doesn't have direct JWK export, so we need to convert manually
-  const jwk = convertSshpkKeyToJwk(key);
+  // Convert SSH → PEM → JWK using Node.js crypto (battle-tested)
+  const pem = sshKey.toString('pem');
+  const keyObject = createPublicKey(pem);
+  const jwk = keyObject.export({ format: 'jwk' });
 
   return {
     jwk,
     fingerprint,
-    algorithm: key.type,
+    algorithm: sshKey.type,
   };
-}
-
-/**
- * Convert an sshpk key to JWK format
- */
-function convertSshpkKeyToJwk(key: sshpk.Key): object {
-  const pemKey = key.toString('pem');
-
-  // For RSA keys
-  if (key.type === 'rsa') {
-    const rsaKey = key as sshpk.Key & { part: Record<string, { data: Buffer }> };
-
-    // Get the RSA components from sshpk
-    const n = rsaKey.part.n?.data;
-    const e = rsaKey.part.e?.data;
-
-    if (!n || !e) {
-      throw new Error('Invalid RSA key: missing n or e component');
-    }
-
-    return {
-      kty: 'RSA',
-      n: base64UrlEncode(n),
-      e: base64UrlEncode(e),
-      alg: 'RS256',
-    };
-  }
-
-  // For ECDSA keys
-  if (key.type === 'ecdsa') {
-    const ecKey = key as sshpk.Key & { part: Record<string, { data: Buffer }>, curve: string };
-
-    // ECDSA keys have Q (public point) which contains x and y
-    const Q = ecKey.part.Q?.data;
-    if (!Q) {
-      throw new Error('Invalid ECDSA key: missing Q component');
-    }
-
-    // The Q component is in uncompressed form: 0x04 || x || y
-    // First byte is 0x04 indicating uncompressed point
-    const keySize = (Q.length - 1) / 2;
-    const x = Q.slice(1, 1 + keySize);
-    const y = Q.slice(1 + keySize);
-
-    // Map sshpk curve names to JWK curve names
-    const curveMap: Record<string, string> = {
-      'nistp256': 'P-256',
-      'nistp384': 'P-384',
-      'nistp521': 'P-521',
-    };
-
-    const crv = curveMap[ecKey.curve] || ecKey.curve;
-
-    return {
-      kty: 'EC',
-      crv,
-      x: base64UrlEncode(x),
-      y: base64UrlEncode(y),
-      alg: crv === 'P-256' ? 'ES256' : crv === 'P-384' ? 'ES384' : 'ES512',
-    };
-  }
-
-  // For Ed25519 keys
-  if (key.type === 'ed25519') {
-    const edKey = key as sshpk.Key & { part: Record<string, { data: Buffer }> };
-    const A = edKey.part.A?.data;
-
-    if (!A) {
-      throw new Error('Invalid Ed25519 key: missing A component');
-    }
-
-    return {
-      kty: 'OKP',
-      crv: 'Ed25519',
-      x: base64UrlEncode(A),
-      alg: 'EdDSA',
-    };
-  }
-
-  throw new Error(`Unsupported key type: ${key.type}`);
-}
-
-/**
- * Base64URL encode a buffer (no padding, URL-safe alphabet)
- */
-function base64UrlEncode(buffer: Buffer): string {
-  return buffer
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
 }
 
 /**
