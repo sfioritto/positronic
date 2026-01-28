@@ -80,8 +80,7 @@ export class RequestSigner {
   signRequest(
     method: string,
     url: string,
-    headers: Record<string, string> = {},
-    body?: string
+    headers: Record<string, string> = {}
   ): SignedHeaders {
     if (!this.privateKey || !this.fingerprint) {
       throw new Error('Request signer not initialized');
@@ -174,8 +173,7 @@ export function isSigningAvailable(): boolean {
 export function maybeSignRequest(
   method: string,
   url: string,
-  headers: Record<string, string> = {},
-  body?: string
+  headers: Record<string, string> = {}
 ): Record<string, string> {
   const signer = getRequestSigner();
   if (!signer.isReady()) {
@@ -183,7 +181,7 @@ export function maybeSignRequest(
   }
 
   try {
-    return signer.signRequest(method, url, headers, body);
+    return signer.signRequest(method, url, headers);
   } catch (error) {
     console.error('Warning: Failed to sign request:', error);
     return {};

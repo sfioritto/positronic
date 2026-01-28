@@ -4,13 +4,42 @@ import type { AuthDO } from '../auth-do.js';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+// Validation constants
+const MAX_USERNAME_LENGTH = 64;
+const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validate a username
+ * @returns null if valid, error message if invalid
+ */
+function validateUsername(name: unknown): string | null {
+  if (!name || typeof name !== 'string') {
+    return 'Name is required';
+  }
+
+  if (name.length === 0) {
+    return 'Name cannot be empty';
+  }
+
+  if (name.length > MAX_USERNAME_LENGTH) {
+    return `Name cannot exceed ${MAX_USERNAME_LENGTH} characters`;
+  }
+
+  if (!USERNAME_PATTERN.test(name)) {
+    return 'Name can only contain letters, numbers, hyphens, and underscores';
+  }
+
+  return null;
+}
+
 // POST /users - Create a new user
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<{ name: string }>();
 
-    if (!body.name || typeof body.name !== 'string') {
-      return c.json({ error: 'Name is required' }, 400);
+    const validationError = validateUsername(body.name);
+    if (validationError) {
+      return c.json({ error: validationError }, 400);
     }
 
     const authDoId = c.env.AUTH_DO.idFromName('auth');

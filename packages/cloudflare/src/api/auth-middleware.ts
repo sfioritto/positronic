@@ -157,7 +157,9 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
         },
       });
     } catch (error) {
-      console.error('Failed to parse signature:', error);
+      // Log error type only - avoid logging request details that could contain sensitive data
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to parse signature:', errorMessage);
       return c.json({ error: 'Invalid signature format' }, 401);
     }
 
@@ -188,7 +190,9 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
         c.set('auth', { userId: userKey.userId, isRoot: false });
         return next();
       } catch (error) {
-        console.error('Signature verification failed:', error);
+        // Log error type only - avoid logging key material or signature data
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Signature verification failed:', errorMessage);
         return c.json({ error: 'Signature verification failed' }, 401);
       }
     }
@@ -205,7 +209,9 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
           return next();
         }
       } catch (error) {
-        console.error('Root key verification failed:', error);
+        // Log error type only - avoid logging key material
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Root key verification failed:', errorMessage);
       }
     }
 

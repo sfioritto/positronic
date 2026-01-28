@@ -96,8 +96,7 @@ export const apiClient = {
         Object.assign(headersObj, existingHeaders);
       }
 
-      const bodyStr = options?.body ? String(options.body) : undefined;
-      const signatureHeaders = maybeSignRequest(method, fullUrl, headersObj, bodyStr);
+      const signatureHeaders = maybeSignRequest(method, fullUrl, headersObj);
 
       requestOptions = {
         ...options,
