@@ -263,7 +263,7 @@ describe('authMiddleware', () => {
     });
 
     it('should handle string errors', () => {
-      const stringError = 'Some error message';
+      const stringError: unknown = 'Some error message';
       const errorMessage = stringError instanceof Error ? stringError.message : 'Unknown error';
 
       expect(errorMessage).toBe('Unknown error');
