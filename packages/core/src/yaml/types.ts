@@ -93,6 +93,17 @@ export interface ValidationResult {
 }
 
 /**
+ * Result of resolving a binding against actual data at dry-run time.
+ */
+export interface ResolvedBinding {
+  path: string; // The binding path, e.g. "email.subject"
+  component: string; // Component name, e.g. "Text"
+  prop: string; // Prop name, e.g. "content"
+  value: string; // Summarized string representation of resolved value
+  resolved: boolean; // true if resolved to a non-undefined value
+}
+
+/**
  * Data type inference for validating bindings.
  */
 export type DataType =

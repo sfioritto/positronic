@@ -3,13 +3,21 @@ import { z } from 'zod';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { UIComponent, Placement, FormSchema } from './types.js';
 import { parseTemplate } from '../yaml/parser.js';
-import { inferDataType, validateDataBindings } from '../yaml/data-validator.js';
+import {
+  inferDataType,
+  resolveBindings,
+  validateDataBindings,
+} from '../yaml/data-validator.js';
 import {
   extractFormSchema,
   validateAgainstZod,
 } from '../yaml/schema-extractor.js';
 import { describeDataShape } from '../yaml/type-inference.js';
-import type { ComponentNode, ValidationError } from '../yaml/types.js';
+import type {
+  ComponentNode,
+  ResolvedBinding,
+  ValidationError,
+} from '../yaml/types.js';
 
 /**
  * Get the type name from a Zod schema for documentation.
@@ -132,6 +140,8 @@ function createValidateTemplateTool(
 4. Form components have a Button for submission
 5. The form fields will produce data matching the expected schema (if schema provided)
 
+Returns resolvedBindings showing what each binding resolves to in the actual data. Use this to verify bindings point to the right values.
+
 Call this after generating your YAML template to verify it's correct before finalizing.`,
     inputSchema: z.object({
       yaml: z.string().describe('The complete YAML template to validate'),
@@ -142,6 +152,7 @@ Call this after generating your YAML template to verify it's correct before fina
       valid: boolean;
       errors: Array<{ type: string; message: string }>;
       extractedFields?: Array<{ name: string; type: string }>;
+      resolvedBindings?: ResolvedBinding[];
     } => {
       const { yaml } = args as { yaml: string };
       const errors: ValidationError[] = [];
@@ -196,10 +207,14 @@ Call this after generating your YAML template to verify it's correct before fina
         errors.push(...schemaErrors);
       }
 
+      // 6. Resolve bindings against actual data
+      const resolved = resolveBindings(root, data);
+
       return {
         valid: errors.length === 0,
         errors: errors.map((e) => ({ type: e.type, message: e.message })),
         extractedFields,
+        resolvedBindings: resolved,
       };
     },
   };

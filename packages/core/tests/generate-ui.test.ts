@@ -3,12 +3,14 @@ import { z } from 'zod';  // Still needed for schema in tests
 import { generateUI } from '../src/ui/generate-ui.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
 import type { UIComponent } from '../src/ui/types.js';
+import type { ResolvedBinding } from '../src/yaml/types.js';
 
 // Type for the validation result returned by validate_template tool
 type ValidationResult = {
   valid: boolean;
   errors: Array<{ type: string; message: string }>;
   extractedFields?: Array<{ name: string; type: string }>;
+  resolvedBindings?: ResolvedBinding[];
 };
 
 const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
@@ -517,6 +519,322 @@ This form collects a name.`,
       client: mockClient,
       prompt: 'Create a container with input',
       components: { Container, Input },
+    });
+  });
+
+  describe('resolvedBindings', () => {
+    const Text: UIComponent<{ content: string }> = {
+      component: () => null,
+      description: 'A text display',
+    };
+
+    const Heading: UIComponent<{ content: string; level?: string }> = {
+      component: () => null,
+      description: 'A heading',
+    };
+
+    const Container: UIComponent<Record<string, never>> = {
+      component: () => null,
+      description: 'A container',
+    };
+
+    const List: UIComponent<{ items: unknown[]; as?: string }> = {
+      component: () => null,
+      description: 'A list loop',
+    };
+
+    it('should resolve bindings to correct values', async () => {
+      mockStreamText.mockImplementationOnce(async (params) => {
+        const result = (await params.tools.validate_template.execute!({
+          yaml: `Container:
+  children:
+    - Heading:
+        content: "{{user.name}}"
+    - Text:
+        content: "{{user.email}}"`,
+        })) as ValidationResult;
+
+        expect(result.resolvedBindings).toBeDefined();
+        expect(result.resolvedBindings).toHaveLength(2);
+
+        const nameBinding = result.resolvedBindings!.find(
+          (b) => b.path === 'user.name'
+        );
+        expect(nameBinding).toEqual({
+          path: 'user.name',
+          component: 'Heading',
+          prop: 'content',
+          value: '"John Smith"',
+          resolved: true,
+        });
+
+        const emailBinding = result.resolvedBindings!.find(
+          (b) => b.path === 'user.email'
+        );
+        expect(emailBinding).toEqual({
+          path: 'user.email',
+          component: 'Text',
+          prop: 'content',
+          value: '"john@example.com"',
+          resolved: true,
+        });
+
+        return {
+          toolCalls: [],
+          text: `Container:
+  children:
+    - Heading:
+        content: "{{user.name}}"`,
+          usage: { totalTokens: 100 },
+        };
+      });
+
+      await generateUI({
+        client: mockClient,
+        prompt: 'Show user info',
+        components: { Container, Heading, Text },
+        data: { user: { name: 'John Smith', email: 'john@example.com' } },
+      });
+    });
+
+    it('should mark unresolved bindings with resolved: false', async () => {
+      mockStreamText.mockImplementationOnce(async (params) => {
+        const result = (await params.tools.validate_template.execute!({
+          yaml: `Container:
+  children:
+    - Text:
+        content: "{{user.inbox}}"`,
+        })) as ValidationResult;
+
+        expect(result.resolvedBindings).toBeDefined();
+        expect(result.resolvedBindings).toHaveLength(1);
+        expect(result.resolvedBindings![0]).toEqual({
+          path: 'user.inbox',
+          component: 'Text',
+          prop: 'content',
+          value: 'undefined',
+          resolved: false,
+        });
+
+        return {
+          toolCalls: [],
+          text: `Container:
+  children:
+    - Text:
+        content: "hello"`,
+          usage: { totalTokens: 100 },
+        };
+      });
+
+      await generateUI({
+        client: mockClient,
+        prompt: 'Show inbox',
+        components: { Container, Text },
+        data: { user: { name: 'John' } },
+      });
+    });
+
+    it('should resolve bindings inside List using first array element', async () => {
+      mockStreamText.mockImplementationOnce(async (params) => {
+        const result = (await params.tools.validate_template.execute!({
+          yaml: `List:
+  items: "{{emails}}"
+  as: "email"
+  children:
+    - Text:
+        content: "{{email.subject}}"`,
+        })) as ValidationResult;
+
+        expect(result.resolvedBindings).toBeDefined();
+
+        // The items binding itself
+        const itemsBinding = result.resolvedBindings!.find(
+          (b) => b.path === 'emails'
+        );
+        expect(itemsBinding).toBeDefined();
+        expect(itemsBinding!.resolved).toBe(true);
+        expect(itemsBinding!.value).toContain('Array(2)');
+
+        // The loop body binding resolved against first element
+        const subjectBinding = result.resolvedBindings!.find(
+          (b) => b.path === 'email.subject'
+        );
+        expect(subjectBinding).toEqual({
+          path: 'email.subject',
+          component: 'Text',
+          prop: 'content',
+          value: '"Hello"',
+          resolved: true,
+        });
+
+        return {
+          toolCalls: [],
+          text: `List:
+  items: "{{emails}}"
+  as: "email"
+  children:
+    - Text:
+        content: "{{email.subject}}"`,
+          usage: { totalTokens: 100 },
+        };
+      });
+
+      await generateUI({
+        client: mockClient,
+        prompt: 'Show emails',
+        components: { Container, Text, List },
+        data: {
+          emails: [
+            { subject: 'Hello', from: 'alice@example.com' },
+            { subject: 'World', from: 'bob@example.com' },
+          ],
+        },
+      });
+    });
+
+    it('should mark loop body bindings as unresolved when array is empty', async () => {
+      mockStreamText.mockImplementationOnce(async (params) => {
+        const result = (await params.tools.validate_template.execute!({
+          yaml: `List:
+  items: "{{emails}}"
+  as: "email"
+  children:
+    - Text:
+        content: "{{email.subject}}"`,
+        })) as ValidationResult;
+
+        expect(result.resolvedBindings).toBeDefined();
+
+        // items binding resolves to empty array
+        const itemsBinding = result.resolvedBindings!.find(
+          (b) => b.path === 'emails'
+        );
+        expect(itemsBinding!.resolved).toBe(true);
+        expect(itemsBinding!.value).toBe('Array(0) []');
+
+        // Loop body binding is unresolved because no sample element
+        const subjectBinding = result.resolvedBindings!.find(
+          (b) => b.path === 'email.subject'
+        );
+        expect(subjectBinding).toEqual({
+          path: 'email.subject',
+          component: 'Text',
+          prop: 'content',
+          value: 'undefined',
+          resolved: false,
+        });
+
+        return {
+          toolCalls: [],
+          text: `Container:
+  children:
+    - Text:
+        content: "No emails"`,
+          usage: { totalTokens: 100 },
+        };
+      });
+
+      await generateUI({
+        client: mockClient,
+        prompt: 'Show emails',
+        components: { Container, Text, List },
+        data: { emails: [] },
+      });
+    });
+
+    it('should return empty resolvedBindings when template has no bindings', async () => {
+      mockStreamText.mockImplementationOnce(async (params) => {
+        const result = (await params.tools.validate_template.execute!({
+          yaml: `Container:
+  children:
+    - Text:
+        content: "Hello world"`,
+        })) as ValidationResult;
+
+        expect(result.resolvedBindings).toBeDefined();
+        expect(result.resolvedBindings).toHaveLength(0);
+
+        return {
+          toolCalls: [],
+          text: `Container:
+  children:
+    - Text:
+        content: "Hello world"`,
+          usage: { totalTokens: 100 },
+        };
+      });
+
+      await generateUI({
+        client: mockClient,
+        prompt: 'Static page',
+        components: { Container, Text },
+        data: {},
+      });
+    });
+
+    it('should not include resolvedBindings when YAML fails to parse', async () => {
+      mockStreamText.mockImplementationOnce(async (params) => {
+        const result = (await params.tools.validate_template.execute!({
+          yaml: `:::invalid yaml[[[`,
+        })) as ValidationResult;
+
+        expect(result.valid).toBe(false);
+        expect(result.resolvedBindings).toBeUndefined();
+
+        return {
+          toolCalls: [],
+          text: `Container:
+  children:
+    - Text:
+        content: "fallback"`,
+          usage: { totalTokens: 100 },
+        };
+      });
+
+      await generateUI({
+        client: mockClient,
+        prompt: 'Broken template',
+        components: { Container, Text },
+        data: {},
+      });
+    });
+
+    it('should truncate long string values in summaries', async () => {
+      const longString = 'A'.repeat(100);
+
+      mockStreamText.mockImplementationOnce(async (params) => {
+        const result = (await params.tools.validate_template.execute!({
+          yaml: `Container:
+  children:
+    - Text:
+        content: "{{message}}"`,
+        })) as ValidationResult;
+
+        expect(result.resolvedBindings).toBeDefined();
+        expect(result.resolvedBindings).toHaveLength(1);
+
+        const binding = result.resolvedBindings![0];
+        expect(binding.resolved).toBe(true);
+        // Should be truncated to 60 chars + quotes
+        expect(binding.value.length).toBeLessThan(70);
+        expect(binding.value).toContain('...');
+
+        return {
+          toolCalls: [],
+          text: `Container:
+  children:
+    - Text:
+        content: "{{message}}"`,
+          usage: { totalTokens: 100 },
+        };
+      });
+
+      await generateUI({
+        client: mockClient,
+        prompt: 'Show long message',
+        components: { Container, Text },
+        data: { message: longString },
+      });
     });
   });
 });
