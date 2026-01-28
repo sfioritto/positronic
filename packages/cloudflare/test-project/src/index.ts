@@ -304,6 +304,52 @@ const agentErrorBrain = brain({ title: 'agent-error-brain', description: 'A brai
     },
   }));
 
+// Brain that generates a large state (> 1MB) to test R2 overflow
+// Note: The large data is generated in a way that the serialized event exceeds R2_OVERFLOW_THRESHOLD
+const largeStateBrain = brain({ title: 'large-state-brain', description: 'A brain that generates large state for R2 overflow testing' })
+  .step('Generate small state', ({ state }) => ({
+    ...state,
+    smallData: 'This is a small initial value',
+  }))
+  .step('Generate large state', ({ state }) => {
+    // Generate a string that's > 1MB (1,048,576 bytes)
+    // The entire serialized event (including type, brainRunId, etc.) needs to exceed threshold
+    const largeString = 'X'.repeat(1.1 * 1024 * 1024); // ~1.1MB of data
+    return {
+      ...state,
+      largeData: largeString,
+    };
+  })
+  .step('Final step', ({ state }) => ({
+    ...state,
+    completed: true,
+    // Clear the large data to avoid keeping it in final state
+    largeData: 'cleared',
+  }));
+
+// Brain with large state that pauses for webhook - for testing R2 overflow with resume
+const largeStateWebhookBrain = brain({ title: 'large-state-webhook-brain', description: 'A brain with large state that waits for webhooks' })
+  .step('Generate large state', ({ state }) => {
+    // Generate a string that's > 1MB
+    const largeString = 'Y'.repeat(1.1 * 1024 * 1024); // ~1.1MB
+    return {
+      ...state,
+      largeData: largeString,
+    };
+  })
+  .step('Wait for webhook', ({ state }) => ({
+    state: { ...state, waiting: true },
+    waitFor: [testWebhook('large-state-test')],
+  }))
+  .step('After webhook', ({ state, response }) => ({
+    ...state,
+    waiting: false,
+    webhookReceived: true,
+    responseMessage: response?.message,
+    // Clear large data after webhook
+    largeData: 'cleared',
+  }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -379,6 +425,16 @@ const brainManifest = {
     filename: 'outer-webhook-after-inner',
     path: 'brains/outer-webhook-after-inner.ts',
     brain: outerWebhookAfterInner,
+  },
+  'large-state-brain': {
+    filename: 'large-state-brain',
+    path: 'brains/large-state-brain.ts',
+    brain: largeStateBrain,
+  },
+  'large-state-webhook-brain': {
+    filename: 'large-state-webhook-brain',
+    path: 'brains/large-state-webhook-brain.ts',
+    brain: largeStateWebhookBrain,
   },
 };
 
