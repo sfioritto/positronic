@@ -6,6 +6,7 @@ import { CloudflareSignalProvider } from './signal-provider.js';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import { WebhookAdapter } from './webhook-adapter.js';
 import { PageAdapter } from './page-adapter.js';
+import { EventLoader } from './event-loader.js';
 import { createPagesService } from './pages-service.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
@@ -325,17 +326,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // Only query SQLite if we don't have the brainRunId from the API
     if (!actualBrainRunId) {
-      const { sql } = this;
       try {
-        const startEventResult = sql
-          .exec<{ serialized_event: string }>(
-            `SELECT serialized_event FROM brain_events WHERE event_type = ? ORDER BY event_id DESC LIMIT 1`,
-            BRAIN_EVENTS.START
-          )
-          .toArray();
+        // Use EventLoader to handle R2 overflow transparently
+        const eventLoader = new EventLoader(this.sql, this.env.RESOURCES_BUCKET);
+        startEvent = await eventLoader.loadEventByType(BRAIN_EVENTS.START, 'DESC');
 
-        if (startEventResult.length > 0) {
-          startEvent = JSON.parse(startEventResult[0].serialized_event);
+        if (startEvent) {
           actualBrainRunId = startEvent.brainRunId;
           actualBrainTitle = startEvent.brainTitle;
         }
@@ -419,7 +415,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
     }
 
-    const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
+    const sqliteAdapter = new BrainRunSQLiteAdapter(sql, this.env.RESOURCES_BUCKET, brainRunId);
     const { eventStreamAdapter } = this;
     const monitorDOStub = this.env.MONITOR_DO.get(
       this.env.MONITOR_DO.idFromName('singleton')
@@ -509,21 +505,18 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('Runtime manifest not initialized');
     }
 
-    // Get the brain title by loading the FIRST START event
-    const startEventResult = sql
-      .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events WHERE event_type = ? ORDER BY event_id ASC LIMIT 1`,
-        BRAIN_EVENTS.START
-      )
-      .toArray();
+    // Use EventLoader to load events (handles R2 overflow transparently)
+    const eventLoader = new EventLoader(sql, this.env.RESOURCES_BUCKET);
 
-    if (startEventResult.length === 0) {
+    // Get the brain title by loading the FIRST START event
+    const startEvent = await eventLoader.loadEventByType(BRAIN_EVENTS.START, 'ASC');
+
+    if (!startEvent) {
       throw new Error(`No START event found for brain run ${brainRunId}`);
     }
 
-    const startEvent = JSON.parse(startEventResult[0].serialized_event);
-    const brainTitle = startEvent.brainTitle;
-    const initialState = startEvent.initialState || {};
+    const brainTitle = (startEvent as any).brainTitle;
+    const initialState = (startEvent as any).initialState || {};
 
     if (!brainTitle) {
       throw new Error(`Brain title not found in START event for brain run ${brainRunId}`);
@@ -552,20 +545,15 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     // Load all events and feed them to the state machine to reconstruct execution tree
-    const allEventsResult = sql
-      .exec<{ serialized_event: string }>(
-        `SELECT serialized_event FROM brain_events ORDER BY event_id ASC`
-      )
-      .toArray();
+    const allEvents = await eventLoader.loadAllEvents();
 
     // Create state machine and feed all historical events to reconstruct execution state
     const machine = createBrainExecutionMachine({ initialState: initialState });
-    for (const row of allEventsResult) {
-      const event = JSON.parse(row.serialized_event);
+    for (const event of allEvents) {
       sendEvent(machine, event);
     }
 
-    const sqliteAdapter = new BrainRunSQLiteAdapter(sql);
+    const sqliteAdapter = new BrainRunSQLiteAdapter(sql, this.env.RESOURCES_BUCKET, brainRunId);
     const { eventStreamAdapter } = this;
     const monitorDOStub = this.env.MONITOR_DO.get(
       this.env.MONITOR_DO.idFromName('singleton')
@@ -651,30 +639,18 @@ export class BrainRunnerDO extends DurableObject<Env> {
     let streamController: ReadableStreamDefaultController | null = null;
     try {
       if (url.pathname === '/watch') {
+        // Create EventLoader for loading historical events (handles R2 overflow)
+        const eventLoader = new EventLoader(sql, this.env.RESOURCES_BUCKET);
+
         const stream = new ReadableStream({
-          async start(controller) {
+          start: async (controller) => {
             streamController = controller;
             try {
-              streamController = controller;
-              const existingEventsSql = `
-                SELECT serialized_event
-                FROM brain_events
-                ORDER BY event_id ASC;
-              `;
-              const existingEventsResult = sql
-                .exec<{ serialized_event: string }>(existingEventsSql)
-                .toArray();
+              // Load all historical events using EventLoader
+              const existingEvents = await eventLoader.loadAllEvents();
 
-              for (const row of existingEventsResult) {
-                try {
-                  const event = JSON.parse(row.serialized_event);
-                  sendEvent(controller, event);
-                } catch (parseError) {
-                  console.error(
-                    `[DO ${brainRunId} WATCH] Failed to parse historical event JSON: ${row.serialized_event}`,
-                    parseError
-                  );
-                }
+              for (const event of existingEvents) {
+                sendEvent(controller, event);
               }
 
               eventStreamAdapter.subscribe(controller);
@@ -684,11 +660,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
                 err
               );
               controller.close();
-              eventStreamAdapter.unsubscribe(streamController);
+              if (streamController) {
+                eventStreamAdapter.unsubscribe(streamController);
+              }
               throw err;
             }
           },
-          cancel(reason) {
+          cancel: (reason) => {
             if (streamController)
               eventStreamAdapter.unsubscribe(streamController);
           },
