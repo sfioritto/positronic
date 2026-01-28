@@ -31,6 +31,7 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist"
   },
   "dependencies": {
+    "@misskey-dev/node-http-message-signatures": "^0.0.10",
     "@positronic/core": "^0.0.56",
     "@positronic/spec": "^0.0.56",
     "@positronic/template-new-project": "^0.0.56",
