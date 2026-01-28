@@ -512,7 +512,7 @@ describe('Resources API Tests', () => {
       expect(listed.objects.length).toBe(0);
     });
 
-    it('should return 403 when not in development mode', async () => {
+    it('should return 401 when not in development mode (auth required)', async () => {
       // Create an environment without NODE_ENV
       const envWithoutNodeEnv = {
         RESOURCES_BUCKET: testEnv.RESOURCES_BUCKET,
@@ -530,18 +530,15 @@ describe('Resources API Tests', () => {
       );
       await waitOnExecutionContext(deleteContext);
 
-      expect(deleteResponse.status).toBe(403);
-      const errorBody = await deleteResponse.json<{ error: string }>();
-      expect(errorBody.error).toBe(
-        'Bulk delete is only available in development mode'
-      );
+      // Auth middleware blocks unauthenticated requests in non-dev mode
+      expect(deleteResponse.status).toBe(401);
 
       // Verify resources are not deleted
       const listed = await testEnv.RESOURCES_BUCKET.list();
       expect(listed.objects.length).toBeGreaterThanOrEqual(3);
     });
 
-    it('should return 403 when NODE_ENV is production', async () => {
+    it('should return 401 when NODE_ENV is production (auth required)', async () => {
       const prodEnv = {
         ...testEnv,
         NODE_ENV: 'production',
@@ -558,11 +555,8 @@ describe('Resources API Tests', () => {
       );
       await waitOnExecutionContext(deleteContext);
 
-      expect(deleteResponse.status).toBe(403);
-      const errorBody = await deleteResponse.json<{ error: string }>();
-      expect(errorBody.error).toBe(
-        'Bulk delete is only available in development mode'
-      );
+      // Auth middleware blocks unauthenticated requests in production mode
+      expect(deleteResponse.status).toBe(401);
     });
   });
 

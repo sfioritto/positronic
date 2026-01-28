@@ -2,12 +2,14 @@ import type { Hono } from 'hono';
 import type { BrainRunnerDO } from '../brain-runner-do.js';
 import type { MonitorDO } from '../monitor-do.js';
 import type { ScheduleDO } from '../schedule-do.js';
+import type { AuthDO } from '../auth-do.js';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
 export type Bindings = {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
+  AUTH_DO: DurableObjectNamespace<AuthDO>;
   RESOURCES_BUCKET: R2Bucket;
   NODE_ENV?: string;
   R2_ACCESS_KEY_ID?: string;
@@ -20,6 +22,8 @@ export type Bindings = {
   CF_SCRIPT_NAME?: string;
   // Origin URL for constructing page URLs
   WORKER_URL?: string;
+  // Root public key for bootstrapping first user (JWK format)
+  ROOT_PUBLIC_KEY?: string;
 };
 
 export type HonoApp = Hono<{ Bindings: Bindings }>;

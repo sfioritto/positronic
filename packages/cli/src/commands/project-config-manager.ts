@@ -6,12 +6,14 @@ export interface Project {
   name: string;
   url: string;
   addedAt: string;
+  privateKeyPath?: string; // Per-project key override
 }
 
 export interface ProjectConfig {
   version: string;
   currentProject: string | null;
   projects: Project[];
+  defaultPrivateKeyPath?: string; // Global default key
 }
 
 export class ProjectConfigManager {
@@ -148,5 +150,105 @@ export class ProjectConfigManager {
       projects: config.projects,
       current: config.currentProject,
     };
+  }
+
+  /**
+   * Get the resolved private key path following the priority order:
+   * 1. POSITRONIC_PRIVATE_KEY environment variable (highest)
+   * 2. Project-specific privateKeyPath (if project selected and has override)
+   * 3. Global defaultPrivateKeyPath from config
+   * 4. ~/.ssh/id_rsa fallback (lowest)
+   */
+  getPrivateKeyPath(): string | null {
+    // Priority 1: Environment variable
+    if (process.env.POSITRONIC_PRIVATE_KEY) {
+      return process.env.POSITRONIC_PRIVATE_KEY;
+    }
+
+    const config = this.read();
+
+    // Priority 2: Project-specific key
+    if (config.currentProject) {
+      const project = config.projects.find((p) => p.name === config.currentProject);
+      if (project?.privateKeyPath) {
+        return project.privateKeyPath;
+      }
+    }
+
+    // Priority 3: Global default key
+    if (config.defaultPrivateKeyPath) {
+      return config.defaultPrivateKeyPath;
+    }
+
+    // Priority 4: No configured key (return null, let caller use fallback)
+    return null;
+  }
+
+  /**
+   * Set the global default private key path
+   */
+  setDefaultPrivateKeyPath(keyPath: string): { success: boolean; error?: string } {
+    const config = this.read();
+    config.defaultPrivateKeyPath = keyPath;
+    this.write(config);
+    return { success: true };
+  }
+
+  /**
+   * Set the private key path for a specific project
+   */
+  setProjectPrivateKeyPath(projectName: string, keyPath: string): { success: boolean; error?: string } {
+    const config = this.read();
+    const project = config.projects.find((p) => p.name === projectName);
+
+    if (!project) {
+      return { success: false, error: `Project "${projectName}" not found` };
+    }
+
+    project.privateKeyPath = keyPath;
+    this.write(config);
+    return { success: true };
+  }
+
+  /**
+   * Clear the global default private key path
+   */
+  clearDefaultPrivateKeyPath(): void {
+    const config = this.read();
+    delete config.defaultPrivateKeyPath;
+    this.write(config);
+  }
+
+  /**
+   * Clear the private key path for a specific project
+   */
+  clearProjectPrivateKeyPath(projectName: string): { success: boolean; error?: string } {
+    const config = this.read();
+    const project = config.projects.find((p) => p.name === projectName);
+
+    if (!project) {
+      return { success: false, error: `Project "${projectName}" not found` };
+    }
+
+    delete project.privateKeyPath;
+    this.write(config);
+    return { success: true };
+  }
+
+  /**
+   * Get the default private key path (global config only, no env var or project override)
+   */
+  getDefaultPrivateKeyPath(): string | undefined {
+    const config = this.read();
+    return config.defaultPrivateKeyPath;
+  }
+
+  /**
+   * Get the private key path for a specific project
+   */
+  getProjectPrivateKeyPath(projectName: string): string | undefined {
+    const config = this.read();
+    const project = config.projects.find((p) => p.name === projectName);
+    return project?.privateKeyPath;
   }
 }
