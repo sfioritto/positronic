@@ -150,6 +150,19 @@ interface MockPage {
   size: number;
 }
 
+interface MockUser {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+interface MockUserKey {
+  fingerprint: string;
+  userId: string;
+  label: string;
+  addedAt: number;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
@@ -159,6 +172,8 @@ export class TestDevServer implements PositronicDevServer {
   private runningBrainsForWatch: MockBrainRun[] = [];
   private secrets: Map<string, MockSecret> = new Map();
   private pages: Map<string, MockPage> = new Map();
+  private users: Map<string, MockUser> = new Map();
+  private userKeys: Map<string, MockUserKey> = new Map();
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
@@ -1242,6 +1257,161 @@ export class TestDevServer implements PositronicDevServer {
       return [404, 'Not Found'];
     });
 
+    // Users Management Endpoints
+
+    // POST /users - Create a new user
+    nockInstance.post('/users').reply((uri, requestBody) => {
+      let body: any;
+      if (typeof requestBody === 'string') {
+        try {
+          body = JSON.parse(requestBody);
+        } catch {
+          body = requestBody;
+        }
+      } else {
+        body = requestBody;
+      }
+
+      // Check if user already exists
+      const existing = Array.from(this.users.values()).find(u => u.name === body.name);
+      if (existing) {
+        return [409, { error: `User '${body.name}' already exists` }];
+      }
+
+      const id = `user-${Date.now()}`;
+      const user: MockUser = {
+        id,
+        name: body.name,
+        createdAt: Date.now(),
+      };
+
+      this.users.set(id, user);
+      this.logCall('createUser', [body.name]);
+
+      return [201, user];
+    });
+
+    // GET /users - List all users
+    nockInstance.get('/users').reply(200, () => {
+      this.logCall('listUsers', []);
+      const users = Array.from(this.users.values());
+      return {
+        users,
+        count: users.length,
+      };
+    });
+
+    // GET /users/:id - Get a specific user
+    nockInstance.get(/^\/users\/([^/]+)$/).reply((uri) => {
+      const match = uri.match(/^\/users\/([^/]+)$/);
+      if (match) {
+        const userId = decodeURIComponent(match[1]);
+        this.logCall('getUser', [userId]);
+
+        const user = this.users.get(userId);
+        if (!user) {
+          return [404, { error: `User '${userId}' not found` }];
+        }
+        return [200, user];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // DELETE /users/:id - Delete a user
+    nockInstance.delete(/^\/users\/([^/]+)$/).reply((uri) => {
+      const match = uri.match(/^\/users\/([^/]+)$/);
+      if (match) {
+        const userId = decodeURIComponent(match[1]);
+
+        if (this.users.has(userId)) {
+          // Delete associated keys
+          for (const [fingerprint, key] of this.userKeys) {
+            if (key.userId === userId) {
+              this.userKeys.delete(fingerprint);
+            }
+          }
+          this.users.delete(userId);
+          this.logCall('deleteUser', [userId]);
+          return [204, ''];
+        } else {
+          return [404, { error: `User '${userId}' not found` }];
+        }
+      }
+      return [404, 'Not Found'];
+    });
+
+    // POST /users/:id/keys - Add a key to a user
+    nockInstance.post(/^\/users\/([^/]+)\/keys$/).reply((uri, requestBody) => {
+      const match = uri.match(/^\/users\/([^/]+)\/keys$/);
+      if (match) {
+        const userId = decodeURIComponent(match[1]);
+        const body =
+          typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+
+        // Check if user exists
+        const user = this.users.get(userId);
+        if (!user) {
+          return [404, { error: `User '${userId}' not found` }];
+        }
+
+        // Check if key already exists
+        if (this.userKeys.has(body.fingerprint)) {
+          return [409, { error: 'Key already exists' }];
+        }
+
+        const key: MockUserKey = {
+          fingerprint: body.fingerprint,
+          userId,
+          label: body.label || '',
+          addedAt: Date.now(),
+        };
+
+        this.userKeys.set(body.fingerprint, key);
+        this.logCall('addUserKey', [userId, body.fingerprint]);
+
+        return [201, key];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // GET /users/:id/keys - List keys for a user
+    nockInstance.get(/^\/users\/([^/]+)\/keys$/).reply((uri) => {
+      const match = uri.match(/^\/users\/([^/]+)\/keys$/);
+      if (match) {
+        const userId = decodeURIComponent(match[1]);
+        this.logCall('listUserKeys', [userId]);
+
+        // Check if user exists
+        const user = this.users.get(userId);
+        if (!user) {
+          return [404, { error: `User '${userId}' not found` }];
+        }
+
+        const keys = Array.from(this.userKeys.values()).filter(k => k.userId === userId);
+        return [200, { keys, count: keys.length }];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // DELETE /users/:id/keys/:fingerprint - Remove a key from a user
+    nockInstance.delete(/^\/users\/([^/]+)\/keys\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/users\/([^/]+)\/keys\/(.+)$/);
+      if (match) {
+        const userId = decodeURIComponent(match[1]);
+        const fingerprint = decodeURIComponent(match[2]);
+
+        const key = this.userKeys.get(fingerprint);
+        if (key && key.userId === userId) {
+          this.userKeys.delete(fingerprint);
+          this.logCall('removeUserKey', [userId, fingerprint]);
+          return [204, ''];
+        } else {
+          return [404, { error: 'Key not found' }];
+        }
+      }
+      return [404, 'Not Found'];
+    });
+
     this.nockScope = nockInstance;
 
     // Simulate some initial log output after server starts
@@ -1343,6 +1513,36 @@ export class TestDevServer implements PositronicDevServer {
 
   getPage(slug: string): MockPage | undefined {
     return this.pages.get(slug);
+  }
+
+  // User helper methods
+  addUser(user: MockUser) {
+    this.users.set(user.id, user);
+  }
+
+  clearUsers() {
+    this.users.clear();
+    this.userKeys.clear();
+  }
+
+  getUsers(): MockUser[] {
+    return Array.from(this.users.values());
+  }
+
+  getUser(id: string): MockUser | undefined {
+    return this.users.get(id);
+  }
+
+  addUserKey(key: MockUserKey) {
+    this.userKeys.set(key.fingerprint, key);
+  }
+
+  clearUserKeys() {
+    this.userKeys.clear();
+  }
+
+  getUserKeys(userId: string): MockUserKey[] {
+    return Array.from(this.userKeys.values()).filter(k => k.userId === userId);
   }
 
   setKillBrainRunError(runId: string, statusCode: number) {

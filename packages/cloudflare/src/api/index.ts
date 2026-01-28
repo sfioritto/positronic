@@ -6,12 +6,23 @@ import webhooks from './webhooks/index.js';
 import pages from './pages.js';
 import secrets from './secrets.js';
 import bundle from './bundle.js';
+import users from './users.js';
+import { authMiddleware } from './auth-middleware.js';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// Health check endpoint
+// Health check endpoint (no auth required)
 app.get('/status', async (context: Context) => {
   return context.json({ ready: true });
+});
+
+// Apply auth middleware to all routes except /status
+app.use('*', async (c, next) => {
+  // Skip auth for /status endpoint
+  if (c.req.path === '/status') {
+    return next();
+  }
+  return authMiddleware()(c, next);
 });
 
 // Mount route modules
@@ -21,6 +32,7 @@ app.route('/webhooks', webhooks);
 app.route('/pages', pages);
 app.route('/secrets', secrets);
 app.route('/bundle', bundle);
+app.route('/users', users);
 
 export default app;
 

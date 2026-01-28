@@ -40,6 +40,12 @@ export function useApiGet<T>(endpoint: string, options?: any) {
         if (response.status === 200) {
           const result = (await response.json()) as T;
           setData(result);
+        } else if (response.status === 401) {
+          setError({
+            title: 'Authentication Required',
+            message: 'Your request could not be authenticated.',
+            details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
+          });
         } else {
           const errorText = await response.text();
           setError({
@@ -97,6 +103,14 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
           const result = (await response.json()) as T;
           setData(result);
           return result;
+        } else if (response.status === 401) {
+          const errorObj = {
+            title: 'Authentication Required',
+            message: 'Your request could not be authenticated.',
+            details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
+          };
+          setError(errorObj);
+          throw errorObj;
         } else {
           const errorText = await response.text();
           const errorObj = {
@@ -158,6 +172,14 @@ export function useApiDelete(resourceType: string) {
 
         if (response.status === 204 || response.status === 200) {
           return true;
+        } else if (response.status === 401) {
+          const errorObj = {
+            title: 'Authentication Required',
+            message: 'Your request could not be authenticated.',
+            details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
+          };
+          setError(errorObj);
+          throw errorObj;
         } else {
           const errorText = await response.text();
           const errorObj = {
