@@ -1,21 +1,14 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Bindings } from './types.js';
 import type { AuthDO } from '../auth-do.js';
+import {
+  parseRequestSignature,
+  type ParsedSignature,
+} from '@misskey-dev/node-http-message-signatures';
 
 export interface AuthContext {
   userId: string | null;
   isRoot: boolean;
-}
-
-// JWK type for SubtleCrypto
-interface JWK {
-  kty: string;
-  crv?: string;
-  alg?: string;
-  n?: string;
-  e?: string;
-  x?: string;
-  y?: string;
 }
 
 // Extend the Hono context to include auth info
@@ -25,85 +18,37 @@ declare module 'hono' {
   }
 }
 
+// Algorithm types for SubtleCrypto operations
+type SubtleCryptoAlgorithm =
+  | { name: 'RSASSA-PKCS1-v1_5'; hash: string }
+  | { name: 'ECDSA'; namedCurve: string }
+  | { name: 'ECDSA'; hash: string }
+  | { name: 'Ed25519' };
+
 /**
- * Parse the Signature-Input header to extract the keyid
- * Format example: sig1=("@method" "@path" "@authority" "content-type");created=1234567890;keyid="SHA256:abc123"
+ * Get the algorithm parameters for SubtleCrypto based on JWK key type
  */
-function parseKeyIdFromSignatureInput(signatureInput: string): string | null {
-  // Match keyid="..." pattern
-  const keyIdMatch = signatureInput.match(/keyid="([^"]+)"/);
-  if (keyIdMatch) {
-    return keyIdMatch[1];
+function getAlgorithmForJwk(jwk: JsonWebKey): SubtleCryptoAlgorithm {
+  if (jwk.kty === 'RSA') {
+    return {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: 'SHA-256',
+    };
+  } else if (jwk.kty === 'EC') {
+    return {
+      name: 'ECDSA',
+      namedCurve: jwk.crv || 'P-256',
+    };
+  } else if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
+    return { name: 'Ed25519' };
   }
-  return null;
+  throw new Error(`Unsupported key type: ${jwk.kty}`);
 }
 
 /**
- * Parse the Signature header to extract the signature value
- * Format example: sig1=:base64encodedSignature=:
+ * Get the algorithm parameters for signature verification
  */
-function parseSignatureValue(signature: string): string | null {
-  // Match sig1=:...: pattern (colons delimit base64 in RFC 9421)
-  const sigMatch = signature.match(/sig1=:([^:]+):/);
-  if (sigMatch) {
-    return sigMatch[1];
-  }
-  return null;
-}
-
-/**
- * Create the signature base string for verification
- * This is a simplified implementation focusing on the most common covered components
- */
-function createSignatureBase(
-  request: Request,
-  signatureInput: string
-): string {
-  const url = new URL(request.url);
-  const lines: string[] = [];
-
-  // Parse which components are covered from signature-input
-  const componentsMatch = signatureInput.match(/sig1=\(([^)]+)\)/);
-  if (!componentsMatch) {
-    throw new Error('Invalid signature-input format');
-  }
-
-  const components = componentsMatch[1].split(' ').map(c => c.replace(/"/g, ''));
-
-  for (const component of components) {
-    if (component === '@method') {
-      lines.push(`"@method": ${request.method}`);
-    } else if (component === '@path') {
-      lines.push(`"@path": ${url.pathname}`);
-    } else if (component === '@authority') {
-      lines.push(`"@authority": ${url.host}`);
-    } else if (component === '@target-uri') {
-      lines.push(`"@target-uri": ${request.url}`);
-    } else if (component.startsWith('@')) {
-      // Other derived components
-      continue;
-    } else {
-      // Regular header
-      const headerValue = request.headers.get(component);
-      if (headerValue) {
-        lines.push(`"${component.toLowerCase()}": ${headerValue}`);
-      }
-    }
-  }
-
-  // Extract signature params for the signature-params line
-  const paramsMatch = signatureInput.match(/sig1=\([^)]+\);(.+)/);
-  const paramsString = paramsMatch ? paramsMatch[1] : '';
-
-  lines.push(`"@signature-params": (${componentsMatch[1]});${paramsString}`);
-
-  return lines.join('\n');
-}
-
-/**
- * Get the SubtleCrypto algorithm parameters for a JWK
- */
-function getSubtleCryptoAlgorithm(jwk: JWK): AlgorithmIdentifier | RsaPssParams | EcdsaParams {
+function getVerifyAlgorithm(jwk: JsonWebKey): SubtleCryptoAlgorithm {
   if (jwk.kty === 'RSA') {
     return {
       name: 'RSASSA-PKCS1-v1_5',
@@ -117,70 +62,65 @@ function getSubtleCryptoAlgorithm(jwk: JWK): AlgorithmIdentifier | RsaPssParams 
   } else if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
     return { name: 'Ed25519' };
   }
-  return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
+  throw new Error(`Unsupported key type: ${jwk.kty}`);
 }
 
 /**
- * Verify an HTTP message signature using the provided JWK
- * Uses Web Crypto API (SubtleCrypto) for signature verification
+ * Convert a JWK to a CryptoKey for signature verification
  */
-async function verifySignature(
-  request: Request,
-  signature: string,
-  signatureInput: string,
-  jwkString: string
+async function jwkToCryptoKey(jwkString: string): Promise<CryptoKey> {
+  const jwk = JSON.parse(jwkString) as JsonWebKey;
+  const algorithm = getAlgorithmForJwk(jwk);
+  return crypto.subtle.importKey('jwk', jwk, algorithm, true, ['verify']);
+}
+
+/**
+ * Verify a signature using Web Crypto API
+ */
+async function verifySignatureWithKey(
+  signatureBase: string,
+  signatureB64: string,
+  cryptoKey: CryptoKey,
+  jwk: JsonWebKey
 ): Promise<boolean> {
-  try {
-    const jwk = JSON.parse(jwkString) as JWK;
-    const signatureBase = createSignatureBase(request, signatureInput);
-    const signatureBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
+  const encoder = new TextEncoder();
+  const data = encoder.encode(signatureBase);
+  const signatureBytes = Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0));
+  const algorithm = getVerifyAlgorithm(jwk);
 
-    // Import the public key using Web Crypto API
-    const algorithm = getSubtleCryptoAlgorithm(jwk);
-    const cryptoKey = await crypto.subtle.importKey(
-      'jwk',
-      jwk,
-      algorithm,
-      true,
-      ['verify']
-    );
-
-    // Verify the signature using Web Crypto API
-    const encoder = new TextEncoder();
-    const data = encoder.encode(signatureBase);
-
-    return await crypto.subtle.verify(
-      algorithm,
-      cryptoKey,
-      signatureBytes,
-      data
-    );
-  } catch (error) {
-    console.error('Signature verification failed:', error);
-    return false;
-  }
+  return crypto.subtle.verify(algorithm, cryptoKey, signatureBytes, data);
 }
 
 /**
- * Try to parse ROOT_PUBLIC_KEY as JWK
+ * Extract keyId and signature info from parsed signature
+ * Handles both draft and RFC9421 formats
  */
-function parseRootPublicKey(rootPublicKey: string): string | null {
-  try {
-    const parsed = JSON.parse(rootPublicKey);
-    if (parsed.kty) {
-      return rootPublicKey; // Valid JWK
-    }
-  } catch {
-    // Not valid JSON
-  }
+function extractSignatureInfo(parsed: ParsedSignature): { keyId: string; signature: string; base: string } | null {
+  if (parsed.version === 'draft') {
+    return {
+      keyId: parsed.value.keyId,
+      signature: parsed.value.params.signature,
+      base: parsed.value.signingString,
+    };
+  } else if (parsed.version === 'rfc9421') {
+    // RFC9421 returns an array of [label, value] tuples
+    const signatures = parsed.value;
+    if (signatures.length === 0) return null;
 
-  console.warn('ROOT_PUBLIC_KEY must be in JWK format');
+    // Use the first signature (usually 'sig1')
+    const [, sigValue] = signatures[0];
+    return {
+      keyId: sigValue.keyid,
+      signature: sigValue.signature,
+      base: sigValue.base,
+    };
+  }
   return null;
 }
 
 /**
  * Authentication middleware for the Positronic API
- * Verifies HTTP message signatures (RFC 9421)
+ * Verifies HTTP message signatures (RFC 9421) using @misskey-dev/node-http-message-signatures for parsing
  */
 export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
   return async (c: Context<{ Bindings: Bindings }>, next) => {
@@ -194,23 +134,40 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
     const signatureHeader = c.req.header('Signature');
     const signatureInputHeader = c.req.header('Signature-Input');
 
-    // If no signature headers, check if auth is required
+    // If no signature headers, return 401
     if (!signatureHeader || !signatureInputHeader) {
-      // No auth provided - return 401
       return c.json({ error: 'Authentication required' }, 401);
     }
 
-    // Extract keyid from signature-input
-    const keyId = parseKeyIdFromSignatureInput(signatureInputHeader);
-    if (!keyId) {
-      return c.json({ error: 'Invalid signature-input: missing keyid' }, 401);
-    }
+    // Parse the signature using the library
+    let parsedSignature: ParsedSignature;
+    try {
+      // Build a request-like object for the library
+      const requestForParsing = {
+        method: c.req.method,
+        url: c.req.url,
+        headers: Object.fromEntries(c.req.raw.headers.entries()),
+      };
 
-    // Extract signature value
-    const signatureValue = parseSignatureValue(signatureHeader);
-    if (!signatureValue) {
+      parsedSignature = parseRequestSignature(requestForParsing, {
+        clockSkew: {
+          now: new Date(),
+          forward: 300000, // 5 minutes
+          delay: 300000,   // 5 minutes
+        },
+      });
+    } catch (error) {
+      console.error('Failed to parse signature:', error);
       return c.json({ error: 'Invalid signature format' }, 401);
     }
+
+    // Extract signature info from parsed result
+    const sigInfo = extractSignatureInfo(parsedSignature);
+    if (!sigInfo) {
+      return c.json({ error: 'No valid signature found' }, 401);
+    }
+
+    const { keyId, signature, base } = sigInfo;
 
     // Try to find the key in the auth database
     const authDoId = c.env.AUTH_DO.idFromName('auth');
@@ -219,38 +176,36 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
     const userKey = await authDo.getKeyByFingerprint(keyId);
 
     if (userKey) {
-      // Verify signature with user's key
-      const isValid = await verifySignature(
-        c.req.raw,
-        signatureValue,
-        signatureInputHeader,
-        userKey.jwk
-      );
+      try {
+        const jwk = JSON.parse(userKey.jwk) as JsonWebKey;
+        const cryptoKey = await jwkToCryptoKey(userKey.jwk);
+        const isValid = await verifySignatureWithKey(base, signature, cryptoKey, jwk);
 
-      if (!isValid) {
-        return c.json({ error: 'Invalid signature' }, 401);
+        if (!isValid) {
+          return c.json({ error: 'Invalid signature' }, 401);
+        }
+
+        c.set('auth', { userId: userKey.userId, isRoot: false });
+        return next();
+      } catch (error) {
+        console.error('Signature verification failed:', error);
+        return c.json({ error: 'Signature verification failed' }, 401);
       }
-
-      c.set('auth', { userId: userKey.userId, isRoot: false });
-      return next();
     }
 
     // Key not found in database, try ROOT_PUBLIC_KEY
-    // We skip fingerprint comparison and just try to verify - if it works, the key is valid
     if (c.env.ROOT_PUBLIC_KEY) {
-      const rootJwk = parseRootPublicKey(c.env.ROOT_PUBLIC_KEY);
-      if (rootJwk) {
-        const isValid = await verifySignature(
-          c.req.raw,
-          signatureValue,
-          signatureInputHeader,
-          rootJwk
-        );
+      try {
+        const jwk = JSON.parse(c.env.ROOT_PUBLIC_KEY) as JsonWebKey;
+        const cryptoKey = await jwkToCryptoKey(c.env.ROOT_PUBLIC_KEY);
+        const isValid = await verifySignatureWithKey(base, signature, cryptoKey, jwk);
 
         if (isValid) {
           c.set('auth', { userId: null, isRoot: true });
           return next();
         }
+      } catch (error) {
+        console.error('Root key verification failed:', error);
       }
     }
 
