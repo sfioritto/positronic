@@ -97,6 +97,8 @@ export interface StepContext<
   brainRunId: string;
   /** Current step ID (for creating unique webhook identifiers) */
   stepId: string;
+  /** Scoped memory for storing and retrieving long-term memories */
+  memory?: import('../memory/types.js').ScopedMemory;
 }
 
 /**

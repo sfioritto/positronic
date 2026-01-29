@@ -5,6 +5,7 @@ import type { Resources } from '../../resources/resources.js';
 import type { ExtractWebhookResponses } from '../webhook.js';
 import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
+import type { MemoryProvider } from '../../memory/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
@@ -28,6 +29,7 @@ export class Brain<
   private optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool>;
+  private memoryProvider?: MemoryProvider;
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -73,6 +75,7 @@ export class Brain<
     nextBrain.optionsSchema = this.optionsSchema;
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
+    nextBrain.memoryProvider = this.memoryProvider;
 
     return nextBrain;
   }
@@ -89,6 +92,7 @@ export class Brain<
     nextBrain.services = this.services;
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
+    nextBrain.memoryProvider = this.memoryProvider;
 
     return nextBrain;
   }
@@ -119,6 +123,7 @@ export class Brain<
     nextBrain.services = this.services;
     nextBrain.components = components;
     nextBrain.defaultTools = this.defaultTools;
+    nextBrain.memoryProvider = this.memoryProvider;
 
     return nextBrain;
   }
@@ -148,6 +153,34 @@ export class Brain<
   ): Brain<TOptions, TState, TServices, TResponse, TPage> {
     const next = this.nextBrain<TState, TResponse, TPage>();
     next.defaultTools = tools;
+    return next;
+  }
+
+  /**
+   * Configure a memory provider for this brain.
+   * When configured, steps receive a scoped memory instance in their context.
+   *
+   * @param provider - The memory provider to use
+   *
+   * @example
+   * ```typescript
+   * import { createMem0Provider } from '@positronic/mem0';
+   *
+   * const memory = createMem0Provider({ apiKey: process.env.MEM0_API_KEY });
+   *
+   * const myBrain = brain('my-brain')
+   *   .withMemory(memory)
+   *   .brain('agent', async ({ memory }) => {
+   *     const prefs = await memory.search('user preferences');
+   *     return { system: `User preferences: ${prefs}`, prompt: 'Help me' };
+   *   });
+   * ```
+   */
+  withMemory(
+    provider: MemoryProvider
+  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+    const next = this.nextBrain<TState, TResponse, TPage>();
+    next.memoryProvider = provider;
     return next;
   }
 
@@ -635,6 +668,7 @@ export class Brain<
       services: this.services,
       components: this.components,
       defaultTools: this.defaultTools,
+      memoryProvider: this.memoryProvider,
     });
 
     yield* stream.next();
@@ -666,6 +700,8 @@ export class Brain<
     nextBrain.components = this.components;
     // Copy defaultTools to the next brain
     nextBrain.defaultTools = this.defaultTools;
+    // Copy memoryProvider to the next brain
+    nextBrain.memoryProvider = this.memoryProvider;
 
     return nextBrain;
   }

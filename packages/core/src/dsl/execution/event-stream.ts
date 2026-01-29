@@ -10,6 +10,8 @@ import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generateUI } from '../../ui/generate-ui.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
+import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
+import { createScopedMemory } from '../../memory/scoped-memory.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { Block, StepBlock, BrainBlock, AgentBlock } from '../definitions/blocks.js';
@@ -45,6 +47,8 @@ export class BrainEventStream<
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool>;
   private signalProvider?: SignalProvider;
+  private memoryProvider?: MemoryProvider;
+  private scopedMemory?: ScopedMemory;
 
   constructor(
     params: (InitialRunParams<TOptions> | ResumeRunParams<TOptions>) & {
@@ -54,6 +58,7 @@ export class BrainEventStream<
       services: TServices;
       components?: Record<string, UIComponent<any>>;
       defaultTools?: Record<string, AgentTool>;
+      memoryProvider?: MemoryProvider;
     }
   ) {
     const {
@@ -70,6 +75,7 @@ export class BrainEventStream<
       components,
       defaultTools,
       signalProvider,
+      memoryProvider,
     } = params;
 
     // Check if this is a resume run or fresh start
@@ -89,6 +95,12 @@ export class BrainEventStream<
     this.components = components;
     this.defaultTools = defaultTools;
     this.signalProvider = signalProvider;
+    this.memoryProvider = memoryProvider;
+
+    // Create scoped memory if provider is configured
+    if (memoryProvider) {
+      this.scopedMemory = createScopedMemory(memoryProvider, title);
+    }
 
     // Initialize steps - all start as pending (fresh UUIDs)
     this.steps = blocks.map((block) => new Step(block));
@@ -446,6 +458,7 @@ export class BrainEventStream<
               page: this.currentPage,
               pages: this.pages,
               env: this.env,
+              memory: this.scopedMemory,
               ...this.services,
             })
           );
@@ -530,6 +543,7 @@ export class BrainEventStream<
       page: this.currentPage,
       pages: this.pages,
       env: this.env,
+      memory: this.scopedMemory,
       ...this.services,
     });
 
@@ -982,6 +996,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             components: this.components,
             brainRunId: this.brainRunId,
             stepId: effectiveStepId,
+            memory: this.scopedMemory,
           };
 
           const toolResult = await tool.execute(toolCall.args, toolContext);
