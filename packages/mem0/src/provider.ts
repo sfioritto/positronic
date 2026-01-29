@@ -20,26 +20,13 @@ export interface Mem0Config {
 }
 
 /**
- * Mem0 API response format for memory search
+ * Mem0 API response format for a single memory (search returns an array of these)
  */
-interface Mem0SearchResponse {
-  results: Array<{
-    id: string;
-    memory: string;
-    score?: number;
-    metadata?: Record<string, unknown>;
-  }>;
-}
-
-/**
- * Mem0 API response format for adding memories
- */
-interface Mem0AddResponse {
-  results: Array<{
-    id: string;
-    memory: string;
-    event: string;
-  }>;
+interface Mem0SearchResult {
+  id: string;
+  memory: string;
+  score?: number;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -116,9 +103,9 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
         );
       }
 
-      const data = (await response.json()) as Mem0SearchResponse;
+      const data = (await response.json()) as Mem0SearchResult[];
 
-      return data.results.map((result) => ({
+      return data.map((result) => ({
         id: result.id,
         content: result.memory,
         score: result.score,
