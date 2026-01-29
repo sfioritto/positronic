@@ -78,6 +78,18 @@ export type {
 // Default tools
 export { createTool, defaultTools, defaultDoneSchema, generateUI, waitForWebhook, print, consoleLog } from './tools/index.js';
 
+// Memory types and utilities
+export type {
+  Memory,
+  MemoryMessage,
+  MemoryScope,
+  MemorySearchOptions,
+  MemoryAddOptions,
+  MemoryProvider,
+  ScopedMemory,
+} from './memory/types.js';
+export { createScopedMemory } from './memory/scoped-memory.js';
+
 // UI types (only UIComponent is public - used by gen-ui-components)
 export type { UIComponent } from './ui/types.js';
 

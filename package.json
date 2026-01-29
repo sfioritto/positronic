@@ -43,7 +43,8 @@
     "packages/client-vercel",
     "packages/gen-ui-components",
     "packages/cloudflare",
-    "packages/cli"
+    "packages/cli",
+    "packages/mem0"
   ],
   "prettier": {
     "semi": true,
