@@ -47,7 +47,8 @@
       "WebFetch(domain:regularhuman.dev)",
       "WebFetch(domain:planningforaliens.com)",
       "WebFetch(domain:vercel.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:docs.mem0.ai)"
     ],
     "deny": []
   }
