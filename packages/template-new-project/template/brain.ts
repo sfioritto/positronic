@@ -59,6 +59,29 @@ import { components } from './components/index.js';
  *   },
  * }));
  * ```
+ *
+ * To add memory (long-term storage with semantic search):
+ *
+ * ```typescript
+ * import { createBrain, defaultTools } from '@positronic/core';
+ * import { createMem0Provider, createMem0Tools } from '@positronic/mem0';
+ * import { components } from './components/index.js';
+ *
+ * const memory = createMem0Provider({
+ *   apiKey: process.env.MEM0_API_KEY!,
+ * });
+ *
+ * export const brain = createBrain({
+ *   components,
+ *   defaultTools,
+ *   memory, // All brains now have access to memory
+ * });
+ *
+ * // Memory tools (rememberFact, recallMemories) can be added to agents:
+ * const memoryTools = createMem0Tools();
+ * ```
+ *
+ * See docs/memory-guide.md for more details on memory configuration.
  */
 export const brain = createBrain({
   components,
