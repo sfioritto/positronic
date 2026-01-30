@@ -1069,14 +1069,16 @@ describe('CLI Integration: positronic brain commands', () => {
           instance.stdin.write('j');
 
           // Wait for selection mode - navigating footer shows 's state'
-          const foundNav = await waitForOutput(/s state/, 30);
+          // Use 100 tries (1 second) to handle React render cycle timing
+          const foundNav = await waitForOutput(/s state/, 100);
           expect(foundNav).toBe(true);
 
           // Press 's' to view state at selected event
           instance.stdin.write('s');
 
           // Should show state view footer (includes paging hint)
-          const foundStateFooter = await waitForOutput(/j\/k scroll.*b back/, 30);
+          // Use 100 tries (1 second) to handle React render cycle timing
+          const foundStateFooter = await waitForOutput(/j\/k scroll.*b back/, 100);
           expect(foundStateFooter).toBe(true);
 
           instance.unmount();
