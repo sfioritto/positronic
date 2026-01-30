@@ -427,52 +427,6 @@ describe('Mem0 Adapter Integration', () => {
     expect(provider.getAddCalls()).toHaveLength(0);
   });
 
-  it('extracts userId from brain options when getUserId is provided', async () => {
-    const provider = createMockProvider();
-    const adapter = createMem0Adapter({
-      provider,
-      getUserId: (options) => options.userId as string,
-    });
-
-    mockGenerateText.mockResolvedValueOnce({
-      text: undefined,
-      toolCalls: [
-        {
-          toolCallId: 'call-1',
-          toolName: 'done',
-          args: {},
-        },
-      ],
-      usage: { totalTokens: 50 },
-      responseMessages: [],
-    });
-
-    const testBrain = brain('test-userid')
-      .withOptionsSchema(z.object({ userId: z.string() }))
-      .brain('Handle Request', () => ({
-        prompt: 'Help the user',
-        tools: {
-          done: {
-            description: 'Done',
-            inputSchema: z.object({}),
-            terminal: true,
-          },
-        },
-      }));
-
-    const runner = new BrainRunner({
-      adapters: [adapter],
-      client: mockClient,
-    });
-
-    await runner.run(testBrain, { options: { userId: 'user-456' } });
-
-    // Verify provider received the userId
-    const addCalls = provider.getAddCalls();
-    expect(addCalls.length).toBeGreaterThan(0);
-    expect(addCalls[0].scope.userId).toBe('user-456');
-  });
-
   it('includes tool calls when configured', async () => {
     const provider = createMockProvider();
     const adapter = createMem0Adapter({

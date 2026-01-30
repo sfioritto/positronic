@@ -13,11 +13,6 @@ export interface Mem0AdapterConfig {
   /** The memory provider to use for storing conversations */
   provider: MemoryProvider;
   /**
-   * Optional function to extract a user ID from the brain options.
-   * If not provided, memories are stored only with agentId scope.
-   */
-  getUserId?: (options: Record<string, unknown>) => string | undefined;
-  /**
    * Whether to include tool calls in the conversation history.
    * Defaults to false.
    */
@@ -29,7 +24,6 @@ export interface Mem0AdapterConfig {
  */
 interface ConversationBuffer {
   agentId: string;
-  userId?: string;
   messages: MemoryMessage[];
 }
 
@@ -49,21 +43,18 @@ interface ConversationBuffer {
  * import { BrainRunner } from '@positronic/core';
  *
  * const provider = createMem0Provider({ apiKey: process.env.MEM0_API_KEY! });
+ * const adapter = createMem0Adapter({ provider });
  *
- * const adapter = createMem0Adapter({
- *   provider,
- *   getUserId: (options) => options.userId as string,
+ * const runner = new BrainRunner({
+ *   adapters: [adapter],
+ *   client,
  * });
  *
- * const runner = new BrainRunner(myBrain)
- *   .withAdapters([adapter])
- *   .withClient(client);
- *
- * await runner.run({ userId: 'user-123' });
+ * await runner.run(myBrain);
  * ```
  */
 export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
-  const { provider, getUserId, includeToolCalls = false } = config;
+  const { provider, includeToolCalls = false } = config;
 
   // Buffer messages per brainRunId
   const buffers = new Map<string, ConversationBuffer>();
@@ -75,13 +66,11 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
       // Handle AGENT_START - initialize buffer for this run
       if (event.type === BRAIN_EVENTS.AGENT_START) {
         const agentId = event.stepTitle; // Use step title as agentId
-        const userId = getUserId?.(event.options as Record<string, unknown>);
 
         // Initialize buffer if not exists
         if (!buffers.has(brainRunId)) {
           buffers.set(brainRunId, {
             agentId,
-            userId,
             messages: [],
           });
         }
@@ -169,7 +158,6 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
     try {
       await provider.add(buffer.messages, {
         agentId: buffer.agentId,
-        userId: buffer.userId,
       });
     } finally {
       buffers.delete(brainRunId);
