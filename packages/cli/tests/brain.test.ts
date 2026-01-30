@@ -1061,8 +1061,9 @@ describe('CLI Integration: positronic brain commands', () => {
         try {
           const { waitForOutput, instance } = await px(['watch', 'test-state-view', '--events']);
 
-          // Wait for events to appear
-          const foundEvents = await waitForOutput(/Events/, 30);
+          // Wait for actual events to arrive from SSE (not just the "Events" header)
+          // The first event is brain:start which shows "Brain started"
+          const foundEvents = await waitForOutput(/Brain started/, 100);
           expect(foundEvents).toBe(true);
 
           // Press 'j' to select an event (start navigation mode - j goes down from auto-scroll)
@@ -1105,14 +1106,14 @@ describe('CLI Integration: positronic brain commands', () => {
         try {
           const { waitForOutput, instance } = await px(['watch', 'test-state-view', '--events']);
 
-          // Wait for events view
-          await waitForOutput(/Events/, 30);
+          // Wait for actual events to arrive from SSE (not just the "Events" header)
+          await waitForOutput(/Brain started/, 100);
 
           // Press 'k' to enter navigation mode
           instance.stdin.write('k');
 
           // Wait for selection
-          await waitForOutput(/Selected:/, 30);
+          await waitForOutput(/Selected:/, 100);
 
           // Footer should show 's state' option
           const foundStateHint = await waitForOutput(/s state/, 30);
