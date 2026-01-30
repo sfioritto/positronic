@@ -11,6 +11,10 @@ const config = {
   transform: {
     '^.+\\.(t|j)sx?$': '@swc/jest',
   },
+  // With --experimental-vm-modules, Node.js handles ESM/CJS interop natively for
+  // node_modules. We only transform packages that need it (ESM-only packages that
+  // Jest can't load directly). Notably, signal-exit is NOT included here - letting
+  // Node load it natively avoids conflicts between v3 (CJS) and v4 (ESM) versions.
   transformIgnorePatterns: [
     '/node_modules/(?!(ink|ansi-styles|kleur|strip-ansi|robot3)/)',
   ],

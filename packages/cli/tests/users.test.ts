@@ -4,6 +4,7 @@ import {
   expect,
 } from '@jest/globals';
 import { createTestEnv, px } from './test-utils.js';
+import nock from 'nock';
 
 describe('users command', () => {
   describe('users list', () => {
@@ -61,6 +62,8 @@ describe('users command', () => {
 
     it('should handle server connection errors gracefully', async () => {
       const env = await createTestEnv();
+      // Block real network to ensure connection error (prevents hitting local dev servers)
+      nock.disableNetConnect();
 
       try {
         const { waitForOutput } = await px(['users', 'list'], {
@@ -72,6 +75,7 @@ describe('users command', () => {
         );
         expect(foundError).toBe(true);
       } finally {
+        nock.enableNetConnect();
         env.cleanup();
       }
     });
@@ -109,6 +113,8 @@ describe('users command', () => {
 
     it('should handle server connection errors gracefully', async () => {
       const env = await createTestEnv();
+      // Block real network to ensure connection error (prevents hitting local dev servers)
+      nock.disableNetConnect();
 
       try {
         const { waitForOutput } = await px(['users', 'create', 'admin'], {
@@ -120,6 +126,7 @@ describe('users command', () => {
         );
         expect(foundError).toBe(true);
       } finally {
+        nock.enableNetConnect();
         env.cleanup();
       }
     });
