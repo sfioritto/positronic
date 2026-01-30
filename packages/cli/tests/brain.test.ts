@@ -581,21 +581,23 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should handle connection errors when looking up active runs', async () => {
       const env = await createTestEnv();
-      // Don't start the server to simulate connection error
+      // Block real network to ensure connection error (prevents hitting local dev servers)
+      nock.disableNetConnect();
 
       try {
         const { waitForOutput } = await px(['watch', 'test-brain'], { server: env.server });
-        
+
         // Should show connection error
         const foundTitle = await waitForOutput(/Connection Error/i, 30);
         expect(foundTitle).toBe(true);
-        
+
         const foundMessage = await waitForOutput(/Error connecting to the local development server/i, 30);
         expect(foundMessage).toBe(true);
-        
+
         const foundDetails = await waitForOutput(/positronic server/i, 30);
         expect(foundDetails).toBe(true);
       } finally {
+        nock.enableNetConnect();
         env.cleanup();
       }
     });
@@ -1194,13 +1196,15 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should handle API errors gracefully', async () => {
       const env = await createTestEnv();
-      // Don't start the server to simulate connection error
-      const { waitForOutput } = await px(['list'], { server: env.server });
+      // Block real network to ensure connection error (prevents hitting local dev servers)
+      nock.disableNetConnect();
 
       try {
+        const { waitForOutput } = await px(['list'], { server: env.server });
         const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
         expect(foundError).toBe(true);
       } finally {
+        nock.enableNetConnect();
         env.cleanup();
       }
     });
@@ -1337,14 +1341,16 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should handle server connection errors', async () => {
       const env = await createTestEnv();
-      // Don't start the server to simulate connection error
-      
+      // Block real network to ensure connection error (prevents hitting local dev servers)
+      nock.disableNetConnect();
+
       try {
         const { waitForOutput } = await px(['history', 'test-brain'], { server: env.server });
-        
+
         const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
         expect(foundError).toBe(true);
       } finally {
+        nock.enableNetConnect();
         env.cleanup();
       }
     });
@@ -1721,7 +1727,8 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should handle server connection errors', async () => {
       const env = await createTestEnv();
-      // Don't start the server to simulate connection error
+      // Block real network to ensure connection error (prevents hitting local dev servers)
+      nock.disableNetConnect();
 
       try {
         const { waitForOutput } = await px(['rerun', 'test-brain'], { server: env.server });
@@ -1733,6 +1740,7 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundConnectionError = await waitForOutput(/Error connecting to the local development server/i, 30);
         expect(foundConnectionError).toBe(true);
       } finally {
+        nock.enableNetConnect();
         env.cleanup();
       }
     });

@@ -2,7 +2,6 @@ import process from 'process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import caz from 'caz';
 import { type ResourceEntry } from '@positronic/core';
 import { isText } from 'istextorbinary';
 import * as http from 'http';
@@ -178,6 +177,11 @@ export async function generateProject(projectName: string, projectDir: string) {
       };
     }
 
+    // Dynamic import to avoid loading caz (and its signal-exit dependency) at module
+    // load time. This prevents ESM/CJS interop issues in tests that import this file.
+    // caz is a CJS module, so dynamic import wraps it - we need .default.default
+    const cazModule = await import('caz');
+    const caz = cazModule.default;
     await caz.default(newProjectTemplatePath, projectDir, {
       ...cazOptions,
       force: false,

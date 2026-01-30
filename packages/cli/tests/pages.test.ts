@@ -71,7 +71,8 @@ describe('pages command', () => {
 
     it('should handle server connection errors', async () => {
       const env = await createTestEnv();
-      // Don't start the server to simulate connection error
+      // Block real network to ensure connection error (prevents hitting local dev servers)
+      nock.disableNetConnect();
 
       try {
         const { waitForOutput } = await px(['pages', 'list'], {
@@ -84,6 +85,7 @@ describe('pages command', () => {
         );
         expect(foundError).toBe(true);
       } finally {
+        nock.enableNetConnect();
         env.cleanup();
       }
     });
