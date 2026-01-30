@@ -138,8 +138,7 @@ describe('brain kill command', () => {
 
   it('should handle server connection errors', async () => {
     const env = await createTestEnv();
-    // Block real network to ensure connection error (prevents hitting local dev servers)
-    nock.disableNetConnect();
+    // Don't start the server to simulate connection error
 
     try {
       const { waitForOutput } = await px(['brain', 'kill', 'run-123', '--force'], {
@@ -149,7 +148,6 @@ describe('brain kill command', () => {
       const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
       expect(foundError).toBe(true);
     } finally {
-      nock.enableNetConnect();
       env.cleanup();
     }
   });

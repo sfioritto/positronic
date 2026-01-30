@@ -1,5 +1,5 @@
-/** @type {import('jest').Config} */
-const config = {
+// Shared configuration for all projects
+const sharedConfig = {
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts', '.tsx', '.jsx'],
   moduleNameMapper: {
@@ -27,6 +27,40 @@ const config = {
   ],
   modulePathIgnorePatterns: [
     '<rootDir>/packages/template-new-project/template/',
+  ],
+};
+
+/** @type {import('jest').Config} */
+const config = {
+  projects: [
+    {
+      // CLI package tests - with nock network safety net
+      // Excludes server.test.ts which tests the server command itself
+      displayName: 'cli',
+      ...sharedConfig,
+      testMatch: ['<rootDir>/packages/cli/**/*.test.ts'],
+      testPathIgnorePatterns: [
+        ...sharedConfig.testPathIgnorePatterns,
+        '<rootDir>/packages/cli/tests/server.test.ts',
+      ],
+      setupFilesAfterEnv: ['<rootDir>/packages/cli/tests/jest.setup.ts'],
+    },
+    {
+      // CLI server tests - no nock setup (tests the server command itself)
+      displayName: 'cli-server',
+      ...sharedConfig,
+      testMatch: ['<rootDir>/packages/cli/tests/server.test.ts'],
+    },
+    {
+      // All other tests
+      displayName: 'other',
+      ...sharedConfig,
+      testMatch: ['<rootDir>/packages/**/*.test.ts'],
+      testPathIgnorePatterns: [
+        ...sharedConfig.testPathIgnorePatterns,
+        '<rootDir>/packages/cli/',
+      ],
+    },
   ],
 };
 
