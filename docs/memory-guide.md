@@ -158,16 +158,7 @@ const provider = createMem0Provider({
   apiKey: process.env.MEM0_API_KEY!,
 });
 
-const adapter = createMem0Adapter({
-  // Required: The memory provider
-  provider,
-
-  // Optional: Extract userId from brain options
-  getUserId: (options) => options.userId as string,
-
-  // Optional: Include tool calls in indexed conversations
-  includeToolCalls: false,
-});
+const adapter = createMem0Adapter({ provider });
 
 // Attach to BrainRunner
 const runner = new BrainRunner({
@@ -176,7 +167,7 @@ const runner = new BrainRunner({
 });
 
 // Run brain - conversations are automatically indexed
-await runner.run(myBrain, { options: { userId: 'user-123' } });
+await runner.run(myBrain);
 ```
 
 ### Adapter Behavior
@@ -361,10 +352,7 @@ const provider = createMem0Provider({
   apiKey: process.env.MEM0_API_KEY!,
 });
 
-const adapter = createMem0Adapter({
-  provider,
-  getUserId: (options) => options.userId as string,
-});
+const adapter = createMem0Adapter({ provider });
 
 const memoryTools = createMem0Tools();
 
