@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
+import type { AuthSetupResponse } from '@positronic/spec';
 
 function getConnectionErrorMessage(): { title: string; message: string; details: string } {
   if (isApiLocalDevMode()) {
@@ -14,6 +15,34 @@ function getConnectionErrorMessage(): { title: string; message: string; details:
       message: 'Error connecting to the remote project server.',
       details: 'Please check your network connection and verify the project URL is correct.',
     };
+  }
+}
+
+/**
+ * Fetch auth setup instructions from the server
+ */
+async function fetchAuthSetupInstructions(): Promise<AuthSetupResponse | null> {
+  try {
+    const response = await apiClient.fetchUnauthenticated('/auth/setup');
+    if (response.ok) {
+      return (await response.json()) as AuthSetupResponse;
+    }
+  } catch {
+    // If we can't fetch setup instructions, fall back to generic message
+  }
+  return null;
+}
+
+/**
+ * Check if the error response indicates ROOT_KEY_NOT_CONFIGURED
+ */
+async function isRootKeyNotConfiguredError(response: Response): Promise<boolean> {
+  try {
+    const clonedResponse = response.clone();
+    const data = await clonedResponse.json() as { error?: string };
+    return data.error === 'ROOT_KEY_NOT_CONFIGURED';
+  } catch {
+    return false;
   }
 }
 
@@ -41,11 +70,29 @@ export function useApiGet<T>(endpoint: string, options?: any) {
           const result = (await response.json()) as T;
           setData(result);
         } else if (response.status === 401) {
-          setError({
-            title: 'Authentication Required',
-            message: 'Your request could not be authenticated.',
-            details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
-          });
+          // Check for ROOT_KEY_NOT_CONFIGURED error
+          if (await isRootKeyNotConfiguredError(response)) {
+            const setupInfo = await fetchAuthSetupInstructions();
+            if (setupInfo) {
+              setError({
+                title: 'Root Key Not Configured',
+                message: 'The server does not have a root authentication key configured.',
+                details: setupInfo.instructions,
+              });
+            } else {
+              setError({
+                title: 'Root Key Not Configured',
+                message: 'The server does not have a root authentication key configured.',
+                details: "Run 'px auth format-jwk-key' to generate the key, then add ROOT_PUBLIC_KEY as a secret in your server configuration.",
+              });
+            }
+          } else {
+            setError({
+              title: 'Authentication Required',
+              message: 'Your request could not be authenticated.',
+              details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
+            });
+          }
         } else {
           const errorText = await response.text();
           setError({
@@ -104,11 +151,30 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
           setData(result);
           return result;
         } else if (response.status === 401) {
-          const errorObj = {
-            title: 'Authentication Required',
-            message: 'Your request could not be authenticated.',
-            details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
-          };
+          // Check for ROOT_KEY_NOT_CONFIGURED error
+          let errorObj;
+          if (await isRootKeyNotConfiguredError(response)) {
+            const setupInfo = await fetchAuthSetupInstructions();
+            if (setupInfo) {
+              errorObj = {
+                title: 'Root Key Not Configured',
+                message: 'The server does not have a root authentication key configured.',
+                details: setupInfo.instructions,
+              };
+            } else {
+              errorObj = {
+                title: 'Root Key Not Configured',
+                message: 'The server does not have a root authentication key configured.',
+                details: "Run 'px auth format-jwk-key' to generate the key, then add ROOT_PUBLIC_KEY as a secret in your server configuration.",
+              };
+            }
+          } else {
+            errorObj = {
+              title: 'Authentication Required',
+              message: 'Your request could not be authenticated.',
+              details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
+            };
+          }
           setError(errorObj);
           throw errorObj;
         } else {
@@ -173,11 +239,30 @@ export function useApiDelete(resourceType: string) {
         if (response.status === 204 || response.status === 200) {
           return true;
         } else if (response.status === 401) {
-          const errorObj = {
-            title: 'Authentication Required',
-            message: 'Your request could not be authenticated.',
-            details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
-          };
+          // Check for ROOT_KEY_NOT_CONFIGURED error
+          let errorObj;
+          if (await isRootKeyNotConfiguredError(response)) {
+            const setupInfo = await fetchAuthSetupInstructions();
+            if (setupInfo) {
+              errorObj = {
+                title: 'Root Key Not Configured',
+                message: 'The server does not have a root authentication key configured.',
+                details: setupInfo.instructions,
+              };
+            } else {
+              errorObj = {
+                title: 'Root Key Not Configured',
+                message: 'The server does not have a root authentication key configured.',
+                details: "Run 'px auth format-jwk-key' to generate the key, then add ROOT_PUBLIC_KEY as a secret in your server configuration.",
+              };
+            }
+          } else {
+            errorObj = {
+              title: 'Authentication Required',
+              message: 'Your request could not be authenticated.',
+              details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
+            };
+          }
           setError(errorObj);
           throw errorObj;
         } else {

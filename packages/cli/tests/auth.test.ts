@@ -279,6 +279,48 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
   });
 
+  describe('auth format-jwk-key', () => {
+    it('should convert public key with --pubkey option', async () => {
+      const { waitForOutput, instance } = await px(
+        ['auth', 'format-jwk-key', '--pubkey', testKeyPubPath],
+        { configDir }
+      );
+
+      const isReady = await waitForOutput(/jwk public key/i);
+      expect(isReady).toBe(true);
+
+      const output = instance.lastFrame() || '';
+      // Should contain JWK fields
+      expect(output).toContain('"kty"');
+      expect(output).toContain('"crv"');
+      expect(output).toContain('"x"');
+      // Should show next steps
+      expect(output.toLowerCase()).toContain('next steps');
+      expect(output).toContain('ROOT_PUBLIC_KEY');
+    });
+
+    it('should error when public key file not found', async () => {
+      const { waitForOutput, instance } = await px(
+        ['auth', 'format-jwk-key', '--pubkey', '/nonexistent/key.pub'],
+        { configDir }
+      );
+
+      const foundError = await waitForOutput(/not found/i);
+      expect(foundError).toBe(true);
+    });
+
+    it('should show key selection when no --pubkey provided and keys exist', async () => {
+      const { waitForOutput, instance } = await px(
+        ['auth', 'format-jwk-key'],
+        { configDir }
+      );
+
+      // Should show key selection or success (if only one key)
+      const foundSelection = await waitForOutput(/select.*ssh.*public key|jwk public key/i);
+      expect(foundSelection).toBe(true);
+    });
+  });
+
   describe('key priority order', () => {
     it('should prioritize env var over global config', async () => {
       // Set global key
