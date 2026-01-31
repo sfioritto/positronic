@@ -1,8 +1,7 @@
 /**
- * Auth middleware tests with real signature verification
+ * Auth middleware tests with JWT Bearer tokens
  *
- * These tests verify that the auth middleware correctly handles different scenarios.
- * For actual signature verification tests with real keys, see packages/cli/tests/signature-verification.test.ts
+ * These tests verify that the auth middleware correctly handles different JWT scenarios.
  */
 
 import {
@@ -11,15 +10,45 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { SignJWT, importPKCS8 } from 'jose';
 import worker from '../src/index';
 
-// Pre-computed test RSA JWK (this is a test key - never use in production!)
-// Generated with: ssh-keygen -t rsa -b 2048, then converted to JWK
-const TEST_RSA_JWK = {
-  "kty": "RSA",
-  "n": "wL5_rMbJlLlZ6v6Ee7DLCY0f5XvqCRoQJWXzrGJB7y7h5yGrL9oEwQi5Ld8zYK-9eCLoB_TQPcwDz3yPwfJ_G9T0HG8XYD5aVtJrHfvkKMmR8z8cWGMPQwL0hNrJUZ4IhGnGk7Y3YQcjXvqLg5VQ8yZKmT7F4XJvZ5p6y8QxJc5T3kPm9H4y7fT5wL5_rMbJlLlZ6v6Ee7DLCY0f5XvqCRoQJWXzrGJB7y7h5yGrL9oEwQi5Ld8zYK-9eCLoB_TQPcwDz3yPwfJ_G9T0HG8XYD5aVtJrHfvkKMmR8z8cWGMPQwL0hNrJUZ4IhGnGk7Y3YQcjXvqLg5VQ8yZKmT7F4XJvZ5p6y8QxJc5T3kPm9H4y7fT5",
-  "e": "AQAB"
+// Test Ed25519 key pair
+const TEST_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIB5IApYfLNX82GzKxUIPNB7b4YQMYYl0ThJB4kx/8Fru
+-----END PRIVATE KEY-----`;
+
+const TEST_PUBLIC_KEY_JWK = {
+  kty: 'OKP',
+  crv: 'Ed25519',
+  x: 'Ryvasd5RoKLJpT-WaLB01DzG-Jv1eOIlHdDJcHxz6XA',
 };
+
+// Different key pair for testing invalid signatures
+const WRONG_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEILcJaI9N6lmKP2fJOkxGTpJMvrCLdGGM6FQSvzm6eG1i
+-----END PRIVATE KEY-----`;
+
+async function createTestJwt(
+  privateKeyPem: string,
+  fingerprint: string,
+  options: { expired?: boolean } = {}
+): Promise<string> {
+  const privateKey = await importPKCS8(privateKeyPem, 'EdDSA');
+
+  let builder = new SignJWT({})
+    .setProtectedHeader({ alg: 'EdDSA' })
+    .setSubject(fingerprint)
+    .setIssuedAt();
+
+  if (options.expired) {
+    builder = builder.setExpirationTime(Math.floor(Date.now() / 1000) - 60);
+  } else {
+    builder = builder.setExpirationTime('30s');
+  }
+
+  return builder.sign(privateKey);
+}
 
 describe('Auth Middleware', () => {
   describe('with NODE_ENV=development', () => {
@@ -42,7 +71,7 @@ describe('Auth Middleware', () => {
   });
 
   describe('with NODE_ENV=production', () => {
-    it('should return 401 when no signature headers', async () => {
+    it('should return 401 when no Authorization header', async () => {
       const request = new Request('http://example.com/brains', {
         method: 'GET',
       });
@@ -50,7 +79,7 @@ describe('Auth Middleware', () => {
       const testEnv = {
         ...env,
         NODE_ENV: 'production',
-        ROOT_PUBLIC_KEY: JSON.stringify(TEST_RSA_JWK),
+        ROOT_PUBLIC_KEY: JSON.stringify(TEST_PUBLIC_KEY_JWK),
       };
 
       const context = createExecutionContext();
@@ -62,20 +91,18 @@ describe('Auth Middleware', () => {
       expect(body.error).toBe('Authentication required');
     });
 
-    it('should return 401 with invalid signature format (no colons)', async () => {
-      // Test truly invalid format - missing the :base64: format
+    it('should return 401 with invalid token format (not Bearer)', async () => {
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Signature': 'sig1=invalid',
-          'Signature-Input': 'sig1=("@method" "@path" "@authority");created=' + Math.floor(Date.now() / 1000) + ';keyid="SHA256:test"',
+          'Authorization': 'Basic dXNlcjpwYXNz',
         },
       });
 
       const testEnv = {
         ...env,
         NODE_ENV: 'production',
-        ROOT_PUBLIC_KEY: JSON.stringify(TEST_RSA_JWK),
+        ROOT_PUBLIC_KEY: JSON.stringify(TEST_PUBLIC_KEY_JWK),
       };
 
       const context = createExecutionContext();
@@ -84,23 +111,23 @@ describe('Auth Middleware', () => {
 
       expect(response.status).toBe(401);
       const body = await response.json() as { error: string };
-      expect(body.error).toBe('Invalid signature format');
+      expect(body.error).toBe('Authentication required');
     });
 
-    it('should return 401 for expired signatures', async () => {
-      // Test clock skew - timestamp from 2009
+    it('should return 401 for expired JWT', async () => {
+      const token = await createTestJwt(TEST_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint', { expired: true });
+
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Signature': 'sig1=:dGVzdA==:',
-          'Signature-Input': 'sig1=("@method" "@path" "@authority");created=1234567890;keyid="SHA256:test"',
+          'Authorization': `Bearer ${token}`,
         },
       });
 
       const testEnv = {
         ...env,
         NODE_ENV: 'production',
-        ROOT_PUBLIC_KEY: JSON.stringify(TEST_RSA_JWK),
+        ROOT_PUBLIC_KEY: JSON.stringify(TEST_PUBLIC_KEY_JWK),
       };
 
       const context = createExecutionContext();
@@ -109,24 +136,24 @@ describe('Auth Middleware', () => {
 
       expect(response.status).toBe(401);
       const body = await response.json() as { error: string };
-      expect(body.error).toBe('Signature expired or clock skew too large');
+      expect(body.error).toBe('Invalid or expired token');
     });
 
-    it('should return 401 for invalid signatures with current timestamp', async () => {
-      // Valid format but invalid signature (doesn't match the key)
-      const currentTimestamp = Math.floor(Date.now() / 1000);
+    it('should return 401 for invalid JWT signature', async () => {
+      // Create a token signed with the wrong key
+      const token = await createTestJwt(WRONG_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint');
+
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Signature': 'sig1=:aW52YWxpZHNpZ25hdHVyZQ==:',
-          'Signature-Input': `sig1=("@method" "@path" "@authority");created=${currentTimestamp};keyid="SHA256:test"`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
       const testEnv = {
         ...env,
         NODE_ENV: 'production',
-        ROOT_PUBLIC_KEY: JSON.stringify(TEST_RSA_JWK),
+        ROOT_PUBLIC_KEY: JSON.stringify(TEST_PUBLIC_KEY_JWK),
       };
 
       const context = createExecutionContext();
@@ -135,17 +162,16 @@ describe('Auth Middleware', () => {
 
       expect(response.status).toBe(401);
       const body = await response.json() as { error: string };
-      // Since ROOT_PUBLIC_KEY is set but the signature doesn't verify, we get "Unknown key"
-      expect(body.error).toBe('Unknown key');
+      expect(body.error).toBe('Invalid or expired token');
     });
 
     it('should return ROOT_KEY_NOT_CONFIGURED when no root key set', async () => {
-      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const token = await createTestJwt(TEST_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint');
+
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Signature': 'sig1=:dGVzdA==:',
-          'Signature-Input': `sig1=("@method" "@path" "@authority");created=${currentTimestamp};keyid="SHA256:test"`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -162,6 +188,29 @@ describe('Auth Middleware', () => {
       expect(response.status).toBe(401);
       const body = await response.json() as { error: string };
       expect(body.error).toBe('ROOT_KEY_NOT_CONFIGURED');
+    });
+
+    it('should allow valid JWT with matching ROOT_PUBLIC_KEY', async () => {
+      const token = await createTestJwt(TEST_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint');
+
+      const request = new Request('http://example.com/status', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const testEnv = {
+        ...env,
+        NODE_ENV: 'production',
+        ROOT_PUBLIC_KEY: JSON.stringify(TEST_PUBLIC_KEY_JWK),
+      };
+
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, testEnv, context);
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(200);
     });
   });
 });

@@ -9,7 +9,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import { createRequire } from 'module';
 import * as dotenv from 'dotenv';
-import { maybeSignRequest } from '../lib/request-signer.js';
+import { getAuthHeader } from '../lib/jwt-auth.js';
 
 // Progress callback types
 export interface ProgressInfo {
@@ -75,10 +75,9 @@ export const apiClient = {
       apiPath.startsWith('/') ? apiPath : '/' + apiPath
     }`;
 
-    // Sign requests when not in local dev mode
+    // Add auth header when not in local dev mode
     let requestOptions = options || {};
     if (!isLocalDevMode) {
-      const method = (options?.method || 'GET').toUpperCase();
       const existingHeaders = options?.headers || {};
       const headersObj: Record<string, string> = {};
 
@@ -95,13 +94,13 @@ export const apiClient = {
         Object.assign(headersObj, existingHeaders);
       }
 
-      const signatureHeaders = maybeSignRequest(method, fullUrl, headersObj);
+      const authHeader = await getAuthHeader();
 
       requestOptions = {
         ...options,
         headers: {
           ...headersObj,
-          ...signatureHeaders,
+          ...authHeader,
         },
       };
     }

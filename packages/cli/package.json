@@ -33,6 +33,7 @@
     "ink": "^5.2.1",
     "ink-text-input": "^6.0.0",
     "istextorbinary": "^9.5.0",
+    "jose": "^5.2.0",
     "node-fetch": "^3.3.2",
     "react": "^18.3.1",
     "react-robot": "^1.2.1",
