@@ -1,6 +1,6 @@
 {
   "name": "@positronic/cloudflare",
-  "version": "0.0.57",
+  "version": "0.0.58",
   "publishConfig": {
     "access": "public"
   },
@@ -32,9 +32,9 @@
   },
   "dependencies": {
     "@misskey-dev/node-http-message-signatures": "^0.0.10",
-    "@positronic/core": "^0.0.57",
-    "@positronic/spec": "^0.0.57",
-    "@positronic/template-new-project": "^0.0.57",
+    "@positronic/core": "^0.0.58",
+    "@positronic/spec": "^0.0.58",
+    "@positronic/template-new-project": "^0.0.58",
     "aws4fetch": "^1.0.18",
     "caz": "^2.0.0",
     "cron-schedule": "^5.0.4",
