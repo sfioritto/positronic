@@ -1,5 +1,6 @@
 import { SignJWT, importPKCS8 } from 'jose';
 import { existsSync } from 'fs';
+import { createPrivateKey } from 'crypto';
 import {
   loadPrivateKey,
   getPrivateKeyFingerprint,
@@ -101,6 +102,44 @@ export class JwtAuthProvider {
   }
 
   /**
+   * Convert the SSH private key to PKCS8 PEM format
+   * Ed25519 keys need special handling because sshpk's PKCS8 output
+   * is not compatible with Node.js/OpenSSL
+   */
+  private getPkcs8Pem(): string {
+    if (!this.privateKey) {
+      throw new Error('Private key not loaded');
+    }
+
+    if (this.privateKey.type === 'ed25519') {
+      // For Ed25519, sshpk's PKCS8 output includes the public key in a format
+      // that Node.js/OpenSSL doesn't understand. Instead, we construct a JWK
+      // from the raw key parts and let Node's crypto handle the conversion.
+      // sshpk stores Ed25519 key data in 'k' (seed) and 'A' (public) parts
+      const parts = this.privateKey.part as unknown as Record<
+        string,
+        { data: Buffer }
+      >;
+      const seed = parts.k.data;
+      const publicKey = parts.A.data;
+
+      // Construct JWK and let Node's crypto convert to PKCS8
+      const jwk = {
+        kty: 'OKP',
+        crv: 'Ed25519',
+        d: seed.toString('base64url'),
+        x: publicKey.toString('base64url'),
+      };
+
+      const keyObj = createPrivateKey({ key: jwk, format: 'jwk' });
+      return keyObj.export({ type: 'pkcs8', format: 'pem' }) as string;
+    }
+
+    // For RSA and ECDSA, sshpk's PKCS8 output works fine
+    return this.privateKey.toString('pkcs8');
+  }
+
+  /**
    * Create a short-lived JWT for authentication
    */
   async createToken(): Promise<string> {
@@ -111,7 +150,7 @@ export class JwtAuthProvider {
     const algorithm = this.getAlgorithm();
 
     // Convert SSH private key to PKCS8 PEM format
-    const pkcs8Pem = this.privateKey.toString('pkcs8');
+    const pkcs8Pem = this.getPkcs8Pem();
 
     // Import the key with jose
     const joseKey = await importPKCS8(pkcs8Pem, algorithm);
@@ -158,19 +197,22 @@ export function isAuthAvailable(): boolean {
 
 /**
  * Get the Authorization header if auth is available
- * Returns { Authorization: 'Bearer <token>' } or empty object
+ * Throws if there's an auth configuration error (e.g., encrypted key)
+ * Returns empty object with warning if no key is configured
  */
 export async function getAuthHeader(): Promise<Record<string, string>> {
   const provider = getJwtAuthProvider();
   if (!provider.isReady()) {
+    const error = provider.getError();
+    if (error) {
+      throw error;
+    }
+    console.warn(
+      'Warning: No SSH key configured for authentication. Run "px auth login" to configure.'
+    );
     return {};
   }
 
-  try {
-    const token = await provider.createToken();
-    return { Authorization: `Bearer ${token}` };
-  } catch (error) {
-    console.error('Warning: Failed to create auth token:', error);
-    return {};
-  }
+  const token = await provider.createToken();
+  return { Authorization: `Bearer ${token}` };
 }
