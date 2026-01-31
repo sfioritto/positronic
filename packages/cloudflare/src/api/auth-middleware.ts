@@ -216,6 +216,10 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
     }
 
     // No matching key found
+    // Check if ROOT_PUBLIC_KEY is configured - if not, return specific error
+    if (!c.env.ROOT_PUBLIC_KEY) {
+      return c.json({ error: 'ROOT_KEY_NOT_CONFIGURED' }, 401);
+    }
     return c.json({ error: 'Unknown key' }, 401);
   };
 }

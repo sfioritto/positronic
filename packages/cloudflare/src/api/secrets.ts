@@ -50,6 +50,9 @@ async function cloudflareSecretsApi(
 
 const secrets = new Hono<{ Bindings: Bindings }>();
 
+// Protected secret name that cannot be managed via the API
+const PROTECTED_SECRET = 'ROOT_PUBLIC_KEY';
+
 // List all secrets (names only, not values)
 secrets.get('/', async (context: Context) => {
   const config = getSecretsApiConfig(context.env);
@@ -74,12 +77,15 @@ secrets.get('/', async (context: Context) => {
 
     // Transform to match spec format - Cloudflare API doesn't return timestamps
     // so we use placeholder values
+    // Filter out ROOT_PUBLIC_KEY from the list for security
     const now = new Date().toISOString();
-    const secretList = data.result.map((secret) => ({
-      name: secret.name,
-      createdAt: now,
-      updatedAt: now,
-    }));
+    const secretList = data.result
+      .filter((secret) => secret.name !== PROTECTED_SECRET)
+      .map((secret) => ({
+        name: secret.name,
+        createdAt: now,
+        updatedAt: now,
+      }));
 
     return context.json({
       secrets: secretList,
@@ -120,6 +126,16 @@ secrets.post('/', async (context: Context) => {
     }
     if (value === undefined) {
       return context.json({ error: 'Missing required field "value"' }, 400);
+    }
+
+    // Block setting ROOT_PUBLIC_KEY via API - must be set in Cloudflare dashboard
+    if (name === PROTECTED_SECRET) {
+      return context.json(
+        {
+          error: `Cannot set ${PROTECTED_SECRET} via API. This secret must be configured directly in the Cloudflare dashboard under Workers & Pages > Settings > Variables and Secrets.`,
+        },
+        403
+      );
     }
 
     // Cloudflare API uses PUT with name in body (not in URL)
@@ -175,6 +191,16 @@ secrets.delete('/:name', async (context: Context) => {
   }
 
   const name = decodeURIComponent(context.req.param('name'));
+
+  // Block deleting ROOT_PUBLIC_KEY via API - must be managed in Cloudflare dashboard
+  if (name === PROTECTED_SECRET) {
+    return context.json(
+      {
+        error: `Cannot delete ${PROTECTED_SECRET} via API. This secret must be managed directly in the Cloudflare dashboard under Workers & Pages > Settings > Variables and Secrets.`,
+      },
+      403
+    );
+  }
 
   try {
     const response = await cloudflareSecretsApi(config, encodeURIComponent(name), {
@@ -279,6 +305,11 @@ secrets.post('/bulk', async (context: Context) => {
     for (const secret of secretsArray) {
       if (!secret.name || secret.value === undefined) {
         continue; // Skip invalid entries
+      }
+
+      // Skip ROOT_PUBLIC_KEY - it cannot be set via API
+      if (secret.name === PROTECTED_SECRET) {
+        continue;
       }
 
       const response = await cloudflareSecretsApi(config, '', {

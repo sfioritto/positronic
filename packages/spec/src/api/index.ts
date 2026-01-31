@@ -8,4 +8,6 @@ export { signals } from './signals.js';
 export { pages } from './pages.js';
 export { bundle } from './bundle.js';
 export { users } from './users.js';
+export { auth } from './auth.js';
 export type { User, UserKey } from './users.js';
+export type { AuthSetupResponse } from './auth.js';
