@@ -1,5 +1,17 @@
 # @positronic/cli
 
+## 0.0.60
+
+### Patch Changes
+
+- - Add ssh-agent fallback for encrypted SSH keys, allowing users with passphrase-protected keys to authenticate without entering their passphrase for every request
+  - Fix Ed25519 key support by properly converting to PKCS8/JWK format for Node.js crypto compatibility
+  - Improve auth error surfacing with clearer error messages when SSH key loading fails
+- Updated dependencies
+  - @positronic/core@0.0.60
+  - @positronic/spec@0.0.60
+  - @positronic/template-new-project@0.0.60
+
 ## 0.0.59
 
 ### Patch Changes

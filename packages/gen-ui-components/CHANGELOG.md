@@ -1,5 +1,12 @@
 # @positronic/gen-ui-components
 
+## 0.0.60
+
+### Patch Changes
+
+- Updated dependencies
+  - @positronic/core@0.0.60
+
 ## 0.0.59
 
 ### Patch Changes
