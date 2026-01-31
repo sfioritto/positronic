@@ -175,6 +175,17 @@ export function getPrivateKeyFingerprint(privateKey: sshpk.PrivateKey): string {
 }
 
 /**
+ * Get the fingerprint from a public key file (.pub file)
+ * This is useful when the private key is encrypted but we need the fingerprint
+ * to look up the key in ssh-agent
+ */
+export function getPublicKeyFingerprint(pubKeyPath: string): string {
+  const content = readFileSync(pubKeyPath, 'utf-8').trim();
+  const sshKey = sshpk.parseKey(content, 'auto');
+  return sshKey.fingerprint('sha256').toString();
+}
+
+/**
  * Resolve the private key path from environment, config, or default
  * @param configuredPath - Optional configured path from ProjectConfigManager
  */
