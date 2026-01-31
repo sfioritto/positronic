@@ -1,10 +1,6 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Bindings } from './types.js';
 import type { AuthDO } from '../auth-do.js';
-import {
-  parseRequestSignature,
-  type ParsedSignature,
-} from '@misskey-dev/node-http-message-signatures';
 
 export interface AuthContext {
   userId: string | null;
@@ -24,6 +20,152 @@ type SubtleCryptoAlgorithm =
   | { name: 'ECDSA'; namedCurve: string }
   | { name: 'ECDSA'; hash: string }
   | { name: 'Ed25519' };
+
+/**
+ * Parsed RFC 9421 signature information
+ */
+interface RFC9421SignatureInfo {
+  label: string;
+  signature: string;
+  keyId: string;
+  created: number;
+  coveredComponents: string[];
+}
+
+/**
+ * Parse RFC 9421 Signature header
+ * Format: sig1=:base64signature:
+ */
+function parseRFC9421Signature(signatureHeader: string): Map<string, string> {
+  const signatures = new Map<string, string>();
+  // Match pattern: label=:base64:
+  const regex = /(\w+)=:([A-Za-z0-9+/=]+):/g;
+  let match;
+  while ((match = regex.exec(signatureHeader)) !== null) {
+    signatures.set(match[1], match[2]);
+  }
+  return signatures;
+}
+
+/**
+ * Parse RFC 9421 Signature-Input header
+ * Format: sig1=("@method" "@path" "@authority");created=123;keyid="fingerprint"
+ */
+function parseRFC9421SignatureInput(signatureInputHeader: string): Map<string, { coveredComponents: string[]; created: number; keyId: string }> {
+  const inputs = new Map<string, { coveredComponents: string[]; created: number; keyId: string }>();
+
+  // Split by comma for multiple signatures, but be careful with quoted values
+  // For simplicity, we'll handle a single signature first
+  const parts = signatureInputHeader.split(/,(?=\w+=\()/);
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+
+    // Match label and components: label=("comp1" "comp2" ...)
+    const labelMatch = trimmed.match(/^(\w+)=\(([^)]*)\)/);
+    if (!labelMatch) continue;
+
+    const label = labelMatch[1];
+    const componentsStr = labelMatch[2];
+
+    // Parse covered components: "@method" "@path" "@authority"
+    const coveredComponents: string[] = [];
+    const compRegex = /"([^"]+)"/g;
+    let compMatch;
+    while ((compMatch = compRegex.exec(componentsStr)) !== null) {
+      coveredComponents.push(compMatch[1]);
+    }
+
+    // Parse parameters after the components
+    const paramsStr = trimmed.slice(labelMatch[0].length);
+
+    // Extract created timestamp
+    const createdMatch = paramsStr.match(/;created=(\d+)/);
+    const created = createdMatch ? parseInt(createdMatch[1], 10) : 0;
+
+    // Extract keyid
+    const keyIdMatch = paramsStr.match(/;keyid="([^"]+)"/);
+    const keyId = keyIdMatch ? keyIdMatch[1] : '';
+
+    inputs.set(label, { coveredComponents, created, keyId });
+  }
+
+  return inputs;
+}
+
+/**
+ * Reconstruct the signature base from request and covered components
+ * This must match exactly what the client signed
+ */
+function reconstructSignatureBase(
+  method: string,
+  url: URL,
+  headers: Record<string, string>,
+  coveredComponents: string[],
+  signatureParams: string
+): string {
+  const lines: string[] = [];
+
+  for (const component of coveredComponents) {
+    if (component === '@method') {
+      lines.push(`"@method": ${method.toUpperCase()}`);
+    } else if (component === '@path') {
+      lines.push(`"@path": ${url.pathname}`);
+    } else if (component === '@authority') {
+      lines.push(`"@authority": ${url.host}`);
+    } else if (component === '@target-uri') {
+      lines.push(`"@target-uri": ${url.href}`);
+    } else if (component === '@scheme') {
+      lines.push(`"@scheme": ${url.protocol.replace(':', '')}`);
+    } else if (component === '@request-target') {
+      lines.push(`"@request-target": ${url.pathname}${url.search}`);
+    } else if (!component.startsWith('@')) {
+      // Regular header
+      const headerName = component.toLowerCase();
+      const headerValue = headers[headerName] || headers[component] || '';
+      lines.push(`"${headerName}": ${headerValue}`);
+    }
+  }
+
+  // Add the signature-params line
+  lines.push(`"@signature-params": ${signatureParams}`);
+
+  return lines.join('\n');
+}
+
+/**
+ * Parse RFC 9421 HTTP Message Signature headers and extract signature info
+ */
+function parseRFC9421Request(
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+  signatureHeader: string,
+  signatureInputHeader: string
+): RFC9421SignatureInfo | null {
+  // Parse the signatures
+  const signatures = parseRFC9421Signature(signatureHeader);
+  if (signatures.size === 0) return null;
+
+  // Parse the signature inputs
+  const inputs = parseRFC9421SignatureInput(signatureInputHeader);
+  if (inputs.size === 0) return null;
+
+  // Get the first signature (usually 'sig1')
+  const firstEntry = signatures.entries().next().value;
+  if (!firstEntry) return null;
+  const [label, signature] = firstEntry;
+  const input = inputs.get(label);
+  if (!input) return null;
+
+  return {
+    label,
+    signature,
+    keyId: input.keyId,
+    created: input.created,
+    coveredComponents: input.coveredComponents,
+  };
+}
 
 /**
  * Get the algorithm parameters for SubtleCrypto based on JWK key type
@@ -92,35 +234,8 @@ async function verifySignatureWithKey(
 }
 
 /**
- * Extract keyId and signature info from parsed signature
- * Handles both draft and RFC9421 formats
- */
-function extractSignatureInfo(parsed: ParsedSignature): { keyId: string; signature: string; base: string } | null {
-  if (parsed.version === 'draft') {
-    return {
-      keyId: parsed.value.keyId,
-      signature: parsed.value.params.signature,
-      base: parsed.value.signingString,
-    };
-  } else if (parsed.version === 'rfc9421') {
-    // RFC9421 returns an array of [label, value] tuples
-    const signatures = parsed.value;
-    if (signatures.length === 0) return null;
-
-    // Use the first signature (usually 'sig1')
-    const [, sigValue] = signatures[0];
-    return {
-      keyId: sigValue.keyid,
-      signature: sigValue.signature,
-      base: sigValue.base,
-    };
-  }
-  return null;
-}
-
-/**
  * Authentication middleware for the Positronic API
- * Verifies HTTP message signatures (RFC 9421) using @misskey-dev/node-http-message-signatures for parsing
+ * Verifies HTTP message signatures (RFC 9421)
  */
 export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
   return async (c: Context<{ Bindings: Bindings }>, next) => {
@@ -139,43 +254,54 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
       return c.json({ error: 'Authentication required' }, 401);
     }
 
-    // Parse the signature using the library
-    let parsedSignature: ParsedSignature;
-    try {
-      // Build a request-like object for the library
-      const requestForParsing = {
-        method: c.req.method,
-        url: c.req.url,
-        headers: Object.fromEntries(c.req.raw.headers.entries()),
-      };
+    // Parse RFC 9421 signature
+    const headers = Object.fromEntries(
+      Array.from(c.req.raw.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
+    );
 
-      parsedSignature = parseRequestSignature(requestForParsing, {
-        clockSkew: {
-          now: new Date(),
-          forward: 300000, // 5 minutes
-          delay: 300000,   // 5 minutes
-        },
-      });
-    } catch (error) {
-      // Log error type only - avoid logging request details that could contain sensitive data
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to parse signature:', errorMessage);
+    const sigInfo = parseRFC9421Request(
+      c.req.method,
+      c.req.url,
+      headers,
+      signatureHeader,
+      signatureInputHeader
+    );
+
+    if (!sigInfo) {
       return c.json({ error: 'Invalid signature format' }, 401);
     }
 
-    // Extract signature info from parsed result
-    const sigInfo = extractSignatureInfo(parsedSignature);
-    if (!sigInfo) {
-      return c.json({ error: 'No valid signature found' }, 401);
+    // Check clock skew (5 minutes tolerance)
+    const now = Math.floor(Date.now() / 1000);
+    const clockSkew = 300; // 5 minutes
+    if (Math.abs(now - sigInfo.created) > clockSkew) {
+      return c.json({ error: 'Signature expired or clock skew too large' }, 401);
     }
 
-    const { keyId, signature, base } = sigInfo;
+    // Reconstruct the signature params string from the input header
+    // We need to extract just the params part after the label
+    const paramsMatch = signatureInputHeader.match(/^\w+=(.+)$/);
+    const signatureParams = paramsMatch ? paramsMatch[1] : '';
+
+    // Reconstruct the signature base
+    const parsedUrl = new URL(c.req.url);
+    const base = reconstructSignatureBase(
+      c.req.method,
+      parsedUrl,
+      headers,
+      sigInfo.coveredComponents,
+      signatureParams
+    );
+
+    const { keyId, signature } = sigInfo;
 
     // Try to find the key in the auth database
-    const authDoId = c.env.AUTH_DO.idFromName('auth');
-    const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
-
-    const userKey = await authDo.getKeyByFingerprint(keyId);
+    let userKey = null;
+    if (c.env.AUTH_DO) {
+      const authDoId = c.env.AUTH_DO.idFromName('auth');
+      const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
+      userKey = await authDo.getKeyByFingerprint(keyId);
+    }
 
     if (userKey) {
       try {
