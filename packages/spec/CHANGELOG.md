@@ -1,5 +1,18 @@
 # @positronic/spec
 
+## 0.0.59
+
+### Patch Changes
+
+- Replace RFC 9421 HTTP Message Signatures with JWT-based authentication
+
+  - Switched from RFC 9421 HTTP Message Signatures to simpler JWT-based auth for API requests
+  - Added new JwtAuthProvider class using the jose library for signing short-lived JWTs with SSH keys
+  - Simplified auth middleware to verify JWTs instead of complex HTTP signature parsing
+  - Removed dependency on @misskey-dev/node-http-message-signatures
+  - Supports RSA, ECDSA (P-256, P-384, P-521), and Ed25519 key types
+  - Improved auth test coverage with dedicated integration tests
+
 ## 0.0.58
 
 ### Patch Changes
