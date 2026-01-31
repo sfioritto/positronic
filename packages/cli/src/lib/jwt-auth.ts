@@ -1,23 +1,42 @@
-import { SignJWT, importPKCS8 } from 'jose';
+import { SignJWT, importPKCS8, base64url } from 'jose';
 import { existsSync } from 'fs';
 import { createPrivateKey } from 'crypto';
 import {
   loadPrivateKey,
   getPrivateKeyFingerprint,
+  getPublicKeyFingerprint,
   resolvePrivateKeyPath,
 } from './ssh-key-utils.js';
 import type sshpk from 'sshpk';
 import { ProjectConfigManager } from '../commands/project-config-manager.js';
+import { AgentSigner } from './ssh-agent-signer.js';
+
+/**
+ * Check if an error indicates an encrypted key
+ */
+function isEncryptedKeyError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'KeyEncryptedError') {
+    return true;
+  }
+  return false;
+}
 
 /**
  * JWT Auth Provider for authenticating API requests
  * Uses SSH private keys to sign short-lived JWTs
+ * Falls back to ssh-agent for encrypted keys
  */
 export class JwtAuthProvider {
   private privateKey: sshpk.PrivateKey | null = null;
   private fingerprint: string | null = null;
   private initialized = false;
   private initError: Error | null = null;
+
+  // Agent fallback support
+  private encryptedKeyPath: string | null = null;
+  private agentSigner: AgentSigner | null = null;
+  private agentKey: sshpk.Key | null = null;
+  private useAgent = false;
 
   constructor() {
     this.initialize();
@@ -42,18 +61,46 @@ export class JwtAuthProvider {
       this.fingerprint = getPrivateKeyFingerprint(this.privateKey);
       this.initialized = true;
     } catch (error) {
-      this.initError =
-        error instanceof Error
-          ? error
-          : new Error('Failed to initialize JWT auth provider');
+      if (isEncryptedKeyError(error)) {
+        // Store the path for agent fallback - we'll try the agent in createToken()
+        const configManager = new ProjectConfigManager();
+        const configuredPath = configManager.getPrivateKeyPath();
+        this.encryptedKeyPath = resolvePrivateKeyPath(configuredPath);
+        this.initError =
+          error instanceof Error
+            ? error
+            : new Error('Key is encrypted');
+      } else {
+        this.initError =
+          error instanceof Error
+            ? error
+            : new Error('Failed to initialize JWT auth provider');
+      }
     }
   }
 
   /**
    * Check if the provider is ready to create JWTs
+   * Returns true if we have a direct key OR if we have an encrypted key
+   * that might work with agent fallback
    */
   isReady(): boolean {
-    return this.initialized && this.privateKey !== null;
+    // Direct key is loaded and ready
+    if (this.initialized && this.privateKey !== null) {
+      return true;
+    }
+    // Encrypted key might work with agent fallback
+    if (this.encryptedKeyPath !== null) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if we have an encrypted key that requires agent fallback
+   */
+  hasEncryptedKey(): boolean {
+    return this.encryptedKeyPath !== null;
   }
 
   /**
@@ -78,13 +125,17 @@ export class JwtAuthProvider {
       throw new Error('Private key not loaded');
     }
 
-    const keyType = this.privateKey.type;
+    return this.getAlgorithmForKeyType(this.privateKey.type, this.privateKey.curve);
+  }
 
+  /**
+   * Map SSH key type string to JWT algorithm
+   */
+  private getAlgorithmForKeyType(keyType: string, curve?: string): string {
     if (keyType === 'rsa') {
       return 'RS256';
     } else if (keyType === 'ecdsa') {
       // ECDSA curve determines algorithm
-      const curve = this.privateKey.curve;
       if (curve === 'nistp256') {
         return 'ES256';
       } else if (curve === 'nistp384') {
@@ -143,8 +194,31 @@ export class JwtAuthProvider {
    * Create a short-lived JWT for authentication
    */
   async createToken(): Promise<string> {
+    // If we have a direct private key, use the standard jose signing path
+    if (this.privateKey && this.fingerprint) {
+      return this.createTokenDirect();
+    }
+
+    // If we have an encrypted key path, try agent fallback
+    if (this.encryptedKeyPath) {
+      await this.tryAgentFallback();
+    }
+
+    // If agent fallback succeeded, use agent signing
+    if (this.useAgent && this.agentSigner && this.agentKey && this.fingerprint) {
+      return this.createTokenWithAgent();
+    }
+
+    // No authentication method available
+    throw this.initError || new Error('JWT auth provider not initialized');
+  }
+
+  /**
+   * Create JWT using direct private key (jose library)
+   */
+  private async createTokenDirect(): Promise<string> {
     if (!this.privateKey || !this.fingerprint) {
-      throw new Error('JWT auth provider not initialized');
+      throw new Error('Private key not loaded');
     }
 
     const algorithm = this.getAlgorithm();
@@ -164,6 +238,93 @@ export class JwtAuthProvider {
       .sign(joseKey);
 
     return jwt;
+  }
+
+  /**
+   * Try to use ssh-agent for signing when private key is encrypted
+   */
+  private async tryAgentFallback(): Promise<void> {
+    if (!this.encryptedKeyPath) {
+      return;
+    }
+
+    // Get fingerprint from public key file
+    const pubKeyPath = this.encryptedKeyPath + '.pub';
+    if (!existsSync(pubKeyPath)) {
+      throw new Error(
+        `Key is encrypted and public key file not found at ${pubKeyPath}.\n` +
+          `Cannot determine key fingerprint for ssh-agent lookup.`
+      );
+    }
+
+    const fingerprint = getPublicKeyFingerprint(pubKeyPath);
+
+    const agent = new AgentSigner();
+    if (!agent.isAvailable()) {
+      throw new Error(
+        `Key is encrypted and ssh-agent is not running.\n` +
+          `Start ssh-agent or use an unencrypted key.`
+      );
+    }
+
+    const agentKey = await agent.hasKey(fingerprint);
+    if (!agentKey) {
+      throw new Error(
+        `Key is encrypted and not loaded in ssh-agent.\n` +
+          `Run: ssh-add ${this.encryptedKeyPath}`
+      );
+    }
+
+    this.agentSigner = agent;
+    this.agentKey = agentKey;
+    this.fingerprint = fingerprint;
+    this.useAgent = true;
+    this.initError = null;
+    this.initialized = true;
+  }
+
+  /**
+   * Create JWT using ssh-agent for signing
+   * Manually constructs the JWT since jose expects to do signing itself
+   */
+  private async createTokenWithAgent(): Promise<string> {
+    if (!this.agentSigner || !this.agentKey || !this.fingerprint) {
+      throw new Error('Agent signing not configured');
+    }
+
+    // Get algorithm from agent key type
+    const keyType = this.agentKey.type;
+    const curve = (this.agentKey as unknown as { curve?: string }).curve;
+    const algorithm = this.getAlgorithmForKeyType(keyType, curve);
+
+    // Build JWT header
+    const header = { alg: algorithm };
+    const encodedHeader = base64url.encode(JSON.stringify(header));
+
+    // Build JWT payload
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      sub: this.fingerprint,
+      iat: now,
+      exp: now + 30,
+    };
+    const encodedPayload = base64url.encode(JSON.stringify(payload));
+
+    // Create signing input
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+    // Sign with agent
+    const signature = await this.agentSigner.sign(
+      this.agentKey,
+      Buffer.from(signingInput)
+    );
+
+    // Convert sshpk.Signature to raw bytes for JWT
+    // sshpk's toBuffer() gives us the raw signature bytes
+    const signatureBytes = signature.toBuffer('raw');
+    const encodedSignature = base64url.encode(signatureBytes);
+
+    return `${signingInput}.${encodedSignature}`;
   }
 }
 
@@ -197,7 +358,7 @@ export function isAuthAvailable(): boolean {
 
 /**
  * Get the Authorization header if auth is available
- * Throws if there's an auth configuration error (e.g., encrypted key)
+ * Throws if there's an auth configuration error
  * Returns empty object with warning if no key is configured
  */
 export async function getAuthHeader(): Promise<Record<string, string>> {
@@ -213,6 +374,7 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
     return {};
   }
 
+  // createToken() will handle agent fallback for encrypted keys
   const token = await provider.createToken();
   return { Authorization: `Bearer ${token}` };
 }
