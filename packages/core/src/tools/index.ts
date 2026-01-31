@@ -40,10 +40,10 @@ export function createTool<T extends z.ZodSchema>(config: {
 const generateUIInputSchema = z.object({
   prompt: z.string().describe(
     'Natural language instructions describing the UI to generate. ' +
-    'Include: (1) the purpose of the page, (2) what information to display from state data, ' +
+    'Include: (1) the purpose of the page, (2) what information to display from the data parameter, ' +
     '(3) what input fields are needed if collecting data, (4) labels and placeholders for fields, ' +
     '(5) any specific layout preferences. Example: "Create a form to collect user feedback with ' +
-    'fields for rating (1-5 scale), comments (text area), and email. Show the product name from state at the top."'
+    'fields for rating (1-5 scale), comments (text area), and email. Show the product name at the top."'
   ),
   hasForm: z.boolean().optional().describe(
     'Whether to include a form that can be submitted. Defaults to true. ' +
@@ -55,6 +55,11 @@ const generateUIInputSchema = z.object({
     'Whether to keep the page after the brain run completes. Defaults to false. ' +
     'Set to false (default): Page is automatically cleaned up when the brain run finishes. Use for one-time forms, approvals, or temporary displays. ' +
     'Set to true: Page survives brain completion and remains accessible. Use for shared dashboards, permanent reference pages, or pages that need to outlive the workflow.'
+  ),
+  data: z.record(z.unknown()).optional().describe(
+    'Structured data for template bindings ({{path.to.value}} syntax). ' +
+    'Pass the objects/arrays you want to display. The UI generator infers the shape ' +
+    'and creates bindings to render all items. Example: { articles: [...], user: { name: "..." } }'
   ),
 });
 
@@ -78,6 +83,8 @@ export const generateUI: AgentTool<typeof generateUIInputSchema> = {
   description: `Generate a web page for displaying rich content or collecting user input.
 
 Sometimes you need more than simple notifications to communicate with users. This tool creates web pages that can display formatted content, dashboards, or forms to collect information.
+
+Pass structured data via the 'data' parameter to populate the page with dynamic content. The UI generator uses {{path.to.value}} template bindings to render your data.
 
 RETURNS: { url: string, webhook: { slug: string, identifier: string } | null }
 - url: The page URL
@@ -108,7 +115,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       client,
       prompt: input.prompt,
       components,
-      data: state as Record<string, unknown>,
+      data: (input.data ?? {}) as Record<string, unknown>,
     });
 
     if (!uiResult.rootId) {
@@ -143,7 +150,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const html = generatePageHtml({
       placements: uiResult.placements,
       rootId: uiResult.rootId,
-      data: state as Record<string, unknown>,
+      data: (input.data ?? {}) as Record<string, unknown>,
       title: hasForm ? 'Generated Form' : 'Generated Page',
       formAction,
     });
