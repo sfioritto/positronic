@@ -1,6 +1,11 @@
 import type { Adapter, BrainEvent } from '@positronic/core';
 import type { SqlStorage, R2Bucket } from '@cloudflare/workers-types';
 
+// R2 overflow stores large events (>1MB) in R2 instead of SQLite.
+// This feature is manually tested because vitest-pool-workers has limitations
+// with large data and isolated storage cleanup.
+// See: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#isolated-storage
+
 // Size threshold for R2 overflow (1MB)
 export const R2_OVERFLOW_THRESHOLD = 1024 * 1024;
 
