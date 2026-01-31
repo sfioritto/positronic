@@ -1,6 +1,6 @@
 {
   "name": "@positronic/spec",
-  "version": "0.0.57",
+  "version": "0.0.58",
   "publishConfig": {
     "access": "public"
   },

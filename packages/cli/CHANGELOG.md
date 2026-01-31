@@ -1,5 +1,22 @@
 # @positronic/cli
 
+## 0.0.58
+
+### Patch Changes
+
+- Add root public key authentication setup flow
+
+  - Add `px auth format-jwk-key` command to convert SSH public keys to JWK format for root authentication
+  - Refactor auth error handling in useApi hooks to reduce duplication and improve error messages
+  - Fix silent error swallowing in fetchAuthSetupInstructions
+  - Add secrets API spec tests for root public key management
+  - Remove obsolete R2 overflow tests
+
+- Updated dependencies
+  - @positronic/core@0.0.58
+  - @positronic/spec@0.0.58
+  - @positronic/template-new-project@0.0.58
+
 ## 0.0.57
 
 ### Patch Changes
