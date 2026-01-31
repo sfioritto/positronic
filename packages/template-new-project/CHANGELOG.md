@@ -1,5 +1,60 @@
 # @positronic/template-new-project
 
+## 0.0.57
+
+### Patch Changes
+
+- ## New Features
+
+  ### SSH Key Authentication
+
+  - Add `px auth` command for managing local SSH key configuration
+  - Implement SSH public key authentication using RFC 9421 HTTP Message Signatures
+  - Add user management commands (`px users create`, `px users list`, `px users delete`)
+  - Add SSH key management (`px users keys add`, `px users keys list`, `px users keys remove`)
+
+  ### Signal System for Brain Interruption
+
+  - Add signal handling to pause, resume, and stop running brains
+  - Add signal endpoints for Cloudflare backend
+  - Add message interface to watch component for sending USER_MESSAGE signals
+  - Implement RESUMED event for proper resume from pause state
+
+  ### Memory System with Mem0 Integration
+
+  - Add new `@positronic/mem0` package for memory integration
+  - Add memory system documentation and examples to project template
+  - Support scoped memory for brain contexts
+
+  ### Watch Command Improvements
+
+  - Add state view to watch command
+  - Add event navigation, detail views, and token tracking
+  - Add pause/resume UI with status tracking
+  - Refactor watch.tsx to use robot3 state machine
+
+  ## Improvements
+
+  - Add R2 overflow storage for large brain events
+  - Add outputSchema support for agent steps
+  - Add maxIterations limit and token tracking to agent steps
+  - Add dry-run binding resolution to validate_template tool
+  - Add persist option and explicit data parameter to generateUI tool
+  - Add print tool for user communication
+  - Auto-generate done tool for every agent step
+  - Improve default tool descriptions for better LLM decision-making
+  - Refactor brain state machine from tree to flat map + stack
+  - Split BrainRunner.run() into separate run() and resume() methods
+  - Optimize MonitorDO event processing from O(N²) to O(1)
+
+  ## Bug Fixes
+
+  - Fix flaky CLI tests by using global nock setup and waiting for actual SSE events
+  - Fix page cleanup when killing paused or zombie brains
+  - Fix USER_MESSAGE signals being lost during webhook resume
+  - Fix tool call history preservation in conversation messages
+  - Fix nested brain webhook resume
+
 ## 0.0.56
 
 ### Patch Changes

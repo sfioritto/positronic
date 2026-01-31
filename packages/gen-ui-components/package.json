@@ -1,6 +1,6 @@
 {
   "name": "@positronic/gen-ui-components",
-  "version": "0.0.56",
+  "version": "0.0.57",
   "publishConfig": {
     "access": "public"
   },
@@ -20,7 +20,7 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
-    "@positronic/core": "^0.0.56",
+    "@positronic/core": "^0.0.57",
     "zod": "^3.24.1"
   },
   "devDependencies": {
