@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
-import { resetRequestSigner } from '../lib/request-signer.js';
+import { resetJwtAuthProvider } from '../lib/jwt-auth.js';
 
 interface AuthLogoutProps {
   configManager: ProjectConfigManager;
@@ -41,7 +41,7 @@ export const AuthLogout = ({ configManager, forProject }: AuthLogoutProps) => {
     }
 
     configManager.clearProjectPrivateKeyPath(currentProject.name);
-    resetRequestSigner();
+    resetJwtAuthProvider();
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -72,7 +72,7 @@ export const AuthLogout = ({ configManager, forProject }: AuthLogoutProps) => {
   }
 
   configManager.clearDefaultPrivateKeyPath();
-  resetRequestSigner();
+  resetJwtAuthProvider();
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>

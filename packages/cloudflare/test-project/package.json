@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.11",
+    "jose": "^5.2.0",
     "@positronic/core": "file:../../core",
     "@positronic/spec": "file:../../spec",
     "typescript": "^5.5.2",

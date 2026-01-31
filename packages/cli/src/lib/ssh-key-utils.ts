@@ -175,20 +175,6 @@ export function getPrivateKeyFingerprint(privateKey: sshpk.PrivateKey): string {
 }
 
 /**
- * Sign data with an SSH private key
- */
-export function signWithPrivateKey(
-  privateKey: sshpk.PrivateKey,
-  data: Buffer | string
-): Buffer {
-  const dataBuffer = typeof data === 'string' ? Buffer.from(data) : data;
-  const signer = privateKey.createSign('sha256');
-  signer.update(dataBuffer);
-  const signature = signer.sign();
-  return signature.toBuffer('raw');
-}
-
-/**
  * Resolve the private key path from environment, config, or default
  * @param configuredPath - Optional configured path from ProjectConfigManager
  */

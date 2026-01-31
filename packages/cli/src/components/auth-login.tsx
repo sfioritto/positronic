@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Text, useApp } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
 import { discoverSSHKeys, expandPath } from '../lib/ssh-key-utils.js';
-import { resetRequestSigner } from '../lib/request-signer.js';
+import { resetJwtAuthProvider } from '../lib/jwt-auth.js';
 import { SelectList, type SelectListItem } from './select-list.js';
 import { existsSync } from 'fs';
 
@@ -65,7 +65,7 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
     }
 
     // Reset request signer to use new key
-    resetRequestSigner();
+    resetJwtAuthProvider();
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -132,7 +132,7 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
       }
 
       // Reset request signer to use new key
-      resetRequestSigner();
+      resetJwtAuthProvider();
 
       setSelectedPath(displayPath);
       setState('success');
