@@ -1429,6 +1429,30 @@ export function buildCli(options: CliOptions) {
             }
           )
           .command(
+            'format-jwk-key',
+            'Convert an SSH public key to JWK format for ROOT_PUBLIC_KEY\n',
+            (yargsFormatJwkKey) => {
+              return yargsFormatJwkKey
+                .option('pubkey', {
+                  describe: 'Path to SSH public key file',
+                  type: 'string',
+                  alias: 'p',
+                })
+                .example(
+                  '$0 auth format-jwk-key',
+                  'Interactive public key selection'
+                )
+                .example(
+                  '$0 auth format-jwk-key --pubkey ~/.ssh/id_ed25519.pub',
+                  'Convert specific key'
+                );
+            },
+            (argv) => {
+              const element = authCommand.formatJwkKey(argv as any);
+              render(element);
+            }
+          )
+          .command(
             '$0',
             false, // Hidden command - default action
             () => {},

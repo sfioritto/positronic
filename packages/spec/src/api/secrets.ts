@@ -256,4 +256,118 @@ export const secrets = {
       return false;
     }
   },
+
+  /**
+   * Test POST /secrets with ROOT_PUBLIC_KEY - Should return 403
+   * ROOT_PUBLIC_KEY is a protected secret that cannot be set via the API
+   */
+  async createRootKeyRejected(fetch: Fetch): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/secrets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: 'ROOT_PUBLIC_KEY', value: 'test-value' }),
+      });
+
+      const response = await fetch(request);
+
+      if (response.status !== 403) {
+        console.error(
+          `POST /secrets for ROOT_PUBLIC_KEY returned ${response.status}, expected 403`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as { error: string };
+
+      if (!data.error || typeof data.error !== 'string') {
+        console.error(`Expected error message in response`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test POST /secrets ROOT_PUBLIC_KEY rejection:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test DELETE /secrets/ROOT_PUBLIC_KEY - Should return 403
+   * ROOT_PUBLIC_KEY is a protected secret that cannot be deleted via the API
+   */
+  async deleteRootKeyRejected(fetch: Fetch): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/secrets/${encodeURIComponent('ROOT_PUBLIC_KEY')}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (response.status !== 403) {
+        console.error(
+          `DELETE /secrets/ROOT_PUBLIC_KEY returned ${response.status}, expected 403`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as { error: string };
+
+      if (!data.error || typeof data.error !== 'string') {
+        console.error(`Expected error message in response`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test DELETE /secrets/ROOT_PUBLIC_KEY rejection:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test GET /secrets - Should not include ROOT_PUBLIC_KEY in list
+   * ROOT_PUBLIC_KEY is filtered from the secrets list for security
+   */
+  async listExcludesRootKey(
+    fetch: Fetch,
+    hasRootKey: boolean
+  ): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/secrets', {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /secrets returned ${response.status}`);
+        return false;
+      }
+
+      const data = (await response.json()) as {
+        secrets: Array<{ name: string }>;
+      };
+
+      // Check that ROOT_PUBLIC_KEY is not in the list
+      const hasRootKeyInList = data.secrets.some(
+        (secret) => secret.name === 'ROOT_PUBLIC_KEY'
+      );
+
+      if (hasRootKeyInList) {
+        console.error(`ROOT_PUBLIC_KEY should not be included in secrets list`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test GET /secrets excludes ROOT_PUBLIC_KEY:`, error);
+      return false;
+    }
+  },
 };
