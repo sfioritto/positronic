@@ -6,7 +6,7 @@ import {
   fetchMock,
 } from 'cloudflare:test';
 import worker from '../src/index';
-import { testStatus, resources, brains, schedules, webhooks, pages, secrets, signals } from '@positronic/spec';
+import { testStatus, resources, brains, schedules, webhooks, pages, secrets, signals, auth } from '@positronic/spec';
 import { resetMockState } from '../src/runner';
 
 describe('Positronic Spec', () => {
@@ -348,6 +348,13 @@ describe('Positronic Spec', () => {
     });
   });
 
+  describe('Auth', () => {
+    it('passes GET /auth/setup test', async () => {
+      const result = await auth.setup(createFetch());
+      expect(result).toBe(true);
+    });
+  });
+
   describe('Secrets', () => {
     // Mock the Cloudflare API for secrets management
     const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com';
@@ -478,6 +485,38 @@ describe('Positronic Spec', () => {
         { name: 'BULK_SECRET_1', value: 'value1' },
         { name: 'BULK_SECRET_2', value: 'value2' },
       ]);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /secrets rejects ROOT_PUBLIC_KEY test', async () => {
+      // No Cloudflare API mocking needed - the endpoint should reject before calling API
+      const result = await secrets.createRootKeyRejected(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes DELETE /secrets/ROOT_PUBLIC_KEY rejected test', async () => {
+      // No Cloudflare API mocking needed - the endpoint should reject before calling API
+      const result = await secrets.deleteRootKeyRejected(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /secrets excludes ROOT_PUBLIC_KEY test', async () => {
+      // Mock Cloudflare API response that includes ROOT_PUBLIC_KEY
+      mockSecrets = [
+        { name: 'ROOT_PUBLIC_KEY', type: 'secret_text' },
+        { name: 'OTHER_SECRET', type: 'secret_text' },
+      ];
+
+      fetchMock
+        .get(CLOUDFLARE_API_BASE)
+        .intercept({ path: SECRETS_PATH, method: 'GET' })
+        .reply(200, {
+          success: true,
+          result: mockSecrets,
+          errors: [],
+        });
+
+      const result = await secrets.listExcludesRootKey(createFetch(), true);
       expect(result).toBe(true);
     });
   });

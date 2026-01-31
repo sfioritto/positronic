@@ -16,10 +16,25 @@ app.get('/status', async (context: Context) => {
   return context.json({ ready: true });
 });
 
-// Apply auth middleware to all routes except /status
+// Auth setup endpoint (no auth required) - returns setup instructions
+app.get('/auth/setup', async (context: Context) => {
+  const rootKeyConfigured = !!context.env.ROOT_PUBLIC_KEY;
+
+  return context.json({
+    backend: 'cloudflare',
+    rootKeyConfigured,
+    instructions: `To configure root authentication:
+1. Run: px auth format-jwk-key
+2. In Cloudflare dashboard, go to Workers & Pages > Your project > Settings > Variables and Secrets
+3. Add a new secret named ROOT_PUBLIC_KEY
+4. Paste the JWK value from step 1`,
+  });
+});
+
+// Apply auth middleware to all routes except /status and /auth/setup
 app.use('*', async (c, next) => {
-  // Skip auth for /status endpoint
-  if (c.req.path === '/status') {
+  // Skip auth for unauthenticated endpoints
+  if (c.req.path === '/status' || c.req.path === '/auth/setup') {
     return next();
   }
   return authMiddleware()(c, next);

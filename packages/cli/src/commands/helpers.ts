@@ -108,6 +108,28 @@ export const apiClient = {
 
     return fetch(fullUrl, requestOptions);
   },
+
+  /**
+   * Fetch without authentication - used for unauthenticated endpoints like /auth/setup
+   */
+  fetchUnauthenticated: async (apiPath: string, options?: RequestInit): Promise<Response> => {
+    let baseUrl: string;
+
+    if (apiBaseUrl) {
+      baseUrl = apiBaseUrl;
+    } else {
+      // Fallback to localhost (for backwards compatibility and testing)
+      const port = process.env.POSITRONIC_PORT || '8787';
+      baseUrl = `http://localhost:${port}`;
+    }
+
+    const fullUrl = `${baseUrl}${
+      apiPath.startsWith('/') ? apiPath : '/' + apiPath
+    }`;
+
+    // Don't sign the request - this is for unauthenticated endpoints
+    return fetch(fullUrl, options);
+  },
 };
 
 export async function generateProject(projectName: string, projectDir: string) {
