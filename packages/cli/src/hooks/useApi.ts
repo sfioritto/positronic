@@ -22,13 +22,9 @@ function getConnectionErrorMessage(): { title: string; message: string; details:
  * Fetch auth setup instructions from the server
  */
 async function fetchAuthSetupInstructions(): Promise<AuthSetupResponse | null> {
-  try {
-    const response = await apiClient.fetchUnauthenticated('/auth/setup');
-    if (response.ok) {
-      return (await response.json()) as AuthSetupResponse;
-    }
-  } catch {
-    // If we can't fetch setup instructions, fall back to generic message
+  const response = await apiClient.fetchUnauthenticated('/auth/setup');
+  if (response.ok) {
+    return (await response.json()) as AuthSetupResponse;
   }
   return null;
 }
