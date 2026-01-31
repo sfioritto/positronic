@@ -1,5 +1,12 @@
 # @positronic/shell
 
+## 0.0.61
+
+### Patch Changes
+
+- - Add JWT authentication to EventSource connections for secure real-time streaming in production deployments
+  - Add observability configuration to Cloudflare template wrangler for improved logging and monitoring
+
 ## 0.0.60
 
 ### Patch Changes
