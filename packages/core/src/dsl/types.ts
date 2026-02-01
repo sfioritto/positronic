@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { WebhookRegistration } from './webhook.js';
+import type { ToolChoice } from '../clients/types.js';
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonArray = JsonValue[];
@@ -166,6 +167,13 @@ export interface AgentConfig<
    * and stores the result under state[outputSchema.name].
    */
   outputSchema?: TOutputSchema;
+  /**
+   * Tool choice configuration for LLM calls.
+   * - 'auto': Model chooses whether to call tools
+   * - 'required': Model must call a tool (default for agents)
+   * - 'none': Model cannot call tools
+   */
+  toolChoice?: ToolChoice;
 }
 
 /**

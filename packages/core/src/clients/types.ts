@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
 /**
+ * Tool choice configuration for LLM calls.
+ * - 'auto': Model chooses whether to call tools (default for most cases)
+ * - 'required': Model must call a tool (default for agent loops)
+ * - 'none': Model cannot call tools
+ */
+export type ToolChoice = 'auto' | 'required' | 'none';
+
+/**
  * Represents a message in a conversation, used as input for the Generator.
  */
 export type Message = {
@@ -113,6 +121,14 @@ export interface ObjectGenerator {
     responseMessages?: ResponseMessage[];
     /** Available tools for the LLM to call */
     tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
+    /**
+     * Tool choice configuration.
+     * - 'auto': Model chooses whether to call tools
+     * - 'required': Model must call a tool (recommended for agent loops)
+     * - 'none': Model cannot call tools
+     * Defaults to 'required' for agent workflows.
+     */
+    toolChoice?: ToolChoice;
   }): Promise<{
     /** Text response from the LLM */
     text?: string;
@@ -161,6 +177,14 @@ export interface ObjectGenerator {
     >;
     /** Maximum number of LLM iterations (default: 10) */
     maxSteps?: number;
+    /**
+     * Tool choice configuration.
+     * - 'auto': Model chooses whether to call tools (default)
+     * - 'required': Model must call a tool
+     * - 'none': Model cannot call tools
+     * Defaults to 'auto' for streamText since it often needs to produce final text.
+     */
+    toolChoice?: ToolChoice;
   }): Promise<{
     /** All tool calls made across all steps, with their results */
     toolCalls: Array<{

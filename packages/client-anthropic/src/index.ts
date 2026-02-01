@@ -1,4 +1,4 @@
-import type { ObjectGenerator, ToolMessage, ResponseMessage } from '@positronic/core';
+import type { ObjectGenerator, ToolMessage, ResponseMessage, ToolChoice } from '@positronic/core';
 import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from 'llm-polyglot';
 import Anthropic from '@anthropic-ai/sdk';
@@ -8,6 +8,21 @@ import { config } from 'dotenv';
 import type { InstructorClient } from '@instructor-ai/instructor';
 
 config();
+
+/**
+ * Convert our ToolChoice type to Anthropic's tool_choice format.
+ */
+function toAnthropicToolChoice(choice: ToolChoice): Anthropic.MessageCreateParams['tool_choice'] {
+  switch (choice) {
+    case 'required':
+      return { type: 'any' };
+    case 'none':
+      return { type: 'none' } as Anthropic.MessageCreateParams['tool_choice'];
+    case 'auto':
+    default:
+      return { type: 'auto' };
+  }
+}
 
 const anthropic = createLLMClient({
   provider: 'anthropic',
@@ -97,13 +112,14 @@ export class AnthropicClient implements ObjectGenerator {
     messages: ToolMessage[];
     responseMessages?: ResponseMessage[];
     tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
+    toolChoice?: ToolChoice;
   }): Promise<{
     text?: string;
     toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
     usage: { totalTokens: number };
     responseMessages: ResponseMessage[];
   }> {
-    const { system, messages, responseMessages, tools } = params;
+    const { system, messages, responseMessages, tools, toolChoice = 'required' } = params;
 
     // Build the messages to send
     let anthropicMessages: Anthropic.MessageParam[];
@@ -169,6 +185,7 @@ export class AnthropicClient implements ObjectGenerator {
       system: system,
       messages: anthropicMessages,
       tools: anthropicTools,
+      tool_choice: toAnthropicToolChoice(toolChoice),
     });
 
     // Extract text and tool calls from response
@@ -219,6 +236,7 @@ export class AnthropicClient implements ObjectGenerator {
       }
     >;
     maxSteps?: number;
+    toolChoice?: ToolChoice;
   }): Promise<{
     toolCalls: Array<{
       toolCallId: string;
@@ -229,7 +247,7 @@ export class AnthropicClient implements ObjectGenerator {
     text?: string;
     usage: { totalTokens: number };
   }> {
-    const { system, prompt, messages = [], tools, maxSteps = 10 } = params;
+    const { system, prompt, messages = [], tools, maxSteps = 10, toolChoice = 'required' } = params;
 
     // Convert tools to Anthropic format
     const anthropicTools: Anthropic.Tool[] = Object.entries(tools).map(
@@ -276,6 +294,7 @@ export class AnthropicClient implements ObjectGenerator {
         system: system,
         messages: anthropicMessages,
         tools: anthropicTools,
+        tool_choice: toAnthropicToolChoice(toolChoice),
       });
 
       totalTokens += response.usage.input_tokens + response.usage.output_tokens;

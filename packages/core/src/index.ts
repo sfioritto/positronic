@@ -21,7 +21,7 @@ export type {
   BrainConfig,
   GeneratedPage,
 } from './dsl/brain.js';
-export type { ObjectGenerator, Message, ToolMessage, ToolCall, ResponseMessage } from './clients/types.js';
+export type { ObjectGenerator, Message, ToolMessage, ToolCall, ResponseMessage, ToolChoice } from './clients/types.js';
 export type {
   State,
   RuntimeEnv,
