@@ -853,6 +853,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         messages: initialMessages,
         responseMessages,
         tools: toolsForClient,
+        toolChoice: config.toolChoice,
       });
 
       // Update responseMessages for next iteration (preserves providerOptions)

@@ -1,4 +1,4 @@
-import type { ObjectGenerator, Message, ToolMessage, ResponseMessage } from '@positronic/core';
+import type { ObjectGenerator, Message, ToolMessage, ResponseMessage, ToolChoice } from '@positronic/core';
 import {
   generateObject,
   generateText,
@@ -110,13 +110,14 @@ export class VercelClient implements ObjectGenerator {
     messages: ToolMessage[];
     responseMessages?: ResponseMessage[];
     tools: Record<string, { description: string; inputSchema: z.ZodSchema }>;
+    toolChoice?: ToolChoice;
   }): Promise<{
     text?: string;
     toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
     usage: { totalTokens: number };
     responseMessages: ResponseMessage[];
   }> {
-    const { system, messages, responseMessages, tools } = params;
+    const { system, messages, responseMessages, tools, toolChoice = 'required' } = params;
 
     // Build the messages to send to the SDK
     let modelMessages: ModelMessage[];
@@ -185,6 +186,7 @@ export class VercelClient implements ObjectGenerator {
     const result = await generateText({
       model: this.model,
       system,
+      toolChoice,
       messages: modelMessages,
       tools: aiTools,
     });
@@ -220,6 +222,7 @@ export class VercelClient implements ObjectGenerator {
       }
     >;
     maxSteps?: number;
+    toolChoice?: ToolChoice;
   }): Promise<{
     toolCalls: Array<{
       toolCallId: string;
@@ -230,7 +233,7 @@ export class VercelClient implements ObjectGenerator {
     text?: string;
     usage: { totalTokens: number };
   }> {
-    const { system, prompt, messages, tools, maxSteps = 10 } = params;
+    const { system, prompt, messages, tools, maxSteps = 10, toolChoice = 'required' } = params;
 
     // Build messages array
     const modelMessages: ModelMessage[] = [];
@@ -313,6 +316,7 @@ export class VercelClient implements ObjectGenerator {
       model: this.model,
       messages: modelMessages,
       tools: aiTools,
+      toolChoice,
       stopWhen: stepCountIs(maxSteps),
     });
 
