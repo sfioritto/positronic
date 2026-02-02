@@ -392,7 +392,20 @@ export class CloudflareDevServer implements PositronicDevServer {
       if (Object.keys(parsedRootEnv).length > 0) {
         devVarsContent =
           Object.entries(parsedRootEnv)
-            .map(([key, value]) => `${key}="${value.replace(/"/g, '\\\\"')}"`)
+            .map(([key, value]) => {
+              // ROOT_PUBLIC_KEY needs special handling - compact JSON to single line
+              // because .dev.vars doesn't handle multi-line values well
+              if (key === 'ROOT_PUBLIC_KEY') {
+                try {
+                  const compacted = JSON.stringify(JSON.parse(value));
+                  return `${key}=${compacted}`;
+                } catch {
+                  // If it's not valid JSON, just use it as-is
+                  return `${key}="${value.replace(/"/g, '\\"')}"`;
+                }
+              }
+              return `${key}="${value.replace(/"/g, '\\"')}"`;
+            })
             .join('\n') + '\n';
       }
     }
