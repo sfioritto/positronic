@@ -917,7 +917,60 @@ brain('Research Assistant')
 Each tool requires:
 - `description: string` - What the tool does
 - `inputSchema: ZodSchema` - Zod schema for the tool's input
-- `execute: (input) => Promise<any>` - Function to execute when the tool is called
+- `execute: (input, context) => Promise<any>` - Function to execute when the tool is called
+- `terminal?: boolean` - If true, calling this tool ends the agent loop
+
+### Tool Webhooks (waitFor)
+
+Tools can pause agent execution and wait for external events by returning `{ waitFor: webhook(...) }` from their `execute` function. This is useful for human-in-the-loop workflows where the agent needs to wait for approval, external API callbacks, or other asynchronous events.
+
+```typescript
+import approvalWebhook from '../webhooks/approval.js';
+
+brain('Support Ticket Handler')
+  .brain('Handle Support Request', {
+    system: 'You are a support agent. Escalate complex issues for human review.',
+    prompt: ({ ticket }) => `Handle this support ticket: <%= '${ticket.description}' %>`,
+    tools: {
+      escalateToHuman: {
+        description: 'Escalate the ticket to a human reviewer for approval',
+        inputSchema: z.object({
+          summary: z.string().describe('Summary of the issue'),
+          recommendation: z.string().describe('Your recommended action'),
+        }),
+        execute: async ({ summary, recommendation }, context) => {
+          // Send notification to human reviewer (e.g., via Slack, email)
+          await notifyReviewer({ summary, recommendation, ticketId: context.state.ticketId });
+
+          // Return waitFor to pause until the webhook fires
+          return {
+            waitFor: approvalWebhook(context.state.ticketId),
+          };
+        },
+      },
+      resolveTicket: {
+        description: 'Mark the ticket as resolved',
+        inputSchema: z.object({
+          resolution: z.string().describe('How the ticket was resolved'),
+        }),
+        terminal: true,
+      },
+    },
+  })
+  .step('Process Result', ({ state, response }) => ({
+    ...state,
+    // response contains the webhook data (e.g., { approved: true, reviewerNote: '...' })
+    approved: response?.approved,
+    reviewerNote: response?.reviewerNote,
+  }));
+```
+
+Key points about tool `waitFor`:
+- Return `{ waitFor: webhook(...) }` to pause the agent and wait for an external event
+- The webhook response is available in the next step via the `response` parameter
+- You can wait for multiple webhooks (first response wins): `{ waitFor: [webhook1(...), webhook2(...)] }`
+- The `execute` function receives a `context` parameter with access to `state`, `options`, `env`, etc.
+- Use this pattern for approvals, external API callbacks, or any human-in-the-loop workflow
 
 ### Agent Output Schema
 
