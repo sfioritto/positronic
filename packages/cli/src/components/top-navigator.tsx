@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
-import { getAuthHeader } from '../lib/jwt-auth.js';
+import { createAuthenticatedFetch } from '../lib/jwt-auth.js';
 import { STATUS } from '@positronic/core';
 import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
@@ -96,20 +96,7 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/brains/watch`;
 
-    // Create authenticated fetch wrapper for production mode
-    // Each fetch call gets a fresh JWT token (tokens have 30-second lifetime)
-    const authenticatedFetch = async (fetchUrl: string | URL, init?: RequestInit) => {
-      const authHeader = await getAuthHeader();
-      return fetch(fetchUrl, {
-        ...init,
-        headers: {
-          ...init?.headers,
-          ...authHeader,
-        },
-      });
-    };
-
-    const es = new EventSource(url, !isApiLocalDevMode() ? { fetch: authenticatedFetch } : undefined);
+    const es = new EventSource(url, { fetch: createAuthenticatedFetch(isApiLocalDevMode()) });
     eventSourceRef.current = es;
 
     setIsConnected(false);
