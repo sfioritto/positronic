@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
-import { createAuthenticatedFetch } from '../lib/jwt-auth.js';
+import { authenticatedFetch } from '../lib/jwt-auth.js';
 import { STATUS } from '@positronic/core';
 import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
@@ -96,7 +96,7 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/brains/watch`;
 
-    const es = new EventSource(url, { fetch: createAuthenticatedFetch() });
+    const es = new EventSource(url, { fetch: authenticatedFetch });
     eventSourceRef.current = es;
 
     setIsConnected(false);
