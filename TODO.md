@@ -187,3 +187,23 @@ Modify the `px server` command (in local dev mode only) to support:
 - AI agents have full control over their server instances
 - Simple bash commands (no custom tooling needed)
 - Each agent can manage multiple servers if needed
+
+## 4. Investigate UI Generation Agentic Loop Design
+
+### Problem
+
+The UI generation in `generateUI()` (`packages/core/src/ui/generate-ui.ts`) has a fragile termination mechanism:
+
+- Uses `toolChoice: 'auto'` so the LLM can optionally call `validate_template`
+- The loop terminates when the LLM outputs text without calling a tool
+- There's no explicit "done" tool - completion is implicit
+- `maxSteps` is just a safety limit, not the intended termination mechanism
+
+This broke when we changed the default `toolChoice` to `'required'` in the Vercel client, because the LLM was forced to call a tool every turn and could never "just output text" to finish.
+
+### Questions to Investigate
+
+- [ ] Should there be an explicit `done` or `submit_template` tool instead of relying on implicit text-only responses?
+- [ ] Is the current pattern (validate is optional, text output = done) the best design?
+- [ ] How do other agentic UI generation systems handle loop termination?
+- [ ] Should `validate_template` be required before accepting output, to ensure valid YAML?
