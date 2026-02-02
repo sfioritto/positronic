@@ -19,6 +19,10 @@ describe('CLI Integration: auth commands', () => {
   let testKeyPubPath: string;
 
   beforeEach(() => {
+    // Clear any POSITRONIC_PRIVATE_KEY that may have been set by other tests
+    // Auth tests need clean environment to test key configuration behavior
+    delete process.env.POSITRONIC_PRIVATE_KEY;
+
     // Create a temp directory for testing
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronic-auth-test-'));
     configDir = path.join(tempDir, '.positronic');
@@ -67,11 +71,11 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should show configured key after login', async () => {
-      // First login
-      await px(['auth', 'login', '--path', testKeyPath], { configDir });
+      // First login (use skipAuthSetup to avoid test-utils setting POSITRONIC_PRIVATE_KEY)
+      await px(['auth', 'login', '--path', testKeyPath], { configDir, skipAuthSetup: true });
 
       // Then check status
-      const { instance } = await px(['auth', 'status'], { configDir });
+      const { instance } = await px(['auth', 'status'], { configDir, skipAuthSetup: true });
       const output = instance.lastFrame() || '';
 
       expect(output).toContain(testKeyPath);

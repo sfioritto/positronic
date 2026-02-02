@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { generateProject } from '../commands/helpers.js';
+import { ProjectAuthSetup } from './project-auth-setup.js';
 import path from 'path';
 
 interface ProjectCreateProps {
   projectPathArg: string;
 }
 
+type CreateStatus = 'creating' | 'auth_setup' | 'success' | 'error';
+
 export const ProjectCreate = ({ projectPathArg }: ProjectCreateProps) => {
-  const [status, setStatus] = useState<'creating' | 'success' | 'error'>('creating');
+  const [status, setStatus] = useState<CreateStatus>('creating');
   const [error, setError] = useState<string | null>(null);
   const [projectDir, setProjectDir] = useState<string>('');
   const [projectName, setProjectName] = useState<string>('');
@@ -23,7 +26,12 @@ export const ProjectCreate = ({ projectPathArg }: ProjectCreateProps) => {
         setProjectName(resolvedProjectName);
 
         await generateProject(resolvedProjectName, resolvedProjectDir);
-        setStatus('success');
+        // After scaffolding, move to auth setup (skip in test environment)
+        if (process.env.NODE_ENV === 'test') {
+          setStatus('success');
+        } else {
+          setStatus('auth_setup');
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error occurred');
         setStatus('error');
@@ -45,6 +53,29 @@ export const ProjectCreate = ({ projectPathArg }: ProjectCreateProps) => {
     return (
       <Box flexDirection="column">
         <Text color="red">Error creating project: {error}</Text>
+      </Box>
+    );
+  }
+
+  if (status === 'auth_setup') {
+    return (
+      <Box flexDirection="column" paddingTop={1}>
+        <Text bold color="green">Project scaffolded!</Text>
+        <Box marginTop={1} paddingLeft={2} flexDirection="column">
+          <Text>
+            <Text bold>Name:</Text> {projectName}
+          </Text>
+          <Text>
+            <Text bold>Location:</Text> {projectDir}
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text bold>Setting up authentication...</Text>
+        </Box>
+        <ProjectAuthSetup
+          projectDir={projectDir}
+          onComplete={() => setStatus('success')}
+        />
       </Box>
     );
   }

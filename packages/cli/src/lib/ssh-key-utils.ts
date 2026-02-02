@@ -1,8 +1,9 @@
 import sshpk from 'sshpk';
-import { readFileSync, readdirSync, existsSync } from 'fs';
+import { readFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { createPublicKey, JsonWebKey } from 'crypto';
+import { execSync } from 'child_process';
 
 export interface SSHKeyInfo {
   jwk: JsonWebKey;
@@ -219,4 +220,57 @@ export function expandPath(keyPath: string): string {
     return join(homedir(), keyPath.slice(1));
   }
   return keyPath;
+}
+
+export interface GenerateSSHKeyResult {
+  success: boolean;
+  error?: string;
+  path: string;
+}
+
+/**
+ * Generate a new SSH key using ssh-keygen
+ * Creates an Ed25519 key with no passphrase
+ */
+export function generateSSHKey(
+  keyPath: string = join(homedir(), '.ssh', 'id_ed25519')
+): GenerateSSHKeyResult {
+  const expandedPath = expandPath(keyPath);
+
+  // Ensure the .ssh directory exists
+  const sshDir = join(homedir(), '.ssh');
+  if (!existsSync(sshDir)) {
+    mkdirSync(sshDir, { mode: 0o700 });
+  }
+
+  // Check if key already exists
+  if (existsSync(expandedPath)) {
+    return {
+      success: false,
+      error: `Key already exists at ${expandedPath}`,
+      path: expandedPath,
+    };
+  }
+
+  try {
+    // Generate Ed25519 key with no passphrase
+    // -t ed25519: key type
+    // -N "": empty passphrase
+    // -f: output file path
+    // -C: comment (email/identifier)
+    execSync(`ssh-keygen -t ed25519 -N "" -f "${expandedPath}" -C "positronic-key"`, {
+      stdio: 'ignore',
+    });
+
+    return {
+      success: true,
+      path: expandedPath,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate SSH key',
+      path: expandedPath,
+    };
+  }
 }

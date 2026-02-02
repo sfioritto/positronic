@@ -75,35 +75,32 @@ export const apiClient = {
       apiPath.startsWith('/') ? apiPath : '/' + apiPath
     }`;
 
-    // Add auth header when not in local dev mode
-    let requestOptions = options || {};
-    if (!isLocalDevMode) {
-      const existingHeaders = options?.headers || {};
-      const headersObj: Record<string, string> = {};
+    // Add auth header to all requests
+    const existingHeaders = options?.headers || {};
+    const headersObj: Record<string, string> = {};
 
-      // Convert headers to plain object
-      if (existingHeaders instanceof Headers) {
-        existingHeaders.forEach((value, key) => {
-          headersObj[key] = value;
-        });
-      } else if (Array.isArray(existingHeaders)) {
-        existingHeaders.forEach(([key, value]) => {
-          headersObj[key] = value;
-        });
-      } else {
-        Object.assign(headersObj, existingHeaders);
-      }
-
-      const authHeader = await getAuthHeader();
-
-      requestOptions = {
-        ...options,
-        headers: {
-          ...headersObj,
-          ...authHeader,
-        },
-      };
+    // Convert headers to plain object
+    if (existingHeaders instanceof Headers) {
+      existingHeaders.forEach((value, key) => {
+        headersObj[key] = value;
+      });
+    } else if (Array.isArray(existingHeaders)) {
+      existingHeaders.forEach(([key, value]) => {
+        headersObj[key] = value;
+      });
+    } else {
+      Object.assign(headersObj, existingHeaders);
     }
+
+    const authHeader = await getAuthHeader();
+
+    const requestOptions = {
+      ...options,
+      headers: {
+        ...headersObj,
+        ...authHeader,
+      },
+    };
 
     return fetch(fullUrl, requestOptions);
   },

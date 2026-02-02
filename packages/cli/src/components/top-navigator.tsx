@@ -96,7 +96,7 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/brains/watch`;
 
-    const es = new EventSource(url, { fetch: createAuthenticatedFetch(isApiLocalDevMode()) });
+    const es = new EventSource(url, { fetch: createAuthenticatedFetch() });
     eventSourceRef.current = es;
 
     setIsConnected(false);

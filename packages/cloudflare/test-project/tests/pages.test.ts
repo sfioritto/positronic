@@ -7,6 +7,7 @@ import {
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
+import { createAuthenticatedRequest } from './test-auth-helper';
 import type {
   BrainEvent,
   BrainCompleteEvent,
@@ -104,7 +105,7 @@ describe('Pages API Tests', () => {
     it('POST /pages creates a new page', async () => {
       const testEnv = env as TestEnv;
 
-      const request = new Request('http://example.com/pages', {
+      const request = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -138,7 +139,7 @@ describe('Pages API Tests', () => {
     it('POST /pages with persist:true creates a persistent page', async () => {
       const testEnv = env as TestEnv;
 
-      const request = new Request('http://example.com/pages', {
+      const request = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,7 +173,7 @@ describe('Pages API Tests', () => {
       // Note: slug is now optional - if not provided, one is auto-generated
 
       // Missing html
-      const request2 = new Request('http://example.com/pages', {
+      const request2 = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -188,7 +189,7 @@ describe('Pages API Tests', () => {
       expect(error2.error).toContain('html');
 
       // Missing brainRunId
-      const request3 = new Request('http://example.com/pages', {
+      const request3 = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -207,7 +208,7 @@ describe('Pages API Tests', () => {
     it('POST /pages validates slug format', async () => {
       const testEnv = env as TestEnv;
 
-      const request = new Request('http://example.com/pages', {
+      const request = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -231,7 +232,7 @@ describe('Pages API Tests', () => {
 
       // Create a few pages first
       for (let i = 0; i < 3; i++) {
-        const createRequest = new Request('http://example.com/pages', {
+        const createRequest = await createAuthenticatedRequest('http://example.com/pages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -246,7 +247,7 @@ describe('Pages API Tests', () => {
       }
 
       // List pages
-      const listRequest = new Request('http://example.com/pages');
+      const listRequest = await createAuthenticatedRequest('http://example.com/pages');
       const listContext = createExecutionContext();
       const listResponse = await worker.fetch(listRequest, testEnv, listContext);
       await waitOnExecutionContext(listContext);
@@ -283,7 +284,7 @@ describe('Pages API Tests', () => {
       const htmlContent = '<html><body><h1>Test Content</h1></body></html>';
 
       // Create a page
-      const createRequest = new Request('http://example.com/pages', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -297,7 +298,7 @@ describe('Pages API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Get the page
-      const getRequest = new Request('http://example.com/pages/get-test-page');
+      const getRequest = await createAuthenticatedRequest('http://example.com/pages/get-test-page');
       const getContext = createExecutionContext();
       const getResponse = await worker.fetch(getRequest, testEnv, getContext);
       await waitOnExecutionContext(getContext);
@@ -311,7 +312,7 @@ describe('Pages API Tests', () => {
     it('GET /pages/:slug returns 404 for non-existent page', async () => {
       const testEnv = env as TestEnv;
 
-      const request = new Request('http://example.com/pages/non-existent-page');
+      const request = await createAuthenticatedRequest('http://example.com/pages/non-existent-page');
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
       await waitOnExecutionContext(context);
@@ -323,7 +324,7 @@ describe('Pages API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a page
-      const createRequest = new Request('http://example.com/pages', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -339,7 +340,7 @@ describe('Pages API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Get metadata
-      const metaRequest = new Request('http://example.com/pages/meta-test-page/meta');
+      const metaRequest = await createAuthenticatedRequest('http://example.com/pages/meta-test-page/meta');
       const metaContext = createExecutionContext();
       const metaResponse = await worker.fetch(metaRequest, testEnv, metaContext);
       await waitOnExecutionContext(metaContext);
@@ -366,7 +367,7 @@ describe('Pages API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a page
-      const createRequest = new Request('http://example.com/pages', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -380,7 +381,7 @@ describe('Pages API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Update the page
-      const updateRequest = new Request('http://example.com/pages/update-test-page', {
+      const updateRequest = await createAuthenticatedRequest('http://example.com/pages/update-test-page', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -401,7 +402,7 @@ describe('Pages API Tests', () => {
       expect(updateBody.updatedAt).toBeDefined();
 
       // Verify the content was updated
-      const getRequest = new Request('http://example.com/pages/update-test-page');
+      const getRequest = await createAuthenticatedRequest('http://example.com/pages/update-test-page');
       const getContext = createExecutionContext();
       const getResponse = await worker.fetch(getRequest, testEnv, getContext);
       await waitOnExecutionContext(getContext);
@@ -413,7 +414,7 @@ describe('Pages API Tests', () => {
     it('PUT /pages/:slug returns 404 for non-existent page', async () => {
       const testEnv = env as TestEnv;
 
-      const request = new Request('http://example.com/pages/non-existent-page', {
+      const request = await createAuthenticatedRequest('http://example.com/pages/non-existent-page', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -431,7 +432,7 @@ describe('Pages API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a page
-      const createRequest = new Request('http://example.com/pages', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -445,7 +446,7 @@ describe('Pages API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Delete the page
-      const deleteRequest = new Request('http://example.com/pages/delete-test-page', {
+      const deleteRequest = await createAuthenticatedRequest('http://example.com/pages/delete-test-page', {
         method: 'DELETE',
       });
       const deleteContext = createExecutionContext();
@@ -455,7 +456,7 @@ describe('Pages API Tests', () => {
       expect(deleteResponse.status).toBe(204);
 
       // Verify it's deleted
-      const getRequest = new Request('http://example.com/pages/delete-test-page');
+      const getRequest = await createAuthenticatedRequest('http://example.com/pages/delete-test-page');
       const getContext = createExecutionContext();
       const getResponse = await worker.fetch(getRequest, testEnv, getContext);
       await waitOnExecutionContext(getContext);
@@ -468,7 +469,7 @@ describe('Pages API Tests', () => {
     it('POST /pages without slug generates a unique slug', async () => {
       const testEnv = env as TestEnv;
 
-      const request = new Request('http://example.com/pages', {
+      const request = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -500,7 +501,7 @@ describe('Pages API Tests', () => {
 
       // Create 3 pages without slugs
       for (let i = 0; i < 3; i++) {
-        const request = new Request('http://example.com/pages', {
+        const request = await createAuthenticatedRequest('http://example.com/pages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -528,7 +529,7 @@ describe('Pages API Tests', () => {
       const slug = 'shared-page';
 
       // First call creates the page
-      const request1 = new Request('http://example.com/pages', {
+      const request1 = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -548,7 +549,7 @@ describe('Pages API Tests', () => {
       const firstCreatedAt = body1.createdAt;
 
       // Second call with same slug overwrites
-      const request2 = new Request('http://example.com/pages', {
+      const request2 = await createAuthenticatedRequest('http://example.com/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -569,7 +570,7 @@ describe('Pages API Tests', () => {
       expect(body2.brainRunId).toBe('brain-run-2');
 
       // Verify only one page exists with this slug and has new content
-      const getRequest = new Request(`http://example.com/pages/${slug}`);
+      const getRequest = await createAuthenticatedRequest(`http://example.com/pages/${slug}`);
       const getContext = createExecutionContext();
       const getResponse = await worker.fetch(getRequest, testEnv, getContext);
       await waitOnExecutionContext(getContext);
@@ -587,7 +588,7 @@ describe('Pages API Tests', () => {
       const slugs: string[] = [];
 
       for (let i = 0; i < 2; i++) {
-        const createRequest = new Request('http://example.com/brains/runs', {
+        const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ brainTitle: brainName }),
@@ -600,7 +601,7 @@ describe('Pages API Tests', () => {
 
         // Watch the brain run
         const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-        const watchRequest = new Request(watchUrl);
+        const watchRequest = await createAuthenticatedRequest(watchUrl);
         const watchContext = createExecutionContext();
         const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
 
@@ -633,7 +634,7 @@ describe('Pages API Tests', () => {
 
       // Run the brain twice
       for (let i = 0; i < 2; i++) {
-        const createRequest = new Request('http://example.com/brains/runs', {
+        const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ brainTitle: brainName }),
@@ -646,7 +647,7 @@ describe('Pages API Tests', () => {
 
         // Watch the brain run
         const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-        const watchRequest = new Request(watchUrl);
+        const watchRequest = await createAuthenticatedRequest(watchUrl);
         const watchContext = createExecutionContext();
         const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
 
@@ -665,7 +666,7 @@ describe('Pages API Tests', () => {
       }
 
       // Verify only one page exists with the fixed slug
-      const metaRequest = new Request('http://example.com/pages/fixed-slug-page/meta');
+      const metaRequest = await createAuthenticatedRequest('http://example.com/pages/fixed-slug-page/meta');
       const metaContext = createExecutionContext();
       const metaResponse = await worker.fetch(metaRequest, testEnv, metaContext);
       await waitOnExecutionContext(metaContext);
@@ -675,7 +676,7 @@ describe('Pages API Tests', () => {
       expect(meta.slug).toBe('fixed-slug-page');
 
       // Verify content is from the second run (overwrote first)
-      const getRequest = new Request('http://example.com/pages/fixed-slug-page');
+      const getRequest = await createAuthenticatedRequest('http://example.com/pages/fixed-slug-page');
       const getContext = createExecutionContext();
       const getResponse = await worker.fetch(getRequest, testEnv, getContext);
       await waitOnExecutionContext(getContext);
@@ -691,7 +692,7 @@ describe('Pages API Tests', () => {
       const brainName = 'pages-brain';
 
       // Start the brain
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -704,7 +705,7 @@ describe('Pages API Tests', () => {
 
       // Watch the brain run
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-      const watchRequest = new Request(watchUrl);
+      const watchRequest = await createAuthenticatedRequest(watchUrl);
       const watchContext = createExecutionContext();
       const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
 
@@ -758,7 +759,7 @@ describe('Pages API Tests', () => {
       expect(pageUpdatedOp?.value).toBe(true);
 
       // Verify the page exists in R2 with updated content
-      const getRequest = new Request('http://example.com/pages/test-page');
+      const getRequest = await createAuthenticatedRequest('http://example.com/pages/test-page');
       const getContext = createExecutionContext();
       const getResponse = await worker.fetch(getRequest, testEnv, getContext);
       await waitOnExecutionContext(getContext);
@@ -773,7 +774,7 @@ describe('Pages API Tests', () => {
       const brainName = 'persistent-page-brain';
 
       // Start the brain
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -786,7 +787,7 @@ describe('Pages API Tests', () => {
 
       // Watch the brain run
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-      const watchRequest = new Request(watchUrl);
+      const watchRequest = await createAuthenticatedRequest(watchUrl);
       const watchContext = createExecutionContext();
       const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
 
@@ -815,7 +816,7 @@ describe('Pages API Tests', () => {
       expect(persistOp?.value).toBe(true);
 
       // Verify the page exists and is marked as persistent
-      const metaRequest = new Request('http://example.com/pages/persistent-test/meta');
+      const metaRequest = await createAuthenticatedRequest('http://example.com/pages/persistent-test/meta');
       const metaContext = createExecutionContext();
       const metaResponse = await worker.fetch(metaRequest, testEnv, metaContext);
       await waitOnExecutionContext(metaContext);

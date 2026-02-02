@@ -281,7 +281,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/brains/runs/${runId}/watch`;
 
-    const es = new EventSource(url, { fetch: createAuthenticatedFetch(isApiLocalDevMode()) });
+    const es = new EventSource(url, { fetch: createAuthenticatedFetch() });
 
     // Reset connection state for new connection
     // Note: rootBrain and isComplete are handled by the new machine (via useMemo)

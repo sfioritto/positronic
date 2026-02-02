@@ -43,12 +43,6 @@ function getAlgorithmForJwk(jwk: JWK): string {
  */
 export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
   return async (c: Context<{ Bindings: Bindings }>, next) => {
-    // Skip auth in development mode
-    if (c.env.NODE_ENV === 'development') {
-      c.set('auth', { userId: null, isRoot: true });
-      return next();
-    }
-
     // Get Authorization header
     const authHeader = c.req.header('Authorization');
 
