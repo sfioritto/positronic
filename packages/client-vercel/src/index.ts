@@ -1,9 +1,9 @@
 import type { ObjectGenerator, Message, ToolMessage, ResponseMessage, ToolChoice } from '@positronic/core';
 import {
-  generateObject,
   generateText,
   streamText as vercelStreamText,
   stepCountIs,
+  Output,
 } from 'ai';
 import { z } from 'zod';
 import type { LanguageModel, ModelMessage } from 'ai';
@@ -82,26 +82,28 @@ export class VercelClient implements ObjectGenerator {
     // AI SDK v5 requires either messages or prompt, but not both as undefined
     // If we have messages built up, use them; otherwise use the prompt directly
     if (coreMessages.length > 0) {
-      const { object } = await generateObject({
+      const { output } = await generateText({
         model: this.model,
-        schema,
-        schemaName,
-        schemaDescription,
+        output: Output.object({
+          schema,
+          name: schemaName,
+          description: schemaDescription,
+        }),
         messages: coreMessages,
-        mode: 'auto',
       });
-      return object as z.infer<T>;
+      return output as z.infer<T>;
     } else {
       // Fallback to prompt-only mode (should rarely happen, but provides a default)
-      const { object } = await generateObject({
+      const { output } = await generateText({
         model: this.model,
-        schema,
-        schemaName,
-        schemaDescription,
+        output: Output.object({
+          schema,
+          name: schemaName,
+          description: schemaDescription,
+        }),
         prompt: prompt || '',
-        mode: 'auto',
       });
-      return object as z.infer<T>;
+      return output as z.infer<T>;
     }
   }
 
