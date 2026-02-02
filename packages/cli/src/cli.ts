@@ -1351,9 +1351,9 @@ export function buildCli(options: CliOptions) {
     }
   );
 
-  // --- Auth Commands (Global Mode Only) ---
-  if (!isLocalDevMode) {
-    const authCommand = new AuthCommand();
+  // --- Auth Commands (Available in both local and global mode) ---
+  const authCommand = new AuthCommand();
+  {
     cli = cli.command(
       'auth',
       'Manage authentication configuration\n',
