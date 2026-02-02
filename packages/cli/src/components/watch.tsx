@@ -7,7 +7,7 @@ import { BRAIN_EVENTS, STATUS, reconstructBrainTree, createBrainExecutionMachine
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
-import { createAuthenticatedFetch } from '../lib/jwt-auth.js';
+import { authenticatedFetch } from '../lib/jwt-auth.js';
 import { ErrorComponent } from './error.js';
 import { EventsView, type StoredEvent, type EventsViewMode } from './events-view.js';
 import { StateView } from './state-view.js';
@@ -281,7 +281,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/brains/runs/${runId}/watch`;
 
-    const es = new EventSource(url, { fetch: createAuthenticatedFetch() });
+    const es = new EventSource(url, { fetch: authenticatedFetch });
 
     // Reset connection state for new connection
     // Note: rootBrain and isComplete are handled by the new machine (via useMemo)
