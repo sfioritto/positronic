@@ -9,6 +9,7 @@ import type { TestServerHandle } from './test-dev-server.js';
 import { TestDevServer } from './test-dev-server.js';
 import { buildCli } from '../src/cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
+import { resetJwtAuthProvider } from '../src/lib/jwt-auth.js';
 import caz from 'caz';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -220,13 +221,15 @@ export async function px(
     server?: PositronicDevServer;
     projectRootDir?: string;
     configDir?: string;
+    skipAuthSetup?: boolean;
   } = {}
 ): Promise<PxResult> {
-  const { server, projectRootDir, configDir } = options;
+  const { server, projectRootDir, configDir, skipAuthSetup } = options;
   let instance: ReturnType<typeof render> | null = null;
   instance = await runCli(argv, {
     server,
     configDir,
+    skipAuthSetup,
   });
 
   // const { lastFrame, rerender, unmount, frames, stdin, stdout, stderr } = instance!;
@@ -291,10 +294,11 @@ async function runCli(
   options: {
     server?: PositronicDevServer;
     configDir?: string;
+    skipAuthSetup?: boolean;
   } = {}
 ): Promise<ReturnType<typeof render> | null> {
   let capturedElement: ReturnType<typeof render> | null = null;
-  const { configDir, server } = options;
+  const { configDir, server, skipAuthSetup } = options;
   const mockRenderFn = (element: React.ReactElement) => {
     capturedElement = render(element);
     return capturedElement;
@@ -304,6 +308,16 @@ async function runCli(
   if (configDir) {
     process.env.POSITRONIC_CONFIG_DIR = configDir;
   }
+
+  // Use a non-existent key path to prevent auth from trying to use real SSH keys
+  // This ensures tests don't accidentally try to connect to ssh-agent
+  // Only set if not already configured (allows auth.test.ts to override)
+  // Skip entirely if skipAuthSetup is true (for auth tests that test global config)
+  if (!skipAuthSetup && !process.env.POSITRONIC_PRIVATE_KEY) {
+    process.env.POSITRONIC_PRIVATE_KEY = '/nonexistent/test-key';
+  }
+  // Always reset provider to pick up current env variable
+  resetJwtAuthProvider();
 
   // Note: We don't delete POSITRONIC_CONFIG_DIR after because React components
   // may use it asynchronously in useEffect hooks

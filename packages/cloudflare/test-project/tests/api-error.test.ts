@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { resetMockState, setMockError } from '../src/runner';
+import { createAuthenticatedRequest } from './test-auth-helper';
 import type {
   BrainEvent,
   BrainStartEvent,
@@ -177,7 +178,7 @@ describe('Brain API Error Handling', () => {
       const testEnv = env as TestEnv;
       const brainName = 'basic-brain';
 
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -191,7 +192,7 @@ describe('Brain API Error Handling', () => {
       const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
       await waitOnExecutionContext(createContext);
 
-      const historyRequest = new Request(
+      const historyRequest = await createAuthenticatedRequest(
         `http://example.com/brains/${brainName}/history?limit=5`
       );
       const historyContext = createExecutionContext();
@@ -217,7 +218,7 @@ describe('Brain API Error Handling', () => {
 
       setMockError(createAnthropicTooManyTokensError());
 
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -231,7 +232,7 @@ describe('Brain API Error Handling', () => {
       const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
       await waitOnExecutionContext(createContext);
 
-      const historyRequest = new Request(
+      const historyRequest = await createAuthenticatedRequest(
         `http://example.com/brains/${brainName}/history?limit=5`
       );
       const historyContext = createExecutionContext();
@@ -275,7 +276,7 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -294,7 +295,7 @@ describe('Brain API Error Handling', () => {
 
       // Watch the brain run via SSE - this should receive the ERROR event
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-      const watchRequest = new Request(watchUrl);
+      const watchRequest = await createAuthenticatedRequest(watchUrl);
       const watchContext = createExecutionContext();
       const watchResponse = await worker.fetch(
         watchRequest,
@@ -333,7 +334,7 @@ describe('Brain API Error Handling', () => {
       expect(startEvent?.status).toBe(STATUS.RUNNING);
 
       // --- Verify history shows ERROR status, not RUNNING ---
-      const historyRequest = new Request(
+      const historyRequest = await createAuthenticatedRequest(
         `http://example.com/brains/${brainName}/history?limit=5`
       );
       const historyContext = createExecutionContext();
@@ -383,7 +384,7 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -401,7 +402,7 @@ describe('Brain API Error Handling', () => {
 
       // Watch the brain run
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-      const watchRequest = new Request(watchUrl);
+      const watchRequest = await createAuthenticatedRequest(watchUrl);
       const watchContext = createExecutionContext();
       const watchResponse = await worker.fetch(
         watchRequest,
@@ -439,7 +440,7 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -457,7 +458,7 @@ describe('Brain API Error Handling', () => {
 
       // Watch until error
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-      const watchRequest = new Request(watchUrl);
+      const watchRequest = await createAuthenticatedRequest(watchUrl);
       const watchContext = createExecutionContext();
       const watchResponse = await worker.fetch(
         watchRequest,
@@ -490,7 +491,7 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: brainName }),
@@ -508,7 +509,7 @@ describe('Brain API Error Handling', () => {
 
       // Watch until error
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
-      const watchRequest = new Request(watchUrl);
+      const watchRequest = await createAuthenticatedRequest(watchUrl);
       const watchContext = createExecutionContext();
       const watchResponse = await worker.fetch(
         watchRequest,
@@ -524,7 +525,7 @@ describe('Brain API Error Handling', () => {
       await waitOnExecutionContext(watchContext);
 
       // Connect to watch endpoint for running brains
-      const runningBrainsRequest = new Request('http://example.com/brains/watch');
+      const runningBrainsRequest = await createAuthenticatedRequest('http://example.com/brains/watch');
       const runningBrainsContext = createExecutionContext();
       const runningBrainsResponse = await worker.fetch(
         runningBrainsRequest,

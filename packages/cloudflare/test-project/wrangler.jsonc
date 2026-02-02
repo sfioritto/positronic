@@ -36,10 +36,11 @@
   },
   "vars": {
     "IS_TEST": "true",
-    "NODE_ENV": "development",
+    "NODE_ENV": "test",
     "CLOUDFLARE_API_TOKEN": "test-api-token",
     "CLOUDFLARE_ACCOUNT_ID": "test-account-id",
-    "CF_SCRIPT_NAME": "test-project"
+    "CF_SCRIPT_NAME": "test-project",
+    "ROOT_PUBLIC_KEY": "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"fYW1WaT583-Y_WWP7_lEmKa132Ue_RoEPcSoai-3kzk\"}"
   },
   "r2_buckets": [
     {

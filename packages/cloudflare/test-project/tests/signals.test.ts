@@ -12,6 +12,7 @@ import type { BrainEvent } from '@positronic/core';
 import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
 import type { MonitorDO } from '../../src/monitor-do.js';
 import type { ScheduleDO } from '../../src/schedule-do.js';
+import { createAuthenticatedRequest } from './test-auth-helper';
 
 interface TestEnv {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
@@ -98,7 +99,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run first
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'basic-brain' }),
@@ -109,7 +110,7 @@ describe('Signal API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Send invalid signal type
-      const signalRequest = new Request(
+      const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',
@@ -130,7 +131,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run (fast brain that will complete quickly)
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'basic-brain' }),
@@ -144,7 +145,7 @@ describe('Signal API Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // Verify brain is complete
-      const getRunRequest = new Request(
+      const getRunRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}`,
         { method: 'GET' }
       );
@@ -155,7 +156,7 @@ describe('Signal API Tests', () => {
       expect(runDetails.status).toBe('complete');
 
       // Now send PAUSE signal - should be rejected
-      const signalRequest = new Request(
+      const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',
@@ -176,7 +177,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run (fast brain that will complete quickly)
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'basic-brain' }),
@@ -190,7 +191,7 @@ describe('Signal API Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // Now send KILL signal - should be rejected
-      const signalRequest = new Request(
+      const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',
@@ -210,7 +211,7 @@ describe('Signal API Tests', () => {
     it('should return 404 for non-existent run', async () => {
       const testEnv = env as TestEnv;
 
-      const signalRequest = new Request(
+      const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/non-existent-id/signals`,
         {
           method: 'POST',
@@ -229,7 +230,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'basic-brain' }),
@@ -240,7 +241,7 @@ describe('Signal API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Send PAUSE signal
-      const signalRequest = new Request(
+      const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',
@@ -263,7 +264,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'basic-brain' }),
@@ -274,7 +275,7 @@ describe('Signal API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Send USER_MESSAGE signal
-      const signalRequest = new Request(
+      const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',
@@ -297,7 +298,7 @@ describe('Signal API Tests', () => {
     it('should return 404 for non-existent run', async () => {
       const testEnv = env as TestEnv;
 
-      const resumeRequest = new Request(
+      const resumeRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/non-existent-id/resume`,
         {
           method: 'POST',
@@ -315,7 +316,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run (fast brain that will complete)
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'basic-brain' }),
@@ -329,7 +330,7 @@ describe('Signal API Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Try to resume
-      const resumeRequest = new Request(
+      const resumeRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/resume`,
         {
           method: 'POST',
@@ -351,7 +352,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a delayed brain run (takes 1.5s on first step)
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'delayed-brain' }),
@@ -362,7 +363,7 @@ describe('Signal API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Send PAUSE signal immediately
-      const signalRequest = new Request(
+      const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',
@@ -380,7 +381,7 @@ describe('Signal API Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Verify brain is paused
-      const getRunRequest = new Request(
+      const getRunRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}`,
         { method: 'GET' }
       );
@@ -391,7 +392,7 @@ describe('Signal API Tests', () => {
       expect(runDetails.status).toBe('paused');
 
       // Verify resume endpoint accepts the request (brain is in paused state)
-      const resumeRequest = new Request(
+      const resumeRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/resume`,
         {
           method: 'POST',
@@ -412,7 +413,7 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a delayed brain run
-      const createRequest = new Request('http://example.com/brains/runs', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brainTitle: 'delayed-brain' }),
@@ -423,7 +424,7 @@ describe('Signal API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Send PAUSE signal
-      const pauseRequest = new Request(
+      const pauseRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',
@@ -439,7 +440,7 @@ describe('Signal API Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Send USER_MESSAGE while paused - should succeed (queued for when brain resumes)
-      const msgRequest = new Request(
+      const msgRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/${brainRunId}/signals`,
         {
           method: 'POST',

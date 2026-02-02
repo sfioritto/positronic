@@ -6,6 +6,7 @@ import {
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import worker from '../src/index';
+import { createAuthenticatedRequest } from './test-auth-helper';
 
 interface TestEnv {
   RESOURCES_BUCKET: R2Bucket;
@@ -50,7 +51,7 @@ describe('Resources API Tests', () => {
     formData.append('path', 'resources/test-files/test.txt');
     formData.append('local', 'false');
 
-    const request = new Request('http://example.com/resources', {
+    const request = await createAuthenticatedRequest('http://example.com/resources', {
       method: 'POST',
       body: formData,
     });
@@ -104,7 +105,7 @@ describe('Resources API Tests', () => {
     formData.append('key', 'videos/large-video.mp4');
     formData.append('local', 'false');
 
-    const request = new Request('http://example.com/resources', {
+    const request = await createAuthenticatedRequest('http://example.com/resources', {
       method: 'POST',
       body: formData,
     });
@@ -156,7 +157,7 @@ describe('Resources API Tests', () => {
     formData.append('key', 'assets/branding/logo.png');
     formData.append('local', 'true'); // Testing with local=true
 
-    const request = new Request('http://example.com/resources', {
+    const request = await createAuthenticatedRequest('http://example.com/resources', {
       method: 'POST',
       body: formData,
     });
@@ -208,7 +209,7 @@ describe('Resources API Tests', () => {
     formData.append('path', 'resources/list-test.txt');
     formData.append('local', 'true');
 
-    const createRequest = new Request('http://example.com/resources', {
+    const createRequest = await createAuthenticatedRequest('http://example.com/resources', {
       method: 'POST',
       body: formData,
     });
@@ -217,7 +218,7 @@ describe('Resources API Tests', () => {
     await waitOnExecutionContext(createContext);
 
     // Now list resources
-    const request = new Request('http://example.com/resources');
+    const request = await createAuthenticatedRequest('http://example.com/resources');
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
     await waitOnExecutionContext(context);
@@ -258,7 +259,7 @@ describe('Resources API Tests', () => {
       formData.append('type', 'text');
       formData.append('path', 'resources/test.txt');
 
-      const request = new Request('http://example.com/resources', {
+      const request = await createAuthenticatedRequest('http://example.com/resources', {
         method: 'POST',
         body: formData,
       });
@@ -275,7 +276,7 @@ describe('Resources API Tests', () => {
       formData.append('file', new Blob(['content']), 'test.txt');
       formData.append('path', 'resources/test.txt');
 
-      const request = new Request('http://example.com/resources', {
+      const request = await createAuthenticatedRequest('http://example.com/resources', {
         method: 'POST',
         body: formData,
       });
@@ -293,7 +294,7 @@ describe('Resources API Tests', () => {
       formData.append('type', 'invalid');
       formData.append('path', 'resources/test.txt');
 
-      const request = new Request('http://example.com/resources', {
+      const request = await createAuthenticatedRequest('http://example.com/resources', {
         method: 'POST',
         body: formData,
       });
@@ -310,7 +311,7 @@ describe('Resources API Tests', () => {
       formData.append('file', new Blob(['content']), 'test.txt');
       formData.append('type', 'text');
 
-      const request = new Request('http://example.com/resources', {
+      const request = await createAuthenticatedRequest('http://example.com/resources', {
         method: 'POST',
         body: formData,
       });
@@ -331,7 +332,7 @@ describe('Resources API Tests', () => {
         },
       });
 
-      const request = new Request('http://example.com/resources');
+      const request = await createAuthenticatedRequest('http://example.com/resources');
       const context = createExecutionContext();
 
       const response = await worker.fetch(request, testEnv, context);
@@ -361,7 +362,7 @@ describe('Resources API Tests', () => {
       formData.append('type', 'text');
       formData.append('key', 'resources/delete-test.txt');
 
-      const createRequest = new Request('http://example.com/resources', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/resources', {
         method: 'POST',
         body: formData,
       });
@@ -375,7 +376,7 @@ describe('Resources API Tests', () => {
       expect(createResponse.status).toBe(201);
 
       // Now delete it
-      const deleteRequest = new Request(
+      const deleteRequest = await createAuthenticatedRequest(
         'http://example.com/resources/' +
           encodeURIComponent('resources/delete-test.txt'),
         { method: 'DELETE' }
@@ -408,7 +409,7 @@ describe('Resources API Tests', () => {
       formData.append('type', 'text');
       formData.append('key', 'resources/subfolder/nested.txt');
 
-      const createRequest = new Request('http://example.com/resources', {
+      const createRequest = await createAuthenticatedRequest('http://example.com/resources', {
         method: 'POST',
         body: formData,
       });
@@ -417,7 +418,7 @@ describe('Resources API Tests', () => {
       await waitOnExecutionContext(createContext);
 
       // Delete with URL encoded key
-      const deleteRequest = new Request(
+      const deleteRequest = await createAuthenticatedRequest(
         'http://example.com/resources/' +
           encodeURIComponent('resources/subfolder/nested.txt'),
         { method: 'DELETE' }
@@ -440,7 +441,7 @@ describe('Resources API Tests', () => {
     });
 
     it('should return 204 even for non-existent resources (idempotent delete)', async () => {
-      const deleteRequest = new Request(
+      const deleteRequest = await createAuthenticatedRequest(
         'http://example.com/resources/' +
           encodeURIComponent('non-existent.txt'),
         { method: 'DELETE' }
@@ -473,7 +474,7 @@ describe('Resources API Tests', () => {
         formData.append('type', 'text');
         formData.append('key', `resources/${resource}`);
 
-        const request = new Request('http://example.com/resources', {
+        const request = await createAuthenticatedRequest('http://example.com/resources', {
           method: 'POST',
           body: formData,
         });
@@ -490,7 +491,7 @@ describe('Resources API Tests', () => {
         NODE_ENV: 'development',
       };
 
-      const deleteRequest = new Request('http://example.com/resources', {
+      const deleteRequest = await createAuthenticatedRequest('http://example.com/resources', {
         method: 'DELETE',
       });
       const deleteContext = createExecutionContext();
@@ -563,7 +564,7 @@ describe('Resources API Tests', () => {
   describe('POST /resources/presigned-link', () => {
     it('should return 400 when R2 credentials are not configured', async () => {
       // This test verifies behavior when the backend doesn't have credentials configured
-      const request = new Request(
+      const request = await createAuthenticatedRequest(
         'http://example.com/resources/presigned-link',
         {
           method: 'POST',
@@ -589,7 +590,7 @@ describe('Resources API Tests', () => {
 
     it('should validate required fields in request body', async () => {
       // Missing key
-      let request = new Request('http://example.com/resources/presigned-link', {
+      let request = await createAuthenticatedRequest('http://example.com/resources/presigned-link', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -605,7 +606,7 @@ describe('Resources API Tests', () => {
       expect(response.status).toBe(400);
 
       // Missing type
-      request = new Request('http://example.com/resources/presigned-link', {
+      request = await createAuthenticatedRequest('http://example.com/resources/presigned-link', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -621,7 +622,7 @@ describe('Resources API Tests', () => {
       expect(response.status).toBe(400);
 
       // Missing size
-      request = new Request('http://example.com/resources/presigned-link', {
+      request = await createAuthenticatedRequest('http://example.com/resources/presigned-link', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -638,7 +639,7 @@ describe('Resources API Tests', () => {
     });
 
     it('should validate type field is text or binary', async () => {
-      const request = new Request(
+      const request = await createAuthenticatedRequest(
         'http://example.com/resources/presigned-link',
         {
           method: 'POST',

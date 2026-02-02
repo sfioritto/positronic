@@ -10,6 +10,7 @@ import { brains } from '@positronic/spec';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
 import type { MonitorDO } from '../../src/monitor-do.js';
+import { createAuthenticatedRequest, createAuthenticatedFetchWrapper } from './test-auth-helper';
 
 interface TestEnv {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
@@ -19,28 +20,34 @@ interface TestEnv {
 }
 
 describe('Brain Kill API', () => {
+  // Helper to create authenticated fetch for spec tests
+  const createAuthFetch = (testEnv: TestEnv, ctx: ExecutionContext) => {
+    const baseFetch = async (req: Request) => worker.fetch(req, testEnv, ctx);
+    return createAuthenticatedFetchWrapper(baseFetch);
+  };
+
   it('should pass the spec test for killing a brain run', async () => {
     const testEnv = env as TestEnv;
     const ctx = createExecutionContext();
-    
+
     // First create a brain run
-    const createRequest = new Request('http://example.com/brains/runs', {
+    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: 'delayed-brain' }),
     });
-    
+
     const createResponse = await worker.fetch(createRequest, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(createResponse.status).toBe(201);
-    
+
     const { brainRunId } = await createResponse.json() as { brainRunId: string };
-    
+
     // Wait a bit to ensure the brain is running
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     // Test via spec
-    const result = await brains.kill(async (req) => worker.fetch(req, testEnv, ctx), brainRunId);
+    const result = await brains.kill(createAuthFetch(testEnv, ctx), brainRunId);
     expect(result).toBe(true);
   });
 
@@ -48,14 +55,14 @@ describe('Brain Kill API', () => {
     const testEnv = env as TestEnv;
     const ctx = createExecutionContext();
     const runId = 'non-existent-run';
-    
-    const request = new Request(`http://example.com/brains/runs/${runId}`, {
+
+    const request = await createAuthenticatedRequest(`http://example.com/brains/runs/${runId}`, {
       method: 'DELETE',
     });
-    
+
     const response = await worker.fetch(request, testEnv, ctx);
     await waitOnExecutionContext(ctx);
-    
+
     expect(response.status).toBe(404);
   });
 
@@ -64,7 +71,7 @@ describe('Brain Kill API', () => {
     const ctx = createExecutionContext();
 
     // First create a brain run
-    const createRequest = new Request('http://example.com/brains/runs', {
+    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: 'delayed-brain' }),
@@ -80,7 +87,7 @@ describe('Brain Kill API', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Kill the brain run
-    const killRequest = new Request(`http://example.com/brains/runs/${brainRunId}`, {
+    const killRequest = await createAuthenticatedRequest(`http://example.com/brains/runs/${brainRunId}`, {
       method: 'DELETE',
     });
 
@@ -89,7 +96,7 @@ describe('Brain Kill API', () => {
     expect(killResponse.status).toBe(204);
 
     // Verify it was killed by checking the monitor
-    const historyRequest = new Request(`http://example.com/brains/delayed-brain/history?limit=1`);
+    const historyRequest = await createAuthenticatedRequest(`http://example.com/brains/delayed-brain/history?limit=1`);
     const historyResponse = await worker.fetch(historyRequest, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(historyResponse.status).toBe(200);
@@ -106,7 +113,7 @@ describe('Brain Kill API', () => {
     const ctx = createExecutionContext();
 
     const result = await brains.killSuspended(
-      async (req) => worker.fetch(req, testEnv, ctx),
+      createAuthFetch(testEnv, ctx),
       'agent-webhook-brain',
       'loop-escalation',
       { escalationId: 'test-escalation-123', approved: true, note: 'Approved after kill' }
@@ -120,7 +127,7 @@ describe('Brain Kill API', () => {
     const ctx = createExecutionContext();
 
     // Step 1: Start the agent-webhook-brain
-    const createRequest = new Request('http://example.com/brains/runs', {
+    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: 'agent-webhook-brain' }),
@@ -133,7 +140,7 @@ describe('Brain Kill API', () => {
     const { brainRunId } = await createResponse.json() as { brainRunId: string };
 
     // Step 2: Watch until WEBHOOK event (brain suspends)
-    const watchRequest = new Request(`http://example.com/brains/runs/${brainRunId}/watch`);
+    const watchRequest = await createAuthenticatedRequest(`http://example.com/brains/runs/${brainRunId}/watch`);
     const watchResponse = await worker.fetch(watchRequest, testEnv, ctx);
     expect(watchResponse.ok).toBe(true);
 
@@ -175,7 +182,7 @@ describe('Brain Kill API', () => {
     expect(foundWebhookEvent).toBe(true);
 
     // Step 3: Kill the suspended brain
-    const killRequest = new Request(`http://example.com/brains/runs/${brainRunId}`, {
+    const killRequest = await createAuthenticatedRequest(`http://example.com/brains/runs/${brainRunId}`, {
       method: 'DELETE',
     });
 
@@ -184,7 +191,7 @@ describe('Brain Kill API', () => {
     expect(killResponse.status).toBe(204);
 
     // Step 4: Verify status is CANCELLED
-    const getRunRequest = new Request(`http://example.com/brains/runs/${brainRunId}`);
+    const getRunRequest = await createAuthenticatedRequest(`http://example.com/brains/runs/${brainRunId}`);
     const getRunResponse = await worker.fetch(getRunRequest, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(getRunResponse.ok).toBe(true);
@@ -198,7 +205,7 @@ describe('Brain Kill API', () => {
     const ctx = createExecutionContext();
 
     // Step 1: Start the page-webhook-brain (creates a page and waits for webhook)
-    const createRequest = new Request('http://example.com/brains/runs', {
+    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: 'page-webhook-brain' }),
@@ -211,7 +218,7 @@ describe('Brain Kill API', () => {
     const { brainRunId } = await createResponse.json() as { brainRunId: string };
 
     // Step 2: Watch until WEBHOOK event (brain suspends after creating page)
-    const watchRequest = new Request(`http://example.com/brains/runs/${brainRunId}/watch`);
+    const watchRequest = await createAuthenticatedRequest(`http://example.com/brains/runs/${brainRunId}/watch`);
     const watchResponse = await worker.fetch(watchRequest, testEnv, ctx);
     expect(watchResponse.ok).toBe(true);
 
@@ -267,13 +274,13 @@ describe('Brain Kill API', () => {
     expect(pageSlug).not.toBeNull();
 
     // Step 3: Verify the page exists in R2 before killing
-    const pageExistsRequest = new Request(`http://example.com/pages/${pageSlug}`);
+    const pageExistsRequest = await createAuthenticatedRequest(`http://example.com/pages/${pageSlug}`);
     const pageExistsResponse = await worker.fetch(pageExistsRequest, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(pageExistsResponse.status).toBe(200);
 
     // Step 4: Kill the suspended brain
-    const killRequest = new Request(`http://example.com/brains/runs/${brainRunId}`, {
+    const killRequest = await createAuthenticatedRequest(`http://example.com/brains/runs/${brainRunId}`, {
       method: 'DELETE',
     });
 
@@ -282,7 +289,7 @@ describe('Brain Kill API', () => {
     expect(killResponse.status).toBe(204);
 
     // Step 5: Verify the page has been cleaned up from R2
-    const pageDeletedRequest = new Request(`http://example.com/pages/${pageSlug}`);
+    const pageDeletedRequest = await createAuthenticatedRequest(`http://example.com/pages/${pageSlug}`);
     const pageDeletedResponse = await worker.fetch(pageDeletedRequest, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(pageDeletedResponse.status).toBe(404);

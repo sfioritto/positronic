@@ -13,15 +13,15 @@ import { describe, it, expect } from 'vitest';
 import { SignJWT, importPKCS8 } from 'jose';
 import worker from '../src/index';
 
-// Test Ed25519 key pair
+// Test Ed25519 key pair (must match ROOT_PUBLIC_KEY in wrangler.jsonc)
 const TEST_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIB5IApYfLNX82GzKxUIPNB7b4YQMYYl0ThJB4kx/8Fru
+MC4CAQAwBQYDK2VwBCIEIL3eMwOlojIBqC+IFspPM5IS63C48gIWqg3ZesihuyaX
 -----END PRIVATE KEY-----`;
 
 const TEST_PUBLIC_KEY_JWK = {
   kty: 'OKP',
   crv: 'Ed25519',
-  x: 'Ryvasd5RoKLJpT-WaLB01DzG-Jv1eOIlHdDJcHxz6XA',
+  x: 'fYW1WaT583-Y_WWP7_lEmKa132Ue_RoEPcSoai-3kzk',
 };
 
 // Different key pair for testing invalid signatures
@@ -178,7 +178,7 @@ describe('Auth Middleware', () => {
       const testEnv = {
         ...env,
         NODE_ENV: 'production',
-        // No ROOT_PUBLIC_KEY
+        ROOT_PUBLIC_KEY: undefined, // Explicitly unset to test missing key scenario
       };
 
       const context = createExecutionContext();
@@ -193,7 +193,8 @@ describe('Auth Middleware', () => {
     it('should allow valid JWT with matching ROOT_PUBLIC_KEY', async () => {
       const token = await createTestJwt(TEST_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint');
 
-      const request = new Request('http://example.com/status', {
+      // Use a protected endpoint (not /status which bypasses auth)
+      const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -210,6 +211,7 @@ describe('Auth Middleware', () => {
       const response = await worker.fetch(request, testEnv, context);
       await waitOnExecutionContext(context);
 
+      // Should pass auth and return 200 (brains list)
       expect(response.status).toBe(200);
     });
   });

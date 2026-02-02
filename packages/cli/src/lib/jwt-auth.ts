@@ -358,25 +358,26 @@ export function isAuthAvailable(): boolean {
 
 /**
  * Get the Authorization header if auth is available
- * Throws if there's an auth configuration error
- * Returns empty object with warning if no key is configured
+ * Returns empty object if no key is configured (server will reject if auth is required)
+ * Only throws for unexpected errors during token creation
  */
 export async function getAuthHeader(): Promise<Record<string, string>> {
   const provider = getJwtAuthProvider();
   if (!provider.isReady()) {
-    const error = provider.getError();
-    if (error) {
-      throw error;
-    }
-    console.warn(
-      'Warning: No SSH key configured for authentication. Run "px auth login" to configure.'
-    );
+    // No key configured - return empty headers
+    // The server will reject the request if authentication is required
     return {};
   }
 
-  // createToken() will handle agent fallback for encrypted keys
-  const token = await provider.createToken();
-  return { Authorization: `Bearer ${token}` };
+  try {
+    // createToken() will handle agent fallback for encrypted keys
+    const token = await provider.createToken();
+    return { Authorization: `Bearer ${token}` };
+  } catch (error) {
+    // Token creation failed (e.g., ssh-agent not running for encrypted key)
+    // Return empty headers and let the server reject if auth is required
+    return {};
+  }
 }
 
 /**
@@ -384,11 +385,7 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
  * consumers that need a fetch function with automatic JWT authentication.
  * Each fetch call gets a fresh JWT token (tokens have 30-second lifetime).
  */
-export function createAuthenticatedFetch(isLocalDevMode: boolean): typeof fetch {
-  if (isLocalDevMode) {
-    return fetch;
-  }
-
+export function createAuthenticatedFetch(): typeof fetch {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const authHeader = await getAuthHeader();
     return fetch(input, {

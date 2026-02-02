@@ -8,14 +8,19 @@ import {
 import worker from '../src/index';
 import { testStatus, resources, brains, schedules, webhooks, pages, secrets, signals, auth } from '@positronic/spec';
 import { resetMockState } from '../src/runner';
+import { createAuthenticatedFetchWrapper } from './test-auth-helper';
 
 describe('Positronic Spec', () => {
   // Helper function to create fetch wrapper for Cloudflare workers
-  const createFetch = () => async (request: Request) => {
-    const context = createExecutionContext();
-    const response = await worker.fetch(request, env, context);
-    await waitOnExecutionContext(context);
-    return response;
+  // Wraps requests with authentication
+  const createFetch = () => {
+    const baseFetch = async (request: Request) => {
+      const context = createExecutionContext();
+      const response = await worker.fetch(request, env, context);
+      await waitOnExecutionContext(context);
+      return response;
+    };
+    return createAuthenticatedFetchWrapper(baseFetch);
   };
 
   // Reset mock state before each test
