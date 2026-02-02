@@ -31,12 +31,27 @@ app.get('/auth/setup', async (context: Context) => {
   });
 });
 
-// Apply auth middleware to all routes except /status and /auth/setup
+// Apply auth middleware to all routes except public endpoints
 app.use('*', async (c, next) => {
   // Skip auth for unauthenticated endpoints
   if (c.req.path === '/status' || c.req.path === '/auth/setup') {
     return next();
   }
+
+  // Skip auth for viewing pages (GET /pages/:slug but not GET /pages/ or /pages/:slug/meta)
+  if (
+    c.req.method === 'GET' &&
+    c.req.path.startsWith('/pages/') &&
+    !c.req.path.endsWith('/meta')
+  ) {
+    return next();
+  }
+
+  // Skip auth for bundle (needed to render pages)
+  if (c.req.method === 'GET' && c.req.path.startsWith('/bundle/')) {
+    return next();
+  }
+
   return authMiddleware()(c, next);
 });
 
