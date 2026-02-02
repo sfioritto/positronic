@@ -143,52 +143,7 @@ export interface PositronicDevServer {
 
 - Server output tool - Maybe a tool that lets agents see the last N lines of server output or brain execution logs (PUNTED)
 
-## 3. Server Management for AI Agents
-
-### Problem
-AI agents need to:
-- Start development servers with specific ports
-- Capture server output to log files
-- Track server process IDs
-- Run multiple servers simultaneously without conflicts
-
-### Solution
-Modify the `px server` command (in local dev mode only) to support:
-1. `--log-file <path>` option that redirects all console output to a specified file
-2. When running in background mode with logging, output the process ID to stdout
-3. Let AI agents manage their own PIDs and log file locations
-
-### Implementation Plan
-
-1. [x] Add `--log-file` option to `px server` command (local dev mode only)
-2. [x] When log file is specified:
-   - Check if file already exists, throw error if it does (prevent overwriting)
-   - Redirect all console output (stdout and stderr) to the file
-   - Output the process ID when starting
-3. [x] Add `-d` flag for detached/background mode
-4. [x] Update AI agent documentation with instructions for background server usage:
-   ```bash
-   # Start server with random port and log file
-   px server --port 38291 --log-file ./server-38291.log -d
-   
-   # Run commands using the port
-   POSITRONIC_PORT=38291 px brain list
-   
-   # Check logs when needed
-   cat ./server-38291.log
-   
-   # Kill server when done
-   kill $PID
-   ```
-
-### Benefits
-- Integrated into existing CLI tool
-- No extra scripts or files to manage
-- AI agents have full control over their server instances
-- Simple bash commands (no custom tooling needed)
-- Each agent can manage multiple servers if needed
-
-## 4. Investigate UI Generation Agentic Loop Design
+## 3. Investigate UI Generation Agentic Loop Design
 
 ### Problem
 
