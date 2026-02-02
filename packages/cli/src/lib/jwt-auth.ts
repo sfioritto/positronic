@@ -378,3 +378,25 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
   const token = await provider.createToken();
   return { Authorization: `Bearer ${token}` };
 }
+
+/**
+ * Create an authenticated fetch wrapper for use with EventSource or other
+ * consumers that need a fetch function with automatic JWT authentication.
+ * Each fetch call gets a fresh JWT token (tokens have 30-second lifetime).
+ */
+export function createAuthenticatedFetch(isLocalDevMode: boolean): typeof fetch {
+  if (isLocalDevMode) {
+    return fetch;
+  }
+
+  return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const authHeader = await getAuthHeader();
+    return fetch(input, {
+      ...init,
+      headers: {
+        ...init?.headers,
+        ...authHeader,
+      },
+    });
+  };
+}

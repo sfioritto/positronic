@@ -7,7 +7,7 @@ import { BRAIN_EVENTS, STATUS, reconstructBrainTree, createBrainExecutionMachine
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useBrainMachine } from '../hooks/useBrainMachine.js';
 import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
-import { getAuthHeader } from '../lib/jwt-auth.js';
+import { createAuthenticatedFetch } from '../lib/jwt-auth.js';
 import { ErrorComponent } from './error.js';
 import { EventsView, type StoredEvent, type EventsViewMode } from './events-view.js';
 import { StateView } from './state-view.js';
@@ -281,20 +281,7 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/brains/runs/${runId}/watch`;
 
-    // Create authenticated fetch wrapper for production mode
-    // Each fetch call gets a fresh JWT token (tokens have 30-second lifetime)
-    const authenticatedFetch = async (fetchUrl: string | URL, init?: RequestInit) => {
-      const authHeader = await getAuthHeader();
-      return fetch(fetchUrl, {
-        ...init,
-        headers: {
-          ...init?.headers,
-          ...authHeader,
-        },
-      });
-    };
-
-    const es = new EventSource(url, !isApiLocalDevMode() ? { fetch: authenticatedFetch } : undefined);
+    const es = new EventSource(url, { fetch: createAuthenticatedFetch(isApiLocalDevMode()) });
 
     // Reset connection state for new connection
     // Note: rootBrain and isComplete are handled by the new machine (via useMemo)
