@@ -451,6 +451,7 @@ export async function generateUI(params: {
       validate_template: validateTool,
     },
     maxSteps,
+    toolChoice: 'auto',
   });
 
   // Extract YAML from the response text
