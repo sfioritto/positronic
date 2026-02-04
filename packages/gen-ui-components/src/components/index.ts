@@ -30,3 +30,6 @@ export type { FormProps } from './Form.js';
 
 export { HiddenInput } from './HiddenInput.js';
 export type { HiddenInputProps } from './HiddenInput.js';
+
+export { Link } from './Link.js';
+export type { LinkProps } from './Link.js';

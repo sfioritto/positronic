@@ -9,6 +9,7 @@ import { Heading } from './components/Heading.js';
 import { Container } from './components/Container.js';
 import { Form } from './components/Form.js';
 import { HiddenInput } from './components/HiddenInput.js';
+import { Link } from './components/Link.js';
 
 /**
  * Default UI components for Positronic generative UI.
@@ -38,6 +39,7 @@ export const components = {
   Container,
   Form,
   HiddenInput,
+  Link,
 };
 
 // Re-export individual components for custom composition
@@ -53,6 +55,7 @@ export {
   Container,
   Form,
   HiddenInput,
+  Link,
 };
 
 // Re-export prop types for TypeScript users
@@ -68,4 +71,5 @@ export type {
   ContainerProps,
   FormProps,
   HiddenInputProps,
+  LinkProps,
 } from './components/index.js';
