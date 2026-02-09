@@ -59,8 +59,9 @@ export class VercelClient implements ObjectGenerator {
     prompt?: string;
     messages?: Message[];
     system?: string;
+    maxRetries?: number;
   }): Promise<z.infer<T>> {
-    const { schema, schemaName, schemaDescription, prompt, messages, system } =
+    const { schema, schemaName, schemaDescription, prompt, messages, system, maxRetries } =
       params;
 
     const coreMessages: Message[] = [];
@@ -90,6 +91,7 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         messages: coreMessages,
+        ...(maxRetries !== undefined && { maxRetries }),
       });
       return output as z.infer<T>;
     } else {
@@ -102,6 +104,7 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         prompt: prompt || '',
+        ...(maxRetries !== undefined && { maxRetries }),
       });
       return output as z.infer<T>;
     }

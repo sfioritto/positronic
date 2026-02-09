@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentOutputSchema, RetryConfig, StepContext } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentOutputSchema, StepContext } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { ExtractWebhookResponses } from '../webhook.js';
 import type { PagesService } from '../pages.js';
@@ -14,7 +14,7 @@ import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams } from '../definitions/run-params.js';
 
 import { BrainEventStream } from '../execution/event-stream.js';
-import { Semaphore, normalizeRetryConfig, executeWithRetry } from '../execution/retry.js';
+import { Semaphore } from '../execution/retry.js';
 
 export class Brain<
   TOptions extends JsonObject = JsonObject,
@@ -371,7 +371,7 @@ export class Brain<
       over: (state: TState) => TItem[];
       concurrency?: number;
       stagger?: number;
-      retry?: RetryConfig;
+      maxRetries?: number;
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
@@ -403,7 +403,7 @@ export class Brain<
       over: (state: any) => any[];
       concurrency?: number;
       stagger?: number;
-      retry?: RetryConfig;
+      maxRetries?: number;
       error?: (item: any, error: Error) => any | null;
     }
   ): any {
@@ -463,7 +463,6 @@ export class Brain<
           const items = batchConfig.over(state);
           const semaphore = new Semaphore(batchConfig.concurrency ?? 10);
           const stagger = batchConfig.stagger ?? 0;
-          const retryConfig = normalizeRetryConfig(batchConfig.retry);
 
           const results: ([any, any] | undefined)[] = new Array(items.length);
 
@@ -477,15 +476,12 @@ export class Brain<
             await semaphore.acquire();
             try {
               const promptText = await template(item, resources);
-              const output = await executeWithRetry(
-                () =>
-                  client.generateObject({
-                    schema,
-                    schemaName,
-                    prompt: promptText,
-                  }),
-                retryConfig
-              );
+              const output = await client.generateObject({
+                schema,
+                schemaName,
+                prompt: promptText,
+                ...(batchConfig.maxRetries !== undefined && { maxRetries: batchConfig.maxRetries }),
+              });
               results[index] = [item, output];
             } catch (error) {
               if (batchConfig.error) {
