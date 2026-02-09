@@ -201,21 +201,6 @@ export type ExtractTerminalInput<TTools extends Record<string, AgentTool>> = {
 }[keyof TTools];
 
 
-/**
- * Configuration for retry behavior with exponential backoff.
- * Used by batch prompt execution.
- */
-export interface RetryConfig {
-  /** Maximum retry attempts per item. Default: 3 */
-  maxRetries?: number;
-  /** Backoff strategy. Default: 'exponential' */
-  backoff?: 'none' | 'linear' | 'exponential';
-  /** Initial delay in ms before first retry. Default: 1000 */
-  initialDelay?: number;
-  /** Maximum delay in ms between retries. Default: 30000 */
-  maxDelay?: number;
-}
-
 // Signal types for brain interruption
 
 /**

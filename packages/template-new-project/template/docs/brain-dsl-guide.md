@@ -831,12 +831,7 @@ brain('Batch Processor')
     over: (state) => state.items,  // Array to iterate over
     concurrency: 10,               // Parallel requests (default: 10)
     stagger: 100,                  // Delay between requests in ms
-    retry: {
-      maxRetries: 3,
-      backoff: 'exponential',
-      initialDelay: 1000,
-      maxDelay: 30000,
-    },
+    maxRetries: 3,
     error: (item, error) => ({ summary: 'Failed to summarize' })  // Fallback on error
   })
   .step('Process Results', ({ state }) => ({
@@ -854,7 +849,7 @@ brain('Batch Processor')
 - `over: (state) => T[]` - Function returning the array to iterate over
 - `concurrency: number` - Maximum parallel requests (default: 10)
 - `stagger: number` - Milliseconds to wait between starting requests
-- `retry: RetryConfig` - Retry configuration for failed requests
+- `maxRetries: number` - Maximum number of retries for failed requests (passed to the AI client SDK)
 - `error: (item, error) => Response` - Fallback function when a request fails
 
 ### Result Format

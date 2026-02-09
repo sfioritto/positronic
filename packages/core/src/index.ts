@@ -33,7 +33,6 @@ export type {
   AgentToolWaitFor,
   StepContext,
   ExtractTerminalInput,
-  RetryConfig,
   SignalType,
   BrainSignal,
   SignalProvider,

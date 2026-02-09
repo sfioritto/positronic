@@ -2662,19 +2662,11 @@ describe('batch prompt', () => {
     });
   });
 
-  describe('retry', () => {
-    it('should retry failed items up to maxRetries', async () => {
-      let callCount = 0;
+  describe('maxRetries passthrough', () => {
+    it('should pass maxRetries to client.generateObject when set', async () => {
+      batchMockGenerateObject.mockResolvedValue({ success: true });
 
-      batchMockGenerateObject.mockImplementation(async () => {
-        callCount++;
-        if (callCount <= 2) {
-          throw new Error('Transient error');
-        }
-        return { success: true };
-      });
-
-      const testBrain = brain('Retry Test')
+      const testBrain = brain('MaxRetries Passthrough Test')
         .step('Init', () => ({
           items: [{ id: 1 }],
         }))
@@ -2689,59 +2681,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            retry: {
-              maxRetries: 3,
-              backoff: 'none',
-              initialDelay: 10,
-            },
-          }
-        );
-
-      let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient })) {
-        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-          finalState = applyPatches(finalState, [event.patch]);
-        }
-      }
-
-      // Should have been called 3 times (2 failures + 1 success)
-      expect(callCount).toBe(3);
-      expect(finalState.results[0][1]).toEqual({ success: true });
-    });
-
-    it('should use exponential backoff by default', async () => {
-      const callTimes: number[] = [];
-      let callCount = 0;
-
-      batchMockGenerateObject.mockImplementation(async () => {
-        callTimes.push(Date.now());
-        callCount++;
-        if (callCount <= 2) {
-          throw new Error('Transient error');
-        }
-        return { success: true };
-      });
-
-      const testBrain = brain('Backoff Test')
-        .step('Init', () => ({
-          items: [{ id: 1 }],
-        }))
-        .prompt(
-          'Process',
-          {
-            template: (item: { id: number }) => `Item ${item.id}`,
-            outputSchema: {
-              schema: z.object({ success: z.boolean() }),
-              name: 'results' as const,
-            },
-          },
-          {
-            over: (state) => state.items,
-            retry: {
-              maxRetries: 3,
-              initialDelay: 50,
-              // backoff defaults to 'exponential'
-            },
+            maxRetries: 5,
           }
         );
 
@@ -2749,15 +2689,38 @@ describe('batch prompt', () => {
         // Just consume events
       }
 
-      // Verify exponential backoff timing
-      // First retry after ~50ms, second after ~100ms (50 * 2)
-      expect(callTimes.length).toBe(3);
-      const firstDelay = callTimes[1] - callTimes[0];
-      const secondDelay = callTimes[2] - callTimes[1];
+      expect(batchMockGenerateObject).toHaveBeenCalledWith(
+        expect.objectContaining({ maxRetries: 5 })
+      );
+    });
 
-      // Allow some tolerance but verify second delay is longer
-      expect(firstDelay).toBeGreaterThanOrEqual(40);
-      expect(secondDelay).toBeGreaterThanOrEqual(80);
+    it('should not pass maxRetries to client.generateObject when unset', async () => {
+      batchMockGenerateObject.mockResolvedValue({ success: true });
+
+      const testBrain = brain('No MaxRetries Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ success: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+          }
+        );
+
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        // Just consume events
+      }
+
+      const callArgs = batchMockGenerateObject.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty('maxRetries');
     });
   });
 
@@ -2780,7 +2743,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            retry: { maxRetries: 0 }, // No retries for faster test
+            maxRetries: 0, // No retries for faster test
           }
         );
 
@@ -2821,7 +2784,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            retry: { maxRetries: 0 },
+            maxRetries: 0,
             error: (item, err) => ({ status: 'failed' }),
           }
         );
@@ -2865,7 +2828,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            retry: { maxRetries: 0 },
+            maxRetries: 0,
             error: (item, err) => null, // Return null to skip
           }
         );
@@ -2909,7 +2872,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            retry: { maxRetries: 0 },
+            maxRetries: 0,
             error: () => ({ done: false }),
           }
         );
