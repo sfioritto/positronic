@@ -29,6 +29,8 @@ function getStatusIcon(status: string): string {
   switch (status) {
     case 'complete':
       return '✓';
+    case 'skipped':
+      return '-';
     case 'running':
       return '•';
     case 'error':

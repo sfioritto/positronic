@@ -86,6 +86,7 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
   stepTitle: string;
   stepId: string;
   patch: JsonPatch;
+  skipped?: boolean;
 }
 
 export interface StepRetryEvent<TOptions extends JsonObject = JsonObject>

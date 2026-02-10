@@ -105,6 +105,28 @@ kill $(lsof -ti:38291)
 - Always clean up by killing the server process when done
 - The log file contains timestamped entries with [INFO], [ERROR], and [WARN] prefixes
 
+## Conditional Branching
+
+Use `.if().then().else()` for conditional logic within brains:
+
+```typescript
+brain('conditional-example')
+  .step('Init', () => ({ needsApproval: true }))
+  .if(({ state }) => state.needsApproval)
+    .then('Get Approval', ({ state }) => ({
+      state: { ...state, approved: true },
+      waitFor: [approvalWebhook(state.id)],
+    }))
+    .else('Auto Approve', ({ state }) => ({ ...state, approved: true }))
+  .step('Continue', ({ state }) => ({ ...state, done: true }));
+```
+
+Key rules:
+- `.else()` is always required (use a pass-through like `({ state }) => state` for no-op)
+- The predicate is synchronous and receives `{ state, options }`
+- State type after the conditional is the union of both branches
+- See `/docs/brain-dsl-guide.md` for more details
+
 ## Brain DSL Type Inference
 
 The Brain DSL has very strong type inference capabilities. **Important**: You should NOT explicitly specify types on the state object as it flows through steps. The types are automatically inferred from the previous step.
