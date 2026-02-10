@@ -319,6 +319,148 @@ describe('brain-state-machine', () => {
     });
   });
 
+  describe('conditional step skipping', () => {
+    it('should mark step as SKIPPED when event has skipped flag', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'conditional-brain',
+        initialState: {},
+      });
+
+      // Execute the then-branch (normal step flow)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_START,
+        brainRunId,
+        stepId: 'then-step',
+        stepTitle: 'Then Branch',
+        stepIndex: 0,
+      });
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_COMPLETE,
+        brainRunId,
+        stepId: 'then-step',
+        stepTitle: 'Then Branch',
+        patch: [{ op: 'add', path: '/branch', value: 'then' }],
+      });
+
+      // Skip the else-branch (skipped flag)
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_COMPLETE,
+        brainRunId,
+        stepId: 'else-step',
+        stepTitle: 'Else Branch',
+        patch: [],
+        skipped: true,
+      });
+
+      // Verify then-branch is COMPLETE
+      const brain = machine.context.brains['conditional-brain'];
+      const thenStep = brain.steps.find(s => s.id === 'then-step');
+      expect(thenStep?.status).toBe(STATUS.COMPLETE);
+
+      // Verify else-branch is SKIPPED
+      const elseStep = brain.steps.find(s => s.id === 'else-step');
+      expect(elseStep?.status).toBe(STATUS.SKIPPED);
+
+      // Verify state only has the then-branch's changes
+      expect(machine.context.currentState).toEqual({ branch: 'then' });
+    });
+
+    it('should not increment topLevelStepCount for skipped steps', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'step-count-brain',
+        initialState: {},
+      });
+
+      // Normal step completes
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_START,
+        brainRunId,
+        stepId: 'step-1',
+        stepTitle: 'Step 1',
+        stepIndex: 0,
+      });
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_COMPLETE,
+        brainRunId,
+        stepId: 'step-1',
+        stepTitle: 'Step 1',
+        patch: [{ op: 'add', path: '/done', value: true }],
+      });
+
+      expect(machine.context.topLevelStepCount).toBe(1);
+
+      // Skipped step should not increment count
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_COMPLETE,
+        brainRunId,
+        stepId: 'step-2',
+        stepTitle: 'Skipped Step',
+        patch: [],
+        skipped: true,
+      });
+
+      expect(machine.context.topLevelStepCount).toBe(1);
+    });
+
+    it('should still advance stepIndex for skipped steps', () => {
+      const machine = createBrainExecutionMachine();
+      const brainRunId = 'test-run-123';
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.START,
+        brainRunId,
+        brainTitle: 'advance-brain',
+        initialState: {},
+      });
+
+      // Complete step 0 normally
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_START,
+        brainRunId,
+        stepId: 'step-0',
+        stepTitle: 'Step 0',
+        stepIndex: 0,
+      });
+
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_COMPLETE,
+        brainRunId,
+        stepId: 'step-0',
+        stepTitle: 'Step 0',
+        patch: [{ op: 'add', path: '/a', value: 1 }],
+      });
+
+      expect(machine.context.executionStack[0].stepIndex).toBe(1);
+
+      // Skip step 1
+      sendEvent(machine, {
+        type: BRAIN_EVENTS.STEP_COMPLETE,
+        brainRunId,
+        stepId: 'step-1',
+        stepTitle: 'Skipped',
+        patch: [],
+        skipped: true,
+      });
+
+      // stepIndex should still advance past the skipped step
+      expect(machine.context.executionStack[0].stepIndex).toBe(2);
+      // But state should not change
+      expect(machine.context.executionStack[0].state).toEqual({ a: 1 });
+    });
+  });
+
   describe('webhook resume', () => {
     it('should resume from waiting state via WEBHOOK_RESPONSE', () => {
       // This test simulates the event sequence that occurs when:

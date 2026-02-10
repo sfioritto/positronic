@@ -14,7 +14,7 @@ import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
 
 import type { BrainEvent } from '../definitions/events.js';
-import type { Block, StepBlock, BrainBlock, AgentBlock } from '../definitions/blocks.js';
+import type { Block, StepBlock, BrainBlock, AgentBlock, ConditionalBlock } from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams, ResumeContext } from '../definitions/run-params.js';
 
@@ -49,6 +49,7 @@ export class BrainEventStream<
   private signalProvider?: SignalProvider;
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
+  private conditionals: Map<number, { predicate: (params: { state: any; options: any }) => boolean; thenIndex: number; elseIndex: number }> = new Map();
 
   constructor(
     params: (InitialRunParams<TOptions> | ResumeRunParams<TOptions>) & {
@@ -102,8 +103,24 @@ export class BrainEventStream<
       this.scopedMemory = createScopedMemory(memoryProvider, title);
     }
 
-    // Initialize steps - all start as pending (fresh UUIDs)
-    this.steps = blocks.map((block) => new Step(block));
+    // Initialize steps - expand ConditionalBlocks into two Steps
+    this.steps = [];
+    for (const block of blocks) {
+      if (block.type === 'conditional') {
+        const conditionalBlock = block as ConditionalBlock<any, any, any, any, any, any, any, any, any>;
+        const thenIndex = this.steps.length;
+        const elseIndex = this.steps.length + 1;
+        this.conditionals.set(thenIndex, {
+          predicate: conditionalBlock.predicate,
+          thenIndex,
+          elseIndex,
+        });
+        this.steps.push(new Step(conditionalBlock.thenBlock));
+        this.steps.push(new Step(conditionalBlock.elseBlock));
+      } else {
+        this.steps.push(new Step(block));
+      }
+    }
 
     if (resumeContext) {
       // Resume: use state and stepIndex directly from resumeContext
@@ -262,9 +279,16 @@ export class BrainEventStream<
 
         const step = steps[this.currentStepIndex];
 
-        // Skip completed steps
-        if (step.serialized.status === STATUS.COMPLETE) {
+        // Skip completed or skipped steps
+        if (step.serialized.status === STATUS.COMPLETE || step.serialized.status === STATUS.SKIPPED) {
           this.currentStepIndex++;
+          continue;
+        }
+
+        // Handle conditional blocks
+        const conditional = this.conditionals.get(this.currentStepIndex);
+        if (conditional) {
+          yield* this.executeConditional(conditional);
           continue;
         }
         // Step start event
@@ -1208,6 +1232,80 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // State doesn't change from UI step - it just sets up the page
     // The next step will receive the page object and can use waitFor
     yield* this.completeStep(step, prevState);
+  }
+
+  private async *executeConditional(
+    conditional: { predicate: (params: { state: any; options: any }) => boolean; thenIndex: number; elseIndex: number }
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const { steps, options, brainRunId } = this;
+    const predicateResult = conditional.predicate({ state: this.currentState, options: this.options });
+
+    const executeIndex = predicateResult ? conditional.thenIndex : conditional.elseIndex;
+    const skipIndex = predicateResult ? conditional.elseIndex : conditional.thenIndex;
+    const executeStep = steps[executeIndex];
+    const skipStep = steps[skipIndex];
+
+    // Execute the chosen branch
+    yield {
+      type: BRAIN_EVENTS.STEP_START,
+      status: STATUS.RUNNING,
+      stepTitle: executeStep.block.title,
+      stepId: executeStep.id,
+      stepIndex: executeIndex,
+      options,
+      brainRunId,
+    };
+
+    executeStep.withStatus(STATUS.RUNNING);
+
+    yield {
+      type: BRAIN_EVENTS.STEP_STATUS,
+      steps: steps.map((step) => {
+        const { patch, ...rest } = step.serialized;
+        return rest;
+      }),
+      options,
+      brainRunId,
+    };
+
+    yield* this.executeStep(executeStep);
+
+    yield {
+      type: BRAIN_EVENTS.STEP_STATUS,
+      steps: steps.map((step) => {
+        const { patch, ...rest } = step.serialized;
+        return rest;
+      }),
+      options,
+      brainRunId,
+    };
+
+    // Mark the skipped branch
+    skipStep.withStatus(STATUS.SKIPPED);
+
+    yield {
+      type: BRAIN_EVENTS.STEP_COMPLETE,
+      status: STATUS.RUNNING,
+      stepTitle: skipStep.block.title,
+      stepId: skipStep.id,
+      patch: [],
+      skipped: true,
+      options,
+      brainRunId,
+    };
+
+    yield {
+      type: BRAIN_EVENTS.STEP_STATUS,
+      steps: steps.map((step) => {
+        const { patch, ...rest } = step.serialized;
+        return rest;
+      }),
+      options,
+      brainRunId,
+    };
+
+    // Advance past both steps
+    this.currentStepIndex += 2;
   }
 
   private *completeStep(

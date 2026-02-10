@@ -157,6 +157,52 @@ const mainBrain = brain('Main Process')
   );
 ```
 
+## Conditional Branching
+
+Use `.if().then().else()` to conditionally execute different steps based on the current state. The predicate receives `{ state, options }` and must be synchronous. Both `.then()` and `.else()` are required.
+
+```typescript
+brain('email-checker')
+  .step('Check Emails', async ({ state, client }) => {
+    const emails = await analyzeEmails(client, state);
+    return { ...state, emails };
+  })
+  .if(({ state }) => state.emails.some(e => e.important))
+    .then('Notify User', async ({ state, pages }) => {
+      const page = await pages.create('<html>...</html>');
+      return { ...state, notified: true };
+    })
+    .else('Skip Notification', ({ state }) => {
+      return { ...state, notified: false };
+    })
+  .step('Continue', ({ state }) => {
+    return { ...state, done: true };
+  });
+```
+
+Key points:
+- The predicate is synchronous and receives `{ state, options }`
+- `.else()` is required - use a pass-through for no-op: `.else('Skip', ({ state }) => state)`
+- The next step's state type is the union of both branches
+- Either branch can use `waitFor` to pause for webhooks
+- When a branch uses `waitFor`, the `response` type in the next step includes `| undefined`
+- Multiple conditionals can be chained in sequence
+- The unchosen branch appears as "skipped" in the CLI watch view
+
+### Multiple Conditionals
+
+```typescript
+brain('processor')
+  .step('Init', () => ({ priority: 'high', format: 'json' }))
+  .if(({ state }) => state.priority === 'high')
+    .then('Urgent Process', ({ state }) => ({ ...state, rushed: true }))
+    .else('Normal Process', ({ state }) => ({ ...state, rushed: false }))
+  .if(({ state }) => state.format === 'json')
+    .then('JSON Output', ({ state }) => ({ ...state, output: JSON.stringify(state) }))
+    .else('Text Output', ({ state }) => ({ ...state, output: String(state) }))
+  .step('Done', ({ state }) => ({ ...state, complete: true }));
+```
+
 ## Step Parameters
 
 Each step receives these parameters:
