@@ -35,9 +35,9 @@ const getCurrentStepIndex = (steps: StepInfo[]): number => {
   const runningIndex = steps.findIndex((s) => s.status === STATUS.RUNNING);
   if (runningIndex >= 0) return runningIndex;
 
-  // Find the last completed/skipped step
+  // Find the last completed/halted step
   for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].status === STATUS.COMPLETE || steps[i].status === STATUS.SKIPPED || steps[i].status === STATUS.ERROR) {
+    if (steps[i].status === STATUS.COMPLETE || steps[i].status === STATUS.HALTED || steps[i].status === STATUS.ERROR) {
       return i;
     }
   }
@@ -46,7 +46,7 @@ const getCurrentStepIndex = (steps: StepInfo[]): number => {
 
 // Count completed steps
 const getCompletedCount = (steps: StepInfo[]): number => {
-  return steps.filter((s) => s.status === STATUS.COMPLETE || s.status === STATUS.SKIPPED).length;
+  return steps.filter((s) => s.status === STATUS.COMPLETE || s.status === STATUS.HALTED).length;
 };
 
 // Get status indicator character
@@ -54,7 +54,7 @@ const getStatusChar = (status: StepInfo['status']): string => {
   switch (status) {
     case STATUS.COMPLETE:
       return '✓';
-    case STATUS.SKIPPED:
+    case STATUS.HALTED:
       return '-';
     case STATUS.ERROR:
       return '✗';
@@ -72,7 +72,7 @@ const getStatusColor = (status: StepInfo['status']): string => {
   switch (status) {
     case STATUS.COMPLETE:
       return 'green';
-    case STATUS.SKIPPED:
+    case STATUS.HALTED:
       return 'gray';
     case STATUS.ERROR:
       return 'red';

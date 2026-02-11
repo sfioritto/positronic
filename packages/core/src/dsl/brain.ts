@@ -1,7 +1,7 @@
 // Re-export from new modular structure for backwards compatibility
 
 // Builder
-export { Brain, brain, IfBuilder, ThenBuilder } from './builder/brain.js';
+export { Brain, brain } from './builder/brain.js';
 
 // Definitions - Events
 export type {
@@ -36,7 +36,7 @@ export type {
 } from './definitions/steps.js';
 
 // Definitions - Blocks
-export type { StepAction, ConditionalBlock } from './definitions/blocks.js';
+export type { StepAction, GuardBlock } from './definitions/blocks.js';
 
 // Definitions - Brain types
 export type { GeneratedPage, BrainConfig } from './definitions/brain-types.js';

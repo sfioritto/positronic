@@ -319,59 +319,59 @@ describe('brain-state-machine', () => {
     });
   });
 
-  describe('conditional step skipping', () => {
-    it('should mark step as SKIPPED when event has skipped flag', () => {
+  describe('guard step halting', () => {
+    it('should mark step as HALTED when event has halted flag', () => {
       const machine = createBrainExecutionMachine();
       const brainRunId = 'test-run-123';
 
       sendEvent(machine, {
         type: BRAIN_EVENTS.START,
         brainRunId,
-        brainTitle: 'conditional-brain',
+        brainTitle: 'guard-brain',
         initialState: {},
       });
 
-      // Execute the then-branch (normal step flow)
+      // Guard step completes (guard evaluated)
       sendEvent(machine, {
         type: BRAIN_EVENTS.STEP_START,
         brainRunId,
-        stepId: 'then-step',
-        stepTitle: 'Then Branch',
+        stepId: 'guard-step',
+        stepTitle: 'Guard',
         stepIndex: 0,
       });
 
       sendEvent(machine, {
         type: BRAIN_EVENTS.STEP_COMPLETE,
         brainRunId,
-        stepId: 'then-step',
-        stepTitle: 'Then Branch',
-        patch: [{ op: 'add', path: '/branch', value: 'then' }],
+        stepId: 'guard-step',
+        stepTitle: 'Guard',
+        patch: [],
       });
 
-      // Skip the else-branch (skipped flag)
+      // Remaining step halted because guard failed
       sendEvent(machine, {
         type: BRAIN_EVENTS.STEP_COMPLETE,
         brainRunId,
-        stepId: 'else-step',
-        stepTitle: 'Else Branch',
+        stepId: 'halted-step',
+        stepTitle: 'Process',
         patch: [],
-        skipped: true,
+        halted: true,
       });
 
-      // Verify then-branch is COMPLETE
-      const brain = machine.context.brains['conditional-brain'];
-      const thenStep = brain.steps.find(s => s.id === 'then-step');
-      expect(thenStep?.status).toBe(STATUS.COMPLETE);
+      // Verify guard is COMPLETE
+      const brain = machine.context.brains['guard-brain'];
+      const guardStep = brain.steps.find(s => s.id === 'guard-step');
+      expect(guardStep?.status).toBe(STATUS.COMPLETE);
 
-      // Verify else-branch is SKIPPED
-      const elseStep = brain.steps.find(s => s.id === 'else-step');
-      expect(elseStep?.status).toBe(STATUS.SKIPPED);
+      // Verify remaining step is HALTED
+      const processStep = brain.steps.find(s => s.id === 'halted-step');
+      expect(processStep?.status).toBe(STATUS.HALTED);
 
-      // Verify state only has the then-branch's changes
-      expect(machine.context.currentState).toEqual({ branch: 'then' });
+      // Verify state is unchanged (guard doesn't modify state)
+      expect(machine.context.currentState).toEqual({});
     });
 
-    it('should not increment topLevelStepCount for skipped steps', () => {
+    it('should not increment topLevelStepCount for halted steps', () => {
       const machine = createBrainExecutionMachine();
       const brainRunId = 'test-run-123';
 
@@ -401,20 +401,20 @@ describe('brain-state-machine', () => {
 
       expect(machine.context.topLevelStepCount).toBe(1);
 
-      // Skipped step should not increment count
+      // Halted step should not increment count
       sendEvent(machine, {
         type: BRAIN_EVENTS.STEP_COMPLETE,
         brainRunId,
         stepId: 'step-2',
-        stepTitle: 'Skipped Step',
+        stepTitle: 'Halted Step',
         patch: [],
-        skipped: true,
+        halted: true,
       });
 
       expect(machine.context.topLevelStepCount).toBe(1);
     });
 
-    it('should still advance stepIndex for skipped steps', () => {
+    it('should still advance stepIndex for halted steps', () => {
       const machine = createBrainExecutionMachine();
       const brainRunId = 'test-run-123';
 
@@ -444,17 +444,17 @@ describe('brain-state-machine', () => {
 
       expect(machine.context.executionStack[0].stepIndex).toBe(1);
 
-      // Skip step 1
+      // Halt step 1 (guard failed)
       sendEvent(machine, {
         type: BRAIN_EVENTS.STEP_COMPLETE,
         brainRunId,
         stepId: 'step-1',
-        stepTitle: 'Skipped',
+        stepTitle: 'Halted',
         patch: [],
-        skipped: true,
+        halted: true,
       });
 
-      // stepIndex should still advance past the skipped step
+      // stepIndex should still advance past the halted step
       expect(machine.context.executionStack[0].stepIndex).toBe(2);
       // But state should not change
       expect(machine.context.executionStack[0].state).toEqual({ a: 1 });

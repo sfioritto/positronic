@@ -29,7 +29,7 @@ function getStatusIcon(status: string): string {
   switch (status) {
     case 'complete':
       return '✓';
-    case 'skipped':
+    case 'halted':
       return '-';
     case 'running':
       return '•';

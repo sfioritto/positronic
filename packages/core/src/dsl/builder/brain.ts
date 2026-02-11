@@ -9,112 +9,12 @@ import type { MemoryProvider } from '../../memory/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
-import type { Block, StepBlock, BrainBlock, AgentBlock, StepAction, ConditionalBlock } from '../definitions/blocks.js';
+import type { Block, StepBlock, BrainBlock, AgentBlock, GuardBlock } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams } from '../definitions/run-params.js';
 
 import { BrainEventStream } from '../execution/event-stream.js';
 import { Semaphore } from '../execution/retry.js';
-
-export class ThenBuilder<
-  TOptions extends JsonObject,
-  TState extends State,
-  TThenState extends State,
-  TServices extends object,
-  TResponse extends JsonObject | undefined,
-  TPage extends GeneratedPage | undefined,
-  TThenWaitFor extends readonly any[]
-> {
-  constructor(
-    private predicate: (params: { state: TState; options: TOptions }) => boolean,
-    private thenBlock: StepBlock<TState, TThenState, TOptions, TServices, TResponse, TThenWaitFor, TPage>,
-    private blocks: Block<any, any, TOptions, TServices, any, any, any>[],
-    private brainFactory: <TNewState extends State, TNewResponse extends JsonObject | undefined, TNewPage extends GeneratedPage | undefined>() => Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage>
-  ) {}
-
-  else<
-    TElseState extends State,
-    TElseWaitFor extends readonly any[] = readonly []
-  >(
-    title: string,
-    action: (
-      params: StepContext<TState, TOptions, TResponse, TPage> & TServices
-    ) =>
-      | TElseState
-      | Promise<TElseState>
-      | { state: TElseState; waitFor: TElseWaitFor }
-      | Promise<{ state: TElseState; waitFor: TElseWaitFor }>
-  ): Brain<
-    TOptions,
-    TThenState | TElseState,
-    TServices,
-    ExtractWebhookResponses<TThenWaitFor> | ExtractWebhookResponses<TElseWaitFor> | undefined,
-    undefined
-  > {
-    const elseBlock: StepBlock<TState, TElseState, TOptions, TServices, TResponse, TElseWaitFor, TPage> = {
-      type: 'step',
-      title,
-      action: action as any,
-    };
-
-    const conditionalBlock: ConditionalBlock<TState, TThenState, TElseState, TOptions, TServices, TResponse, TThenWaitFor, TElseWaitFor, TPage> = {
-      type: 'conditional',
-      title: `${this.thenBlock.title} / ${title}`,
-      predicate: this.predicate,
-      thenBlock: this.thenBlock,
-      elseBlock,
-    };
-
-    this.blocks.push(conditionalBlock);
-
-    return this.brainFactory<
-      TThenState | TElseState,
-      ExtractWebhookResponses<TThenWaitFor> | ExtractWebhookResponses<TElseWaitFor> | undefined,
-      undefined
-    >();
-  }
-}
-
-export class IfBuilder<
-  TOptions extends JsonObject,
-  TState extends State,
-  TServices extends object,
-  TResponse extends JsonObject | undefined,
-  TPage extends GeneratedPage | undefined
-> {
-  constructor(
-    private predicate: (params: { state: TState; options: TOptions }) => boolean,
-    private blocks: Block<any, any, TOptions, TServices, any, any, any>[],
-    private brainFactory: <TNewState extends State, TNewResponse extends JsonObject | undefined, TNewPage extends GeneratedPage | undefined>() => Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage>
-  ) {}
-
-  then<
-    TThenState extends State,
-    TThenWaitFor extends readonly any[] = readonly []
-  >(
-    title: string,
-    action: (
-      params: StepContext<TState, TOptions, TResponse, TPage> & TServices
-    ) =>
-      | TThenState
-      | Promise<TThenState>
-      | { state: TThenState; waitFor: TThenWaitFor }
-      | Promise<{ state: TThenState; waitFor: TThenWaitFor }>
-  ): ThenBuilder<TOptions, TState, TThenState, TServices, TResponse, TPage, TThenWaitFor> {
-    const thenBlock: StepBlock<TState, TThenState, TOptions, TServices, TResponse, TThenWaitFor, TPage> = {
-      type: 'step',
-      title,
-      action: action as any,
-    };
-
-    return new ThenBuilder<TOptions, TState, TThenState, TServices, TResponse, TPage, TThenWaitFor>(
-      this.predicate,
-      thenBlock,
-      this.blocks,
-      this.brainFactory
-    );
-  }
-}
 
 export class Brain<
   TOptions extends JsonObject = JsonObject,
@@ -148,13 +48,10 @@ export class Brain<
             type: 'agent' as const,
             title: block.title,
           };
-        } else if (block.type === 'conditional') {
-          const conditionalBlock = block as ConditionalBlock<any, any, any, TOptions, TServices>;
+        } else if (block.type === 'guard') {
           return {
-            type: 'conditional' as const,
-            title: `${conditionalBlock.thenBlock.title} / ${conditionalBlock.elseBlock.title}`,
-            thenStep: { title: conditionalBlock.thenBlock.title },
-            elseStep: { title: conditionalBlock.elseBlock.title },
+            type: 'guard' as const,
+            title: block.title,
           };
         } else {
           // block.type === 'brain'
@@ -323,15 +220,17 @@ export class Brain<
     return this.nextBrain<TNewState, ExtractWebhookResponses<TWaitFor>, undefined>();
   }
 
-  if(
-    predicate: (params: { state: TState; options: TOptions }) => boolean
-  ): IfBuilder<TOptions, TState, TServices, TResponse, TPage> {
-    return new IfBuilder<TOptions, TState, TServices, TResponse, TPage>(
+  guard(
+    predicate: (params: { state: TState; options: TOptions }) => boolean,
+    title?: string
+  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+    const guardBlock: GuardBlock<TState, TOptions> = {
+      type: 'guard',
+      title: title ?? 'Guard',
       predicate,
-      this.blocks,
-      <TNewState extends State, TNewResponse extends JsonObject | undefined, TNewPage extends GeneratedPage | undefined>() =>
-        this.nextBrain<TNewState, TNewResponse, TNewPage>()
-    );
+    };
+    this.blocks.push(guardBlock);
+    return this.nextBrain<TState, TResponse, TPage>();
   }
 
   // Overload 1: Nested brain

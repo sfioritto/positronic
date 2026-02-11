@@ -105,26 +105,24 @@ kill $(lsof -ti:38291)
 - Always clean up by killing the server process when done
 - The log file contains timestamped entries with [INFO], [ERROR], and [WARN] prefixes
 
-## Conditional Branching
+## Guard Clauses
 
-Use `.if().then().else()` for conditional logic within brains:
+Use `.guard()` to short-circuit a brain when a condition isn't met:
 
 ```typescript
-brain('conditional-example')
-  .step('Init', () => ({ needsApproval: true }))
-  .if(({ state }) => state.needsApproval)
-    .then('Get Approval', ({ state }) => ({
-      state: { ...state, approved: true },
-      waitFor: [approvalWebhook(state.id)],
-    }))
-    .else('Auto Approve', ({ state }) => ({ ...state, approved: true }))
+brain('approval-example')
+  .step('Init', () => ({ needsApproval: true, data: [] }))
+  .guard(({ state }) => state.data.length > 0, 'Has data')
+  // everything below only runs if guard passes
+  .step('Process', ({ state }) => ({ ...state, processed: true }))
   .step('Continue', ({ state }) => ({ ...state, done: true }));
 ```
 
 Key rules:
-- `.else()` is always required (use a pass-through like `({ state }) => state` for no-op)
+- Predicate returns `true` to continue, `false` to skip all remaining steps
 - The predicate is synchronous and receives `{ state, options }`
-- State type after the conditional is the union of both branches
+- State type is unchanged after a guard
+- Optional title as second argument: `.guard(predicate, 'Check condition')`
 - See `/docs/brain-dsl-guide.md` for more details
 
 ## Brain DSL Type Inference
