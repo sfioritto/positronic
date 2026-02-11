@@ -157,9 +157,9 @@ const mainBrain = brain('Main Process')
   );
 ```
 
-## Conditional Branching
+## Guard Clauses
 
-Use `.if().then().else()` to conditionally execute different steps based on the current state. The predicate receives `{ state, options }` and must be synchronous. Both `.then()` and `.else()` are required.
+Use `.guard()` to short-circuit a brain when a condition isn't met. If the predicate returns `true`, execution continues normally. If it returns `false`, all remaining steps are skipped and the brain completes with the current state.
 
 ```typescript
 brain('email-checker')
@@ -167,40 +167,31 @@ brain('email-checker')
     const emails = await analyzeEmails(client, state);
     return { ...state, emails };
   })
-  .if(({ state }) => state.emails.some(e => e.important))
-    .then('Notify User', async ({ state, pages }) => {
-      const page = await pages.create('<html>...</html>');
-      return { ...state, notified: true };
-    })
-    .else('Skip Notification', ({ state }) => {
-      return { ...state, notified: false };
-    })
-  .step('Continue', ({ state }) => {
-    return { ...state, done: true };
-  });
+  .guard(({ state }) => state.emails.some(e => e.important))
+  // everything below only runs if guard passes
+  .ui('Review emails', { ... })
+  .step('Notify and wait', ...)
+  .step('Handle response', ...);
 ```
 
 Key points:
 - The predicate is synchronous and receives `{ state, options }`
-- `.else()` is required - use a pass-through for no-op: `.else('Skip', ({ state }) => state)`
-- The next step's state type is the union of both branches
-- Either branch can use `waitFor` to pause for webhooks
-- When a branch uses `waitFor`, the `response` type in the next step includes `| undefined`
-- Multiple conditionals can be chained in sequence
-- The unchosen branch appears as "skipped" in the CLI watch view
+- Returns `true` to continue, `false` to skip all remaining steps
+- The guard doesn't transform state — if you need to set "early exit" fields, do it in the step before the guard
+- State type is unchanged after a guard (subsequent steps see the same type)
+- Multiple guards can be chained — the first one that fails skips everything after it
+- Halted steps appear as "halted" in the CLI watch view
+- An optional title can be passed as the second argument: `.guard(predicate, 'Check emails exist')`
 
-### Multiple Conditionals
+### Multiple Guards
 
 ```typescript
 brain('processor')
-  .step('Init', () => ({ priority: 'high', format: 'json' }))
-  .if(({ state }) => state.priority === 'high')
-    .then('Urgent Process', ({ state }) => ({ ...state, rushed: true }))
-    .else('Normal Process', ({ state }) => ({ ...state, rushed: false }))
-  .if(({ state }) => state.format === 'json')
-    .then('JSON Output', ({ state }) => ({ ...state, output: JSON.stringify(state) }))
-    .else('Text Output', ({ state }) => ({ ...state, output: String(state) }))
-  .step('Done', ({ state }) => ({ ...state, complete: true }));
+  .step('Init', () => ({ data: [], validated: false }))
+  .guard(({ state }) => state.data.length > 0, 'Has data')
+  .step('Validate', ({ state }) => ({ ...state, validated: true }))
+  .guard(({ state }) => state.validated, 'Is valid')
+  .step('Process', ({ state }) => ({ ...state, processed: true }));
 ```
 
 ## Step Parameters

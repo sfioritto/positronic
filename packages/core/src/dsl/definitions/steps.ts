@@ -17,10 +17,8 @@ export interface BrainStructure {
   title: string;
   description?: string;
   steps: Array<{
-    type: 'step' | 'brain' | 'agent' | 'conditional';
+    type: 'step' | 'brain' | 'agent' | 'guard';
     title: string;
     innerBrain?: BrainStructure;
-    thenStep?: { title: string };
-    elseStep?: { title: string };
   }>;
 }

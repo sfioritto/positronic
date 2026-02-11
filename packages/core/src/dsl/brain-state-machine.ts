@@ -175,7 +175,7 @@ export interface CompleteStepPayload {
   stepId: string;
   stepTitle: string;
   patch?: JsonPatch;
-  skipped?: boolean;
+  halted?: boolean;
 }
 
 export interface WebhookPayload {
@@ -486,7 +486,7 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
 );
 
 const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
-  (ctx, { stepId, stepTitle, patch, skipped }) => {
+  (ctx, { stepId, stepTitle, patch, halted }) => {
     const {
       brains,
       brainIdStack,
@@ -503,11 +503,11 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     const currentBrain = brains[currentBrainId];
     if (!currentBrain) return ctx;
 
-    // Use explicit skipped flag from the event
-    const isSkipped = skipped === true;
+    // Use explicit halted flag from the event
+    const isHalted = halted === true;
 
-    // Update step status - SKIPPED if explicitly marked, COMPLETE otherwise
-    const stepStatus = isSkipped ? STATUS.SKIPPED : STATUS.COMPLETE;
+    // Update step status - HALTED if explicitly marked, COMPLETE otherwise
+    const stepStatus = isHalted ? STATUS.HALTED : STATUS.COMPLETE;
     const existingStep = currentBrain.steps.find((s) => s.id === stepId);
     const newSteps = existingStep
       ? currentBrain.steps.map((s) =>
@@ -524,7 +524,7 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     let newExecutionStack = executionStack;
     if (executionStack.length > 0) {
       const topEntry = executionStack[executionStack.length - 1];
-      const newState = patch && !isSkipped
+      const newState = patch && !isHalted
         ? applyPatches(topEntry.state, [patch]) as JsonObject
         : topEntry.state;
       // Increment stepIndex so resume knows to start from the NEXT step
@@ -539,7 +539,7 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     // Skipped steps don't change state or count toward topLevelStepCount
     let newState = currentState;
     let newStepCount = topLevelStepCount;
-    if (depth === 1 && patch && !isSkipped) {
+    if (depth === 1 && patch && !isHalted) {
       newState = applyPatches(currentState, [patch]) as JsonObject;
       newStepCount = topLevelStepCount + 1;
     }

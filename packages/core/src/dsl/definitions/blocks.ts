@@ -108,22 +108,13 @@ export type AgentBlock<
   ) => AgentConfig<TTools, TOutputSchema> | Promise<AgentConfig<TTools, TOutputSchema>>;
 };
 
-export type ConditionalBlock<
+export type GuardBlock<
   TStateIn,
-  TThenStateOut,
-  TElseStateOut,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object,
-  TResponseIn extends JsonObject | undefined = undefined,
-  TThenWaitFor extends readonly any[] = readonly [],
-  TElseWaitFor extends readonly any[] = readonly [],
-  TPageIn extends GeneratedPage | undefined = undefined
 > = {
-  type: 'conditional';
+  type: 'guard';
   title: string;
   predicate: (params: { state: TStateIn; options: TOptions }) => boolean;
-  thenBlock: StepBlock<TStateIn, TThenStateOut, TOptions, TServices, TResponseIn, TThenWaitFor, TPageIn>;
-  elseBlock: StepBlock<TStateIn, TElseStateOut, TOptions, TServices, TResponseIn, TElseWaitFor, TPageIn>;
 };
 
 export type Block<
@@ -146,4 +137,4 @@ export type Block<
     >
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
   | AgentBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>
-  | ConditionalBlock<TStateIn, any, any, TOptions, TServices, TResponseIn, any, any, TPageIn>;
+  | GuardBlock<TStateIn, TOptions>;
