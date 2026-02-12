@@ -52,6 +52,11 @@ app.use('*', async (c, next) => {
     return next();
   }
 
+  // Skip auth for form submissions from generated pages (browser can't send JWT)
+  if (c.req.method === 'POST' && c.req.path === '/webhooks/system/ui-form') {
+    return next();
+  }
+
   return authMiddleware()(c, next);
 });
 
