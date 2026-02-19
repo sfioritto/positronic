@@ -2824,7 +2824,8 @@ describe('batch prompt', () => {
       // Should have processed only the first chunk (2 items)
       expect(batchMockGenerateObject).toHaveBeenCalledTimes(2);
 
-      // Should have 1 chunk event then a PAUSED event
+      // Should have 1 chunk event and NO PAUSED event
+      // (pausing between batch chunks is a backend implementation detail)
       const chunkEvents = events.filter(
         (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
       );
@@ -2833,7 +2834,13 @@ describe('batch prompt', () => {
       const pausedEvent = events.find(
         (e) => e.type === BRAIN_EVENTS.PAUSED
       );
-      expect(pausedEvent).toBeDefined();
+      expect(pausedEvent).toBeUndefined();
+
+      // Should NOT have a COMPLETE event (execution stopped mid-batch)
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeUndefined();
     });
   });
 

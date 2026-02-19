@@ -50,6 +50,7 @@ export class BrainEventStream<
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
+  private stopped = false;
 
   constructor(
     params: (InitialRunParams<TOptions> | ResumeRunParams<TOptions>) & {
@@ -310,6 +311,11 @@ export class BrainEventStream<
         // Execute step and yield the STEP_COMPLETE event and
         // all events from inner brains if any
         yield* this.executeStep(step);
+
+        // Backend requested a stop (e.g. batch chunk pause for DO restart)
+        if (this.stopped) {
+          return;
+        }
 
         // Step Status Event
         yield {
@@ -1182,14 +1188,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             return;
           }
           if (signal.type === 'PAUSE') {
-            yield {
-              type: BRAIN_EVENTS.PAUSED,
-              status: STATUS.PAUSED,
-              brainTitle: this.title,
-              brainDescription: this.description,
-              brainRunId: this.brainRunId,
-              options: this.options ?? ({} as TOptions),
-            };
+            // Don't yield PAUSED - pausing between batch chunks is a backend
+            // implementation detail (e.g. Cloudflare DO restart for memory).
+            // Just stop execution silently; the backend handles resume.
+            this.stopped = true;
             return;
           }
         }
