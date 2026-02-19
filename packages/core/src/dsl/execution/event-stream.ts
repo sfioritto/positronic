@@ -1243,7 +1243,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     // All chunks done - update state and complete step
-    const finalResults = results.filter((r): r is [any, any] => r !== undefined);
+    const finalResults = results.filter((r): r is [any, any] => r != null);
     this.currentState = { ...this.currentState, [batchConfig.schemaName]: finalResults };
     yield* this.completeStep(step, prevState);
   }
