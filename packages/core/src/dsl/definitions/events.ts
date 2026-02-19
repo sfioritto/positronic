@@ -222,6 +222,18 @@ export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
   response: JsonObject;
 }
 
+export interface BatchChunkCompleteEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.BATCH_CHUNK_COMPLETE;
+  stepTitle: string;
+  stepId: string;
+  chunkStartIndex: number;
+  processedCount: number;
+  totalItems: number;
+  chunkResults: ([any, any] | undefined)[];
+  schemaName: string;
+}
+
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -246,4 +258,5 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | AgentIterationLimitEvent<TOptions>
   | AgentWebhookEvent<TOptions>
   | AgentRawResponseMessageEvent<TOptions>
-  | AgentUserMessageEvent<TOptions>;
+  | AgentUserMessageEvent<TOptions>
+  | BatchChunkCompleteEvent<TOptions>;

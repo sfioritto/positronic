@@ -378,6 +378,12 @@ export class BrainEventStream<
         yield* this.executeUIStep(step, stepBlock);
         return;
       }
+
+      // Check if this is a batch prompt step - handle specially
+      if (stepBlock.batchConfig) {
+        yield* this.executeBatchPrompt(step);
+        return;
+      }
     }
 
     if (block.type === 'brain') {
@@ -1131,6 +1137,113 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         return;
       }
     }
+  }
+
+  /**
+   * Execute a batch prompt step in chunks, yielding one BATCH_CHUNK_COMPLETE
+   * event per chunk. Between chunks, checks for PAUSE/KILL signals so
+   * Cloudflare backends can restart the DO to reclaim memory.
+   */
+  private async *executeBatchPrompt(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as StepBlock<any, any, TOptions, TServices, any, any, any>;
+    const batchConfig = block.batchConfig!;
+    const prevState = this.currentState;
+    const client = batchConfig.client ?? this.client;
+    const items = batchConfig.over(this.currentState);
+    const totalItems = items.length;
+    const chunkSize = batchConfig.chunkSize ?? 10;
+
+    // Resume support: pick up from where we left off
+    const batchProgress = this.resumeContext?.batchProgress;
+    const startIndex = batchProgress?.processedCount ?? 0;
+    const results: ([any, any] | undefined)[] = batchProgress?.accumulatedResults
+      ? [...batchProgress.accumulatedResults]
+      : new Array(totalItems);
+
+    // Clear resumeContext after consuming batchProgress
+    if (batchProgress) {
+      this.resumeContext = undefined;
+    }
+
+    for (let chunkStart = startIndex; chunkStart < totalItems; chunkStart += chunkSize) {
+      // Check signals before each chunk (allows Cloudflare adapter to pause between chunks)
+      if (this.signalProvider) {
+        const signals = await this.signalProvider.getSignals('CONTROL');
+        for (const signal of signals) {
+          if (signal.type === 'KILL') {
+            yield {
+              type: BRAIN_EVENTS.CANCELLED,
+              status: STATUS.CANCELLED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+          if (signal.type === 'PAUSE') {
+            yield {
+              type: BRAIN_EVENTS.PAUSED,
+              status: STATUS.PAUSED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+        }
+      }
+
+      const chunkEnd = Math.min(chunkStart + chunkSize, totalItems);
+      const chunk = items.slice(chunkStart, chunkEnd);
+
+      // Process chunk concurrently
+      const chunkResults = await Promise.all(
+        chunk.map(async (item) => {
+          try {
+            const promptText = await batchConfig.template(item, this.resources);
+            const output = await client.generateObject({
+              schema: batchConfig.schema,
+              schemaName: batchConfig.schemaName,
+              prompt: promptText,
+              ...(batchConfig.maxRetries !== undefined && { maxRetries: batchConfig.maxRetries }),
+            });
+            return [item, output] as [any, any];
+          } catch (error) {
+            if (batchConfig.error) {
+              const fallback = batchConfig.error(item, error as Error);
+              return fallback !== null ? ([item, fallback] as [any, any]) : undefined;
+            }
+            throw error;
+          }
+        })
+      );
+
+      // Store chunk results at correct indices
+      for (let i = 0; i < chunkResults.length; i++) {
+        results[chunkStart + i] = chunkResults[i];
+      }
+
+      // Yield ONE event per chunk
+      yield {
+        type: BRAIN_EVENTS.BATCH_CHUNK_COMPLETE,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        chunkStartIndex: chunkStart,
+        processedCount: chunkEnd,
+        totalItems,
+        chunkResults,
+        schemaName: batchConfig.schemaName,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+    }
+
+    // All chunks done - update state and complete step
+    const finalResults = results.filter((r): r is [any, any] => r !== undefined);
+    this.currentState = { ...this.currentState, [batchConfig.schemaName]: finalResults };
+    yield* this.completeStep(step, prevState);
   }
 
   /**

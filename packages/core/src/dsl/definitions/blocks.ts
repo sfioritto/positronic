@@ -62,6 +62,17 @@ export type StepBlock<
     template: (state: TStateIn, resources: Resources) => string | Promise<string>;
     responseSchema?: z.ZodObject<any>;
   };
+  /** Configuration for batch prompt execution (prompt with `over`) */
+  batchConfig?: {
+    over: (state: any) => any[];
+    maxRetries?: number;
+    error?: (item: any, error: Error) => any | null;
+    template: (item: any, resources: Resources) => string | Promise<string>;
+    schema: z.ZodObject<any>;
+    schemaName: string;
+    client?: ObjectGenerator;
+    chunkSize?: number;
+  };
 };
 
 // BrainBlock uses a generic TInnerBrain to avoid circular dependency with Brain class

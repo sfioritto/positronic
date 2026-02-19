@@ -14,6 +14,12 @@ export interface ResumeContext {
   innerResumeContext?: ResumeContext;  // For nested brain
   agentContext?: AgentContext;    // If resuming mid-agent (at deepest level only)
   webhookResponse?: JsonObject;   // External input if from webhook (at deepest level only)
+  batchProgress?: {               // If resuming mid-batch (at deepest level only)
+    accumulatedResults: ([any, any] | undefined)[];
+    processedCount: number;
+    totalItems: number;
+    schemaName: string;
+  };
 }
 
 export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {

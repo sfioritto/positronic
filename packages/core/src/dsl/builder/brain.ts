@@ -14,7 +14,6 @@ import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams } from '../definitions/run-params.js';
 
 import { BrainEventStream } from '../execution/event-stream.js';
-import { Semaphore } from '../execution/retry.js';
 
 export class Brain<
   TOptions extends JsonObject = JsonObject,
@@ -387,10 +386,9 @@ export class Brain<
     },
     batchConfig: {
       over: (state: TState) => TItem[];
-      concurrency?: number;
-      stagger?: number;
       maxRetries?: number;
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
+      chunkSize?: number;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
@@ -419,10 +417,9 @@ export class Brain<
     },
     batchConfig?: {
       over: (state: any) => any[];
-      concurrency?: number;
-      stagger?: number;
       maxRetries?: number;
       error?: (item: any, error: Error) => any | null;
+      chunkSize?: number;
     }
   ): any {
     // Schema-less prompt - returns text response for next step
@@ -461,7 +458,7 @@ export class Brain<
     const outputSchema = config.outputSchema!;
 
     if (batchConfig) {
-      // Batch mode - run prompt for each item
+      // Batch mode - store config on block for event-stream to execute with per-item events
       const promptBlock: StepBlock<
         TState,
         any,
@@ -473,58 +470,16 @@ export class Brain<
       > = {
         type: 'step',
         title,
-        action: async ({ state, client: runClient, resources }) => {
-          const { template, client: stepClient } = config;
-          const { schema, name: schemaName } = outputSchema;
-          const client = stepClient ?? runClient;
-
-          const items = batchConfig.over(state);
-          const semaphore = new Semaphore(batchConfig.concurrency ?? 10);
-          const stagger = batchConfig.stagger ?? 0;
-
-          const results: ([any, any] | undefined)[] = new Array(items.length);
-
-          const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-          const promises = items.map(async (item, index) => {
-            if (stagger > 0 && index > 0) {
-              await sleep(stagger * index);
-            }
-
-            await semaphore.acquire();
-            try {
-              const promptText = await template(item, resources);
-              const output = await client.generateObject({
-                schema,
-                schemaName,
-                prompt: promptText,
-                ...(batchConfig.maxRetries !== undefined && { maxRetries: batchConfig.maxRetries }),
-              });
-              results[index] = [item, output];
-            } catch (error) {
-              if (batchConfig.error) {
-                const fallback = batchConfig.error(item, error as Error);
-                if (fallback !== null) {
-                  results[index] = [item, fallback];
-                }
-              } else {
-                throw error;
-              }
-            } finally {
-              semaphore.release();
-            }
-          });
-
-          await Promise.all(promises);
-
-          const finalResults = results.filter(
-            (r): r is [any, any] => r !== undefined
-          );
-
-          return {
-            ...state,
-            [outputSchema.name]: finalResults,
-          };
+        action: async ({ state }) => state,
+        batchConfig: {
+          over: batchConfig.over,
+          maxRetries: batchConfig.maxRetries,
+          error: batchConfig.error,
+          template: config.template,
+          schema: outputSchema.schema,
+          schemaName: outputSchema.name,
+          client: config.client,
+          chunkSize: batchConfig.chunkSize,
         },
       };
       this.blocks.push(promptBlock);

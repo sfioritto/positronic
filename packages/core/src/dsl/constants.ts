@@ -26,6 +26,8 @@ export const BRAIN_EVENTS = {
   AGENT_WEBHOOK: 'agent:webhook',
   AGENT_RAW_RESPONSE_MESSAGE: 'agent:raw_response_message',
   AGENT_USER_MESSAGE: 'agent:user_message',
+  // Batch prompt events (prompt with `over`)
+  BATCH_CHUNK_COMPLETE: 'batch:chunk_complete',
 } as const;
 
 export const STATUS = {

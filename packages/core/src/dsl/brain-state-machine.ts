@@ -106,6 +106,17 @@ export interface AgentContext {
   pendingToolName: string | null;
 }
 
+/**
+ * Context for tracking batch execution state across pause/resume cycles.
+ * Accumulates chunk results so the batch can resume from where it left off.
+ */
+export interface BatchContext {
+  accumulatedResults: ([any, any] | undefined)[];
+  processedCount: number;
+  totalItems: number;
+  schemaName: string;
+}
+
 export interface BrainExecutionContext {
   // === Flat storage (source of truth) ===
   // These are the authoritative data structures. O(1) access to current brain.
@@ -126,6 +137,10 @@ export interface BrainExecutionContext {
   // Agent context - tracks agent execution state for pause/resume
   // Non-null when we're inside an agent loop (or paused from one)
   agentContext: AgentContext | null;
+
+  // Batch context - tracks batch execution state for pause/resume
+  // Non-null when we're inside a batch step (or paused from one)
+  batchContext: BatchContext | null;
 
   // Derived state (updated by reducers)
   // The authoritative status (depth-aware) - use this instead of checking event.status
@@ -263,6 +278,7 @@ const createInitialContext = (
   currentState: opts?.initialState ?? {},
   options: opts?.options ?? {},
   agentContext: null,
+  batchContext: null,
   status: STATUS.PENDING,
   isTopLevel: false,
   isRunning: false,
@@ -550,6 +566,7 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       executionStack: newExecutionStack,
       currentState: newState,
       topLevelStepCount: newStepCount,
+      batchContext: null,
     };
   }
 );
@@ -630,6 +647,24 @@ const stepRetry = reduce<BrainExecutionContext, StepRetryPayload>((ctx) => ctx);
 
 // passthrough is now a no-op - we just let the event pass through
 const passthrough = () => reduce<BrainExecutionContext, any>((ctx) => ctx);
+
+// Reducer for BATCH_CHUNK_COMPLETE - merges chunk results into batchContext
+const batchChunkComplete = reduce<BrainExecutionContext, any>((ctx, payload) => {
+  const existing = ctx.batchContext;
+  const newResults = existing?.accumulatedResults ? [...existing.accumulatedResults] : [];
+  for (let i = 0; i < payload.chunkResults.length; i++) {
+    newResults[payload.chunkStartIndex + i] = payload.chunkResults[i];
+  }
+  return {
+    ...ctx,
+    batchContext: {
+      accumulatedResults: newResults,
+      processedCount: payload.processedCount,
+      totalItems: payload.totalItems,
+      schemaName: payload.schemaName,
+    },
+  };
+});
 
 // Reducer for agent iteration events that tracks tokens per-iteration
 // This ensures tokens are counted even if the agent doesn't complete (e.g., webhook interruption)
@@ -850,6 +885,9 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(BRAIN_EVENTS.STEP_COMPLETE, 'running', completeStep) as any,
         transition(BRAIN_EVENTS.STEP_STATUS, 'running', stepStatus) as any,
         transition(BRAIN_EVENTS.STEP_RETRY, 'running', stepRetry) as any,
+
+        // Batch chunk complete - stays in running, accumulates results
+        transition(BRAIN_EVENTS.BATCH_CHUNK_COMPLETE, 'running', batchChunkComplete) as any,
 
         // AGENT_START transitions to the agentLoop state
         transition(BRAIN_EVENTS.AGENT_START, 'agentLoop', agentStart) as any
