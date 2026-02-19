@@ -2769,6 +2769,83 @@ describe('batch prompt', () => {
       expect(finalState.results).toHaveLength(4);
     });
 
+    it('should filter out null entries from batch results after JSON round-trip', async () => {
+      batchMockGenerateObject.mockResolvedValue({ done: true });
+
+      const testBrain = brain('Batch Null Filter Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            chunkSize: 2,
+            error: () => null, // Skip failed items
+          }
+        )
+        .step('Use Results', ({ state }) => {
+          // Iterate over results like a real brain step would
+          const processed = [];
+          for (const [item, output] of state.results) {
+            processed.push({ id: item.id, ...output });
+          }
+          return { ...state, processed };
+        });
+
+      // Simulate resume where batchProgress has been through JSON round-trip
+      // (stored in SQLite, loaded back). JSON.stringify converts undefined to null.
+      const batchProgress = JSON.parse(JSON.stringify({
+        accumulatedResults: [
+          [{ id: 1 }, { done: true }],
+          undefined,  // Error item — becomes null after JSON round-trip
+          [{ id: 3 }, { done: true }],
+          [{ id: 4 }, { done: true }],
+        ],
+        processedCount: 4,
+        totalItems: 4,
+        schemaName: 'results',
+      }));
+
+      // Verify the JSON round-trip actually converted undefined to null
+      expect(batchProgress.accumulatedResults[1]).toBeNull();
+
+      const resumeContext: ResumeContext = {
+        stepIndex: 1,
+        state: { items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }] },
+        batchProgress,
+      };
+
+      const events: any[] = [];
+      for await (const event of testBrain.run({
+        client: batchMockClient,
+        resumeContext,
+        brainRunId: 'test-null-filter',
+      })) {
+        events.push(event);
+      }
+
+      // Should complete without error
+      expect(events.some(e => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+
+      // Final state should have 3 results (null entry filtered out)
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+      expect(finalState.results).toHaveLength(3);
+      expect(finalState.processed).toHaveLength(3);
+    });
+
     it('should stop when PAUSE signal is received between chunks', async () => {
       batchMockGenerateObject.mockResolvedValue({ done: true });
 
