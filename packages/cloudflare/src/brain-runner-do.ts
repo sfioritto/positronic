@@ -100,6 +100,27 @@ class ScheduleAdapter implements Adapter {
   }
 }
 
+/**
+ * Adapter that intercepts BATCH_CHUNK_COMPLETE events and triggers a
+ * DO alarm-based restart to reclaim memory between chunks.
+ * After each chunk, it queues a PAUSE signal and sets an immediate alarm.
+ * The alarm fires, calls wakeUp(), which replays events, reconstructs
+ * batch progress, and resumes from the next chunk.
+ */
+class BatchChunkAdapter implements Adapter {
+  constructor(
+    private doQueueSignal: (signal: { type: string }) => Promise<any>,
+    private doSetAlarm: (time: number) => Promise<void>
+  ) {}
+
+  async dispatch(event: BrainEvent<any>): Promise<void> {
+    if (event.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE) {
+      await this.doQueueSignal({ type: 'PAUSE' });
+      await this.doSetAlarm(Date.now());
+    }
+  }
+}
+
 // SQL to initialize the signals table
 const signalsTableSQL = `
 CREATE TABLE IF NOT EXISTS brain_signals (
@@ -381,6 +402,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
     return { success: true, message: 'Brain run cancelled' };
   }
 
+  async alarm() {
+    await this.wakeUp(this.brainRunId);
+  }
+
   async start(
     brainTitle: string,
     brainRunId: string,
@@ -468,6 +493,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Create abort controller for this run
     this.abortController = new AbortController();
 
+    const batchChunkAdapter = new BatchChunkAdapter(
+      (signal) => this.queueSignal(signal),
+      (time) => this.ctx.storage.setAlarm(time)
+    );
+
     runnerWithResources
       .withAdapters([
         sqliteAdapter,
@@ -476,6 +506,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         scheduleAdapter,
         webhookAdapter,
         this.pageAdapter,
+        batchChunkAdapter,
       ])
       .run(brainToRun, {
         initialState,
@@ -601,6 +632,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Create abort controller for this run
     this.abortController = new AbortController();
 
+    const batchChunkAdapter = new BatchChunkAdapter(
+      (signal) => this.queueSignal(signal),
+      (time) => this.ctx.storage.setAlarm(time)
+    );
+
     runnerWithResources
       .withAdapters([
         sqliteAdapter,
@@ -609,6 +645,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         scheduleAdapter,
         webhookAdapter,
         this.pageAdapter,
+        batchChunkAdapter,
       ])
       .resume(brainToRun, {
         machine,

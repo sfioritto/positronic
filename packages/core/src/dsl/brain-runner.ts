@@ -1,5 +1,5 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
-import { createBrainExecutionMachine, sendEvent, type BrainStateMachine, type ExecutionStackEntry, type AgentContext } from './brain-state-machine.js';
+import { createBrainExecutionMachine, sendEvent, type BrainStateMachine, type ExecutionStackEntry, type AgentContext, type BatchContext } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type Brain, type BrainEvent, type ResumeContext } from './brain.js';
 import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
@@ -16,7 +16,8 @@ import type { BrainCancelledEvent } from './definitions/events.js';
  */
 function executionStackToResumeContext(
   stack: ExecutionStackEntry[],
-  agentContext: AgentContext | null
+  agentContext: AgentContext | null,
+  batchContext: BatchContext | null
 ): ResumeContext {
   if (stack.length === 0) {
     throw new Error('Cannot convert empty execution stack to ResumeContext');
@@ -27,11 +28,12 @@ function executionStackToResumeContext(
   for (let i = stack.length - 1; i >= 0; i--) {
     const entry = stack[i];
     if (i === stack.length - 1) {
-      // Deepest level - add agent context (webhook response comes from signals now)
+      // Deepest level - add agent context and batch progress (webhook response comes from signals now)
       context = {
         stepIndex: entry.stepIndex,
         state: entry.state,
         agentContext: agentContext ?? undefined,
+        batchProgress: batchContext ?? undefined,
       };
     } else {
       // Outer level - wrap inner context
@@ -163,8 +165,8 @@ export class BrainRunner {
 
     // Build ResumeContext from machine's execution stack
     // Webhook response comes from signals during execution, not from resume parameters
-    const { executionStack, agentContext } = machine.context;
-    const resumeContext = executionStackToResumeContext(executionStack, agentContext);
+    const { executionStack, agentContext, batchContext } = machine.context;
+    const resumeContext = executionStackToResumeContext(executionStack, agentContext, batchContext);
 
     return this.execute(brain, {
       resumeContext,

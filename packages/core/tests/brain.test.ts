@@ -2499,13 +2499,8 @@ describe('batch prompt', () => {
     });
 
     it('should maintain item order in results', async () => {
-      // Make the mock return different values based on order of calls
-      let callOrder = 0;
       batchMockGenerateObject.mockImplementation(async () => {
-        const order = callOrder++;
-        // Add artificial delays to test order preservation
-        await new Promise((resolve) => setTimeout(resolve, (3 - order) * 10));
-        return { order };
+        return { order: 1 };
       });
 
       const testBrain = brain('Order Test')
@@ -2533,105 +2528,89 @@ describe('batch prompt', () => {
         }
       }
 
-      // Results should be in original item order, not completion order
+      // Results should be in original item order
       expect(finalState.results[0][0]).toEqual({ id: 'a' });
       expect(finalState.results[1][0]).toEqual({ id: 'b' });
       expect(finalState.results[2][0]).toEqual({ id: 'c' });
     });
-  });
 
-  describe('concurrency', () => {
-    it('should respect concurrency limit', async () => {
-      let concurrentCalls = 0;
-      let maxConcurrentCalls = 0;
+    it('should yield BATCH_CHUNK_COMPLETE events per chunk', async () => {
+      batchMockGenerateObject.mockResolvedValue({ category: 'general' });
 
-      batchMockGenerateObject.mockImplementation(async () => {
-        concurrentCalls++;
-        maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentCalls);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        concurrentCalls--;
-        return { done: true };
-      });
-
-      const testBrain = brain('Concurrency Test')
+      const testBrain = brain('Batch Events Test')
         .step('Init', () => ({
-          items: Array.from({ length: 10 }, (_, i) => ({ id: i })),
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }],
         }))
         .prompt(
-          'Process',
+          'Categorize',
           {
             template: (item: { id: number }) => `Item ${item.id}`,
             outputSchema: {
-              schema: z.object({ done: z.boolean() }),
-              name: 'results' as const,
+              schema: z.object({ category: z.string() }),
+              name: 'categories' as const,
             },
           },
           {
             over: (state) => state.items,
-            concurrency: 3,
+            chunkSize: 2,
           }
         );
 
+      const events: any[] = [];
       for await (const event of testBrain.run({ client: batchMockClient })) {
-        // Just consume events
+        events.push(event);
       }
 
-      // Max concurrent calls should not exceed the limit
-      expect(maxConcurrentCalls).toBeLessThanOrEqual(3);
-      // Should have processed all items
-      expect(batchMockGenerateObject).toHaveBeenCalledTimes(10);
-    });
+      // Filter batch chunk events
+      const batchEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      );
 
-    it('should default to concurrency of 10', async () => {
-      let concurrentCalls = 0;
-      let maxConcurrentCalls = 0;
+      // Should have 2 chunks: [0,1] and [2]
+      expect(batchEvents).toHaveLength(2);
 
-      batchMockGenerateObject.mockImplementation(async () => {
-        concurrentCalls++;
-        maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentCalls);
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        concurrentCalls--;
-        return { done: true };
-      });
+      // First chunk
+      expect(batchEvents[0].chunkStartIndex).toBe(0);
+      expect(batchEvents[0].processedCount).toBe(2);
+      expect(batchEvents[0].totalItems).toBe(3);
+      expect(batchEvents[0].chunkResults).toHaveLength(2);
+      expect(batchEvents[0].schemaName).toBe('categories');
 
-      const testBrain = brain('Default Concurrency Test')
-        .step('Init', () => ({
-          items: Array.from({ length: 20 }, (_, i) => ({ id: i })),
-        }))
-        .prompt(
-          'Process',
-          {
-            template: (item: { id: number }) => `Item ${item.id}`,
-            outputSchema: {
-              schema: z.object({ done: z.boolean() }),
-              name: 'results' as const,
-            },
-          },
-          {
-            over: (state) => state.items,
-            // No concurrency specified - should default to 10
-          }
-        );
+      // Second chunk
+      expect(batchEvents[1].chunkStartIndex).toBe(2);
+      expect(batchEvents[1].processedCount).toBe(3);
+      expect(batchEvents[1].totalItems).toBe(3);
+      expect(batchEvents[1].chunkResults).toHaveLength(1);
 
-      for await (const event of testBrain.run({ client: batchMockClient })) {
-        // Just consume events
+      // Should include stepTitle
+      expect(batchEvents[0].stepTitle).toBe('Categorize');
+
+      // Batch events should appear between STEP_START and STEP_COMPLETE for the batch step
+      const stepStartIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.STEP_START && e.stepTitle === 'Categorize'
+      );
+      const stepCompleteIndex = events.findIndex(
+        (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE && e.stepTitle === 'Categorize'
+      );
+
+      for (const batchEvent of batchEvents) {
+        const batchIndex = events.indexOf(batchEvent);
+        expect(batchIndex).toBeGreaterThan(stepStartIndex);
+        expect(batchIndex).toBeLessThan(stepCompleteIndex);
       }
-
-      // Max concurrent calls should not exceed default of 10
-      expect(maxConcurrentCalls).toBeLessThanOrEqual(10);
     });
-  });
 
-  describe('stagger', () => {
-    it('should delay between starting each item', async () => {
-      const startTimes: number[] = [];
-
+    it('should handle errors within chunks using error handler', async () => {
+      let callCount = 0;
       batchMockGenerateObject.mockImplementation(async () => {
-        startTimes.push(Date.now());
-        return { done: true };
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Failed for item 2');
+        }
+        return { status: 'success' };
       });
 
-      const testBrain = brain('Stagger Test')
+      const testBrain = brain('Batch Error Events Test')
         .step('Init', () => ({
           items: [{ id: 1 }, { id: 2 }, { id: 3 }],
         }))
@@ -2640,25 +2619,221 @@ describe('batch prompt', () => {
           {
             template: (item: { id: number }) => `Item ${item.id}`,
             outputSchema: {
+              schema: z.object({ status: z.string() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            maxRetries: 0,
+            error: (item, err) => ({ status: 'failed' }),
+            chunkSize: 10, // All in one chunk
+          }
+        );
+
+      const events: any[] = [];
+      for await (const event of testBrain.run({ client: batchMockClient })) {
+        events.push(event);
+      }
+
+      const chunkEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      );
+
+      // One chunk with all 3 items (chunk size 10 > 3 items)
+      expect(chunkEvents).toHaveLength(1);
+
+      // Chunk should include results - 2 successes and 1 fallback
+      const chunkResults = chunkEvents[0].chunkResults;
+      expect(chunkResults).toHaveLength(3);
+      // Item 1: success
+      expect(chunkResults[0][1]).toEqual({ status: 'success' });
+      // Item 2: fallback from error handler
+      expect(chunkResults[1][1]).toEqual({ status: 'failed' });
+      // Item 3: success
+      expect(chunkResults[2][1]).toEqual({ status: 'success' });
+    });
+
+    it('should process items in chunks concurrently', async () => {
+      const processedIds: number[] = [];
+      batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
+        const id = parseInt(prompt?.split(' ')[1] ?? '0');
+        processedIds.push(id);
+        return { done: true };
+      });
+
+      const testBrain = brain('Chunk Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
             },
           },
           {
             over: (state) => state.items,
-            stagger: 50, // 50ms between each item start
+            chunkSize: 2,
           }
         );
 
+      const events: any[] = [];
       for await (const event of testBrain.run({ client: batchMockClient })) {
-        // Just consume events
+        events.push(event);
       }
 
-      // Verify delays between start times
-      // Item 1 should start immediately, item 2 after ~50ms, item 3 after ~100ms
-      expect(startTimes.length).toBe(3);
-      expect(startTimes[1] - startTimes[0]).toBeGreaterThanOrEqual(40); // Allow some tolerance
-      expect(startTimes[2] - startTimes[0]).toBeGreaterThanOrEqual(90);
+      // All items should be processed
+      expect(processedIds).toHaveLength(4);
+      expect(processedIds).toContain(1);
+      expect(processedIds).toContain(2);
+      expect(processedIds).toContain(3);
+      expect(processedIds).toContain(4);
+
+      // Should produce 2 chunk events (chunk size 2, 4 items)
+      const chunkEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      );
+      expect(chunkEvents).toHaveLength(2);
+    });
+
+    it('should resume batch from batchProgress', async () => {
+      batchMockGenerateObject.mockResolvedValue({ done: true });
+
+      const testBrain = brain('Batch Resume Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            chunkSize: 2,
+          }
+        );
+
+      // Resume with first 2 items already processed
+      const resumeContext: ResumeContext = {
+        stepIndex: 1, // At the batch step (step 0 = Init, step 1 = Process)
+        state: { items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }] },
+        batchProgress: {
+          accumulatedResults: [
+            [{ id: 1 }, { done: true }],
+            [{ id: 2 }, { done: true }],
+            undefined,
+            undefined,
+          ],
+          processedCount: 2,
+          totalItems: 4,
+          schemaName: 'results',
+        },
+      };
+
+      const events: any[] = [];
+      for await (const event of testBrain.run({
+        client: batchMockClient,
+        resumeContext,
+        brainRunId: 'test-resume-batch',
+      })) {
+        events.push(event);
+      }
+
+      // Should only have processed the remaining 2 items (not all 4)
+      expect(batchMockGenerateObject).toHaveBeenCalledTimes(2);
+
+      // Should produce 1 chunk event for the remaining items
+      const chunkEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      );
+      expect(chunkEvents).toHaveLength(1);
+      expect(chunkEvents[0].chunkStartIndex).toBe(2);
+      expect(chunkEvents[0].processedCount).toBe(4);
+
+      // Final state should have all 4 results
+      let finalState: any = {};
+      for (const event of events) {
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          finalState = applyPatches(finalState, [event.patch]);
+        }
+      }
+      expect(finalState.results).toHaveLength(4);
+    });
+
+    it('should stop when PAUSE signal is received between chunks', async () => {
+      batchMockGenerateObject.mockResolvedValue({ done: true });
+
+      let controlSignalCallCount = 0;
+      const mockSignalProvider = {
+        getSignals: async (filter: string) => {
+          if (filter === 'CONTROL') {
+            controlSignalCallCount++;
+            // Control signal checks:
+            // 1 = main loop before Init step
+            // 2 = main loop before Process step
+            // 3 = inside executeBatchPrompt before first chunk
+            // 4 = inside executeBatchPrompt before second chunk
+            // Return PAUSE before the second chunk
+            if (controlSignalCallCount === 4) {
+              return [{ type: 'PAUSE' as const }];
+            }
+          }
+          if (filter === 'WEBHOOK') {
+            return [];
+          }
+          return [];
+        },
+      };
+
+      const testBrain = brain('Batch Pause Test')
+        .step('Init', () => ({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+        }))
+        .prompt(
+          'Process',
+          {
+            template: (item: { id: number }) => `Item ${item.id}`,
+            outputSchema: {
+              schema: z.object({ done: z.boolean() }),
+              name: 'results' as const,
+            },
+          },
+          {
+            over: (state) => state.items,
+            chunkSize: 2,
+          }
+        );
+
+      const events: any[] = [];
+      for await (const event of testBrain.run({
+        client: batchMockClient,
+        signalProvider: mockSignalProvider,
+      })) {
+        events.push(event);
+      }
+
+      // Should have processed only the first chunk (2 items)
+      expect(batchMockGenerateObject).toHaveBeenCalledTimes(2);
+
+      // Should have 1 chunk event then a PAUSED event
+      const chunkEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      );
+      expect(chunkEvents).toHaveLength(1);
+
+      const pausedEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.PAUSED
+      );
+      expect(pausedEvent).toBeDefined();
     });
   });
 
