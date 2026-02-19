@@ -52,8 +52,8 @@ app.use('*', async (c, next) => {
     return next();
   }
 
-  // Skip auth for form submissions from generated pages (browser can't send JWT)
-  if (c.req.method === 'POST' && c.req.path === '/webhooks/system/ui-form') {
+  // Skip auth for all webhook POST requests (external services and browser forms can't send JWT)
+  if (c.req.method === 'POST' && c.req.path.startsWith('/webhooks/')) {
     return next();
   }
 
