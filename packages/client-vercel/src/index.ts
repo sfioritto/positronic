@@ -8,6 +8,55 @@ import {
 import { z } from 'zod';
 import type { LanguageModel, ModelMessage } from 'ai';
 
+const MAX_RATE_LIMIT_RETRIES = 4;
+const INITIAL_RETRY_DELAY_MS = 5000;
+const RETRY_BACKOFF_FACTOR = 2;
+
+function isErrorWithStatusCode(error: unknown, codes: number[]): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'statusCode' in error &&
+    typeof (error as any).statusCode === 'number' &&
+    codes.includes((error as any).statusCode)
+  );
+}
+
+function isRateLimitError(error: unknown): boolean {
+  const rateLimitCodes = [429, 529];
+
+  if (isErrorWithStatusCode(error, rateLimitCodes)) {
+    return true;
+  }
+
+  // RetryError wrapping rate limit errors (SDK exhausted its retries)
+  if (error instanceof Error && 'errors' in error && Array.isArray((error as any).errors)) {
+    return (error as any).errors.some((e: unknown) => isErrorWithStatusCode(e, rateLimitCodes));
+  }
+
+  return false;
+}
+
+async function retryWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === MAX_RATE_LIMIT_RETRIES || !isRateLimitError(error)) {
+        throw error;
+      }
+
+      const baseDelay = INITIAL_RETRY_DELAY_MS * Math.pow(RETRY_BACKOFF_FACTOR, attempt);
+      const jitter = 0.5 + Math.random();
+      const delay = baseDelay * jitter;
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw new Error('unreachable');
+}
+
 /**
  * Creates a tool result message in SDK-native format.
  * Use this to append tool results to responseMessages before the next generateText call.
@@ -82,32 +131,34 @@ export class VercelClient implements ObjectGenerator {
 
     // AI SDK v5 requires either messages or prompt, but not both as undefined
     // If we have messages built up, use them; otherwise use the prompt directly
-    if (coreMessages.length > 0) {
-      const { output } = await generateText({
-        model: this.model,
-        output: Output.object({
-          schema,
-          name: schemaName,
-          description: schemaDescription,
-        }),
-        messages: coreMessages,
-        ...(maxRetries !== undefined && { maxRetries }),
-      });
-      return output as z.infer<T>;
-    } else {
-      // Fallback to prompt-only mode (should rarely happen, but provides a default)
-      const { output } = await generateText({
-        model: this.model,
-        output: Output.object({
-          schema,
-          name: schemaName,
-          description: schemaDescription,
-        }),
-        prompt: prompt || '',
-        ...(maxRetries !== undefined && { maxRetries }),
-      });
-      return output as z.infer<T>;
-    }
+    return retryWithBackoff(async () => {
+      if (coreMessages.length > 0) {
+        const { output } = await generateText({
+          model: this.model,
+          output: Output.object({
+            schema,
+            name: schemaName,
+            description: schemaDescription,
+          }),
+          messages: coreMessages,
+          ...(maxRetries !== undefined && { maxRetries }),
+        });
+        return output as z.infer<T>;
+      } else {
+        // Fallback to prompt-only mode (should rarely happen, but provides a default)
+        const { output } = await generateText({
+          model: this.model,
+          output: Output.object({
+            schema,
+            name: schemaName,
+            description: schemaDescription,
+          }),
+          prompt: prompt || '',
+          ...(maxRetries !== undefined && { maxRetries }),
+        });
+        return output as z.infer<T>;
+      }
+    });
   }
 
   async generateText(params: {
@@ -188,30 +239,30 @@ export class VercelClient implements ObjectGenerator {
       };
     }
 
-    const result = await generateText({
-      model: this.model,
-      system,
-      toolChoice,
-      messages: modelMessages,
-      tools: aiTools,
+    return retryWithBackoff(async () => {
+      const result = await generateText({
+        model: this.model,
+        system,
+        toolChoice,
+        messages: modelMessages,
+        tools: aiTools,
+      });
+
+      const updatedMessages = [...modelMessages, ...result.response.messages];
+
+      return {
+        text: result.text || undefined,
+        toolCalls: result.toolCalls?.map((tc) => ({
+          toolCallId: tc.toolCallId,
+          toolName: tc.toolName,
+          args: tc.input,
+        })),
+        usage: {
+          totalTokens: result.usage?.totalTokens ?? 0,
+        },
+        responseMessages: updatedMessages as ResponseMessage[],
+      };
     });
-
-    // Return the updated conversation (input messages + new response messages)
-    // The response.messages contain proper providerOptions for Gemini thoughtSignature etc.
-    const updatedMessages = [...modelMessages, ...result.response.messages];
-
-    return {
-      text: result.text || undefined,
-      toolCalls: result.toolCalls?.map((tc) => ({
-        toolCallId: tc.toolCallId,
-        toolName: tc.toolName,
-        args: tc.input,
-      })),
-      usage: {
-        totalTokens: result.usage?.totalTokens ?? 0,
-      },
-      responseMessages: updatedMessages as ResponseMessage[],
-    };
   }
 
   async streamText(params: {
@@ -316,51 +367,49 @@ export class VercelClient implements ObjectGenerator {
       };
     }
 
-    // Call Vercel's streamText with multi-step support
-    const stream = vercelStreamText({
-      model: this.model,
-      messages: modelMessages,
-      tools: aiTools,
-      toolChoice,
-      stopWhen: stepCountIs(maxSteps),
-    });
+    return retryWithBackoff(async () => {
+      const stream = vercelStreamText({
+        model: this.model,
+        messages: modelMessages,
+        tools: aiTools,
+        toolChoice,
+        stopWhen: stepCountIs(maxSteps),
+      });
 
-    // Await the steps and text (automatically consumes the stream)
-    const [steps, text, usage] = await Promise.all([
-      stream.steps,
-      stream.text,
-      stream.totalUsage,
-    ]);
+      const [steps, text, usage] = await Promise.all([
+        stream.steps,
+        stream.text,
+        stream.totalUsage,
+      ]);
 
-    // Collect all tool calls across all steps with their results
-    const allToolCalls: Array<{
-      toolCallId: string;
-      toolName: string;
-      args: unknown;
-      result: unknown;
-    }> = [];
+      const allToolCalls: Array<{
+        toolCallId: string;
+        toolName: string;
+        args: unknown;
+        result: unknown;
+      }> = [];
 
-    for (const step of steps) {
-      // Match tool calls with their results
-      for (const toolCall of step.toolCalls) {
-        const toolResult = step.toolResults.find(
-          (tr) => tr.toolCallId === toolCall.toolCallId
-        );
-        allToolCalls.push({
-          toolCallId: toolCall.toolCallId,
-          toolName: toolCall.toolName,
-          args: toolCall.input,
-          result: toolResult?.output,
-        });
+      for (const step of steps) {
+        for (const toolCall of step.toolCalls) {
+          const toolResult = step.toolResults.find(
+            (tr) => tr.toolCallId === toolCall.toolCallId
+          );
+          allToolCalls.push({
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+            args: toolCall.input,
+            result: toolResult?.output,
+          });
+        }
       }
-    }
 
-    return {
-      toolCalls: allToolCalls,
-      text: text || undefined,
-      usage: {
-        totalTokens: usage?.totalTokens ?? 0,
-      },
-    };
+      return {
+        toolCalls: allToolCalls,
+        text: text || undefined,
+        usage: {
+          totalTokens: usage?.totalTokens ?? 0,
+        },
+      };
+    });
   }
 }
