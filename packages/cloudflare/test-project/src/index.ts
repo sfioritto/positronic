@@ -350,6 +350,38 @@ const largeStateWebhookBrain = brain({ title: 'large-state-webhook-brain', descr
     largeData: 'cleared',
   }));
 
+// Brain that does batch processing followed by a webhook wait.
+// Tests that alarm-based DO restart (for batch chunk processing) preserves the brainRunId
+// so that MonitorDO can correctly track state and validate webhook responses.
+const batchWebhookBrain = brain({ title: 'batch-webhook-brain', description: 'Batch processing followed by webhook' })
+  .step('Init items', ({ state }) => ({
+    ...state,
+    items: ['item-a', 'item-b', 'item-c'],
+  }))
+  .prompt(
+    'Process items',
+    {
+      template: (item: string) => `Process: ${item}`,
+      outputSchema: {
+        schema: z.object({ result: z.string() }),
+        name: 'batchResults' as const,
+      },
+    },
+    {
+      over: (state) => state.items,
+      chunkSize: 2,
+    }
+  )
+  .step('Wait for webhook', ({ state }) => ({
+    state: { ...state, waiting: true },
+    waitFor: [testWebhook('batch-webhook-test')],
+  }))
+  .step('Process webhook response', ({ state, response }) => ({
+    ...state,
+    waiting: false,
+    webhookMessage: response.message,
+  }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -435,6 +467,11 @@ const brainManifest = {
     filename: 'large-state-webhook-brain',
     path: 'brains/large-state-webhook-brain.ts',
     brain: largeStateWebhookBrain,
+  },
+  'batch-webhook-brain': {
+    filename: 'batch-webhook-brain',
+    path: 'brains/batch-webhook-brain.ts',
+    brain: batchWebhookBrain,
   },
 };
 

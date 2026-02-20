@@ -115,8 +115,15 @@ class BatchChunkAdapter implements Adapter {
 
   async dispatch(event: BrainEvent<any>): Promise<void> {
     if (event.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE) {
-      await this.doQueueSignal({ type: 'PAUSE' });
-      await this.doSetAlarm(Date.now());
+      // Only pause and restart between chunks, not after the last chunk.
+      // After the last chunk the brain continues to subsequent steps naturally.
+      // A spurious alarm after the last chunk would call wakeUp() while the
+      // brain is still running, corrupting execution state.
+      const { processedCount, totalItems } = event as any;
+      if (processedCount < totalItems) {
+        await this.doQueueSignal({ type: 'PAUSE' });
+        await this.doSetAlarm(Date.now());
+      }
     }
   }
 }
@@ -549,6 +556,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const brainTitle = (startEvent as any).brainTitle;
     const initialState = (startEvent as any).initialState || {};
 
+    // Use the brainRunId from the START event, not the parameter.
+    // alarm() passes state.id.toString() (the DO hex ID), but the brain was
+    // originally started with a UUID. Events must use the original UUID so
+    // MonitorDO can correlate them with the existing brain_runs row.
+    const originalBrainRunId = (startEvent as any).brainRunId || brainRunId;
+
     if (!brainTitle) {
       throw new Error(`Brain title not found in START event for brain run ${brainRunId}`);
     }
@@ -649,11 +662,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
       ])
       .resume(brainToRun, {
         machine,
-        brainRunId,
+        brainRunId: originalBrainRunId,
         signal: this.abortController.signal,
       })
       .catch((err: any) => {
-        console.error(`[DO ${brainRunId}] BrainRunner wakeUp failed:`, err);
+        console.error(`[DO ${originalBrainRunId}] BrainRunner wakeUp failed:`, err);
         throw err;
       })
       .finally(() => {
