@@ -1673,4 +1673,163 @@ describe('Hono API Tests', () => {
     });
   });
 
+  describe('Batch + Webhook Resumption', () => {
+    it('should preserve brainRunId across alarm-based batch restarts so webhooks work', async () => {
+      const testEnv = env as TestEnv;
+      const brainName = 'batch-webhook-brain';
+      const webhookIdentifier = 'batch-webhook-test';
+
+      // Step 1: Start the brain (has batch step followed by webhook wait)
+      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      });
+      const createContext = createExecutionContext();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      expect(createResponse.status).toBe(201);
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
+      await waitOnExecutionContext(createContext);
+
+      // Step 2: Watch the brain - it should process batch chunks (with alarm restarts)
+      // and then pause with WEBHOOK event
+      const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
+      const watchRequest = await createAuthenticatedRequest(watchUrl);
+      const watchContext = createExecutionContext();
+      const watchResponse = await worker.fetch(
+        watchRequest,
+        testEnv,
+        watchContext
+      );
+
+      expect(watchResponse.status).toBe(200);
+      if (!watchResponse.body) {
+        throw new Error('Watch response body is null');
+      }
+
+      // Read events until we get the WEBHOOK event (brain pauses after batch + webhook)
+      const reader = watchResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const events: BrainEvent[] = [];
+      let foundWebhookEvent = false;
+
+      while (!foundWebhookEvent) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        let eventEndIndex;
+        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+          const message = buffer.substring(0, eventEndIndex);
+          buffer = buffer.substring(eventEndIndex + 2);
+
+          if (message.startsWith('data:')) {
+            const event = parseSseEvent(message);
+            if (event) {
+              events.push(event);
+              if (event.type === BRAIN_EVENTS.WEBHOOK) {
+                foundWebhookEvent = true;
+                reader.cancel();
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Verify we got WEBHOOK event after batch processing
+      expect(foundWebhookEvent).toBe(true);
+      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
+      expect(webhookEvent).toBeDefined();
+
+      // Should NOT have completed yet
+      const prematureComplete = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(prematureComplete).toBeUndefined();
+
+      await waitOnExecutionContext(watchContext);
+
+      // Step 3: Send webhook response - this is the critical test.
+      // If the brainRunId was corrupted by alarm() using the DO hex ID,
+      // MonitorDO would have the brain in 'pending' state and reject this.
+      const webhookRequest = await createAuthenticatedRequest(
+        'http://example.com/webhooks/test-webhook',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: 'Webhook after batch',
+            user: 'test-user',
+            threadId: webhookIdentifier,
+          }),
+        }
+      );
+      const webhookContext = createExecutionContext();
+      const webhookResponse = await worker.fetch(
+        webhookRequest,
+        testEnv,
+        webhookContext
+      );
+
+      expect(webhookResponse.status).toBe(200);
+      const webhookResult = await webhookResponse.json<{
+        received: boolean;
+        action: string;
+        reason?: string;
+      }>();
+      expect(webhookResult.received).toBe(true);
+      // This would be 'ignored' with reason "Cannot WEBHOOK_RESPONSE brain in 'pending' state"
+      // if the brainRunId was corrupted by the alarm path
+      expect(webhookResult.action).toBe('resumed');
+      await waitOnExecutionContext(webhookContext);
+
+      // Step 4: Watch the brain again - it should now complete
+      const resumeWatchRequest = await createAuthenticatedRequest(watchUrl);
+      const resumeWatchContext = createExecutionContext();
+      const resumeWatchResponse = await worker.fetch(
+        resumeWatchRequest,
+        testEnv,
+        resumeWatchContext
+      );
+
+      if (!resumeWatchResponse.body) {
+        throw new Error('Resume watch response body is null');
+      }
+
+      const resumeEvents = await readSseStream(resumeWatchResponse.body);
+      await waitOnExecutionContext(resumeWatchContext);
+
+      // Step 5: Verify brain completed with webhook response data
+      const completeEvent = resumeEvents.find(
+        (e): e is BrainCompleteEvent => e.type === BRAIN_EVENTS.COMPLETE
+      );
+      expect(completeEvent).toBeDefined();
+      expect(completeEvent?.status).toBe(STATUS.COMPLETE);
+
+      // Verify the webhook response step processed the data
+      const finalStepComplete = resumeEvents.find(
+        (e): e is StepCompletedEvent =>
+          e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+          e.stepTitle === 'Process webhook response'
+      );
+      expect(finalStepComplete).toBeDefined();
+
+      // Verify the webhook response data made it into the state
+      const patch = finalStepComplete?.patch;
+      expect(patch).toBeDefined();
+      const webhookMessageOp = patch?.find(
+        (op) => op.op === 'add' && op.path === '/webhookMessage'
+      );
+      expect(webhookMessageOp?.value).toBe('Webhook after batch');
+    });
+  });
+
 });
