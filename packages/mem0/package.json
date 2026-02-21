@@ -1,6 +1,6 @@
 {
   "name": "@positronic/mem0",
-  "version": "0.0.61",
+  "version": "0.0.62",
   "publishConfig": {
     "access": "public"
   },
@@ -29,6 +29,6 @@
     "zod": "^3.24.1"
   },
   "peerDependencies": {
-    "@positronic/core": "^0.0.61"
+    "@positronic/core": "^0.0.62"
   }
 }
