@@ -48,7 +48,10 @@
       "WebFetch(domain:planningforaliens.com)",
       "WebFetch(domain:vercel.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:docs.mem0.ai)"
+      "WebFetch(domain:docs.mem0.ai)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic log --oneline v0.0.61..HEAD)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic diff --stat v0.0.61..HEAD)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic status)"
     ],
     "deny": []
   }
