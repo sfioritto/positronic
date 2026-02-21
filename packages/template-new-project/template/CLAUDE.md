@@ -119,6 +119,16 @@ export default brain('approval-workflow')
   }));
 ```
 
+### CSRF Tokens for Pages with Forms
+
+If your brain generates a custom HTML page with a form that submits to a webhook, you must include a CSRF token. Without a token, the server will reject the submission.
+
+1. Generate a token with `generateFormToken()` from `@positronic/core`
+2. Add `<input type="hidden" name="__positronic_token" value="${token}">` to the form
+3. Pass the token when creating the webhook registration: `myWebhook(identifier, token)`
+
+The `.ui()` step handles this automatically. See `/docs/brain-dsl-guide.md` for full examples.
+
 ### How Auto-Discovery Works
 
 - Place webhook files in `/webhooks` directory

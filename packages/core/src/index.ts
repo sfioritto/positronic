@@ -93,6 +93,9 @@ export { createScopedMemory } from './memory/scoped-memory.js';
 // UI types (only UIComponent is public - used by gen-ui-components)
 export type { UIComponent } from './ui/types.js';
 
+// UI utilities
+export { generateFormToken } from './ui/generate-page-html.js';
+
 // Brain state machine
 export {
   createBrainExecutionMachine,

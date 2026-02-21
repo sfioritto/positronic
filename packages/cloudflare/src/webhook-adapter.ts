@@ -20,7 +20,8 @@ export class WebhookAdapter implements Adapter {
       await this.monitorStub.registerWebhook(
         registration.slug,
         registration.identifier,
-        event.brainRunId
+        event.brainRunId,
+        registration.token
       );
     }
   }

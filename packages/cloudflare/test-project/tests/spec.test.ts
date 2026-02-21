@@ -232,7 +232,7 @@ describe('Positronic Spec', () => {
       const result = await webhooks.uiForm(createFetch(), 'test-identifier-123', {
         name: 'Test User',
         email: 'test@example.com',
-      });
+      }, 'test-csrf-token-123');
       expect(result).toBe(true);
     });
 
@@ -240,7 +240,7 @@ describe('Positronic Spec', () => {
       const result = await webhooks.uiForm(createFetch(), 'test-identifier-456', {
         selectedItems: ['item1', 'item2', 'item3'],
         name: 'Test User',
-      });
+      }, 'test-csrf-token-456');
       expect(result).toBe(true);
     });
 

@@ -180,16 +180,19 @@ export const webhooks = {
    * The endpoint:
    * - Accepts form data (application/x-www-form-urlencoded or multipart/form-data)
    * - Requires an `identifier` query parameter to match the waiting brain
+   * - Requires a `__positronic_token` field for CSRF validation
    * - Returns { received: true, action: 'resumed' | 'not_found', ... }
    */
   async uiForm(
     fetch: Fetch,
     identifier: string,
-    formData: Record<string, string | string[]>
+    formData: Record<string, string | string[]>,
+    token: string
   ): Promise<boolean> {
     try {
       // Build URLSearchParams from form data
       const params = new URLSearchParams();
+      params.append('__positronic_token', token);
       for (const [key, value] of Object.entries(formData)) {
         if (Array.isArray(value)) {
           for (const v of value) {

@@ -82,6 +82,13 @@ export class MonitorDO extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS idx_page_persist
       ON page_registrations(persist);
     `);
+
+    // Migration: add token column to webhook_registrations
+    try {
+      this.storage.exec(`ALTER TABLE webhook_registrations ADD COLUMN token TEXT`);
+    } catch {
+      // Column already exists
+    }
   }
 
   handleBrainEvent(event: BrainEvent<any>) {
@@ -408,28 +415,29 @@ export class MonitorDO extends DurableObject<Env> {
    * Register a webhook to wait for
    * Called when a brain emits a WEBHOOK event
    */
-  registerWebhook(slug: string, identifier: string, brainRunId: string) {
+  registerWebhook(slug: string, identifier: string, brainRunId: string, token?: string) {
     this.storage.exec(
       `
-      INSERT INTO webhook_registrations (slug, identifier, brain_run_id, created_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO webhook_registrations (slug, identifier, brain_run_id, token, created_at)
+      VALUES (?, ?, ?, ?, ?)
     `,
       slug,
       identifier,
       brainRunId,
+      token ?? null,
       Date.now()
     );
   }
 
   /**
    * Find a brain waiting for this webhook
-   * Returns the brain_run_id if found, null otherwise
+   * Returns the brain_run_id and token if found, null otherwise
    */
-  findWaitingBrain(slug: string, identifier: string): string | null {
+  findWaitingBrain(slug: string, identifier: string): { brainRunId: string; token: string | null } | null {
     const results = this.storage
       .exec(
         `
-      SELECT brain_run_id as brainRunId
+      SELECT brain_run_id as brainRunId, token
       FROM webhook_registrations
       WHERE slug = ? AND identifier = ?
       LIMIT 1
@@ -439,7 +447,9 @@ export class MonitorDO extends DurableObject<Env> {
       )
       .toArray();
 
-    return results.length > 0 ? (results[0] as any).brainRunId : null;
+    if (results.length === 0) return null;
+    const row = results[0] as any;
+    return { brainRunId: row.brainRunId, token: row.token ?? null };
   }
 
   /**
