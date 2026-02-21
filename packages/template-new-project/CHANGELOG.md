@@ -1,5 +1,11 @@
 # @positronic/template-new-project
 
+## 0.0.63
+
+### Patch Changes
+
+- Replace step-level `waitFor` with dedicated `.wait()` builder method for cleaner webhook/event handling in Brain DSL. Instead of returning `{ state, waitFor: [...] }` from steps, brains now use a `.wait('name', () => webhook(...))` chain method, improving readability and separating concerns between state updates and event subscriptions.
+
 ## 0.0.62
 
 ### Patch Changes

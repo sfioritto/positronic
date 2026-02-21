@@ -1,6 +1,6 @@
 {
   "name": "@positronic/client-anthropic",
-  "version": "0.0.62",
+  "version": "0.0.63",
   "publishConfig": {
     "access": "public"
   },
@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
-    "@positronic/core": "^0.0.62",
+    "@positronic/core": "^0.0.63",
     "@instructor-ai/instructor": "^1.5.0",
     "llm-polyglot": "^2.4.0",
     "dotenv": "^16.4.7",
