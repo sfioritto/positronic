@@ -38,6 +38,11 @@ app.use('*', async (c, next) => {
     return next();
   }
 
+  // Ignore favicon requests (browsers auto-request this when loading pages)
+  if (c.req.path === '/favicon.ico') {
+    return c.body(null, 204);
+  }
+
   // Skip auth for viewing pages (GET /pages/:slug but not GET /pages/ or /pages/:slug/meta)
   if (
     c.req.method === 'GET' &&

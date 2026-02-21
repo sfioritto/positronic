@@ -853,9 +853,9 @@ Sometimes you need more than simple notifications to communicate with users. Thi
 AVAILABLE COMPONENTS:
 ${componentList}
 
-RETURNS: { url: string, webhook: { slug: string, identifier: string } | null }
+RETURNS: { url: string, webhook: { slug: string, identifier: string, token: string } | null }
 - url: The page URL
-- webhook: For forms (hasForm=true), contains slug and identifier that can be passed to waitForWebhook to pause execution until the user submits the form
+- webhook: For forms (hasForm=true), contains slug, identifier, and token that must all be passed to waitForWebhook to pause execution until the user submits the form
 
 IMPORTANT: Users have no way to discover the page URL on their own. After generating a page, you must tell them the URL using whatever communication tools are available.`;
         }
@@ -1047,6 +1047,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               webhooks: webhooks.map((w) => ({
                 slug: w.slug,
                 identifier: w.identifier,
+                token: w.token,
               })),
             };
 
@@ -1303,6 +1304,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Create unique identifier for this form submission webhook
     const webhookIdentifier = `${this.brainRunId}-${step.id}`;
 
+    // Generate CSRF token for form submission validation
+    const formToken = crypto.randomUUID();
+
     // Construct form action URL for the webhook
     const formAction = `${this.env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
 
@@ -1313,6 +1317,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       data: this.currentState as Record<string, unknown>,
       title: stepBlock.title,
       formAction,
+      formToken,
     });
 
     const page = await this.pages.create(html);
@@ -1323,6 +1328,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       slug: 'ui-form',
       identifier: webhookIdentifier,
       schema: uiConfig.responseSchema ?? z.record(z.unknown()),
+      token: formToken,
     };
 
     // Set currentPage for the next step to access
@@ -1398,6 +1404,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       (registration: WebhookRegistration) => ({
         slug: registration.slug,
         identifier: registration.identifier,
+        token: registration.token,
       })
     );
 

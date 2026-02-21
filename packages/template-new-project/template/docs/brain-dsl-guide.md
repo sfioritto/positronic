@@ -1103,6 +1103,87 @@ The created page object contains:
 - `url: string` - Public URL to access the page
 - `webhook: WebhookConfig` - Webhook configuration for handling form submissions
 
+### Custom Pages with Forms (CSRF Token)
+
+When building custom HTML pages with forms, you must include a CSRF token to prevent unauthorized submissions. The `.ui()` step handles this automatically, but custom pages require manual setup. This applies whether you submit to the built-in `ui-form` endpoint or to a custom webhook.
+
+#### Using a Custom Webhook
+
+If your page submits to a custom webhook (e.g., `/webhooks/archive`), pass the token as the second argument when creating the webhook registration:
+
+```typescript
+import { generateFormToken } from '@positronic/core';
+import archiveWebhook from '../webhooks/archive.js';
+
+brain('Archive Workflow')
+  .step('Create Page', async ({ state, pages, env }) => {
+    const formToken = generateFormToken();
+
+    const html = `<html>
+      <body>
+        <form method="POST" action="<%= '${env.origin}' %>/webhooks/archive">
+          <input type="hidden" name="__positronic_token" value="<%= '${formToken}' %>">
+          <input type="text" name="name" placeholder="Your name">
+          <button type="submit">Submit</button>
+        </form>
+      </body>
+    </html>`;
+
+    await pages.create('my-page', html);
+    return { ...state, formToken };
+  })
+  .wait('Wait for submission', ({ state }) => archiveWebhook(state.sessionId, state.formToken))
+  .step('Process', ({ state, response }) => ({
+    ...state,
+    name: response.name,
+  }));
+```
+
+#### Using the System `ui-form` Endpoint
+
+If your page submits to the built-in `ui-form` endpoint, include the token in the webhook registration object:
+
+```typescript
+import { generateFormToken } from '@positronic/core';
+
+brain('Custom Form')
+  .step('Create Form Page', async ({ state, pages, env }) => {
+    const formToken = generateFormToken();
+    const webhookIdentifier = `custom-form-<%= '${Date.now()}' %>`;
+    const formAction = `<%= '${env.origin}' %>/webhooks/system/ui-form?identifier=<%= '${encodeURIComponent(webhookIdentifier)}' %>`;
+
+    const page = await pages.create('my-form', `<html>
+      <body>
+        <form method="POST" action="<%= '${formAction}' %>">
+          <input type="hidden" name="__positronic_token" value="<%= '${formToken}' %>">
+          <input type="text" name="name" placeholder="Your name">
+          <button type="submit">Submit</button>
+        </form>
+      </body>
+    </html>`);
+
+    return {
+      ...state,
+      pageUrl: page.url,
+      webhook: { slug: 'ui-form', identifier: webhookIdentifier, token: formToken },
+    };
+  })
+  .wait('Wait for form', ({ state }) => state.webhook)
+  .step('Process', ({ state, response }) => ({
+    ...state,
+    name: response.name,
+  }));
+```
+
+#### Summary
+
+The three required pieces for any custom page with a form:
+1. Call `generateFormToken()` to get a token
+2. Add `<input type="hidden" name="__positronic_token" value="...">` to your form
+3. Include the `token` in your webhook registration — either as the second argument to a custom webhook function (e.g., `myWebhook(identifier, token)`) or in the registration object for `ui-form`
+
+Without a token, the server will reject the form submission.
+
 ## UI Steps
 
 UI steps allow brains to generate dynamic user interfaces using AI. The `.ui()` step generates a page and provides a `page` object to the next step. You then notify users and use `.wait()` to pause until the form is submitted.

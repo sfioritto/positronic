@@ -86,13 +86,13 @@ Sometimes you need more than simple notifications to communicate with users. Thi
 
 Pass structured data via the 'data' parameter to populate the page with dynamic content. The UI generator uses {{path.to.value}} template bindings to render your data.
 
-RETURNS: { url: string, webhook: { slug: string, identifier: string } | null }
+RETURNS: { url: string, webhook: { slug: string, identifier: string, token: string } | null }
 - url: The page URL
-- webhook: For forms (hasForm=true), contains slug and identifier that can be passed to waitForWebhook to pause execution until the user submits the form
+- webhook: For forms (hasForm=true), contains slug, identifier, and token that must be passed to waitForWebhook to pause execution until the user submits the form
 
 IMPORTANT: Users have no way to discover the page URL on their own. After generating a page, you must tell them the URL using whatever communication tools are available.`,
   inputSchema: generateUIInputSchema,
-  async execute(input, context): Promise<{ url: string; webhook: { slug: string; identifier: string } | null }> {
+  async execute(input, context): Promise<{ url: string; webhook: { slug: string; identifier: string; token: string } | null }> {
     const { components, pages, client, state, env, brainRunId, stepId } = context;
     const hasForm = input.hasForm ?? true;
 
@@ -134,15 +134,18 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     // Create webhook info only if hasForm is true
-    let webhookInfo: { slug: string; identifier: string } | null = null;
+    let webhookInfo: { slug: string; identifier: string; token: string } | null = null;
     let formAction: string | undefined;
+    let formToken: string | undefined;
 
     if (hasForm) {
       const webhookIdentifier = `${brainRunId}-${stepId}-generateui-${Date.now()}`;
+      formToken = crypto.randomUUID();
       formAction = `${env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
       webhookInfo = {
         slug: 'ui-form',
         identifier: webhookIdentifier,
+        token: formToken,
       };
     }
 
@@ -153,6 +156,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       data: (input.data ?? {}) as Record<string, unknown>,
       title: hasForm ? 'Generated Form' : 'Generated Page',
       formAction,
+      formToken,
     });
 
     // Create the page
@@ -176,6 +180,11 @@ const waitForWebhookInputSchema = z.object({
     'The unique identifier for this specific webhook instance. ' +
     'This is returned by generateUI in webhook.identifier. ' +
     'Each generateUI call creates a unique identifier - use the one from the specific page you want to wait for.'
+  ),
+  token: z.string().optional().describe(
+    'The CSRF token for form submission validation. ' +
+    'This is returned by generateUI in webhook.token. ' +
+    'Pass it through to ensure only submissions from the actual page are accepted.'
   ),
 });
 
@@ -221,6 +230,7 @@ RETURNS: The webhook payload when triggered. For UI forms, this contains all for
       slug: input.slug,
       identifier: input.identifier,
       schema: z.record(z.unknown()),
+      token: input.token,
     };
 
     return {

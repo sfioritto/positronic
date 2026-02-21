@@ -1,4 +1,4 @@
-import { generatePageHtml } from '../src/ui/generate-page-html.js';
+import { generatePageHtml, generateFormToken } from '../src/ui/generate-page-html.js';
 import type { Placement } from '../src/ui/types.js';
 
 describe('generatePageHtml', () => {
@@ -129,5 +129,58 @@ describe('generatePageHtml', () => {
 
     // Binding syntax should be preserved in placements
     expect(html).toContain('{{user.email}}');
+  });
+
+  it('should embed formToken as global and hidden input for Form components', () => {
+    const placements: Placement[] = [
+      { id: 'form-1', component: 'Form', props: {}, parentId: null },
+      { id: 'input-1', component: 'Input', props: { name: 'email' }, parentId: 'form-1' },
+    ];
+
+    const token = 'test-csrf-token-123';
+
+    const html = generatePageHtml({
+      placements,
+      rootId: 'form-1',
+      data: {},
+      formAction: '/api/submit',
+      formToken: token,
+    });
+
+    // Token should be embedded as a global variable
+    expect(html).toContain('window.__POSITRONIC_FORM_TOKEN__');
+    expect(html).toContain(token);
+
+    // Bootstrap runtime should include hidden input injection logic
+    expect(html).toContain('__positronic_token');
+    expect(html).toContain('formToken');
+  });
+
+  it('should set formToken global to null when not provided', () => {
+    const placements: Placement[] = [
+      { id: 'root', component: 'Form', props: {}, parentId: null },
+    ];
+
+    const html = generatePageHtml({
+      placements,
+      rootId: 'root',
+      data: {},
+    });
+
+    expect(html).toContain('window.__POSITRONIC_FORM_TOKEN__ = null');
+  });
+
+  describe('generateFormToken', () => {
+    it('should return a UUID string', () => {
+      const token = generateFormToken();
+      expect(typeof token).toBe('string');
+      expect(token).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    });
+
+    it('should return unique tokens', () => {
+      const token1 = generateFormToken();
+      const token2 = generateFormToken();
+      expect(token1).not.toBe(token2);
+    });
   });
 });

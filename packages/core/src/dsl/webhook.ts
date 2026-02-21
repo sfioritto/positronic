@@ -5,12 +5,14 @@ export type WebhookRegistration<TSchema extends z.ZodSchema = z.ZodSchema> = {
   slug: string;
   identifier: string;
   schema: TSchema;
+  token?: string;
 };
 
 // Serializable version for events (no Zod schema)
 export type SerializedWebhookRegistration = {
   slug: string;
   identifier: string;
+  token?: string;
 };
 
 // Type for the webhook handler return value (discriminated union)
@@ -27,7 +29,7 @@ export type WebhookHandlerResult<TSchema extends z.ZodSchema = z.ZodSchema> =
 
 // Type for the webhook function with handler attached
 export interface WebhookFunction<TSchema extends z.ZodSchema = z.ZodSchema> {
-  (identifier: string): WebhookRegistration<TSchema>;
+  (identifier: string, token?: string): WebhookRegistration<TSchema>;
   handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>;
   slug: string;
   schema: TSchema;
@@ -40,10 +42,11 @@ export function createWebhook<TSchema extends z.ZodSchema>(
   handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>
 ): WebhookFunction<TSchema> {
   // Create the registration function
-  const webhookFn = (identifier: string): WebhookRegistration<TSchema> => ({
+  const webhookFn = (identifier: string, token?: string): WebhookRegistration<TSchema> => ({
     slug,
     identifier,
-    schema
+    schema,
+    token,
   });
   
   // Attach properties to the function

@@ -1,6 +1,20 @@
 import type { Placement } from './types.js';
 
 /**
+ * Generate a CSRF token for form submissions.
+ * Use this when building custom HTML pages with forms that submit to webhook endpoints.
+ *
+ * Include the returned token as a hidden input field:
+ * ```html
+ * <input type="hidden" name="__positronic_token" value="${token}">
+ * ```
+ * And include it in the WebhookRegistration's `token` field.
+ */
+export function generateFormToken(): string {
+  return crypto.randomUUID();
+}
+
+/**
  * Options for generating the page HTML.
  */
 export interface GeneratePageHtmlOptions {
@@ -14,6 +28,8 @@ export interface GeneratePageHtmlOptions {
   title?: string;
   /** Form action URL for form submission */
   formAction?: string;
+  /** CSRF token for form submission validation */
+  formToken?: string;
 }
 
 /**
@@ -27,6 +43,7 @@ const bootstrapRuntime = `
   const tree = window.__POSITRONIC_TREE__;
   const rootId = window.__POSITRONIC_ROOT__;
   const formAction = window.__POSITRONIC_FORM_ACTION__;
+  const formToken = window.__POSITRONIC_FORM_TOKEN__;
 
   if (!components) {
     console.error('PositronicComponents not loaded');
@@ -114,7 +131,7 @@ const bootstrapRuntime = `
       return null;
     }
 
-    // Handle Form component - inject action URL
+    // Handle Form component - inject action URL and CSRF token
     if (placement.component === 'Form' && formAction) {
       props.action = formAction;
     }
@@ -127,6 +144,13 @@ const bootstrapRuntime = `
     var children = childIds.map(function(childId) {
       return buildElement(childId, ctx);
     });
+
+    // Prepend hidden CSRF token input to Form components
+    if (placement.component === 'Form' && formToken) {
+      children = [React.createElement('input', {
+        type: 'hidden', name: '__positronic_token', value: formToken, key: '__positronic_token'
+      })].concat(children);
+    }
 
     return React.createElement(Component, props, children.length > 0 ? children : undefined);
   }
@@ -168,6 +192,7 @@ export function generatePageHtml(options: GeneratePageHtmlOptions): string {
     data,
     title = 'Generated Page',
     formAction,
+    formToken,
   } = options;
 
   // Escape for embedding in HTML
@@ -207,6 +232,7 @@ export function generatePageHtml(options: GeneratePageHtmlOptions): string {
     window.__POSITRONIC_TREE__ = ${safeJsonStringify(placements)};
     window.__POSITRONIC_ROOT__ = ${safeJsonStringify(rootId)};
     window.__POSITRONIC_FORM_ACTION__ = ${formAction ? safeJsonStringify(formAction) : 'null'};
+    window.__POSITRONIC_FORM_TOKEN__ = ${formToken ? safeJsonStringify(formToken) : 'null'};
   </script>
 
   <!-- Bootstrap runtime -->

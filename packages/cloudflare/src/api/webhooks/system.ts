@@ -20,9 +20,24 @@ system.post('/ui-form', async (context: Context) => {
 
   try {
     const formData = await context.req.formData();
-    const response = parseFormData(formData);
+    const { data: response, token } = parseFormData(formData);
 
-    const result = await queueWebhookAndWakeUp(context, 'ui-form', identifier, response);
+    // System ui-form endpoint always requires a CSRF token
+    if (!token) {
+      return context.json({
+        received: false,
+        action: 'ignored',
+        identifier,
+        reason: 'Missing form token',
+      }, 403);
+    }
+
+    const result = await queueWebhookAndWakeUp(context, 'ui-form', identifier, response, token);
+
+    // Return 403 if token mismatch
+    if (result.action === 'ignored' && result.reason === 'Invalid form token') {
+      return context.json(result, 403);
+    }
 
     // Return 404 if no brain was waiting
     if (result.action === 'not_found') {
