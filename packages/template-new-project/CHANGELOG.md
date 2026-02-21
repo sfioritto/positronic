@@ -1,5 +1,17 @@
 # @positronic/template-new-project
 
+## 0.0.62
+
+### Patch Changes
+
+- - Replace .if().then().else() with .guard() for conditional branching in Brain DSL
+  - Overhaul batch processing: chunk-based execution with alarm-based DO restart, fix null entries after JSON round-trip, stop emitting PAUSED between chunks, fix webhook rejection after restart
+  - Enable authentication everywhere (local dev + tests); make pages and bundles public; skip auth for form submissions
+  - Move retry logic from framework to client SDKs; add rate limit retry with exponential backoff to Vercel client
+  - Add Link component to gen-ui-components
+  - Replace deprecated generateObject with generateText + Output.object; fix generateUI hanging
+  - Add toolChoice parameter for agent steps; add createAuthenticatedFetch helper
+
 ## 0.0.61
 
 ### Patch Changes
