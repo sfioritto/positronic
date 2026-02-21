@@ -4,6 +4,7 @@ import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentOutput
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
+import type { WebhookRegistration } from '../webhook.js';
 
 // Shared interface for step action functions
 export type StepAction<
@@ -12,7 +13,6 @@ export type StepAction<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWaitFor extends readonly any[] = readonly [],
   TResponseOut extends JsonObject | undefined = undefined,
   TPageIn extends GeneratedPage | undefined = undefined
 > = (
@@ -29,8 +29,6 @@ export type StepAction<
 ) =>
   | TStateOut
   | Promise<TStateOut>
-  | { state: TStateOut; waitFor: TWaitFor }
-  | Promise<{ state: TStateOut; waitFor: TWaitFor }>
   | { state: TStateOut; promptResponse: TResponseOut }
   | Promise<{ state: TStateOut; promptResponse: TResponseOut }>;
 
@@ -40,7 +38,6 @@ export type StepBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWebhooks extends readonly any[] = readonly [],
   TPageIn extends GeneratedPage | undefined = undefined
 > = {
   type: 'step';
@@ -51,7 +48,6 @@ export type StepBlock<
     TOptions,
     TServices,
     TResponseIn,
-    TWebhooks,
     JsonObject | undefined,
     TPageIn
   >;
@@ -73,6 +69,31 @@ export type StepBlock<
     client?: ObjectGenerator;
     chunkSize?: number;
   };
+};
+
+export type WaitBlock<
+  TState,
+  TOptions extends JsonObject = JsonObject,
+  TServices extends object = object,
+  TPage extends GeneratedPage | undefined = undefined
+> = {
+  type: 'wait';
+  title: string;
+  action: (
+    params: {
+      state: TState;
+      options: TOptions;
+      client: ObjectGenerator;
+      resources: Resources;
+      page: TPage;
+      pages?: PagesService;
+      env: RuntimeEnv;
+    } & TServices
+  ) =>
+    | WebhookRegistration<any>
+    | readonly WebhookRegistration<any>[]
+    | Promise<WebhookRegistration<any>>
+    | Promise<readonly WebhookRegistration<any>[]>;
 };
 
 // BrainBlock uses a generic TInnerBrain to avoid circular dependency with Brain class
@@ -134,7 +155,6 @@ export type Block<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TWebhooks extends readonly any[] = readonly [],
   TPageIn extends GeneratedPage | undefined = undefined
 > =
   | StepBlock<
@@ -143,9 +163,9 @@ export type Block<
       TOptions,
       TServices,
       TResponseIn,
-      TWebhooks,
       TPageIn
     >
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
   | AgentBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>
-  | GuardBlock<TStateIn, TOptions>;
+  | GuardBlock<TStateIn, TOptions>
+  | WaitBlock<TStateIn, TOptions, TServices, TPageIn>;

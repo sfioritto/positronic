@@ -14,7 +14,7 @@ import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
 
 import type { BrainEvent } from '../definitions/events.js';
-import type { Block, StepBlock, BrainBlock, AgentBlock, GuardBlock } from '../definitions/blocks.js';
+import type { Block, StepBlock, BrainBlock, AgentBlock, GuardBlock, WaitBlock } from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams, ResumeContext } from '../definitions/run-params.js';
 
@@ -50,13 +50,14 @@ export class BrainEventStream<
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
+  private waits: Map<number, WaitBlock<any, any, any, any>> = new Map();
   private stopped = false;
 
   constructor(
     params: (InitialRunParams<TOptions> | ResumeRunParams<TOptions>) & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices, any, any, any>[];
+      blocks: Block<any, any, TOptions, TServices, any, any>[];
       services: TServices;
       components?: Record<string, UIComponent<any>>;
       defaultTools?: Record<string, AgentTool>;
@@ -104,12 +105,15 @@ export class BrainEventStream<
       this.scopedMemory = createScopedMemory(memoryProvider, title);
     }
 
-    // Initialize steps - track guard blocks by index
+    // Initialize steps - track guard and wait blocks by index
     this.steps = [];
     for (const block of blocks) {
       if (block.type === 'guard') {
         const guardBlock = block as GuardBlock<any, any>;
         this.guards.set(this.steps.length, guardBlock);
+      } else if (block.type === 'wait') {
+        const waitBlock = block as WaitBlock<any, any, any, any>;
+        this.waits.set(this.steps.length, waitBlock);
       }
       this.steps.push(new Step(block));
     }
@@ -284,6 +288,14 @@ export class BrainEventStream<
           continue;
         }
 
+        // Handle wait blocks
+        const waitBlock = this.waits.get(this.currentStepIndex);
+        if (waitBlock) {
+          yield* this.executeWait(step, waitBlock);
+          this.currentStepIndex++;
+          continue;
+        }
+
         // Step start event
         yield {
           type: BRAIN_EVENTS.STEP_START,
@@ -377,7 +389,7 @@ export class BrainEventStream<
     const block = step.block as Block<any, any, TOptions, TServices, any, any>;
 
     if (block.type === 'step') {
-      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any, any>;
+      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
 
       // Check if this is a UI step - handle specially
       if (stepBlock.isUIStep) {
@@ -468,7 +480,7 @@ export class BrainEventStream<
     } else {
       // Get previous state before action
       const prevState = this.currentState;
-      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any, any>;
+      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
 
       // Execute step with automatic retry on failure
       let retries = 0;
@@ -516,30 +528,13 @@ export class BrainEventStream<
         }
       }
 
-      // Extract state from result (handles waitFor and promptResponse cases)
-      if (result && typeof result === 'object' && ('waitFor' in result || 'promptResponse' in result)) {
+      // Extract state from result (handles promptResponse case)
+      if (result && typeof result === 'object' && 'promptResponse' in result) {
         this.currentState = result.state;
       } else {
         this.currentState = result;
       }
       yield* this.completeStep(step, prevState);
-
-      if (result && typeof result === 'object' && 'waitFor' in result) {
-        // Serialize webhook registrations (remove Zod schemas for event serializability)
-        const serializedWaitFor: SerializedWebhookRegistration[] = result.waitFor.map(
-          (registration: WebhookRegistration) => ({
-            slug: registration.slug,
-            identifier: registration.identifier,
-          })
-        );
-
-        yield {
-          type: BRAIN_EVENTS.WEBHOOK,
-          waitFor: serializedWaitFor,
-          options: this.options,
-          brainRunId: this.brainRunId,
-        };
-      }
 
       // Handle promptResponse - set currentResponse for next step
       if (result && typeof result === 'object' && 'promptResponse' in result) {
@@ -1151,7 +1146,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
    * Cloudflare backends can restart the DO to reclaim memory.
    */
   private async *executeBatchPrompt(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as StepBlock<any, any, TOptions, TServices, any, any, any>;
+    const block = step.block as StepBlock<any, any, TOptions, TServices, any, any>;
     const batchConfig = block.batchConfig!;
     const prevState = this.currentState;
     const client = batchConfig.client ?? this.client;
@@ -1202,7 +1197,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
       // Process chunk concurrently
       const chunkResults = await Promise.all(
-        chunk.map(async (item) => {
+        chunk.map(async (item: any) => {
           try {
             const promptText = await batchConfig.template(item, this.resources);
             const output = await client.generateObject({
@@ -1254,7 +1249,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
    */
   private async *executeUIStep(
     step: Step,
-    stepBlock: StepBlock<any, any, TOptions, TServices, any, any, any>
+    stepBlock: StepBlock<any, any, TOptions, TServices, any, any>
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const prevState = this.currentState;
 
@@ -1339,6 +1334,83 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // State doesn't change from UI step - it just sets up the page
     // The next step will receive the page object and can use waitFor
     yield* this.completeStep(step, prevState);
+  }
+
+  private async *executeWait(
+    step: Step,
+    waitBlock: WaitBlock<any, any, any, any>
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const { steps, options, brainRunId } = this;
+
+    // Emit STEP_START for the wait block
+    yield {
+      type: BRAIN_EVENTS.STEP_START,
+      status: STATUS.RUNNING,
+      stepTitle: step.block.title,
+      stepId: step.id,
+      stepIndex: this.currentStepIndex,
+      options,
+      brainRunId,
+    };
+
+    step.withStatus(STATUS.RUNNING);
+
+    yield {
+      type: BRAIN_EVENTS.STEP_STATUS,
+      steps: steps.map((s) => {
+        const { patch, ...rest } = s.serialized;
+        return rest;
+      }),
+      options,
+      brainRunId,
+    };
+
+    // Execute the wait action (side effects like notifications happen here)
+    const result = await waitBlock.action({
+      state: this.currentState,
+      options: this.options ?? ({} as TOptions),
+      client: this.client,
+      resources: this.resources,
+      page: this.currentPage,
+      pages: this.pages,
+      env: this.env,
+      ...this.services,
+    });
+
+    // Complete step (state unchanged, generates empty patch)
+    yield* this.completeStep(step, this.currentState);
+
+    yield {
+      type: BRAIN_EVENTS.STEP_STATUS,
+      steps: steps.map((s) => {
+        const { patch, ...rest } = s.serialized;
+        return rest;
+      }),
+      options,
+      brainRunId,
+    };
+
+    // Normalize result to array (handle single webhook case)
+    const webhooks = Array.isArray(result) ? result : [result];
+
+    // Serialize webhooks (strip Zod schemas)
+    const serializedWaitFor: SerializedWebhookRegistration[] = webhooks.map(
+      (registration: WebhookRegistration) => ({
+        slug: registration.slug,
+        identifier: registration.identifier,
+      })
+    );
+
+    // Emit WEBHOOK event
+    yield {
+      type: BRAIN_EVENTS.WEBHOOK,
+      waitFor: serializedWaitFor,
+      options: this.options,
+      brainRunId: this.brainRunId,
+    };
+
+    // Reset currentPage after wait consumes it (page is ephemeral)
+    this.currentPage = undefined;
   }
 
   private *executeGuard(

@@ -40,13 +40,11 @@ describe('webhook type inference', () => {
       })
       .step('Step 1', ({ state }) => {
         return {
-          state: {
-            ...state,
-            step1: 'value',
-          },
-          waitFor: [webhook1('id1'), webhook2('id2')],
+          ...state,
+          step1: 'value',
         };
       })
+      .wait('Wait for webhooks', () => [webhook1('id1'), webhook2('id2')])
       .step('Step 2', ({ state, response }) => {
         // Type inference test: response should be a union of both webhook response types
         if (response) {

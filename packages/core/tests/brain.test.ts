@@ -254,10 +254,7 @@ describe('brain creation', () => {
       .step('First step', () => {
         return { count: 1 };
       })
-      .step('Webhook step', ({ state }) => ({
-        state,
-        waitFor: [testWebhook('test-id')],
-      }))
+      .wait('Webhook step', () => testWebhook('test-id'))
       .step('Third step', ({ state }) => ({
         ...state,
         processed: true,
@@ -1538,10 +1535,10 @@ describe('nested brains', () => {
       'Inner Brain'
     )
       .step('Inner step 1', ({ state }) => ({ count: state.count + 1 }))
-      .step('Wait for webhook', ({ state }) => ({
-        state: { ...state, waiting: true },
-        waitFor: [testWebhook('test-id')],
+      .step('Prepare wait', ({ state }) => ({
+        ...state, waiting: true,
       }))
+      .wait('Wait for webhook', () => testWebhook('test-id'))
       .step('Process webhook', ({ state, response }) => ({
         ...state,
         webhookData: response?.data || 'no-data',
@@ -1597,13 +1594,13 @@ describe('nested brains', () => {
 
     // Build resumeContext from events using the new tree structure
     // Outer brain: at step 1 (the inner brain step), state after step 0
-    // Inner brain: at step 2 (Process webhook), state after steps 0 and 1
+    // Inner brain: at step 3 (Process webhook), state after steps 0, 1, and 2
     const resumeContext: ResumeContext = {
       stepIndex: 1, // Outer brain is at step 1 (Run inner brain)
       state: { prefix: 'outer-' }, // State after outer step 1
       innerResumeContext: {
-        stepIndex: 2, // Inner brain resumes at step 2 (Process webhook)
-        state: { count: 1, waiting: true }, // State after inner steps 0 and 1
+        stepIndex: 3, // Inner brain resumes at step 3 (Process webhook)
+        state: { count: 1, waiting: true }, // State after inner steps 0, 1, and 2
         webhookResponse: { data: 'hello from webhook!' },
       },
     };

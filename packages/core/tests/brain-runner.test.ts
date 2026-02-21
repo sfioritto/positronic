@@ -403,10 +403,7 @@ describe('BrainRunner', () => {
 
     const testBrain = brain('Webhook Test Brain')
       .step('First Step', () => ({ count: 1 }))
-      .step('Webhook Step', ({ state }) => ({
-        state,
-        waitFor: [testWebhook('test-id')],
-      }))
+      .wait('Webhook Step', () => testWebhook('test-id'))
       .step('Third Step', ({ state }) => ({
         ...state,
         processed: true,
@@ -474,10 +471,10 @@ describe('BrainRunner', () => {
 
     const testBrain = brain('Webhook Resume Brain')
       .step('Initial Step', () => ({ count: 1 }))
-      .step('Webhook Step', ({ state }) => ({
-        state: { ...state, webhookSent: true },
-        waitFor: [userInputWebhook('user-id')],
+      .step('Prepare Webhook', ({ state }) => ({
+        ...state, webhookSent: true,
       }))
+      .wait('Webhook Step', () => userInputWebhook('user-id'))
       .step('Process Response', ({ state, response }) => ({
         ...state,
         userResponse: response?.userInput || 'no response',
@@ -520,8 +517,15 @@ describe('BrainRunner', () => {
       type: BRAIN_EVENTS.STEP_COMPLETE,
       brainRunId,
       stepId: 'step-1',
-      stepTitle: 'Webhook Step',
+      stepTitle: 'Prepare Webhook',
       patch: [{ op: 'add', path: '/webhookSent', value: true }],
+    });
+    sendEvent(machine, {
+      type: BRAIN_EVENTS.STEP_COMPLETE,
+      brainRunId,
+      stepId: 'step-2',
+      stepTitle: 'Webhook Step',
+      patch: [],
     });
     sendEvent(machine, {
       type: BRAIN_EVENTS.WEBHOOK,

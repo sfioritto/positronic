@@ -202,7 +202,7 @@ Each step receives these parameters:
 - `client` - AI client for generating structured objects
 - `resources` - Loaded resources (files, documents, etc.)
 - `options` - Runtime options passed to the brain
-- `response` - Webhook response data (available after `waitFor` completes)
+- `response` - Webhook response data (available after `.wait()` completes)
 - `page` - Generated page object (available after `.ui()` step)
 - `pages` - Pages service for HTML page management
 - `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
@@ -1105,7 +1105,7 @@ The created page object contains:
 
 ## UI Steps
 
-UI steps allow brains to generate dynamic user interfaces using AI. The `.ui()` step generates a page and provides a `page` object to the next step. You then notify users and use `waitFor` to pause until the form is submitted.
+UI steps allow brains to generate dynamic user interfaces using AI. The `.ui()` step generates a page and provides a `page` object to the next step. You then notify users and use `.wait()` to pause until the form is submitted.
 
 ### Basic UI Step
 
@@ -1128,14 +1128,13 @@ brain('Feedback Collector')
       comments: z.string(),
     }),
   })
-  // Notify user and wait for submission
-  .step('Notify and Wait', async ({ state, page, slack }) => {
+  // Notify user
+  .step('Notify', async ({ state, page, slack }) => {
     await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
-    return {
-      state,
-      waitFor: [page.webhook],
-    };
+    return state;
   })
+  // Wait for form submission
+  .wait('Wait for submission', ({ page }) => page.webhook)
   // Process the form data (comes through response, not page)
   .step('Process Feedback', ({ state, response }) => ({
     ...state,
@@ -1151,8 +1150,8 @@ brain('Feedback Collector')
 2. **AI Generation**: The AI creates a component tree based on the prompt
 3. **Page Object**: Next step receives `page` with `url` and `webhook`
 4. **Notification**: You notify users however you want (Slack, email, etc.)
-5. **Wait**: Use `waitFor: [page.webhook]` to pause until form submission
-6. **Form Data**: Step after `waitFor` receives form data via `response`
+5. **Wait**: Use `.wait('title', ({ page }) => page.webhook)` to pause until form submission
+6. **Form Data**: Step after `.wait()` receives form data via `response`
 
 ### The `page` Object
 
@@ -1225,10 +1224,11 @@ brain('User Onboarding')
       dob: z.string(),
     }),
   })
-  .step('Wait for Personal', async ({ state, page, notify }) => {
+  .step('Notify Personal', async ({ state, page, notify }) => {
     await notify(`Step 1: <%= '${page.url}' %>`);
-    return { state, waitFor: [page.webhook] };
+    return state;
   })
+  .wait('Wait for Personal', ({ page }) => page.webhook)
   .step('Save Personal', ({ state, response }) => ({
     ...state,
     userData: { ...state.userData, ...response },
@@ -1247,10 +1247,11 @@ brain('User Onboarding')
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
   })
-  .step('Wait for Preferences', async ({ state, page, notify }) => {
+  .step('Notify Preferences', async ({ state, page, notify }) => {
     await notify(`Step 2: <%= '${page.url}' %>`);
-    return { state, waitFor: [page.webhook] };
+    return state;
   })
+  .wait('Wait for Preferences', ({ page }) => page.webhook)
   .step('Complete', ({ state, response }) => ({
     ...state,
     userData: { ...state.userData, preferences: response },
