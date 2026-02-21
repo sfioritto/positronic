@@ -91,10 +91,10 @@ const titleTestBrain = brain({ title: 'Brain with Custom Title', description: 'T
 
 // Brain that uses webhooks
 const webhookBrain = brain({ title: 'webhook-brain', description: 'A brain that waits for webhooks' })
-  .step('Send message and wait', ({ state }) => ({
-    state: { ...state, waiting: true },
-    waitFor: [testWebhook('test-thread-123')],
+  .step('Prepare', ({ state }) => ({
+    ...state, waiting: true,
   }))
+  .wait('Wait for webhook', () => testWebhook('test-thread-123'))
   .step('Process response', ({ state, response }) => ({
     ...state,
     waiting: false,
@@ -108,10 +108,10 @@ const innerWebhookBrain = brain<{ data: string }, { count: number }>({
   description: 'Inner brain that waits for webhooks',
 })
   .step('Inner step 1', ({ state }) => ({ count: state.count + 1 }))
-  .step('Wait for inner webhook', ({ state }) => ({
-    state: { ...state, waiting: true },
-    waitFor: [innerWebhook('inner-test-id')],
+  .step('Prepare inner wait', ({ state }) => ({
+    ...state, waiting: true,
   }))
+  .wait('Wait for inner webhook', () => innerWebhook('inner-test-id'))
   .step('Process inner webhook', ({ state, response }) => ({
     ...state,
     waiting: false,
@@ -159,10 +159,10 @@ const outerWebhookAfterInner = brain({
     ({ state, brainState }) => ({ ...state, innerResult: brainState }),
     () => ({})
   )
-  .step('Wait for webhook', ({ state }) => ({
-    state: { ...state, waitingForWebhook: true },
-    waitFor: [testWebhook('outer-status-test')],
+  .step('Prepare webhook wait', ({ state }) => ({
+    ...state, waitingForWebhook: true,
   }))
+  .wait('Wait for webhook', () => testWebhook('outer-status-test'))
   .step('After webhook', ({ state }) => ({ ...state, complete: true }));
 
 // Brain that uses the pages service
@@ -249,10 +249,10 @@ const pageWebhookBrain = brain({ title: 'page-webhook-brain', description: 'A br
       pageUrl: page.url,
     };
   })
-  .step('Wait for webhook', ({ state }) => ({
-    state: { ...state, waiting: true },
-    waitFor: [testWebhook('page-webhook-test')],
+  .step('Prepare webhook wait', ({ state }) => ({
+    ...state, waiting: true,
   }))
+  .wait('Wait for webhook', () => testWebhook('page-webhook-test'))
   .step('After webhook', ({ state, response }) => ({
     ...state,
     waiting: false,
@@ -337,10 +337,10 @@ const largeStateWebhookBrain = brain({ title: 'large-state-webhook-brain', descr
       largeData: largeString,
     };
   })
-  .step('Wait for webhook', ({ state }) => ({
-    state: { ...state, waiting: true },
-    waitFor: [testWebhook('large-state-test')],
+  .step('Prepare webhook wait', ({ state }) => ({
+    ...state, waiting: true,
   }))
+  .wait('Wait for webhook', () => testWebhook('large-state-test'))
   .step('After webhook', ({ state, response }) => ({
     ...state,
     waiting: false,
@@ -372,10 +372,10 @@ const batchWebhookBrain = brain({ title: 'batch-webhook-brain', description: 'Ba
       chunkSize: 2,
     }
   )
-  .step('Wait for webhook', ({ state }) => ({
-    state: { ...state, waiting: true },
-    waitFor: [testWebhook('batch-webhook-test')],
+  .step('Prepare webhook wait', ({ state }) => ({
+    ...state, waiting: true,
   }))
+  .wait('Wait for webhook', () => testWebhook('batch-webhook-test'))
   .step('Process webhook response', ({ state, response }) => ({
     ...state,
     waiting: false,

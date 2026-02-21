@@ -45,11 +45,9 @@ export const emailWebhook = createWebhook(
 
 const myBrain = brain('My Brain')
   .step('My Step', ({ state }) => {
-    return {
-      state: { cool: 'thing', ...state },
-      waitFor: [slackWebhook('thread-123'), emailWebhook('email-456')],
-    };
+    return { cool: 'thing', ...state };
   })
+  .wait('Wait for response', () => [slackWebhook('thread-123'), emailWebhook('email-456')])
   .step('My Step 2', ({ state, response }) => {
     if (response) {
       if ('threadId' in response) {

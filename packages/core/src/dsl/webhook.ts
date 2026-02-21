@@ -61,6 +61,9 @@ type ExtractSchema<T> = T extends { schema: infer S }
     : never 
   : never;
 
+// Helper to normalize a single WebhookRegistration into a tuple for ExtractWebhookResponses
+export type NormalizeToArray<T> = T extends readonly any[] ? T : readonly [T];
+
 // Helper type to extract the union of response types from an array of webhook registrations
 export type ExtractWebhookResponses<T> = T extends readonly [...infer Items]
   ? Items[number] extends infer Item

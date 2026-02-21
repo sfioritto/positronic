@@ -101,7 +101,7 @@ export default approvalWebhook;
 
 ### Using Webhooks in Brains
 
-Import the webhook and use it with `waitFor`:
+Import the webhook and use `.wait()` to pause execution:
 
 ```typescript
 import { brain } from '../brain.js';
@@ -109,9 +109,9 @@ import approvalWebhook from '../webhooks/approval.js';
 
 export default brain('approval-workflow')
   .step('Request approval', ({ state }) => ({
-    state: { ...state, status: 'pending' },
-    waitFor: [approvalWebhook(state.requestId)],  // pause and wait
+    ...state, status: 'pending',
   }))
+  .wait('Wait for approval', ({ state }) => approvalWebhook(state.requestId))
   .step('Process approval', ({ state, response }) => ({
     ...state,
     status: response.approved ? 'approved' : 'rejected',

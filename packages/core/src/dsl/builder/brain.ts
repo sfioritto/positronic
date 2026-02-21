@@ -2,14 +2,14 @@ import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
 import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentOutputSchema, StepContext } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
-import type { ExtractWebhookResponses } from '../webhook.js';
+import type { WebhookRegistration, ExtractWebhookResponses, NormalizeToArray } from '../webhook.js';
 import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import type { MemoryProvider } from '../../memory/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
-import type { Block, StepBlock, BrainBlock, AgentBlock, GuardBlock } from '../definitions/blocks.js';
+import type { Block, StepBlock, BrainBlock, AgentBlock, GuardBlock, WaitBlock } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams } from '../definitions/run-params.js';
 
@@ -22,7 +22,7 @@ export class Brain<
   TResponse extends JsonObject | undefined = undefined,
   TPage extends GeneratedPage | undefined = undefined
 > {
-  private blocks: Block<any, any, TOptions, TServices, any, any, any>[] = [];
+  private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
   private optionsSchema?: z.ZodSchema<any>;
@@ -50,6 +50,11 @@ export class Brain<
         } else if (block.type === 'guard') {
           return {
             type: 'guard' as const,
+            title: block.title,
+          };
+        } else if (block.type === 'wait') {
+          return {
+            type: 'wait' as const,
             title: block.title,
           };
         } else {
@@ -188,26 +193,20 @@ export class Brain<
     return next;
   }
 
-  step<
-    TNewState extends State,
-    TWaitFor extends readonly any[] = readonly []
-  >(
+  step<TNewState extends State>(
     title: string,
     action: (
       params: StepContext<TState, TOptions, TResponse, TPage> & TServices
     ) =>
       | TNewState
       | Promise<TNewState>
-      | { state: TNewState; waitFor: TWaitFor }
-      | Promise<{ state: TNewState; waitFor: TWaitFor }>
-  ): Brain<TOptions, TNewState, TServices, ExtractWebhookResponses<TWaitFor>, undefined> {
+  ): Brain<TOptions, TNewState, TServices, undefined, undefined> {
     const stepBlock: StepBlock<
       TState,
       TNewState,
       TOptions,
       TServices,
       TResponse,
-      TWaitFor,
       TPage
     > = {
       type: 'step',
@@ -216,7 +215,25 @@ export class Brain<
     };
     this.blocks.push(stepBlock);
 
-    return this.nextBrain<TNewState, ExtractWebhookResponses<TWaitFor>, undefined>();
+    return this.nextBrain<TNewState, undefined, undefined>();
+  }
+
+  wait<TWaitFor extends WebhookRegistration<any> | readonly WebhookRegistration<any>[]>(
+    title: string,
+    action: (
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices
+    ) =>
+      | TWaitFor
+      | Promise<TWaitFor>
+  ): Brain<TOptions, TState, TServices, ExtractWebhookResponses<NormalizeToArray<TWaitFor>>, undefined> {
+    const waitBlock: WaitBlock<TState, TOptions, TServices, TPage> = {
+      type: 'wait',
+      title,
+      action: action as any,
+    };
+    this.blocks.push(waitBlock);
+
+    return this.nextBrain<TState, ExtractWebhookResponses<NormalizeToArray<TWaitFor>>, undefined>();
   }
 
   guard(
@@ -431,7 +448,6 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly [],
         TPage
       > = {
         type: 'step',
@@ -465,7 +481,6 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly [],
         TPage
       > = {
         type: 'step',
@@ -492,7 +507,6 @@ export class Brain<
         TOptions,
         TServices,
         TResponse,
-        readonly [],
         TPage
       > = {
         type: 'step',
@@ -532,8 +546,8 @@ export class Brain<
    * - `webhook`: Pre-configured WebhookRegistration for form submissions
    *
    * The brain author is responsible for notifying users about the page (via Slack,
-   * email, etc.) and using `waitFor` to pause until the form is submitted.
-   * Form data arrives in the `response` parameter of the step after `waitFor`.
+   * email, etc.) and using `.wait()` to pause until the form is submitted.
+   * Form data arrives in the `response` parameter of the step after `.wait()`.
    *
    * @example
    * ```typescript
@@ -546,12 +560,11 @@ export class Brain<
    *       comments: z.string(),
    *     }),
    *   })
-   *   .step('Notify and Wait', async ({ state, page, slack }) => {
-   *     // Notify user however you want
+   *   .step('Notify', async ({ state, page, slack }) => {
    *     await slack.post('#general', `Please fill out: ${page.url}`);
-   *     // Wait for form submission
-   *     return { state, waitFor: [page.webhook] };
+   *     return state;
    *   })
+   *   .wait('Wait for submission', ({ page }) => page.webhook)
    *   .step('Process Feedback', ({ state, response }) => ({
    *     ...state,
    *     // response is typed: { rating: number, comments: string }
@@ -576,7 +589,6 @@ export class Brain<
       TOptions,
       TServices,
       TResponse,
-      readonly [],
       TPage
     > = {
       type: 'step',
@@ -644,7 +656,7 @@ export class Brain<
   }
 
   private withBlocks(
-    blocks: Block<any, any, TOptions, TServices, any, any, any>[]
+    blocks: Block<any, any, TOptions, TServices, any, any>[]
   ): this {
     this.blocks = blocks;
     return this;

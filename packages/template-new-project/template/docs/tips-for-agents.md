@@ -207,8 +207,8 @@ Most generated brains should not have try-catch blocks. Only use them when the e
 When you need to collect user input, use the `.ui()` method. The pattern is:
 1. `.ui()` generates the page
 2. Next step gets `page.url` and `page.webhook`
-3. Notify users and use `waitFor: [page.webhook]`
-4. Step after `waitFor` gets form data in `response`
+3. Notify users, then use `.wait()` with `page.webhook`
+4. Step after `.wait()` gets form data in `response`
 
 ```typescript
 import { z } from 'zod';
@@ -231,11 +231,13 @@ brain('feedback-collector')
       comments: z.string(),
     }),
   })
-  // Notify and wait for submission
+  // Notify users
   .step('Notify', async ({ state, page, slack }) => {
     await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
-    return { state, waitFor: [page.webhook] };
+    return state;
   })
+  // Wait for form submission
+  .wait('Wait for submission', ({ page }) => page.webhook)
   // Form data comes through response (not page)
   .step('Process', ({ state, response }) => ({
     ...state,
@@ -246,8 +248,8 @@ brain('feedback-collector')
 
 Key points:
 - `page.url` - where to send users
-- `page.webhook` - use with `waitFor` to pause for submission
-- `response` - form data arrives here (in step after `waitFor`)
+- `page.webhook` - use with `.wait()` to pause for submission
+- `response` - form data arrives here (in step after `.wait()`)
 - You control how users are notified (Slack, email, etc.)
 
 See `/docs/brain-dsl-guide.md` for more UI step examples.
