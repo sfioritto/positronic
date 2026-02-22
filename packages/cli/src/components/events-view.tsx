@@ -90,12 +90,6 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `Step completed: "${event.stepTitle}"`,
         color: 'green',
       };
-    case BRAIN_EVENTS.STEP_RETRY:
-      return {
-        symbol: '[?]',
-        text: `Step retry: "${event.stepTitle}" (attempt ${event.attempt})`,
-        color: 'yellow',
-      };
     case BRAIN_EVENTS.STEP_STATUS:
       return {
         symbol: '[-]',

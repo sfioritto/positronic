@@ -745,15 +745,6 @@ describe('error handling', () => {
         type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
       }),
-      // Inner brain step retries once before failing
-      expect.objectContaining({
-        type: BRAIN_EVENTS.STEP_RETRY,
-        stepTitle: 'Throw error',
-        attempt: 1,
-        error: expect.objectContaining({
-          message: 'Inner brain error',
-        }),
-      }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
         brainTitle: 'Failing Inner Brain',
@@ -1304,15 +1295,6 @@ describe('nested brains', () => {
       expect.objectContaining({
         type: BRAIN_EVENTS.STEP_STATUS,
         steps: expect.any(Array),
-      }),
-      // Inner brain step retries once before failing
-      expect.objectContaining({
-        type: BRAIN_EVENTS.STEP_RETRY,
-        stepTitle: 'Throw error',
-        attempt: 1,
-        error: expect.objectContaining({
-          message: 'Inner brain error',
-        }),
       }),
       expect.objectContaining({
         type: BRAIN_EVENTS.ERROR,
@@ -2181,57 +2163,13 @@ describe('brain structure', () => {
     });
   });
 
-  describe('step retry behavior', () => {
-    it('should retry a step that fails once then succeeds', async () => {
+  describe('step error propagation', () => {
+    it('should propagate step errors immediately without retry', async () => {
       let callCount = 0;
-      const testBrain = brain('Retry Brain').step('Flaky step', () => {
+      const testBrain = brain('Error Propagation Brain').step('Failing step', () => {
         callCount++;
-        if (callCount === 1) {
-          throw new Error('First attempt failed');
-        }
-        return { success: true };
+        throw new Error('Step failed');
       });
-
-      const events: BrainEvent<any>[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
-        events.push(event);
-      }
-
-      // Verify step was called twice
-      expect(callCount).toBe(2);
-
-      // Verify STEP_RETRY event was emitted
-      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
-      expect(retryEvent).toBeDefined();
-      expect(retryEvent).toEqual(
-        expect.objectContaining({
-          type: BRAIN_EVENTS.STEP_RETRY,
-          stepTitle: 'Flaky step',
-          stepId: expect.any(String),
-          error: expect.objectContaining({
-            name: 'Error',
-            message: 'First attempt failed',
-          }),
-          attempt: 1,
-        })
-      );
-
-      // Verify brain completed successfully
-      const completeEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.COMPLETE
-      );
-      expect(completeEvent).toBeDefined();
-    });
-
-    it('should emit ERROR event when step fails twice', async () => {
-      let callCount = 0;
-      const testBrain = brain('Always Fail Brain').step(
-        'Always fails',
-        () => {
-          callCount++;
-          throw new Error('This step always fails');
-        }
-      );
 
       const events: BrainEvent<any>[] = [];
       let error: Error | undefined;
@@ -2244,24 +2182,13 @@ describe('brain structure', () => {
         error = e as Error;
       }
 
-      // Verify step was called twice (initial + 1 retry)
-      expect(callCount).toBe(2);
+      // Verify step was called only once (no retry)
+      expect(callCount).toBe(1);
 
       // Verify error was thrown
-      expect(error?.message).toBe('This step always fails');
+      expect(error?.message).toBe('Step failed');
 
-      // Verify STEP_RETRY event was emitted for the first failure
-      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
-      expect(retryEvent).toBeDefined();
-      expect(retryEvent).toEqual(
-        expect.objectContaining({
-          type: BRAIN_EVENTS.STEP_RETRY,
-          stepTitle: 'Always fails',
-          attempt: 1,
-        })
-      );
-
-      // Verify ERROR event was emitted for the final failure
+      // Verify ERROR event was emitted
       const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
       expect(errorEvent).toBeDefined();
       expect(errorEvent).toEqual(
@@ -2269,119 +2196,10 @@ describe('brain structure', () => {
           type: BRAIN_EVENTS.ERROR,
           status: STATUS.ERROR,
           error: expect.objectContaining({
-            message: 'This step always fails',
+            message: 'Step failed',
           }),
         })
       );
-    });
-
-    it('should not emit STEP_RETRY when step succeeds on first attempt', async () => {
-      const testBrain = brain('Success Brain').step(
-        'Successful step',
-        () => ({ result: 'success' })
-      );
-
-      const events: BrainEvent<any>[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
-        events.push(event);
-      }
-
-      // Verify no STEP_RETRY event was emitted
-      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
-      expect(retryEvent).toBeUndefined();
-
-      // Verify brain completed successfully
-      const completeEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.COMPLETE
-      );
-      expect(completeEvent).toBeDefined();
-    });
-
-    it('should not retry nested brain errors at outer level', async () => {
-      let innerCallCount = 0;
-
-      // Inner brain that always fails
-      const innerBrain = brain<{}, { value: number }>('Failing Inner').step(
-        'Inner fail',
-        () => {
-          innerCallCount++;
-          throw new Error('Inner brain error');
-        }
-      );
-
-      // Outer brain wrapping the failing inner brain
-      const outerBrain = brain('Outer Brain')
-        .step('Before inner', () => ({ step: 'first' }))
-        .brain(
-          'Run inner',
-          innerBrain,
-          ({ state, brainState }) => ({
-            ...state,
-            innerResult: (brainState as { value: number }).value,
-          }),
-          () => ({})
-        );
-
-      const events: BrainEvent<any>[] = [];
-      let error: Error | undefined;
-
-      try {
-        for await (const event of outerBrain.run({ client: mockClient })) {
-          events.push(event);
-        }
-      } catch (e) {
-        error = e as Error;
-      }
-
-      // Verify inner brain was only called twice (its own retry, not outer retry)
-      expect(innerCallCount).toBe(2);
-
-      // Verify error propagated
-      expect(error?.message).toBe('Inner brain error');
-
-      // Verify there's a STEP_RETRY event from inner brain
-      const retryEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.STEP_RETRY
-      );
-      expect(retryEvents.length).toBe(1);
-      expect(retryEvents[0]).toEqual(
-        expect.objectContaining({
-          stepTitle: 'Inner fail',
-        })
-      );
-    });
-
-    it('should retry async steps correctly', async () => {
-      let callCount = 0;
-      const testBrain = brain('Async Retry Brain').step(
-        'Async flaky step',
-        async () => {
-          callCount++;
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          if (callCount === 1) {
-            throw new Error('Async first attempt failed');
-          }
-          return { asyncSuccess: true };
-        }
-      );
-
-      const events: BrainEvent<any>[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
-        events.push(event);
-      }
-
-      // Verify step was called twice
-      expect(callCount).toBe(2);
-
-      // Verify STEP_RETRY event was emitted
-      const retryEvent = events.find((e) => e.type === BRAIN_EVENTS.STEP_RETRY);
-      expect(retryEvent).toBeDefined();
-
-      // Verify brain completed successfully
-      const completeEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.COMPLETE
-      );
-      expect(completeEvent).toBeDefined();
     });
   });
 });
@@ -2549,7 +2367,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            chunkSize: 2,
+            concurrency: 2,
           }
         );
 
@@ -2622,9 +2440,8 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            maxRetries: 0,
             error: (item, err) => ({ status: 'failed' }),
-            chunkSize: 10, // All in one chunk
+            concurrency: 10, // All in one chunk
           }
         );
 
@@ -2674,7 +2491,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            chunkSize: 2,
+            concurrency: 2,
           }
         );
 
@@ -2715,7 +2532,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            chunkSize: 2,
+            concurrency: 2,
           }
         );
 
@@ -2784,7 +2601,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            chunkSize: 2,
+            concurrency: 2,
             error: () => null, // Skip failed items
           }
         )
@@ -2883,7 +2700,7 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            chunkSize: 2,
+            concurrency: 2,
           }
         );
 
@@ -2918,68 +2735,6 @@ describe('batch prompt', () => {
     });
   });
 
-  describe('maxRetries passthrough', () => {
-    it('should pass maxRetries to client.generateObject when set', async () => {
-      batchMockGenerateObject.mockResolvedValue({ success: true });
-
-      const testBrain = brain('MaxRetries Passthrough Test')
-        .step('Init', () => ({
-          items: [{ id: 1 }],
-        }))
-        .prompt(
-          'Process',
-          {
-            template: (item: { id: number }) => `Item ${item.id}`,
-            outputSchema: {
-              schema: z.object({ success: z.boolean() }),
-              name: 'results' as const,
-            },
-          },
-          {
-            over: (state) => state.items,
-            maxRetries: 5,
-          }
-        );
-
-      for await (const event of testBrain.run({ client: batchMockClient })) {
-        // Just consume events
-      }
-
-      expect(batchMockGenerateObject).toHaveBeenCalledWith(
-        expect.objectContaining({ maxRetries: 5 })
-      );
-    });
-
-    it('should not pass maxRetries to client.generateObject when unset', async () => {
-      batchMockGenerateObject.mockResolvedValue({ success: true });
-
-      const testBrain = brain('No MaxRetries Test')
-        .step('Init', () => ({
-          items: [{ id: 1 }],
-        }))
-        .prompt(
-          'Process',
-          {
-            template: (item: { id: number }) => `Item ${item.id}`,
-            outputSchema: {
-              schema: z.object({ success: z.boolean() }),
-              name: 'results' as const,
-            },
-          },
-          {
-            over: (state) => state.items,
-          }
-        );
-
-      for await (const event of testBrain.run({ client: batchMockClient })) {
-        // Just consume events
-      }
-
-      const callArgs = batchMockGenerateObject.mock.calls[0][0];
-      expect(callArgs).not.toHaveProperty('maxRetries');
-    });
-  });
-
   describe('error handling', () => {
     it('should fail whole step when no error handler and item fails', async () => {
       batchMockGenerateObject.mockRejectedValue(new Error('API error'));
@@ -2999,7 +2754,6 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            maxRetries: 0, // No retries for faster test
           }
         );
 
@@ -3040,7 +2794,6 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            maxRetries: 0,
             error: (item, err) => ({ status: 'failed' }),
           }
         );
@@ -3084,7 +2837,6 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            maxRetries: 0,
             error: (item, err) => null, // Return null to skip
           }
         );
@@ -3128,7 +2880,6 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            maxRetries: 0,
             error: () => ({ done: false }),
           }
         );

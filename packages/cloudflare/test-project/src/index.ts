@@ -369,7 +369,7 @@ const batchWebhookBrain = brain({ title: 'batch-webhook-brain', description: 'Ba
     },
     {
       over: (state) => state.items,
-      chunkSize: 2,
+      concurrency: 2,
     }
   )
   .step('Prepare webhook wait', ({ state }) => ({

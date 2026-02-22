@@ -89,15 +89,6 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
   halted?: boolean;
 }
 
-export interface StepRetryEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.STEP_RETRY;
-  stepTitle: string;
-  stepId: string;
-  error: SerializedError;
-  attempt: number;
-}
-
 // Webhook Event
 export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
@@ -245,7 +236,6 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepStatusEvent<TOptions>
   | StepStartedEvent<TOptions>
   | StepCompletedEvent<TOptions>
-  | StepRetryEvent<TOptions>
   | WebhookEvent<TOptions>
   | WebhookResponseEvent<TOptions>
   | AgentStartEvent<TOptions>

@@ -206,13 +206,6 @@ export interface StepStatusPayload {
   steps: Array<{ id: string; title: string; status: string }>;
 }
 
-export interface StepRetryPayload {
-  stepId: string;
-  stepTitle: string;
-  error: SerializedError;
-  attempt: number;
-}
-
 // ============================================================================
 // Tree Reconstruction Helper (for consumers who need tree representation)
 // ============================================================================
@@ -642,9 +635,6 @@ const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
   }
 );
 
-// stepRetry is a no-op - we just let the event pass through
-const stepRetry = reduce<BrainExecutionContext, StepRetryPayload>((ctx) => ctx);
-
 // passthrough is now a no-op - we just let the event pass through
 const passthrough = () => reduce<BrainExecutionContext, any>((ctx) => ctx);
 
@@ -884,7 +874,6 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(BRAIN_EVENTS.STEP_START, 'running', startStep) as any,
         transition(BRAIN_EVENTS.STEP_COMPLETE, 'running', completeStep) as any,
         transition(BRAIN_EVENTS.STEP_STATUS, 'running', stepStatus) as any,
-        transition(BRAIN_EVENTS.STEP_RETRY, 'running', stepRetry) as any,
 
         // Batch chunk complete - stays in running, accumulates results
         transition(BRAIN_EVENTS.BATCH_CHUNK_COMPLETE, 'running', batchChunkComplete) as any,

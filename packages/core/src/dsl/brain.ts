@@ -13,7 +13,6 @@ export type {
   StepStatusEvent,
   StepStartedEvent,
   StepCompletedEvent,
-  StepRetryEvent,
   WebhookEvent,
   AgentStartEvent,
   AgentIterationEvent,

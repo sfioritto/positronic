@@ -403,9 +403,8 @@ export class Brain<
     },
     batchConfig: {
       over: (state: TState) => TItem[];
-      maxRetries?: number;
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
-      chunkSize?: number;
+      concurrency?: number;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
@@ -434,9 +433,8 @@ export class Brain<
     },
     batchConfig?: {
       over: (state: any) => any[];
-      maxRetries?: number;
       error?: (item: any, error: Error) => any | null;
-      chunkSize?: number;
+      concurrency?: number;
     }
   ): any {
     // Schema-less prompt - returns text response for next step
@@ -488,13 +486,12 @@ export class Brain<
         action: async ({ state }) => state,
         batchConfig: {
           over: batchConfig.over,
-          maxRetries: batchConfig.maxRetries,
           error: batchConfig.error,
           template: config.template,
           schema: outputSchema.schema,
           schemaName: outputSchema.name,
           client: config.client,
-          chunkSize: batchConfig.chunkSize,
+          concurrency: batchConfig.concurrency,
         },
       };
       this.blocks.push(promptBlock);

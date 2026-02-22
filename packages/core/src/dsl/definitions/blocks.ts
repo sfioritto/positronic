@@ -61,13 +61,12 @@ export type StepBlock<
   /** Configuration for batch prompt execution (prompt with `over`) */
   batchConfig?: {
     over: (state: any) => any[];
-    maxRetries?: number;
     error?: (item: any, error: Error) => any | null;
     template: (item: any, resources: Resources) => string | Promise<string>;
     schema: z.ZodObject<any>;
     schemaName: string;
     client?: ObjectGenerator;
-    chunkSize?: number;
+    concurrency?: number;
   };
 };
 

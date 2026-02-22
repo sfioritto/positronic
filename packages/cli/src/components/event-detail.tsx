@@ -54,8 +54,6 @@ function getEventSymbol(event: BrainEvent): { symbol: string; color: string } {
       return { symbol: '[.]', color: 'yellow' };
     case BRAIN_EVENTS.STEP_COMPLETE:
       return { symbol: '[+]', color: 'green' };
-    case BRAIN_EVENTS.STEP_RETRY:
-      return { symbol: '[?]', color: 'yellow' };
     case BRAIN_EVENTS.STEP_STATUS:
       return { symbol: '[-]', color: 'gray' };
     case BRAIN_EVENTS.WEBHOOK:
@@ -198,9 +196,6 @@ function getEventDetailContent(event: BrainEvent): string {
 
     case BRAIN_EVENTS.STEP_START:
       return [`Step: ${event.stepTitle}`, `Step ID: ${event.stepId}`].join('\n');
-
-    case BRAIN_EVENTS.STEP_RETRY:
-      return [`Step: ${event.stepTitle}`, `Step ID: ${event.stepId}`, `Attempt: ${event.attempt}`].join('\n');
 
     case BRAIN_EVENTS.COMPLETE:
       return [`Brain: ${event.brainTitle}`, '', 'Brain completed successfully.'].join('\n');
