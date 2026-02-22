@@ -248,6 +248,19 @@ describe('Positronic Spec', () => {
       const result = await webhooks.uiFormMissingIdentifier(createFetch());
       expect(result).toBe(true);
     });
+
+    it('passes POST /webhooks/system/ui-form missing token test (403)', async () => {
+      const result = await webhooks.uiFormMissingToken(createFetch(), 'test-identifier-no-token');
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /webhooks/system/ui-form wrong token test (not 200)', async () => {
+      const result = await webhooks.uiFormWrongToken(createFetch(), 'test-identifier-wrong-token', {
+        name: 'Test User',
+        email: 'test@example.com',
+      }, 'definitely-wrong-token');
+      expect(result).toBe(true);
+    });
   });
 
   describe('Pages', () => {
