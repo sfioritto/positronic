@@ -308,4 +308,131 @@ export const webhooks = {
       return false;
     }
   },
+
+  /**
+   * Test POST /webhooks/system/ui-form without a CSRF token - Should return 403.
+   * The endpoint checks for missing token before looking up a waiting brain.
+   */
+  async uiFormMissingToken(fetch: Fetch, identifier: string): Promise<boolean> {
+    try {
+      // Send form data without __positronic_token
+      const params = new URLSearchParams();
+      params.append('name', 'Test User');
+
+      const request = new Request(
+        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (response.status !== 403) {
+        console.error(
+          `POST /webhooks/system/ui-form without token returned ${response.status}, expected 403`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as {
+        received: boolean;
+        action: string;
+        reason?: string;
+      };
+
+      if (data.received !== false) {
+        console.error(
+          `Expected received to be false, got ${data.received}`
+        );
+        return false;
+      }
+
+      if (data.action !== 'ignored') {
+        console.error(
+          `Expected action to be 'ignored', got '${data.action}'`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Failed to test POST /webhooks/system/ui-form without token:',
+        error
+      );
+      return false;
+    }
+  },
+
+  /**
+   * Test POST /webhooks/system/ui-form with a wrong CSRF token.
+   * Without a brain waiting, the endpoint returns 404 (not_found) since
+   * token comparison only runs after a brain is found. The key assertion
+   * is that a wrong token never produces a successful 200 "resumed" response.
+   */
+  async uiFormWrongToken(
+    fetch: Fetch,
+    identifier: string,
+    formData: Record<string, string | string[]>,
+    wrongToken: string
+  ): Promise<boolean> {
+    try {
+      const params = new URLSearchParams();
+      params.append('__positronic_token', wrongToken);
+      for (const [key, value] of Object.entries(formData)) {
+        if (Array.isArray(value)) {
+          for (const v of value) {
+            params.append(`${key}[]`, v);
+          }
+        } else {
+          params.append(key, value);
+        }
+      }
+
+      const request = new Request(
+        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        }
+      );
+
+      const response = await fetch(request);
+
+      // Should NOT be 200 - wrong token must never succeed
+      if (response.status === 200) {
+        const data = (await response.json()) as { action?: string };
+        if (data.action === 'resumed') {
+          console.error(
+            'POST /webhooks/system/ui-form with wrong token returned 200 with action "resumed" — token validation failed'
+          );
+          return false;
+        }
+      }
+
+      // Accept 403 (token mismatch) or 404 (no brain waiting — token check happens after brain lookup)
+      if (response.status !== 403 && response.status !== 404) {
+        console.error(
+          `POST /webhooks/system/ui-form with wrong token returned ${response.status}, expected 403 or 404`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Failed to test POST /webhooks/system/ui-form with wrong token:',
+        error
+      );
+      return false;
+    }
+  },
 };
