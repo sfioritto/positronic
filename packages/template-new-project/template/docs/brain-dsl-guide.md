@@ -882,7 +882,7 @@ brain('Batch Processor')
 ### Batch Options
 
 - `over: (state) => T[]` - Function returning the array to iterate over
-- `concurrency: number` - Maximum number of items processed in parallel (default: 10). The framework automatically handles rate limit retries with exponential backoff.
+- `concurrency: number` - Maximum number of items processed in parallel (default: 10)
 - `error: (item, error) => Response` - Fallback function when a request fails
 
 ### Result Format

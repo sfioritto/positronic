@@ -71,7 +71,6 @@ export class AnthropicClient implements ObjectGenerator {
     prompt?: string;
     messages?: { role: 'user' | 'assistant' | 'system'; content: string }[];
     system?: string;
-    maxRetries?: number;
   }): Promise<z.infer<T>> {
     // Compose messages array according to the interface contract
     let messages = params.messages ? [...params.messages] : [];
@@ -104,7 +103,6 @@ export class AnthropicClient implements ObjectGenerator {
       ...(temperature !== undefined ? { temperature } : {}),
       ...(top_p !== undefined ? { top_p } : {}),
       extra_options,
-      ...(params.maxRetries !== undefined && { max_retries: params.maxRetries }),
     });
     return response;
   }

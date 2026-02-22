@@ -90,12 +90,6 @@ export interface ObjectGenerator {
      * prepend this as a `system` role message to the full message list.
      */
     system?: string;
-
-    /**
-     * Maximum number of retries for transient failures.
-     * Passed through to the underlying SDK's retry mechanism.
-     */
-    maxRetries?: number;
   }): Promise<z.infer<T>>;
 
   /**
