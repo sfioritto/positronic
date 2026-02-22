@@ -19,10 +19,40 @@ import type { GeneratedPage } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams, ResumeContext } from '../definitions/run-params.js';
 
 import { Step } from '../builder/step.js';
-import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT, MAX_RETRIES } from './constants.js';
+import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT } from './constants.js';
 import { defaultDoneSchema } from '../../tools/index.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+function createSemaphore(limit: number) {
+  let running = 0;
+  const queue: (() => void)[] = [];
+  return {
+    async acquire(): Promise<() => void> {
+      if (running < limit) {
+        running++;
+        return () => {
+          running--;
+          if (queue.length > 0) {
+            running++;
+            queue.shift()!();
+          }
+        };
+      }
+      return new Promise<() => void>((resolve) => {
+        queue.push(() =>
+          resolve(() => {
+            running--;
+            if (queue.length > 0) {
+              running++;
+              queue.shift()!();
+            }
+          })
+        );
+      });
+    },
+  };
+}
 
 export class BrainEventStream<
   TOptions extends JsonObject = JsonObject,
@@ -482,51 +512,20 @@ export class BrainEventStream<
       const prevState = this.currentState;
       const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
 
-      // Execute step with automatic retry on failure
-      let retries = 0;
-      let result;
-
-      while (true) {
-        try {
-          const actionPromise = Promise.resolve(
-            stepBlock.action({
-              state: this.currentState,
-              options: this.options ?? ({} as TOptions),
-              client: this.client,
-              resources: this.resources,
-              response: this.currentResponse,
-              page: this.currentPage,
-              pages: this.pages,
-              env: this.env,
-              memory: this.scopedMemory,
-              ...this.services,
-            })
-          );
-
-          result = await actionPromise;
-          break; // Success
-        } catch (error) {
-          if (retries < MAX_RETRIES) {
-            retries++;
-            yield {
-              type: BRAIN_EVENTS.STEP_RETRY,
-              stepTitle: step.block.title,
-              stepId: step.id,
-              error: {
-                name: (error as Error).name,
-                message: (error as Error).message,
-                stack: (error as Error).stack,
-              },
-              attempt: retries,
-              options: this.options ?? ({} as TOptions),
-              brainRunId: this.brainRunId,
-            };
-            // Loop continues to retry
-          } else {
-            throw error;
-          }
-        }
-      }
+      const result = await Promise.resolve(
+        stepBlock.action({
+          state: this.currentState,
+          options: this.options ?? ({} as TOptions),
+          client: this.client,
+          resources: this.resources,
+          response: this.currentResponse,
+          page: this.currentPage,
+          pages: this.pages,
+          env: this.env,
+          memory: this.scopedMemory,
+          ...this.services,
+        })
+      );
 
       // Extract state from result (handles promptResponse case)
       if (result && typeof result === 'object' && 'promptResponse' in result) {
@@ -1153,7 +1152,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const client = batchConfig.client ?? this.client;
     const items = batchConfig.over(this.currentState);
     const totalItems = items.length;
-    const chunkSize = batchConfig.chunkSize ?? 10;
+    const concurrency = batchConfig.concurrency ?? 10;
+    const semaphore = createSemaphore(concurrency);
 
     // Resume support: pick up from where we left off
     const batchProgress = this.resumeContext?.batchProgress;
@@ -1167,7 +1167,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       this.resumeContext = undefined;
     }
 
-    for (let chunkStart = startIndex; chunkStart < totalItems; chunkStart += chunkSize) {
+    for (let chunkStart = startIndex; chunkStart < totalItems; chunkStart += concurrency) {
       // Check signals before each chunk (allows Cloudflare adapter to pause between chunks)
       if (this.signalProvider) {
         const signals = await this.signalProvider.getSignals('CONTROL');
@@ -1193,19 +1193,19 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         }
       }
 
-      const chunkEnd = Math.min(chunkStart + chunkSize, totalItems);
+      const chunkEnd = Math.min(chunkStart + concurrency, totalItems);
       const chunk = items.slice(chunkStart, chunkEnd);
 
-      // Process chunk concurrently
+      // Process chunk with concurrency-limited pool
       const chunkResults = await Promise.all(
         chunk.map(async (item: any) => {
+          const release = await semaphore.acquire();
           try {
             const promptText = await batchConfig.template(item, this.resources);
             const output = await client.generateObject({
               schema: batchConfig.schema,
               schemaName: batchConfig.schemaName,
               prompt: promptText,
-              ...(batchConfig.maxRetries !== undefined && { maxRetries: batchConfig.maxRetries }),
             });
             return [item, output] as [any, any];
           } catch (error) {
@@ -1214,6 +1214,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               return fallback !== null ? ([item, fallback] as [any, any]) : undefined;
             }
             throw error;
+          } finally {
+            release();
           }
         })
       );

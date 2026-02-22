@@ -16,7 +16,6 @@ export type {
   StepStatusEvent,
   StepStartedEvent,
   StepCompletedEvent,
-  StepRetryEvent,
   BrainStructure,
   BrainConfig,
   GeneratedPage,

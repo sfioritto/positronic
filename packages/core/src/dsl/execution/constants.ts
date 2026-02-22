@@ -26,8 +26,3 @@ You are running as an automated agent in a headless workflow. This is NOT a chat
 
 ## Resumption
 When resuming after a webhook, that response appears as the tool result in your conversation history.`;
-
-/**
- * Maximum number of retries for step execution.
- */
-export const MAX_RETRIES = 1;

@@ -8,55 +8,6 @@ import {
 import { z } from 'zod';
 import type { LanguageModel, ModelMessage } from 'ai';
 
-const MAX_RATE_LIMIT_RETRIES = 4;
-const INITIAL_RETRY_DELAY_MS = 5000;
-const RETRY_BACKOFF_FACTOR = 2;
-
-function isErrorWithStatusCode(error: unknown, codes: number[]): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'statusCode' in error &&
-    typeof (error as any).statusCode === 'number' &&
-    codes.includes((error as any).statusCode)
-  );
-}
-
-function isRateLimitError(error: unknown): boolean {
-  const rateLimitCodes = [429, 529];
-
-  if (isErrorWithStatusCode(error, rateLimitCodes)) {
-    return true;
-  }
-
-  // RetryError wrapping rate limit errors (SDK exhausted its retries)
-  if (error instanceof Error && 'errors' in error && Array.isArray((error as any).errors)) {
-    return (error as any).errors.some((e: unknown) => isErrorWithStatusCode(e, rateLimitCodes));
-  }
-
-  return false;
-}
-
-async function retryWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (attempt === MAX_RATE_LIMIT_RETRIES || !isRateLimitError(error)) {
-        throw error;
-      }
-
-      const baseDelay = INITIAL_RETRY_DELAY_MS * Math.pow(RETRY_BACKOFF_FACTOR, attempt);
-      const jitter = 0.5 + Math.random();
-      const delay = baseDelay * jitter;
-
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-
-  throw new Error('unreachable');
-}
-
 /**
  * Creates a tool result message in SDK-native format.
  * Use this to append tool results to responseMessages before the next generateText call.
@@ -88,9 +39,82 @@ export function createToolResultMessage(
 
 export class VercelClient implements ObjectGenerator {
   private model: LanguageModel;
+  private backoffUntil: number = 0;
+  private backoffDelay: number = 0;
+
+  private static INITIAL_DELAY_MS = 5000;
+  private static BACKOFF_FACTOR = 2;
+  private static MAX_RETRIES = 4;
 
   constructor(model: LanguageModel) {
     this.model = model;
+  }
+
+  private async waitForBackoff(): Promise<void> {
+    const now = Date.now();
+    if (this.backoffUntil > now) {
+      await new Promise((resolve) => setTimeout(resolve, this.backoffUntil - now));
+    }
+  }
+
+  private handleRateLimit(): void {
+    if (this.backoffDelay === 0) {
+      this.backoffDelay = VercelClient.INITIAL_DELAY_MS;
+    } else {
+      this.backoffDelay *= VercelClient.BACKOFF_FACTOR;
+    }
+    const jitter = 0.5 + Math.random();
+    this.backoffUntil = Date.now() + this.backoffDelay * jitter;
+  }
+
+  private resetBackoff(): void {
+    this.backoffUntil = 0;
+    this.backoffDelay = 0;
+  }
+
+  private isRateLimitError(error: unknown): boolean {
+    const rateLimitCodes = [429, 529];
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      typeof (error as any).statusCode === 'number' &&
+      rateLimitCodes.includes((error as any).statusCode)
+    ) {
+      return true;
+    }
+
+    // RetryError wrapping rate limit errors (SDK exhausted its retries)
+    if (error instanceof Error && 'errors' in error && Array.isArray((error as any).errors)) {
+      return (error as any).errors.some(
+        (e: unknown) =>
+          typeof e === 'object' &&
+          e !== null &&
+          'statusCode' in e &&
+          typeof (e as any).statusCode === 'number' &&
+          rateLimitCodes.includes((e as any).statusCode)
+      );
+    }
+
+    return false;
+  }
+
+  private async withRateLimitRetry<T>(fn: () => Promise<T>): Promise<T> {
+    for (let attempt = 0; attempt <= VercelClient.MAX_RETRIES; attempt++) {
+      await this.waitForBackoff();
+      try {
+        const result = await fn();
+        this.resetBackoff();
+        return result;
+      } catch (error) {
+        if (attempt === VercelClient.MAX_RETRIES || !this.isRateLimitError(error)) {
+          throw error;
+        }
+        this.handleRateLimit();
+      }
+    }
+    throw new Error('unreachable');
   }
 
   createToolResultMessage(
@@ -131,7 +155,7 @@ export class VercelClient implements ObjectGenerator {
 
     // AI SDK v5 requires either messages or prompt, but not both as undefined
     // If we have messages built up, use them; otherwise use the prompt directly
-    return retryWithBackoff(async () => {
+    return this.withRateLimitRetry(async () => {
       if (coreMessages.length > 0) {
         const { output } = await generateText({
           model: this.model,
@@ -141,7 +165,7 @@ export class VercelClient implements ObjectGenerator {
             description: schemaDescription,
           }),
           messages: coreMessages,
-          ...(maxRetries !== undefined && { maxRetries }),
+          maxRetries: 0,
         });
         return output as z.infer<T>;
       } else {
@@ -154,7 +178,7 @@ export class VercelClient implements ObjectGenerator {
             description: schemaDescription,
           }),
           prompt: prompt || '',
-          ...(maxRetries !== undefined && { maxRetries }),
+          maxRetries: 0,
         });
         return output as z.infer<T>;
       }
@@ -239,13 +263,14 @@ export class VercelClient implements ObjectGenerator {
       };
     }
 
-    return retryWithBackoff(async () => {
+    return this.withRateLimitRetry(async () => {
       const result = await generateText({
         model: this.model,
         system,
         toolChoice,
         messages: modelMessages,
         tools: aiTools,
+        maxRetries: 0,
       });
 
       const updatedMessages = [...modelMessages, ...result.response.messages];
@@ -367,12 +392,13 @@ export class VercelClient implements ObjectGenerator {
       };
     }
 
-    return retryWithBackoff(async () => {
+    return this.withRateLimitRetry(async () => {
       const stream = vercelStreamText({
         model: this.model,
         messages: modelMessages,
         tools: aiTools,
         toolChoice,
+        maxRetries: 0,
         stopWhen: stepCountIs(maxSteps),
       });
 
