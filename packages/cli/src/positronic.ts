@@ -7,6 +7,7 @@ import { render } from 'ink';
 import { createDevServer } from './commands/backend.js';
 import { configureApiClient } from './commands/helpers.js';
 import { ProjectConfigManager } from './commands/project-config-manager.js';
+import { setAuthProjectRootPath } from './lib/jwt-auth.js';
 
 function findProjectRootSync(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
@@ -48,11 +49,15 @@ if (projectRootPath) {
   // Commands will show appropriate errors when they try to connect
 }
 
+// Set the project root path for local auth resolution
+setAuthProjectRootPath(projectRootPath);
+
 // Build and parse the CLI
 const cli = buildCli({
   server,
   exitProcess: true,
   render,
+  projectRootPath: projectRootPath || undefined,
 });
 
 // Parse the arguments

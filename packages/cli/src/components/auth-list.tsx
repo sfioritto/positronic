@@ -2,16 +2,27 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
 import { discoverSSHKeys, resolvePrivateKeyPath } from '../lib/ssh-key-utils.js';
+import { readLocalAuth } from '../lib/local-auth.js';
 
 interface AuthListProps {
   configManager: ProjectConfigManager;
+  projectRootPath?: string;
 }
 
-export const AuthList = ({ configManager }: AuthListProps) => {
+export const AuthList = ({ configManager, projectRootPath }: AuthListProps) => {
   const discoveredKeys = discoverSSHKeys();
 
-  // Get the currently active key path for comparison
-  const configuredPath = configManager.getPrivateKeyPath();
+  // Get the currently active key path for comparison, including local auth
+  const envPath = process.env.POSITRONIC_PRIVATE_KEY;
+  let configuredPath: string | null;
+  if (envPath) {
+    configuredPath = envPath;
+  } else if (projectRootPath) {
+    const localKeyPath = readLocalAuth(projectRootPath);
+    configuredPath = localKeyPath || configManager.getPrivateKeyPath();
+  } else {
+    configuredPath = configManager.getPrivateKeyPath();
+  }
   const activeKeyPath = resolvePrivateKeyPath(configuredPath);
 
   if (discoveredKeys.length === 0) {

@@ -2,7 +2,8 @@
  * CLI Integration Tests - Auth Command
  *
  * Tests for the `px auth` command which manages local SSH key configuration.
- * Auth commands only work in global mode (not local dev mode).
+ * Auth commands work in both global mode and local dev mode.
+ * In dev mode, auth defaults to writing .positronic-auth.json at the project root.
  */
 
 import * as fs from 'fs';
@@ -364,6 +365,147 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
       // Active key should show project key
       expect(output).toContain(testKeyPath);
       expect(output).toContain('TestProject');
+    });
+  });
+
+  describe('dev mode auth (local project key)', () => {
+    let projectDir: string;
+
+    beforeEach(() => {
+      // Create a project directory to simulate dev mode
+      projectDir = path.join(tempDir, 'my-project');
+      fs.mkdirSync(projectDir, { recursive: true });
+    });
+
+    it('should write .positronic-auth.json on login in dev mode', async () => {
+      const { waitForOutput, instance } = await px(
+        ['auth', 'login', '--path', testKeyPath],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+
+      const isReady = await waitForOutput(/configured successfully/i);
+      expect(isReady).toBe(true);
+
+      const output = instance.lastFrame() || '';
+      expect(output).toContain(testKeyPath);
+      expect(output.toLowerCase()).toContain('local project');
+
+      // Verify .positronic-auth.json was created
+      const authFilePath = path.join(projectDir, '.positronic-auth.json');
+      expect(fs.existsSync(authFilePath)).toBe(true);
+
+      const authData = JSON.parse(fs.readFileSync(authFilePath, 'utf-8'));
+      expect(authData.privateKeyPath).toBe(testKeyPath);
+
+      // Verify global config was NOT modified with a defaultPrivateKeyPath
+      const configPath = path.join(configDir, 'config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        expect(config.defaultPrivateKeyPath).toBeUndefined();
+      }
+    });
+
+    it('should clear .positronic-auth.json on logout in dev mode', async () => {
+      // First login in dev mode
+      await px(
+        ['auth', 'login', '--path', testKeyPath],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+
+      // Then logout in dev mode
+      const { waitForOutput, instance } = await px(
+        ['auth', 'logout'],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+
+      const isReady = await waitForOutput(/cleared/i);
+      expect(isReady).toBe(true);
+
+      const output = instance.lastFrame() || '';
+      expect(output.toLowerCase()).toContain('local project');
+
+      // Verify .positronic-auth.json was removed
+      const authFilePath = path.join(projectDir, '.positronic-auth.json');
+      expect(fs.existsSync(authFilePath)).toBe(false);
+    });
+
+    it('should show "Local Project Key" row in status in dev mode', async () => {
+      // Login in dev mode
+      await px(
+        ['auth', 'login', '--path', testKeyPath],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+
+      // Check status
+      const { instance } = await px(
+        ['auth', 'status'],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+      const output = instance.lastFrame() || '';
+
+      expect(output).toContain('Local Project Key');
+      expect(output).toContain(testKeyPath);
+      expect(output.toLowerCase()).toContain('local project');
+    });
+
+    it('should show no local key message on logout when none configured', async () => {
+      const { waitForOutput } = await px(
+        ['auth', 'logout'],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+
+      const foundMessage = await waitForOutput(/no local project.*configured/i);
+      expect(foundMessage).toBe(true);
+    });
+
+    it('should prioritize local key over global key', async () => {
+      // Set global key
+      await px(
+        ['auth', 'login', '--path', '~/.ssh/global_key'],
+        { configDir, skipAuthSetup: true }
+      );
+
+      // Set local key (different path)
+      await px(
+        ['auth', 'login', '--path', testKeyPath],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+
+      // Check status in dev mode
+      const { instance } = await px(
+        ['auth', 'status'],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+      const output = instance.lastFrame() || '';
+
+      // Active source should be "local project", not "global config"
+      expect(output.toLowerCase()).toContain('local project');
+      expect(output).toContain(testKeyPath);
+    });
+
+    it('should prioritize env var over local key', async () => {
+      // Set local key
+      await px(
+        ['auth', 'login', '--path', testKeyPath],
+        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
+      );
+
+      // Set env var
+      process.env.POSITRONIC_PRIVATE_KEY = '/env/key/path';
+
+      try {
+        const { instance } = await px(
+          ['auth', 'status'],
+          { configDir, projectRootDir: projectDir }
+        );
+        const output = instance.lastFrame() || '';
+
+        // Active key should show env var, not local key
+        expect(output).toContain('/env/key/path');
+        expect(output.toLowerCase()).toContain('environment variable');
+      } finally {
+        delete process.env.POSITRONIC_PRIVATE_KEY;
+      }
     });
   });
 });

@@ -22,9 +22,11 @@ interface FormatJwkKeyArgs {
 
 export class AuthCommand {
   private configManager: ProjectConfigManager;
+  private projectRootPath?: string;
 
-  constructor(configManager?: ProjectConfigManager) {
+  constructor(configManager?: ProjectConfigManager, projectRootPath?: string) {
     this.configManager = configManager || new ProjectConfigManager();
+    this.projectRootPath = projectRootPath;
   }
 
   /**
@@ -34,6 +36,7 @@ export class AuthCommand {
   status(): React.ReactElement {
     return React.createElement(AuthStatus, {
       configManager: this.configManager,
+      projectRootPath: this.projectRootPath,
     });
   }
 
@@ -46,6 +49,7 @@ export class AuthCommand {
       configManager: this.configManager,
       keyPath: path,
       forProject: project || false,
+      projectRootPath: this.projectRootPath,
     });
   }
 
@@ -57,6 +61,7 @@ export class AuthCommand {
     return React.createElement(AuthLogout, {
       configManager: this.configManager,
       forProject: project || false,
+      projectRootPath: this.projectRootPath,
     });
   }
 
@@ -67,6 +72,7 @@ export class AuthCommand {
   list(): React.ReactElement {
     return React.createElement(AuthList, {
       configManager: this.configManager,
+      projectRootPath: this.projectRootPath,
     });
   }
 

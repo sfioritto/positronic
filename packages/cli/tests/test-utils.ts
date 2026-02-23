@@ -9,7 +9,7 @@ import type { TestServerHandle } from './test-dev-server.js';
 import { TestDevServer } from './test-dev-server.js';
 import { buildCli } from '../src/cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
-import { resetJwtAuthProvider } from '../src/lib/jwt-auth.js';
+import { resetJwtAuthProvider, setAuthProjectRootPath } from '../src/lib/jwt-auth.js';
 import caz from 'caz';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -230,6 +230,7 @@ export async function px(
     server,
     configDir,
     skipAuthSetup,
+    projectRootPath: projectRootDir,
   });
 
   // const { lastFrame, rerender, unmount, frames, stdin, stdout, stderr } = instance!;
@@ -295,10 +296,11 @@ async function runCli(
     server?: PositronicDevServer;
     configDir?: string;
     skipAuthSetup?: boolean;
+    projectRootPath?: string;
   } = {}
 ): Promise<ReturnType<typeof render> | null> {
   let capturedElement: ReturnType<typeof render> | null = null;
-  const { configDir, server, skipAuthSetup } = options;
+  const { configDir, server, skipAuthSetup, projectRootPath } = options;
   const mockRenderFn = (element: React.ReactElement) => {
     capturedElement = render(element);
     return capturedElement;
@@ -316,6 +318,9 @@ async function runCli(
   if (!skipAuthSetup && !process.env.POSITRONIC_PRIVATE_KEY) {
     process.env.POSITRONIC_PRIVATE_KEY = '/nonexistent/test-key';
   }
+  // Set project root path for local auth resolution
+  setAuthProjectRootPath(projectRootPath || null);
+
   // Always reset provider to pick up current env variable
   resetJwtAuthProvider();
 
@@ -326,6 +331,7 @@ async function runCli(
     server,
     exitProcess: false,
     render: mockRenderFn,
+    projectRootPath,
   });
 
   await testCli.parse();

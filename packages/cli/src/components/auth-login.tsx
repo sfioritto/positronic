@@ -3,6 +3,7 @@ import { Box, Text, useApp } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
 import { discoverSSHKeys, expandPath } from '../lib/ssh-key-utils.js';
 import { resetJwtAuthProvider } from '../lib/jwt-auth.js';
+import { writeLocalAuth } from '../lib/local-auth.js';
 import { SelectList, type SelectListItem } from './select-list.js';
 import { existsSync } from 'fs';
 
@@ -10,11 +11,13 @@ interface AuthLoginProps {
   configManager: ProjectConfigManager;
   keyPath?: string;
   forProject: boolean;
+  projectRootPath?: string;
 }
 
 type LoginState = 'selecting' | 'success' | 'error';
 
-export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps) => {
+export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath }: AuthLoginProps) => {
+  const isDevMode = !!projectRootPath;
   const { exit } = useApp();
   const [state, setState] = useState<LoginState>(keyPath ? 'success' : 'selecting');
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +63,20 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
           </Box>
         );
       }
+    } else if (isDevMode) {
+      writeLocalAuth(projectRootPath!, keyPath);
     } else {
       configManager.setDefaultPrivateKeyPath(keyPath);
     }
 
     // Reset request signer to use new key
     resetJwtAuthProvider();
+
+    const scope = forProject && currentProject
+      ? `project "${currentProject.name}"`
+      : isDevMode
+        ? 'local project'
+        : 'global';
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -79,8 +90,7 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
         </Box>
         <Box paddingLeft={2}>
           <Text>
-            <Text bold>Scope:</Text>{' '}
-            {forProject && currentProject ? `project "${currentProject.name}"` : 'global'}
+            <Text bold>Scope:</Text> {scope}
           </Text>
         </Box>
       </Box>
@@ -127,6 +137,8 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
           setState('error');
           return;
         }
+      } else if (isDevMode) {
+        writeLocalAuth(projectRootPath!, displayPath);
       } else {
         configManager.setDefaultPrivateKeyPath(displayPath);
       }
@@ -142,10 +154,16 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
       exit();
     };
 
+    const headerSuffix = forProject && currentProject
+      ? ` for project "${currentProject.name}"`
+      : isDevMode
+        ? ' (local project)'
+        : ' (global)';
+
     return (
       <SelectList
         items={items}
-        header={`Select an SSH key${forProject && currentProject ? ` for project "${currentProject.name}"` : ' (global)'}`}
+        header={`Select an SSH key${headerSuffix}`}
         onSelect={handleSelect}
         onCancel={handleCancel}
         footer="Use arrow keys to navigate, Enter to select, q to cancel"
@@ -154,6 +172,12 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
   }
 
   if (state === 'success' && selectedPath) {
+    const scope = forProject && currentProject
+      ? `project "${currentProject.name}"`
+      : isDevMode
+        ? 'local project'
+        : 'global';
+
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
         <Text color="green">
@@ -166,8 +190,7 @@ export const AuthLogin = ({ configManager, keyPath, forProject }: AuthLoginProps
         </Box>
         <Box paddingLeft={2}>
           <Text>
-            <Text bold>Scope:</Text>{' '}
-            {forProject && currentProject ? `project "${currentProject.name}"` : 'global'}
+            <Text bold>Scope:</Text> {scope}
           </Text>
         </Box>
       </Box>

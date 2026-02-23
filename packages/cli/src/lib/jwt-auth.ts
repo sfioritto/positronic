@@ -10,6 +10,10 @@ import {
 import type sshpk from 'sshpk';
 import { ProjectConfigManager } from '../commands/project-config-manager.js';
 import { AgentSigner } from './ssh-agent-signer.js';
+import { readLocalAuth } from './local-auth.js';
+
+// Module-level state: project root path for local auth resolution
+let authProjectRootPath: string | null = null;
 
 /**
  * Check if an error indicates an encrypted key
@@ -46,7 +50,24 @@ export class JwtAuthProvider {
     try {
       // Get configured path from project config manager
       const configManager = new ProjectConfigManager();
-      const configuredPath = configManager.getPrivateKeyPath();
+
+      // Build resolved path with local auth in the priority chain:
+      // 1. POSITRONIC_PRIVATE_KEY env var (handled inside resolvePrivateKeyPath)
+      // 2. Local project auth file (.positronic-auth.json)
+      // 3. Project-specific key from global config
+      // 4. Global default key from global config
+      // 5. Fallback (~/.ssh/id_rsa)
+      let configuredPath: string | null;
+      if (!process.env.POSITRONIC_PRIVATE_KEY && authProjectRootPath) {
+        const localKeyPath = readLocalAuth(authProjectRootPath);
+        if (localKeyPath) {
+          configuredPath = localKeyPath;
+        } else {
+          configuredPath = configManager.getPrivateKeyPath();
+        }
+      } else {
+        configuredPath = configManager.getPrivateKeyPath();
+      }
 
       const keyPath = resolvePrivateKeyPath(configuredPath);
 
@@ -64,8 +85,14 @@ export class JwtAuthProvider {
       if (isEncryptedKeyError(error)) {
         // Store the path for agent fallback - we'll try the agent in createToken()
         const configManager = new ProjectConfigManager();
-        const configuredPath = configManager.getPrivateKeyPath();
-        this.encryptedKeyPath = resolvePrivateKeyPath(configuredPath);
+        let configuredPathForAgent: string | null;
+        if (!process.env.POSITRONIC_PRIVATE_KEY && authProjectRootPath) {
+          const localKeyPath = readLocalAuth(authProjectRootPath);
+          configuredPathForAgent = localKeyPath || configManager.getPrivateKeyPath();
+        } else {
+          configuredPathForAgent = configManager.getPrivateKeyPath();
+        }
+        this.encryptedKeyPath = resolvePrivateKeyPath(configuredPathForAgent);
         this.initError =
           error instanceof Error
             ? error
@@ -378,6 +405,23 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
     // Return empty headers and let the server reject if auth is required
     return {};
   }
+}
+
+/**
+ * Set the project root path for local auth resolution.
+ * Called once at startup from positronic.ts when in dev mode.
+ * Nulls the singleton so it reinitializes on next use with the new path.
+ */
+export function setAuthProjectRootPath(projectRoot: string | null): void {
+  authProjectRootPath = projectRoot;
+  providerInstance = null;
+}
+
+/**
+ * Get the current auth project root path (for use by auth components).
+ */
+export function getAuthProjectRootPath(): string | null {
+  return authProjectRootPath;
 }
 
 /**
