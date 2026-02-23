@@ -1,5 +1,19 @@
 # @positronic/cloudflare
 
+## 0.0.64
+
+### Patch Changes
+
+- - Add local dev-mode auth: store selected SSH key in `.positronic-auth.json` at project root for per-project key selection during local development
+  - Add CSRF token protection for webhook form submissions with spec coverage for token rejection
+  - Move `parseFormData` and `validateWebhookToken` to core package for reuse across backends
+  - Remove custom rate limit retry infrastructure in favor of SDK built-in retry; replace stacked retries with shared rate limiter and concurrency pool
+  - Simplify Vercel client implementation
+- Updated dependencies
+  - @positronic/core@0.0.64
+  - @positronic/spec@0.0.64
+  - @positronic/template-new-project@0.0.64
+
 ## 0.0.63
 
 ### Patch Changes
