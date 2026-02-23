@@ -2,14 +2,17 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
 import { resetJwtAuthProvider } from '../lib/jwt-auth.js';
+import { readLocalAuth, clearLocalAuth } from '../lib/local-auth.js';
 
 interface AuthLogoutProps {
   configManager: ProjectConfigManager;
   forProject: boolean;
+  projectRootPath?: string;
 }
 
-export const AuthLogout = ({ configManager, forProject }: AuthLogoutProps) => {
+export const AuthLogout = ({ configManager, forProject, projectRootPath }: AuthLogoutProps) => {
   const currentProject = configManager.getCurrentProject();
+  const isDevMode = !!projectRootPath;
 
   // If --project flag is used but no project is selected, show error
   if (forProject && !currentProject) {
@@ -51,6 +54,38 @@ export const AuthLogout = ({ configManager, forProject }: AuthLogoutProps) => {
         <Box marginTop={1}>
           <Text dimColor>
             The project will now use the global default key (if configured).
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // In dev mode, clear local auth by default
+  if (isDevMode) {
+    const localKeyPath = readLocalAuth(projectRootPath!);
+
+    if (!localKeyPath) {
+      return (
+        <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
+          <Text>No local project SSH key configured.</Text>
+          <Box marginTop={1}>
+            <Text dimColor>Nothing to clear.</Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    clearLocalAuth(projectRootPath!);
+    resetJwtAuthProvider();
+
+    return (
+      <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
+        <Text color="green">
+          Local project SSH key configuration cleared.
+        </Text>
+        <Box marginTop={1}>
+          <Text dimColor>
+            Requests will now use the global default key (if configured).
           </Text>
         </Box>
       </Box>

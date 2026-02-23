@@ -20,6 +20,7 @@ export interface CliOptions {
   server?: PositronicDevServer;
   exitProcess?: boolean;
   render: (element: React.ReactElement) => any;
+  projectRootPath?: string;
 }
 
 // Helper function to parse key=value options
@@ -46,6 +47,7 @@ export function buildCli(options: CliOptions) {
     server,
     exitProcess = false,
     render,
+    projectRootPath,
   } = options;
 
   const isLocalDevMode = server !== undefined;
@@ -1352,7 +1354,7 @@ export function buildCli(options: CliOptions) {
   );
 
   // --- Auth Commands (Available in both local and global mode) ---
-  const authCommand = new AuthCommand();
+  const authCommand = new AuthCommand(undefined, projectRootPath);
   {
     cli = cli.command(
       'auth',

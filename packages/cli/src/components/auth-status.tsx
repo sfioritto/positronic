@@ -1,23 +1,38 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
-import { resolvePrivateKeyPath, expandPath } from '../lib/ssh-key-utils.js';
+import { resolvePrivateKeyPath } from '../lib/ssh-key-utils.js';
+import { readLocalAuth } from '../lib/local-auth.js';
 import { existsSync } from 'fs';
 
 interface AuthStatusProps {
   configManager: ProjectConfigManager;
+  projectRootPath?: string;
 }
 
-export const AuthStatus = ({ configManager }: AuthStatusProps) => {
+export const AuthStatus = ({ configManager, projectRootPath }: AuthStatusProps) => {
   const envPath = process.env.POSITRONIC_PRIVATE_KEY;
   const globalKeyPath = configManager.getDefaultPrivateKeyPath();
   const currentProject = configManager.getCurrentProject();
   const projectKeyPath = currentProject
     ? configManager.getProjectPrivateKeyPath(currentProject.name)
     : undefined;
+  const localKeyPath = projectRootPath ? readLocalAuth(projectRootPath) : null;
 
-  // Determine the active key path (what will actually be used)
-  const configuredPath = configManager.getPrivateKeyPath();
+  // Determine the active key path following the full priority chain:
+  // 1. Env var
+  // 2. Local project auth (.positronic-auth.json)
+  // 3. Per-project key from global config
+  // 4. Global default key
+  // 5. Fallback
+  let configuredPath: string | null;
+  if (envPath) {
+    configuredPath = envPath;
+  } else if (localKeyPath) {
+    configuredPath = localKeyPath;
+  } else {
+    configuredPath = configManager.getPrivateKeyPath();
+  }
   const activeKeyPath = resolvePrivateKeyPath(configuredPath);
   const keyExists = existsSync(activeKeyPath);
 
@@ -25,6 +40,8 @@ export const AuthStatus = ({ configManager }: AuthStatusProps) => {
   let activeSource: string;
   if (envPath) {
     activeSource = 'environment variable';
+  } else if (localKeyPath) {
+    activeSource = 'local project';
   } else if (projectKeyPath && currentProject) {
     activeSource = `project "${currentProject.name}"`;
   } else if (globalKeyPath) {
@@ -56,6 +73,20 @@ export const AuthStatus = ({ configManager }: AuthStatusProps) => {
             </Box>
           )}
         </Box>
+
+        {/* Local project key */}
+        {projectRootPath && (
+          <Box flexDirection="column" marginBottom={1}>
+            <Text>
+              <Text bold>Local Project Key:</Text>{' '}
+              {localKeyPath ? (
+                <Text color="cyan">{localKeyPath}</Text>
+              ) : (
+                <Text dimColor>not configured</Text>
+              )}
+            </Text>
+          </Box>
+        )}
 
         {/* Global default key */}
         <Box flexDirection="column" marginBottom={1}>
@@ -105,7 +136,7 @@ export const AuthStatus = ({ configManager }: AuthStatusProps) => {
         </Box>
       </Box>
 
-      {!globalKeyPath && !envPath && !projectKeyPath && (
+      {!globalKeyPath && !envPath && !projectKeyPath && !localKeyPath && (
         <Box marginTop={1}>
           <Text dimColor>
             Run "px auth login" to configure your SSH key for authentication.
