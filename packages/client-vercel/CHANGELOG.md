@@ -1,5 +1,13 @@
 # @positronic/client-vercel
 
+## 0.0.65
+
+### Patch Changes
+
+- Add configurable timeout for `.wait()` steps: pass `{ timeout: '24h' }` (or milliseconds) to automatically cancel a brain if a webhook response isn't received within the deadline. Includes new `parseDuration` utility, `TimeoutAdapter` for Cloudflare DO alarm-based timeout enforcement, and `waitForWebhook` agent tool.
+- Updated dependencies
+  - @positronic/core@0.0.65
+
 ## 0.0.64
 
 ### Patch Changes
