@@ -598,6 +598,149 @@ describe('agent step', () => {
       expect(webhookEvent.waitFor[1].slug).toBe('email-response');
       expect(webhookEvent.waitFor[1].identifier).toBe('email-msg-1');
     });
+
+    it('should emit WEBHOOK event with timeout when tool returns waitFor with timeout', async () => {
+      const supportWebhook = createWebhook(
+        'support-timeout',
+        z.object({ approved: z.boolean() }),
+        async () => ({
+          type: 'webhook' as const,
+          identifier: 'ticket-789',
+          response: { approved: true },
+        })
+      );
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'escalate',
+            args: { summary: 'Needs review' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+        responseMessages: [],
+      });
+
+      const testBrain = brain('test-waitfor-timeout').brain('Handle Timeout', () => ({
+        prompt: 'Handle the request',
+        tools: {
+          escalate: {
+            description: 'Escalate with timeout',
+            inputSchema: z.object({ summary: z.string() }),
+            execute: async () => ({
+              waitFor: supportWebhook('ticket-789'),
+              timeout: 30 * 60 * 1000, // 30 minutes
+            }),
+          },
+          resolve: {
+            description: 'Mark resolved',
+            inputSchema: z.object({ resolution: z.string() }),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      expect(webhookEvent).toBeDefined();
+      expect(webhookEvent.timeout).toBe(30 * 60 * 1000);
+    });
+
+    it('should emit WEBHOOK event without timeout when tool returns waitFor without timeout', async () => {
+      const supportWebhook = createWebhook(
+        'support-no-timeout',
+        z.object({ approved: z.boolean() }),
+        async () => ({
+          type: 'webhook' as const,
+          identifier: 'ticket-no-to',
+          response: { approved: true },
+        })
+      );
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'escalate',
+            args: { summary: 'Needs review' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+        responseMessages: [],
+      });
+
+      const testBrain = brain('test-waitfor-no-timeout').brain('Handle No Timeout', () => ({
+        prompt: 'Handle the request',
+        tools: {
+          escalate: {
+            description: 'Escalate without timeout',
+            inputSchema: z.object({ summary: z.string() }),
+            execute: async () => ({
+              waitFor: supportWebhook('ticket-no-to'),
+            }),
+          },
+          resolve: {
+            description: 'Mark resolved',
+            inputSchema: z.object({ resolution: z.string() }),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      expect(webhookEvent).toBeDefined();
+      expect(webhookEvent.timeout).toBeUndefined();
+    });
+
+    it('should use 1h default timeout when built-in waitForWebhook tool is called without timeout', async () => {
+      const { waitForWebhook } = await import('../src/tools/index.js');
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'waitForWebhook',
+            args: { slug: 'ui-form', identifier: 'form-123', token: 'tok-abc' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+        responseMessages: [],
+      });
+
+      const testBrain = brain('test-default-timeout').brain('Default Timeout', () => ({
+        prompt: 'Wait for user',
+        tools: {
+          waitForWebhook,
+          resolve: {
+            description: 'Mark resolved',
+            inputSchema: z.object({ resolution: z.string() }),
+            terminal: true,
+          },
+        },
+      }));
+
+      const events: BrainEvent[] = [];
+      for await (const event of testBrain.run({ client: mockClient })) {
+        events.push(event);
+      }
+
+      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      expect(webhookEvent).toBeDefined();
+      expect(webhookEvent.timeout).toBe(60 * 60 * 1000); // 1h default
+    });
   });
 
   describe('agent throws when generateText not implemented', () => {

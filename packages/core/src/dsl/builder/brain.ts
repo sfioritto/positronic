@@ -14,6 +14,7 @@ import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type { InitialRunParams, ResumeRunParams } from '../definitions/run-params.js';
 
 import { BrainEventStream } from '../execution/event-stream.js';
+import { parseDuration } from '../duration.js';
 
 export class Brain<
   TOptions extends JsonObject = JsonObject,
@@ -224,12 +225,14 @@ export class Brain<
       params: StepContext<TState, TOptions, TResponse, TPage> & TServices
     ) =>
       | TWaitFor
-      | Promise<TWaitFor>
+      | Promise<TWaitFor>,
+    options?: { timeout?: number | string }
   ): Brain<TOptions, TState, TServices, ExtractWebhookResponses<NormalizeToArray<TWaitFor>>, undefined> {
     const waitBlock: WaitBlock<TState, TOptions, TServices, TPage> = {
       type: 'wait',
       title,
       action: action as any,
+      ...(options?.timeout !== undefined && { timeout: parseDuration(options.timeout) }),
     };
     this.blocks.push(waitBlock);
 

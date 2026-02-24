@@ -1,6 +1,14 @@
 import { brain } from '../src/dsl/brain.js';
 import { createWebhook } from '../src/dsl/webhook.js';
+import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { z } from 'zod';
+import type { ObjectGenerator } from '../src/clients/types.js';
+import { jest } from '@jest/globals';
+
+const mockClient: ObjectGenerator = {
+  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
+  streamText: jest.fn<ObjectGenerator['streamText']>(),
+};
 
 describe('webhook type inference', () => {
   it('should infer webhook response types correctly', () => {
@@ -79,5 +87,70 @@ describe('webhook type inference', () => {
     // The real test is in the type assertions above, which are checked during TypeScript compilation
     expect(myBrain).toBeDefined();
     expect(myBrain.title).toBe('Test Brain');
+  });
+});
+
+describe('wait step timeout', () => {
+  const testWebhook = createWebhook(
+    'timeout-test-webhook',
+    z.object({ data: z.string() }),
+    async (request) => ({
+      type: 'webhook' as const,
+      identifier: 'test',
+      response: { data: 'hello' },
+    })
+  );
+
+  it('should emit WEBHOOK event without timeout when no timeout specified', async () => {
+    const testBrain = brain('no-timeout brain')
+      .step('Init', () => ({ ready: true }))
+      .wait('Wait', () => testWebhook('id1'));
+
+    const events = [];
+    for await (const event of testBrain.run({ client: mockClient })) {
+      events.push(event);
+    }
+
+    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+    expect(webhookEvent).toBeDefined();
+    expect(webhookEvent.timeout).toBeUndefined();
+  });
+
+  it('should emit WEBHOOK event with timeout in ms when timeout string specified', async () => {
+    const testBrain = brain('timeout-string brain')
+      .step('Init', () => ({ ready: true }))
+      .wait('Wait', () => testWebhook('id1'), { timeout: '24h' });
+
+    const events = [];
+    for await (const event of testBrain.run({ client: mockClient })) {
+      events.push(event);
+    }
+
+    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+    expect(webhookEvent).toBeDefined();
+    expect(webhookEvent.timeout).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it('should emit WEBHOOK event with timeout in ms when timeout number specified', async () => {
+    const testBrain = brain('timeout-number brain')
+      .step('Init', () => ({ ready: true }))
+      .wait('Wait', () => testWebhook('id1'), { timeout: 30000 });
+
+    const events = [];
+    for await (const event of testBrain.run({ client: mockClient })) {
+      events.push(event);
+    }
+
+    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+    expect(webhookEvent).toBeDefined();
+    expect(webhookEvent.timeout).toBe(30000);
+  });
+
+  it('should throw on invalid timeout value', () => {
+    expect(() => {
+      brain('invalid-timeout brain')
+        .step('Init', () => ({ ready: true }))
+        .wait('Wait', () => testWebhook('id1'), { timeout: 'not-valid' });
+    }).toThrow('Invalid duration string');
   });
 });

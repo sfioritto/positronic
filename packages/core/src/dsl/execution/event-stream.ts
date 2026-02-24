@@ -956,6 +956,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         toolName: string;
         input: JsonObject;
         webhooks: Array<{ slug: string; identifier: string }>;
+        timeout?: number;
       } | null = null;
 
       // Process tool calls
@@ -1048,6 +1049,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
                 identifier: w.identifier,
                 token: w.token,
               })),
+              timeout: waitForResult.timeout,
             };
 
             // Emit tool result event for debugging/visibility (with pending status)
@@ -1132,6 +1134,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield {
           type: BRAIN_EVENTS.WEBHOOK,
           waitFor: pendingWebhook.webhooks,
+          ...(pendingWebhook.timeout !== undefined && { timeout: pendingWebhook.timeout }),
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
@@ -1414,6 +1417,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     yield {
       type: BRAIN_EVENTS.WEBHOOK,
       waitFor: serializedWaitFor,
+      ...(waitBlock.timeout !== undefined && { timeout: waitBlock.timeout }),
       options: this.options,
       brainRunId: this.brainRunId,
     };

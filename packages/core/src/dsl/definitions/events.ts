@@ -94,6 +94,7 @@ export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK;
   waitFor: SerializedWebhookRegistration[];
+  timeout?: number;
 }
 
 // Agent Events

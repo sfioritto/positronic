@@ -47,7 +47,7 @@ const myBrain = brain('My Brain')
   .step('My Step', ({ state }) => {
     return { cool: 'thing', ...state };
   })
-  .wait('Wait for response', () => [slackWebhook('thread-123'), emailWebhook('email-456')])
+  .wait('Wait for response', () => [slackWebhook('thread-123'), emailWebhook('email-456')], { timeout: '24h' })
   .step('My Step 2', ({ state, response }) => {
     if (response) {
       if ('threadId' in response) {

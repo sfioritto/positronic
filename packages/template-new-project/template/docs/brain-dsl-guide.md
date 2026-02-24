@@ -999,6 +999,7 @@ Key points about tool `waitFor`:
 - You can wait for multiple webhooks (first response wins): `{ waitFor: [webhook1(...), webhook2(...)] }`
 - The `execute` function receives a `context` parameter with access to `state`, `options`, `env`, etc.
 - Use this pattern for approvals, external API callbacks, or any human-in-the-loop workflow
+- The built-in `waitForWebhook` tool defaults to a 1-hour timeout. Agents can customize via the `timeout` parameter (e.g., "30m", "24h", "7d"). If the timeout elapses, the brain is cancelled.
 
 ### Agent Output Schema
 
@@ -1128,7 +1129,7 @@ brain('Archive Workflow')
     await pages.create('my-page', html);
     return { ...state, formToken };
   })
-  .wait('Wait for submission', ({ state }) => archiveWebhook(state.sessionId, state.formToken))
+  .wait('Wait for submission', ({ state }) => archiveWebhook(state.sessionId, state.formToken), { timeout: '24h' })
   .step('Process', ({ state, response }) => ({
     ...state,
     name: response.name,
@@ -1210,8 +1211,8 @@ brain('Feedback Collector')
     await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
     return state;
   })
-  // Wait for form submission
-  .wait('Wait for submission', ({ page }) => page.webhook)
+  // Wait for form submission (timeout after 24 hours, brain is cancelled if no response)
+  .wait('Wait for submission', ({ page }) => page.webhook, { timeout: '24h' })
   // Process the form data (comes through response, not page)
   .step('Process Feedback', ({ state, response }) => ({
     ...state,
