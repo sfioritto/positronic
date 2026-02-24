@@ -111,13 +111,15 @@ export default brain('approval-workflow')
   .step('Request approval', ({ state }) => ({
     ...state, status: 'pending',
   }))
-  .wait('Wait for approval', ({ state }) => approvalWebhook(state.requestId))
+  .wait('Wait for approval', ({ state }) => approvalWebhook(state.requestId), { timeout: '24h' })
   .step('Process approval', ({ state, response }) => ({
     ...state,
     status: response.approved ? 'approved' : 'rejected',
     reviewerNote: response.reviewerNote,
   }));
 ```
+
+The optional `timeout` parameter accepts durations like `'30m'`, `'1h'`, `'24h'`, `'7d'`, or a number in milliseconds. If the timeout elapses without a webhook response, the brain is cancelled. Without a timeout, the brain waits indefinitely.
 
 ### CSRF Tokens for Pages with Forms
 

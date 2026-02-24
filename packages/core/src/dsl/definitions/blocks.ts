@@ -78,6 +78,7 @@ export type WaitBlock<
 > = {
   type: 'wait';
   title: string;
+  timeout?: number;
   action: (
     params: {
       state: TState;

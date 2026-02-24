@@ -61,6 +61,7 @@ export type JsonPatch = {
  */
 export interface AgentToolWaitFor {
   waitFor: WebhookRegistration<z.ZodSchema> | WebhookRegistration<z.ZodSchema>[];
+  timeout?: number;
 }
 
 /**

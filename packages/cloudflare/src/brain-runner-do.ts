@@ -5,6 +5,7 @@ import type { Adapter, BrainEvent } from '@positronic/core';
 import { CloudflareSignalProvider } from './signal-provider.js';
 import { BrainRunSQLiteAdapter } from './sqlite-adapter.js';
 import { WebhookAdapter } from './webhook-adapter.js';
+import { TimeoutAdapter } from './timeout-adapter.js';
 import { PageAdapter } from './page-adapter.js';
 import { EventLoader } from './event-loader.js';
 import { createPagesService } from './pages-service.js';
@@ -138,6 +139,14 @@ CREATE TABLE IF NOT EXISTS brain_signals (
 );
 `;
 
+// SQL to initialize the wait timeout table
+const waitTimeoutTableSQL = `
+CREATE TABLE IF NOT EXISTS wait_timeout (
+  brain_run_id TEXT PRIMARY KEY,
+  timeout_at INTEGER NOT NULL
+);
+`;
+
 export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private brainRunId: string;
@@ -145,6 +154,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
   private abortController: AbortController | null = null;
   private pageAdapter: PageAdapter | null = null;
   private signalsTableInitialized = false;
+  private waitTimeoutTableInitialized = false;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -158,6 +168,41 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.sql.exec(signalsTableSQL);
       this.signalsTableInitialized = true;
     }
+  }
+
+  private initializeWaitTimeoutTable() {
+    if (!this.waitTimeoutTableInitialized) {
+      this.sql.exec(waitTimeoutTableSQL);
+      this.waitTimeoutTableInitialized = true;
+    }
+  }
+
+  storeWaitTimeout(brainRunId: string, timeoutAt: number) {
+    this.initializeWaitTimeoutTable();
+    this.sql.exec(
+      `INSERT OR REPLACE INTO wait_timeout (brain_run_id, timeout_at) VALUES (?, ?)`,
+      brainRunId,
+      timeoutAt
+    );
+  }
+
+  clearWaitTimeout(brainRunId: string) {
+    this.initializeWaitTimeoutTable();
+    this.sql.exec(
+      `DELETE FROM wait_timeout WHERE brain_run_id = ?`,
+      brainRunId
+    );
+  }
+
+  getWaitTimeout(): { brainRunId: string; timeoutAt: number } | null {
+    this.initializeWaitTimeoutTable();
+    const results = this.sql
+      .exec<{ brain_run_id: string; timeout_at: number }>(
+        `SELECT brain_run_id, timeout_at FROM wait_timeout LIMIT 1`
+      )
+      .toArray();
+    if (results.length === 0) return null;
+    return { brainRunId: results[0].brain_run_id, timeoutAt: results[0].timeout_at };
   }
 
   /**
@@ -410,6 +455,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
   }
 
   async alarm() {
+    const timeout = this.getWaitTimeout();
+    if (timeout && Date.now() >= timeout.timeoutAt) {
+      this.clearWaitTimeout(timeout.brainRunId);
+      await this.queueSignal({ type: 'KILL' });
+    }
     await this.wakeUp(this.brainRunId);
   }
 
@@ -505,6 +555,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
       (time) => this.ctx.storage.setAlarm(time)
     );
 
+    const timeoutAdapter = new TimeoutAdapter(
+      (brainRunId, timeoutAt) => this.storeWaitTimeout(brainRunId, timeoutAt),
+      (time) => this.ctx.storage.setAlarm(time)
+    );
+
     runnerWithResources
       .withAdapters([
         sqliteAdapter,
@@ -514,6 +569,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         webhookAdapter,
         this.pageAdapter,
         batchChunkAdapter,
+        timeoutAdapter,
       ])
       .run(brainToRun, {
         initialState,
@@ -538,6 +594,15 @@ export class BrainRunnerDO extends DurableObject<Env> {
    */
   async wakeUp(brainRunId: string) {
     const { sql } = this;
+
+    // Clear any pending timeout and cancel the alarm to prevent spurious alarm
+    // fires after explicit resume. Safe because wakeUp() is only called when a
+    // brain is suspended (waiting/paused), never during active batch execution.
+    const pendingTimeout = this.getWaitTimeout();
+    if (pendingTimeout) {
+      this.clearWaitTimeout(pendingTimeout.brainRunId);
+      await this.ctx.storage.deleteAlarm();
+    }
 
     if (!manifest) {
       throw new Error('Runtime manifest not initialized');
@@ -650,6 +715,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
       (time) => this.ctx.storage.setAlarm(time)
     );
 
+    const timeoutAdapter = new TimeoutAdapter(
+      (brainRunId, timeoutAt) => this.storeWaitTimeout(brainRunId, timeoutAt),
+      (time) => this.ctx.storage.setAlarm(time)
+    );
+
     runnerWithResources
       .withAdapters([
         sqliteAdapter,
@@ -659,6 +729,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         webhookAdapter,
         this.pageAdapter,
         batchChunkAdapter,
+        timeoutAdapter,
       ])
       .resume(brainToRun, {
         machine,

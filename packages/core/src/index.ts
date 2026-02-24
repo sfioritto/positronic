@@ -37,6 +37,7 @@ export type {
   SignalProvider,
 } from './dsl/types.js';
 export { applyPatches } from './dsl/json-patch.js';
+export { parseDuration } from './dsl/duration.js';
 
 // Only needed for development to ensure that zod version numbers are the same, it's a peer
 // dependency so when not using file://..path/to/package links the version numbers
