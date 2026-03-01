@@ -98,10 +98,9 @@ describe('signal validation', () => {
         expect(result.reason).toBe("Cannot RESUME brain in 'complete' state");
       });
 
-      it('rejects RESUME from waiting state', () => {
+      it('allows RESUME from waiting state', () => {
         const result = isSignalValid(brainMachineDefinition, STATUS.WAITING, 'RESUME');
-        expect(result.valid).toBe(false);
-        expect(result.reason).toBe("Cannot RESUME brain in 'waiting' state");
+        expect(result.valid).toBe(true);
       });
     });
 
@@ -185,8 +184,8 @@ describe('signal validation', () => {
       const signals = getValidSignals(brainMachineDefinition, STATUS.WAITING);
       expect(signals).toContain('WEBHOOK_RESPONSE');
       expect(signals).toContain('KILL');
+      expect(signals).toContain('RESUME');
       expect(signals).not.toContain('PAUSE');
-      expect(signals).not.toContain('RESUME');
     });
 
     it('returns empty array for complete state', () => {

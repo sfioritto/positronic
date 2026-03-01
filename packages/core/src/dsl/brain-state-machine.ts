@@ -953,6 +953,8 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         // Otherwise go to running
         transition(BRAIN_EVENTS.WEBHOOK_RESPONSE, 'running', webhookResponse),
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
+        // RESUMED transitions out of waiting (e.g., timeout-triggered wakeUp with no webhook response)
+        transition(BRAIN_EVENTS.RESUMED, 'running', resumeBrain) as any,
         // START can resume from waiting (after webhook response is processed)
         // If we have agentContext, resume to agentLoop; otherwise to running
         transition(
