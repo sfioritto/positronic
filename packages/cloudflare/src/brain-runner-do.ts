@@ -442,6 +442,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
       options: startEvent?.options || {},
     };
 
+    // Clean up any pending wait timeout and alarm to prevent spurious
+    // alarm fires after the brain has been manually cancelled.
+    const pendingTimeout = this.getWaitTimeout();
+    if (pendingTimeout) {
+      this.clearWaitTimeout(pendingTimeout.brainRunId);
+      await this.ctx.storage.deleteAlarm();
+    }
+
     // Dispatch to PageAdapter for cleanup (deletes non-persistent pages from R2)
     // This is needed because when a brain is paused (waiting for webhook), the BrainRunner
     // has already returned and adapters aren't receiving events through the normal pipeline.

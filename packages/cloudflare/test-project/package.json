@@ -11,10 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.8.11",
-    "jose": "^5.2.0",
+    "@cloudflare/vitest-pool-workers": "^0.12.18",
     "@positronic/core": "file:../../core",
     "@positronic/spec": "file:../../spec",
+    "jose": "^5.2.0",
     "typescript": "^5.5.2",
     "vitest": "3.0.9",
     "wrangler": "^4.37.0",

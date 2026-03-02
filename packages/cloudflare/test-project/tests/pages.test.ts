@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { createAuthenticatedRequest } from './test-auth-helper';
+import { readSseStream } from './sse-helpers';
 import type {
   BrainEvent,
   BrainCompleteEvent,
@@ -26,68 +27,6 @@ interface TestEnv {
 }
 
 describe('Pages API Tests', () => {
-  // Helper to parse SSE data field
-  function parseSseEvent(text: string): any | null {
-    const lines = text.trim().split('\n');
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const jsonData = line.substring(6);
-          const parsed = JSON.parse(jsonData);
-          return parsed;
-        } catch (e) {
-          console.error('[TEST_SSE_PARSE] Failed to parse SSE data:', line.substring(6), e);
-          return null;
-        }
-      }
-    }
-    return null;
-  }
-
-  // Helper function to read the entire SSE stream and collect events
-  async function readSseStream(stream: ReadableStream<Uint8Array>): Promise<BrainEvent[]> {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    const events: BrainEvent[] = [];
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        if (buffer.trim().length > 0) {
-          const event = parseSseEvent(buffer);
-          if (event) {
-            events.push(event);
-          }
-        }
-        break;
-      }
-
-      const decodedChunk = decoder.decode(value, { stream: true });
-      buffer += decodedChunk;
-      let eventEndIndex;
-      while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-        const message = buffer.substring(0, eventEndIndex);
-        buffer = buffer.substring(eventEndIndex + 2);
-        if (message.startsWith('data:')) {
-          const event = parseSseEvent(message);
-          if (event) {
-            events.push(event);
-            if (event.type === BRAIN_EVENTS.COMPLETE) {
-              reader.cancel(`Received terminal event: ${event.type}`);
-              return events;
-            }
-            if (event.type === BRAIN_EVENTS.ERROR) {
-              console.error('Received BRAIN_EVENTS.ERROR. Event details:', event);
-              reader.cancel(`Received terminal event: ${event.type}`);
-              throw new Error(`Received terminal event: ${event.type}. Details: ${JSON.stringify(event)}`);
-            }
-          }
-        }
-      }
-    }
-    return events;
-  }
 
   // Clean up pages after each test
   afterEach(async () => {
