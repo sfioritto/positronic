@@ -51,7 +51,8 @@
       "WebFetch(domain:docs.mem0.ai)",
       "Bash(git -C /Users/seanfioritto/projects/positronic log --oneline v0.0.61..HEAD)",
       "Bash(git -C /Users/seanfioritto/projects/positronic diff --stat v0.0.61..HEAD)",
-      "Bash(git -C /Users/seanfioritto/projects/positronic status)"
+      "Bash(git -C /Users/seanfioritto/projects/positronic status)",
+      "Bash(npm view:*)"
     ],
     "deny": []
   }
