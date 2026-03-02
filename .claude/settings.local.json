@@ -52,7 +52,11 @@
       "Bash(git -C /Users/seanfioritto/projects/positronic log --oneline v0.0.61..HEAD)",
       "Bash(git -C /Users/seanfioritto/projects/positronic diff --stat v0.0.61..HEAD)",
       "Bash(git -C /Users/seanfioritto/projects/positronic status)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic log --all --oneline --grep=\"cron-schedule\")",
+      "Bash(git -C /Users/seanfioritto/projects/positronic log --all --oneline --grep=\"croner\")",
+      "Bash(git -C /Users/seanfioritto/projects/positronic log --all --oneline --grep=\"cron\")",
+      "Bash(git -C /Users/seanfioritto/projects/positronic blame packages/cloudflare/src/schedule-do.ts)"
     ],
     "deny": []
   }
