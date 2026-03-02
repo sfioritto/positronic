@@ -1,5 +1,11 @@
 # @positronic/template-new-project
 
+## 0.0.66
+
+### Patch Changes
+
+- Fix wait timeout: add RESUMED transition from waiting state to prevent state machine errors when a brain resumes after a wait timeout. Add comprehensive integration tests for wait timeout functionality and extract shared SSE test helpers for reuse across test suites.
+
 ## 0.0.65
 
 ### Patch Changes

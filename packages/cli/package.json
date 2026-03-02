@@ -1,6 +1,6 @@
 {
   "name": "@positronic/cli",
-  "version": "0.0.65",
+  "version": "0.0.66",
   "publishConfig": {
     "access": "public"
   },
@@ -23,9 +23,9 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
-    "@positronic/core": "^0.0.65",
-    "@positronic/spec": "^0.0.65",
-    "@positronic/template-new-project": "^0.0.65",
+    "@positronic/core": "^0.0.66",
+    "@positronic/spec": "^0.0.66",
+    "@positronic/template-new-project": "^0.0.66",
     "caz": "^2.0.0",
     "chokidar": "^3.6.0",
     "dotenv": "^16.4.7",

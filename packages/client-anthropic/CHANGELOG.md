@@ -1,5 +1,13 @@
 # @positronic/client-anthropic
 
+## 0.0.66
+
+### Patch Changes
+
+- Fix wait timeout: add RESUMED transition from waiting state to prevent state machine errors when a brain resumes after a wait timeout. Add comprehensive integration tests for wait timeout functionality and extract shared SSE test helpers for reuse across test suites.
+- Updated dependencies
+  - @positronic/core@0.0.66
+
 ## 0.0.65
 
 ### Patch Changes
