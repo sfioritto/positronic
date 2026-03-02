@@ -1,5 +1,16 @@
 # @positronic/client-anthropic
 
+## 0.0.67
+
+### Patch Changes
+
+- - Add timezone support to the schedule system (CLI, spec, and Cloudflare backend)
+  - Fix AgentTool type variance to accept specifically-typed tools
+  - Fix flaky signal tests by using SSE stream instead of setTimeout
+  - Allow git log and git blame in Claude settings
+- Updated dependencies
+  - @positronic/core@0.0.67
+
 ## 0.0.66
 
 ### Patch Changes
