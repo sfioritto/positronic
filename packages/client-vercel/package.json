@@ -1,6 +1,6 @@
 {
   "name": "@positronic/client-vercel",
-  "version": "0.0.66",
+  "version": "0.0.67",
   "publishConfig": {
     "access": "public"
   },
@@ -23,7 +23,7 @@
     "ai": "^6.0.0"
   },
   "dependencies": {
-    "@positronic/core": "^0.0.66",
+    "@positronic/core": "^0.0.67",
     "zod": "^3.24.1"
   }
 }
