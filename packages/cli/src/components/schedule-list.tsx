@@ -11,6 +11,7 @@ interface Schedule {
   id: string;
   brainTitle: string;
   cronExpression: string;
+  timezone: string;
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
@@ -113,6 +114,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
     brainTitle: { header: 'Brain Title', width: 20 },
     schedule: { header: 'Schedule', width: 15 },
     status: { header: 'Status', width: 10 },
+    timezone: { header: 'Timezone', width: 18 },
     nextRun: { header: 'Next Run', width: 12 },
     created: { header: 'Created', width: 20 },
     id: { header: 'ID', width: 36 },
@@ -138,6 +140,8 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
           <Text bold color="cyan">{padRight(columns.schedule.header, columns.schedule.width)}</Text>
           <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.status.header, columns.status.width)}</Text>
+          <Text>  </Text>
+          <Text bold color="cyan">{padRight(columns.timezone.header, columns.timezone.width)}</Text>
           <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.nextRun.header, columns.nextRun.width)}</Text>
           <Text>  </Text>
@@ -166,6 +170,8 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
               <Text color={schedule.enabled ? 'green' : 'red'}>
                 {padRight(schedule.enabled ? 'Enabled' : 'Disabled', columns.status.width)}
               </Text>
+              <Text>  </Text>
+              <Text dimColor>{padRight(truncate(schedule.timezone || 'UTC', columns.timezone.width), columns.timezone.width)}</Text>
               <Text>  </Text>
               <Text color={isOverdue ? 'red' : undefined}>
                 {padRight(

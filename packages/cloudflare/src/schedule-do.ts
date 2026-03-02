@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { v4 as uuidv4 } from 'uuid';
-import { parseCronExpression, type Cron } from 'cron-schedule';
+import { Cron } from 'croner';
 import { BRAIN_EVENTS, type BrainEvent } from '@positronic/core';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 
@@ -14,6 +14,7 @@ interface Schedule {
   id: string;
   brainTitle: string;
   cronExpression: string;
+  timezone: string;
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
@@ -69,11 +70,19 @@ export class ScheduleDO extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS idx_runs_schedule
       ON scheduled_runs(schedule_id, ran_at DESC);
     `);
+
+    // Migration: add timezone column for existing DOs
+    try {
+      this.storage.exec(`ALTER TABLE schedules ADD COLUMN timezone TEXT NOT NULL DEFAULT 'UTC'`);
+    } catch {
+      // Column already exists
+    }
   }
 
   async createSchedule(
     brainTitle: string,
-    cronExpression: string
+    cronExpression: string,
+    timezone: string = 'UTC'
   ): Promise<Schedule> {
     const id = uuidv4();
     const createdAt = Date.now();
@@ -85,15 +94,15 @@ export class ScheduleDO extends DurableObject<Env> {
     }
     // Note: Cron expression is validated at the API level before calling this method
     // Calculate next run time
-    const cron = parseCronExpression(cronExpression);
-    const nextRunAt = this.calculateNextRunTime(cron, createdAt);
+    const nextRunAt = this.calculateNextRunTime(cronExpression, createdAt, timezone);
 
     this.storage.exec(
-      `INSERT INTO schedules (id, brain_title, cron_expression, enabled, created_at, next_run_at)
-       VALUES (?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO schedules (id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at)
+       VALUES (?, ?, ?, ?, 1, ?, ?)`,
       id,
       brainTitle,
       cronExpression,
+      timezone,
       createdAt,
       nextRunAt
     );
@@ -102,6 +111,7 @@ export class ScheduleDO extends DurableObject<Env> {
       id,
       brainTitle,
       cronExpression,
+      timezone,
       enabled: true,
       createdAt,
       nextRunAt,
@@ -111,7 +121,7 @@ export class ScheduleDO extends DurableObject<Env> {
   async getSchedule(scheduleId: string): Promise<Schedule | null> {
     const results = this.storage
       .exec(
-        `SELECT id, brain_title, cron_expression, enabled, created_at, next_run_at
+        `SELECT id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at
          FROM schedules WHERE id = ?`,
         scheduleId
       )
@@ -127,6 +137,7 @@ export class ScheduleDO extends DurableObject<Env> {
       id: result.id as string,
       brainTitle: result.brain_title as string,
       cronExpression: result.cron_expression as string,
+      timezone: (result.timezone as string) || 'UTC',
       enabled: result.enabled === 1,
       createdAt: result.created_at as number,
       nextRunAt: result.next_run_at as number | undefined,
@@ -159,7 +170,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
     const schedules = this.storage
       .exec(
-        `SELECT id, brain_title, cron_expression, enabled, created_at, next_run_at
+        `SELECT id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at
          FROM schedules
          ORDER BY created_at DESC`
       )
@@ -168,6 +179,7 @@ export class ScheduleDO extends DurableObject<Env> {
         id: row.id as string,
         brainTitle: row.brain_title as string,
         cronExpression: row.cron_expression as string,
+        timezone: (row.timezone as string) || 'UTC',
         enabled: row.enabled === 1,
         createdAt: row.created_at as number,
         nextRunAt: row.next_run_at as number | undefined,
@@ -237,7 +249,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
       const dueSchedules = this.storage
         .exec(
-          `SELECT id, brain_title, cron_expression
+          `SELECT id, brain_title, cron_expression, timezone
            FROM schedules
            WHERE enabled = 1 AND next_run_at <= ?`,
           now
@@ -281,8 +293,8 @@ export class ScheduleDO extends DurableObject<Env> {
         }
 
         // Calculate and update next run time
-        const cron = parseCronExpression(cronExpression);
-        const nextRunAt = this.calculateNextRunTime(cron, now);
+        const timezone = (schedule.timezone as string) || 'UTC';
+        const nextRunAt = this.calculateNextRunTime(cronExpression, now, timezone);
 
         this.storage.exec(
           `UPDATE schedules SET next_run_at = ? WHERE id = ?`,
@@ -362,16 +374,24 @@ export class ScheduleDO extends DurableObject<Env> {
 
   private isValidCronExpression(expression: string): boolean {
     try {
-      // Try to parse the expression - if it throws, it's invalid
-      parseCronExpression(expression);
+      new Cron(expression);
       return true;
     } catch (error) {
       return false;
     }
   }
 
-  private calculateNextRunTime(cron: Cron, afterTime: number): number {
-    const nextDate = cron.getNextDate(new Date(afterTime));
-    return nextDate.getTime();
+  private calculateNextRunTime(cronExpression: string, afterTime: number, timezone: string): number {
+    const job = new Cron(cronExpression, { timezone });
+    const nextDate = job.nextRun(new Date(afterTime));
+    return nextDate!.getTime();
+  }
+
+  async setProjectTimezone(timezone: string): Promise<void> {
+    this.ctx.storage.put('projectTimezone', timezone);
+  }
+
+  async getProjectTimezone(): Promise<string> {
+    return (await this.ctx.storage.get<string>('projectTimezone')) || 'UTC';
   }
 }

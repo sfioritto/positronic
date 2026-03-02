@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { v4 as uuidv4 } from 'uuid';
-import { parseCronExpression } from 'cron-schedule';
+import { Cron } from 'croner';
 import Fuse from 'fuse.js';
 import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 import { getManifest } from '../brain-runner-do.js';
@@ -453,7 +453,7 @@ brains.post('/schedules', async (context: Context) => {
 
     // Validate cron expression before calling DO
     try {
-      parseCronExpression(cronExpression);
+      new Cron(cronExpression);
     } catch {
       return context.json(
         { error: `Invalid cron expression: ${cronExpression}` },
@@ -485,12 +485,26 @@ brains.post('/schedules', async (context: Context) => {
     const brainTitle = (brain as any).title || identifier;
 
     // Get the schedule singleton instance
-    const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
-    const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId);
+    const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
+    const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
+
+    // Determine timezone: use provided value, fall back to project timezone
+    let timezone = body.timezone;
+    if (!timezone) {
+      timezone = await scheduleStub.getProjectTimezone();
+    }
+
+    // Validate timezone
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    } catch {
+      return context.json({ error: `Invalid timezone: ${timezone}` }, 400);
+    }
 
     const schedule = await scheduleStub.createSchedule(
       brainTitle,
-      cronExpression
+      cronExpression,
+      timezone
     );
     return context.json(schedule, 201);
   } catch (error) {
@@ -519,6 +533,33 @@ brains.get('/schedules/runs', async (context: Context) => {
 
   const result = await scheduleStub.getAllRuns(scheduleIdParam, limit);
   return context.json(result);
+});
+
+// Get project timezone
+brains.get('/schedules/timezone', async (context: Context) => {
+  const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
+  const timezone = await scheduleStub.getProjectTimezone();
+  return context.json({ timezone });
+});
+
+// Set project timezone
+brains.put('/schedules/timezone', async (context: Context) => {
+  const body = await context.req.json();
+  const { timezone } = body;
+  if (!timezone) {
+    return context.json({ error: 'Missing required field "timezone"' }, 400);
+  }
+  // Validate timezone
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    return context.json({ error: `Invalid timezone: ${timezone}` }, 400);
+  }
+  const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
+  const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
+  await scheduleStub.setProjectTimezone(timezone);
+  return context.json({ timezone });
 });
 
 // Delete a schedule

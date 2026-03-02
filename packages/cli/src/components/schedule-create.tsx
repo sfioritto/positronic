@@ -12,6 +12,7 @@ interface CreateScheduleResponse {
   id: string;
   brainTitle: string;
   cronExpression: string;
+  timezone: string;
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
@@ -69,11 +70,19 @@ export const ScheduleCreate = ({ identifier, cronExpression }: ScheduleCreatePro
             <Text bold>Cron Expression:</Text> {schedule.cronExpression}
           </Text>
           <Text>
+            <Text bold>Timezone:</Text> {schedule.timezone}
+          </Text>
+          <Text>
             <Text bold>Status:</Text> {schedule.enabled ? 'Enabled' : 'Disabled'}
           </Text>
           {schedule.nextRunAt && (
             <Text>
-              <Text bold>Next Run:</Text> {new Date(schedule.nextRunAt).toLocaleString()}
+              <Text bold>Next Run:</Text>{' '}
+              {new Date(schedule.nextRunAt).toLocaleString('en-US', {
+                timeZone: schedule.timezone,
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}
             </Text>
           )}
         </Box>
