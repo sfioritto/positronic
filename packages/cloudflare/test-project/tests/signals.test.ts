@@ -6,11 +6,9 @@ import {
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
-import { BRAIN_EVENTS, STATUS, createBrainExecutionMachine, sendEvent } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
-import { parseSseEvent } from './sse-helpers';
-import type { BrainEvent } from '@positronic/core';
+import { readSseStream } from './sse-helpers';
 import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
 import type { MonitorDO } from '../../src/monitor-do.js';
 import type { ScheduleDO } from '../../src/schedule-do.js';
@@ -28,56 +26,29 @@ describe('Signal API Tests', () => {
     resetMockState();
   });
 
-  // Helper to read SSE events until a condition is met or timeout
-  async function readSseUntil(
-    stream: ReadableStream<Uint8Array>,
-    predicate: (events: BrainEvent[]) => boolean,
-    timeoutMs: number = 5000
-  ): Promise<BrainEvent[]> {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    const events: BrainEvent[] = [];
-    const machine = createBrainExecutionMachine();
+  async function createRunAndWaitForComplete(
+    testEnv: TestEnv,
+    brainTitle: string
+  ): Promise<string> {
+    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brainTitle }),
+    });
+    const createContext = createExecutionContext();
+    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+    const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+    await waitOnExecutionContext(createContext);
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('SSE read timeout')), timeoutMs)
+    const watchRequest = await createAuthenticatedRequest(
+      `http://example.com/brains/runs/${brainRunId}/watch`
     );
+    const watchContext = createExecutionContext();
+    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    await readSseStream(watchResponse.body!);
+    await waitOnExecutionContext(watchContext);
 
-    const readPromise = (async () => {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        let eventEndIndex;
-        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-          const message = buffer.substring(0, eventEndIndex);
-          buffer = buffer.substring(eventEndIndex + 2);
-          if (message.startsWith('data:')) {
-            const event = parseSseEvent(message);
-            if (event) {
-              events.push(event);
-              sendEvent(machine, event);
-
-              if (predicate(events)) {
-                reader.cancel('Condition met');
-                return events;
-              }
-
-              // Also exit on completion/error
-              if (machine.context.isComplete || machine.context.isError) {
-                reader.cancel('Brain finished');
-                return events;
-              }
-            }
-          }
-        }
-      }
-      return events;
-    })();
-
-    return Promise.race([readPromise, timeoutPromise]);
+    return brainRunId;
   }
 
   describe('POST /brains/runs/:runId/signals', () => {
@@ -116,30 +87,8 @@ describe('Signal API Tests', () => {
     it('should return 409 when PAUSE signal sent to completed brain', async () => {
       const testEnv = env as TestEnv;
 
-      // Create a brain run (fast brain that will complete quickly)
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'basic-brain' }),
-      });
-      const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
-      await waitOnExecutionContext(createContext);
-
-      // Wait for brain to complete
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Verify brain is complete
-      const getRunRequest = await createAuthenticatedRequest(
-        `http://example.com/brains/runs/${brainRunId}`,
-        { method: 'GET' }
-      );
-      const getRunContext = createExecutionContext();
-      const getRunResponse = await worker.fetch(getRunRequest, testEnv, getRunContext);
-      await waitOnExecutionContext(getRunContext);
-      const runDetails = await getRunResponse.json<{ status: string }>();
-      expect(runDetails.status).toBe('complete');
+      // Create a brain run and wait for it to complete via SSE
+      const brainRunId = await createRunAndWaitForComplete(testEnv, 'basic-brain');
 
       // Now send PAUSE signal - should be rejected
       const signalRequest = await createAuthenticatedRequest(
@@ -162,19 +111,8 @@ describe('Signal API Tests', () => {
     it('should return 409 when KILL signal sent to completed brain', async () => {
       const testEnv = env as TestEnv;
 
-      // Create a brain run (fast brain that will complete quickly)
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'basic-brain' }),
-      });
-      const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
-      await waitOnExecutionContext(createContext);
-
-      // Wait for brain to complete
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Create a brain run and wait for it to complete via SSE
+      const brainRunId = await createRunAndWaitForComplete(testEnv, 'basic-brain');
 
       // Now send KILL signal - should be rejected
       const signalRequest = await createAuthenticatedRequest(
@@ -301,19 +239,8 @@ describe('Signal API Tests', () => {
     it('should return 409 when brain is not paused', async () => {
       const testEnv = env as TestEnv;
 
-      // Create a brain run (fast brain that will complete)
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'basic-brain' }),
-      });
-      const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
-      await waitOnExecutionContext(createContext);
-
-      // Wait a bit for brain to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Create a brain run and wait for it to complete via SSE
+      const brainRunId = await createRunAndWaitForComplete(testEnv, 'basic-brain');
 
       // Try to resume
       const resumeRequest = await createAuthenticatedRequest(
