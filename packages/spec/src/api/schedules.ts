@@ -7,15 +7,21 @@ export const schedules = {
   async create(
     fetch: Fetch,
     identifier: string,
-    cronExpression: string
+    cronExpression: string,
+    timezone?: string
   ): Promise<string | null> {
     try {
+      const body: Record<string, string> = { identifier, cronExpression };
+      if (timezone) {
+        body.timezone = timezone;
+      }
+
       const request = new Request('http://example.com/brains/schedules', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ identifier, cronExpression }),
+        body: JSON.stringify(body),
       });
 
       const response = await fetch(request);
@@ -31,6 +37,7 @@ export const schedules = {
         id: string;
         brainTitle: string;
         cronExpression: string;
+        timezone: string;
         enabled: boolean;
         createdAt: number;
       };
@@ -93,6 +100,7 @@ export const schedules = {
           id: string;
           brainTitle: string;
           cronExpression: string;
+          timezone: string;
           enabled: boolean;
           createdAt: number;
         }>;
@@ -240,6 +248,86 @@ export const schedules = {
       return true;
     } catch (error) {
       console.error(`Failed to test GET /brains/schedules/runs:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test GET /brains/schedules/timezone - Get project timezone
+   */
+  async getTimezone(fetch: Fetch): Promise<string | null> {
+    try {
+      const request = new Request(
+        'http://example.com/brains/schedules/timezone',
+        { method: 'GET' }
+      );
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(
+          `GET /brains/schedules/timezone returned ${response.status}`
+        );
+        return null;
+      }
+
+      const data = (await response.json()) as { timezone: string };
+
+      if (typeof data.timezone !== 'string') {
+        console.error(
+          `Expected timezone to be string, got ${typeof data.timezone}`
+        );
+        return null;
+      }
+
+      return data.timezone;
+    } catch (error) {
+      console.error(
+        `Failed to test GET /brains/schedules/timezone:`,
+        error
+      );
+      return null;
+    }
+  },
+
+  /**
+   * Test PUT /brains/schedules/timezone - Set project timezone
+   */
+  async setTimezone(fetch: Fetch, timezone: string): Promise<boolean> {
+    try {
+      const request = new Request(
+        'http://example.com/brains/schedules/timezone',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timezone }),
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(
+          `PUT /brains/schedules/timezone returned ${response.status}`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as { timezone: string };
+
+      if (data.timezone !== timezone) {
+        console.error(
+          `Expected timezone to be '${timezone}', got '${data.timezone}'`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test PUT /brains/schedules/timezone:`,
+        error
+      );
       return false;
     }
   },

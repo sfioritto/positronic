@@ -42,10 +42,11 @@ describe('schedule command', () => {
         );
         expect(foundSuccess).toBe(true);
 
-        // Verify the output contains the brain name and cron expression
+        // Verify the output contains the brain name, cron expression, and timezone
         const output = instance.lastFrame() || '';
         expect(output).toContain('test-brain');
         expect(output).toContain('0 3 * * *');
+        expect(output).toContain('UTC');
 
         // Verify the API call was made
         const methodCalls = env.server.getLogs();
@@ -510,6 +511,81 @@ describe('schedule command', () => {
         const runsCall = calls.find((c) => c.method === 'getScheduleRuns');
         expect(runsCall).toBeDefined();
         expect(runsCall?.args[0]).toContain('limit=50');
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
+  describe('schedule timezone', () => {
+    it('should show UTC when no timezone has been set', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px([
+          'schedule',
+          'timezone',
+        ]);
+
+        const found = await waitForOutput(/Project timezone/i, 30);
+        expect(found).toBe(true);
+
+        const output = instance.lastFrame() || '';
+        expect(output).toContain('UTC');
+
+        // Verify API call
+        const calls = env.server.getLogs();
+        const tzCall = calls.find((c) => c.method === 'getProjectTimezone');
+        expect(tzCall).toBeDefined();
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should set timezone successfully', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px([
+          'schedule',
+          'timezone',
+          'America/Chicago',
+        ]);
+
+        const found = await waitForOutput(/Timezone set to/i, 30);
+        expect(found).toBe(true);
+
+        const output = instance.lastFrame() || '';
+        expect(output).toContain('America/Chicago');
+
+        // Verify API call
+        const calls = env.server.getLogs();
+        const tzCall = calls.find((c) => c.method === 'setProjectTimezone');
+        expect(tzCall).toBeDefined();
+        expect(tzCall!.args[0]).toBe('America/Chicago');
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show error for invalid timezone', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px([
+          'schedule',
+          'timezone',
+          'Not/A/Timezone',
+        ]);
+
+        const found = await waitForOutput(/Invalid Timezone/i, 30);
+        expect(found).toBe(true);
+
+        const output = instance.lastFrame() || '';
+        expect(output).toContain('Not/A/Timezone');
       } finally {
         await env.stopAndCleanup();
       }

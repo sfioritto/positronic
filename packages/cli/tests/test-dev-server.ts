@@ -89,6 +89,7 @@ interface MockSchedule {
   id: string;
   brainTitle: string;
   cronExpression: string;
+  timezone?: string;
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
@@ -166,6 +167,7 @@ interface MockUserKey {
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
+  private projectTimezone: string = 'UTC';
   private scheduleRuns: MockScheduleRun[] = [];
   private brains: Map<string, MockBrain> = new Map();
   private brainRuns: MockBrainRun[] = [];
@@ -973,7 +975,10 @@ export class TestDevServer implements PositronicDevServer {
 
     // GET /brains/schedules
     nockInstance.get('/brains/schedules').reply(200, () => {
-      const schedules = Array.from(this.schedules.values());
+      const schedules = Array.from(this.schedules.values()).map((s) => ({
+        ...s,
+        timezone: s.timezone || 'UTC',
+      }));
       this.logCall('getSchedules', []);
       return {
         schedules,
@@ -985,15 +990,17 @@ export class TestDevServer implements PositronicDevServer {
     nockInstance.post('/brains/schedules').reply(201, (uri, requestBody) => {
       const body =
         typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
-      
+
       // Support both identifier and brainTitle for backward compatibility
       const brainTitle = body.brainTitle || body.identifier;
-      
+      const timezone = body.timezone || this.projectTimezone || 'UTC';
+
       const scheduleId = `schedule-${Date.now()}`;
       const schedule: MockSchedule = {
         id: scheduleId,
         brainTitle: brainTitle,
         cronExpression: body.cronExpression,
+        timezone,
         enabled: true,
         createdAt: Date.now(),
         nextRunAt: Date.now() + 3600000, // 1 hour from now
@@ -1035,6 +1042,33 @@ export class TestDevServer implements PositronicDevServer {
           },
         ];
       });
+
+    // GET /brains/schedules/timezone
+    nockInstance.get('/brains/schedules/timezone').reply(200, () => {
+      this.logCall('getProjectTimezone', []);
+      return { timezone: this.projectTimezone };
+    });
+
+    // PUT /brains/schedules/timezone
+    nockInstance.put('/brains/schedules/timezone').reply((uri, requestBody) => {
+      const body =
+        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+
+      if (!body.timezone) {
+        return [400, { error: 'Missing required field "timezone"' }];
+      }
+
+      // Validate timezone
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: body.timezone });
+      } catch {
+        return [400, { error: `Invalid timezone: ${body.timezone}` }];
+      }
+
+      this.projectTimezone = body.timezone;
+      this.logCall('setProjectTimezone', [body.timezone]);
+      return [200, { timezone: this.projectTimezone }];
+    });
 
     // DELETE /brains/schedules/:id
     nockInstance.delete(/^\/brains\/schedules\/(.+)$/).reply((uri) => {
@@ -1473,6 +1507,14 @@ export class TestDevServer implements PositronicDevServer {
 
   getSchedules(): MockSchedule[] {
     return Array.from(this.schedules.values());
+  }
+
+  setProjectTimezone(timezone: string) {
+    this.projectTimezone = timezone;
+  }
+
+  getProjectTimezone(): string {
+    return this.projectTimezone;
   }
 
   // Secret helper methods

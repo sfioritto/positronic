@@ -925,11 +925,12 @@ export function buildCli(options: CliOptions) {
             argv.delete,
             argv._.includes('create') || argv._.includes('c'),
             argv._.includes('runs'),
+            argv._.includes('timezone'),
           ].filter(Boolean).length;
 
           if (operations === 0) {
             throw new Error(
-              'You must specify an operation: create, -l (list), -d (delete), or runs'
+              'You must specify an operation: create, -l (list), -d (delete), runs, or timezone'
             );
           }
           if (operations > 1) {
@@ -1006,6 +1007,30 @@ export function buildCli(options: CliOptions) {
           },
           (argv) => {
             const element = scheduleCommand.create(argv);
+            render(element);
+          }
+        )
+        .command(
+          'timezone [timezone]',
+          'Get or set the project timezone for schedules\n',
+          (yargsTimezone) => {
+            return yargsTimezone
+              .positional('timezone', {
+                describe:
+                  'IANA timezone (e.g., "America/Chicago", "Europe/London")',
+                type: 'string',
+              })
+              .example(
+                '$0 schedule timezone',
+                'Show current project timezone'
+              )
+              .example(
+                '$0 schedule timezone America/Chicago',
+                'Set timezone to Central'
+              );
+          },
+          (argv) => {
+            const element = scheduleCommand.timezone(argv as any);
             render(element);
           }
         )
