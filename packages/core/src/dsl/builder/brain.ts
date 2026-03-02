@@ -28,7 +28,7 @@ export class Brain<
   private services: TServices = {} as TServices;
   private optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
-  private defaultTools?: Record<string, AgentTool>;
+  private defaultTools?: Record<string, AgentTool<any>>;
   private memoryProvider?: MemoryProvider;
 
   constructor(public readonly title: string, private description?: string) {}
@@ -158,7 +158,7 @@ export class Brain<
    *   }));
    * ```
    */
-  withTools<TTools extends Record<string, AgentTool>>(
+  withTools<TTools extends Record<string, AgentTool<any>>>(
     tools: TTools
   ): Brain<TOptions, TState, TServices, TResponse, TPage> {
     const next = this.nextBrain<TState, TResponse, TPage>();
@@ -266,7 +266,7 @@ export class Brain<
 
   // Overload 2: Agent config object WITH outputSchema
   brain<
-    TTools extends Record<string, AgentTool>,
+    TTools extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & { [K in TName]: z.infer<TSchema> }
@@ -277,7 +277,7 @@ export class Brain<
 
   // Overload 3: Agent config function WITH outputSchema
   brain<
-    TTools extends Record<string, AgentTool>,
+    TTools extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & { [K in TName]: z.infer<TSchema> }
@@ -286,14 +286,14 @@ export class Brain<
     configFn: (
       params: StepContext<TState, TOptions, TResponse, TPage> & TServices & {
         /** Default tools available for agent steps */
-        tools: Record<string, AgentTool>;
+        tools: Record<string, AgentTool<any>>;
       }
     ) => AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
   // Overload 4: Agent config object (no outputSchema)
   brain<
-    TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+    TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
     TNewState extends State = TState
   >(
     title: string,
@@ -302,14 +302,14 @@ export class Brain<
 
   // Overload 5: Agent config function (no outputSchema)
   brain<
-    TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+    TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
     TNewState extends State = TState
   >(
     title: string,
     configFn: (
       params: StepContext<TState, TOptions, TResponse, TPage> & TServices & {
         /** Default tools available for agent steps */
-        tools: Record<string, AgentTool>;
+        tools: Record<string, AgentTool<any>>;
       }
     ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
@@ -722,7 +722,7 @@ export function brain<
 
 // Overload 3: Direct agent with config object WITH outputSchema
 export function brain<
-  TTools extends Record<string, AgentTool>,
+  TTools extends Record<string, AgentTool<any>>,
   TName extends string & { readonly brand?: unique symbol },
   TSchema extends z.ZodObject<any>,
   TNewState extends State = { [K in TName]: z.infer<TSchema> }
@@ -733,7 +733,7 @@ export function brain<
 
 // Overload 4: Direct agent with config function WITH outputSchema
 export function brain<
-  TTools extends Record<string, AgentTool>,
+  TTools extends Record<string, AgentTool<any>>,
   TName extends string & { readonly brand?: unique symbol },
   TSchema extends z.ZodObject<any>,
   TNewState extends State = { [K in TName]: z.infer<TSchema> }
@@ -741,14 +741,14 @@ export function brain<
   title: string,
   configFn: (
     params: StepContext<object, JsonObject, undefined, undefined> & {
-      tools: Record<string, AgentTool>;
+      tools: Record<string, AgentTool<any>>;
     }
   ) => AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>
 ): Brain<JsonObject, TNewState, object, undefined, undefined>;
 
 // Overload 5: Direct agent with config object (no outputSchema)
 export function brain<
-  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
   TState extends State = object
 >(
   title: string,
@@ -757,13 +757,13 @@ export function brain<
 
 // Overload 6: Direct agent with config function (no outputSchema)
 export function brain<
-  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
   TState extends State = object
 >(
   title: string,
   configFn: (
     params: StepContext<object, JsonObject, undefined, undefined> & {
-      tools: Record<string, AgentTool>;
+      tools: Record<string, AgentTool<any>>;
     }
   ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
 ): Brain<JsonObject, TState, object, undefined, undefined>;

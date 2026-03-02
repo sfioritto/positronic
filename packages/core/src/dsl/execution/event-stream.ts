@@ -75,7 +75,7 @@ export class BrainEventStream<
   private currentPage: GeneratedPage | undefined = undefined;
   private resumeContext?: ResumeContext;
   private components?: Record<string, UIComponent<any>>;
-  private defaultTools?: Record<string, AgentTool>;
+  private defaultTools?: Record<string, AgentTool<any>>;
   private signalProvider?: SignalProvider;
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
@@ -90,7 +90,7 @@ export class BrainEventStream<
       blocks: Block<any, any, TOptions, TServices, any, any>[];
       services: TServices;
       components?: Record<string, UIComponent<any>>;
-      defaultTools?: Record<string, AgentTool>;
+      defaultTools?: Record<string, AgentTool<any>>;
       memoryProvider?: MemoryProvider;
     }
   ) {
@@ -573,7 +573,7 @@ export class BrainEventStream<
     this.currentPage = undefined;
 
     // Merge tools: step tools override defaults
-    const mergedTools: Record<string, AgentTool> = { ...defaultTools, ...(config.tools ?? {}) };
+    const mergedTools: Record<string, AgentTool<any>> = { ...defaultTools, ...(config.tools ?? {}) };
 
     // Always generate a 'done' terminal tool for every agent
     // If outputSchema is provided, use that schema; otherwise use defaultDoneSchema

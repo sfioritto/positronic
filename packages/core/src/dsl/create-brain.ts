@@ -73,7 +73,7 @@ export function createBrain<
 
   // The params available in agent config functions - uses StepContext for consistency
   type AgentParams = StepContext<object, {}, undefined, undefined> & TServices & {
-    tools: TTools extends {} ? Record<string, AgentTool> : TTools;
+    tools: TTools extends {} ? Record<string, AgentTool<any>> : TTools;
   };
 
   // Return type for the brain function
@@ -81,7 +81,7 @@ export function createBrain<
 
   // Overload 1: Direct agent with config object WITH outputSchema
   function brain<
-    T extends Record<string, AgentTool>,
+    T extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TNewState extends State = { [K in TName]: z.infer<TSchema> }
@@ -92,7 +92,7 @@ export function createBrain<
 
   // Overload 2: Direct agent with config function WITH outputSchema
   function brain<
-    T extends Record<string, AgentTool>,
+    T extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TNewState extends State = { [K in TName]: z.infer<TSchema> }
@@ -102,13 +102,13 @@ export function createBrain<
   ): Brain<{}, TNewState, TServices, undefined, undefined>;
 
   // Overload 3: Direct agent with config function (no outputSchema)
-  function brain<T extends Record<string, AgentTool>>(
+  function brain<T extends Record<string, AgentTool<any>>>(
     title: string,
     configFn: (params: AgentParams) => AgentConfig<T> | Promise<AgentConfig<T>>
   ): BrainReturn;
 
   // Overload 4: Direct agent with config object (no outputSchema)
-  function brain<T extends Record<string, AgentTool>>(
+  function brain<T extends Record<string, AgentTool<any>>>(
     title: string,
     config: AgentConfig<T>
   ): BrainReturn;
