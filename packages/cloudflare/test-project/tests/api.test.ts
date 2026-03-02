@@ -6,9 +6,10 @@ import {
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
-import { BRAIN_EVENTS, STATUS, createBrainExecutionMachine, sendEvent } from '@positronic/core';
+import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
+import { parseSseEvent, readSseStream } from './sse-helpers';
 import type {
   BrainEvent,
   BrainStartEvent,
@@ -40,89 +41,6 @@ describe('Hono API Tests', () => {
   beforeEach(() => {
     resetMockState();
   });
-
-  // Helper to parse SSE data field
-  function parseSseEvent(text: string): any | null {
-    const lines = text.trim().split('\n');
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const jsonData = line.substring(6); // Length of "data: "
-          const parsed = JSON.parse(jsonData);
-          return parsed;
-        } catch (e) {
-          console.error(
-            '[TEST_SSE_PARSE] Failed to parse SSE data:',
-            line.substring(6),
-            e
-          );
-          return null;
-        }
-      }
-    }
-    return null;
-  }
-
-  // Helper function to read the entire SSE stream and collect events
-  // Uses the state machine to track brain state and know when execution is complete
-  async function readSseStream(
-    stream: ReadableStream<Uint8Array>
-  ): Promise<BrainEvent[]> {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    const events: BrainEvent[] = [];
-    const machine = createBrainExecutionMachine();
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        // Process any remaining buffer content
-        if (buffer.trim().length > 0) {
-          const event = parseSseEvent(buffer);
-          if (event) {
-            events.push(event);
-            sendEvent(machine, event);
-          }
-        }
-        break; // Exit loop when stream is done
-      }
-
-      const decodedChunk = decoder.decode(value, { stream: true });
-      buffer += decodedChunk;
-      // Process buffer line by line, looking for complete messages (ending in \n\n)
-      let eventEndIndex;
-      while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-        const message = buffer.substring(0, eventEndIndex);
-        buffer = buffer.substring(eventEndIndex + 2); // Consume message + \n\n
-        if (message.startsWith('data:')) {
-          const event = parseSseEvent(message);
-          if (event) {
-            events.push(event);
-            sendEvent(machine, event);
-
-            // Use state machine to determine when brain is complete
-            if (machine.context.isComplete) {
-              reader.cancel('Brain completed');
-              return events;
-            }
-
-            if (machine.context.isError) {
-              console.error(
-                'Received BRAIN_EVENTS.ERROR. Event details:',
-                event
-              );
-              reader.cancel('Brain errored');
-              throw new Error(
-                `Brain errored. Details: ${JSON.stringify(event)}`
-              );
-            }
-          }
-        }
-      }
-    }
-    return events;
-  }
 
   it('POST /brains/runs without brainName should return 400', async () => {
     const testEnv = env as TestEnv;

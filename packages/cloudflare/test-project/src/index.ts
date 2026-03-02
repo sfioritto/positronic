@@ -382,6 +382,26 @@ const batchWebhookBrain = brain({ title: 'batch-webhook-brain', description: 'Ba
     webhookMessage: response.message,
   }));
 
+// Brain with a single wait step that has a timeout
+const timeoutWebhookBrain = brain({ title: 'timeout-webhook-brain', description: 'A brain that waits for a webhook with a timeout' })
+  .step('Prepare', ({ state }) => ({
+    ...state, waiting: true,
+  }))
+  .wait('Wait for webhook', () => testWebhook('timeout-test-123'), { timeout: '1h' })
+  .step('Process response', ({ state, response }) => ({
+    ...state,
+    waiting: false,
+    receivedMessage: response.message,
+  }));
+
+// Brain with two sequential waits, each with a timeout
+const multiWaitBrain = brain({ title: 'multi-wait-brain', description: 'A brain with two sequential waits with timeouts' })
+  .step('Init', ({ state }) => ({ ...state, step: 1 }))
+  .wait('Wait 1', () => testWebhook('multi-wait-1'), { timeout: '1h' })
+  .step('After wait 1', ({ state, response }) => ({ ...state, step: 2, msg1: response.message }))
+  .wait('Wait 2', () => testWebhook('multi-wait-2'), { timeout: '2h' })
+  .step('After wait 2', ({ state, response }) => ({ ...state, step: 3, msg2: response.message }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -472,6 +492,16 @@ const brainManifest = {
     filename: 'batch-webhook-brain',
     path: 'brains/batch-webhook-brain.ts',
     brain: batchWebhookBrain,
+  },
+  'timeout-webhook-brain': {
+    filename: 'timeout-webhook-brain',
+    path: 'brains/timeout-webhook-brain.ts',
+    brain: timeoutWebhookBrain,
+  },
+  'multi-wait-brain': {
+    filename: 'multi-wait-brain',
+    path: 'brains/multi-wait-brain.ts',
+    brain: multiWaitBrain,
   },
 };
 

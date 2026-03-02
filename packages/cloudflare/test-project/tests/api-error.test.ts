@@ -9,6 +9,7 @@ import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { resetMockState, setMockError } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
+import { parseSseEvent, readSseStreamIncludingErrors } from './sse-helpers';
 import type {
   BrainEvent,
   BrainStartEvent,
@@ -60,93 +61,6 @@ describe('Brain API Error Handling', () => {
   beforeEach(() => {
     resetMockState();
   });
-
-  // Helper to parse SSE data field
-  function parseSseEvent(text: string): any | null {
-    const lines = text.trim().split('\n');
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const jsonData = line.substring(6);
-          const parsed = JSON.parse(jsonData);
-          return parsed;
-        } catch (e) {
-          console.error('[TEST_SSE_PARSE] Failed to parse SSE data:', e);
-          return null;
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Read SSE stream and collect all events, including ERROR events.
-   * Unlike the standard readSseStream helper, this one doesn't throw on ERROR.
-   * It also waits for one more event after ERROR to capture the final STEP_STATUS.
-   */
-  async function readSseStreamIncludingErrors(
-    stream: ReadableStream<Uint8Array>
-  ): Promise<BrainEvent[]> {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    const events: BrainEvent[] = [];
-    let sawTerminalEvent = false;
-    let eventsAfterTerminal = 0;
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        // Process any remaining buffer content
-        if (buffer.trim().length > 0) {
-          const event = parseSseEvent(buffer);
-          if (event) {
-            events.push(event);
-          }
-        }
-        break;
-      }
-
-      const decodedChunk = decoder.decode(value, { stream: true });
-      buffer += decodedChunk;
-
-      // Process buffer line by line, looking for complete messages (ending in \n\n)
-      let eventEndIndex;
-      while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-        const message = buffer.substring(0, eventEndIndex);
-        buffer = buffer.substring(eventEndIndex + 2);
-        if (message.startsWith('data:')) {
-          const event = parseSseEvent(message);
-          if (event) {
-            events.push(event);
-
-            // Mark when we see terminal events
-            if (
-              event.type === BRAIN_EVENTS.COMPLETE ||
-              event.type === BRAIN_EVENTS.ERROR
-            ) {
-              sawTerminalEvent = true;
-            }
-
-            // After terminal event, wait for one more event (the final STEP_STATUS)
-            // then stop reading
-            if (sawTerminalEvent) {
-              eventsAfterTerminal++;
-              // The brain emits STEP_STATUS after ERROR, so wait for it
-              if (
-                eventsAfterTerminal > 1 ||
-                event.type === BRAIN_EVENTS.STEP_STATUS
-              ) {
-                reader.cancel('Received final events after terminal');
-                return events;
-              }
-            }
-          }
-        }
-      }
-    }
-    return events;
-  }
 
   /**
    * DESIGN DOCUMENTATION: Fire-and-forget pattern

@@ -8,11 +8,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS, createBrainExecutionMachine, sendEvent } from '@positronic/core';
 import { resetMockState } from '../src/runner';
+import { createAuthenticatedRequest } from './test-auth-helper';
+import { parseSseEvent } from './sse-helpers';
 import type { BrainEvent } from '@positronic/core';
 import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
 import type { MonitorDO } from '../../src/monitor-do.js';
 import type { ScheduleDO } from '../../src/schedule-do.js';
-import { createAuthenticatedRequest } from './test-auth-helper';
 
 interface TestEnv {
   BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
@@ -26,21 +27,6 @@ describe('Signal API Tests', () => {
   beforeEach(() => {
     resetMockState();
   });
-
-  // Helper to parse SSE data field
-  function parseSseEvent(text: string): any | null {
-    const lines = text.trim().split('\n');
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          return JSON.parse(line.substring(6));
-        } catch {
-          return null;
-        }
-      }
-    }
-    return null;
-  }
 
   // Helper to read SSE events until a condition is met or timeout
   async function readSseUntil(
