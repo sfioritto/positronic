@@ -119,10 +119,10 @@ export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
    * @param input - The validated input from the LLM
    * @param context - Runtime context with access to client, pages, state, etc.
    */
-  execute?: (
+  execute?(
     input: z.infer<TInput>,
     context: StepContext
-  ) => Promise<unknown | AgentToolWaitFor> | unknown | AgentToolWaitFor;
+  ): Promise<unknown | AgentToolWaitFor> | unknown | AgentToolWaitFor;
   /**
    * If true, calling this tool ends the agent.
    * The tool's input becomes the agent result (merged into state).
@@ -149,7 +149,7 @@ export interface AgentOutputSchema<
  * Configuration for an agent step.
  */
 export interface AgentConfig<
-  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
   TOutputSchema extends AgentOutputSchema | undefined = undefined
 > {
   /** System prompt for the LLM */
@@ -193,7 +193,7 @@ export interface AgentMessage {
  * Helper type to extract the terminal tool's input type from a tools object.
  * Used for typing the result that gets merged into state.
  */
-export type ExtractTerminalInput<TTools extends Record<string, AgentTool>> = {
+export type ExtractTerminalInput<TTools extends Record<string, AgentTool<any>>> = {
   [K in keyof TTools]: TTools[K] extends { terminal: true; inputSchema: infer S }
     ? S extends z.ZodSchema
       ? z.infer<S>

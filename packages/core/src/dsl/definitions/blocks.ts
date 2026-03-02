@@ -122,7 +122,7 @@ export type AgentBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TTools extends Record<string, AgentTool> = Record<string, AgentTool>,
+  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
   TOutputSchema extends AgentOutputSchema | undefined = undefined
 > = {
   type: 'agent';
