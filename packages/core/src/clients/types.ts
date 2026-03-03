@@ -53,6 +53,15 @@ export type ResponseMessage = unknown;
  * and potentially other types of content in the future.
  */
 export interface ObjectGenerator {
+  /** SHA-256 hash of `model:apiKey`, used for rate-limit bucket identification. */
+  identity?: string;
+
+  /** The model identifier string (e.g. 'gemini-3-pro-preview'). */
+  modelId?: string;
+
+  /** Returns a new client instance with a different model but the same API key and wrapper. */
+  withModel?: (modelName: string) => ObjectGenerator;
+
   /**
    * Generates a structured JSON object that conforms to the provided Zod schema.
    *
@@ -145,6 +154,8 @@ export interface ObjectGenerator {
      * Pass these back in the next call via responseMessages parameter.
      */
     responseMessages: ResponseMessage[];
+    /** Raw response headers from the provider, used for rate limit tracking. */
+    responseHeaders?: Record<string, string>;
   }>;
 
   /**
@@ -197,5 +208,7 @@ export interface ObjectGenerator {
     text?: string;
     /** Token usage across all steps */
     usage: { totalTokens: number };
+    /** Raw response headers from the provider, used for rate limit tracking. */
+    responseHeaders?: Record<string, string>;
   }>;
 }

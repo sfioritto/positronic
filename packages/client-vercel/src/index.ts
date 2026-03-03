@@ -39,9 +39,19 @@ export function createToolResultMessage(
 
 export class VercelClient implements ObjectGenerator {
   private model: LanguageModel;
+  apiKey?: string;
+  modelId?: string;
 
-  constructor(model: LanguageModel) {
+  constructor(model: LanguageModel, apiKey?: string) {
     this.model = model;
+    this.apiKey = apiKey;
+    this.modelId = typeof model === 'string' ? model : model.modelId;
+  }
+
+  withModel(modelName: string): ObjectGenerator {
+    // Creating a new LanguageModel requires knowing the provider (google, anthropic, openai).
+    // The Governor wrapper will intercept this and create the appropriate provider model.
+    throw new Error('withModel() requires the Governor wrapper');
   }
 
   createToolResultMessage(
@@ -119,6 +129,7 @@ export class VercelClient implements ObjectGenerator {
     toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
     usage: { totalTokens: number };
     responseMessages: ResponseMessage[];
+    responseHeaders?: Record<string, string>;
   }> {
     const { system, messages, responseMessages, tools, toolChoice = 'required' } = params;
 
@@ -208,6 +219,7 @@ export class VercelClient implements ObjectGenerator {
         totalTokens: result.usage?.totalTokens ?? 0,
       },
       responseMessages: updatedMessages as ResponseMessage[],
+      responseHeaders: result.response.headers,
     };
   }
 
@@ -234,6 +246,7 @@ export class VercelClient implements ObjectGenerator {
     }>;
     text?: string;
     usage: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
   }> {
     const { system, prompt, messages, tools, maxSteps = 10, toolChoice = 'required' } = params;
 
@@ -355,6 +368,7 @@ export class VercelClient implements ObjectGenerator {
       usage: {
         totalTokens: usage?.totalTokens ?? 0,
       },
+      responseHeaders: steps[steps.length - 1]?.response?.headers,
     };
   }
 }

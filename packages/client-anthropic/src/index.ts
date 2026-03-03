@@ -46,6 +46,10 @@ export class AnthropicClient implements ObjectGenerator {
     });
   }
 
+  withModel(modelName: string): ObjectGenerator {
+    throw new Error('withModel() is not implemented for AnthropicClient');
+  }
+
   createToolResultMessage(
     toolCallId: string,
     toolName: string,
