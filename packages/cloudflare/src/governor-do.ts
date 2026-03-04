@@ -232,16 +232,14 @@ export class GovernorDO extends DurableObject<Env> {
     }
   }
 
-  async alarm(): Promise<void> {
-    const cutoff = Date.now() - LEASE_TIMEOUT_MS;
+  async cleanupStaleLeases(leaseTimeoutMs: number = LEASE_TIMEOUT_MS): Promise<void> {
+    const cutoff = Date.now() - leaseTimeoutMs;
 
-    // Clean up stale leases
     this.storage.exec(
       `DELETE FROM active_requests WHERE acquired_at < ?`,
       cutoff
     );
 
-    // Reschedule if there are still active requests
     const countResult = this.storage
       .exec(`SELECT COUNT(*) as count FROM active_requests`)
       .one();
@@ -250,6 +248,10 @@ export class GovernorDO extends DurableObject<Env> {
     if (remaining > 0) {
       this.ensureAlarm();
     }
+  }
+
+  async alarm(): Promise<void> {
+    await this.cleanupStaleLeases();
   }
 
   async getStats(): Promise<RateLimitStats> {
