@@ -1,7 +1,24 @@
-import type { DurableObjectStub } from '@cloudflare/workers-types';
 import type { ObjectGenerator } from '@positronic/core';
 import type { GovernorDO, AcquireResult } from './governor-do.js';
 import { estimateRequestTokens } from './token-estimator.js';
+
+type GovernorStub = Pick<GovernorDO, 'acquire' | 'release'>;
+
+interface GovernorNamespace {
+  idFromName(name: string): { toString(): string };
+  get(id: { toString(): string }): GovernorStub;
+}
+
+let governorNamespace: GovernorNamespace | null = null;
+
+export function setGovernorBinding(ns: GovernorNamespace) {
+  governorNamespace = ns;
+}
+
+function getGovernorStub(): GovernorStub | null {
+  if (!governorNamespace) return null;
+  return governorNamespace.get(governorNamespace.idFromName('governor'));
+}
 
 async function computeIdentity(modelId: string, apiKey: string): Promise<string> {
   const data = new TextEncoder().encode(`${modelId}:${apiKey}`);
@@ -19,7 +36,7 @@ function sleep(ms: number): Promise<void> {
 const MAX_ACQUIRE_ATTEMPTS = 10;
 
 interface GovernedCallParams<T> {
-  governorStub: DurableObjectStub<GovernorDO>;
+  governorStub: GovernorStub | null;
   identity: string;
   estimatedTokens: number;
   call: () => Promise<T>;
@@ -36,6 +53,10 @@ async function governedCall<T>({
   call,
   extractUsage,
 }: GovernedCallParams<T>): Promise<T> {
+  if (!governorStub) {
+    return call();
+  }
+
   const requestId = crypto.randomUUID();
   let leaseGranted = false;
 
@@ -103,7 +124,6 @@ async function governedCall<T>({
 
 export function rateGoverned(
   client: ObjectGenerator,
-  governorStub: DurableObjectStub<GovernorDO>,
   apiKey: string,
   createClient?: (modelName: string) => ObjectGenerator,
 ): ObjectGenerator {
@@ -127,6 +147,7 @@ export function rateGoverned(
 
     async generateObject(params) {
       const identity = await getIdentity();
+      const governorStub = getGovernorStub();
       const estimated = estimateRequestTokens({
         prompt: params.prompt,
         messages: params.messages as Array<{ content: string }> | undefined,
@@ -148,6 +169,7 @@ export function rateGoverned(
 
     async streamText(params) {
       const identity = await getIdentity();
+      const governorStub = getGovernorStub();
       const estimated = estimateRequestTokens({
         prompt: params.prompt,
         messages: params.messages as Array<{ content: string }> | undefined,
@@ -168,7 +190,7 @@ export function rateGoverned(
 
     withModel: (modelName: string) => {
       if (createClient) {
-        return rateGoverned(createClient(modelName), governorStub, apiKey, createClient);
+        return rateGoverned(createClient(modelName), apiKey, createClient);
       }
       throw new Error('withModel requires a createClient factory');
     },
@@ -177,6 +199,7 @@ export function rateGoverned(
   if (client.generateText) {
     wrapper.generateText = async (params) => {
       const identity = await getIdentity();
+      const governorStub = getGovernorStub();
       const estimated = estimateRequestTokens({
         messages: params.messages as Array<{ content: string }> | undefined,
         system: params.system,
