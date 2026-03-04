@@ -1,6 +1,5 @@
 import { BrainRunner } from '@positronic/core';
 import { VercelClient } from '@positronic/client-vercel';
-import { rateGoverned } from '@positronic/cloudflare';
 import { google } from '@ai-sdk/google';
 
 /**
@@ -19,11 +18,7 @@ import { google } from '@ai-sdk/google';
  *
  * export const runner = new BrainRunner({
  *   adapters: [memoryAdapter],
- *   client: rateGoverned(
- *     new VercelClient(google('gemini-3-pro-preview')),
- *     '',
- *     (modelName) => new VercelClient(google(modelName)),
- *   ),
+ *   client: new VercelClient(google('gemini-3-pro-preview')),
  *   resources: {},
  * });
  * ```
@@ -35,8 +30,6 @@ const client = new VercelClient(google('gemini-3-pro-preview'));
 
 export const runner = new BrainRunner({
   adapters: [],
-  client: rateGoverned(client, client.apiKey ?? '', (modelName) =>
-    new VercelClient(google(modelName)),
-  ),
+  client,
   resources: {},
 });
