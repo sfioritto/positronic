@@ -1152,7 +1152,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const block = step.block as StepBlock<any, any, TOptions, TServices, any, any>;
     const batchConfig = block.batchConfig!;
     const prevState = this.currentState;
-    const client = batchConfig.client ?? this.client;
+    const rawClient = batchConfig.client;
+    const client = typeof rawClient === 'function'
+      ? rawClient(this.client)
+      : (rawClient ?? this.client);
     const items = batchConfig.over(this.currentState);
     const totalItems = items.length;
     const concurrency = batchConfig.concurrency ?? 10;
