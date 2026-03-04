@@ -41,6 +41,7 @@
     "fuse.js": "^7.1.0",
     "hono": "^4.2.3",
     "jose": "^5.2.0",
+    "js-tiktoken": "^1.0.21",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
