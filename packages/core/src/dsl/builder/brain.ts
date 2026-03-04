@@ -382,7 +382,7 @@ export class Brain<
         schema: TSchema;
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
       };
-      client?: ObjectGenerator;
+      client?: ObjectGenerator | ((client: ObjectGenerator) => ObjectGenerator);
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
 
@@ -402,7 +402,7 @@ export class Brain<
         schema: TSchema;
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
       };
-      client?: ObjectGenerator;
+      client?: ObjectGenerator | ((client: ObjectGenerator) => ObjectGenerator);
     },
     batchConfig: {
       over: (state: TState) => TItem[];
@@ -419,7 +419,7 @@ export class Brain<
         state: TState,
         resources: Resources
       ) => string | Promise<string>;
-      client?: ObjectGenerator;
+      client?: ObjectGenerator | ((client: ObjectGenerator) => ObjectGenerator);
     }
   ): Brain<TOptions, TState, TServices, { text: string }, undefined>;
 
@@ -432,7 +432,7 @@ export class Brain<
         schema: z.ZodObject<any>;
         name: string;
       };
-      client?: ObjectGenerator;
+      client?: ObjectGenerator | ((client: ObjectGenerator) => ObjectGenerator);
     },
     batchConfig?: {
       over: (state: any) => any[];
@@ -454,8 +454,11 @@ export class Brain<
         type: 'step',
         title,
         action: async ({ state, client: runClient, resources }) => {
-          const { template, client: stepClient } = config;
-          const client = stepClient ?? runClient;
+          const { template, client: rawStepClient } = config;
+          const resolvedStepClient = typeof rawStepClient === 'function'
+            ? rawStepClient(runClient)
+            : rawStepClient;
+          const client = resolvedStepClient ?? runClient;
           const prompt = await template(state, resources);
           const response = await client.generateObject({
             schema: textSchema,
@@ -512,9 +515,12 @@ export class Brain<
         type: 'step',
         title,
         action: async ({ state, client: runClient, resources }) => {
-          const { template, client: stepClient } = config;
+          const { template, client: rawStepClient } = config;
           const { schema, name: schemaName } = outputSchema;
-          const client = stepClient ?? runClient;
+          const resolvedStepClient = typeof rawStepClient === 'function'
+            ? rawStepClient(runClient)
+            : rawStepClient;
+          const client = resolvedStepClient ?? runClient;
           const prompt = await template(state, resources);
           const response = await client.generateObject({
             schema,

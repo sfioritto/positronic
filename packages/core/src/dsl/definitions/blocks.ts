@@ -65,7 +65,7 @@ export type StepBlock<
     template: (item: any, resources: Resources) => string | Promise<string>;
     schema: z.ZodObject<any>;
     schemaName: string;
-    client?: ObjectGenerator;
+    client?: ObjectGenerator | ((client: ObjectGenerator) => ObjectGenerator);
     concurrency?: number;
   };
 };
