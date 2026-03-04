@@ -3,6 +3,7 @@ import type { BrainRunnerDO } from '../brain-runner-do.js';
 import type { MonitorDO } from '../monitor-do.js';
 import type { ScheduleDO } from '../schedule-do.js';
 import type { AuthDO } from '../auth-do.js';
+import type { GovernorDO } from '../governor-do.js';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
 export type Bindings = {
@@ -10,6 +11,7 @@ export type Bindings = {
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   AUTH_DO: DurableObjectNamespace<AuthDO>;
+  GOVERNOR_DO: DurableObjectNamespace<GovernorDO>;
   RESOURCES_BUCKET: R2Bucket;
   NODE_ENV?: string;
   R2_ACCESS_KEY_ID?: string;
