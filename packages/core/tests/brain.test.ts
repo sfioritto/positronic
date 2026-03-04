@@ -424,7 +424,7 @@ describe('brain creation', () => {
       streamText: jest.fn<ObjectGenerator['streamText']>(),
     };
 
-    const factoryFn = jest.fn().mockReturnValue(derivedClient);
+    const factoryFn = jest.fn<(client: ObjectGenerator) => ObjectGenerator>().mockReturnValue(derivedClient);
 
     const testBrain = brain('Client Factory Test')
       .prompt('Use factory client', {
