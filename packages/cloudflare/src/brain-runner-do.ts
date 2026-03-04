@@ -11,7 +11,9 @@ import { EventLoader } from './event-loader.js';
 import { createPagesService } from './pages-service.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
+import type { GovernorDO } from './governor-do.js';
 import { PositronicManifest } from './manifest.js';
+import { setGovernorBinding } from './governor-client-wrapper.js';
 import { CloudflareR2Loader } from './r2-loader.js';
 import { createResources, type ResourceManifest } from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
@@ -43,7 +45,7 @@ export interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  GOVERNOR_DO: DurableObjectNamespace;
+  GOVERNOR_DO: DurableObjectNamespace<GovernorDO>;
   RESOURCES_BUCKET: R2Bucket;
   WORKER_URL?: string; // Base URL for the worker (e.g., "https://myapp.workers.dev")
 }
@@ -529,6 +531,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
       env
     );
 
+    setGovernorBinding(this.env.GOVERNOR_DO);
+
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
     }
@@ -693,6 +697,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
       monitorDOStub,
       env
     );
+
+    setGovernorBinding(this.env.GOVERNOR_DO);
 
     if (!brainRunner) {
       throw new Error('BrainRunner not initialized');
