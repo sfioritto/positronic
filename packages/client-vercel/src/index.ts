@@ -48,12 +48,6 @@ export class VercelClient implements ObjectGenerator {
     this.modelId = typeof model === 'string' ? model : model.modelId;
   }
 
-  withModel(modelName: string): ObjectGenerator {
-    // Creating a new LanguageModel requires knowing the provider (google, anthropic, openai).
-    // The Governor wrapper will intercept this and create the appropriate provider model.
-    throw new Error('withModel() requires the Governor wrapper');
-  }
-
   createToolResultMessage(
     toolCallId: string,
     toolName: string,

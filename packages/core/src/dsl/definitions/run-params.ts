@@ -29,6 +29,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   pages?: PagesService;
   env?: RuntimeEnv;
   signalProvider?: SignalProvider;
+  governor?: (client: ObjectGenerator) => ObjectGenerator;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
