@@ -124,9 +124,8 @@ async function governedCall<T>({
 
 export function rateGoverned(
   client: ObjectGenerator,
-  apiKey: string,
-  createClient?: (modelName: string) => ObjectGenerator,
 ): ObjectGenerator {
+  const apiKey = client.apiKey ?? '';
   let cachedIdentity: string | null = null;
 
   async function getIdentity(): Promise<string> {
@@ -143,6 +142,10 @@ export function rateGoverned(
 
     get modelId() {
       return client.modelId;
+    },
+
+    get apiKey() {
+      return client.apiKey;
     },
 
     async generateObject(params) {
@@ -186,13 +189,6 @@ export function rateGoverned(
           responseHeaders: result.responseHeaders,
         }),
       });
-    },
-
-    withModel: (modelName: string) => {
-      if (createClient) {
-        return rateGoverned(createClient(modelName), apiKey, createClient);
-      }
-      throw new Error('withModel requires a createClient factory');
     },
   };
 

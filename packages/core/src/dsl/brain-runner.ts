@@ -74,6 +74,7 @@ export class BrainRunner {
       pages?: PagesService;
       env?: RuntimeEnv;
       signalProvider?: SignalProvider;
+      governor?: (client: ObjectGenerator) => ObjectGenerator;
     }
   ) {}
 
@@ -117,6 +118,13 @@ export class BrainRunner {
     return new BrainRunner({
       ...this.options,
       signalProvider,
+    });
+  }
+
+  withGovernor(governor: (client: ObjectGenerator) => ObjectGenerator): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      governor,
     });
   }
 
@@ -195,7 +203,8 @@ export class BrainRunner {
       initialStepCount: number;
     }
   ): Promise<TState> {
-    const { adapters, client, resources, pages, env, signalProvider } = this.options;
+    const { adapters, client: rawClient, resources, pages, env, signalProvider, governor } = this.options;
+    const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
     const { initialState, resumeContext, machine: providedMachine, options, brainRunId, endAfter, signal, initialStepCount } = params;
 
@@ -215,6 +224,7 @@ export class BrainRunner {
           pages,
           env: resolvedEnv,
           signalProvider,
+          governor,
         })
       : brain.run({
           initialState: initialState ?? ({} as TState),
@@ -225,6 +235,7 @@ export class BrainRunner {
           pages,
           env: resolvedEnv,
           signalProvider,
+          governor,
         });
 
     try {

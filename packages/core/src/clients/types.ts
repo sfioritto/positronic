@@ -59,8 +59,8 @@ export interface ObjectGenerator {
   /** The model identifier string (e.g. 'gemini-3-pro-preview'). */
   modelId?: string;
 
-  /** Returns a new client instance with a different model but the same API key and wrapper. */
-  withModel?: (modelName: string) => ObjectGenerator;
+  /** The API key used by this client, for rate-limit bucket identification. */
+  apiKey?: string;
 
   /**
    * Generates a structured JSON object that conforms to the provided Zod schema.

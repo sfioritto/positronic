@@ -416,24 +416,22 @@ describe('brain creation', () => {
     // Verify that the state was updated correctly with values from both clients.
   });
 
-  it('should accept a factory function for prompt step client', async () => {
-    const derivedClient: jest.Mocked<ObjectGenerator> = {
+  it('should use a plain ObjectGenerator override on prompt step', async () => {
+    const overrideClient: jest.Mocked<ObjectGenerator> = {
       generateObject: jest
         .fn<ObjectGenerator['generateObject']>()
         .mockResolvedValue({ derived: true }),
       streamText: jest.fn<ObjectGenerator['streamText']>(),
     };
 
-    const factoryFn = jest.fn<(client: ObjectGenerator) => ObjectGenerator>().mockReturnValue(derivedClient);
-
-    const testBrain = brain('Client Factory Test')
-      .prompt('Use factory client', {
+    const testBrain = brain('Client Plain Override Test')
+      .prompt('Use override client', {
         template: () => 'prompt1',
         outputSchema: {
           schema: z.object({ derived: z.boolean() }),
-          name: 'factoryResponse' as const,
+          name: 'overrideResponse' as const,
         },
-        client: factoryFn,
+        client: overrideClient,
       });
 
     const events = [];
@@ -445,19 +443,16 @@ describe('brain creation', () => {
       }
     }
 
-    // Factory should have been called with the runner's client
-    expect(factoryFn).toHaveBeenCalledWith(mockClient);
-
-    // The derived client should have been used for the prompt call
-    expect(derivedClient.generateObject).toHaveBeenCalledWith(
+    // The override client should have been used for the prompt call
+    expect(overrideClient.generateObject).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: 'prompt1' })
     );
 
     // The runner's client should NOT have been called
     expect(mockClient.generateObject).not.toHaveBeenCalled();
 
-    // State should reflect the derived client's response
-    expect(finalState).toEqual({ factoryResponse: { derived: true } });
+    // State should reflect the override client's response
+    expect(finalState).toEqual({ overrideResponse: { derived: true } });
   });
 
   it('should use the provided brainRunId for the initial run if supplied', async () => {
