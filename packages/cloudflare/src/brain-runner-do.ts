@@ -43,6 +43,7 @@ export interface Env {
   BRAIN_RUNNER_DO: DurableObjectNamespace;
   MONITOR_DO: DurableObjectNamespace<MonitorDO>;
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
+  GOVERNOR_DO: DurableObjectNamespace;
   RESOURCES_BUCKET: R2Bucket;
   WORKER_URL?: string; // Base URL for the worker (e.g., "https://myapp.workers.dev")
 }

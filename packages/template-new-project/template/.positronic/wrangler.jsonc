@@ -13,13 +13,18 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["BrainRunnerDO", "MonitorDO", "ScheduleDO"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["GovernorDO"]
     }
   ],
   "durable_objects": {
     "bindings": [
       { "name": "BRAIN_RUNNER_DO", "class_name": "BrainRunnerDO" },
       { "name": "MONITOR_DO", "class_name": "MonitorDO" },
-      { "name": "SCHEDULE_DO", "class_name": "ScheduleDO" }
+      { "name": "SCHEDULE_DO", "class_name": "ScheduleDO" },
+      { "name": "GOVERNOR_DO", "class_name": "GovernorDO" }
     ]
   },
   "r2_buckets": [
@@ -59,7 +64,8 @@
         "bindings": [
           { "name": "BRAIN_RUNNER_DO", "class_name": "BrainRunnerDO" },
           { "name": "MONITOR_DO", "class_name": "MonitorDO" },
-          { "name": "SCHEDULE_DO", "class_name": "ScheduleDO" }
+          { "name": "SCHEDULE_DO", "class_name": "ScheduleDO" },
+          { "name": "GOVERNOR_DO", "class_name": "GovernorDO" }
         ]
       },
       "r2_buckets": [
