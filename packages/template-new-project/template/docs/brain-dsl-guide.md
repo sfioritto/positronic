@@ -755,8 +755,8 @@ Access resources using dot notation that matches the file structure:
 
 ```typescript
 brain('Resource Example').step('Load Data', async ({ resources }) => {
-  const config = await resources.config.loadText();
-  const template = await resources.prompts.customerSupport.loadText();
+  const config = await resources.config.load();
+  const template = await resources.prompts.customerSupport.load();
   return { config: JSON.parse(config), template };
 });
 ```
@@ -766,7 +766,7 @@ Resources are also available in prompt templates:
 ```typescript
 brain('Template Example').prompt('Generate Content', {
   template: async (state, resources) => {
-    const template = await resources.prompts.customerSupport.loadText();
+    const template = await resources.prompts.customerSupport.load();
     return template.replace('{{issue}}', state.issue);
   },
   outputSchema: {
@@ -778,13 +778,12 @@ brain('Template Example').prompt('Generate Content', {
 
 ### Resource Methods
 
-Each resource has three methods:
+Each resource has a single `load()` method that returns the appropriate type:
 
-- `loadText()` - Load as a string (for text files like `.md`, `.json`, `.txt`)
-- `loadBinary()` - Load as a Buffer (for binary files like images)
-- `load()` - Load using the detected type (returns string or Buffer)
+- `TextResource.load()` - Returns `Promise<string>` (for text files like `.md`, `.json`, `.txt`)
+- `BinaryResource.load()` - Returns `Promise<Buffer>` (for binary files like images)
 
-Calling `loadText()` on a binary resource (or vice versa) throws an error.
+The resource type is determined automatically based on file content detection when you run `px resources types`.
 
 ### File Naming and Property Access
 
@@ -794,10 +793,10 @@ The resource name you use in code must be a valid JavaScript identifier. The sys
 
 ```
 resources/
-├── myPrompt.md          ✅  → resources.myPrompt.loadText()
-├── config.json          ✅  → resources.config.loadText()
+├── myPrompt.md          ✅  → resources.myPrompt.load()
+├── config.json          ✅  → resources.config.load()
 ├── reference-material.md  ❌  → "reference-material" has a hyphen, not a valid identifier
-├── referenceMaterial.md   ✅  → resources.referenceMaterial.loadText()
+├── referenceMaterial.md   ✅  → resources.referenceMaterial.load()
 ```
 
 Use camelCase or single-word names for your resource files. Avoid hyphens, spaces, or other characters that aren't valid in JavaScript identifiers.
@@ -805,14 +804,14 @@ Use camelCase or single-word names for your resource files. Avoid hyphens, space
 You can also access resources by their full filename (including extension) using bracket notation:
 
 ```typescript
-const content = await resources['config.json'].loadText();
+const content = await resources['config.json'].load();
 ```
 
 ### Type Generation
 
 Run `px resources types` to generate a `resources.d.ts` file in your project root. This provides TypeScript type safety for your resources — your editor will autocomplete resource names and flag typos.
 
-The generated types distinguish between `TextResource` and `BinaryResource` based on file content detection, so `loadText()` and `loadBinary()` calls are type-checked.
+The generated types distinguish between `TextResource` and `BinaryResource` based on file content detection, so `load()` returns the correct type (`string` or `Buffer`).
 
 ### Path-Based Access
 
@@ -862,7 +861,7 @@ interface FilterPromptState {
 export const aiFilterPrompt = {
   template: async (state: FilterPromptState, resources: Resources) => {
     // Load a prompt template from resources
-    const template = await resources.prompts.hnFilter.loadText();
+    const template = await resources.prompts.hnFilter.load();
 
     // Build the prompt with state data
     const articleList = state.articles
@@ -1438,7 +1437,7 @@ const completeBrain = brain({
   .prompt('Generate Plan', {
     template: async (state, resources) => {
       // Load a template from resources
-      const template = await resources.templates.projectPlan.loadText();
+      const template = await resources.templates.projectPlan.load();
       return template.replace('{{context}}', 'software project');
     },
     outputSchema: {
