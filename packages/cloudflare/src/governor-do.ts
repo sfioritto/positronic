@@ -101,6 +101,7 @@ export class GovernorDO extends DurableObject<Env> {
           now + 60_000
         );
       } else {
+        console.warn(`[Governor] No rate limits known for model "${modelId}" (identity: ${clientIdentity.slice(0, 8)}…) — granting without throttling`);
         this.storage.exec(
           `INSERT INTO active_requests (request_id, client_identity, estimated_tokens, acquired_at)
            VALUES (?, ?, ?, ?)`,
