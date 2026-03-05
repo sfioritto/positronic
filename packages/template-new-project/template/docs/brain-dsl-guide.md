@@ -733,13 +733,31 @@ for await (const event of brain.run({ client })) {
 
 ## Resources
 
-Access loaded resources with type-safe API:
+Resources are files in your project's `/resources` directory that brains can access at runtime. They provide a type-safe way to load text and binary content.
+
+### Adding Resources
+
+Place files in the `/resources` directory:
+
+```
+resources/
+├── config.json
+├── prompts/
+│   ├── customerSupport.md
+│   └── codeReview.md
+└── data/
+    └── records.csv
+```
+
+### Accessing Resources
+
+Access resources using dot notation that matches the file structure:
 
 ```typescript
 brain('Resource Example').step('Load Data', async ({ resources }) => {
   const config = await resources.config.loadText();
-  const data = await resources.data.records.loadText();
-  return { config: JSON.parse(config), data };
+  const template = await resources.prompts.customerSupport.loadText();
+  return { config: JSON.parse(config), template };
 });
 ```
 
@@ -756,6 +774,53 @@ brain('Template Example').prompt('Generate Content', {
     name: 'supportResponse' as const,
   },
 });
+```
+
+### Resource Methods
+
+Each resource has three methods:
+
+- `loadText()` - Load as a string (for text files like `.md`, `.json`, `.txt`)
+- `loadBinary()` - Load as a Buffer (for binary files like images)
+- `load()` - Load using the detected type (returns string or Buffer)
+
+Calling `loadText()` on a binary resource (or vice versa) throws an error.
+
+### File Naming and Property Access
+
+The resource name you use in code must be a valid JavaScript identifier. The system strips file extensions automatically, so `config.json` is accessed as `resources.config`.
+
+**Important**: Resource filenames must be valid JS identifiers (after extension stripping) to be accessible via dot notation. This means:
+
+```
+resources/
+├── myPrompt.md          ✅  → resources.myPrompt.loadText()
+├── config.json          ✅  → resources.config.loadText()
+├── reference-material.md  ❌  → "reference-material" has a hyphen, not a valid identifier
+├── referenceMaterial.md   ✅  → resources.referenceMaterial.loadText()
+```
+
+Use camelCase or single-word names for your resource files. Avoid hyphens, spaces, or other characters that aren't valid in JavaScript identifiers.
+
+You can also access resources by their full filename (including extension) using bracket notation:
+
+```typescript
+const content = await resources['config.json'].loadText();
+```
+
+### Type Generation
+
+Run `px resources types` to generate a `resources.d.ts` file in your project root. This provides TypeScript type safety for your resources — your editor will autocomplete resource names and flag typos.
+
+The generated types distinguish between `TextResource` and `BinaryResource` based on file content detection, so `loadText()` and `loadBinary()` calls are type-checked.
+
+### Path-Based Access
+
+You can also load resources by path string at any level of the resource tree:
+
+```typescript
+const content = await resources.loadText('prompts/customerSupport.md');
+const binary = await resources.loadBinary('images/logo.png');
 ```
 
 ## Organizing Complex Prompts
