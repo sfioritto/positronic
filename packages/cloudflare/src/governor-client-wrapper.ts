@@ -38,6 +38,7 @@ const MAX_ACQUIRE_ATTEMPTS = 10;
 interface GovernedCallParams<T> {
   governorStub: GovernorStub | null;
   identity: string;
+  modelId: string;
   estimatedTokens: number;
   call: () => Promise<T>;
   extractUsage: (result: T) => {
@@ -49,6 +50,7 @@ interface GovernedCallParams<T> {
 async function governedCall<T>({
   governorStub,
   identity,
+  modelId,
   estimatedTokens,
   call,
   extractUsage,
@@ -67,6 +69,7 @@ async function governedCall<T>({
       result = await governorStub.acquire({
         requestId,
         clientIdentity: identity,
+        modelId,
         estimatedTokens,
       });
     } catch (error) {
@@ -160,6 +163,7 @@ export function rateGoverned(
       return governedCall({
         governorStub,
         identity,
+        modelId: client.modelId ?? 'unknown',
         estimatedTokens: estimated,
         call: () => client.generateObject(params),
         extractUsage: () => ({ actualTokens: estimated }),
@@ -182,6 +186,7 @@ export function rateGoverned(
       return governedCall({
         governorStub,
         identity,
+        modelId: client.modelId ?? 'unknown',
         estimatedTokens: estimated,
         call: () => client.streamText(params),
         extractUsage: (result) => ({
@@ -204,6 +209,7 @@ export function rateGoverned(
       return governedCall({
         governorStub,
         identity,
+        modelId: client.modelId ?? 'unknown',
         estimatedTokens: estimated,
         call: () => client.generateText!(params),
         extractUsage: (result) => ({
