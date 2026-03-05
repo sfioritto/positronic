@@ -75,6 +75,7 @@ export class GovernorDO extends DurableObject<Env> {
   }
 
   async acquire({ requestId, clientIdentity, modelId, estimatedTokens }: AcquireRequest): Promise<AcquireResult> {
+    console.log(`[Governor] acquire: model="${modelId}" estimated=${estimatedTokens} identity=${clientIdentity.slice(0, 8)}…`);
     const rows = this.storage
       .exec(
         `SELECT rpm_limit, rpm_remaining, rpm_reset_at, tpm_limit, tpm_remaining, tpm_reset_at
@@ -89,6 +90,7 @@ export class GovernorDO extends DurableObject<Env> {
     if (rows.length === 0) {
       const googleDefaults = getGoogleModelDefaults(modelId);
       if (googleDefaults) {
+        console.log(`[Governor] Seeding Google defaults for "${modelId}": rpm=${googleDefaults.requestsLimit} tpm=${googleDefaults.tokensLimit}`);
         this.storage.exec(
           `INSERT INTO rate_limits (client_identity, rpm_limit, rpm_remaining, rpm_reset_at, tpm_limit, tpm_remaining, tpm_reset_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -151,19 +153,26 @@ export class GovernorDO extends DurableObject<Env> {
       rpmResetAt = now + 60_000;
     }
     if (tpmLimit !== null && tpmResetAt !== null && now >= tpmResetAt) {
-      tpmRemaining = tpmLimit;
+      // Subtract in-flight estimated tokens from the refilled limit
+      const inFlight = this.storage.exec(
+        `SELECT COALESCE(SUM(estimated_tokens), 0) as total FROM active_requests WHERE client_identity = ?`,
+        clientIdentity
+      ).one();
+      tpmRemaining = tpmLimit - (inFlight.total as number);
       tpmResetAt = now + 60_000;
     }
 
     // Check RPM capacity
     if (rpmLimit !== null && rpmRemaining !== null && rpmRemaining < 1) {
       const retryAfterMs = rpmResetAt !== null ? Math.max(0, rpmResetAt - now) : 60_000;
+      console.log(`[Governor] DENIED (RPM exhausted): rpmRemaining=${rpmRemaining} retryAfterMs=${retryAfterMs}`);
       return { granted: false, retryAfterMs };
     }
 
     // Check TPM capacity
     if (tpmLimit !== null && tpmRemaining !== null && tpmRemaining < estimatedTokens) {
       const retryAfterMs = tpmResetAt !== null ? Math.max(0, tpmResetAt - now) : 60_000;
+      console.log(`[Governor] DENIED (TPM exhausted): tpmRemaining=${tpmRemaining} estimated=${estimatedTokens} retryAfterMs=${retryAfterMs}`);
       return { granted: false, retryAfterMs };
     }
 
@@ -197,16 +206,37 @@ export class GovernorDO extends DurableObject<Env> {
       now
     );
 
+    console.log(`[Governor] GRANTED: rpmRemaining=${rpmRemaining} tpmRemaining=${tpmRemaining}`);
     this.ensureAlarm();
     return { granted: true };
   }
 
   async release({ requestId, clientIdentity, actualTokens, responseHeaders }: ReleaseRequest): Promise<void> {
+    // Query the estimated tokens before deleting the active request
+    const activeRow = this.storage
+      .exec(
+        `SELECT estimated_tokens FROM active_requests WHERE request_id = ?`,
+        requestId
+      )
+      .toArray();
+    const estimatedTokens = activeRow.length > 0 ? (activeRow[0].estimated_tokens as number) : 0;
+
     // Remove the in-flight lease
     this.storage.exec(
       `DELETE FROM active_requests WHERE request_id = ?`,
       requestId
     );
+
+    // Adjust TPM bucket: if actual usage differs from estimate, correct the remaining tokens
+    const delta = actualTokens - estimatedTokens;
+    if (delta !== 0 && estimatedTokens > 0) {
+      this.storage.exec(
+        `UPDATE rate_limits SET tpm_remaining = tpm_remaining - ?
+         WHERE client_identity = ? AND tpm_remaining IS NOT NULL`,
+        delta,
+        clientIdentity
+      );
+    }
 
     // If we have response headers, parse them and upsert rate limits
     if (responseHeaders) {

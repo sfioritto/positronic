@@ -1220,12 +1220,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           const release = await semaphore.acquire();
           try {
             const promptText = await batchConfig.template(item, this.resources);
-            const output = await client.generateObject({
+            const result = await client.generateObject({
               schema: batchConfig.schema,
               schemaName: batchConfig.schemaName,
               prompt: promptText,
             });
-            return [item, output] as [any, any];
+            return [item, result.object] as [any, any];
           } catch (error) {
             if (batchConfig.error) {
               const fallback = batchConfig.error(item, error as Error);

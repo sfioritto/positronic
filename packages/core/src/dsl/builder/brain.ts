@@ -456,14 +456,14 @@ export class Brain<
         client: config.client,
         action: async ({ state, client, resources }) => {
           const prompt = await config.template(state, resources);
-          const response = await client.generateObject({
+          const result = await client.generateObject({
             schema: textSchema,
             schemaName: 'TextResponse',
             prompt,
           });
           return {
             state,
-            promptResponse: response,
+            promptResponse: result.object,
           };
         },
       };
@@ -514,14 +514,14 @@ export class Brain<
         action: async ({ state, client, resources }) => {
           const { schema, name: schemaName } = outputSchema;
           const prompt = await config.template(state, resources);
-          const response = await client.generateObject({
+          const result = await client.generateObject({
             schema,
             schemaName,
             prompt,
           });
           return {
             ...state,
-            [outputSchema.name]: response,
+            [outputSchema.name]: result.object,
           };
         },
       };

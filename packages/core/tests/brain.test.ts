@@ -360,12 +360,12 @@ describe('brain creation', () => {
     const overrideClient: jest.Mocked<ObjectGenerator> = {
       generateObject: jest
         .fn<ObjectGenerator['generateObject']>()
-        .mockResolvedValue({ override: true }),
+        .mockResolvedValue({ object: { override: true } }),
       streamText: jest.fn<ObjectGenerator['streamText']>(),
     };
 
     // Make sure that for the default prompt the default client returns a known value.
-    mockClient.generateObject.mockResolvedValueOnce({ override: false });
+    mockClient.generateObject.mockResolvedValueOnce({ object: { override: false } });
 
     const testBrain = brain('Client Override Test')
       .prompt('Use default client', {
@@ -420,7 +420,7 @@ describe('brain creation', () => {
     const overrideClient: jest.Mocked<ObjectGenerator> = {
       generateObject: jest
         .fn<ObjectGenerator['generateObject']>()
-        .mockResolvedValue({ derived: true }),
+        .mockResolvedValue({ object: { derived: true } }),
       streamText: jest.fn<ObjectGenerator['streamText']>(),
     };
 
@@ -514,7 +514,7 @@ describe('brain creation', () => {
         }
       );
 
-      mockGenerateObject.mockResolvedValue({ summary: 'Test summary' });
+      mockGenerateObject.mockResolvedValue({ object: { summary: 'Test summary' } });
 
       const run = testBrain.run({
         client: mockClient,
@@ -558,7 +558,7 @@ describe('brain creation', () => {
         });
 
       mockGenerateObject.mockResolvedValue({
-        analysis: 'Analysis result',
+        object: { analysis: 'Analysis result' },
       });
 
       const run = testBrain.run({
@@ -2096,8 +2096,7 @@ describe('type inference', () => {
 
     // Mock the client response
     mockClient.generateObject.mockResolvedValueOnce({
-      name: 'Test User',
-      age: 30,
+      object: { name: 'Test User', age: 30 },
     });
 
     // Run brain and collect final state
@@ -2263,9 +2262,9 @@ describe('batch prompt', () => {
 
       // Mock client to return category based on email content
       batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
-        if (prompt?.includes('urgent')) return { category: 'urgent' };
-        if (prompt?.includes('newsletter')) return { category: 'newsletter' };
-        return { category: 'general' };
+        if (prompt?.includes('urgent')) return { object: { category: 'urgent' } };
+        if (prompt?.includes('newsletter')) return { object: { category: 'newsletter' } };
+        return { object: { category: 'general' } };
       });
 
       const testBrain = brain('Batch Test')
@@ -2320,7 +2319,7 @@ describe('batch prompt', () => {
     });
 
     it('should store results under outputSchema.name', async () => {
-      batchMockGenerateObject.mockResolvedValue({ sentiment: 'positive' });
+      batchMockGenerateObject.mockResolvedValue({ object: { sentiment: 'positive' } });
 
       const testBrain = brain('Named Results Test')
         .step('Init', () => ({
@@ -2354,7 +2353,7 @@ describe('batch prompt', () => {
 
     it('should maintain item order in results', async () => {
       batchMockGenerateObject.mockImplementation(async () => {
-        return { order: 1 };
+        return { object: { order: 1 } };
       });
 
       const testBrain = brain('Order Test')
@@ -2389,7 +2388,7 @@ describe('batch prompt', () => {
     });
 
     it('should yield BATCH_CHUNK_COMPLETE events per chunk', async () => {
-      batchMockGenerateObject.mockResolvedValue({ category: 'general' });
+      batchMockGenerateObject.mockResolvedValue({ object: { category: 'general' } });
 
       const testBrain = brain('Batch Events Test')
         .step('Init', () => ({
@@ -2461,7 +2460,7 @@ describe('batch prompt', () => {
         if (callCount === 2) {
           throw new Error('Failed for item 2');
         }
-        return { status: 'success' };
+        return { object: { status: 'success' } };
       });
 
       const testBrain = brain('Batch Error Events Test')
@@ -2512,7 +2511,7 @@ describe('batch prompt', () => {
       batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
         const id = parseInt(prompt?.split(' ')[1] ?? '0');
         processedIds.push(id);
-        return { done: true };
+        return { object: { done: true } };
       });
 
       const testBrain = brain('Chunk Test')
@@ -2554,7 +2553,7 @@ describe('batch prompt', () => {
     });
 
     it('should resume batch from batchProgress', async () => {
-      batchMockGenerateObject.mockResolvedValue({ done: true });
+      batchMockGenerateObject.mockResolvedValue({ object: { done: true } });
 
       const testBrain = brain('Batch Resume Test')
         .step('Init', () => ({
@@ -2623,7 +2622,7 @@ describe('batch prompt', () => {
     });
 
     it('should filter out null entries from batch results after JSON round-trip', async () => {
-      batchMockGenerateObject.mockResolvedValue({ done: true });
+      batchMockGenerateObject.mockResolvedValue({ object: { done: true } });
 
       const testBrain = brain('Batch Null Filter Test')
         .step('Init', () => ({
@@ -2700,7 +2699,7 @@ describe('batch prompt', () => {
     });
 
     it('should stop when PAUSE signal is received between chunks', async () => {
-      batchMockGenerateObject.mockResolvedValue({ done: true });
+      batchMockGenerateObject.mockResolvedValue({ object: { done: true } });
 
       let controlSignalCallCount = 0;
       const mockSignalProvider = {
@@ -2815,7 +2814,7 @@ describe('batch prompt', () => {
         if (callCount === 2) {
           throw new Error('Failed for item 2');
         }
-        return { status: 'success' };
+        return { object: { status: 'success' } };
       });
 
       const testBrain = brain('Error Handler Test')
@@ -2858,7 +2857,7 @@ describe('batch prompt', () => {
         if (callCount === 2) {
           throw new Error('Failed for item 2');
         }
-        return { status: 'success' };
+        return { object: { status: 'success' } };
       });
 
       const testBrain = brain('Skip Item Test')
@@ -2901,7 +2900,7 @@ describe('batch prompt', () => {
         if (id === 2) {
           throw new Error('Error on item 2');
         }
-        return { done: true };
+        return { object: { done: true } };
       });
 
       const testBrain = brain('Continue After Error Test')
@@ -2937,7 +2936,7 @@ describe('batch prompt', () => {
 
   describe('type inference', () => {
     it('should infer TItem from over function', async () => {
-      batchMockGenerateObject.mockResolvedValue({ label: 'test' });
+      batchMockGenerateObject.mockResolvedValue({ object: { label: 'test' } });
 
       const testBrain = brain('Type Inference Test')
         .step('Init', () => ({
@@ -2989,7 +2988,7 @@ describe('batch prompt', () => {
     });
 
     it('should provide correct state type to subsequent steps', async () => {
-      batchMockGenerateObject.mockResolvedValue({ score: 10 });
+      batchMockGenerateObject.mockResolvedValue({ object: { score: 10 } });
 
       const testBrain = brain('Subsequent Step Type Test')
         .step('Init', () => ({
@@ -3064,7 +3063,7 @@ describe('batch prompt', () => {
     });
 
     it('should work with async template function', async () => {
-      batchMockGenerateObject.mockResolvedValue({ processed: true });
+      batchMockGenerateObject.mockResolvedValue({ object: { processed: true } });
 
       const testBrain = brain('Async Template Test')
         .step('Init', () => ({
@@ -3102,7 +3101,7 @@ describe('batch prompt', () => {
     });
 
     it('should work with custom client per prompt', async () => {
-      const customGenerateObject = jest.fn<ObjectGenerator['generateObject']>().mockResolvedValue({ custom: true });
+      const customGenerateObject = jest.fn<ObjectGenerator['generateObject']>().mockResolvedValue({ object: { custom: true } });
       const customClient = {
         generateObject: customGenerateObject,
         streamText: jest.fn<ObjectGenerator['streamText']>(),
@@ -3154,7 +3153,7 @@ describe('batch prompt', () => {
 
     it('should return text response available in next step', async () => {
       // Mock the internal text schema response
-      schemaLessMockGenerateObject.mockResolvedValueOnce({ text: 'Generated summary text' });
+      schemaLessMockGenerateObject.mockResolvedValueOnce({ object: { text: 'Generated summary text' } });
 
       const testBrain = brain('Schema-less Prompt Test')
         .step('Init', () => ({ data: 'some data' }))
@@ -3189,7 +3188,7 @@ describe('batch prompt', () => {
     });
 
     it('should not modify state in schema-less prompt step', async () => {
-      schemaLessMockGenerateObject.mockResolvedValueOnce({ text: 'Result' });
+      schemaLessMockGenerateObject.mockResolvedValueOnce({ object: { text: 'Result' } });
 
       const testBrain = brain('Schema-less No State Change')
         .step('Init', () => ({ original: 'value' }))
@@ -3213,7 +3212,7 @@ describe('batch prompt', () => {
     });
 
     it('should have correct TypeScript types for response', async () => {
-      schemaLessMockGenerateObject.mockResolvedValueOnce({ text: 'Typed text' });
+      schemaLessMockGenerateObject.mockResolvedValueOnce({ object: { text: 'Typed text' } });
 
       // This test verifies compile-time types - if it compiles, types are correct
       const testBrain = brain('Type Test')

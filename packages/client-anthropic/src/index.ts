@@ -71,7 +71,11 @@ export class AnthropicClient implements ObjectGenerator {
     prompt?: string;
     messages?: { role: 'user' | 'assistant' | 'system'; content: string }[];
     system?: string;
-  }): Promise<z.infer<T>> {
+  }): Promise<{
+    object: z.infer<T>;
+    usage?: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
+  }> {
     // Compose messages array according to the interface contract
     let messages = params.messages ? [...params.messages] : [];
     if (params.system) {
@@ -104,7 +108,7 @@ export class AnthropicClient implements ObjectGenerator {
       ...(top_p !== undefined ? { top_p } : {}),
       extra_options,
     });
-    return response;
+    return { object: response };
   }
 
   async generateText(params: {

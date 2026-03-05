@@ -63,7 +63,11 @@ export class VercelClient implements ObjectGenerator {
     prompt?: string;
     messages?: Message[];
     system?: string;
-  }): Promise<z.infer<T>> {
+  }): Promise<{
+    object: z.infer<T>;
+    usage?: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
+  }> {
     const { schema, schemaName, schemaDescription, prompt, messages, system } = params;
 
     const coreMessages: Message[] = [];
@@ -85,7 +89,7 @@ export class VercelClient implements ObjectGenerator {
     // AI SDK v5 requires either messages or prompt, but not both as undefined
     // If we have messages built up, use them; otherwise use the prompt directly
     if (coreMessages.length > 0) {
-      const { output } = await generateText({
+      const { output, usage, response } = await generateText({
         model: this.model,
         output: Output.object({
           schema,
@@ -95,10 +99,14 @@ export class VercelClient implements ObjectGenerator {
         messages: coreMessages,
         maxRetries: 5,
       });
-      return output as z.infer<T>;
+      return {
+        object: output as z.infer<T>,
+        usage: { totalTokens: usage?.totalTokens ?? 0 },
+        responseHeaders: response.headers,
+      };
     } else {
       // Fallback to prompt-only mode (should rarely happen, but provides a default)
-      const { output } = await generateText({
+      const { output, usage, response } = await generateText({
         model: this.model,
         output: Output.object({
           schema,
@@ -108,7 +116,11 @@ export class VercelClient implements ObjectGenerator {
         prompt: prompt || '',
         maxRetries: 5,
       });
-      return output as z.infer<T>;
+      return {
+        object: output as z.infer<T>,
+        usage: { totalTokens: usage?.totalTokens ?? 0 },
+        responseHeaders: response.headers,
+      };
     }
   }
 
