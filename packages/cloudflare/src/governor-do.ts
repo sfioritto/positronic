@@ -227,9 +227,12 @@ export class GovernorDO extends DurableObject<Env> {
       requestId
     );
 
-    // Adjust TPM bucket: if actual usage differs from estimate, correct the remaining tokens
+    // Adjust TPM bucket: only subtract MORE when actual exceeds estimate (we underestimated).
+    // Don't give tokens back when actual < estimate — the overestimate is intentional safety
+    // padding from ESTIMATE_SAFETY_MULTIPLIER. Returning it would undermine the multiplier
+    // by creating a trickle of new grants as requests complete.
     const delta = actualTokens - estimatedTokens;
-    if (delta !== 0 && estimatedTokens > 0) {
+    if (delta > 0 && estimatedTokens > 0) {
       this.storage.exec(
         `UPDATE rate_limits SET tpm_remaining = tpm_remaining - ?
          WHERE client_identity = ? AND tpm_remaining IS NOT NULL`,
