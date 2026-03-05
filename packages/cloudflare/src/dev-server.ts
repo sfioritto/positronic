@@ -85,7 +85,7 @@ async function generateProject(
   projectDir: string,
   onSuccess?: () => Promise<void> | void
 ) {
-  const devPath = process.env.POSITRONIC_LOCAL_PATH;
+  let devPath = process.env.POSITRONIC_LOCAL_PATH;
   let newProjectTemplatePath = '@positronic/template-new-project';
   let cazOptions: {
     name: string;
@@ -96,6 +96,7 @@ async function generateProject(
   } = { name: projectName };
 
   let templateSourcePath: string;
+  let inferredDevPath = false;
 
   try {
     if (devPath) {
@@ -117,6 +118,21 @@ async function generateProject(
       const require = createRequire(import.meta.url);
       const templatePackageJsonPath = require.resolve('@positronic/template-new-project/package.json');
       templateSourcePath = path.dirname(templatePackageJsonPath);
+
+      // Auto-detect local workspace: if the template resolves to a real path
+      // outside node_modules, we're running from a local monorepo (e.g. the user's
+      // project uses file: references to @positronic/cloudflare). In that case,
+      // set POSITRONIC_LOCAL_PATH so the template generates file: references too.
+      const realPath = fs.realpathSync(templateSourcePath);
+      if (!realPath.includes(`${path.sep}node_modules${path.sep}`)) {
+        const potentialRoot = path.resolve(realPath, '..', '..');
+        if (fs.existsSync(path.join(potentialRoot, 'packages', 'core')) &&
+            fs.existsSync(path.join(potentialRoot, 'packages', 'cloudflare'))) {
+          devPath = potentialRoot;
+          process.env.POSITRONIC_LOCAL_PATH = potentialRoot;
+          inferredDevPath = true;
+        }
+      }
     }
 
     // Always copy to a temporary directory to avoid CAZ modifying our source
@@ -147,6 +163,11 @@ async function generateProject(
 
     await onSuccess?.();
   } finally {
+    // Clean up the temporarily set env var
+    if (inferredDevPath) {
+      delete process.env.POSITRONIC_LOCAL_PATH;
+    }
+
     // Clean up the temporary copied new project package
     fs.rmSync(newProjectTemplatePath, {
       recursive: true,

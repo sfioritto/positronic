@@ -35,6 +35,13 @@ function sleep(ms: number): Promise<void> {
 
 const MAX_ACQUIRE_ATTEMPTS = 10;
 
+// Our token estimate only sees the user-visible prompt, but the actual API request includes
+// additional overhead (schema/format instructions injected by the AI SDK, tokenizer differences
+// between cl100k_base and the target model's tokenizer). This multiplier prevents burst-granting
+// more requests than the API can actually handle within its TPM window.
+// TODO: investigate per-model multipliers or calibrating this from actual release() deltas
+const ESTIMATE_SAFETY_MULTIPLIER = 2;
+
 interface GovernedCallParams<T> {
   governorStub: GovernorStub | null;
   identity: string;
@@ -154,11 +161,11 @@ export function rateGoverned(
     async generateObject(params) {
       const identity = await getIdentity();
       const governorStub = getGovernorStub();
-      const estimated = estimateRequestTokens({
+      const estimated = Math.ceil(estimateRequestTokens({
         prompt: params.prompt,
         messages: params.messages as Array<{ content: string }> | undefined,
         system: params.system,
-      });
+      }) * ESTIMATE_SAFETY_MULTIPLIER);
 
       return governedCall({
         governorStub,
@@ -166,7 +173,11 @@ export function rateGoverned(
         modelId: client.modelId ?? 'unknown',
         estimatedTokens: estimated,
         call: () => client.generateObject(params),
-        extractUsage: () => ({ actualTokens: estimated }),
+        extractUsage: (result) => {
+          const actualTokens = result.usage?.totalTokens ?? estimated;
+          console.log(`[Governor] generateObject release: totalTokens=${result.usage?.totalTokens} estimated=${estimated} using=${actualTokens}`);
+          return { actualTokens, responseHeaders: result.responseHeaders };
+        },
       });
     },
 
@@ -177,11 +188,11 @@ export function rateGoverned(
     async streamText(params) {
       const identity = await getIdentity();
       const governorStub = getGovernorStub();
-      const estimated = estimateRequestTokens({
+      const estimated = Math.ceil(estimateRequestTokens({
         prompt: params.prompt,
         messages: params.messages as Array<{ content: string }> | undefined,
         system: params.system,
-      });
+      }) * ESTIMATE_SAFETY_MULTIPLIER);
 
       return governedCall({
         governorStub,
@@ -201,10 +212,10 @@ export function rateGoverned(
     wrapper.generateText = async (params) => {
       const identity = await getIdentity();
       const governorStub = getGovernorStub();
-      const estimated = estimateRequestTokens({
+      const estimated = Math.ceil(estimateRequestTokens({
         messages: params.messages as Array<{ content: string }> | undefined,
         system: params.system,
-      });
+      }) * ESTIMATE_SAFETY_MULTIPLIER);
 
       return governedCall({
         governorStub,

@@ -99,7 +99,11 @@ export interface ObjectGenerator {
      * prepend this as a `system` role message to the full message list.
      */
     system?: string;
-  }): Promise<z.infer<T>>;
+  }): Promise<{
+    object: z.infer<T>;
+    usage?: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
+  }>;
 
   /**
    * Creates a tool result message in the SDK-native format.
