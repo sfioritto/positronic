@@ -12,6 +12,7 @@ export const ALARM_INTERVAL_MS = 60 * 1000;
 export interface AcquireRequest {
   requestId: string;
   clientIdentity: string;
+  modelId: string;
   estimatedTokens: number;
 }
 
@@ -73,7 +74,7 @@ export class GovernorDO extends DurableObject<Env> {
     `);
   }
 
-  async acquire({ requestId, clientIdentity, estimatedTokens }: AcquireRequest): Promise<AcquireResult> {
+  async acquire({ requestId, clientIdentity, modelId, estimatedTokens }: AcquireRequest): Promise<AcquireResult> {
     const rows = this.storage
       .exec(
         `SELECT rpm_limit, rpm_remaining, rpm_reset_at, tpm_limit, tpm_remaining, tpm_reset_at
@@ -86,7 +87,7 @@ export class GovernorDO extends DurableObject<Env> {
 
     // No row — check for hardcoded Google defaults, otherwise grant immediately
     if (rows.length === 0) {
-      const googleDefaults = getGoogleModelDefaults(clientIdentity);
+      const googleDefaults = getGoogleModelDefaults(modelId);
       if (googleDefaults) {
         this.storage.exec(
           `INSERT INTO rate_limits (client_identity, rpm_limit, rpm_remaining, rpm_reset_at, tpm_limit, tpm_remaining, tpm_reset_at)

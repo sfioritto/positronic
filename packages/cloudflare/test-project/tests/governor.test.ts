@@ -79,6 +79,7 @@ describe('GovernorDO Integration Tests', () => {
     const acquireResult = await stub.acquire({
       requestId: 'test-1',
       clientIdentity: 'test-identity',
+      modelId: 'test-model',
       estimatedTokens: 100,
     });
     expect(acquireResult).toEqual({ granted: true });
@@ -107,6 +108,7 @@ describe('GovernorDO Integration Tests', () => {
     await stub.acquire({
       requestId: 'stale-1',
       clientIdentity: 'test-identity',
+      modelId: 'test-model',
       estimatedTokens: 100,
     });
     const statsAfter = await stub.getStats();
@@ -117,6 +119,27 @@ describe('GovernorDO Integration Tests', () => {
 
     const statsAfterCleanup = await stub.getStats();
     expect(statsAfterCleanup.activeRequestCount).toBe(0);
+  });
+
+  it('should seed Google model defaults from modelId', async () => {
+    const testEnv = env as TestEnv;
+    const stub = getGovernorStub(testEnv);
+
+    // Acquire with a known Google model name — should seed rate limit defaults
+    const result = await stub.acquire({
+      requestId: 'google-1',
+      clientIdentity: 'google-identity-hash',
+      modelId: 'gemini-2.5-flash-lite',
+      estimatedTokens: 100,
+    });
+    expect(result.granted).toBe(true);
+
+    // Verify rate limits were seeded from Google defaults
+    const stats = await stub.getStats();
+    const entry = stats.rateLimits.find((r) => r.clientIdentity === 'google-identity-hash');
+    expect(entry).toBeDefined();
+    expect(entry!.rpmLimit).toBe(4000);
+    expect(entry!.tpmLimit).toBe(4_000_000);
   });
 
   it('should enforce rate limits when RPM is exhausted', async () => {
@@ -142,6 +165,7 @@ describe('GovernorDO Integration Tests', () => {
     const acquireResult = await stub.acquire({
       requestId: 'denied-1',
       clientIdentity: 'limited-identity',
+      modelId: 'test-model',
       estimatedTokens: 100,
     });
     expect(acquireResult.granted).toBe(false);
@@ -169,6 +193,7 @@ describe('GovernorDO Integration Tests', () => {
     await stub.acquire({
       requestId: 'api-test-1',
       clientIdentity: 'api-test-identity',
+      modelId: 'test-model',
       estimatedTokens: 200,
     });
 
