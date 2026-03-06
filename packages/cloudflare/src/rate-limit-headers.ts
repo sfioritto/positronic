@@ -39,9 +39,12 @@ const GOOGLE_MODEL_LIMITS: Record<string, { rpm: number; tpm: number }> = {
   'gemini-3.1-pro': { rpm: 25, tpm: 1_000_000 },
   'gemini-3-pro': { rpm: 25, tpm: 1_000_000 },
   'gemini-3-flash': { rpm: 1_000, tpm: 1_000_000 },
+  'gemini-3.1-flash-lite-preview': { rpm: 4_000, tpm: 4_000_000 },
 };
 
-export function getGoogleModelDefaults(modelId: string): ParsedRateLimits | null {
+export function getGoogleModelDefaults(
+  modelId: string
+): ParsedRateLimits | null {
   // Strip "models/" prefix used by some Google SDKs
   const normalized = modelId.startsWith('models/') ? modelId.slice(7) : modelId;
 
@@ -67,9 +70,9 @@ function parseDurationToMs(duration: string): number | null {
   if (!hours && !minutes && !seconds && !millis) return null;
 
   return (
-    (parseInt(hours || '0', 10) * 3600000) +
-    (parseInt(minutes || '0', 10) * 60000) +
-    (parseInt(seconds || '0', 10) * 1000) +
+    parseInt(hours || '0', 10) * 3600000 +
+    parseInt(minutes || '0', 10) * 60000 +
+    parseInt(seconds || '0', 10) * 1000 +
     parseInt(millis || '0', 10)
   );
 }
