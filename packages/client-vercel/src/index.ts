@@ -97,7 +97,7 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         messages: coreMessages,
-        maxRetries: 5,
+        maxRetries: 0,
       });
       return {
         object: output as z.infer<T>,
@@ -114,7 +114,7 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         prompt: prompt || '',
-        maxRetries: 5,
+        maxRetries: 0,
       });
       return {
         object: output as z.infer<T>,
@@ -209,7 +209,7 @@ export class VercelClient implements ObjectGenerator {
       toolChoice,
       messages: modelMessages,
       tools: aiTools,
-      maxRetries: 5,
+      maxRetries: 0,
     });
 
     const updatedMessages = [...modelMessages, ...result.response.messages];
@@ -337,7 +337,7 @@ export class VercelClient implements ObjectGenerator {
       messages: modelMessages,
       tools: aiTools,
       toolChoice,
-      maxRetries: 5,
+      maxRetries: 0,
       stopWhen: stepCountIs(maxSteps),
     });
 
