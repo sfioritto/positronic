@@ -1,5 +1,11 @@
 # @positronic/template-new-project
 
+## 0.0.68
+
+### Patch Changes
+
+- Add Governor rate limiter for coordinated AI client rate limiting across Durable Objects. The Governor DO implements a queue-based leaky bucket algorithm that tracks token usage per model and enforces TPM/RPM limits parsed from provider response headers. Includes `withGovernor` integration on BrainRunner, `rateGoverned` client wrapper, token estimation via js-tiktoken, and rate-limit header parsing for Anthropic and Vercel providers. Also adds Flash Lite model support, improves client response metadata (identity, modelId, responseHeaders), and updates documentation for resources and Brain DSL guide.
+
 ## 0.0.67
 
 ### Patch Changes
