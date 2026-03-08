@@ -41,6 +41,7 @@ describe('Brain withOptionsSchema', () => {
       const events = await collectAllEvents(
         myBrain.run({
           client: mockClient,
+          currentUser: { id: 'test-user' },
           options: { name: 'Alice', age: 30 },
         })
       );
@@ -63,6 +64,7 @@ describe('Brain withOptionsSchema', () => {
         await collectAllEvents(
           myBrain.run({
             client: mockClient,
+            currentUser: { id: 'test-user' },
             options: { name: 'Alice', age: -5 } as any,
           })
         );
@@ -84,6 +86,7 @@ describe('Brain withOptionsSchema', () => {
       const events = await collectAllEvents(
         myBrain.run({
           client: mockClient,
+          currentUser: { id: 'test-user' },
           // No options provided, should use defaults
         })
       );
@@ -102,6 +105,7 @@ describe('Brain withOptionsSchema', () => {
         await collectAllEvents(
           myBrain.run({
             client: mockClient,
+            currentUser: { id: 'test-user' },
             options: { some: 'options' },
           })
         );
@@ -121,6 +125,7 @@ describe('Brain withOptionsSchema', () => {
         await collectAllEvents(
           myBrain.run({
             client: mockClient,
+            currentUser: { id: 'test-user' },
             options: { wrong: 'field' } as any,
           })
         );
@@ -133,6 +138,7 @@ describe('Brain withOptionsSchema', () => {
       const events = await collectAllEvents(
         myBrain.run({
           client: mockClient,
+          currentUser: { id: 'test-user' },
           // No options
         })
       );
@@ -195,6 +201,7 @@ describe('Brain withOptionsSchema', () => {
       const events = await collectAllEvents(
         myBrain.run({
           client: mockClient,
+          currentUser: { id: 'test-user' },
           options: {
             user: { name: 'Bob', email: 'bob@example.com' },
             settings: { theme: 'dark', notifications: true },
@@ -224,6 +231,7 @@ describe('Brain withOptionsSchema', () => {
       const events = await collectAllEvents(
         myBrain.run({
           client: mockClient,
+          currentUser: { id: 'test-user' },
           options: { required: 'test' } as z.infer<typeof schema>,
         })
       );
@@ -249,6 +257,7 @@ describe('Brain withOptionsSchema', () => {
         await collectAllEvents(
           myBrain.run({
             client: mockClient,
+            currentUser: { id: 'test-user' },
             options: { name: 'Test', count: 42 },
           })
         );

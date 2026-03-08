@@ -1,5 +1,5 @@
 import type { BRAIN_EVENTS, STATUS } from '../constants.js';
-import type { JsonObject, JsonPatch } from '../types.js';
+import type { JsonObject, JsonPatch, CurrentUser } from '../types.js';
 import type { SerializedStepStatus } from './steps.js';
 import type { SerializedWebhookRegistration } from '../webhook.js';
 import type { ResponseMessage } from '../../clients/types.js';
@@ -29,6 +29,7 @@ export interface BrainStartEvent<TOptions extends JsonObject = JsonObject>
   type: typeof BRAIN_EVENTS.START;
   initialState: object;  // Always included now (no longer optional)
   status: typeof STATUS.RUNNING;
+  currentUser: CurrentUser;
 }
 
 export interface BrainCompleteEvent<TOptions extends JsonObject = JsonObject>

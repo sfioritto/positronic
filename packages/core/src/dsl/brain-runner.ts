@@ -2,7 +2,7 @@ import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { createBrainExecutionMachine, sendEvent, type BrainStateMachine, type ExecutionStackEntry, type AgentContext, type BatchContext } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
 import { DEFAULT_ENV, type Brain, type BrainEvent, type ResumeContext } from './brain.js';
-import type { State, JsonObject, RuntimeEnv, SignalProvider } from './types.js';
+import type { State, JsonObject, RuntimeEnv, SignalProvider, CurrentUser } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
@@ -142,7 +142,8 @@ export class BrainRunner {
    */
   async run<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
-    options?: {
+    options: {
+      currentUser: CurrentUser;
       initialState?: TState;
       options?: TOptions;
       brainRunId?: string;
@@ -150,7 +151,7 @@ export class BrainRunner {
       signal?: AbortSignal;
     }
   ): Promise<TState> {
-    const { initialState = {} as TState, options: brainOptions, brainRunId, endAfter, signal } = options ?? {};
+    const { initialState = {} as TState, options: brainOptions, brainRunId, endAfter, signal, currentUser } = options;
 
     return this.execute(brain, {
       initialState,
@@ -158,6 +159,7 @@ export class BrainRunner {
       brainRunId,
       endAfter,
       signal,
+      currentUser,
       initialStepCount: 0,
     });
   }
@@ -171,6 +173,7 @@ export class BrainRunner {
   async resume<TOptions extends JsonObject = {}, TState extends State = {}>(
     brain: Brain<TOptions, TState, any>,
     options: {
+      currentUser: CurrentUser;
       machine: BrainStateMachine;
       brainRunId: string;
       options?: TOptions;
@@ -178,7 +181,7 @@ export class BrainRunner {
       signal?: AbortSignal;
     }
   ): Promise<TState> {
-    const { machine, brainRunId, options: brainOptions, endAfter, signal } = options;
+    const { machine, brainRunId, options: brainOptions, endAfter, signal, currentUser } = options;
 
     // Build ResumeContext from machine's execution stack
     // Webhook response comes from signals during execution, not from resume parameters
@@ -192,6 +195,7 @@ export class BrainRunner {
       brainRunId,
       endAfter,
       signal,
+      currentUser,
       initialStepCount: resumeContext.stepIndex,
     });
   }
@@ -209,13 +213,14 @@ export class BrainRunner {
       brainRunId?: string;
       endAfter?: number;
       signal?: AbortSignal;
+      currentUser: CurrentUser;
       initialStepCount: number;
     }
   ): Promise<TState> {
     const { adapters, client: rawClient, resources, pages, env, signalProvider, governor, storeProvider } = this.options;
     const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
-    const { initialState, resumeContext, machine: providedMachine, options, brainRunId, endAfter, signal, initialStepCount } = params;
+    const { initialState, resumeContext, machine: providedMachine, options, brainRunId, endAfter, signal, currentUser, initialStepCount } = params;
 
     // Use provided state machine if available (for resumes with historical events),
     // otherwise create a new one
@@ -235,6 +240,7 @@ export class BrainRunner {
           signalProvider,
           governor,
           storeProvider,
+          currentUser,
         })
       : brain.run({
           initialState: initialState ?? ({} as TState),
@@ -247,6 +253,7 @@ export class BrainRunner {
           signalProvider,
           governor,
           storeProvider,
+          currentUser,
         });
 
     try {

@@ -84,7 +84,7 @@ describe('Memory Tools Integration', () => {
           },
         }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient }));
+      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } }));
 
       // Verify brain completed
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
@@ -141,7 +141,7 @@ describe('Memory Tools Integration', () => {
           },
         }));
 
-      await collectEvents(testBrain.run({ client: mockClient }));
+      await collectEvents(testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } }));
 
       const addCalls = provider.getAddCalls();
       expect(addCalls).toHaveLength(1);
@@ -188,7 +188,7 @@ describe('Memory Tools Integration', () => {
         },
       }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient }));
+      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } }));
 
       // Should still complete successfully
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
@@ -255,7 +255,7 @@ describe('Memory Tools Integration', () => {
           },
         }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient }));
+      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } }));
 
       // Verify brain completed
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
@@ -320,7 +320,7 @@ describe('Memory Tools Integration', () => {
         },
       }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient }));
+      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } }));
 
       // Find tool result event
       const toolResultEvent = events.find(
@@ -385,7 +385,7 @@ describe('Mem0 Adapter Integration', () => {
       client: mockClient,
     });
 
-    await runner.run(testBrain);
+    await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // Verify provider.add() was called with the conversation
     const addCalls = provider.getAddCalls();
@@ -421,7 +421,7 @@ describe('Mem0 Adapter Integration', () => {
     });
 
     // The brain will error
-    await expect(runner.run(testBrain)).rejects.toThrow('API error');
+    await expect(runner.run(testBrain, { currentUser: { id: 'test-user' } })).rejects.toThrow('API error');
 
     // Verify provider.add() was NOT called
     expect(provider.getAddCalls()).toHaveLength(0);
@@ -481,7 +481,7 @@ describe('Mem0 Adapter Integration', () => {
       client: mockClient,
     });
 
-    await runner.run(testBrain);
+    await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // Verify tool calls are included in the indexed conversation
     const addCalls = provider.getAddCalls();
@@ -545,7 +545,7 @@ describe('Mem0 Adapter Integration', () => {
       client: mockClient,
     });
 
-    await runner.run(testBrain);
+    await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // Verify tool calls are NOT included
     const addCalls = provider.getAddCalls();
@@ -572,7 +572,7 @@ describe('Mem0 Adapter Integration', () => {
       client: mockClient,
     });
 
-    await runner.run(testBrain);
+    await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // No agent messages were generated, so nothing should be indexed
     expect(provider.getAddCalls()).toHaveLength(0);

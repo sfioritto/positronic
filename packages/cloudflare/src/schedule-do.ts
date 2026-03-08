@@ -321,7 +321,9 @@ export class ScheduleDO extends DurableObject<Env> {
     console.log(
       `[ScheduleDO] Triggering brain run ${brainTitle} with id ${brainRunId}`
     );
-    await stub.start(brainTitle, brainRunId);
+    // TODO: Phase 4 will add run_as_user_id to schedules so each scheduled run
+    // is owned by the user who created the schedule. For now, use 'system'.
+    await stub.start(brainTitle, brainRunId, { id: 'system' });
 
     return brainRunId;
   }

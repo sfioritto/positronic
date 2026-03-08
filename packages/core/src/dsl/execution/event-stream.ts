@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator, ToolMessage, ResponseMessage } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, StepContext, SignalProvider } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, StepContext, SignalProvider, CurrentUser } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
 import type { Resources } from '../../resources/resources.js';
@@ -84,6 +84,7 @@ export class BrainEventStream<
   private storeDefinition?: StoreDefinition<any>;
   private typedStore?: TypedStore<any>;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
+  private currentUser: CurrentUser;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
   private waits: Map<number, WaitBlock<any, any, any, any>> = new Map();
   private stopped = false;
@@ -117,10 +118,12 @@ export class BrainEventStream<
       memoryProvider,
       storeDefinition,
       storeProvider,
+      currentUser,
     } = params;
 
     // Store governor for per-step client resolution
     this.governor = (params as any).governor;
+    this.currentUser = currentUser;
 
     // Check if this is a resume run or fresh start
     const resumeParams = params as ResumeRunParams<TOptions>;
@@ -222,6 +225,7 @@ export class BrainEventStream<
           initialState: currentState,
           options,
           brainRunId,
+          currentUser: this.currentUser,
         };
 
         // Emit initial step status after brain starts
@@ -470,6 +474,7 @@ export class BrainEventStream<
         ? brainBlock.innerBrain.run({
             resources: this.resources,
             client: this.client,
+            currentUser: this.currentUser,
             resumeContext: innerResumeContext,
             options: this.options ?? ({} as TOptions),
             pages: this.pages,
@@ -480,6 +485,7 @@ export class BrainEventStream<
         : brainBlock.innerBrain.run({
             resources: this.resources,
             client: this.client,
+            currentUser: this.currentUser,
             initialState,
             options: this.options ?? ({} as TOptions),
             pages: this.pages,
@@ -549,6 +555,7 @@ export class BrainEventStream<
           env: this.env,
           memory: this.scopedMemory,
           store: this.typedStore,
+          currentUser: this.currentUser,
           ...this.services,
         })
       );
@@ -593,6 +600,7 @@ export class BrainEventStream<
       env: this.env,
       memory: this.scopedMemory,
       store: this.typedStore,
+      currentUser: this.currentUser,
       ...this.services,
     });
 
@@ -1049,6 +1057,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             stepId: effectiveStepId,
             memory: this.scopedMemory,
             store: this.typedStore,
+            currentUser: this.currentUser,
           };
 
           const toolResult = await tool.execute(toolCall.args, toolContext);
@@ -1417,6 +1426,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       pages: this.pages,
       env: this.env,
       store: this.typedStore,
+      currentUser: this.currentUser,
       ...this.services,
     });
 

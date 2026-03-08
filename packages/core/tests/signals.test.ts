@@ -37,6 +37,7 @@ describe('signal handling', () => {
       const events: BrainEvent[] = [];
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -80,6 +81,7 @@ describe('signal handling', () => {
       const events: BrainEvent[] = [];
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -167,6 +169,7 @@ describe('signal handling', () => {
 
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -241,6 +244,7 @@ describe('signal handling', () => {
 
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -325,6 +329,7 @@ describe('signal handling', () => {
 
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -374,6 +379,7 @@ describe('signal handling', () => {
       const events: BrainEvent[] = [];
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -438,6 +444,7 @@ describe('signal handling', () => {
 
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -476,6 +483,7 @@ describe('signal handling', () => {
       const events: BrainEvent[] = [];
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         // No signalProvider
       })) {
         events.push(event);
@@ -504,6 +512,7 @@ describe('signal handling', () => {
       const events: BrainEvent[] = [];
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);
@@ -596,7 +605,7 @@ describe('signal handling', () => {
 
       // First run - should stop at webhook
       const firstRunEvents: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         firstRunEvents.push(event);
       }
 
@@ -674,6 +683,7 @@ describe('signal handling', () => {
       const resumeEvents: BrainEvent[] = [];
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resumeContext,
         brainRunId,
         signalProvider: resumeSignalProvider,
@@ -748,6 +758,7 @@ describe('signal handling', () => {
 
       for await (const event of testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         signalProvider,
       })) {
         events.push(event);

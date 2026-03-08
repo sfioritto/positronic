@@ -257,6 +257,7 @@ export async function runBrainTest<
   try {
     // Run the brain
     await runner.run(brain, {
+      currentUser: { id: 'test-user' },
       initialState,
       options: brainOptions,
     });

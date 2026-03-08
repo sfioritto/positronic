@@ -47,11 +47,18 @@ brains.post('/runs', async (context: Context) => {
   const doId = namespace.idFromName(brainRunId);
   const stub = namespace.get(doId);
 
+  // Read auth context for currentUser (every brain run must have an owner)
+  const auth = context.get('auth');
+  if (!auth?.userId && !auth?.isRoot) {
+    return context.json({ error: 'Authentication required to run a brain' }, 401);
+  }
+  const currentUser = { id: auth.userId || 'root' };
+
   // Pass options to the brain runner if provided
   const initialData = options ? { options } : undefined;
   // Get the actual brain title from the resolved brain
   const brainTitle = (brain as any).title || identifier;
-  await stub.start(brainTitle, brainRunId, initialData);
+  await stub.start(brainTitle, brainRunId, currentUser, initialData);
 
   const response: CreateBrainRunResponse = {
     brainRunId,
@@ -104,6 +111,13 @@ brains.post('/runs/rerun', async (context: Context) => {
     }
   }
 
+  // Read auth context for currentUser (every brain run must have an owner)
+  const auth = context.get('auth');
+  if (!auth?.userId && !auth?.isRoot) {
+    return context.json({ error: 'Authentication required to run a brain' }, 401);
+  }
+  const currentUser = { id: auth.userId || 'root' };
+
   // Create a new brain run with rerun parameters
   const newBrainRunId = uuidv4();
   const namespace = context.env.BRAIN_RUNNER_DO;
@@ -119,7 +133,7 @@ brains.post('/runs/rerun', async (context: Context) => {
 
   // Get the actual brain title from the resolved brain
   const brainTitle = (brain as any).title || identifier;
-  await stub.start(brainTitle, newBrainRunId, rerunOptions);
+  await stub.start(brainTitle, newBrainRunId, currentUser, rerunOptions);
 
   const response: CreateBrainRunResponse = {
     brainRunId: newBrainRunId,

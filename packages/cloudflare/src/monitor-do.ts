@@ -89,6 +89,13 @@ export class MonitorDO extends DurableObject<Env> {
     } catch {
       // Column already exists
     }
+
+    // Migration: add user_id column to brain_runs for ownership tracking
+    try {
+      this.storage.exec(`ALTER TABLE brain_runs ADD COLUMN user_id TEXT`);
+    } catch {
+      // Column already exists
+    }
   }
 
   handleBrainEvent(event: BrainEvent<any>) {
@@ -169,12 +176,18 @@ export class MonitorDO extends DurableObject<Env> {
       } else {
         // All other events have brainTitle/brainDescription (BrainBaseEvent types)
         const brainEvent = event as { brainTitle: string; brainDescription?: string };
+
+        // Extract user_id from START event (set once, never updated)
+        const userId = event.type === BRAIN_EVENTS.START
+          ? (event as any).currentUser.id
+          : null;
+
         this.storage.exec(
           `
           INSERT INTO brain_runs (
             run_id, brain_title, brain_description, type, status,
-            options, error, created_at, started_at, completed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            options, error, created_at, started_at, completed_at, user_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(run_id) DO UPDATE SET
             type = excluded.type,
             status = excluded.status,
@@ -190,7 +203,8 @@ export class MonitorDO extends DurableObject<Env> {
           error,
           currentTime,
           startTime,
-          completeTime
+          completeTime,
+          userId
         );
       }
 
@@ -332,7 +346,8 @@ export class MonitorDO extends DurableObject<Env> {
         error,
         created_at as createdAt,
         started_at as startedAt,
-        completed_at as completedAt
+        completed_at as completedAt,
+        user_id as userId
       FROM brain_runs
       WHERE run_id = ?
     `,
@@ -371,16 +386,17 @@ export class MonitorDO extends DurableObject<Env> {
         error,
         created_at as createdAt,
         started_at as startedAt,
-        completed_at as completedAt
+        completed_at as completedAt,
+        user_id as userId
       FROM brain_runs
-      WHERE brain_title = ? -- Filter by new column name
+      WHERE brain_title = ?
       ORDER BY created_at DESC
       LIMIT ?
     `,
         brainTitle,
         limit
       )
-      .toArray(); // Use renamed parameter
+      .toArray();
   }
 
   // Get active brain runs for a specific brain (running, paused, or waiting)
@@ -398,7 +414,8 @@ export class MonitorDO extends DurableObject<Env> {
         error,
         created_at as createdAt,
         started_at as startedAt,
-        completed_at as completedAt
+        completed_at as completedAt,
+        user_id as userId
       FROM brain_runs
       WHERE brain_title = ? AND status IN (?, ?, ?)
       ORDER BY created_at DESC

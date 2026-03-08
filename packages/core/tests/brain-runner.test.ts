@@ -45,7 +45,7 @@ describe('BrainRunner', () => {
         finalValue: state.value * 2,
       }));
 
-    await runner.run(testBrain);
+    await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // Verify adapter received all events in correct order
     expect(mockAdapter.dispatch).toHaveBeenCalledWith(
@@ -102,7 +102,7 @@ describe('BrainRunner', () => {
     });
 
     try {
-      await runner.run(errorBrain);
+      await runner.run(errorBrain, { currentUser: { id: 'test-user' } });
     } catch (error) {
       // Expected error
     }
@@ -130,7 +130,7 @@ describe('BrainRunner', () => {
         count: state.count + 1,
       }));
 
-    const result = await runner.run(testBrain);
+    const result = await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     expect(result.count).toEqual(2);
   });
@@ -184,7 +184,7 @@ describe('BrainRunner', () => {
       }
     );
 
-    await runner.run(resourceConsumingBrain);
+    await runner.run(resourceConsumingBrain, { currentUser: { id: 'test-user' } });
 
     expect(mockLoad).toHaveBeenCalledWith('myTextFile', 'text');
     expect(mockLoad).toHaveBeenCalledWith('myBinaryFile', 'binary');
@@ -210,7 +210,7 @@ describe('BrainRunner', () => {
 
     const testBrain = brain('Test Brain').step('Step 1', () => ({ value: 1 }));
 
-    await updatedRunner.run(testBrain);
+    await updatedRunner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // Verify all adapters received events
     expect(mockAdapter.dispatch).toHaveBeenCalledWith(
@@ -274,7 +274,7 @@ describe('BrainRunner', () => {
       }
     );
 
-    const result = await updatedRunner.run(testBrain);
+    const result = await updatedRunner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // Verify new client was used, not the original
     expect(originalClient.generateObject).not.toHaveBeenCalled();
@@ -328,6 +328,7 @@ describe('BrainRunner', () => {
     const result = await runner.resume(testBrain, {
       machine,
       brainRunId: 'test-run-123',
+      currentUser: { id: 'test-user' },
     });
 
     // Verify the final state includes resumed state plus third step
@@ -360,6 +361,7 @@ describe('BrainRunner', () => {
 
     // Run brain but stop after 2 steps
     const result = await runner.run(testBrain, {
+      currentUser: { id: 'test-user' },
       endAfter: 2,
     });
 
@@ -409,7 +411,7 @@ describe('BrainRunner', () => {
         processed: true,
       }));
 
-    const result = await runner.run(testBrain);
+    const result = await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     // Verify the final state only includes changes up to webhook step
     expect(result).toEqual({ count: 1 });
@@ -482,7 +484,7 @@ describe('BrainRunner', () => {
       }));
 
     // First run - should stop at webhook
-    const firstRunState = await runner.run(testBrain);
+    const firstRunState = await runner.run(testBrain, { currentUser: { id: 'test-user' } });
 
     expect(firstRunState).toEqual({
       count: 1,
@@ -545,6 +547,7 @@ describe('BrainRunner', () => {
     const finalState = await runnerWithSignals.resume(testBrain, {
       machine,
       brainRunId,
+      currentUser: { id: 'test-user' },
     });
 
     expect(finalState).toEqual({
