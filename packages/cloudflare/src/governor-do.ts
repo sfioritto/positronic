@@ -77,12 +77,10 @@ export class GovernorDO extends DurableObject<Env> {
         this.tpmLimit = defaults.tpm;
         this.limitsLoaded = true;
         this.persistLimits();
-        console.log(`[Governor] Seeded Google defaults for "${modelId}": rpm=${defaults.rpm} tpm=${defaults.tpm}`);
       }
     }
 
     if (!this.limitsLoaded) {
-      console.log(`[Governor] No limits known for "${modelId}" — admitting immediately`);
       return;
     }
 
