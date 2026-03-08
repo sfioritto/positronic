@@ -68,7 +68,7 @@ describe('agent step', () => {
       );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -157,7 +157,7 @@ describe('agent step', () => {
       );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -208,7 +208,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -276,7 +276,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -350,7 +350,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -394,7 +394,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -441,7 +441,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -515,7 +515,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -581,7 +581,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -643,7 +643,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -695,7 +695,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -733,7 +733,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -773,6 +773,7 @@ describe('agent step', () => {
       try {
         for await (const event of testBrain.run({
           client: clientWithoutGenerateText,
+          currentUser: { id: 'test-user' },
         })) {
           events.push(event);
         }
@@ -814,7 +815,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -856,7 +857,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -897,7 +898,7 @@ describe('agent step', () => {
         }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -954,7 +955,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1032,7 +1033,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClientWithToolResult })) {
+      for await (const event of testBrain.run({ client: mockClientWithToolResult, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1079,7 +1080,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1125,7 +1126,7 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1185,7 +1186,7 @@ describe('agent step', () => {
       );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1288,7 +1289,7 @@ describe('agent step', () => {
 
       // Run until webhook pause
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1375,6 +1376,7 @@ describe('agent step', () => {
       const resumeEvents: BrainEvent[] = [];
       for await (const event of resumedBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resumeContext,
         brainRunId,
       })) {
@@ -1420,7 +1422,7 @@ describe('agent step', () => {
       });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1475,7 +1477,7 @@ describe('agent step', () => {
         }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1523,7 +1525,7 @@ describe('agent step', () => {
       });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1574,7 +1576,7 @@ describe('agent step', () => {
         });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 
@@ -1619,7 +1621,7 @@ describe('agent step', () => {
       });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient })) {
+      for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
         events.push(event);
       }
 

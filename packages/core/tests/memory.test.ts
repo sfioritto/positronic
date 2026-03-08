@@ -117,6 +117,7 @@ describe('Brain.withMemory', () => {
     const events = await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
       })
     );
@@ -143,6 +144,7 @@ describe('Brain.withMemory', () => {
     const events = await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
       })
     );
@@ -171,6 +173,7 @@ describe('Brain.withMemory', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
       })
     );
@@ -204,6 +207,7 @@ describe('Brain.withMemory', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
       })
     );
@@ -238,6 +242,7 @@ describe('Brain.withMemory', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
       })
     );
@@ -259,6 +264,7 @@ describe('Brain.withMemory', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
       })
     );

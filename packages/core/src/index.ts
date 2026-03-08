@@ -23,6 +23,7 @@ export type {
 export type { ObjectGenerator, Message, ToolMessage, ToolCall, ResponseMessage, ToolChoice } from './clients/types.js';
 export type {
   State,
+  CurrentUser,
   RuntimeEnv,
   Secrets,
   AgentTool,

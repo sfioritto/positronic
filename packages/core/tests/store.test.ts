@@ -124,6 +124,7 @@ describe('Brain.withStore', () => {
     const events = await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
         storeProvider: provider,
       })
@@ -152,6 +153,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
         storeProvider: provider,
       })
@@ -184,6 +186,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
         storeProvider: provider,
       })
@@ -220,6 +223,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
         storeProvider: provider,
       })
@@ -242,6 +246,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
       })
     );
@@ -265,6 +270,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
+        currentUser: { id: 'test-user' },
         resources: {} as any,
         // No storeProvider
       })

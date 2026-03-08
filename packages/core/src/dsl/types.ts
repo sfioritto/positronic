@@ -31,6 +31,10 @@ export interface Secrets {
  * Runtime environment information provided by the backend.
  * Contains deployment-specific values that brains need at runtime.
  */
+export interface CurrentUser {
+  id: string;
+}
+
 export interface RuntimeEnv {
   /**
    * The base URL/origin of the running instance.
@@ -103,6 +107,8 @@ export interface StepContext<
   memory?: import('../memory/types.js').ScopedMemory;
   /** Typed key-value store for persistent structured data */
   store?: import('../store/types.js').TypedStore<any>;
+  /** The authenticated user running this brain */
+  currentUser: CurrentUser;
 }
 
 /**

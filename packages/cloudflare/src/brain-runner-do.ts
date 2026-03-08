@@ -133,6 +133,13 @@ class BatchChunkAdapter implements Adapter {
   }
 }
 
+// SQL to initialize the run owner table (stores who started this brain run)
+const runOwnerTableSQL = `
+CREATE TABLE IF NOT EXISTS run_owner (
+  user_id TEXT NOT NULL
+);
+`;
+
 // SQL to initialize the signals table
 const signalsTableSQL = `
 CREATE TABLE IF NOT EXISTS brain_signals (
@@ -157,6 +164,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
   private eventStreamAdapter = new EventStreamAdapter();
   private abortController: AbortController | null = null;
   private pageAdapter: PageAdapter | null = null;
+  private runOwnerTableInitialized = false;
   private signalsTableInitialized = false;
   private waitTimeoutTableInitialized = false;
 
@@ -165,6 +173,26 @@ export class BrainRunnerDO extends DurableObject<Env> {
     this.sql = state.storage.sql;
     this.brainRunId = state.id.toString();
     this.env = env;
+  }
+
+  private initializeRunOwnerTable() {
+    if (!this.runOwnerTableInitialized) {
+      this.sql.exec(runOwnerTableSQL);
+      this.runOwnerTableInitialized = true;
+    }
+  }
+
+  private storeRunOwner(userId: string) {
+    this.initializeRunOwnerTable();
+    this.sql.exec(`INSERT INTO run_owner (user_id) VALUES (?)`, userId);
+  }
+
+  private getRunOwner(): string | null {
+    this.initializeRunOwnerTable();
+    const results = this.sql
+      .exec<{ user_id: string }>(`SELECT user_id FROM run_owner LIMIT 1`)
+      .toArray();
+    return results.length > 0 ? results[0].user_id : null;
   }
 
   private initializeSignalsTable() {
@@ -478,6 +506,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
   async start(
     brainTitle: string,
     brainRunId: string,
+    currentUser: { id: string },
     initialData?: Record<string, any>
   ) {
     const { sql } = this;
@@ -565,6 +594,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const options = initialData?.options;
     const initialState = initialData && !initialData.options ? initialData : {};
 
+    // Persist run owner durably (immutable, not derived from events)
+    this.storeRunOwner(currentUser.id);
+
     // Create abort controller for this run
     this.abortController = new AbortController();
 
@@ -590,6 +622,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         timeoutAdapter,
       ])
       .run(brainToRun, {
+        currentUser,
         initialState,
         brainRunId,
         ...(options && { options }),
@@ -638,6 +671,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const brainTitle = (startEvent as any).brainTitle;
     const initialState = (startEvent as any).initialState || {};
+
+    // Read run owner from durable storage (set once in start(), not from events)
+    const ownerId = this.getRunOwner();
+    if (!ownerId) {
+      throw new Error(`No run owner found for brain run ${brainRunId}`);
+    }
+    const currentUser = { id: ownerId };
 
     // Use the brainRunId from the START event, not the parameter.
     // alarm() passes state.id.toString() (the DO hex ID), but the brain was
@@ -756,6 +796,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         timeoutAdapter,
       ])
       .resume(brainToRun, {
+        currentUser,
         machine,
         brainRunId: originalBrainRunId,
         signal: this.abortController.signal,

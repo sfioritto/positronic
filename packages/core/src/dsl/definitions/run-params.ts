@@ -1,5 +1,5 @@
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, SignalProvider } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, SignalProvider, CurrentUser } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { AgentContext } from '../brain-state-machine.js';
@@ -32,6 +32,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   signalProvider?: SignalProvider;
   governor?: (client: ObjectGenerator) => ObjectGenerator;
   storeProvider?: StoreProvider;
+  currentUser: CurrentUser;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
