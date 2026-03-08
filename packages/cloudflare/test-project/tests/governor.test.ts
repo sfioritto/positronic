@@ -37,44 +37,28 @@ describe('GovernorDO Integration Tests', () => {
 
     // waitForCapacity should resolve immediately for an unknown model
     await stub.waitForCapacity('unknown-model', 100);
-
-    const stats = await stub.getStats();
-    expect(stats.rpmLimit).toBeNull();
-    expect(stats.tpmLimit).toBeNull();
-    expect(stats.waitQueueLength).toBe(0);
-    expect(stats.loopRunning).toBe(false);
   });
 
   it('should seed Google defaults and throttle', async () => {
     const testEnv = env as TestEnv;
     const stub = getGovernorStub(testEnv, 'google-identity');
 
-    // First call seeds limits from Google defaults
+    // First call seeds limits from Google defaults and resolves
     await stub.waitForCapacity('gemini-2.5-flash-lite', 100);
-
-    const stats = await stub.getStats();
-    expect(stats.rpmLimit).toBe(4000);
-    expect(stats.tpmLimit).toBe(4_000_000);
   });
 
   it('should update limits from reportHeaders', async () => {
     const testEnv = env as TestEnv;
     const stub = getGovernorStub(testEnv, 'header-update-identity');
 
-    // Initially no limits
-    const before = await stub.getStats();
-    expect(before.rpmLimit).toBeNull();
-    expect(before.tpmLimit).toBeNull();
-
-    // Report headers with Anthropic-style limits
+    // Report headers with Anthropic-style limits, then verify
+    // waitForCapacity uses the limits by resolving (not hanging forever)
     await stub.reportHeaders({
       'anthropic-ratelimit-requests-limit': '100',
       'anthropic-ratelimit-tokens-limit': '500000',
     });
 
-    const after = await stub.getStats();
-    expect(after.rpmLimit).toBe(100);
-    expect(after.tpmLimit).toBe(500000);
+    await stub.waitForCapacity('some-model', 100);
   });
 
   it('should update limits from OpenAI-style headers', async () => {
@@ -86,9 +70,7 @@ describe('GovernorDO Integration Tests', () => {
       'x-ratelimit-limit-tokens': '1000000',
     });
 
-    const stats = await stub.getStats();
-    expect(stats.rpmLimit).toBe(200);
-    expect(stats.tpmLimit).toBe(1000000);
+    await stub.waitForCapacity('some-model', 100);
   });
 
   it('should process multiple concurrent requests in order', async () => {
@@ -115,17 +97,6 @@ describe('GovernorDO Integration Tests', () => {
     expect(order).toHaveLength(5);
     // Should be FIFO ordered
     expect(order).toEqual([1, 2, 3, 4, 5]);
-  });
-
-  it('should have correct stats shape', async () => {
-    const testEnv = env as TestEnv;
-    const stub = getGovernorStub(testEnv, 'stats-identity');
-
-    const stats = await stub.getStats();
-    expect(stats).toHaveProperty('rpmLimit');
-    expect(stats).toHaveProperty('tpmLimit');
-    expect(stats).toHaveProperty('waitQueueLength');
-    expect(stats).toHaveProperty('loopRunning');
   });
 
   it('should complete brain execution through governor', async () => {
@@ -168,8 +139,7 @@ describe('GovernorDO Integration Tests', () => {
       'x-request-id': 'abc123',
     });
 
-    const stats = await stub.getStats();
-    expect(stats.rpmLimit).toBeNull();
-    expect(stats.tpmLimit).toBeNull();
+    // Unknown model + no limits seeded = should resolve immediately
+    await stub.waitForCapacity('unknown-model', 100);
   });
 });

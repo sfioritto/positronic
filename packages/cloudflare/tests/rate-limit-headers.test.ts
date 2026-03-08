@@ -3,82 +3,38 @@ import { parseRateLimitHeaders, getGoogleModelDefaults } from '../src/rate-limit
 
 describe('parseRateLimitHeaders', () => {
   describe('Anthropic headers', () => {
-    it('parses a full set of Anthropic rate-limit headers', () => {
+    it('parses Anthropic rate-limit headers', () => {
       const result = parseRateLimitHeaders({
         'anthropic-ratelimit-requests-limit': '100',
-        'anthropic-ratelimit-requests-remaining': '95',
-        'anthropic-ratelimit-requests-reset': '2025-01-15T12:00:00Z',
         'anthropic-ratelimit-tokens-limit': '500000',
-        'anthropic-ratelimit-tokens-remaining': '450000',
-        'anthropic-ratelimit-tokens-reset': '2025-01-15T12:00:00Z',
       });
 
       expect(result).not.toBeNull();
       expect(result!.requestsLimit).toBe(100);
-      expect(result!.requestsRemaining).toBe(95);
-      expect(result!.requestsResetAt).toBe(new Date('2025-01-15T12:00:00Z').getTime());
       expect(result!.tokensLimit).toBe(500000);
-      expect(result!.tokensRemaining).toBe(450000);
-      expect(result!.tokensResetAt).toBe(new Date('2025-01-15T12:00:00Z').getTime());
     });
 
-    it('parses partial Anthropic headers (RPM only, TPM fields null)', () => {
+    it('parses partial Anthropic headers (RPM only)', () => {
       const result = parseRateLimitHeaders({
         'anthropic-ratelimit-requests-limit': '100',
-        'anthropic-ratelimit-requests-remaining': '50',
-        'anthropic-ratelimit-requests-reset': '2025-01-15T12:00:00Z',
       });
 
       expect(result).not.toBeNull();
       expect(result!.requestsLimit).toBe(100);
-      expect(result!.requestsRemaining).toBe(50);
-      expect(result!.requestsResetAt).toBe(new Date('2025-01-15T12:00:00Z').getTime());
       expect(result!.tokensLimit).toBeNull();
-      expect(result!.tokensRemaining).toBeNull();
-      expect(result!.tokensResetAt).toBeNull();
     });
   });
 
   describe('OpenAI headers', () => {
-    it('parses a full set of OpenAI headers with duration reset format', () => {
-      const before = Date.now();
+    it('parses OpenAI rate-limit headers', () => {
       const result = parseRateLimitHeaders({
         'x-ratelimit-limit-requests': '200',
-        'x-ratelimit-remaining-requests': '180',
-        'x-ratelimit-reset-requests': '6m0s',
         'x-ratelimit-limit-tokens': '1000000',
-        'x-ratelimit-remaining-tokens': '900000',
-        'x-ratelimit-reset-tokens': '200ms',
       });
-      const after = Date.now();
 
       expect(result).not.toBeNull();
       expect(result!.requestsLimit).toBe(200);
-      expect(result!.requestsRemaining).toBe(180);
-      // 6m0s = 360000ms from now
-      expect(result!.requestsResetAt).toBeGreaterThanOrEqual(before + 360000);
-      expect(result!.requestsResetAt).toBeLessThanOrEqual(after + 360000);
       expect(result!.tokensLimit).toBe(1000000);
-      expect(result!.tokensRemaining).toBe(900000);
-      // 200ms from now
-      expect(result!.tokensResetAt).toBeGreaterThanOrEqual(before + 200);
-      expect(result!.tokensResetAt).toBeLessThanOrEqual(after + 200);
-    });
-
-    it('parses duration with hours, minutes, and seconds', () => {
-      const before = Date.now();
-      const result = parseRateLimitHeaders({
-        'x-ratelimit-limit-requests': '10',
-        'x-ratelimit-remaining-requests': '5',
-        'x-ratelimit-reset-requests': '1h2m3s',
-      });
-      const after = Date.now();
-
-      expect(result).not.toBeNull();
-      // 1h2m3s = 3723000ms
-      const expectedMs = (1 * 3600 + 2 * 60 + 3) * 1000;
-      expect(result!.requestsResetAt).toBeGreaterThanOrEqual(before + expectedMs);
-      expect(result!.requestsResetAt).toBeLessThanOrEqual(after + expectedMs);
     });
   });
 
@@ -86,13 +42,10 @@ describe('parseRateLimitHeaders', () => {
     it('handles mixed-case header keys', () => {
       const result = parseRateLimitHeaders({
         'Anthropic-RateLimit-Requests-Limit': '100',
-        'Anthropic-RateLimit-Requests-Remaining': '50',
-        'Anthropic-RateLimit-Requests-Reset': '2025-01-15T12:00:00Z',
       });
 
       expect(result).not.toBeNull();
       expect(result!.requestsLimit).toBe(100);
-      expect(result!.requestsRemaining).toBe(50);
     });
   });
 
@@ -115,8 +68,6 @@ describe('parseRateLimitHeaders', () => {
     it('returns null fields for non-numeric limit values', () => {
       const result = parseRateLimitHeaders({
         'anthropic-ratelimit-requests-limit': 'not-a-number',
-        'anthropic-ratelimit-requests-remaining': 'abc',
-        'anthropic-ratelimit-requests-reset': 'invalid-date',
       });
 
       // The headers are recognized as Anthropic but all values fail to parse
@@ -126,14 +77,25 @@ describe('parseRateLimitHeaders', () => {
     it('preserves valid fields when some are invalid', () => {
       const result = parseRateLimitHeaders({
         'anthropic-ratelimit-requests-limit': '100',
-        'anthropic-ratelimit-requests-remaining': 'not-a-number',
+        'anthropic-ratelimit-tokens-limit': 'not-a-number',
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.requestsLimit).toBe(100);
+      expect(result!.tokensLimit).toBeNull();
+    });
+  });
+
+  describe('ignores non-limit headers from known providers', () => {
+    it('still detects Anthropic provider from non-limit headers but only parses limits', () => {
+      const result = parseRateLimitHeaders({
+        'anthropic-ratelimit-requests-limit': '100',
+        'anthropic-ratelimit-requests-remaining': '95',
         'anthropic-ratelimit-requests-reset': '2025-01-15T12:00:00Z',
       });
 
       expect(result).not.toBeNull();
       expect(result!.requestsLimit).toBe(100);
-      expect(result!.requestsRemaining).toBeNull();
-      expect(result!.requestsResetAt).toBe(new Date('2025-01-15T12:00:00Z').getTime());
     });
   });
 });
