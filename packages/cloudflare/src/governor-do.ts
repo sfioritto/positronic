@@ -6,13 +6,6 @@ export interface Env {
   NODE_ENV?: string;
 }
 
-export interface GovernorStats {
-  rpmLimit: number | null;
-  tpmLimit: number | null;
-  waitQueueLength: number;
-  loopRunning: boolean;
-}
-
 interface WaitQueueItem {
   estimatedTokens: number;
   resolve: () => void;
@@ -103,15 +96,6 @@ export class GovernorDO extends DurableObject<Env> {
 
     this.persistLimits();
     this.limitsLoaded = true;
-  }
-
-  async getStats(): Promise<GovernorStats> {
-    return {
-      rpmLimit: this.rpmLimit,
-      tpmLimit: this.tpmLimit,
-      waitQueueLength: this.waitQueue.length,
-      loopRunning: this.loopRunning,
-    };
   }
 
   private kickLoop() {

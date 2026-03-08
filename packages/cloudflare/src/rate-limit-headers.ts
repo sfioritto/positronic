@@ -1,10 +1,6 @@
 export interface ParsedRateLimits {
   requestsLimit: number | null;
-  requestsRemaining: number | null;
-  requestsResetAt: number | null;
   tokensLimit: number | null;
-  tokensRemaining: number | null;
-  tokensResetAt: number | null;
 }
 
 const ANTHROPIC_PREFIX = 'anthropic-ratelimit-';
@@ -12,20 +8,12 @@ const OPENAI_PREFIX = 'x-ratelimit-';
 
 const ANTHROPIC_KEYS: Record<string, keyof ParsedRateLimits> = {
   'requests-limit': 'requestsLimit',
-  'requests-remaining': 'requestsRemaining',
-  'requests-reset': 'requestsResetAt',
   'tokens-limit': 'tokensLimit',
-  'tokens-remaining': 'tokensRemaining',
-  'tokens-reset': 'tokensResetAt',
 };
 
 const OPENAI_KEYS: Record<string, keyof ParsedRateLimits> = {
   'limit-requests': 'requestsLimit',
-  'remaining-requests': 'requestsRemaining',
-  'reset-requests': 'requestsResetAt',
   'limit-tokens': 'tokensLimit',
-  'remaining-tokens': 'tokensRemaining',
-  'reset-tokens': 'tokensResetAt',
 };
 
 // Google Gemini doesn't return rate-limit headers, so we hardcode known limits.
@@ -52,34 +40,6 @@ export function getGoogleModelDefaults(
   if (!entry) return null;
 
   return entry;
-}
-
-function parseDurationToMs(duration: string): number | null {
-  const regex = /(?:(\d+)h)?(?:(\d+)m(?!s))?(?:(\d+)s)?(?:(\d+)ms)?/;
-  const match = duration.match(regex);
-  if (!match) return null;
-
-  const [, hours, minutes, seconds, millis] = match;
-  if (!hours && !minutes && !seconds && !millis) return null;
-
-  return (
-    parseInt(hours || '0', 10) * 3600000 +
-    parseInt(minutes || '0', 10) * 60000 +
-    parseInt(seconds || '0', 10) * 1000 +
-    parseInt(millis || '0', 10)
-  );
-}
-
-function parseResetValue(value: string): number | null {
-  // Try ISO 8601 date first (Anthropic format)
-  const dateMs = new Date(value).getTime();
-  if (!isNaN(dateMs)) return dateMs;
-
-  // Try duration string (OpenAI format: "6m0s", "200ms", "1h2m3s")
-  const durationMs = parseDurationToMs(value);
-  if (durationMs !== null) return Date.now() + durationMs;
-
-  return null;
 }
 
 function parseNumeric(value: string): number | null {
@@ -117,11 +77,7 @@ export function parseRateLimitHeaders(
 
   const result: ParsedRateLimits = {
     requestsLimit: null,
-    requestsRemaining: null,
-    requestsResetAt: null,
     tokensLimit: null,
-    tokensRemaining: null,
-    tokensResetAt: null,
   };
 
   let hasAnyValue = false;
@@ -131,11 +87,7 @@ export function parseRateLimitHeaders(
     const value = normalized[headerKey];
     if (value === undefined) continue;
 
-    if (field.endsWith('ResetAt')) {
-      result[field] = parseResetValue(value);
-    } else {
-      result[field] = parseNumeric(value);
-    }
+    result[field] = parseNumeric(value);
 
     if (result[field] !== null) {
       hasAnyValue = true;
