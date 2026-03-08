@@ -135,6 +135,41 @@ Key points about prompt steps:
 - You can optionally provide a transform function as the third parameter
 - Type inference works throughout - TypeScript knows about your schema types
 
+#### Per-Step Client Overrides
+
+You can use a different AI model for a specific prompt step by passing a `client` option. This is useful when some steps need a cheaper model for simple tasks and others need a more capable model for complex reasoning:
+
+```typescript
+import { createAnthropicClient } from '@positronic/client-anthropic';
+
+const fastModel = createAnthropicClient({ model: 'claude-haiku-4-5-20251001' });
+const smartModel = createAnthropicClient({ model: 'claude-sonnet-4-5-20250929' });
+
+brain('Multi-Model Brain')
+  .prompt('Quick summary', {
+    template: ({ document }) => `Summarize this briefly: <%= '${document}' %>`,
+    outputSchema: {
+      schema: z.object({ summary: z.string() }),
+      name: 'quickSummary' as const,
+    },
+    client: fastModel,  // Use a fast, cheap model for summarization
+  })
+  .prompt('Deep analysis', {
+    template: ({ quickSummary }) =>
+      `Analyze the implications of this summary: <%= '${quickSummary.summary}' %>`,
+    outputSchema: {
+      schema: z.object({
+        insights: z.array(z.string()),
+        risks: z.array(z.string()),
+      }),
+      name: 'analysis' as const,
+    },
+    client: smartModel,  // Use a more capable model for analysis
+  });
+```
+
+When deployed to Cloudflare, rate limiting is applied automatically to all clients — including per-step overrides — through the Governor system. Brain authors don't need to worry about rate limiting.
+
 ### 3. Nested Brains
 
 Compose complex workflows from smaller brains:
@@ -948,6 +983,8 @@ brain('Batch Processor')
 - `over: (state) => T[]` - Function returning the array to iterate over
 - `concurrency: number` - Maximum number of items processed in parallel (default: 10)
 - `error: (item, error) => Response` - Fallback function when a request fails
+
+Batch prompts also support per-step `client` overrides (see Prompt Steps above), so you can use a different model for batch processing.
 
 ### Result Format
 

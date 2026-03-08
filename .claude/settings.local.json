@@ -56,7 +56,12 @@
       "Bash(git -C /Users/seanfioritto/projects/positronic log --all --oneline --grep=\"cron-schedule\")",
       "Bash(git -C /Users/seanfioritto/projects/positronic log --all --oneline --grep=\"croner\")",
       "Bash(git -C /Users/seanfioritto/projects/positronic log --all --oneline --grep=\"cron\")",
-      "Bash(git -C /Users/seanfioritto/projects/positronic blame packages/cloudflare/src/schedule-do.ts)"
+      "Bash(git -C /Users/seanfioritto/projects/positronic blame packages/cloudflare/src/schedule-do.ts)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:discuss.ai.google.dev)",
+      "Bash(git stash:*)",
+      "Bash(git stash pop:*)"
     ],
     "deny": []
   }

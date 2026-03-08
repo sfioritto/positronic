@@ -58,6 +58,8 @@ export type StepBlock<
     template: (state: TStateIn, resources: Resources) => string | Promise<string>;
     responseSchema?: z.ZodObject<any>;
   };
+  /** Per-step client override for prompt steps */
+  client?: ObjectGenerator;
   /** Configuration for batch prompt execution (prompt with `over`) */
   batchConfig?: {
     over: (state: any) => any[];

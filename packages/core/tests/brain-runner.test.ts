@@ -249,7 +249,7 @@ describe('BrainRunner', () => {
     };
 
     // Configure the new client's response
-    newClient.generateObject.mockResolvedValue({ result: 'from new client' });
+    newClient.generateObject.mockResolvedValue({ object: { result: 'from new client' } });
 
     const runner = new BrainRunner({
       adapters: [],
@@ -265,12 +265,12 @@ describe('BrainRunner', () => {
     const testBrain = brain('Test Brain').step(
       'Generate',
       async ({ client }) => {
-        const response = await client.generateObject({
+        const { object } = await client.generateObject({
           prompt: 'test prompt',
           schema: testSchema,
           schemaName: 'TestSchema',
         });
-        return { generated: response.result };
+        return { generated: object.result };
       }
     );
 

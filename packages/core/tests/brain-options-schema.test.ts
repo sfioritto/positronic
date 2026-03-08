@@ -5,7 +5,7 @@ import type { ObjectGenerator, BrainEvent } from '../src/index.js';
 
 describe('Brain withOptionsSchema', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-  mockGenerateObject.mockResolvedValue({ result: 'test' } as any);
+  mockGenerateObject.mockResolvedValue({ object: { result: 'test' } } as any);
 
   const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 

@@ -9,6 +9,7 @@ import {
 } from '../../src/brain-runner-do';
 import { MonitorDO } from '../../src/monitor-do';
 import { ScheduleDO } from '../../src/schedule-do';
+import { GovernorDO } from '../../src/governor-do';
 import { PositronicManifest } from '../../src/manifest.js';
 import { runner } from './runner';
 // Import webhooks from webhooks/ directory (simulates auto-discovery pattern)
@@ -402,6 +403,15 @@ const multiWaitBrain = brain({ title: 'multi-wait-brain', description: 'A brain 
   .wait('Wait 2', () => testWebhook('multi-wait-2'), { timeout: '2h' })
   .step('After wait 2', ({ state, response }) => ({ ...state, step: 3, msg2: response.message }));
 
+const governorTestBrain = brain({ title: 'governor-test-brain', description: 'Tests governor rate limiting' })
+  .prompt('Generate something', {
+    template: () => 'Say hello',
+    outputSchema: {
+      schema: z.object({ greeting: z.string() }),
+      name: 'result' as const,
+    },
+  });
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -503,6 +513,11 @@ const brainManifest = {
     path: 'brains/multi-wait-brain.ts',
     brain: multiWaitBrain,
   },
+  'governor-test-brain': {
+    filename: 'governor-test-brain',
+    path: 'brains/governor-test-brain.ts',
+    brain: governorTestBrain,
+  },
 };
 
 const manifest = new PositronicManifest({
@@ -517,4 +532,4 @@ export default {
   fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { BrainRunnerDO, MonitorDO, ScheduleDO };
+export { BrainRunnerDO, MonitorDO, ScheduleDO, GovernorDO };

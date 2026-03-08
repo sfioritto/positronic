@@ -25,9 +25,13 @@ export class MockObjectGenerator implements ObjectGenerator {
 
   async generateObject<T extends z.AnyZodObject>(
     params: Parameters<ObjectGenerator['generateObject']>[0]
-  ): Promise<z.infer<T>> {
+  ): Promise<{
+    object: z.infer<T>;
+    usage?: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
+  }> {
     this.calls.push({ params, timestamp: new Date() });
-    return this.generateObjectMock(params) as Promise<z.infer<T>>;
+    return this.generateObjectMock(params);
   }
 
   async streamText(): Promise<{
@@ -47,7 +51,7 @@ export class MockObjectGenerator implements ObjectGenerator {
    * Mock a response for the next generateObject call
    */
   mockNextResponse<T>(response: T): void {
-    this.generateObjectMock.mockResolvedValueOnce(response as any);
+    this.generateObjectMock.mockResolvedValueOnce({ object: response });
   }
 
   /**
@@ -55,7 +59,7 @@ export class MockObjectGenerator implements ObjectGenerator {
    */
   mockResponses(...responses: any[]): void {
     responses.forEach((response) => {
-      this.generateObjectMock.mockResolvedValueOnce(response as any);
+      this.generateObjectMock.mockResolvedValueOnce({ object: response });
     });
   }
 

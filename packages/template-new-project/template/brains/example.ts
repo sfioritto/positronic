@@ -7,7 +7,7 @@ const exampleBrain = brain('example')
     topic: 'AI workflows',
   }))
   .step('Generate greeting', async ({ state, client }) => {
-    const result = await client.generateObject({
+    const { object } = await client.generateObject({
       schema: z.object({
         greeting: z.string(),
         funFact: z.string(),
@@ -18,8 +18,8 @@ const exampleBrain = brain('example')
     });
     return {
       ...state,
-      greeting: result.greeting,
-      funFact: result.funFact,
+      greeting: object.greeting,
+      funFact: object.funFact,
     };
   })
   .step('Finish', ({ state }) => ({

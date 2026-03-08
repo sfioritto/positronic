@@ -87,6 +87,9 @@ The project uses npm workspaces with the following packages:
 - Consider adding small delays, e.g. awaiting a promise wrapping a setTimeout, when dealing with asynchronous code to be bad practice and a last resort.
 - You tend to want to add things like `eslint-disable-next-line @typescript-eslint/no-explicit-any` to avoid type errors BUT you don't need to do this. Don't add eslint disable comments unless you see a linter error when running the lint command — which you won't because there's no linter.
 - Don't add empty `.catch()` blocks or catch blocks that only log/comment. If you're not actually handling the error (recovering, retrying, showing UI), don't catch it. Don't ever catch and rethrow as well. That's ridiculous.
+- Never use underscore-prefixed parameters (e.g. `_unused`) to indicate unused variables. If a parameter is unused, just leave it named normally — the underscore convention is ugly and unnecessary in this codebase.
+- Prefer inferred return types. Don't add explicit return type annotations unless the method/function is complex and a return type would aid in future refactoring.
+- Prefer destructuring at the top of methods/functions over `params.blah` access patterns.
 
 ### Testing
 
