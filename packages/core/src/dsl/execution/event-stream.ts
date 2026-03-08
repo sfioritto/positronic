@@ -79,6 +79,7 @@ export class BrainEventStream<
   private signalProvider?: SignalProvider;
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
+  private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
   private waits: Map<number, WaitBlock<any, any, any, any>> = new Map();
   private stopped = false;
@@ -110,6 +111,9 @@ export class BrainEventStream<
       signalProvider,
       memoryProvider,
     } = params;
+
+    // Store governor for per-step client resolution
+    this.governor = (params as any).governor;
 
     // Check if this is a resume run or fresh start
     const resumeParams = params as ResumeRunParams<TOptions>;
@@ -458,6 +462,7 @@ export class BrainEventStream<
             pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
+            governor: this.governor,
           })
         : brainBlock.innerBrain.run({
             resources: this.resources,
@@ -467,6 +472,7 @@ export class BrainEventStream<
             pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
+            governor: this.governor,
           });
 
       for await (const event of innerRun) {
@@ -512,11 +518,17 @@ export class BrainEventStream<
       const prevState = this.currentState;
       const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
 
+      // Resolve per-step client: if the step has an override, apply governor to it;
+      // otherwise use the default (already-governed) client
+      const stepClient = stepBlock.client
+        ? (this.governor ? this.governor(stepBlock.client) : stepBlock.client)
+        : this.client;
+
       const result = await Promise.resolve(
         stepBlock.action({
           state: this.currentState,
           options: this.options ?? ({} as TOptions),
-          client: this.client,
+          client: stepClient,
           resources: this.resources,
           response: this.currentResponse,
           page: this.currentPage,
@@ -1152,7 +1164,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const block = step.block as StepBlock<any, any, TOptions, TServices, any, any>;
     const batchConfig = block.batchConfig!;
     const prevState = this.currentState;
-    const client = batchConfig.client ?? this.client;
+    const rawClient = batchConfig.client;
+    const client = rawClient
+      ? (this.governor ? this.governor(rawClient) : rawClient)
+      : this.client;
     const items = batchConfig.over(this.currentState);
     const totalItems = items.length;
     const concurrency = batchConfig.concurrency ?? 10;
@@ -1205,12 +1220,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           const release = await semaphore.acquire();
           try {
             const promptText = await batchConfig.template(item, this.resources);
-            const output = await client.generateObject({
+            const result = await client.generateObject({
               schema: batchConfig.schema,
               schemaName: batchConfig.schemaName,
               prompt: promptText,
             });
-            return [item, output] as [any, any];
+            return [item, result.object] as [any, any];
           } catch (error) {
             if (batchConfig.error) {
               const fallback = batchConfig.error(item, error as Error);

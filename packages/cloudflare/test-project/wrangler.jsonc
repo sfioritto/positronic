@@ -16,6 +16,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["BrainRunnerDO", "MonitorDO", "ScheduleDO"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["GovernorDO"]
     }
   ],
   "durable_objects": {
@@ -31,6 +35,10 @@
       {
         "class_name": "ScheduleDO",
         "name": "SCHEDULE_DO"
+      },
+      {
+        "class_name": "GovernorDO",
+        "name": "GOVERNOR_DO"
       }
     ]
   },

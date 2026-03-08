@@ -26,8 +26,10 @@ import { google } from '@ai-sdk/google';
  * The adapter automatically indexes all agent conversations to memory.
  * See docs/memory-guide.md for more details.
  */
+const client = new VercelClient(google('gemini-3-pro-preview'));
+
 export const runner = new BrainRunner({
   adapters: [],
-  client: new VercelClient(google('gemini-3-pro-preview')),
+  client,
   resources: {},
 });

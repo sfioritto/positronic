@@ -39,9 +39,13 @@ export function createToolResultMessage(
 
 export class VercelClient implements ObjectGenerator {
   private model: LanguageModel;
+  apiKey?: string;
+  modelId?: string;
 
-  constructor(model: LanguageModel) {
+  constructor(model: LanguageModel, apiKey?: string) {
     this.model = model;
+    this.apiKey = apiKey;
+    this.modelId = typeof model === 'string' ? model : model.modelId;
   }
 
   createToolResultMessage(
@@ -59,7 +63,11 @@ export class VercelClient implements ObjectGenerator {
     prompt?: string;
     messages?: Message[];
     system?: string;
-  }): Promise<z.infer<T>> {
+  }): Promise<{
+    object: z.infer<T>;
+    usage?: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
+  }> {
     const { schema, schemaName, schemaDescription, prompt, messages, system } = params;
 
     const coreMessages: Message[] = [];
@@ -81,7 +89,7 @@ export class VercelClient implements ObjectGenerator {
     // AI SDK v5 requires either messages or prompt, but not both as undefined
     // If we have messages built up, use them; otherwise use the prompt directly
     if (coreMessages.length > 0) {
-      const { output } = await generateText({
+      const { output, usage, response } = await generateText({
         model: this.model,
         output: Output.object({
           schema,
@@ -89,12 +97,16 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         messages: coreMessages,
-        maxRetries: 5,
+        maxRetries: 2,
       });
-      return output as z.infer<T>;
+      return {
+        object: output as z.infer<T>,
+        usage: { totalTokens: usage?.totalTokens ?? 0 },
+        responseHeaders: response.headers,
+      };
     } else {
       // Fallback to prompt-only mode (should rarely happen, but provides a default)
-      const { output } = await generateText({
+      const { output, usage, response } = await generateText({
         model: this.model,
         output: Output.object({
           schema,
@@ -102,9 +114,13 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         prompt: prompt || '',
-        maxRetries: 5,
+        maxRetries: 2,
       });
-      return output as z.infer<T>;
+      return {
+        object: output as z.infer<T>,
+        usage: { totalTokens: usage?.totalTokens ?? 0 },
+        responseHeaders: response.headers,
+      };
     }
   }
 
@@ -119,6 +135,7 @@ export class VercelClient implements ObjectGenerator {
     toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
     usage: { totalTokens: number };
     responseMessages: ResponseMessage[];
+    responseHeaders?: Record<string, string>;
   }> {
     const { system, messages, responseMessages, tools, toolChoice = 'required' } = params;
 
@@ -192,7 +209,7 @@ export class VercelClient implements ObjectGenerator {
       toolChoice,
       messages: modelMessages,
       tools: aiTools,
-      maxRetries: 5,
+      maxRetries: 0,
     });
 
     const updatedMessages = [...modelMessages, ...result.response.messages];
@@ -208,6 +225,7 @@ export class VercelClient implements ObjectGenerator {
         totalTokens: result.usage?.totalTokens ?? 0,
       },
       responseMessages: updatedMessages as ResponseMessage[],
+      responseHeaders: result.response.headers,
     };
   }
 
@@ -234,6 +252,7 @@ export class VercelClient implements ObjectGenerator {
     }>;
     text?: string;
     usage: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
   }> {
     const { system, prompt, messages, tools, maxSteps = 10, toolChoice = 'required' } = params;
 
@@ -318,7 +337,7 @@ export class VercelClient implements ObjectGenerator {
       messages: modelMessages,
       tools: aiTools,
       toolChoice,
-      maxRetries: 5,
+      maxRetries: 0,
       stopWhen: stepCountIs(maxSteps),
     });
 
@@ -355,6 +374,7 @@ export class VercelClient implements ObjectGenerator {
       usage: {
         totalTokens: usage?.totalTokens ?? 0,
       },
+      responseHeaders: steps[steps.length - 1]?.response?.headers,
     };
   }
 }

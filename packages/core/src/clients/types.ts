@@ -53,6 +53,15 @@ export type ResponseMessage = unknown;
  * and potentially other types of content in the future.
  */
 export interface ObjectGenerator {
+  /** SHA-256 hash of `model:apiKey`, used for rate-limit bucket identification. */
+  identity?: string;
+
+  /** The model identifier string (e.g. 'gemini-3-pro-preview'). */
+  modelId?: string;
+
+  /** The API key used by this client, for rate-limit bucket identification. */
+  apiKey?: string;
+
   /**
    * Generates a structured JSON object that conforms to the provided Zod schema.
    *
@@ -90,7 +99,11 @@ export interface ObjectGenerator {
      * prepend this as a `system` role message to the full message list.
      */
     system?: string;
-  }): Promise<z.infer<T>>;
+  }): Promise<{
+    object: z.infer<T>;
+    usage?: { totalTokens: number };
+    responseHeaders?: Record<string, string>;
+  }>;
 
   /**
    * Creates a tool result message in the SDK-native format.
@@ -145,6 +158,8 @@ export interface ObjectGenerator {
      * Pass these back in the next call via responseMessages parameter.
      */
     responseMessages: ResponseMessage[];
+    /** Raw response headers from the provider, used for rate limit tracking. */
+    responseHeaders?: Record<string, string>;
   }>;
 
   /**
@@ -197,5 +212,7 @@ export interface ObjectGenerator {
     text?: string;
     /** Token usage across all steps */
     usage: { totalTokens: number };
+    /** Raw response headers from the provider, used for rate limit tracking. */
+    responseHeaders?: Record<string, string>;
   }>;
 }
