@@ -97,7 +97,7 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         messages: coreMessages,
-        maxRetries: 0,
+        maxRetries: 2,
       });
       return {
         object: output as z.infer<T>,
@@ -114,7 +114,7 @@ export class VercelClient implements ObjectGenerator {
           description: schemaDescription,
         }),
         prompt: prompt || '',
-        maxRetries: 0,
+        maxRetries: 2,
       });
       return {
         object: output as z.infer<T>,
