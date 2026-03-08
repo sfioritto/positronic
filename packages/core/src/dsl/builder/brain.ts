@@ -6,6 +6,8 @@ import type { WebhookRegistration, ExtractWebhookResponses, NormalizeToArray } f
 import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import type { MemoryProvider } from '../../memory/types.js';
+import type { StoreDefinition, StoreContext } from '../../store/types.js';
+import type { JsonValue } from '../types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
@@ -21,7 +23,8 @@ export class Brain<
   TState extends State = object,
   TServices extends object = object,
   TResponse extends JsonObject | undefined = undefined,
-  TPage extends GeneratedPage | undefined = undefined
+  TPage extends GeneratedPage | undefined = undefined,
+  TStore extends Record<string, JsonValue> = never
 > {
   private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
   public type: 'brain' = 'brain';
@@ -30,6 +33,7 @@ export class Brain<
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool<any>>;
   private memoryProvider?: MemoryProvider;
+  private storeDefinition?: StoreDefinition<any>;
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -73,8 +77,8 @@ export class Brain<
   // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
-  ): Brain<TOptions, TState, TNewServices, TResponse, TPage> {
-    const nextBrain = new Brain<TOptions, TState, TNewServices, TResponse, TPage>(
+  ): Brain<TOptions, TState, TNewServices, TResponse, TPage, TStore> {
+    const nextBrain = new Brain<TOptions, TState, TNewServices, TResponse, TPage, TStore>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -86,14 +90,15 @@ export class Brain<
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
     nextBrain.memoryProvider = this.memoryProvider;
+    nextBrain.storeDefinition = this.storeDefinition;
 
     return nextBrain;
   }
 
   withOptionsSchema<TSchema extends z.ZodSchema>(
     schema: TSchema
-  ): Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage> {
-    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage>(
+  ): Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage, TStore> {
+    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices, TResponse, TPage, TStore>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -103,6 +108,7 @@ export class Brain<
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
     nextBrain.memoryProvider = this.memoryProvider;
+    nextBrain.storeDefinition = this.storeDefinition;
 
     return nextBrain;
   }
@@ -123,8 +129,8 @@ export class Brain<
    */
   withComponents(
     components: Record<string, UIComponent<any>>
-  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
-    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, TPage>(
+  ): Brain<TOptions, TState, TServices, TResponse, TPage, TStore> {
+    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, TPage, TStore>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -134,6 +140,7 @@ export class Brain<
     nextBrain.components = components;
     nextBrain.defaultTools = this.defaultTools;
     nextBrain.memoryProvider = this.memoryProvider;
+    nextBrain.storeDefinition = this.storeDefinition;
 
     return nextBrain;
   }
@@ -160,7 +167,7 @@ export class Brain<
    */
   withTools<TTools extends Record<string, AgentTool<any>>>(
     tools: TTools
-  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+  ): Brain<TOptions, TState, TServices, TResponse, TPage, TStore> {
     const next = this.nextBrain<TState, TResponse, TPage>();
     next.defaultTools = tools;
     return next;
@@ -188,20 +195,60 @@ export class Brain<
    */
   withMemory(
     provider: MemoryProvider
-  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+  ): Brain<TOptions, TState, TServices, TResponse, TPage, TStore> {
     const next = this.nextBrain<TState, TResponse, TPage>();
     next.memoryProvider = provider;
     return next;
   }
 
+  /**
+   * Configure a typed key-value store for this brain.
+   * When configured, steps receive a `store` object in their context with typed get/set/delete/has.
+   *
+   * @param store - The store definition created with `createStore()`
+   *
+   * @example
+   * ```typescript
+   * const store = createStore({
+   *   deselectedThreads: [] as string[],
+   *   lastDigestDate: '',
+   * });
+   *
+   * const myBrain = brain('email-digest')
+   *   .withStore(store)
+   *   .step('Process', async ({ store }) => {
+   *     const deselected = await store.get('deselectedThreads');
+   *     await store.set('deselectedThreads', [...deselected, 'new-id']);
+   *     return { processed: true };
+   *   });
+   * ```
+   */
+  withStore<T extends Record<string, JsonValue>>(
+    store: StoreDefinition<T>
+  ): Brain<TOptions, TState, TServices, TResponse, TPage, T> {
+    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, TPage, T>(
+      this.title,
+      this.description
+    ).withBlocks(this.blocks as any);
+
+    nextBrain.optionsSchema = this.optionsSchema;
+    nextBrain.services = this.services as any;
+    nextBrain.components = this.components;
+    nextBrain.defaultTools = this.defaultTools;
+    nextBrain.memoryProvider = this.memoryProvider;
+    nextBrain.storeDefinition = store;
+
+    return nextBrain;
+  }
+
   step<TNewState extends State>(
     title: string,
     action: (
-      params: StepContext<TState, TOptions, TResponse, TPage> & TServices
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & StoreContext<TStore>
     ) =>
       | TNewState
       | Promise<TNewState>
-  ): Brain<TOptions, TNewState, TServices, undefined, undefined> {
+  ): Brain<TOptions, TNewState, TServices, undefined, undefined, TStore> {
     const stepBlock: StepBlock<
       TState,
       TNewState,
@@ -222,12 +269,12 @@ export class Brain<
   wait<TWaitFor extends WebhookRegistration<any> | readonly WebhookRegistration<any>[]>(
     title: string,
     action: (
-      params: StepContext<TState, TOptions, TResponse, TPage> & TServices
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & StoreContext<TStore>
     ) =>
       | TWaitFor
       | Promise<TWaitFor>,
     options?: { timeout?: number | string }
-  ): Brain<TOptions, TState, TServices, ExtractWebhookResponses<NormalizeToArray<TWaitFor>>, undefined> {
+  ): Brain<TOptions, TState, TServices, ExtractWebhookResponses<NormalizeToArray<TWaitFor>>, undefined, TStore> {
     const waitBlock: WaitBlock<TState, TOptions, TServices, TPage> = {
       type: 'wait',
       title,
@@ -242,7 +289,7 @@ export class Brain<
   guard(
     predicate: (params: { state: TState; options: TOptions }) => boolean,
     title?: string
-  ): Brain<TOptions, TState, TServices, TResponse, TPage> {
+  ): Brain<TOptions, TState, TServices, TResponse, TPage, TStore> {
     const guardBlock: GuardBlock<TState, TOptions> = {
       type: 'guard',
       title: title ?? 'Guard',
@@ -262,7 +309,7 @@ export class Brain<
       services: TServices;
     }) => TNewState,
     initialState?: State | ((state: TState) => State)
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 2: Agent config object WITH outputSchema
   brain<
@@ -273,7 +320,7 @@ export class Brain<
   >(
     title: string,
     config: AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 3: Agent config function WITH outputSchema
   brain<
@@ -284,12 +331,12 @@ export class Brain<
   >(
     title: string,
     configFn: (
-      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & {
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & StoreContext<TStore> & {
         /** Default tools available for agent steps */
         tools: Record<string, AgentTool<any>>;
       }
     ) => AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 4: Agent config object (no outputSchema)
   brain<
@@ -298,7 +345,7 @@ export class Brain<
   >(
     title: string,
     config: AgentConfig<TTools>
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 5: Agent config function (no outputSchema)
   brain<
@@ -307,12 +354,12 @@ export class Brain<
   >(
     title: string,
     configFn: (
-      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & {
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & StoreContext<TStore> & {
         /** Default tools available for agent steps */
         tools: Record<string, AgentTool<any>>;
       }
     ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Implementation
   brain(
@@ -384,7 +431,7 @@ export class Brain<
       };
       client?: ObjectGenerator;
     }
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 2: Batch execution - runs prompt for each item in array
   prompt<
@@ -409,7 +456,7 @@ export class Brain<
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
       concurrency?: number;
     }
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined>;
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 3: Schema-less prompt - returns text response for next step
   prompt(
@@ -421,7 +468,7 @@ export class Brain<
       ) => string | Promise<string>;
       client?: ObjectGenerator;
     }
-  ): Brain<TOptions, TState, TServices, { text: string }, undefined>;
+  ): Brain<TOptions, TState, TServices, { text: string }, undefined, TStore>;
 
   // Implementation
   prompt(
@@ -580,7 +627,7 @@ export class Brain<
       ) => string | Promise<string>;
       responseSchema?: TSchema;
     }
-  ): Brain<TOptions, TState, TServices, TResponse, GeneratedPage<TSchema>> {
+  ): Brain<TOptions, TState, TServices, TResponse, GeneratedPage<TSchema>, TStore> {
     const uiBlock: StepBlock<
       TState,
       TState,
@@ -648,6 +695,7 @@ export class Brain<
       components: this.components,
       defaultTools: this.defaultTools,
       memoryProvider: this.memoryProvider,
+      storeDefinition: this.storeDefinition,
     });
 
     yield* stream.next();
@@ -664,9 +712,9 @@ export class Brain<
     TNewState extends State,
     TNewResponse extends JsonObject | undefined = undefined,
     TNewPage extends GeneratedPage | undefined = undefined
-  >(): Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage> {
+  >(): Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage, TStore> {
     // Pass default options to the next brain
-    const nextBrain = new Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage>(
+    const nextBrain = new Brain<TOptions, TNewState, TServices, TNewResponse, TNewPage, TStore>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -681,6 +729,8 @@ export class Brain<
     nextBrain.defaultTools = this.defaultTools;
     // Copy memoryProvider to the next brain
     nextBrain.memoryProvider = this.memoryProvider;
+    // Copy storeDefinition to the next brain
+    nextBrain.storeDefinition = this.storeDefinition;
 
     return nextBrain;
   }

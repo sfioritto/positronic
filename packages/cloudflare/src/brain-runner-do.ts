@@ -15,6 +15,7 @@ import type { GovernorDO } from './governor-do.js';
 import { PositronicManifest } from './manifest.js';
 import { setGovernorBinding, rateGoverned } from './governor-client-wrapper.js';
 import { CloudflareR2Loader } from './r2-loader.js';
+import { R2StoreProvider } from './r2-store-provider.js';
 import { createResources, type ResourceManifest } from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
@@ -554,9 +555,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const signalProvider = new CloudflareSignalProvider(
       (filter) => this.getAndConsumeSignals(filter)
     );
+    const storeProvider = new R2StoreProvider(this.env.RESOURCES_BUCKET);
     runnerWithResources = runnerWithResources
       .withSignalProvider(signalProvider)
-      .withGovernor((c) => rateGoverned(c));
+      .withGovernor((c) => rateGoverned(c))
+      .withStoreProvider(storeProvider);
 
     // Extract options from initialData if present
     const options = initialData?.options;
@@ -722,9 +725,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const signalProvider = new CloudflareSignalProvider(
       (filter) => this.getAndConsumeSignals(filter)
     );
+    const storeProvider = new R2StoreProvider(this.env.RESOURCES_BUCKET);
     runnerWithResources = runnerWithResources
       .withSignalProvider(signalProvider)
-      .withGovernor((c) => rateGoverned(c));
+      .withGovernor((c) => rateGoverned(c))
+      .withStoreProvider(storeProvider);
 
     // Create abort controller for this run
     this.abortController = new AbortController();
