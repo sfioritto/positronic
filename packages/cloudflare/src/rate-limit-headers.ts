@@ -44,21 +44,14 @@ const GOOGLE_MODEL_LIMITS: Record<string, { rpm: number; tpm: number }> = {
 
 export function getGoogleModelDefaults(
   modelId: string
-): ParsedRateLimits | null {
+): { rpm: number; tpm: number } | null {
   // Strip "models/" prefix used by some Google SDKs
   const normalized = modelId.startsWith('models/') ? modelId.slice(7) : modelId;
 
   const entry = GOOGLE_MODEL_LIMITS[normalized];
   if (!entry) return null;
 
-  return {
-    requestsLimit: entry.rpm,
-    requestsRemaining: entry.rpm,
-    requestsResetAt: null,
-    tokensLimit: entry.tpm,
-    tokensRemaining: entry.tpm,
-    tokensResetAt: null,
-  };
+  return entry;
 }
 
 function parseDurationToMs(duration: string): number | null {

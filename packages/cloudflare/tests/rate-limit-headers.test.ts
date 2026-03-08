@@ -142,33 +142,29 @@ describe('getGoogleModelDefaults', () => {
   it('returns defaults for gemini-2.5-pro', () => {
     const result = getGoogleModelDefaults('gemini-2.5-pro');
     expect(result).not.toBeNull();
-    expect(result!.requestsLimit).toBe(150);
-    expect(result!.requestsRemaining).toBe(150);
-    expect(result!.tokensLimit).toBe(2_000_000);
-    expect(result!.tokensRemaining).toBe(2_000_000);
-    expect(result!.requestsResetAt).toBeNull();
-    expect(result!.tokensResetAt).toBeNull();
+    expect(result!.rpm).toBe(150);
+    expect(result!.tpm).toBe(2_000_000);
   });
 
   it('returns defaults for gemini-3-flash', () => {
     const result = getGoogleModelDefaults('gemini-3-flash');
     expect(result).not.toBeNull();
-    expect(result!.requestsLimit).toBe(1_000);
-    expect(result!.tokensLimit).toBe(1_000_000);
+    expect(result!.rpm).toBe(1_000);
+    expect(result!.tpm).toBe(1_000_000);
   });
 
   it('returns defaults for gemini-2.5-flash-lite', () => {
     const result = getGoogleModelDefaults('gemini-2.5-flash-lite');
     expect(result).not.toBeNull();
-    expect(result!.requestsLimit).toBe(4_000);
-    expect(result!.tokensLimit).toBe(4_000_000);
+    expect(result!.rpm).toBe(4_000);
+    expect(result!.tpm).toBe(4_000_000);
   });
 
   it('returns defaults for gemini-2.5-flash', () => {
     const result = getGoogleModelDefaults('gemini-2.5-flash');
     expect(result).not.toBeNull();
-    expect(result!.requestsLimit).toBe(1_000);
-    expect(result!.tokensLimit).toBe(1_000_000);
+    expect(result!.rpm).toBe(1_000);
+    expect(result!.tpm).toBe(1_000_000);
   });
 
   it('returns null for unknown version suffixes', () => {
@@ -178,7 +174,7 @@ describe('getGoogleModelDefaults', () => {
   it('strips models/ prefix used by Google SDKs', () => {
     const result = getGoogleModelDefaults('models/gemini-2.5-pro');
     expect(result).not.toBeNull();
-    expect(result!.requestsLimit).toBe(150);
+    expect(result!.rpm).toBe(150);
   });
 
   it('returns null for unknown models', () => {
@@ -197,8 +193,8 @@ describe('getGoogleModelDefaults', () => {
     for (const model of models) {
       const result = getGoogleModelDefaults(model);
       expect(result).not.toBeNull();
-      expect(result!.requestsLimit).toBeGreaterThan(0);
-      expect(result!.tokensLimit).toBeGreaterThan(0);
+      expect(result!.rpm).toBeGreaterThan(0);
+      expect(result!.tpm).toBeGreaterThan(0);
     }
   });
 });
