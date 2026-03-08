@@ -7,6 +7,7 @@ import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
 import type { BrainCancelledEvent } from './definitions/events.js';
+import type { StoreProvider } from '../store/types.js';
 
 /**
  * Convert execution stack to ResumeContext tree.
@@ -75,6 +76,7 @@ export class BrainRunner {
       env?: RuntimeEnv;
       signalProvider?: SignalProvider;
       governor?: (client: ObjectGenerator) => ObjectGenerator;
+      storeProvider?: StoreProvider;
     }
   ) {}
 
@@ -125,6 +127,13 @@ export class BrainRunner {
     return new BrainRunner({
       ...this.options,
       governor,
+    });
+  }
+
+  withStoreProvider(storeProvider: StoreProvider): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      storeProvider,
     });
   }
 
@@ -203,7 +212,7 @@ export class BrainRunner {
       initialStepCount: number;
     }
   ): Promise<TState> {
-    const { adapters, client: rawClient, resources, pages, env, signalProvider, governor } = this.options;
+    const { adapters, client: rawClient, resources, pages, env, signalProvider, governor, storeProvider } = this.options;
     const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
     const { initialState, resumeContext, machine: providedMachine, options, brainRunId, endAfter, signal, initialStepCount } = params;
@@ -225,6 +234,7 @@ export class BrainRunner {
           env: resolvedEnv,
           signalProvider,
           governor,
+          storeProvider,
         })
       : brain.run({
           initialState: initialState ?? ({} as TState),
@@ -236,6 +246,7 @@ export class BrainRunner {
           env: resolvedEnv,
           signalProvider,
           governor,
+          storeProvider,
         });
 
     try {

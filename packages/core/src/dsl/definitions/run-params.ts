@@ -3,6 +3,7 @@ import type { State, JsonObject, RuntimeEnv, SignalProvider } from '../types.js'
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { AgentContext } from '../brain-state-machine.js';
+import type { StoreProvider } from '../../store/types.js';
 
 /**
  * ResumeContext tracks the execution state needed to resume a brain.
@@ -30,6 +31,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   env?: RuntimeEnv;
   signalProvider?: SignalProvider;
   governor?: (client: ObjectGenerator) => ObjectGenerator;
+  storeProvider?: StoreProvider;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
