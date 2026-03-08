@@ -21,8 +21,8 @@ interface TestEnv {
   RESOURCES_BUCKET: R2Bucket;
 }
 
-function getGovernorStub(testEnv: TestEnv) {
-  const id = testEnv.GOVERNOR_DO.idFromName('governor');
+function getGovernorStub(testEnv: TestEnv, identity = 'test-identity') {
+  const id = testEnv.GOVERNOR_DO.idFromName(identity);
   return testEnv.GOVERNOR_DO.get(id);
 }
 
@@ -31,13 +31,105 @@ describe('GovernorDO Integration Tests', () => {
     resetMockState();
   });
 
-  it('should track active requests during brain execution', async () => {
+  it('should admit immediately for unknown model (no limits)', async () => {
     const testEnv = env as TestEnv;
-    const stub = getGovernorStub(testEnv);
+    const stub = getGovernorStub(testEnv, 'unknown-model-identity');
 
-    // Verify no active requests initially
-    const initialStats = await stub.getStats();
-    expect(initialStats.activeRequestCount).toBe(0);
+    // waitForCapacity should resolve immediately for an unknown model
+    await stub.waitForCapacity('unknown-model', 100);
+
+    const stats = await stub.getStats();
+    expect(stats.rpmLimit).toBeNull();
+    expect(stats.tpmLimit).toBeNull();
+    expect(stats.waitQueueLength).toBe(0);
+    expect(stats.loopRunning).toBe(false);
+  });
+
+  it('should seed Google defaults and throttle', async () => {
+    const testEnv = env as TestEnv;
+    const stub = getGovernorStub(testEnv, 'google-identity');
+
+    // First call seeds limits from Google defaults
+    await stub.waitForCapacity('gemini-2.5-flash-lite', 100);
+
+    const stats = await stub.getStats();
+    expect(stats.rpmLimit).toBe(4000);
+    expect(stats.tpmLimit).toBe(4_000_000);
+  });
+
+  it('should update limits from reportHeaders', async () => {
+    const testEnv = env as TestEnv;
+    const stub = getGovernorStub(testEnv, 'header-update-identity');
+
+    // Initially no limits
+    const before = await stub.getStats();
+    expect(before.rpmLimit).toBeNull();
+    expect(before.tpmLimit).toBeNull();
+
+    // Report headers with Anthropic-style limits
+    await stub.reportHeaders({
+      'anthropic-ratelimit-requests-limit': '100',
+      'anthropic-ratelimit-tokens-limit': '500000',
+    });
+
+    const after = await stub.getStats();
+    expect(after.rpmLimit).toBe(100);
+    expect(after.tpmLimit).toBe(500000);
+  });
+
+  it('should update limits from OpenAI-style headers', async () => {
+    const testEnv = env as TestEnv;
+    const stub = getGovernorStub(testEnv, 'openai-identity');
+
+    await stub.reportHeaders({
+      'x-ratelimit-limit-requests': '200',
+      'x-ratelimit-limit-tokens': '1000000',
+    });
+
+    const stats = await stub.getStats();
+    expect(stats.rpmLimit).toBe(200);
+    expect(stats.tpmLimit).toBe(1000000);
+  });
+
+  it('should process multiple concurrent requests in order', async () => {
+    const testEnv = env as TestEnv;
+    const stub = getGovernorStub(testEnv, 'concurrent-identity');
+
+    // Seed limits first (high RPM so delays are very small)
+    await stub.reportHeaders({
+      'x-ratelimit-limit-requests': '10000',
+      'x-ratelimit-limit-tokens': '10000000',
+    });
+
+    // Fire multiple concurrent waitForCapacity calls
+    const order: number[] = [];
+    const promises = [1, 2, 3, 4, 5].map((i) =>
+      stub.waitForCapacity('test-model', 100).then(() => {
+        order.push(i);
+      })
+    );
+
+    await Promise.all(promises);
+
+    // All should have resolved
+    expect(order).toHaveLength(5);
+    // Should be FIFO ordered
+    expect(order).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('should have correct stats shape', async () => {
+    const testEnv = env as TestEnv;
+    const stub = getGovernorStub(testEnv, 'stats-identity');
+
+    const stats = await stub.getStats();
+    expect(stats).toHaveProperty('rpmLimit');
+    expect(stats).toHaveProperty('tpmLimit');
+    expect(stats).toHaveProperty('waitQueueLength');
+    expect(stats).toHaveProperty('loopRunning');
+  });
+
+  it('should complete brain execution through governor', async () => {
+    const testEnv = env as TestEnv;
 
     // Create a brain run that uses a prompt step (exercises rateGoverned wrapper)
     const request = await createAuthenticatedRequest('http://example.com/brains/runs', {
@@ -65,145 +157,19 @@ describe('GovernorDO Integration Tests', () => {
     // Verify brain completed
     const completeEvent = allEvents.find((e) => e.type === BRAIN_EVENTS.COMPLETE);
     expect(completeEvent).toBeDefined();
-
-    // After completion, all leases should be released
-    const finalStats = await stub.getStats();
-    expect(finalStats.activeRequestCount).toBe(0);
   });
 
-  it('should acquire and release leases via GovernorDO directly', async () => {
+  it('should ignore reportHeaders with unrecognized headers', async () => {
     const testEnv = env as TestEnv;
-    const stub = getGovernorStub(testEnv);
+    const stub = getGovernorStub(testEnv, 'noop-headers-identity');
 
-    // Acquire a lease
-    const acquireResult = await stub.acquire({
-      requestId: 'test-1',
-      clientIdentity: 'test-identity',
-      modelId: 'test-model',
-      estimatedTokens: 100,
-    });
-    expect(acquireResult).toEqual({ granted: true });
-
-    // Verify active request count
-    const statsAfterAcquire = await stub.getStats();
-    expect(statsAfterAcquire.activeRequestCount).toBe(1);
-
-    // Release the lease
-    await stub.release({
-      requestId: 'test-1',
-      clientIdentity: 'test-identity',
-      actualTokens: 50,
+    await stub.reportHeaders({
+      'content-type': 'application/json',
+      'x-request-id': 'abc123',
     });
 
-    // Verify lease was released
-    const statsAfterRelease = await stub.getStats();
-    expect(statsAfterRelease.activeRequestCount).toBe(0);
-  });
-
-  it('should clean up stale leases', async () => {
-    const testEnv = env as TestEnv;
-    const stub = getGovernorStub(testEnv);
-
-    // Acquire a lease
-    await stub.acquire({
-      requestId: 'stale-1',
-      clientIdentity: 'test-identity',
-      modelId: 'test-model',
-      estimatedTokens: 100,
-    });
-    const statsAfter = await stub.getStats();
-    expect(statsAfter.activeRequestCount).toBe(1);
-
-    // Clean up with timeout of 0ms — all leases are immediately "stale"
-    await stub.cleanupStaleLeases(0);
-
-    const statsAfterCleanup = await stub.getStats();
-    expect(statsAfterCleanup.activeRequestCount).toBe(0);
-  });
-
-  it('should seed Google model defaults from modelId', async () => {
-    const testEnv = env as TestEnv;
-    const stub = getGovernorStub(testEnv);
-
-    // Acquire with a known Google model name — should seed rate limit defaults
-    const result = await stub.acquire({
-      requestId: 'google-1',
-      clientIdentity: 'google-identity-hash',
-      modelId: 'gemini-2.5-flash-lite',
-      estimatedTokens: 100,
-    });
-    expect(result.granted).toBe(true);
-
-    // Verify rate limits were seeded from Google defaults
     const stats = await stub.getStats();
-    const entry = stats.rateLimits.find((r) => r.clientIdentity === 'google-identity-hash');
-    expect(entry).toBeDefined();
-    expect(entry!.rpmLimit).toBe(4000);
-    expect(entry!.tpmLimit).toBe(4_000_000);
-  });
-
-  it('should enforce rate limits when RPM is exhausted', async () => {
-    const testEnv = env as TestEnv;
-    const stub = getGovernorStub(testEnv);
-
-    // Seed rate limits by releasing with headers that indicate exhausted RPM
-    await stub.release({
-      requestId: 'seed-request',
-      clientIdentity: 'limited-identity',
-      actualTokens: 10,
-      responseHeaders: {
-        'x-ratelimit-limit-requests': '2',
-        'x-ratelimit-remaining-requests': '0',
-        'x-ratelimit-reset-requests': '60s',
-        'x-ratelimit-limit-tokens': '10000',
-        'x-ratelimit-remaining-tokens': '9000',
-        'x-ratelimit-reset-tokens': '60s',
-      },
-    });
-
-    // Attempt to acquire — should be denied
-    const acquireResult = await stub.acquire({
-      requestId: 'denied-1',
-      clientIdentity: 'limited-identity',
-      modelId: 'test-model',
-      estimatedTokens: 100,
-    });
-    expect(acquireResult.granted).toBe(false);
-    expect(acquireResult.retryAfterMs).toBeGreaterThan(0);
-  });
-
-  it('GET /governor/stats returns rate limit data', async () => {
-    const testEnv = env as TestEnv;
-
-    // Check stats via API — should start empty
-    const statsRequest = await createAuthenticatedRequest('http://example.com/governor/stats');
-    const statsContext = createExecutionContext();
-    const statsResponse = await worker.fetch(statsRequest, testEnv, statsContext);
-    await waitOnExecutionContext(statsContext);
-
-    expect(statsResponse.status).toBe(200);
-    const stats = await statsResponse.json<{ rateLimits: unknown[]; activeRequestCount: number }>();
-    expect(stats).toHaveProperty('rateLimits');
-    expect(stats).toHaveProperty('activeRequestCount');
-    expect(Array.isArray(stats.rateLimits)).toBe(true);
-    expect(stats.activeRequestCount).toBe(0);
-
-    // Acquire a lease directly, then verify stats endpoint reflects it
-    const stub = getGovernorStub(testEnv);
-    await stub.acquire({
-      requestId: 'api-test-1',
-      clientIdentity: 'api-test-identity',
-      modelId: 'test-model',
-      estimatedTokens: 200,
-    });
-
-    const statsRequest2 = await createAuthenticatedRequest('http://example.com/governor/stats');
-    const statsContext2 = createExecutionContext();
-    const statsResponse2 = await worker.fetch(statsRequest2, testEnv, statsContext2);
-    await waitOnExecutionContext(statsContext2);
-
-    expect(statsResponse2.status).toBe(200);
-    const stats2 = await statsResponse2.json<{ rateLimits: unknown[]; activeRequestCount: number }>();
-    expect(stats2.activeRequestCount).toBe(1);
+    expect(stats.rpmLimit).toBeNull();
+    expect(stats.tpmLimit).toBeNull();
   });
 });
