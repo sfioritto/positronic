@@ -94,7 +94,7 @@ Stores a fact in long-term memory:
 import { rememberFact } from '@positronic/mem0';
 
 // The agent can call this tool to store information
-// Input: { fact: string, userId?: string }
+// Input: { fact: string }
 // Output: { remembered: boolean, fact: string }
 ```
 
@@ -108,7 +108,7 @@ Searches for relevant memories:
 import { recallMemories } from '@positronic/mem0';
 
 // The agent can call this tool to search memory
-// Input: { query: string, userId?: string, limit?: number }
+// Input: { query: string, limit?: number }
 // Output: { found: number, memories: Array<{ content: string, relevance?: number }> }
 ```
 
@@ -204,9 +204,8 @@ When memory is attached, you can access it directly in step functions:
 const myBrain = brain('my-brain')
   .withMemory(memory)
   .step('Load Context', async ({ memory }) => {
-    // Search for relevant memories
+    // Search for relevant memories (userId auto-scoped from currentUser)
     const memories = await memory.search('user preferences', {
-      userId: 'user-123',
       limit: 5,
     });
 
@@ -278,7 +277,6 @@ const myBrain = brain('my-brain')
       'You are a helpful assistant.',
       'user context and preferences',
       {
-        userId: 'user-123',
         limit: 10,
         memoriesHeader: '\n\nUser context:',
       }
@@ -296,7 +294,6 @@ Gets just the memory context block for manual prompt construction:
 import { getMemoryContext } from '@positronic/mem0';
 
 const context = await getMemoryContext(memory, 'user preferences', {
-  userId: 'user-123',
   limit: 5,
 });
 
@@ -321,16 +318,16 @@ brain('sales-agent').withMemory(memory)    // agentId = 'sales-agent'
 
 ### userId
 
-Optional user-level scoping. Pass when searching or adding:
+Automatically set from `currentUser.id` when the brain runs. All memory operations are automatically scoped to the current user — no need to pass `userId` manually:
 
 ```typescript
-// In tools - passed as parameter
-rememberFact({ fact: 'Prefers dark mode', userId: 'user-123' })
-recallMemories({ query: 'preferences', userId: 'user-123' })
+// userId is auto-bound from currentUser — just use memory directly
+await memory.search('preferences');
+await memory.add(messages);
 
-// In direct memory access
-await memory.search('preferences', { userId: 'user-123' });
-await memory.add(messages, { userId: 'user-123' });
+// In tools — the agent just passes the fact/query, userId is automatic
+rememberFact({ fact: 'Prefers dark mode' })
+recallMemories({ query: 'preferences' })
 ```
 
 ## Complete Example
@@ -360,11 +357,10 @@ const memoryTools = createMem0Tools();
 const assistant = brain('personal-assistant')
   .withMemory(provider)
   .withOptionsSchema(z.object({
-    userId: z.string(),
     message: z.string(),
   }))
   .brain('Respond', async ({ memory, options }) => {
-    // Build system prompt with memory context
+    // Build system prompt with memory context (userId auto-scoped from currentUser)
     const system = await createMemorySystemPrompt(
       memory,
       `You are a personalized assistant. You remember user preferences and context.
@@ -372,7 +368,7 @@ const assistant = brain('personal-assistant')
 When the user shares preferences or important information, use rememberFact to store it.
 When you need context, use recallMemories to search your memory.`,
       'user preferences and context',
-      { userId: options.userId, limit: 10 }
+      { limit: 10 }
     );
 
     return {
@@ -396,8 +392,8 @@ const runner = new BrainRunner({
 });
 
 const result = await runner.run(assistant, {
+  currentUser: { id: 'user-123' },
   options: {
-    userId: 'user-123',
     message: 'I prefer dark mode and concise responses',
   },
 });

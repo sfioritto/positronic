@@ -44,8 +44,6 @@ export interface MemoryScope {
  * Search options for memory retrieval.
  */
 export interface MemorySearchOptions {
-  /** Optional user ID to scope the search */
-  userId?: string;
   /** Maximum number of memories to return */
   limit?: number;
 }
@@ -54,8 +52,6 @@ export interface MemorySearchOptions {
  * Options for adding memories.
  */
 export interface MemoryAddOptions {
-  /** Optional user ID to scope the memory */
-  userId?: string;
   /** Additional metadata to store with the memory */
   metadata?: Record<string, unknown>;
 }
@@ -95,15 +91,15 @@ export interface MemoryProvider {
 }
 
 /**
- * Scoped memory interface with agentId pre-bound.
- * This is what brain steps receive - they don't need to pass agentId.
+ * Scoped memory interface with agentId and userId pre-bound.
+ * This is what brain steps receive - they don't need to pass agentId or userId.
  */
 export interface ScopedMemory {
   /**
    * Search for relevant memories.
    *
    * @param query - The search query
-   * @param options - Optional search options (userId, limit)
+   * @param options - Optional search options (limit)
    * @returns Array of matching memories
    */
   search(query: string, options?: MemorySearchOptions): Promise<Memory[]>;
@@ -112,7 +108,7 @@ export interface ScopedMemory {
    * Add memories from messages.
    *
    * @param messages - Array of messages to extract memories from
-   * @param options - Optional options (userId, metadata)
+   * @param options - Optional options (metadata)
    */
   add(messages: MemoryMessage[], options?: MemoryAddOptions): Promise<void>;
 }

@@ -101,7 +101,7 @@ export interface CreateMemorySystemPromptOptions extends MemorySearchOptions {
  *       memory,
  *       'You are a helpful assistant.',
  *       'user preferences',
- *       { userId: 'user-123', memoriesHeader: '\n\nUser context:' }
+ *       { memoriesHeader: '\n\nUser context:' }
  *     );
  *
  *     return { system, prompt: 'Help me with my task' };
@@ -115,13 +115,12 @@ export async function createMemorySystemPrompt(
   options: CreateMemorySystemPromptOptions = {}
 ): Promise<string> {
   const {
-    userId,
     limit,
     memoriesHeader = '\n\nRelevant context from previous interactions:',
     includeScores = false,
   } = options;
 
-  const memories = await memory.search(query, { userId, limit });
+  const memories = await memory.search(query, { limit });
 
   if (memories.length === 0) {
     return basePrompt;
@@ -150,7 +149,6 @@ export async function createMemorySystemPrompt(
  * @example
  * ```typescript
  * const context = await getMemoryContext(memory, 'user preferences', {
- *   userId: 'user-123',
  *   limit: 5,
  * });
  *
