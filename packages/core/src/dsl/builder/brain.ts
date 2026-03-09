@@ -6,7 +6,7 @@ import type { WebhookRegistration, ExtractWebhookResponses, NormalizeToArray } f
 import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import type { MemoryProvider } from '../../memory/types.js';
-import type { StoreDefinition, StoreContext } from '../../store/types.js';
+import type { StoreSchema, InferStoreTypes, StoreContext, Store, StoreProvider } from '../../store/types.js';
 import type { JsonValue } from '../types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
@@ -33,7 +33,7 @@ export class Brain<
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool<any>>;
   private memoryProvider?: MemoryProvider;
-  private storeDefinition?: StoreDefinition<any>;
+  private storeSchema?: StoreSchema;
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -90,7 +90,7 @@ export class Brain<
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
     nextBrain.memoryProvider = this.memoryProvider;
-    nextBrain.storeDefinition = this.storeDefinition;
+    nextBrain.storeSchema = this.storeSchema;
 
     return nextBrain;
   }
@@ -108,7 +108,7 @@ export class Brain<
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
     nextBrain.memoryProvider = this.memoryProvider;
-    nextBrain.storeDefinition = this.storeDefinition;
+    nextBrain.storeSchema = this.storeSchema;
 
     return nextBrain;
   }
@@ -140,7 +140,7 @@ export class Brain<
     nextBrain.components = components;
     nextBrain.defaultTools = this.defaultTools;
     nextBrain.memoryProvider = this.memoryProvider;
-    nextBrain.storeDefinition = this.storeDefinition;
+    nextBrain.storeSchema = this.storeSchema;
 
     return nextBrain;
   }
@@ -205,17 +205,16 @@ export class Brain<
    * Configure a typed key-value store for this brain.
    * When configured, steps receive a `store` object in their context with typed get/set/delete/has.
    *
-   * @param store - The store definition created with `createStore()`
+   * @param fields - Store field definitions. Plain values are shared; `{ value, perUser: true }` are per-user scoped.
    *
    * @example
    * ```typescript
-   * const store = createStore({
-   *   deselectedThreads: [] as string[],
-   *   lastDigestDate: '',
-   * });
-   *
    * const myBrain = brain('email-digest')
-   *   .withStore(store)
+   *   .withStore({
+   *     deselectedThreads: [] as string[],
+   *     lastDigestDate: '',
+   *     theme: { value: 'light', perUser: true },
+   *   })
    *   .step('Process', async ({ store }) => {
    *     const deselected = await store.get('deselectedThreads');
    *     await store.set('deselectedThreads', [...deselected, 'new-id']);
@@ -223,10 +222,10 @@ export class Brain<
    *   });
    * ```
    */
-  withStore<T extends Record<string, JsonValue>>(
-    store: StoreDefinition<T>
-  ): Brain<TOptions, TState, TServices, TResponse, TPage, T> {
-    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, TPage, T>(
+  withStore<T extends StoreSchema>(
+    storeSchema: T
+  ): Brain<TOptions, TState, TServices, TResponse, TPage, InferStoreTypes<T>> {
+    const nextBrain = new Brain<TOptions, TState, TServices, TResponse, TPage, InferStoreTypes<T>>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -236,7 +235,7 @@ export class Brain<
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
     nextBrain.memoryProvider = this.memoryProvider;
-    nextBrain.storeDefinition = store;
+    nextBrain.storeSchema = storeSchema;
 
     return nextBrain;
   }
@@ -685,6 +684,11 @@ export class Brain<
       validatedOptions = {} as TOptions;
     }
 
+    // Build store if withStore() was called and a store provider is given
+    const store = this.storeSchema && params.storeProvider
+      ? params.storeProvider({ schema: this.storeSchema, brainTitle: this.title, currentUser: params.currentUser })
+      : undefined;
+
     const stream = new BrainEventStream({
       title,
       description,
@@ -695,7 +699,7 @@ export class Brain<
       components: this.components,
       defaultTools: this.defaultTools,
       memoryProvider: this.memoryProvider,
-      storeDefinition: this.storeDefinition,
+      store,
     });
 
     yield* stream.next();
@@ -729,8 +733,8 @@ export class Brain<
     nextBrain.defaultTools = this.defaultTools;
     // Copy memoryProvider to the next brain
     nextBrain.memoryProvider = this.memoryProvider;
-    // Copy storeDefinition to the next brain
-    nextBrain.storeDefinition = this.storeDefinition;
+    // Copy store schema to the next brain
+    nextBrain.storeSchema = this.storeSchema;
 
     return nextBrain;
   }

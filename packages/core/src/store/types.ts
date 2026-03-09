@@ -1,42 +1,58 @@
-import type { JsonValue } from '../dsl/types.js';
+import { z } from 'zod';
+import type { JsonValue, CurrentUser } from '../dsl/types.js';
 
 /**
- * What createStore() returns. Holds the default values for each key.
+ * Per-user field marker for store field definitions.
+ * Wraps a Zod type and marks the field as per-user scoped.
  */
-export interface StoreDefinition<T extends Record<string, JsonValue>> {
-  defaults: T;
+export interface PerUserField<T extends z.ZodType = z.ZodType> {
+  type: T;
+  perUser: true;
 }
 
 /**
- * Raw store provider interface.
- * Backends (R2, KV, in-memory) implement this.
- * All values are serialized as JSON.
+ * Store field definitions — the shape declaration for withStore().
+ * Values are either Zod types (shared) or { type: ZodType, perUser: true } (per-user).
  */
-export interface StoreProvider {
-  get(key: string): Promise<JsonValue | undefined>;
-  set(key: string, value: JsonValue): Promise<void>;
-  delete(key: string): Promise<void>;
-  has(key: string): Promise<boolean>;
-}
+export type StoreSchema = Record<string, z.ZodType | PerUserField<any>>;
 
 /**
- * Typed store interface that brain steps receive.
- * Keys are constrained to the store definition, and values are typed.
+ * Extract the value types from store field definitions.
+ * PerUserField<T> extracts z.infer<T>, plain ZodType extracts z.infer.
  */
-export interface TypedStore<T extends Record<string, JsonValue>> {
-  get<K extends keyof T & string>(key: K): Promise<T[K]>;
+export type InferStoreTypes<T extends StoreSchema> = {
+  [K in keyof T]: T[K] extends PerUserField<infer V> ? z.infer<V> : T[K] extends z.ZodType ? z.infer<T[K]> : never;
+};
+
+/**
+ * Unified store interface — used for both raw backends AND typed stores.
+ * Raw backend: Store<any> (string keys, any values)
+ * Typed store: Store<{counter: number, pref: string}> (constrained keys, typed values)
+ */
+export interface Store<T extends Record<string, JsonValue>> {
+  get<K extends keyof T & string>(key: K): Promise<T[K] | undefined>;
   set<K extends keyof T & string>(key: K, value: T[K]): Promise<void>;
   delete<K extends keyof T & string>(key: K): Promise<void>;
   has<K extends keyof T & string>(key: K): Promise<boolean>;
 }
 
 /**
+ * Factory function that creates a typed Store from a schema and runtime context.
+ * Backends implement this to handle persistence and key resolution.
+ */
+export type StoreProvider = (config: {
+  schema: StoreSchema;
+  brainTitle: string;
+  currentUser?: CurrentUser;
+}) => Store<any>;
+
+/**
  * Conditional type that adds `store` to step params only when withStore() is used.
  * When TStore is `never` (default), this resolves to `{}` — no store in params.
- * When TStore is a record type, this adds `{ store: TypedStore<TStore> }`.
+ * When TStore is a record type, this adds `{ store: Store<TStore> }`.
  */
 export type StoreContext<TStore> = [TStore] extends [never]
   ? {}
   : TStore extends Record<string, JsonValue>
-    ? { store: TypedStore<TStore> }
+    ? { store: Store<TStore> }
     : {};

@@ -1,42 +1,46 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { R2StoreProvider } from '../../src/r2-store-provider.js';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
+import { z } from 'zod';
+import { createR2Backend } from '../../src/create-r2-store.js';
+import type { Store } from '@positronic/core';
 
 interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  DB: D1Database;
   TEST_RESOURCES_BUCKET: R2Bucket;
 }
 
-describe('R2StoreProvider', () => {
+describe('createR2Backend', () => {
   const testEnv = env as TestEnv;
-  let store: R2StoreProvider;
 
   beforeEach(async () => {
-    store = new R2StoreProvider(testEnv.TEST_RESOURCES_BUCKET);
-
     // Clean up store keys from previous tests
-    const listed = await testEnv.TEST_RESOURCES_BUCKET.list({ prefix: 'store/' });
+    const listed = await testEnv.TEST_RESOURCES_BUCKET.list();
     for (const obj of listed.objects) {
-      await testEnv.TEST_RESOURCES_BUCKET.delete(obj.key);
+      if (obj.key.endsWith('.json')) {
+        await testEnv.TEST_RESOURCES_BUCKET.delete(obj.key);
+      }
     }
   });
 
+  function createStore(schema: Record<string, any> = { key: z.string() }, currentUser?: { id: string }): Store<any> {
+    const factory = createR2Backend(testEnv.TEST_RESOURCES_BUCKET);
+    return factory({ schema, brainTitle: 'test-brain', currentUser });
+  }
+
   it('should return undefined for a missing key', async () => {
-    const result = await store.get('nonexistent');
+    const store = createStore();
+    const result = await store.get('key');
     expect(result).toBeUndefined();
   });
 
   it('should set and get a string value', async () => {
+    const store = createStore({ name: z.string() });
     await store.set('name', 'test-value');
     const result = await store.get('name');
     expect(result).toBe('test-value');
   });
 
   it('should set and get an array value', async () => {
+    const store = createStore({ items: z.array(z.string()) });
     const items = ['a', 'b', 'c'];
     await store.set('items', items);
     const result = await store.get('items');
@@ -44,12 +48,14 @@ describe('R2StoreProvider', () => {
   });
 
   it('should set and get a number value', async () => {
+    const store = createStore({ count: z.number() });
     await store.set('count', 42);
     const result = await store.get('count');
     expect(result).toBe(42);
   });
 
   it('should set and get a nested object', async () => {
+    const store = createStore({ data: z.object({ nested: z.object({ key: z.string() }), list: z.array(z.number()) }) });
     const data = { nested: { key: 'value' }, list: [1, 2, 3] };
     await store.set('data', data);
     const result = await store.get('data');
@@ -57,6 +63,7 @@ describe('R2StoreProvider', () => {
   });
 
   it('should overwrite an existing value', async () => {
+    const store = createStore({ key: z.string() });
     await store.set('key', 'first');
     await store.set('key', 'second');
     const result = await store.get('key');
@@ -64,6 +71,7 @@ describe('R2StoreProvider', () => {
   });
 
   it('should delete a key', async () => {
+    const store = createStore({ key: z.string() });
     await store.set('key', 'value');
     expect(await store.has('key')).toBe(true);
 
@@ -73,37 +81,34 @@ describe('R2StoreProvider', () => {
   });
 
   it('should check if a key exists', async () => {
+    const store = createStore({ key: z.string() });
     expect(await store.has('key')).toBe(false);
 
     await store.set('key', 'value');
     expect(await store.has('key')).toBe(true);
   });
 
-  it('should store values at store/ prefix in R2', async () => {
+  it('should store shared keys at store/{brainTitle}/{key}.json in R2', async () => {
+    const store = createStore({ mykey: z.string() });
     await store.set('mykey', 'myvalue');
 
     // Verify the R2 object is at the expected path
-    const obj = await testEnv.TEST_RESOURCES_BUCKET.get('store/mykey.json');
+    const obj = await testEnv.TEST_RESOURCES_BUCKET.get('store/test-brain/mykey.json');
     expect(obj).not.toBeNull();
     const text = await obj!.text();
     expect(JSON.parse(text)).toBe('myvalue');
   });
 
-  it('should not interfere with non-store R2 objects', async () => {
-    // Put a resource object (non-store)
-    await testEnv.TEST_RESOURCES_BUCKET.put('resource.txt', 'hello', {
-      customMetadata: { type: 'text', path: 'resource.txt' },
-    });
+  it('should store per-user keys at store/{brainTitle}/user/{userId}/{key}.json in R2', async () => {
+    const store = createStore(
+      { pref: { type: z.string(), perUser: true } },
+      { id: 'user-42' }
+    );
+    await store.set('pref', 'dark');
 
-    // Store a value
-    await store.set('key', 'value');
-
-    // Verify resource is untouched
-    const resource = await testEnv.TEST_RESOURCES_BUCKET.get('resource.txt');
-    expect(resource).not.toBeNull();
-    expect(await resource!.text()).toBe('hello');
-
-    // Clean up
-    await testEnv.TEST_RESOURCES_BUCKET.delete('resource.txt');
+    const obj = await testEnv.TEST_RESOURCES_BUCKET.get('store/test-brain/user/user-42/pref.json');
+    expect(obj).not.toBeNull();
+    const text = await obj!.text();
+    expect(JSON.parse(text)).toBe('dark');
   });
 });
