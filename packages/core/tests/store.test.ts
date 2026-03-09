@@ -260,6 +260,48 @@ describe('Brain.withStore', () => {
     expect(storeFactory.data.get('store/test-brain/user/user-42/userPref')).toBe('dark');
   });
 
+  it('should isolate store data between different brains', async () => {
+    const storeFactory = createInMemoryStoreProvider();
+    const mockClient = createMockClient();
+
+    const brainA = brain('brain-a')
+      .withStore({ counter: z.number() })
+      .step('Set Counter', async ({ store }) => {
+        await store.set('counter', 100);
+        return { done: true };
+      });
+
+    const brainB = brain('brain-b')
+      .withStore({ counter: z.number() })
+      .step('Set Counter', async ({ store }) => {
+        await store.set('counter', 999);
+        return { done: true };
+      });
+
+    // Run both brains against the same backend
+    await collectEvents(
+      brainA.run({
+        client: mockClient,
+        currentUser: { id: 'test-user' },
+        resources: {} as any,
+        storeProvider: storeFactory,
+      })
+    );
+
+    await collectEvents(
+      brainB.run({
+        client: mockClient,
+        currentUser: { id: 'test-user' },
+        resources: {} as any,
+        storeProvider: storeFactory,
+      })
+    );
+
+    // Each brain's data is stored under its own namespace
+    expect(storeFactory.data.get('store/brain-a/counter')).toBe(100);
+    expect(storeFactory.data.get('store/brain-b/counter')).toBe(999);
+  });
+
   it('should work with store passed via createBrain', async () => {
     const { createBrain } = await import('../src/dsl/create-brain.js');
     const storeFactory = createInMemoryStoreProvider();
