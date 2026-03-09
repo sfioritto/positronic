@@ -111,4 +111,43 @@ describe('createR2Backend', () => {
     const text = await obj!.text();
     expect(JSON.parse(text)).toBe('dark');
   });
+
+  it('should isolate per-user data between different users', async () => {
+    const schema = { pref: { type: z.string(), perUser: true } };
+
+    const storeUserA = createStore(schema, { id: 'user-A' });
+    const storeUserB = createStore(schema, { id: 'user-B' });
+
+    await storeUserA.set('pref', 'dark');
+    await storeUserB.set('pref', 'light');
+
+    expect(await storeUserA.get('pref')).toBe('dark');
+    expect(await storeUserB.get('pref')).toBe('light');
+  });
+
+  it('should share non-per-user data across users', async () => {
+    const schema = {
+      globalConfig: z.string(),
+      userPref: { type: z.string(), perUser: true },
+    };
+
+    const storeUserA = createStore(schema, { id: 'user-A' });
+    const storeUserB = createStore(schema, { id: 'user-B' });
+
+    await storeUserA.set('globalConfig', 'v2');
+    await storeUserA.set('userPref', 'dark');
+
+    // User B sees the shared config but not user A's preference
+    expect(await storeUserB.get('globalConfig')).toBe('v2');
+    expect(await storeUserB.get('userPref')).toBeUndefined();
+  });
+
+  it('should throw when accessing per-user key without currentUser', async () => {
+    const store = createStore(
+      { pref: { type: z.string(), perUser: true } }
+      // no currentUser
+    );
+
+    await expect(store.get('pref')).rejects.toThrow(/per-user but no currentUser/);
+  });
 });
