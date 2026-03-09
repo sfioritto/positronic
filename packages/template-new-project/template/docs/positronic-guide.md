@@ -232,9 +232,60 @@ const api = {
 };
 ```
 
+## currentUser
+
+Every brain run requires a `currentUser` — an object with at least an `id` field that identifies who is running the brain. This identity is used to scope per-user data like memory and store fields.
+
+### How currentUser Gets Set
+
+The way `currentUser` is provided depends on how the brain is running:
+
+**Deployed (Cloudflare / production)**: The backend sets `currentUser` from the authenticated request. When a user hits an API endpoint to start a brain run, the auth middleware determines their identity and passes it through. You don't need to set it manually.
+
+**Local development with `px brain run`**: The CLI passes a default user identity automatically. You don't need to do anything special.
+
+**Local development with `runner.ts`**: When calling `runner.run()` directly, you must pass `currentUser`:
+
+```typescript
+import { runner } from './runner.js';
+import myBrain from './brains/my-brain.js';
+
+await runner.run(myBrain, {
+  currentUser: { id: 'local-dev-user' },
+});
+```
+
+**In tests**: Pass `currentUser` when running the brain:
+
+```typescript
+const events = await collectEvents(
+  testBrain.run({
+    client: mockClient,
+    currentUser: { id: 'test-user' },
+  })
+);
+```
+
+### What currentUser Scopes
+
+- **Memory**: All memory operations (search, add) are automatically scoped to the current user. No need to pass `userId` manually — see [docs/memory-guide.md](memory-guide.md).
+- **Store (per-user fields)**: Store fields marked with `perUser: true` are automatically scoped to the current user — see [docs/brain-dsl-guide.md](brain-dsl-guide.md).
+
+### Accessing currentUser in Steps
+
+`currentUser` is available in step context if you need it:
+
+```typescript
+export default brain('greet')
+  .step('Hello', ({ currentUser }) => ({
+    greeting: 'Hello, user ' + currentUser.id,
+  }));
+```
+
 ## Getting Help
 
 - **Documentation**: https://positronic.dev
 - **CLI Help**: `px --help`
 - **Brain DSL Guide**: `/docs/brain-dsl-guide.md` (includes UI steps for generating forms)
+- **Memory Guide**: `/docs/memory-guide.md`
 - **Testing Guide**: `/docs/brain-testing-guide.md`
