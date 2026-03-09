@@ -502,6 +502,13 @@ brains.post('/schedules', async (context: Context) => {
     const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
     const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
+    // Require authentication — scheduled runs will execute as this user
+    const auth = context.get('auth');
+    if (!auth?.userId && !auth?.isRoot) {
+      return context.json({ error: 'Authentication required to create a schedule' }, 401);
+    }
+    const runAsUserId = auth.userId || 'root';
+
     // Determine timezone: use provided value, fall back to project timezone
     let timezone = body.timezone;
     if (!timezone) {
@@ -518,7 +525,8 @@ brains.post('/schedules', async (context: Context) => {
     const schedule = await scheduleStub.createSchedule(
       brainTitle,
       cronExpression,
-      timezone
+      timezone,
+      runAsUserId
     );
     return context.json(schedule, 201);
   } catch (error) {

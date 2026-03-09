@@ -713,6 +713,7 @@ describe('Hono API Tests', () => {
         cronExpression: string;
         enabled: boolean;
         createdAt: number;
+        runAsUserId: string;
       }>();
 
       expect(responseBody.id).toBeDefined();
@@ -720,6 +721,8 @@ describe('Hono API Tests', () => {
       expect(responseBody.cronExpression).toBe(cronExpression);
       expect(responseBody.enabled).toBe(true);
       expect(responseBody.createdAt).toBeDefined();
+      // Root key auth sets userId to null, so runAsUserId falls back to 'root'
+      expect(responseBody.runAsUserId).toBe('root');
     });
 
     it('GET /brains/schedules lists all schedules', async () => {
@@ -759,12 +762,18 @@ describe('Hono API Tests', () => {
           cronExpression: string;
           enabled: boolean;
           createdAt: number;
+          runAsUserId: string;
         }>;
         count: number;
       }>();
 
       expect(responseBody.schedules).toBeInstanceOf(Array);
       expect(responseBody.count).toBeGreaterThanOrEqual(3);
+
+      // Verify each schedule has a runAsUserId
+      for (const schedule of responseBody.schedules) {
+        expect(schedule.runAsUserId).toBeDefined();
+      }
     });
 
     it('DELETE /brains/schedules/:scheduleId deletes a schedule', async () => {

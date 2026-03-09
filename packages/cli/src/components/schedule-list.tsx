@@ -15,6 +15,7 @@ interface Schedule {
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
+  runAsUserId: string;
 }
 
 interface SchedulesResponse {
@@ -114,6 +115,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
     brainTitle: { header: 'Brain Title', width: 20 },
     schedule: { header: 'Schedule', width: 15 },
     status: { header: 'Status', width: 10 },
+    runAs: { header: 'Run As', width: 14 },
     timezone: { header: 'Timezone', width: 18 },
     nextRun: { header: 'Next Run', width: 12 },
     created: { header: 'Created', width: 20 },
@@ -140,6 +142,8 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
           <Text bold color="cyan">{padRight(columns.schedule.header, columns.schedule.width)}</Text>
           <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.status.header, columns.status.width)}</Text>
+          <Text>  </Text>
+          <Text bold color="cyan">{padRight(columns.runAs.header, columns.runAs.width)}</Text>
           <Text>  </Text>
           <Text bold color="cyan">{padRight(columns.timezone.header, columns.timezone.width)}</Text>
           <Text>  </Text>
@@ -170,6 +174,8 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
               <Text color={schedule.enabled ? 'green' : 'red'}>
                 {padRight(schedule.enabled ? 'Enabled' : 'Disabled', columns.status.width)}
               </Text>
+              <Text>  </Text>
+              <Text dimColor>{padRight(truncate(schedule.runAsUserId, columns.runAs.width), columns.runAs.width)}</Text>
               <Text>  </Text>
               <Text dimColor>{padRight(truncate(schedule.timezone || 'UTC', columns.timezone.width), columns.timezone.width)}</Text>
               <Text>  </Text>
