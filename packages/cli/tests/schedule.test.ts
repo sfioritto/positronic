@@ -129,6 +129,7 @@ describe('schedule command', () => {
         enabled: true,
         createdAt: Date.now() - 86400000, // 1 day ago
         nextRunAt: Date.now() + 3600000, // 1 hour from now
+        runAsUserId: 'user-alice',
       });
       server.addSchedule({
         id: 'schedule-2',
@@ -137,6 +138,7 @@ describe('schedule command', () => {
         enabled: true,
         createdAt: Date.now() - 172800000, // 2 days ago
         nextRunAt: Date.now() + 1800000, // 30 mins from now
+        runAsUserId: 'user-bob',
       });
 
       const px = await env.start();
@@ -154,6 +156,10 @@ describe('schedule command', () => {
         expect(output).toContain('hourly-sync');
         expect(output).toContain('0 9 * * *');
         expect(output).toContain('0 * * * *');
+
+        // Verify runAsUserId appears in list output (may be truncated by column width)
+        expect(output).toMatch(/user-ali/);
+        expect(output).toMatch(/user-bob/);
 
         // Verify API call was made
         const calls = server.getLogs();

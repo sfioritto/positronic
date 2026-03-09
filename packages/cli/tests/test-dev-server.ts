@@ -93,6 +93,7 @@ interface MockSchedule {
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
+  runAsUserId?: string;
 }
 
 interface MockScheduleRun {
@@ -978,6 +979,7 @@ export class TestDevServer implements PositronicDevServer {
       const schedules = Array.from(this.schedules.values()).map((s) => ({
         ...s,
         timezone: s.timezone || 'UTC',
+        runAsUserId: s.runAsUserId || 'test-user',
       }));
       this.logCall('getSchedules', []);
       return {
@@ -1004,6 +1006,7 @@ export class TestDevServer implements PositronicDevServer {
         enabled: true,
         createdAt: Date.now(),
         nextRunAt: Date.now() + 3600000, // 1 hour from now
+        runAsUserId: 'test-user',
       };
       this.schedules.set(scheduleId, schedule);
       this.logCall('createSchedule', [body]);

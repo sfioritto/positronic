@@ -40,6 +40,7 @@ export const schedules = {
         timezone: string;
         enabled: boolean;
         createdAt: number;
+        runAsUserId: string;
       };
 
       // Validate response structure
@@ -103,6 +104,7 @@ export const schedules = {
           timezone: string;
           enabled: boolean;
           createdAt: number;
+          runAsUserId: string;
         }>;
         count: number;
       };

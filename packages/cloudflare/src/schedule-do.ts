@@ -18,6 +18,7 @@ interface Schedule {
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
+  runAsUserId: string;
 }
 
 interface ScheduledRun {
@@ -47,7 +48,8 @@ export class ScheduleDO extends DurableObject<Env> {
         cron_expression TEXT NOT NULL,
         enabled INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL,
-        next_run_at INTEGER
+        next_run_at INTEGER,
+        run_as_user_id TEXT NOT NULL
       );
 
       CREATE INDEX IF NOT EXISTS idx_schedules_brain
@@ -77,12 +79,14 @@ export class ScheduleDO extends DurableObject<Env> {
     } catch {
       // Column already exists
     }
+
   }
 
   async createSchedule(
     brainTitle: string,
     cronExpression: string,
-    timezone: string = 'UTC'
+    timezone: string = 'UTC',
+    runAsUserId: string
   ): Promise<Schedule> {
     const id = uuidv4();
     const createdAt = Date.now();
@@ -97,14 +101,15 @@ export class ScheduleDO extends DurableObject<Env> {
     const nextRunAt = this.calculateNextRunTime(cronExpression, createdAt, timezone);
 
     this.storage.exec(
-      `INSERT INTO schedules (id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO schedules (id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at, run_as_user_id)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
       id,
       brainTitle,
       cronExpression,
       timezone,
       createdAt,
-      nextRunAt
+      nextRunAt,
+      runAsUserId
     );
 
     return {
@@ -115,13 +120,14 @@ export class ScheduleDO extends DurableObject<Env> {
       enabled: true,
       createdAt,
       nextRunAt,
+      runAsUserId,
     };
   }
 
   async getSchedule(scheduleId: string): Promise<Schedule | null> {
     const results = this.storage
       .exec(
-        `SELECT id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at
+        `SELECT id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at, run_as_user_id
          FROM schedules WHERE id = ?`,
         scheduleId
       )
@@ -141,6 +147,7 @@ export class ScheduleDO extends DurableObject<Env> {
       enabled: result.enabled === 1,
       createdAt: result.created_at as number,
       nextRunAt: result.next_run_at as number | undefined,
+      runAsUserId: result.run_as_user_id as string,
     };
   }
 
@@ -170,7 +177,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
     const schedules = this.storage
       .exec(
-        `SELECT id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at
+        `SELECT id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at, run_as_user_id
          FROM schedules
          ORDER BY created_at DESC`
       )
@@ -183,6 +190,7 @@ export class ScheduleDO extends DurableObject<Env> {
         enabled: row.enabled === 1,
         createdAt: row.created_at as number,
         nextRunAt: row.next_run_at as number | undefined,
+        runAsUserId: row.run_as_user_id as string,
       }));
 
     return {
@@ -249,7 +257,7 @@ export class ScheduleDO extends DurableObject<Env> {
 
       const dueSchedules = this.storage
         .exec(
-          `SELECT id, brain_title, cron_expression, timezone
+          `SELECT id, brain_title, cron_expression, timezone, run_as_user_id
            FROM schedules
            WHERE enabled = 1 AND next_run_at <= ?`,
           now
@@ -261,10 +269,11 @@ export class ScheduleDO extends DurableObject<Env> {
         const scheduleId = schedule.id as string;
         const brainTitle = schedule.brain_title as string;
         const cronExpression = schedule.cron_expression as string;
+        const runAsUserId = schedule.run_as_user_id as string;
 
         try {
-          // Trigger the brain run
-          const brainRunId = await this.triggerBrainRun(brainTitle);
+          // Trigger the brain run as the user who created the schedule
+          const brainRunId = await this.triggerBrainRun(brainTitle, runAsUserId);
 
           // Record successful run
           this.storage.exec(
@@ -313,17 +322,15 @@ export class ScheduleDO extends DurableObject<Env> {
     }
   }
 
-  private async triggerBrainRun(brainTitle: string): Promise<string> {
+  private async triggerBrainRun(brainTitle: string, runAsUserId: string): Promise<string> {
     const brainRunId = uuidv4();
     const namespace = this.env.BRAIN_RUNNER_DO;
     const doId = namespace.idFromName(brainRunId);
     const stub = namespace.get(doId);
     console.log(
-      `[ScheduleDO] Triggering brain run ${brainTitle} with id ${brainRunId}`
+      `[ScheduleDO] Triggering brain run ${brainTitle} with id ${brainRunId} as user ${runAsUserId}`
     );
-    // TODO: Phase 4 will add run_as_user_id to schedules so each scheduled run
-    // is owned by the user who created the schedule. For now, use 'system'.
-    await stub.start(brainTitle, brainRunId, { id: 'system' });
+    await stub.start(brainTitle, brainRunId, { id: runAsUserId });
 
     return brainRunId;
   }
