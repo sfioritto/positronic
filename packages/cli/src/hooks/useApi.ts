@@ -16,6 +16,12 @@ const AUTH_REQUIRED_ERROR: ErrorObject = {
   details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
 };
 
+const ROOT_ACCESS_REQUIRED_ERROR: ErrorObject = {
+  title: 'Root Access Required',
+  message: 'This operation requires root access.',
+  details: 'You are authenticated as a regular user. This command can only be run with a root key.',
+};
+
 function getConnectionErrorMessage(): ErrorObject {
   if (isApiLocalDevMode()) {
     return {
@@ -96,6 +102,8 @@ export function useApiGet<T>(endpoint: string, options?: any) {
         if (response.status === 200) {
           const result = (await response.json()) as T;
           setData(result);
+        } else if (response.status === 403) {
+          setError(ROOT_ACCESS_REQUIRED_ERROR);
         } else if (response.status === 401) {
           setError(await buildAuthError(response));
         } else {
@@ -155,6 +163,9 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
           const result = (await response.json()) as T;
           setData(result);
           return result;
+        } else if (response.status === 403) {
+          setError(ROOT_ACCESS_REQUIRED_ERROR);
+          throw ROOT_ACCESS_REQUIRED_ERROR;
         } else if (response.status === 401) {
           const errorObj = await buildAuthError(response);
           setError(errorObj);
@@ -220,6 +231,9 @@ export function useApiDelete(resourceType: string) {
 
         if (response.status === 204 || response.status === 200) {
           return true;
+        } else if (response.status === 403) {
+          setError(ROOT_ACCESS_REQUIRED_ERROR);
+          throw ROOT_ACCESS_REQUIRED_ERROR;
         } else if (response.status === 401) {
           const errorObj = await buildAuthError(response);
           setError(errorObj);
