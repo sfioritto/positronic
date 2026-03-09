@@ -642,6 +642,101 @@ const brainWithComponents = brain('Custom UI Brain')
   });
 ```
 
+### Typed Store with `withStore()`
+
+The `withStore()` method declares a typed key-value store for persistent structured data. Unlike brain state (which resets each run), store data persists across runs.
+
+#### Declaring Store Shape
+
+Use Zod types to declare the shape of your store. All store keys are scoped per-brain — each brain gets its own namespace automatically.
+
+```typescript
+import { z } from 'zod';
+
+const myBrain = brain('email-preferences')
+  .withStore({
+    deselectedThreads: z.array(z.string()),
+    lastProcessedAt: z.number(),
+  })
+  .step('Process', async ({ store }) => {
+    // Typed get — returns the value or undefined if not set
+    const deselected = await store.get('deselectedThreads') ?? [];
+    const lastTime = await store.get('lastProcessedAt');
+
+    // Typed set
+    await store.set('lastProcessedAt', Date.now());
+
+    return { deselected, lastTime };
+  });
+```
+
+#### Per-User Fields
+
+Mark fields as per-user to scope them to the current user. This is useful for user preferences, user-specific state, or any data that should be isolated between users.
+
+```typescript
+const myBrain = brain('dashboard')
+  .withStore({
+    globalConfig: z.object({ theme: z.string() }),           // shared across all users
+    userPreferences: { type: z.object({ darkMode: z.boolean() }), perUser: true },  // per-user
+  })
+  .step('Load Preferences', async ({ store }) => {
+    const config = await store.get('globalConfig');
+    const prefs = await store.get('userPreferences');  // scoped to currentUser automatically
+    return { config, prefs };
+  });
+```
+
+Per-user fields require a `currentUser` to be set when running the brain. If a per-user field is accessed without a current user, an error is thrown.
+
+#### Store Scoping
+
+All store keys are automatically namespaced:
+
+- **Shared fields**: scoped per-brain (e.g., brain "my-brain" key "counter" is isolated from brain "other-brain" key "counter")
+- **Per-user fields**: scoped per-brain AND per-user (each user gets their own value)
+
+There is no global scope — every field belongs to a specific brain.
+
+#### Store Operations
+
+The store provides four operations:
+
+```typescript
+await store.get('key');     // Returns T | undefined
+await store.set('key', value);  // Sets the value
+await store.delete('key');  // Removes the key
+await store.has('key');     // Returns boolean
+```
+
+#### Using with `createBrain()`
+
+You can declare store fields at the project level so all brains share the same store shape:
+
+```typescript
+// brain.ts
+export const brain = createBrain({
+  services: { slack },
+  store: {
+    processedCount: z.number(),
+    userSettings: { type: z.object({ notifications: z.boolean() }), perUser: true },
+  },
+});
+```
+
+Or declare per-brain stores for brain-specific data:
+
+```typescript
+// brains/my-brain.ts
+export default brain('my-brain')
+  .withStore({ counter: z.number() })
+  .step('Increment', async ({ store }) => {
+    const count = await store.get('counter') ?? 0;
+    await store.set('counter', count + 1);
+    return { count: count + 1 };
+  });
+```
+
 ### Using `createBrain()` for Project Configuration
 
 For project-wide configuration, use `createBrain()` in your `brain.ts` file:
@@ -669,11 +764,14 @@ export const brain = createBrain({
       props: z.object({ message: z.string(), type: z.enum(['info', 'warning', 'error']) }),
       render: (props) => `<div class="alert alert-<%= '${props.type}' %>"><%= '${props.message}' %></div>`
     }
+  },
+  store: {
+    processedCount: z.number(),
   }
 });
 ```
 
-All brains created with this factory will have access to the configured services, tools, and components.
+All brains created with this factory will have access to the configured services, tools, components, and store.
 
 ## Running Brains
 
