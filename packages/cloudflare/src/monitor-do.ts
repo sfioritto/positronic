@@ -330,9 +330,10 @@ export class MonitorDO extends DurableObject<Env> {
 
   /**
    * Get detailed information about a specific brain run
-   * Returns null if run not found
+   * Returns null if run not found or not owned by userId
+   * Pass null for userId to skip ownership check (root access)
    */
-  getRun(brainRunId: string) {
+  getRun(brainRunId: string, userId: string | null = null) {
     const results = this.storage
       .exec(
         `
@@ -350,8 +351,11 @@ export class MonitorDO extends DurableObject<Env> {
         user_id as userId
       FROM brain_runs
       WHERE run_id = ?
+        AND (? IS NULL OR user_id = ?)
     `,
-        brainRunId
+        brainRunId,
+        userId,
+        userId
       )
       .toArray();
 
@@ -369,10 +373,11 @@ export class MonitorDO extends DurableObject<Env> {
     };
   }
 
-  // Update history method parameter and query
-  history(brainTitle: string, limit: number = 10) {
-    // Renamed parameter
-    // Update select query with aliases and filter by brain_title
+  /**
+   * Get run history for a brain.
+   * Pass null for userId to skip ownership filter (root access).
+   */
+  history(brainTitle: string, limit: number = 10, userId: string | null = null) {
     return this.storage
       .exec(
         `
@@ -390,17 +395,23 @@ export class MonitorDO extends DurableObject<Env> {
         user_id as userId
       FROM brain_runs
       WHERE brain_title = ?
+        AND (? IS NULL OR user_id = ?)
       ORDER BY created_at DESC
       LIMIT ?
     `,
         brainTitle,
+        userId,
+        userId,
         limit
       )
       .toArray();
   }
 
-  // Get active brain runs for a specific brain (running, paused, or waiting)
-  activeRuns(brainTitle: string) {
+  /**
+   * Get active brain runs for a specific brain (running, paused, or waiting).
+   * Pass null for userId to skip ownership filter (root access).
+   */
+  activeRuns(brainTitle: string, userId: string | null = null) {
     return this.storage
       .exec(
         `
@@ -418,12 +429,15 @@ export class MonitorDO extends DurableObject<Env> {
         user_id as userId
       FROM brain_runs
       WHERE brain_title = ? AND status IN (?, ?, ?)
+        AND (? IS NULL OR user_id = ?)
       ORDER BY created_at DESC
     `,
         brainTitle,
         STATUS.RUNNING,
         STATUS.PAUSED,
-        STATUS.WAITING
+        STATUS.WAITING,
+        userId,
+        userId
       )
       .toArray();
   }

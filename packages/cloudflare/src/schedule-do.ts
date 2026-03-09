@@ -163,7 +163,10 @@ export class ScheduleDO extends DurableObject<Env> {
     return true;
   }
 
-  async listSchedules(): Promise<{ schedules: Schedule[]; count: number }> {
+  /**
+   * List all schedules. Pass null for userId to skip ownership filter (root access).
+   */
+  async listSchedules(userId: string | null = null): Promise<{ schedules: Schedule[]; count: number }> {
     if (this.env.NODE_ENV === 'development') {
       console.log('[ScheduleDO] Checking alarm');
       const alarm = await this.ctx.storage.getAlarm();
@@ -179,7 +182,10 @@ export class ScheduleDO extends DurableObject<Env> {
       .exec(
         `SELECT id, brain_title, cron_expression, timezone, enabled, created_at, next_run_at, run_as_user_id
          FROM schedules
-         ORDER BY created_at DESC`
+         WHERE (? IS NULL OR run_as_user_id = ?)
+         ORDER BY created_at DESC`,
+        userId,
+        userId
       )
       .toArray()
       .map((row) => ({
@@ -199,22 +205,32 @@ export class ScheduleDO extends DurableObject<Env> {
     };
   }
 
+  /**
+   * Get all scheduled runs. Pass null for userId to skip ownership filter (root access).
+   * When userId is set, only returns runs for schedules owned by that user.
+   */
   async getAllRuns(
     scheduleId?: string,
-    limit: number = 100
+    limit: number = 100,
+    userId: string | null = null
   ): Promise<{ runs: ScheduledRun[]; count: number }> {
     let query = `
-      SELECT id, schedule_id, brain_run_id, status, ran_at, completed_at, error
-      FROM scheduled_runs
+      SELECT sr.id, sr.schedule_id, sr.brain_run_id, sr.status, sr.ran_at, sr.completed_at, sr.error
+      FROM scheduled_runs sr
+      JOIN schedules s ON sr.schedule_id = s.id
+      WHERE 1=1
     `;
     const params: any[] = [];
 
     if (scheduleId) {
-      query += ` WHERE schedule_id = ?`;
+      query += ` AND sr.schedule_id = ?`;
       params.push(scheduleId);
     }
 
-    query += ` ORDER BY ran_at DESC LIMIT ?`;
+    query += ` AND (? IS NULL OR s.run_as_user_id = ?)`;
+    params.push(userId, userId);
+
+    query += ` ORDER BY sr.ran_at DESC LIMIT ?`;
     params.push(limit);
 
     const runs = this.storage
@@ -231,13 +247,21 @@ export class ScheduleDO extends DurableObject<Env> {
       }));
 
     // Get total count
-    let countQuery = `SELECT COUNT(*) as count FROM scheduled_runs`;
+    let countQuery = `
+      SELECT COUNT(*) as count
+      FROM scheduled_runs sr
+      JOIN schedules s ON sr.schedule_id = s.id
+      WHERE 1=1
+    `;
     const countParams: any[] = [];
 
     if (scheduleId) {
-      countQuery += ` WHERE schedule_id = ?`;
+      countQuery += ` AND sr.schedule_id = ?`;
       countParams.push(scheduleId);
     }
+
+    countQuery += ` AND (? IS NULL OR s.run_as_user_id = ?)`;
+    countParams.push(userId, userId);
 
     const countResult = this.storage.exec(countQuery, ...countParams).one();
     const count = (countResult?.count as number) || 0;
