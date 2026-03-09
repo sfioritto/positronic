@@ -8,6 +8,20 @@ export interface AuthContext {
   isRoot: boolean;
 }
 
+/**
+ * Middleware that restricts access to root users only.
+ * Returns 403 if the authenticated user is not root.
+ */
+export function requireRoot(): MiddlewareHandler {
+  return async (c, next) => {
+    const auth = c.get('auth');
+    if (!auth?.isRoot) {
+      return c.json({ error: 'Root access required' }, 403);
+    }
+    return next();
+  };
+}
+
 // Extend the Hono context to include auth info
 declare module 'hono' {
   interface ContextVariableMap {

@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import type { Bindings } from './types.js';
+import { requireRoot } from './auth-middleware.js';
 
 type CloudflareSecretResponse = {
   result: Array<{
@@ -49,6 +50,9 @@ async function cloudflareSecretsApi(
 }
 
 const secrets = new Hono<{ Bindings: Bindings }>();
+
+// Only root users can manage secrets
+secrets.use('*', requireRoot());
 
 // Protected secret name that cannot be managed via the API
 const PROTECTED_SECRET = 'ROOT_PUBLIC_KEY';
