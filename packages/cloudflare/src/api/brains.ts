@@ -8,6 +8,16 @@ import type { Bindings, CreateBrainRunRequest, CreateBrainRunResponse } from './
 
 const brains = new Hono<{ Bindings: Bindings }>();
 
+/**
+ * Get the userId for ownership filtering from the auth context.
+ * Root users get null (no filter — sees everything).
+ * Non-root users get their userId (sees only their own).
+ */
+function scopeUserId(context: Context): string | null {
+  const auth = context.get('auth');
+  return auth?.isRoot ? null : auth?.userId ?? null;
+}
+
 brains.post('/runs', async (context: Context) => {
   const requestBody = await context.req.json<CreateBrainRunRequest & { identifier?: string }>();
   const { options } = requestBody;
@@ -152,10 +162,11 @@ brains.get('/runs/:runId/watch', async (context: Context) => {
 
 brains.get('/runs/:runId', async (context: Context) => {
   const runId = context.req.param('runId');
+  const userId = scopeUserId(context);
 
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
-  const run = await monitorStub.getRun(runId);
+  const run = await monitorStub.getRun(runId, userId);
 
   if (!run) {
     return context.json({ error: `Brain run '${runId}' not found` }, 404);
@@ -306,7 +317,8 @@ brains.get('/:identifier/history', async (context: Context) => {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
 
-  const runs = await monitorStub.history(brainTitle, limit);
+  const userId = scopeUserId(context);
+  const runs = await monitorStub.history(brainTitle, limit, userId);
   return context.json({ runs });
 });
 
@@ -340,7 +352,8 @@ brains.get('/:identifier/active-runs', async (context: Context) => {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
 
-  const runs = await monitorStub.activeRuns(brainTitle);
+  const userId = scopeUserId(context);
+  const runs = await monitorStub.activeRuns(brainTitle, userId);
   return context.json({ runs });
 });
 
@@ -541,7 +554,8 @@ brains.get('/schedules', async (context: Context) => {
   const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
   const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId);
 
-  const result = await scheduleStub.listSchedules();
+  const userId = scopeUserId(context);
+  const result = await scheduleStub.listSchedules(userId);
   return context.json(result);
 });
 
@@ -553,7 +567,8 @@ brains.get('/schedules/runs', async (context: Context) => {
   const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
   const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
-  const result = await scheduleStub.getAllRuns(scheduleIdParam, limit);
+  const userId = scopeUserId(context);
+  const result = await scheduleStub.getAllRuns(scheduleIdParam, limit, userId);
   return context.json(result);
 });
 
