@@ -96,9 +96,10 @@ describe('Memory Tools Integration', () => {
         { role: 'assistant', content: 'User prefers dark mode' },
       ]);
       expect(addCalls[0].scope.agentId).toBe('test-remember');
+      expect(addCalls[0].scope.userId).toBe('test-user');
     });
 
-    it('passes userId to provider when specified', async () => {
+    it('auto-scopes userId from currentUser', async () => {
       const provider = createMockProvider();
 
       mockGenerateText
@@ -108,7 +109,7 @@ describe('Memory Tools Integration', () => {
             {
               toolCallId: 'call-1',
               toolName: 'rememberFact',
-              args: { fact: 'User likes TypeScript', userId: 'user-123' },
+              args: { fact: 'User likes TypeScript' },
             },
           ],
           usage: { totalTokens: 50 },
@@ -145,7 +146,7 @@ describe('Memory Tools Integration', () => {
 
       const addCalls = provider.getAddCalls();
       expect(addCalls).toHaveLength(1);
-      expect(addCalls[0].scope.userId).toBe('user-123');
+      expect(addCalls[0].scope.userId).toBe('test-user');
     });
 
     it('returns remembered: false when memory is not configured', async () => {
@@ -265,6 +266,7 @@ describe('Memory Tools Integration', () => {
       expect(searchCalls).toHaveLength(1);
       expect(searchCalls[0].query).toBe('user preferences');
       expect(searchCalls[0].scope.agentId).toBe('test-recall');
+      expect(searchCalls[0].scope.userId).toBe('test-user');
 
       // Verify tool result contains the memories
       const toolResultEvent = events.find(
@@ -395,6 +397,7 @@ describe('Mem0 Adapter Integration', () => {
     const lastCall = addCalls[addCalls.length - 1];
     expect(lastCall.messages.some((m) => m.role === 'user')).toBe(true);
     expect(lastCall.scope.agentId).toBe('Help User');
+    expect(lastCall.scope.userId).toBe('test-user');
   });
 
   it('does not index when brain errors', async () => {

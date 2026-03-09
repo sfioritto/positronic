@@ -1,6 +1,7 @@
 import type {
   Adapter,
   BrainEvent,
+  BrainStartEvent,
   MemoryProvider,
   MemoryMessage,
 } from '@positronic/core';
@@ -24,6 +25,7 @@ export interface Mem0AdapterConfig {
  */
 interface ConversationBuffer {
   agentId: string;
+  userId?: string;
   messages: MemoryMessage[];
 }
 
@@ -63,12 +65,30 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
     async dispatch(event: BrainEvent): Promise<void> {
       const brainRunId = event.brainRunId;
 
+      // Handle START - capture currentUser for later use in scope
+      if (event.type === BRAIN_EVENTS.START) {
+        const startEvent = event as BrainStartEvent;
+        const existing = buffers.get(brainRunId);
+        if (existing) {
+          existing.userId = startEvent.currentUser.id;
+        } else {
+          buffers.set(brainRunId, {
+            agentId: '',
+            userId: startEvent.currentUser.id,
+            messages: [],
+          });
+        }
+      }
+
       // Handle AGENT_START - initialize buffer for this run
       if (event.type === BRAIN_EVENTS.AGENT_START) {
         const agentId = event.stepTitle; // Use step title as agentId
 
-        // Initialize buffer if not exists
-        if (!buffers.has(brainRunId)) {
+        // Initialize or update buffer
+        const existing = buffers.get(brainRunId);
+        if (existing) {
+          existing.agentId = agentId;
+        } else {
           buffers.set(brainRunId, {
             agentId,
             messages: [],
@@ -158,6 +178,7 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
     try {
       await provider.add(buffer.messages, {
         agentId: buffer.agentId,
+        userId: buffer.userId,
       });
     } finally {
       buffers.delete(brainRunId);

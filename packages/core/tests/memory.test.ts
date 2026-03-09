@@ -29,7 +29,7 @@ const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
 });
 
 describe('createScopedMemory', () => {
-  it('should bind agentId to search calls', async () => {
+  it('should bind agentId and userId to search calls', async () => {
     const mockProvider = createMockProvider();
     const testMemories: Memory[] = [
       { id: '1', content: 'Test memory 1', score: 0.9 },
@@ -37,22 +37,22 @@ describe('createScopedMemory', () => {
     ];
     mockProvider.search.mockResolvedValue(testMemories);
 
-    const scopedMemory = createScopedMemory(mockProvider, 'my-brain');
+    const scopedMemory = createScopedMemory(mockProvider, 'my-brain', 'user-123');
     const result = await scopedMemory.search('test query');
 
     expect(mockProvider.search).toHaveBeenCalledWith(
       'test query',
-      { agentId: 'my-brain', userId: undefined },
+      { agentId: 'my-brain', userId: 'user-123' },
       { limit: undefined }
     );
     expect(result).toEqual(testMemories);
   });
 
-  it('should pass userId and limit to search calls', async () => {
+  it('should pass limit to search calls', async () => {
     const mockProvider = createMockProvider();
-    const scopedMemory = createScopedMemory(mockProvider, 'my-brain');
+    const scopedMemory = createScopedMemory(mockProvider, 'my-brain', 'user-123');
 
-    await scopedMemory.search('test query', { userId: 'user-123', limit: 5 });
+    await scopedMemory.search('test query', { limit: 5 });
 
     expect(mockProvider.search).toHaveBeenCalledWith(
       'test query',
@@ -61,9 +61,9 @@ describe('createScopedMemory', () => {
     );
   });
 
-  it('should bind agentId to add calls', async () => {
+  it('should bind agentId and userId to add calls', async () => {
     const mockProvider = createMockProvider();
-    const scopedMemory = createScopedMemory(mockProvider, 'my-brain');
+    const scopedMemory = createScopedMemory(mockProvider, 'my-brain', 'user-123');
 
     const messages: MemoryMessage[] = [
       { role: 'user', content: 'Hello' },
@@ -74,21 +74,20 @@ describe('createScopedMemory', () => {
 
     expect(mockProvider.add).toHaveBeenCalledWith(
       messages,
-      { agentId: 'my-brain', userId: undefined },
+      { agentId: 'my-brain', userId: 'user-123' },
       { metadata: undefined }
     );
   });
 
-  it('should pass userId and metadata to add calls', async () => {
+  it('should pass metadata to add calls', async () => {
     const mockProvider = createMockProvider();
-    const scopedMemory = createScopedMemory(mockProvider, 'my-brain');
+    const scopedMemory = createScopedMemory(mockProvider, 'my-brain', 'user-123');
 
     const messages: MemoryMessage[] = [
       { role: 'assistant', content: 'User prefers dark mode' },
     ];
 
     await scopedMemory.add(messages, {
-      userId: 'user-123',
       metadata: { source: 'preference' },
     });
 
@@ -151,7 +150,7 @@ describe('Brain.withMemory', () => {
 
     expect(mockProvider.search).toHaveBeenCalledWith(
       'user preferences',
-      { agentId: 'test-brain', userId: undefined },
+      { agentId: 'test-brain', userId: 'test-user' },
       { limit: undefined }
     );
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
@@ -180,7 +179,7 @@ describe('Brain.withMemory', () => {
 
     expect(mockProvider.add).toHaveBeenCalledWith(
       [{ role: 'assistant', content: 'User prefers dark mode' }],
-      { agentId: 'test-brain', userId: undefined },
+      { agentId: 'test-brain', userId: 'test-user' },
       { metadata: undefined }
     );
   });

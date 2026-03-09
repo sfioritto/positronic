@@ -6,10 +6,10 @@ import type { Memory, ScopedMemory, MemorySearchOptions, MemoryAddOptions, Memor
 function createMockScopedMemory(searchResult: Memory[] = []): ScopedMemory {
   return {
     search: jest.fn(
-      async (_query: string, _options?: MemorySearchOptions): Promise<Memory[]> => searchResult
+      async (query: string, options?: MemorySearchOptions): Promise<Memory[]> => searchResult
     ),
     add: jest.fn(
-      async (_messages: MemoryMessage[], _options?: MemoryAddOptions): Promise<void> => {}
+      async (messages: MemoryMessage[], options?: MemoryAddOptions): Promise<void> => {}
     ),
   };
 }
@@ -81,7 +81,6 @@ describe('createMemorySystemPrompt', () => {
     );
 
     expect(mockScopedMemory.search).toHaveBeenCalledWith('user preferences', {
-      userId: undefined,
       limit: undefined,
     });
     expect(result).toBe(
@@ -123,18 +122,17 @@ describe('createMemorySystemPrompt', () => {
     );
   });
 
-  it('should pass userId and limit to search', async () => {
+  it('should pass limit to search', async () => {
     const mockScopedMemory = createMockScopedMemory([]);
 
     await createMemorySystemPrompt(
       mockScopedMemory,
       'Base',
       'query',
-      { userId: 'user-123', limit: 5 }
+      { limit: 5 }
     );
 
     expect(mockScopedMemory.search).toHaveBeenCalledWith('query', {
-      userId: 'user-123',
       limit: 5,
     });
   });
@@ -168,12 +166,10 @@ describe('getMemoryContext', () => {
     const mockScopedMemory = createMockScopedMemory([]);
 
     await getMemoryContext(mockScopedMemory, 'query', {
-      userId: 'user-123',
       limit: 3,
     });
 
     expect(mockScopedMemory.search).toHaveBeenCalledWith('query', {
-      userId: 'user-123',
       limit: 3,
     });
   });

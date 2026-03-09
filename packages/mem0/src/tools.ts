@@ -6,10 +6,6 @@ import type { AgentTool, StepContext } from '@positronic/core';
  */
 const rememberFactSchema = z.object({
   fact: z.string().describe('The fact or information to remember for later'),
-  userId: z
-    .string()
-    .optional()
-    .describe('Optional user ID to associate this memory with'),
 });
 
 /**
@@ -17,10 +13,6 @@ const rememberFactSchema = z.object({
  */
 const recallMemoriesSchema = z.object({
   query: z.string().describe('The search query to find relevant memories'),
-  userId: z
-    .string()
-    .optional()
-    .describe('Optional user ID to scope the search'),
   limit: z
     .number()
     .optional()
@@ -32,7 +24,7 @@ const recallMemoriesSchema = z.object({
  * Tool for storing facts in long-term memory.
  *
  * This tool allows the agent to store important information for future reference.
- * Facts are stored with the agent's scope and optionally a user ID.
+ * Facts are stored scoped to the current agent and user (auto-bound from currentUser).
  *
  * @example
  * ```typescript
@@ -69,8 +61,7 @@ The fact should be a clear, standalone statement that can be retrieved later.`,
     }
 
     await context.memory.add(
-      [{ role: 'assistant', content: input.fact }],
-      { userId: input.userId }
+      [{ role: 'assistant', content: input.fact }]
     );
 
     return {
@@ -84,7 +75,7 @@ The fact should be a clear, standalone statement that can be retrieved later.`,
  * Tool for recalling memories from long-term storage.
  *
  * This tool allows the agent to search for and retrieve relevant memories.
- * Memories are searched within the agent's scope and optionally a user ID.
+ * Memories are searched within the current agent and user scope (auto-bound from currentUser).
  *
  * @example
  * ```typescript
@@ -124,7 +115,6 @@ The query should describe what you're looking for. Results include relevance sco
     }
 
     const memories = await context.memory.search(input.query, {
-      userId: input.userId,
       limit: input.limit,
     });
 

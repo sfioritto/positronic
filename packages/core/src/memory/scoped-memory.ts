@@ -8,37 +8,36 @@ import type {
 } from './types.js';
 
 /**
- * Creates a scoped memory instance with the agentId pre-bound.
+ * Creates a scoped memory instance with agentId and userId pre-bound.
  *
  * This wraps a MemoryProvider and automatically includes the agentId
- * in all calls, so brain steps don't need to pass it explicitly.
+ * and userId in all calls, so brain steps don't need to pass them explicitly.
  *
  * @param provider - The underlying memory provider
  * @param agentId - The agent/brain ID to scope memories to
+ * @param userId - The user ID to scope memories to (from currentUser.id)
  * @returns A ScopedMemory instance
  *
  * @example
  * ```typescript
  * const provider = createMem0Provider({ apiKey: '...' });
- * const scopedMemory = createScopedMemory(provider, 'my-brain');
+ * const scopedMemory = createScopedMemory(provider, 'my-brain', 'user-123');
  *
- * // Now search without passing agentId
+ * // Now search without passing agentId or userId
  * const memories = await scopedMemory.search('user preferences');
  * ```
  */
 export function createScopedMemory(
   provider: MemoryProvider,
-  agentId: string
+  agentId: string,
+  userId: string
 ): ScopedMemory {
   return {
     async search(
       query: string,
       options?: MemorySearchOptions
     ): Promise<Memory[]> {
-      const scope = {
-        agentId,
-        userId: options?.userId,
-      };
+      const scope = { agentId, userId };
       return provider.search(query, scope, { limit: options?.limit });
     },
 
@@ -46,10 +45,7 @@ export function createScopedMemory(
       messages: MemoryMessage[],
       options?: MemoryAddOptions
     ): Promise<void> {
-      const scope = {
-        agentId,
-        userId: options?.userId,
-      };
+      const scope = { agentId, userId };
       return provider.add(messages, scope, { metadata: options?.metadata });
     },
   };
