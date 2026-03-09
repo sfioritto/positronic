@@ -3,6 +3,7 @@ import { brain as coreBrain, Brain } from './builder/brain.js';
 import type { AgentConfig, AgentTool, AgentOutputSchema, StepContext, State } from './types.js';
 import type { UIComponent } from '../ui/types.js';
 import type { MemoryProvider } from '../memory/types.js';
+import type { StoreSchema } from '../store/types.js';
 
 /**
  * Configuration for creating a project-level brain function.
@@ -20,6 +21,8 @@ export interface CreateBrainConfig<
   defaultTools?: TTools;
   /** Memory provider for long-term memory storage */
   memory?: MemoryProvider;
+  /** Store field definitions for typed key-value storage */
+  store?: StoreSchema;
 }
 
 /**
@@ -69,7 +72,7 @@ export function createBrain<
   TComponents extends Record<string, UIComponent<any>> = {},
   TTools extends Record<string, AgentTool<any>> = {}
 >(config: CreateBrainConfig<TServices, TComponents, TTools>) {
-  const { services, components, defaultTools, memory } = config;
+  const { services, components, defaultTools, memory, store } = config;
 
   // The params available in agent config functions - uses StepContext for consistency
   type AgentParams = StepContext<object, {}, undefined, undefined> & TServices & {
@@ -136,6 +139,10 @@ export function createBrain<
 
     if (memory) {
       base = base.withMemory(memory) as any;
+    }
+
+    if (store) {
+      base = base.withStore(store) as any;
     }
 
     if (services) {

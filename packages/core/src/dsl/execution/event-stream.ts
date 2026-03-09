@@ -12,8 +12,7 @@ import { generateUI } from '../../ui/generate-ui.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
 import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
-import type { StoreDefinition, TypedStore } from '../../store/types.js';
-import { createTypedStore } from '../../store/create-typed-store.js';
+import type { Store } from '../../store/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { Block, StepBlock, BrainBlock, AgentBlock, GuardBlock, WaitBlock } from '../definitions/blocks.js';
@@ -81,8 +80,7 @@ export class BrainEventStream<
   private signalProvider?: SignalProvider;
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
-  private storeDefinition?: StoreDefinition<any>;
-  private typedStore?: TypedStore<any>;
+  private store?: Store<any>;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private currentUser: CurrentUser;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
@@ -98,7 +96,7 @@ export class BrainEventStream<
       components?: Record<string, UIComponent<any>>;
       defaultTools?: Record<string, AgentTool<any>>;
       memoryProvider?: MemoryProvider;
-      storeDefinition?: StoreDefinition<any>;
+      store?: Store<any>;
     }
   ) {
     const {
@@ -116,8 +114,7 @@ export class BrainEventStream<
       defaultTools,
       signalProvider,
       memoryProvider,
-      storeDefinition,
-      storeProvider,
+      store,
       currentUser,
     } = params;
 
@@ -143,16 +140,11 @@ export class BrainEventStream<
     this.defaultTools = defaultTools;
     this.signalProvider = signalProvider;
     this.memoryProvider = memoryProvider;
-    this.storeDefinition = storeDefinition;
+    this.store = store;
 
     // Create scoped memory if provider is configured
     if (memoryProvider) {
       this.scopedMemory = createScopedMemory(memoryProvider, title);
-    }
-
-    // Create typed store if both definition and provider are configured
-    if (storeDefinition && storeProvider) {
-      this.typedStore = createTypedStore(storeProvider, storeDefinition);
     }
 
     // Initialize steps - track guard and wait blocks by index
@@ -554,7 +546,7 @@ export class BrainEventStream<
           pages: this.pages,
           env: this.env,
           memory: this.scopedMemory,
-          store: this.typedStore,
+          store: this.store,
           currentUser: this.currentUser,
           ...this.services,
         })
@@ -599,7 +591,7 @@ export class BrainEventStream<
       pages: this.pages,
       env: this.env,
       memory: this.scopedMemory,
-      store: this.typedStore,
+      store: this.store,
       currentUser: this.currentUser,
       ...this.services,
     });
@@ -1056,7 +1048,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             brainRunId: this.brainRunId,
             stepId: effectiveStepId,
             memory: this.scopedMemory,
-            store: this.typedStore,
+            store: this.store,
             currentUser: this.currentUser,
           };
 
@@ -1425,7 +1417,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       page: this.currentPage,
       pages: this.pages,
       env: this.env,
-      store: this.typedStore,
+      store: this.store,
       currentUser: this.currentUser,
       ...this.services,
     });

@@ -79,13 +79,12 @@ export type {
 // Default tools
 export { createTool, defaultTools, defaultDoneSchema, generateUI, waitForWebhook, print, consoleLog } from './tools/index.js';
 
-// Store types and utilities
-export { createStore } from './store/create-store.js';
-export { createTypedStore } from './store/create-typed-store.js';
+// Store types
 export type {
-  StoreDefinition,
+  Store,
   StoreProvider,
-  TypedStore,
+  PerUserField,
+  InferStoreTypes,
   StoreContext,
 } from './store/types.js';
 

@@ -106,7 +106,7 @@ export interface StepContext<
   /** Scoped memory for storing and retrieving long-term memories */
   memory?: import('../memory/types.js').ScopedMemory;
   /** Typed key-value store for persistent structured data */
-  store?: import('../store/types.js').TypedStore<any>;
+  store?: import('../store/types.js').Store<any>;
   /** The authenticated user running this brain */
   currentUser: CurrentUser;
 }

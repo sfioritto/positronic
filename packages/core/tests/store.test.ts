@@ -1,7 +1,6 @@
 import { jest } from '@jest/globals';
-import { createStore } from '../src/store/create-store.js';
-import { createTypedStore } from '../src/store/create-typed-store.js';
-import type { StoreProvider } from '../src/store/types.js';
+import { z } from 'zod';
+import type { Store, StoreProvider } from '../src/store/types.js';
 import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
@@ -17,16 +16,46 @@ const collectEvents = async <T>(
   return events;
 };
 
-// Mock store provider for testing
-const createMockProvider = (): jest.Mocked<StoreProvider> & { data: Map<string, any> } => {
+// In-memory store factory for testing — mimics key resolution like a real backend
+const createInMemoryStoreProvider = (): StoreProvider & { data: Map<string, any> } => {
   const data = new Map<string, any>();
-  return {
-    data,
-    get: jest.fn<StoreProvider['get']>().mockImplementation(async (key) => data.get(key)),
-    set: jest.fn<StoreProvider['set']>().mockImplementation(async (key, value) => { data.set(key, value); }),
-    delete: jest.fn<StoreProvider['delete']>().mockImplementation(async (key) => { data.delete(key); }),
-    has: jest.fn<StoreProvider['has']>().mockImplementation(async (key) => data.has(key)),
-  };
+
+  const factory: StoreProvider & { data: Map<string, any> } = Object.assign(
+    ({ schema, brainTitle, currentUser }: Parameters<StoreProvider>[0]) => {
+      // Parse per-user keys from schema
+      const perUserKeys = new Set<string>();
+      for (const [key, value] of Object.entries(schema)) {
+        if (value !== null && typeof value === 'object' && 'perUser' in value && (value as any).perUser === true) {
+          perUserKeys.add(key);
+        }
+      }
+
+      function resolveKey(key: string): string {
+        if (perUserKeys.has(key)) {
+          if (!currentUser) {
+            throw new Error(
+              `Store key "${key}" is per-user but no currentUser was provided. ` +
+              `Per-user store keys require a currentUser in run params.`
+            );
+          }
+          return `store/${brainTitle}/user/${currentUser.id}/${key}`;
+        }
+        return `store/${brainTitle}/${key}`;
+      }
+
+      const store: Store<any> = {
+        async get(key: string) { return data.get(resolveKey(key)); },
+        async set(key: string, value: any) { data.set(resolveKey(key), value); },
+        async delete(key: string) { data.delete(resolveKey(key)); },
+        async has(key: string) { return data.has(resolveKey(key)); },
+      };
+
+      return store;
+    },
+    { data }
+  );
+
+  return factory;
 };
 
 // Mock ObjectGenerator for testing
@@ -35,87 +64,15 @@ const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
   streamText: jest.fn<ObjectGenerator['streamText']>(),
 });
 
-describe('createStore', () => {
-  it('should return a store definition with defaults', () => {
-    const store = createStore({
-      deselectedThreads: [] as string[],
-      lastDigestDate: '',
-    });
-
-    expect(store.defaults).toEqual({
-      deselectedThreads: [],
-      lastDigestDate: '',
-    });
-  });
-});
-
-describe('createTypedStore', () => {
-  it('should get a stored value', async () => {
-    const provider = createMockProvider();
-    const definition = createStore({ count: 0 });
-    const store = createTypedStore(provider, definition);
-
-    provider.data.set('count', 42);
-
-    const result = await store.get('count');
-    expect(result).toBe(42);
-    expect(provider.get).toHaveBeenCalledWith('count');
-  });
-
-  it('should return default value when key does not exist', async () => {
-    const provider = createMockProvider();
-    const definition = createStore({
-      items: ['default-item'] as string[],
-    });
-    const store = createTypedStore(provider, definition);
-
-    const result = await store.get('items');
-    expect(result).toEqual(['default-item']);
-  });
-
-  it('should set a value', async () => {
-    const provider = createMockProvider();
-    const definition = createStore({ name: '' });
-    const store = createTypedStore(provider, definition);
-
-    await store.set('name', 'test-value');
-    expect(provider.set).toHaveBeenCalledWith('name', 'test-value');
-    expect(provider.data.get('name')).toBe('test-value');
-  });
-
-  it('should delete a value', async () => {
-    const provider = createMockProvider();
-    const definition = createStore({ count: 0 });
-    const store = createTypedStore(provider, definition);
-
-    provider.data.set('count', 42);
-    await store.delete('count');
-    expect(provider.delete).toHaveBeenCalledWith('count');
-    expect(provider.data.has('count')).toBe(false);
-  });
-
-  it('should check if a key exists', async () => {
-    const provider = createMockProvider();
-    const definition = createStore({ count: 0 });
-    const store = createTypedStore(provider, definition);
-
-    expect(await store.has('count')).toBe(false);
-
-    provider.data.set('count', 42);
-    expect(await store.has('count')).toBe(true);
-  });
-});
-
 describe('Brain.withStore', () => {
   it('should inject store into step context', async () => {
-    const provider = createMockProvider();
+    const storeFactory = createInMemoryStoreProvider();
     const mockClient = createMockClient();
 
-    const storeDefinition = createStore({ counter: 0 });
     let receivedStore: any;
 
     const testBrain = brain('test-brain')
-      .withStore(storeDefinition)
+      .withStore({ counter: z.number() })
       .step('Test Step', ({ store }) => {
         receivedStore = store;
         return { done: true };
@@ -126,7 +83,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { id: 'test-user' },
         resources: {} as any,
-        storeProvider: provider,
+        storeProvider: storeFactory,
       })
     );
 
@@ -134,19 +91,17 @@ describe('Brain.withStore', () => {
     expect(receivedStore).toBeDefined();
   });
 
-  it('should allow get and set in step', async () => {
-    const provider = createMockProvider();
+  it('should allow get and set in step with brain-scoped keys', async () => {
+    const storeFactory = createInMemoryStoreProvider();
     const mockClient = createMockClient();
 
-    const storeDefinition = createStore({
-      items: [] as string[],
-    });
-
     const testBrain = brain('test-brain')
-      .withStore(storeDefinition)
+      .withStore({
+        items: z.array(z.string()),
+      })
       .step('Add Items', async ({ store }) => {
         const current = await store.get('items');
-        await store.set('items', [...current, 'new-item']);
+        await store.set('items', [...(current ?? []), 'new-item']);
         return { done: true };
       });
 
@@ -155,25 +110,23 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { id: 'test-user' },
         resources: {} as any,
-        storeProvider: provider,
+        storeProvider: storeFactory,
       })
     );
 
-    // Verify the provider was called correctly
-    expect(provider.get).toHaveBeenCalledWith('items');
-    expect(provider.set).toHaveBeenCalledWith('items', ['new-item']);
+    // Verify data was stored at the brain-scoped path
+    expect(storeFactory.data.get('store/test-brain/items')).toEqual(['new-item']);
   });
 
   it('should preserve store through step chain', async () => {
-    const provider = createMockProvider();
+    const storeFactory = createInMemoryStoreProvider();
     const mockClient = createMockClient();
 
-    const storeDefinition = createStore({ counter: 0 });
     let step1Store: any;
     let step2Store: any;
 
     const testBrain = brain('test-brain')
-      .withStore(storeDefinition)
+      .withStore({ counter: z.number() })
       .step('Step 1', ({ store }) => {
         step1Store = store;
         return { step: 1 };
@@ -188,7 +141,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { id: 'test-user' },
         resources: {} as any,
-        storeProvider: provider,
+        storeProvider: storeFactory,
       })
     );
 
@@ -199,7 +152,7 @@ describe('Brain.withStore', () => {
   });
 
   it('should work alongside withServices', async () => {
-    const provider = createMockProvider();
+    const storeFactory = createInMemoryStoreProvider();
     const mockClient = createMockClient();
 
     interface TestServices {
@@ -207,12 +160,11 @@ describe('Brain.withStore', () => {
     }
 
     const mockLogger = { log: jest.fn() };
-    const storeDefinition = createStore({ value: '' });
     let receivedStore: any;
     let receivedLogger: any;
 
     const testBrain = brain('test-brain')
-      .withStore(storeDefinition)
+      .withStore({ value: z.string() })
       .withServices<TestServices>({ logger: mockLogger })
       .step('Combined Step', ({ store, logger }) => {
         receivedStore = store;
@@ -225,7 +177,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { id: 'test-user' },
         resources: {} as any,
-        storeProvider: provider,
+        storeProvider: storeFactory,
       })
     );
 
@@ -254,15 +206,14 @@ describe('Brain.withStore', () => {
     expect(receivedStore).toBeUndefined();
   });
 
-  it('should be undefined when store is configured but no provider is given', async () => {
+  it('should be undefined when store is configured but no factory is given', async () => {
     const mockClient = createMockClient();
 
-    const storeDefinition = createStore({ counter: 0 });
     let receivedStore: any = 'not-undefined';
 
     const testBrain = brain('test-brain')
-      .withStore(storeDefinition)
-      .step('No Provider Step', ({ store }) => {
+      .withStore({ counter: z.number() })
+      .step('No Backend Step', ({ store }) => {
         receivedStore = store;
         return { done: true };
       });
@@ -272,10 +223,69 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { id: 'test-user' },
         resources: {} as any,
-        // No storeProvider
+        // No store factory
       })
     );
 
     expect(receivedStore).toBeUndefined();
+  });
+
+  it('should scope per-user keys to currentUser', async () => {
+    const storeFactory = createInMemoryStoreProvider();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain')
+      .withStore({
+        sharedCounter: z.number(),
+        userPref: { type: z.string(), perUser: true },
+      })
+      .step('Use Store', async ({ store }) => {
+        await store.set('sharedCounter', 1);
+        await store.set('userPref', 'dark');
+        return { done: true };
+      });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { id: 'user-42' },
+        resources: {} as any,
+        storeProvider: storeFactory,
+      })
+    );
+
+    // Shared key uses brain-scoped path
+    expect(storeFactory.data.get('store/test-brain/sharedCounter')).toBe(1);
+    // Per-user key uses user-scoped path
+    expect(storeFactory.data.get('store/test-brain/user/user-42/userPref')).toBe('dark');
+  });
+
+  it('should work with store passed via createBrain', async () => {
+    const { createBrain } = await import('../src/dsl/create-brain.js');
+    const storeFactory = createInMemoryStoreProvider();
+    const mockClient = createMockClient();
+
+    const myBrain = createBrain({
+      store: { counter: z.number() },
+    });
+
+    let receivedStore: any;
+
+    const testBrain = myBrain('test-brain')
+      .step('Test', ({ store }) => {
+        receivedStore = store;
+        return { done: true };
+      });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { id: 'test-user' },
+        resources: {} as any,
+        storeProvider: storeFactory,
+      })
+    );
+
+    expect(receivedStore).toBeDefined();
   });
 });
