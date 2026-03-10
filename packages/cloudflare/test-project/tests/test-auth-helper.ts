@@ -78,3 +78,88 @@ export function createAuthenticatedFetchWrapper(
     return baseFetch(authRequest);
   };
 }
+
+/**
+ * Create a JWT with a custom fingerprint (sub claim).
+ * Used to authenticate as a specific user whose key has this fingerprint.
+ */
+async function createJwtWithFingerprint(fingerprint: string): Promise<string> {
+  const privateKey = await importPKCS8(TEST_PRIVATE_KEY_PEM, 'EdDSA');
+  return new SignJWT({})
+    .setProtectedHeader({ alg: 'EdDSA' })
+    .setSubject(fingerprint)
+    .setIssuedAt()
+    .setExpirationTime('30s')
+    .sign(privateKey);
+}
+
+/**
+ * Create an authenticated fetch wrapper that authenticates as a specific user.
+ *
+ * Uses the root-authenticated fetch to:
+ * 1. Create a user via POST /users
+ * 2. Register the test public key with a unique fingerprint for that user
+ * 3. Return a fetch wrapper that signs JWTs with that user's fingerprint
+ *
+ * The auth middleware will find the fingerprint in AuthDO, verify the JWT
+ * with the stored public key (same test key), and set auth.userId.
+ */
+export async function createUserFetch(
+  baseFetch: (request: Request) => Promise<Response>,
+  rootFetch: (request: Request) => Promise<Response>,
+  userName: string
+): Promise<{ fetch: (request: Request) => Promise<Response>; userId: string }> {
+  // 1. Create the user
+  const createUserResponse = await rootFetch(
+    new Request('http://example.com/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: userName }),
+    })
+  );
+
+  if (createUserResponse.status !== 201) {
+    const error = await createUserResponse.text();
+    throw new Error(`Failed to create user '${userName}': ${error}`);
+  }
+
+  const user = await createUserResponse.json<{ id: string; name: string }>();
+  const userId = user.id;
+
+  // 2. Register the test public key with a unique fingerprint for this user
+  const userFingerprint = `SHA256:user-${userName}`;
+  const addKeyResponse = await rootFetch(
+    new Request(`http://example.com/users/${userId}/keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jwk: TEST_PUBLIC_KEY_JWK,
+        fingerprint: userFingerprint,
+      }),
+    })
+  );
+
+  if (addKeyResponse.status !== 201) {
+    const error = await addKeyResponse.text();
+    throw new Error(`Failed to add key for user '${userName}': ${error}`);
+  }
+
+  // 3. Create a fetch wrapper that authenticates as this user
+  const userFetch = async (request: Request): Promise<Response> => {
+    const token = await createJwtWithFingerprint(userFingerprint);
+    const headers = new Headers(request.headers);
+    headers.set('Authorization', `Bearer ${token}`);
+
+    const body = request.body ? await request.clone().arrayBuffer() : null;
+
+    const authRequest = new Request(request.url, {
+      method: request.method,
+      headers,
+      body,
+    });
+
+    return baseFetch(authRequest);
+  };
+
+  return { fetch: userFetch, userId };
+}

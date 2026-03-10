@@ -20,6 +20,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["GovernorDO"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["AuthDO"]
     }
   ],
   "durable_objects": {
@@ -39,6 +43,10 @@
       {
         "class_name": "GovernorDO",
         "name": "GOVERNOR_DO"
+      },
+      {
+        "class_name": "AuthDO",
+        "name": "AUTH_DO"
       }
     ]
   },

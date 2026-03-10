@@ -10,6 +10,7 @@ import {
 import { MonitorDO } from '../../src/monitor-do';
 import { ScheduleDO } from '../../src/schedule-do';
 import { GovernorDO } from '../../src/governor-do';
+import { AuthDO } from '../../src/auth-do';
 import { PositronicManifest } from '../../src/manifest.js';
 import { runner } from './runner';
 // Import webhooks from webhooks/ directory (simulates auto-discovery pattern)
@@ -532,4 +533,4 @@ export default {
   fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { BrainRunnerDO, MonitorDO, ScheduleDO, GovernorDO };
+export { BrainRunnerDO, MonitorDO, ScheduleDO, GovernorDO, AuthDO };
