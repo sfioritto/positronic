@@ -231,7 +231,7 @@ const fixedSlugBrain = brain({ title: 'fixed-slug-brain', description: 'A brain 
   .step('Create page with fixed slug', async ({ state, pages }) => {
     fixedSlugRunCount++;
     // Explicit slug provided - will overwrite if exists
-    const page = await pages!.create('fixed-slug-page', `<html><body>Run ${fixedSlugRunCount}</body></html>`);
+    const page = await pages!.create('fixed-slug-page', `<html><body>Run ${fixedSlugRunCount}</body></html>`, { persist: true });
     return {
       ...state,
       pageSlug: page.slug,
