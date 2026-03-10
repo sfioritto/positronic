@@ -1,5 +1,15 @@
 # @positronic/cloudflare
 
+## 0.0.73
+
+### Patch Changes
+
+- Fix R2 bucket upload command for production deployments. The wrangler r2 object put command now correctly uses `--remote` flag for non-local uploads instead of omitting the flag entirely.
+- Updated dependencies
+  - @positronic/core@0.0.73
+  - @positronic/spec@0.0.73
+  - @positronic/template-new-project@0.0.73
+
 ## 0.0.72
 
 ### Patch Changes
