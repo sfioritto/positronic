@@ -61,8 +61,7 @@ export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
         }
 
         // Send to API
-        const body = JSON.stringify({ secrets });
-        const response = await execute(body);
+        const response = await execute({ secrets });
         setResult(response);
         setCompleted(true);
       } catch (err) {

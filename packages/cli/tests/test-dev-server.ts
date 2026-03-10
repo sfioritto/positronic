@@ -5,6 +5,15 @@ import fs from 'fs';
 import Fuse from 'fuse.js';
 import { STATUS } from '@positronic/core';
 
+/**
+ * Parse a nock request body as JSON.
+ * nock auto-parses JSON bodies when Content-Type: application/json is set,
+ * so properly-sent requests may arrive as objects or strings.
+ */
+function parseRequestBody(requestBody: nock.Body): any {
+  return typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+}
+
 interface MockResource {
   key: string;
   type: 'text' | 'binary';
@@ -308,7 +317,7 @@ export class TestDevServer implements PositronicDevServer {
     // POST /brains/runs
     nockInstance.post('/brains/runs').reply((uri, requestBody) => {
       const body =
-        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        parseRequestBody(requestBody);
 
       // Support both identifier and brainTitle for backward compatibility
       const identifier = body.identifier || body.brainTitle;
@@ -337,7 +346,7 @@ export class TestDevServer implements PositronicDevServer {
     // POST /brains/runs/rerun
     nockInstance.post('/brains/runs/rerun').reply((uri, requestBody) => {
       const body =
-        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        parseRequestBody(requestBody);
 
       // Support both identifier and brainTitle for backward compatibility
       const identifier = body.identifier || body.brainTitle;
@@ -406,7 +415,7 @@ export class TestDevServer implements PositronicDevServer {
       const match = uri.match(/^\/brains\/runs\/(.+)\/signals$/);
       if (match) {
         const runId = decodeURIComponent(match[1]);
-        const body = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        const body = parseRequestBody(requestBody);
 
         this.logCall('sendSignal', [runId, body]);
 
@@ -991,7 +1000,7 @@ export class TestDevServer implements PositronicDevServer {
     // POST /brains/schedules
     nockInstance.post('/brains/schedules').reply(201, (uri, requestBody) => {
       const body =
-        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        parseRequestBody(requestBody);
 
       // Support both identifier and brainTitle for backward compatibility
       const brainTitle = body.brainTitle || body.identifier;
@@ -1055,7 +1064,7 @@ export class TestDevServer implements PositronicDevServer {
     // PUT /brains/schedules/timezone
     nockInstance.put('/brains/schedules/timezone').reply((uri, requestBody) => {
       const body =
-        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        parseRequestBody(requestBody);
 
       if (!body.timezone) {
         return [400, { error: 'Missing required field "timezone"' }];
@@ -1161,7 +1170,7 @@ export class TestDevServer implements PositronicDevServer {
     // POST /secrets
     nockInstance.post('/secrets').reply(201, (uri, requestBody) => {
       const body =
-        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        parseRequestBody(requestBody);
 
       const now = new Date().toISOString();
       const secret: MockSecret = {
@@ -1233,7 +1242,7 @@ export class TestDevServer implements PositronicDevServer {
     // POST /secrets/bulk
     nockInstance.post('/secrets/bulk').reply(201, (uri, requestBody) => {
       const body =
-        typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        parseRequestBody(requestBody);
 
       let created = 0;
       let updated = 0;
@@ -1298,16 +1307,7 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /users - Create a new user
     nockInstance.post('/users').reply((uri, requestBody) => {
-      let body: any;
-      if (typeof requestBody === 'string') {
-        try {
-          body = JSON.parse(requestBody);
-        } catch {
-          body = requestBody;
-        }
-      } else {
-        body = requestBody;
-      }
+      const body = parseRequestBody(requestBody);
 
       // Check if user already exists
       const existing = Array.from(this.users.values()).find(u => u.name === body.name);
@@ -1383,7 +1383,7 @@ export class TestDevServer implements PositronicDevServer {
       if (match) {
         const userId = decodeURIComponent(match[1]);
         const body =
-          typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+          parseRequestBody(requestBody);
 
         // Check if user exists
         const user = this.users.get(userId);

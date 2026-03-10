@@ -73,7 +73,7 @@ export const UsersKeysList = ({ userId }: UsersKeysListProps) => {
         <Text>No keys found for user "{user.name}".</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Add a key with "px users {userId} keys add ~/.ssh/id_rsa.pub"
+            Tip: Add a key with "px users keys add {userId} ~/.ssh/id_rsa.pub"
           </Text>
         </Box>
       </Box>

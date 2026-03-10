@@ -80,7 +80,7 @@ export const UsersCreate = ({ name }: UsersCreateProps) => {
         </Box>
         <Box marginTop={1}>
           <Text dimColor>
-            Add a key with: px users {data.id} keys add ~/.ssh/id_rsa.pub
+            Add a key with: px users keys add {data.id} ~/.ssh/id_rsa.pub
           </Text>
         </Box>
       </Box>

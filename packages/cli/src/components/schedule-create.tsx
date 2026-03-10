@@ -31,8 +31,7 @@ export const ScheduleCreate = ({ identifier, cronExpression }: ScheduleCreatePro
   useEffect(() => {
     const createSchedule = async () => {
       try {
-        const body = JSON.stringify({ identifier, cronExpression });
-        const result = await execute(body);
+        const result = await execute({ identifier, cronExpression });
         setSchedule(result);
         setCreated(true);
       } catch (err) {
