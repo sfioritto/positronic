@@ -72,8 +72,7 @@ const TimezoneSet = ({ timezone }: { timezone: string }) => {
   useEffect(() => {
     const setTz = async () => {
       try {
-        const body = JSON.stringify({ timezone });
-        const res = await execute(body);
+        const res = await execute({ timezone });
         setResult(res);
         setDone(true);
       } catch {

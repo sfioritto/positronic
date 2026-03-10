@@ -33,8 +33,7 @@ export const SecretCreate = ({ name, value }: SecretCreateProps) => {
       }
 
       try {
-        const body = JSON.stringify({ name, value });
-        const result = await execute(body);
+        const result = await execute({ name, value });
         setSecret(result);
         setCreated(true);
       } catch (err) {

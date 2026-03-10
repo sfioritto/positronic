@@ -156,7 +156,12 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
           method: 'POST',
           ...defaultOptions,
           ...options,
-          body,
+          headers: {
+            'Content-Type': 'application/json',
+            ...defaultOptions?.headers,
+            ...options?.headers,
+          },
+          body: body != null ? JSON.stringify(body) : undefined,
         });
 
         if (response.status === 200 || response.status === 201 || response.status === 202) {
