@@ -1,5 +1,15 @@
 # @positronic/cloudflare
 
+## 0.0.70
+
+### Patch Changes
+
+- Fix project template to include AuthDO binding and export in wrangler config and index.ts
+- Updated dependencies
+  - @positronic/core@0.0.70
+  - @positronic/spec@0.0.70
+  - @positronic/template-new-project@0.0.70
+
 ## 0.0.69
 
 ### Patch Changes

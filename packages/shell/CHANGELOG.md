@@ -1,5 +1,11 @@
 # @positronic/shell
 
+## 0.0.70
+
+### Patch Changes
+
+- Fix project template to include AuthDO binding and export in wrangler config and index.ts
+
 ## 0.0.69
 
 ### Patch Changes
