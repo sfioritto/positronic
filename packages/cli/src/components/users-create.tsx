@@ -8,7 +8,6 @@ interface UsersCreateProps {
 }
 
 interface User {
-  id: string;
   name: string;
   createdAt: number;
 }
@@ -74,13 +73,10 @@ export const UsersCreate = ({ name }: UsersCreateProps) => {
           <Text>
             <Text bold>Name:</Text> {data.name}
           </Text>
-          <Text>
-            <Text bold>ID:</Text> {data.id}
-          </Text>
         </Box>
         <Box marginTop={1}>
           <Text dimColor>
-            Add a key with: px users keys add {data.id} ~/.ssh/id_rsa.pub
+            Add a key with: px users add-key {data.name} ~/.ssh/id_ed25519.pub
           </Text>
         </Box>
       </Box>

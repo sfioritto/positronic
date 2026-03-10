@@ -210,7 +210,7 @@ export const ProjectAuthSetup = ({ projectDir, onComplete }: ProjectAuthSetupPro
         <Text color="red">Auth setup failed: {error}</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            You can manually configure auth later with: px auth login
+            You can manually configure auth later with: px login
           </Text>
         </Box>
       </Box>

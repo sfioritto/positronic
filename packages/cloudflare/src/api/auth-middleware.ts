@@ -103,7 +103,7 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
           algorithms: [algorithm],
         });
 
-        c.set('auth', { userId: userKey.userId, isRoot: false });
+        c.set('auth', { userId: userKey.userName, isRoot: false });
         return next();
       } catch (error) {
         // Log error type only - avoid logging key material or token data

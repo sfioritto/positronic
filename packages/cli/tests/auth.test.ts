@@ -1,16 +1,15 @@
 /**
- * CLI Integration Tests - Auth Command
+ * CLI Integration Tests - Auth Commands
  *
- * Tests for the `px auth` command which manages local SSH key configuration.
- * Auth commands work in both global mode and local dev mode.
- * In dev mode, auth defaults to writing .positronic-auth.json at the project root.
+ * Tests for `px login`, `px logout`, and `px whoami` commands.
+ * These are top-level commands that manage local SSH key configuration.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { px } from './test-utils.js';
+import { createTestEnv, px } from './test-utils.js';
 
 describe('CLI Integration: auth commands', () => {
   let tempDir: string;
@@ -21,7 +20,6 @@ describe('CLI Integration: auth commands', () => {
 
   beforeEach(() => {
     // Clear any POSITRONIC_PRIVATE_KEY that may have been set by other tests
-    // Auth tests need clean environment to test key configuration behavior
     delete process.env.POSITRONIC_PRIVATE_KEY;
 
     // Create a temp directory for testing
@@ -32,12 +30,11 @@ describe('CLI Integration: auth commands', () => {
     // Create mock SSH directory with test keys
     fs.mkdirSync(sshDir, { recursive: true });
 
-    // Create a mock private key file (minimal format that sshpk can parse)
+    // Create a mock private key file
     testKeyPath = path.join(sshDir, 'id_ed25519');
     testKeyPubPath = path.join(sshDir, 'id_ed25519.pub');
 
     // Write a real Ed25519 key pair for testing
-    // This is a test key - never use in production!
     const testPrivateKey = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACBHK9totwRFqGY0xAKJUT+WV7c03PPGfJGxXQAAAAjJcHwzyXB8MwAAAAtz
@@ -56,52 +53,14 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
   });
 
   afterEach(() => {
-    // Clean up test directory
     fs.rmSync(tempDir, { recursive: true, force: true });
-    // Restore HOME
     delete process.env.HOME;
   });
 
-  describe('auth status', () => {
-    it('should show "not configured" when no key is set', async () => {
-      const { instance } = await px(['auth', 'status'], { configDir });
-      const output = instance.lastFrame() || '';
-
-      expect(output.toLowerCase()).toContain('authentication configuration');
-      expect(output.toLowerCase()).toContain('not configured');
-    });
-
-    it('should show configured key after login', async () => {
-      // First login (use skipAuthSetup to avoid test-utils setting POSITRONIC_PRIVATE_KEY)
-      await px(['auth', 'login', '--path', testKeyPath], { configDir, skipAuthSetup: true });
-
-      // Then check status
-      const { instance } = await px(['auth', 'status'], { configDir, skipAuthSetup: true });
-      const output = instance.lastFrame() || '';
-
-      expect(output).toContain(testKeyPath);
-      expect(output.toLowerCase()).toContain('global config');
-    });
-
-    it('should show environment variable when set', async () => {
-      process.env.POSITRONIC_PRIVATE_KEY = '/custom/key/path';
-
-      try {
-        const { instance } = await px(['auth', 'status'], { configDir });
-        const output = instance.lastFrame() || '';
-
-        expect(output).toContain('/custom/key/path');
-        expect(output.toLowerCase()).toContain('environment variable');
-      } finally {
-        delete process.env.POSITRONIC_PRIVATE_KEY;
-      }
-    });
-  });
-
-  describe('auth login', () => {
+  describe('login', () => {
     it('should set global key with --path option', async () => {
       const { waitForOutput, instance } = await px(
-        ['auth', 'login', '--path', testKeyPath],
+        ['login', '--path', testKeyPath],
         { configDir }
       );
 
@@ -122,7 +81,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
 
     it('should error when key file not found', async () => {
       const { waitForOutput, instance } = await px(
-        ['auth', 'login', '--path', '/nonexistent/key'],
+        ['login', '--path', '/nonexistent/key'],
         { configDir }
       );
 
@@ -132,7 +91,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
 
     it('should error when --project flag used without selected project', async () => {
       const { waitForOutput, instance } = await px(
-        ['auth', 'login', '--project', '--path', testKeyPath],
+        ['login', '--project', '--path', testKeyPath],
         { configDir }
       );
 
@@ -149,7 +108,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
 
       // Then login with --project flag
       const { waitForOutput, instance } = await px(
-        ['auth', 'login', '--project', '--path', testKeyPath],
+        ['login', '--project', '--path', testKeyPath],
         { configDir }
       );
 
@@ -166,13 +125,13 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
   });
 
-  describe('auth logout', () => {
+  describe('logout', () => {
     it('should clear global key configuration', async () => {
       // First login
-      await px(['auth', 'login', '--path', testKeyPath], { configDir });
+      await px(['login', '--path', testKeyPath], { configDir });
 
       // Then logout
-      const { waitForOutput, instance } = await px(['auth', 'logout'], {
+      const { waitForOutput, instance } = await px(['logout'], {
         configDir,
       });
 
@@ -186,7 +145,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should show message when no key is configured', async () => {
-      const { waitForOutput, instance } = await px(['auth', 'logout'], {
+      const { waitForOutput, instance } = await px(['logout'], {
         configDir,
       });
 
@@ -196,7 +155,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
 
     it('should error when --project flag used without selected project', async () => {
       const { waitForOutput, instance } = await px(
-        ['auth', 'logout', '--project'],
+        ['logout', '--project'],
         { configDir }
       );
 
@@ -212,13 +171,13 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
       );
 
       // Login with --project flag
-      await px(['auth', 'login', '--project', '--path', testKeyPath], {
+      await px(['login', '--project', '--path', testKeyPath], {
         configDir,
       });
 
       // Then logout with --project flag
       const { waitForOutput, instance } = await px(
-        ['auth', 'logout', '--project'],
+        ['logout', '--project'],
         { configDir }
       );
 
@@ -232,139 +191,39 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
   });
 
-  describe('auth list', () => {
-    it('should list available SSH keys', async () => {
-      const { waitForOutput, instance } = await px(['auth', 'list'], {
-        configDir,
-      });
-
-      // The command should either show available keys or "no keys found"
-      // We can't guarantee what keys exist on the test machine
-      const foundKeys = await waitForOutput(/available ssh keys|no ssh keys found/i);
-      expect(foundKeys).toBe(true);
-
-      const output = instance.lastFrame() || '';
-      // Should show SSH key info if keys exist
-      if (output.toLowerCase().includes('available ssh keys')) {
-        // Should contain some SSH key type
-        expect(
-          output.toLowerCase().includes('rsa') ||
-          output.toLowerCase().includes('ed25519') ||
-          output.toLowerCase().includes('ecdsa')
-        ).toBe(true);
-      }
-    });
-
-    it('should indicate currently active key when configured', async () => {
-      // Login first using the test key we created
-      await px(['auth', 'login', '--path', testKeyPath], { configDir });
-
-      const { waitForOutput, instance } = await px(['auth', 'list'], {
-        configDir,
-      });
-
-      const foundKeys = await waitForOutput(/available ssh keys|no ssh keys found/i);
-      expect(foundKeys).toBe(true);
-
-      const output = instance.lastFrame() || '';
-      // If keys are shown, should have some indicator
-      if (output.toLowerCase().includes('available ssh keys')) {
-        // The active key marker should be present
-        expect(output).toContain('*');
-      }
-    });
-  });
-
-  describe('auth (default to status)', () => {
-    it('should show status when just "auth" is run', async () => {
-      const { instance } = await px(['auth'], { configDir });
-      const output = instance.lastFrame() || '';
-
-      expect(output.toLowerCase()).toContain('authentication configuration');
-    });
-  });
-
-  describe('auth format-jwk-key', () => {
-    it('should convert public key with --pubkey option', async () => {
-      const { waitForOutput, instance } = await px(
-        ['auth', 'format-jwk-key', '--pubkey', testKeyPubPath],
-        { configDir }
-      );
-
-      const isReady = await waitForOutput(/jwk public key/i);
-      expect(isReady).toBe(true);
-
-      const output = instance.lastFrame() || '';
-      // Should contain JWK fields
-      expect(output).toContain('"kty"');
-      expect(output).toContain('"crv"');
-      expect(output).toContain('"x"');
-      // Should show next steps
-      expect(output.toLowerCase()).toContain('next steps');
-      expect(output).toContain('ROOT_PUBLIC_KEY');
-    });
-
-    it('should error when public key file not found', async () => {
-      const { waitForOutput, instance } = await px(
-        ['auth', 'format-jwk-key', '--pubkey', '/nonexistent/key.pub'],
-        { configDir }
-      );
-
-      const foundError = await waitForOutput(/not found/i);
-      expect(foundError).toBe(true);
-    });
-
-    it('should show key selection when no --pubkey provided and keys exist', async () => {
-      const { waitForOutput, instance } = await px(
-        ['auth', 'format-jwk-key'],
-        { configDir }
-      );
-
-      // Should show key selection or success (if only one key)
-      const foundSelection = await waitForOutput(/select.*ssh.*public key|jwk public key/i);
-      expect(foundSelection).toBe(true);
-    });
-  });
-
-  describe('key priority order', () => {
-    it('should prioritize env var over global config', async () => {
-      // Set global key
-      await px(['auth', 'login', '--path', testKeyPath], { configDir });
-
-      // Set env var
-      process.env.POSITRONIC_PRIVATE_KEY = '/env/key/path';
+  describe('whoami', () => {
+    it('should show identity when authenticated', async () => {
+      const env = await createTestEnv();
+      const pxFn = await env.start();
 
       try {
-        const { instance } = await px(['auth', 'status'], { configDir });
-        const output = instance.lastFrame() || '';
+        const { waitForOutput, instance } = await pxFn(['whoami']);
 
-        // Active key should show env var
-        expect(output).toContain('/env/key/path');
-        expect(output.toLowerCase()).toContain('environment variable');
+        const found = await waitForOutput(/logged in as/i, 30);
+        expect(found).toBe(true);
+
+        const output = instance.lastFrame() || '';
+        expect(output).toContain('root');
       } finally {
-        delete process.env.POSITRONIC_PRIVATE_KEY;
+        await env.stopAndCleanup();
       }
     });
 
-    it('should prioritize project key over global key', async () => {
-      // Set global key
-      await px(['auth', 'login', '--path', '~/.ssh/global_key'], { configDir });
+    it('should handle server connection errors gracefully', async () => {
+      const env = await createTestEnv();
 
-      // Add project and set project key
-      await px(
-        ['project', 'add', 'TestProject', '--url', 'https://test.positronic.sh'],
-        { configDir }
-      );
-      await px(['auth', 'login', '--project', '--path', testKeyPath], {
-        configDir,
-      });
+      try {
+        const { waitForOutput } = await px(['whoami'], {
+          server: env.server,
+        });
 
-      const { instance } = await px(['auth', 'status'], { configDir });
-      const output = instance.lastFrame() || '';
-
-      // Active key should show project key
-      expect(output).toContain(testKeyPath);
-      expect(output).toContain('TestProject');
+        const foundError = await waitForOutput(
+          /Error connecting to the local development server/i
+        );
+        expect(foundError).toBe(true);
+      } finally {
+        env.cleanup();
+      }
     });
   });
 
@@ -372,14 +231,13 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     let projectDir: string;
 
     beforeEach(() => {
-      // Create a project directory to simulate dev mode
       projectDir = path.join(tempDir, 'my-project');
       fs.mkdirSync(projectDir, { recursive: true });
     });
 
     it('should write .positronic-auth.json on login in dev mode', async () => {
       const { waitForOutput, instance } = await px(
-        ['auth', 'login', '--path', testKeyPath],
+        ['login', '--path', testKeyPath],
         { configDir, projectRootDir: projectDir, skipAuthSetup: true }
       );
 
@@ -408,13 +266,13 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     it('should clear .positronic-auth.json on logout in dev mode', async () => {
       // First login in dev mode
       await px(
-        ['auth', 'login', '--path', testKeyPath],
+        ['login', '--path', testKeyPath],
         { configDir, projectRootDir: projectDir, skipAuthSetup: true }
       );
 
       // Then logout in dev mode
       const { waitForOutput, instance } = await px(
-        ['auth', 'logout'],
+        ['logout'],
         { configDir, projectRootDir: projectDir, skipAuthSetup: true }
       );
 
@@ -429,83 +287,14 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
       expect(fs.existsSync(authFilePath)).toBe(false);
     });
 
-    it('should show "Local Project Key" row in status in dev mode', async () => {
-      // Login in dev mode
-      await px(
-        ['auth', 'login', '--path', testKeyPath],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
-
-      // Check status
-      const { instance } = await px(
-        ['auth', 'status'],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
-      const output = instance.lastFrame() || '';
-
-      expect(output).toContain('Local Project Key');
-      expect(output).toContain(testKeyPath);
-      expect(output.toLowerCase()).toContain('local project');
-    });
-
     it('should show no local key message on logout when none configured', async () => {
       const { waitForOutput } = await px(
-        ['auth', 'logout'],
+        ['logout'],
         { configDir, projectRootDir: projectDir, skipAuthSetup: true }
       );
 
       const foundMessage = await waitForOutput(/no local project.*configured/i);
       expect(foundMessage).toBe(true);
-    });
-
-    it('should prioritize local key over global key', async () => {
-      // Set global key
-      await px(
-        ['auth', 'login', '--path', '~/.ssh/global_key'],
-        { configDir, skipAuthSetup: true }
-      );
-
-      // Set local key (different path)
-      await px(
-        ['auth', 'login', '--path', testKeyPath],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
-
-      // Check status in dev mode
-      const { instance } = await px(
-        ['auth', 'status'],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
-      const output = instance.lastFrame() || '';
-
-      // Active source should be "local project", not "global config"
-      expect(output.toLowerCase()).toContain('local project');
-      expect(output).toContain(testKeyPath);
-    });
-
-    it('should prioritize env var over local key', async () => {
-      // Set local key
-      await px(
-        ['auth', 'login', '--path', testKeyPath],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
-
-      // Set env var
-      process.env.POSITRONIC_PRIVATE_KEY = '/env/key/path';
-
-      try {
-        const { instance } = await px(
-          ['auth', 'status'],
-          { configDir, projectRootDir: projectDir }
-        );
-        const output = instance.lastFrame() || '';
-
-        // Active key should show env var, not local key
-        expect(output).toContain('/env/key/path');
-        expect(output.toLowerCase()).toContain('environment variable');
-      } finally {
-        delete process.env.POSITRONIC_PRIVATE_KEY;
-      }
     });
   });
 });

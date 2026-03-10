@@ -112,7 +112,7 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
           </Box>
           <Box marginTop={1}>
             <Text dimColor>
-              Or specify a custom path with: px auth login --path /path/to/key
+              Or specify a custom path with: px login --path /path/to/key
             </Text>
           </Box>
         </Box>

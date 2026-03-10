@@ -25,10 +25,9 @@ app.get('/auth/setup', async (context: Context) => {
     backend: 'cloudflare',
     rootKeyConfigured,
     instructions: `To configure root authentication:
-1. Run: px auth format-jwk-key
+1. Convert your SSH public key to JWK format
 2. In Cloudflare dashboard, go to Workers & Pages > Your project > Settings > Variables and Secrets
-3. Add a new secret named ROOT_PUBLIC_KEY
-4. Paste the JWK value from step 1`,
+3. Add a new secret named ROOT_PUBLIC_KEY with the JWK value`,
   });
 });
 
@@ -64,6 +63,15 @@ app.use('*', async (c, next) => {
   }
 
   return authMiddleware()(c, next);
+});
+
+// Whoami endpoint (requires auth, handled by middleware above)
+app.get('/auth/whoami', async (context: Context) => {
+  const auth = context.get('auth');
+  if (auth.isRoot) {
+    return context.json({ name: 'root', isRoot: true });
+  }
+  return context.json({ name: auth.userId, isRoot: false });
 });
 
 // Mount route modules

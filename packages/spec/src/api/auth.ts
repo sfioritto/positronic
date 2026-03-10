@@ -6,6 +6,11 @@ export interface AuthSetupResponse {
   instructions: string;
 }
 
+export interface WhoamiResponse {
+  name: string;
+  isRoot: boolean;
+}
+
 export const auth = {
   /**
    * Test GET /auth/setup - Unauthenticated endpoint returning setup instructions
@@ -46,6 +51,41 @@ export const auth = {
     } catch (error) {
       console.error(`Failed to test GET /auth/setup:`, error);
       return false;
+    }
+  },
+
+  /**
+   * Test GET /auth/whoami - Authenticated endpoint returning current user identity
+   */
+  async whoami(fetch: Fetch): Promise<WhoamiResponse | null> {
+    try {
+      const request = new Request('http://example.com/auth/whoami', {
+        method: 'GET',
+      });
+
+      const response = await fetch(request);
+
+      if (!response.ok) {
+        console.error(`GET /auth/whoami returned ${response.status}`);
+        return null;
+      }
+
+      const data = (await response.json()) as WhoamiResponse;
+
+      if (typeof data.name !== 'string') {
+        console.error(`Expected name to be string, got ${typeof data.name}`);
+        return null;
+      }
+
+      if (typeof data.isRoot !== 'boolean') {
+        console.error(`Expected isRoot to be boolean, got ${typeof data.isRoot}`);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`Failed to test GET /auth/whoami:`, error);
+      return null;
     }
   },
 };

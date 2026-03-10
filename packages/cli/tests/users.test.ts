@@ -29,12 +29,10 @@ describe('users command', () => {
       const { server } = env;
 
       server.addUser({
-        id: 'user-123',
         name: 'admin',
         createdAt: Date.now(),
       });
       server.addUser({
-        id: 'user-456',
         name: 'alice',
         createdAt: Date.now() - 1000,
       });
@@ -131,7 +129,6 @@ describe('users command', () => {
       const { server } = env;
 
       server.addUser({
-        id: 'user-123',
         name: 'admin',
         createdAt: Date.now(),
       });
@@ -142,7 +139,7 @@ describe('users command', () => {
         const { waitForOutput, instance } = await pxFn([
           'users',
           'delete',
-          'user-123',
+          'admin',
           '--force',
         ]);
 
@@ -152,7 +149,7 @@ describe('users command', () => {
         const calls = server.getLogs();
         const deleteCall = calls.find((c) => c.method === 'deleteUser');
         expect(deleteCall).toBeDefined();
-        expect(deleteCall!.args[0]).toBe('user-123');
+        expect(deleteCall!.args[0]).toBe('admin');
       } finally {
         await env.stopAndCleanup();
       }
@@ -178,13 +175,12 @@ describe('users command', () => {
     });
   });
 
-  describe('users keys list', () => {
+  describe('users list-keys', () => {
     it('should show message when no keys exist', async () => {
       const env = await createTestEnv();
       const { server } = env;
 
       server.addUser({
-        id: 'user-123',
         name: 'admin',
         createdAt: Date.now(),
       });
@@ -194,9 +190,8 @@ describe('users command', () => {
       try {
         const { waitForOutput, instance } = await pxFn([
           'users',
-          'keys',
-          'list',
-          'user-123',
+          'list-keys',
+          'admin',
         ]);
 
         const foundMessage = await waitForOutput(/No keys found/i, 30);
@@ -211,13 +206,12 @@ describe('users command', () => {
       const { server } = env;
 
       server.addUser({
-        id: 'user-123',
         name: 'admin',
         createdAt: Date.now(),
       });
       server.addUserKey({
         fingerprint: 'SHA256:abc123',
-        userId: 'user-123',
+        userName: 'admin',
         label: 'laptop',
         addedAt: Date.now(),
       });
@@ -227,9 +221,8 @@ describe('users command', () => {
       try {
         const { waitForOutput, instance } = await pxFn([
           'users',
-          'keys',
-          'list',
-          'user-123',
+          'list-keys',
+          'admin',
         ]);
 
         const foundKeys = await waitForOutput(/1 key/i, 30);
@@ -244,19 +237,18 @@ describe('users command', () => {
     });
   });
 
-  describe('users keys remove', () => {
+  describe('users remove-key', () => {
     it('should remove a key with --force', async () => {
       const env = await createTestEnv();
       const { server } = env;
 
       server.addUser({
-        id: 'user-123',
         name: 'admin',
         createdAt: Date.now(),
       });
       server.addUserKey({
         fingerprint: 'SHA256:abc123',
-        userId: 'user-123',
+        userName: 'admin',
         label: 'laptop',
         addedAt: Date.now(),
       });
@@ -266,9 +258,8 @@ describe('users command', () => {
       try {
         const { waitForOutput, instance } = await pxFn([
           'users',
-          'keys',
-          'remove',
-          'user-123',
+          'remove-key',
+          'admin',
           'SHA256:abc123',
           '--force',
         ]);

@@ -7,13 +7,13 @@ type ErrorObject = { title: string; message: string; details: string };
 const ROOT_KEY_NOT_CONFIGURED_ERROR: ErrorObject = {
   title: 'Root Key Not Configured',
   message: 'The server does not have a root authentication key configured.',
-  details: "Run 'px auth format-jwk-key' to generate the key, then add ROOT_PUBLIC_KEY as a secret in your server configuration.",
+  details: "The server does not have a ROOT_PUBLIC_KEY secret configured. Add it in your server configuration.",
 };
 
 const AUTH_REQUIRED_ERROR: ErrorObject = {
   title: 'Authentication Required',
   message: 'Your request could not be authenticated.',
-  details: "Run 'px auth login' to configure your SSH key, or check that your key is registered on the server.",
+  details: "Run 'px login' to configure your SSH key, or check that your key is registered on the server.",
 };
 
 const ROOT_ACCESS_REQUIRED_ERROR: ErrorObject = {
