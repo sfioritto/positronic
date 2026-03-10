@@ -112,6 +112,10 @@ The project template (`packages/template-new-project/template/.positronic/`) is 
 - Jest is the test framework
 - **IMPORTANT**: Before creating or updating any tests, always read and load a few different test suites to follow the same patterns
 
+## Developer Journal
+
+- Always follow the developer journal skill (`.claude/skills/journal/SKILL.md`) when doing non-trivial work. This maintains a living record of development decisions, dead ends, and solutions in `docs/journal/`.
+
 ## Development Workflow
 
 - Run `npm run dev` from the top of this mono repo every time you change a file and addresses errors and test failures as needed
