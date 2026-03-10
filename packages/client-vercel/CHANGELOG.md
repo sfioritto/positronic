@@ -1,5 +1,17 @@
 # @positronic/client-vercel
 
+## 0.0.72
+
+### Patch Changes
+
+- - Add store explorer CLI command (`px store explore`) with interactive navigation of brain stores, keys, and values
+  - Add store API endpoints for listing stores, keys, and key values
+  - Add store spec tests for API contract validation
+  - Centralize origin URL via R2 config key (`__config/origin`) instead of WORKER_URL env var
+  - Fix default origin in core constants to use port 8787
+- Updated dependencies
+  - @positronic/core@0.0.72
+
 ## 0.0.71
 
 ### Patch Changes
