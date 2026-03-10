@@ -1,5 +1,13 @@
 # @positronic/client-vercel
 
+## 0.0.71
+
+### Patch Changes
+
+- Fix useApiPost sending [object Object] instead of JSON body. The hook now properly sets Content-Type: application/json and stringifies request bodies, so callers no longer need to manually JSON.stringify.
+- Updated dependencies
+  - @positronic/core@0.0.71
+
 ## 0.0.70
 
 ### Patch Changes
