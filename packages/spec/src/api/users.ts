@@ -1,14 +1,13 @@
 import type { Fetch } from './types.js';
 
 export interface User {
-  id: string;
   name: string;
   createdAt: number;
 }
 
 export interface UserKey {
   fingerprint: string;
-  userId: string;
+  userName: string;
   label: string;
   addedAt: number;
 }
@@ -38,11 +37,6 @@ export const users = {
 
       const data = (await response.json()) as User;
 
-      if (!data.id || typeof data.id !== 'string') {
-        console.error(`Expected id to be string, got ${typeof data.id}`);
-        return null;
-      }
-
       if (data.name !== name) {
         console.error(`Expected name to be '${name}', got ${data.name}`);
         return null;
@@ -55,7 +49,7 @@ export const users = {
         return null;
       }
 
-      return data.id;
+      return data.name;
     } catch (error) {
       console.error(`Failed to test POST /users:`, error);
       return null;
@@ -98,7 +92,6 @@ export const users = {
       // Validate each user has required fields
       for (const user of data.users) {
         if (
-          !user.id ||
           !user.name ||
           typeof user.createdAt !== 'number'
         ) {
@@ -117,11 +110,11 @@ export const users = {
   },
 
   /**
-   * Test GET /users/:id - Get a specific user
+   * Test GET /users/:name - Get a specific user
    */
-  async get(fetch: Fetch, userId: string): Promise<User | null> {
+  async get(fetch: Fetch, userName: string): Promise<User | null> {
     try {
-      const request = new Request(`http://example.com/users/${userId}`, {
+      const request = new Request(`http://example.com/users/${userName}`, {
         method: 'GET',
       });
 
@@ -132,30 +125,30 @@ export const users = {
       }
 
       if (!response.ok) {
-        console.error(`GET /users/${userId} returned ${response.status}`);
+        console.error(`GET /users/${userName} returned ${response.status}`);
         return null;
       }
 
       const data = (await response.json()) as User;
 
-      if (!data.id || !data.name || typeof data.createdAt !== 'number') {
+      if (!data.name || typeof data.createdAt !== 'number') {
         console.error(`User missing required fields: ${JSON.stringify(data)}`);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error(`Failed to test GET /users/${userId}:`, error);
+      console.error(`Failed to test GET /users/${userName}:`, error);
       return null;
     }
   },
 
   /**
-   * Test DELETE /users/:id - Delete a user
+   * Test DELETE /users/:name - Delete a user
    */
-  async delete(fetch: Fetch, userId: string): Promise<boolean> {
+  async delete(fetch: Fetch, userName: string): Promise<boolean> {
     try {
-      const request = new Request(`http://example.com/users/${userId}`, {
+      const request = new Request(`http://example.com/users/${userName}`, {
         method: 'DELETE',
       });
 
@@ -163,30 +156,30 @@ export const users = {
 
       if (response.status !== 204) {
         console.error(
-          `DELETE /users/${userId} returned ${response.status}, expected 204`
+          `DELETE /users/${userName} returned ${response.status}, expected 204`
         );
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error(`Failed to test DELETE /users/${userId}:`, error);
+      console.error(`Failed to test DELETE /users/${userName}:`, error);
       return false;
     }
   },
 
   /**
-   * Test POST /users/:id/keys - Add a key to a user
+   * Test POST /users/:name/keys - Add a key to a user
    */
   async addKey(
     fetch: Fetch,
-    userId: string,
+    userName: string,
     jwk: object,
     fingerprint: string,
     label?: string
   ): Promise<boolean> {
     try {
-      const request = new Request(`http://example.com/users/${userId}/keys`, {
+      const request = new Request(`http://example.com/users/${userName}/keys`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -198,7 +191,7 @@ export const users = {
 
       if (response.status !== 201) {
         console.error(
-          `POST /users/${userId}/keys returned ${response.status}, expected 201`
+          `POST /users/${userName}/keys returned ${response.status}, expected 201`
         );
         return false;
       }
@@ -212,8 +205,8 @@ export const users = {
         return false;
       }
 
-      if (data.userId !== userId) {
-        console.error(`Expected userId to be '${userId}', got ${data.userId}`);
+      if (data.userName !== userName) {
+        console.error(`Expected userName to be '${userName}', got ${data.userName}`);
         return false;
       }
 
@@ -226,24 +219,24 @@ export const users = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test POST /users/${userId}/keys:`, error);
+      console.error(`Failed to test POST /users/${userName}/keys:`, error);
       return false;
     }
   },
 
   /**
-   * Test GET /users/:id/keys - List keys for a user
+   * Test GET /users/:name/keys - List keys for a user
    */
-  async listKeys(fetch: Fetch, userId: string): Promise<boolean> {
+  async listKeys(fetch: Fetch, userName: string): Promise<boolean> {
     try {
-      const request = new Request(`http://example.com/users/${userId}/keys`, {
+      const request = new Request(`http://example.com/users/${userName}/keys`, {
         method: 'GET',
       });
 
       const response = await fetch(request);
 
       if (!response.ok) {
-        console.error(`GET /users/${userId}/keys returned ${response.status}`);
+        console.error(`GET /users/${userName}/keys returned ${response.status}`);
         return false;
       }
 
@@ -266,7 +259,7 @@ export const users = {
       for (const key of data.keys) {
         if (
           !key.fingerprint ||
-          !key.userId ||
+          !key.userName ||
           typeof key.addedAt !== 'number'
         ) {
           console.error(`Key missing required fields: ${JSON.stringify(key)}`);
@@ -276,22 +269,22 @@ export const users = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test GET /users/${userId}/keys:`, error);
+      console.error(`Failed to test GET /users/${userName}/keys:`, error);
       return false;
     }
   },
 
   /**
-   * Test DELETE /users/:id/keys/:fingerprint - Remove a key from a user
+   * Test DELETE /users/:name/keys/:fingerprint - Remove a key from a user
    */
   async removeKey(
     fetch: Fetch,
-    userId: string,
+    userName: string,
     fingerprint: string
   ): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/users/${userId}/keys/${encodeURIComponent(fingerprint)}`,
+        `http://example.com/users/${userName}/keys/${encodeURIComponent(fingerprint)}`,
         {
           method: 'DELETE',
         }
@@ -301,7 +294,7 @@ export const users = {
 
       if (response.status !== 204) {
         console.error(
-          `DELETE /users/${userId}/keys/${fingerprint} returned ${response.status}, expected 204`
+          `DELETE /users/${userName}/keys/${fingerprint} returned ${response.status}, expected 204`
         );
         return false;
       }
@@ -309,7 +302,7 @@ export const users = {
       return true;
     } catch (error) {
       console.error(
-        `Failed to test DELETE /users/${userId}/keys/${fingerprint}:`,
+        `Failed to test DELETE /users/${userName}/keys/${fingerprint}:`,
         error
       );
       return false;

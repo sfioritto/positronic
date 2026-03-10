@@ -162,14 +162,13 @@ interface MockPage {
 }
 
 interface MockUser {
-  id: string;
   name: string;
   createdAt: number;
 }
 
 interface MockUserKey {
   fingerprint: string;
-  userId: string;
+  userName: string;
   label: string;
   addedAt: number;
 }
@@ -1321,19 +1320,16 @@ export class TestDevServer implements PositronicDevServer {
       const body = parseRequestBody(requestBody);
 
       // Check if user already exists
-      const existing = Array.from(this.users.values()).find(u => u.name === body.name);
-      if (existing) {
+      if (this.users.has(body.name)) {
         return [409, { error: `User '${body.name}' already exists` }];
       }
 
-      const id = `user-${Date.now()}`;
       const user: MockUser = {
-        id,
         name: body.name,
         createdAt: Date.now(),
       };
 
-      this.users.set(id, user);
+      this.users.set(body.name, user);
       this.logCall('createUser', [body.name]);
 
       return [201, user];
@@ -1349,57 +1345,57 @@ export class TestDevServer implements PositronicDevServer {
       };
     });
 
-    // GET /users/:id - Get a specific user
+    // GET /users/:name - Get a specific user
     nockInstance.get(/^\/users\/([^/]+)$/).reply((uri) => {
       const match = uri.match(/^\/users\/([^/]+)$/);
       if (match) {
-        const userId = decodeURIComponent(match[1]);
-        this.logCall('getUser', [userId]);
+        const name = decodeURIComponent(match[1]);
+        this.logCall('getUser', [name]);
 
-        const user = this.users.get(userId);
+        const user = this.users.get(name);
         if (!user) {
-          return [404, { error: `User '${userId}' not found` }];
+          return [404, { error: `User '${name}' not found` }];
         }
         return [200, user];
       }
       return [404, 'Not Found'];
     });
 
-    // DELETE /users/:id - Delete a user
+    // DELETE /users/:name - Delete a user
     nockInstance.delete(/^\/users\/([^/]+)$/).reply((uri) => {
       const match = uri.match(/^\/users\/([^/]+)$/);
       if (match) {
-        const userId = decodeURIComponent(match[1]);
+        const name = decodeURIComponent(match[1]);
 
-        if (this.users.has(userId)) {
+        if (this.users.has(name)) {
           // Delete associated keys
           for (const [fingerprint, key] of this.userKeys) {
-            if (key.userId === userId) {
+            if (key.userName === name) {
               this.userKeys.delete(fingerprint);
             }
           }
-          this.users.delete(userId);
-          this.logCall('deleteUser', [userId]);
+          this.users.delete(name);
+          this.logCall('deleteUser', [name]);
           return [204, ''];
         } else {
-          return [404, { error: `User '${userId}' not found` }];
+          return [404, { error: `User '${name}' not found` }];
         }
       }
       return [404, 'Not Found'];
     });
 
-    // POST /users/:id/keys - Add a key to a user
+    // POST /users/:name/keys - Add a key to a user
     nockInstance.post(/^\/users\/([^/]+)\/keys$/).reply((uri, requestBody) => {
       const match = uri.match(/^\/users\/([^/]+)\/keys$/);
       if (match) {
-        const userId = decodeURIComponent(match[1]);
+        const name = decodeURIComponent(match[1]);
         const body =
           parseRequestBody(requestBody);
 
         // Check if user exists
-        const user = this.users.get(userId);
+        const user = this.users.get(name);
         if (!user) {
-          return [404, { error: `User '${userId}' not found` }];
+          return [404, { error: `User '${name}' not found` }];
         }
 
         // Check if key already exists
@@ -1409,55 +1405,61 @@ export class TestDevServer implements PositronicDevServer {
 
         const key: MockUserKey = {
           fingerprint: body.fingerprint,
-          userId,
+          userName: name,
           label: body.label || '',
           addedAt: Date.now(),
         };
 
         this.userKeys.set(body.fingerprint, key);
-        this.logCall('addUserKey', [userId, body.fingerprint]);
+        this.logCall('addUserKey', [name, body.fingerprint]);
 
         return [201, key];
       }
       return [404, 'Not Found'];
     });
 
-    // GET /users/:id/keys - List keys for a user
+    // GET /users/:name/keys - List keys for a user
     nockInstance.get(/^\/users\/([^/]+)\/keys$/).reply((uri) => {
       const match = uri.match(/^\/users\/([^/]+)\/keys$/);
       if (match) {
-        const userId = decodeURIComponent(match[1]);
-        this.logCall('listUserKeys', [userId]);
+        const name = decodeURIComponent(match[1]);
+        this.logCall('listUserKeys', [name]);
 
         // Check if user exists
-        const user = this.users.get(userId);
+        const user = this.users.get(name);
         if (!user) {
-          return [404, { error: `User '${userId}' not found` }];
+          return [404, { error: `User '${name}' not found` }];
         }
 
-        const keys = Array.from(this.userKeys.values()).filter(k => k.userId === userId);
+        const keys = Array.from(this.userKeys.values()).filter(k => k.userName === name);
         return [200, { keys, count: keys.length }];
       }
       return [404, 'Not Found'];
     });
 
-    // DELETE /users/:id/keys/:fingerprint - Remove a key from a user
+    // DELETE /users/:name/keys/:fingerprint - Remove a key from a user
     nockInstance.delete(/^\/users\/([^/]+)\/keys\/(.+)$/).reply((uri) => {
       const match = uri.match(/^\/users\/([^/]+)\/keys\/(.+)$/);
       if (match) {
-        const userId = decodeURIComponent(match[1]);
+        const name = decodeURIComponent(match[1]);
         const fingerprint = decodeURIComponent(match[2]);
 
         const key = this.userKeys.get(fingerprint);
-        if (key && key.userId === userId) {
+        if (key && key.userName === name) {
           this.userKeys.delete(fingerprint);
-          this.logCall('removeUserKey', [userId, fingerprint]);
+          this.logCall('removeUserKey', [name, fingerprint]);
           return [204, ''];
         } else {
           return [404, { error: 'Key not found' }];
         }
       }
       return [404, 'Not Found'];
+    });
+
+    // GET /auth/whoami - Return current user identity
+    nockInstance.get('/auth/whoami').reply(200, () => {
+      this.logCall('whoami', []);
+      return { name: 'root', isRoot: true };
     });
 
     // Store Management Endpoints
@@ -1704,7 +1706,7 @@ export class TestDevServer implements PositronicDevServer {
 
   // User helper methods
   addUser(user: MockUser) {
-    this.users.set(user.id, user);
+    this.users.set(user.name, user);
   }
 
   clearUsers() {
@@ -1716,8 +1718,8 @@ export class TestDevServer implements PositronicDevServer {
     return Array.from(this.users.values());
   }
 
-  getUser(id: string): MockUser | undefined {
-    return this.users.get(id);
+  getUser(name: string): MockUser | undefined {
+    return this.users.get(name);
   }
 
   addUserKey(key: MockUserKey) {
@@ -1728,8 +1730,8 @@ export class TestDevServer implements PositronicDevServer {
     this.userKeys.clear();
   }
 
-  getUserKeys(userId: string): MockUserKey[] {
-    return Array.from(this.userKeys.values()).filter(k => k.userId === userId);
+  getUserKeys(userName: string): MockUserKey[] {
+    return Array.from(this.userKeys.values()).filter(k => k.userName === userName);
   }
 
   // Store helper methods

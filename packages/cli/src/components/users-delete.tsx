@@ -4,19 +4,18 @@ import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
 
 interface UsersDeleteProps {
-  userId: string;
+  userName: string;
   force: boolean;
 }
 
 interface User {
-  id: string;
   name: string;
   createdAt: number;
 }
 
-export const UsersDelete = ({ userId, force }: UsersDeleteProps) => {
+export const UsersDelete = ({ userName, force }: UsersDeleteProps) => {
   const { exit } = useApp();
-  const { data: user, loading: loadingUser, error: getUserError } = useApiGet<User>(`/users/${userId}`);
+  const { data: user, loading: loadingUser, error: getUserError } = useApiGet<User>(`/users/${userName}`);
   const { loading: deleting, error: deleteError, execute } = useApiDelete('user');
   const [confirmed, setConfirmed] = useState(force);
   const [deleted, setDeleted] = useState(false);
@@ -26,12 +25,12 @@ export const UsersDelete = ({ userId, force }: UsersDeleteProps) => {
     if (deletionStarted) return;
     setDeletionStarted(true);
     try {
-      await execute(`/users/${userId}`);
+      await execute(`/users/${userName}`);
       setDeleted(true);
     } catch {
       // Error is handled by the hook
     }
-  }, [execute, userId, deletionStarted]);
+  }, [execute, userName, deletionStarted]);
 
   useEffect(() => {
     if (confirmed && user && !deleted && !deletionStarted) {
@@ -68,7 +67,7 @@ export const UsersDelete = ({ userId, force }: UsersDeleteProps) => {
   if (!user) {
     return (
       <Box>
-        <Text color="red">User not found: {userId}</Text>
+        <Text color="red">User not found: {userName}</Text>
       </Box>
     );
   }

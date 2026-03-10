@@ -138,6 +138,26 @@ export function convertSSHPubKeyToJWK(pubKeyPath: string): SSHKeyInfo {
 }
 
 /**
+ * Convert an SSH public key string to JWK format
+ * Like convertSSHPubKeyToJWK but accepts the key content directly instead of a file path
+ */
+export function convertSSHPubKeyStringToJWK(pubKeyContent: string): SSHKeyInfo {
+  const sshKey = sshpk.parseKey(pubKeyContent.trim(), 'auto');
+
+  const fingerprint = sshKey.fingerprint('sha256').toString();
+
+  const pem = sshKey.toString('pem');
+  const keyObject = createPublicKey(pem);
+  const jwk = keyObject.export({ format: 'jwk' });
+
+  return {
+    jwk,
+    fingerprint,
+    algorithm: sshKey.type,
+  };
+}
+
+/**
  * Load an SSH private key from a file path or environment variable
  */
 export function loadPrivateKey(pathOrEnv?: string): sshpk.PrivateKey {

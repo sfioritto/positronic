@@ -1249,12 +1249,12 @@ export function buildCli(options: CliOptions) {
           }
         )
         .command(
-          'delete <id>',
+          'delete <name>',
           'Delete a user\n',
           (yargsDelete) => {
             return yargsDelete
-              .positional('id', {
-                describe: 'ID of the user to delete',
+              .positional('name', {
+                describe: 'Name of the user to delete',
                 type: 'string',
                 demandOption: true,
               })
@@ -1264,9 +1264,9 @@ export function buildCli(options: CliOptions) {
                 alias: 'f',
                 default: false,
               })
-              .example('$0 users delete abc123', 'Delete a user')
+              .example('$0 users delete admin', 'Delete a user')
               .example(
-                '$0 users delete abc123 --force',
+                '$0 users delete admin --force',
                 'Delete without confirmation'
               );
           },
@@ -1276,104 +1276,104 @@ export function buildCli(options: CliOptions) {
           }
         )
         .command(
-          'keys',
-          'Manage SSH keys for users\n',
-          (yargsKeys) => {
-            return yargsKeys
-              .command(
-                'list <user-id>',
-                'List keys for a user\n',
-                (yargsKeysList) => {
-                  return yargsKeysList
-                    .positional('user-id', {
-                      describe: 'User ID',
-                      type: 'string',
-                      demandOption: true,
-                    })
-                    .example('$0 users keys list abc123', 'List keys for a user');
-                },
-                (argv) => {
-                  const element = usersCommand.keysList({ id: argv.userId as string } as any);
-                  render(element);
-                }
-              )
-              .command(
-                'add <user-id> <pubkey-path>',
-                'Add an SSH public key to a user\n',
-                (yargsAdd) => {
-                  return yargsAdd
-                    .positional('user-id', {
-                      describe: 'User ID',
-                      type: 'string',
-                      demandOption: true,
-                    })
-                    .positional('pubkey-path', {
-                      describe: 'Path to the SSH public key file',
-                      type: 'string',
-                      demandOption: true,
-                    })
-                    .option('label', {
-                      describe: 'Label for the key (e.g., "laptop", "desktop")',
-                      type: 'string',
-                      alias: 'l',
-                    })
-                    .example(
-                      '$0 users keys add abc123 ~/.ssh/id_rsa.pub',
-                      'Add RSA public key'
-                    )
-                    .example(
-                      '$0 users keys add abc123 ~/.ssh/id_ed25519.pub --label laptop',
-                      'Add key with label'
-                    );
-                },
-                (argv) => {
-                  const element = usersCommand.keysAdd({
-                    id: argv.userId as string,
-                    pubkeyPath: argv.pubkeyPath as string,
-                    label: argv.label as string | undefined,
-                  } as any);
-                  render(element);
-                }
-              )
-              .command(
-                'remove <user-id> <fingerprint>',
-                'Remove a key from a user\n',
-                (yargsRemove) => {
-                  return yargsRemove
-                    .positional('user-id', {
-                      describe: 'User ID',
-                      type: 'string',
-                      demandOption: true,
-                    })
-                    .positional('fingerprint', {
-                      describe: 'Fingerprint of the key to remove',
-                      type: 'string',
-                      demandOption: true,
-                    })
-                    .option('force', {
-                      describe: 'Skip confirmation prompt',
-                      type: 'boolean',
-                      alias: 'f',
-                      default: false,
-                    })
-                    .example(
-                      '$0 users keys remove abc123 SHA256:...',
-                      'Remove a key'
-                    );
-                },
-                (argv) => {
-                  const element = usersCommand.keysRemove({
-                    id: argv.userId as string,
-                    fingerprint: argv.fingerprint as string,
-                    force: argv.force as boolean,
-                  } as any);
-                  render(element);
-                }
-              )
-              .demandCommand(1, 'You need to specify a keys command (list, add, remove)');
+          'list-keys <name>',
+          'List keys for a user\n',
+          (yargsKeysList) => {
+            return yargsKeysList
+              .positional('name', {
+                describe: 'Name of the user',
+                type: 'string',
+                demandOption: true,
+              })
+              .example('$0 users list-keys admin', 'List keys for a user');
+          },
+          (argv) => {
+            const element = usersCommand.listKeys(argv as any);
+            render(element);
           }
         )
-        .demandCommand(1, 'You need to specify a users command (list, create, delete, keys)');
+        .command(
+          'add-key <name> [pubkey-path]',
+          'Add an SSH public key to a user\n',
+          (yargsAdd) => {
+            return yargsAdd
+              .positional('name', {
+                describe: 'Name of the user',
+                type: 'string',
+                demandOption: true,
+              })
+              .positional('pubkey-path', {
+                describe: 'Path to the SSH public key file',
+                type: 'string',
+              })
+              .option('paste', {
+                describe: 'Paste a public key from clipboard',
+                type: 'boolean',
+                default: false,
+              })
+              .option('label', {
+                describe: 'Label for the key (e.g., "laptop", "desktop")',
+                type: 'string',
+                alias: 'l',
+              })
+              .check((argv) => {
+                if (!argv.pubkeyPath && !argv.paste) {
+                  throw new Error(
+                    'You must provide a pubkey-path or use --paste'
+                  );
+                }
+                return true;
+              })
+              .example(
+                '$0 users add-key admin ~/.ssh/id_ed25519.pub',
+                'Add an SSH public key'
+              )
+              .example(
+                '$0 users add-key admin --paste',
+                'Paste a public key interactively'
+              )
+              .example(
+                '$0 users add-key admin ~/.ssh/id_ed25519.pub --label laptop',
+                'Add key with label'
+              );
+          },
+          (argv) => {
+            const element = usersCommand.addKey(argv as any);
+            render(element);
+          }
+        )
+        .command(
+          'remove-key <name> <fingerprint>',
+          'Remove a key from a user\n',
+          (yargsRemove) => {
+            return yargsRemove
+              .positional('name', {
+                describe: 'Name of the user',
+                type: 'string',
+                demandOption: true,
+              })
+              .positional('fingerprint', {
+                describe: 'Fingerprint of the key to remove',
+                type: 'string',
+                demandOption: true,
+              })
+              .option('force', {
+                describe: 'Skip confirmation prompt',
+                type: 'boolean',
+                alias: 'f',
+                default: false,
+              })
+              .example(
+                '$0 users remove-key admin SHA256:...',
+                'Remove a key'
+              );
+          },
+          (argv) => {
+            const element = usersCommand.removeKey(argv as any);
+            render(element);
+          }
+        )
+        .demandCommand(1, 'You need to specify a users command (list, create, delete, list-keys, add-key, remove-key)');
 
       return yargsUsers;
     }
@@ -1391,122 +1391,71 @@ export function buildCli(options: CliOptions) {
     }
   );
 
-  // --- Auth Commands (Available in both local and global mode) ---
+  // --- Auth Commands (Top-level) ---
   const authCommand = new AuthCommand(undefined, projectRootPath);
-  {
-    cli = cli.command(
-      'auth',
-      'Manage authentication configuration\n',
-      (yargsAuth) => {
-        yargsAuth
-          .command(
-            'status',
-            'Show current auth configuration\n',
-            () => {},
-            () => {
-              const element = authCommand.status();
-              render(element);
-            }
-          )
-          .command(
-            'login',
-            'Configure SSH key for authentication\n',
-            (yargsLogin) => {
-              return yargsLogin
-                .option('path', {
-                  describe: 'Path to SSH private key',
-                  type: 'string',
-                  alias: 'p',
-                })
-                .option('project', {
-                  describe: 'Set key for current project instead of global',
-                  type: 'boolean',
-                  default: false,
-                })
-                .example('$0 auth login', 'Interactive key selection')
-                .example(
-                  '$0 auth login --path ~/.ssh/id_ed25519',
-                  'Set key directly'
-                )
-                .example(
-                  '$0 auth login --project',
-                  'Set key for current project'
-                );
-            },
-            (argv) => {
-              const element = authCommand.login(argv as any);
-              render(element);
-            }
-          )
-          .command(
-            'logout',
-            'Clear SSH key configuration\n',
-            (yargsLogout) => {
-              return yargsLogout
-                .option('project', {
-                  describe: 'Clear key for current project only',
-                  type: 'boolean',
-                  default: false,
-                })
-                .example('$0 auth logout', 'Clear global key configuration')
-                .example(
-                  '$0 auth logout --project',
-                  'Clear project-specific key'
-                );
-            },
-            (argv) => {
-              const element = authCommand.logout(argv as any);
-              render(element);
-            }
-          )
-          .command(
-            'list',
-            'List available SSH keys\n',
-            () => {},
-            () => {
-              const element = authCommand.list();
-              render(element);
-            }
-          )
-          .command(
-            'format-jwk-key',
-            'Convert an SSH public key to JWK format for ROOT_PUBLIC_KEY\n',
-            (yargsFormatJwkKey) => {
-              return yargsFormatJwkKey
-                .option('pubkey', {
-                  describe: 'Path to SSH public key file',
-                  type: 'string',
-                  alias: 'p',
-                })
-                .example(
-                  '$0 auth format-jwk-key',
-                  'Interactive public key selection'
-                )
-                .example(
-                  '$0 auth format-jwk-key --pubkey ~/.ssh/id_ed25519.pub',
-                  'Convert specific key'
-                );
-            },
-            (argv) => {
-              const element = authCommand.formatJwkKey(argv as any);
-              render(element);
-            }
-          )
-          .command(
-            '$0',
-            false, // Hidden command - default action
-            () => {},
-            () => {
-              // Default to status when just 'px auth' is run
-              const element = authCommand.status();
-              render(element);
-            }
-          );
 
-        return yargsAuth;
-      }
-    );
-  }
+  cli = cli.command(
+    'login',
+    'Configure SSH key for authentication\n',
+    (yargsLogin) => {
+      return yargsLogin
+        .option('path', {
+          describe: 'Path to SSH private key',
+          type: 'string',
+          alias: 'p',
+        })
+        .option('project', {
+          describe: 'Set key for current project instead of global',
+          type: 'boolean',
+          default: false,
+        })
+        .example('$0 login', 'Interactive key selection')
+        .example(
+          '$0 login --path ~/.ssh/id_ed25519',
+          'Set key directly'
+        )
+        .example(
+          '$0 login --project',
+          'Set key for current project'
+        );
+    },
+    (argv) => {
+      const element = authCommand.login(argv as any);
+      render(element);
+    }
+  );
+
+  cli = cli.command(
+    'logout',
+    'Clear SSH key configuration\n',
+    (yargsLogout) => {
+      return yargsLogout
+        .option('project', {
+          describe: 'Clear key for current project only',
+          type: 'boolean',
+          default: false,
+        })
+        .example('$0 logout', 'Clear global key configuration')
+        .example(
+          '$0 logout --project',
+          'Clear project-specific key'
+        );
+    },
+    (argv) => {
+      const element = authCommand.logout(argv as any);
+      render(element);
+    }
+  );
+
+  cli = cli.command(
+    'whoami',
+    'Show your current authenticated identity\n',
+    () => {},
+    () => {
+      const element = authCommand.whoami();
+      render(element);
+    }
+  );
 
   cli = cli.epilogue('For more information, visit https://positronic.sh');
 

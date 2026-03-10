@@ -253,9 +253,9 @@ export const scoping = {
         id: string;
         runAsUserId: string;
       };
-      if (schedule.runAsUserId !== userA.userId) {
+      if (schedule.runAsUserId !== userA.userName) {
         console.error(
-          `Expected runAsUserId to be '${userA.userId}', got '${schedule.runAsUserId}'`
+          `Expected runAsUserId to be '${userA.userName}', got '${schedule.runAsUserId}'`
         );
         return false;
       }

@@ -12,22 +12,23 @@ interface UsersCreateArgs {
 }
 
 interface UsersDeleteArgs {
-  id: string;
+  name: string;
   force: boolean;
 }
 
-interface UsersKeysListArgs {
-  id: string;
+interface UsersListKeysArgs {
+  name: string;
 }
 
-interface UsersKeysAddArgs {
-  id: string;
-  pubkeyPath: string;
+interface UsersAddKeyArgs {
+  name: string;
+  pubkeyPath?: string;
+  paste?: boolean;
   label?: string;
 }
 
-interface UsersKeysRemoveArgs {
-  id: string;
+interface UsersRemoveKeyArgs {
+  name: string;
   fingerprint: string;
   force: boolean;
 }
@@ -43,33 +44,35 @@ export class UsersCommand {
     return React.createElement(UsersCreate, { name });
   }
 
-  delete({ id, force }: ArgumentsCamelCase<UsersDeleteArgs>): React.ReactElement {
-    return React.createElement(UsersDelete, { userId: id, force });
+  delete({ name, force }: ArgumentsCamelCase<UsersDeleteArgs>): React.ReactElement {
+    return React.createElement(UsersDelete, { userName: name, force });
   }
 
-  keysList({ id }: ArgumentsCamelCase<UsersKeysListArgs>): React.ReactElement {
-    return React.createElement(UsersKeysList, { userId: id });
+  listKeys({ name }: ArgumentsCamelCase<UsersListKeysArgs>): React.ReactElement {
+    return React.createElement(UsersKeysList, { userName: name });
   }
 
-  keysAdd({
-    id,
+  addKey({
+    name,
     pubkeyPath,
+    paste,
     label,
-  }: ArgumentsCamelCase<UsersKeysAddArgs>): React.ReactElement {
+  }: ArgumentsCamelCase<UsersAddKeyArgs>): React.ReactElement {
     return React.createElement(UsersKeysAdd, {
-      userId: id,
+      userName: name,
       pubkeyPath,
+      paste,
       label,
     });
   }
 
-  keysRemove({
-    id,
+  removeKey({
+    name,
     fingerprint,
     force,
-  }: ArgumentsCamelCase<UsersKeysRemoveArgs>): React.ReactElement {
+  }: ArgumentsCamelCase<UsersRemoveKeyArgs>): React.ReactElement {
     return React.createElement(UsersKeysRemove, {
-      userId: id,
+      userName: name,
       fingerprint,
       force,
     });

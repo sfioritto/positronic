@@ -4,12 +4,12 @@ import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
 
 interface UsersKeysListProps {
-  userId: string;
+  userName: string;
 }
 
 interface UserKey {
   fingerprint: string;
-  userId: string;
+  userName: string;
   label: string;
   addedAt: number;
 }
@@ -20,7 +20,6 @@ interface KeysResponse {
 }
 
 interface User {
-  id: string;
   name: string;
   createdAt: number;
 }
@@ -39,9 +38,9 @@ const padRight = (text: string, width: number): string => {
   return text + ' '.repeat(Math.max(0, width - text.length));
 };
 
-export const UsersKeysList = ({ userId }: UsersKeysListProps) => {
-  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userId}`);
-  const { data, loading, error } = useApiGet<KeysResponse>(`/users/${userId}/keys`);
+export const UsersKeysList = ({ userName }: UsersKeysListProps) => {
+  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userName}`);
+  const { data, loading, error } = useApiGet<KeysResponse>(`/users/${userName}/keys`);
 
   if (userError) {
     return <ErrorComponent error={userError} />;
@@ -62,7 +61,7 @@ export const UsersKeysList = ({ userId }: UsersKeysListProps) => {
   if (!user) {
     return (
       <Box>
-        <Text color="red">User not found: {userId}</Text>
+        <Text color="red">User not found: {userName}</Text>
       </Box>
     );
   }
@@ -73,7 +72,7 @@ export const UsersKeysList = ({ userId }: UsersKeysListProps) => {
         <Text>No keys found for user "{user.name}".</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Add a key with "px users keys add {userId} ~/.ssh/id_rsa.pub"
+            Tip: Add a key with "px users add-key {userName} ~/.ssh/id_ed25519.pub"
           </Text>
         </Box>
       </Box>

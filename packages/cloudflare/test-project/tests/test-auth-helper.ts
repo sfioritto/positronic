@@ -108,7 +108,7 @@ export async function createUserFetch(
   baseFetch: (request: Request) => Promise<Response>,
   rootFetch: (request: Request) => Promise<Response>,
   userName: string
-): Promise<{ fetch: (request: Request) => Promise<Response>; userId: string }> {
+): Promise<{ fetch: (request: Request) => Promise<Response>; userName: string }> {
   // 1. Create the user
   const createUserResponse = await rootFetch(
     new Request('http://example.com/users', {
@@ -123,13 +123,10 @@ export async function createUserFetch(
     throw new Error(`Failed to create user '${userName}': ${error}`);
   }
 
-  const user = await createUserResponse.json<{ id: string; name: string }>();
-  const userId = user.id;
-
   // 2. Register the test public key with a unique fingerprint for this user
   const userFingerprint = `SHA256:user-${userName}`;
   const addKeyResponse = await rootFetch(
-    new Request(`http://example.com/users/${userId}/keys`, {
+    new Request(`http://example.com/users/${userName}/keys`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -161,5 +158,5 @@ export async function createUserFetch(
     return baseFetch(authRequest);
   };
 
-  return { fetch: userFetch, userId };
+  return { fetch: userFetch, userName };
 }

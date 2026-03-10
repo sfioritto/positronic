@@ -73,7 +73,7 @@ export class JwtAuthProvider {
 
       if (!existsSync(keyPath)) {
         this.initError = new Error(
-          `Private key not found at ${keyPath}. Run 'px auth login' to configure your SSH key, or set POSITRONIC_PRIVATE_KEY environment variable.`
+          `Private key not found at ${keyPath}. Run 'px login' to configure your SSH key, or set POSITRONIC_PRIVATE_KEY environment variable.`
         );
         return;
       }

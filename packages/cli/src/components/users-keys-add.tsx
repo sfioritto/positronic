@@ -1,58 +1,90 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiPost, useApiGet } from '../hooks/useApi.js';
-import { convertSSHPubKeyToJWK } from '../lib/ssh-key-utils.js';
+import { convertSSHPubKeyToJWK, convertSSHPubKeyStringToJWK } from '../lib/ssh-key-utils.js';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
 interface UsersKeysAddProps {
-  userId: string;
-  pubkeyPath: string;
+  userName: string;
+  pubkeyPath?: string;
+  paste?: boolean;
   label?: string;
 }
 
 interface UserKey {
   fingerprint: string;
-  userId: string;
+  userName: string;
   label: string;
   addedAt: number;
 }
 
 interface User {
-  id: string;
   name: string;
   createdAt: number;
 }
 
-export const UsersKeysAdd = ({ userId, pubkeyPath, label }: UsersKeysAddProps) => {
-  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userId}`);
-  const { data, loading, error, execute } = useApiPost<UserKey>(`/users/${userId}/keys`);
+export const UsersKeysAdd = ({ userName, pubkeyPath, paste, label }: UsersKeysAddProps) => {
+  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userName}`);
+  const { data, loading, error, execute } = useApiPost<UserKey>(`/users/${userName}/keys`);
   const [added, setAdded] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [keyInfo, setKeyInfo] = useState<{ fingerprint: string; algorithm: string } | null>(null);
+  const [pasteMode, setPasteMode] = useState(paste && !pubkeyPath);
+  const [pastedKey, setPastedKey] = useState('');
+  const [pasteSubmitted, setPasteSubmitted] = useState(false);
+
+  useInput((input, key) => {
+    if (!pasteMode || pasteSubmitted) return;
+
+    if (key.return) {
+      setPasteSubmitted(true);
+      return;
+    }
+
+    if (key.backspace || key.delete) {
+      setPastedKey((prev) => prev.slice(0, -1));
+      return;
+    }
+
+    if (input) {
+      setPastedKey((prev) => prev + input);
+    }
+  }, { isActive: pasteMode && !pasteSubmitted });
 
   useEffect(() => {
-    if (!added && user && !parseError) {
-      // Resolve the path
+    if (!user || added || parseError) return;
+    if (pasteMode && !pasteSubmitted) return;
+
+    if (pasteMode && pasteSubmitted && pastedKey) {
+      try {
+        const { jwk, fingerprint, algorithm } = convertSSHPubKeyStringToJWK(pastedKey.trim());
+        setKeyInfo({ fingerprint, algorithm });
+        execute({ jwk, fingerprint, label: label || '' })
+          .then(() => setAdded(true))
+          .catch(() => {});
+      } catch (err: any) {
+        setParseError(err.message || 'Failed to parse SSH public key');
+      }
+      return;
+    }
+
+    if (pubkeyPath) {
       let resolvedPath = pubkeyPath;
       if (resolvedPath.startsWith('~')) {
         resolvedPath = join(homedir(), resolvedPath.slice(1));
       }
 
-      // Check if file exists
       if (!existsSync(resolvedPath)) {
         setParseError(`Public key file not found: ${resolvedPath}`);
         return;
       }
 
       try {
-        // Convert SSH public key to JWK
         const { jwk, fingerprint, algorithm } = convertSSHPubKeyToJWK(resolvedPath);
         setKeyInfo({ fingerprint, algorithm });
-
-        // Upload the key
         execute({ jwk, fingerprint, label: label || '' })
           .then(() => setAdded(true))
           .catch(() => {});
@@ -60,7 +92,7 @@ export const UsersKeysAdd = ({ userId, pubkeyPath, label }: UsersKeysAddProps) =
         setParseError(err.message || 'Failed to parse SSH public key');
       }
     }
-  }, [user, added, pubkeyPath, label, execute, parseError]);
+  }, [user, added, pubkeyPath, label, execute, parseError, pasteMode, pasteSubmitted, pastedKey]);
 
   if (userError) {
     return <ErrorComponent error={userError} />;
@@ -94,7 +126,18 @@ export const UsersKeysAdd = ({ userId, pubkeyPath, label }: UsersKeysAddProps) =
   if (!user) {
     return (
       <Box>
-        <Text color="red">User not found: {userId}</Text>
+        <Text color="red">User not found: {userName}</Text>
+      </Box>
+    );
+  }
+
+  if (pasteMode && !pasteSubmitted) {
+    return (
+      <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
+        <Text>Paste your SSH public key and press <Text bold>Enter</Text>:</Text>
+        <Box marginTop={1}>
+          <Text>{pastedKey || '...'}</Text>
+        </Box>
       </Box>
     );
   }

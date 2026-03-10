@@ -46,7 +46,7 @@ app.post('/', async (c) => {
     const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
 
     // Check if user already exists
-    const existing = await authDo.getUserByName(body.name);
+    const existing = await authDo.getUser(body.name);
     if (existing) {
       return c.json({ error: `User '${body.name}' already exists` }, 409);
     }
@@ -73,17 +73,17 @@ app.get('/', async (c) => {
   }
 });
 
-// GET /users/:id - Get a specific user
-app.get('/:id', async (c) => {
+// GET /users/:name - Get a specific user
+app.get('/:name', async (c) => {
   try {
-    const userId = c.req.param('id');
+    const name = c.req.param('name');
 
     const authDoId = c.env.AUTH_DO.idFromName('auth');
     const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
 
-    const user = await authDo.getUser(userId);
+    const user = await authDo.getUser(name);
     if (!user) {
-      return c.json({ error: `User '${userId}' not found` }, 404);
+      return c.json({ error: `User '${name}' not found` }, 404);
     }
 
     return c.json(user);
@@ -93,17 +93,17 @@ app.get('/:id', async (c) => {
   }
 });
 
-// DELETE /users/:id - Delete a user
-app.delete('/:id', async (c) => {
+// DELETE /users/:name - Delete a user
+app.delete('/:name', async (c) => {
   try {
-    const userId = c.req.param('id');
+    const name = c.req.param('name');
 
     const authDoId = c.env.AUTH_DO.idFromName('auth');
     const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
 
-    const deleted = await authDo.deleteUser(userId);
+    const deleted = await authDo.deleteUser(name);
     if (!deleted) {
-      return c.json({ error: `User '${userId}' not found` }, 404);
+      return c.json({ error: `User '${name}' not found` }, 404);
     }
 
     return c.body(null, 204);
@@ -113,10 +113,10 @@ app.delete('/:id', async (c) => {
   }
 });
 
-// POST /users/:id/keys - Add a key to a user
-app.post('/:id/keys', async (c) => {
+// POST /users/:name/keys - Add a key to a user
+app.post('/:name/keys', async (c) => {
   try {
-    const userId = c.req.param('id');
+    const name = c.req.param('name');
     const body = await c.req.json<{
       jwk: object;
       fingerprint: string;
@@ -135,9 +135,9 @@ app.post('/:id/keys', async (c) => {
     const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
 
     // Check if user exists
-    const user = await authDo.getUser(userId);
+    const user = await authDo.getUser(name);
     if (!user) {
-      return c.json({ error: `User '${userId}' not found` }, 404);
+      return c.json({ error: `User '${name}' not found` }, 404);
     }
 
     // Check if key already exists
@@ -147,7 +147,7 @@ app.post('/:id/keys', async (c) => {
     }
 
     const key = await authDo.addKey(
-      userId,
+      name,
       body.fingerprint,
       JSON.stringify(body.jwk),
       body.label || ''
@@ -157,7 +157,7 @@ app.post('/:id/keys', async (c) => {
     return c.json(
       {
         fingerprint: key.fingerprint,
-        userId: key.userId,
+        userName: key.userName,
         label: key.label,
         addedAt: key.addedAt,
       },
@@ -169,27 +169,27 @@ app.post('/:id/keys', async (c) => {
   }
 });
 
-// GET /users/:id/keys - List keys for a user
-app.get('/:id/keys', async (c) => {
+// GET /users/:name/keys - List keys for a user
+app.get('/:name/keys', async (c) => {
   try {
-    const userId = c.req.param('id');
+    const name = c.req.param('name');
 
     const authDoId = c.env.AUTH_DO.idFromName('auth');
     const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
 
     // Check if user exists
-    const user = await authDo.getUser(userId);
+    const user = await authDo.getUser(name);
     if (!user) {
-      return c.json({ error: `User '${userId}' not found` }, 404);
+      return c.json({ error: `User '${name}' not found` }, 404);
     }
 
-    const result = await authDo.listKeys(userId);
+    const result = await authDo.listKeys(name);
 
     // Return keys without the jwk for security
     return c.json({
       keys: result.keys.map((key) => ({
         fingerprint: key.fingerprint,
-        userId: key.userId,
+        userName: key.userName,
         label: key.label,
         addedAt: key.addedAt,
       })),
@@ -201,16 +201,16 @@ app.get('/:id/keys', async (c) => {
   }
 });
 
-// DELETE /users/:id/keys/:fingerprint - Remove a key from a user
-app.delete('/:id/keys/:fingerprint', async (c) => {
+// DELETE /users/:name/keys/:fingerprint - Remove a key from a user
+app.delete('/:name/keys/:fingerprint', async (c) => {
   try {
-    const userId = c.req.param('id');
+    const name = c.req.param('name');
     const fingerprint = decodeURIComponent(c.req.param('fingerprint'));
 
     const authDoId = c.env.AUTH_DO.idFromName('auth');
     const authDo = c.env.AUTH_DO.get(authDoId) as DurableObjectStub<AuthDO>;
 
-    const deleted = await authDo.removeKey(userId, fingerprint);
+    const deleted = await authDo.removeKey(name, fingerprint);
     if (!deleted) {
       return c.json({ error: `Key not found` }, 404);
     }

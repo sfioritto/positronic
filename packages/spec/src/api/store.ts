@@ -367,7 +367,7 @@ export const store = {
   ): Promise<boolean> {
     try {
       // Get userA's fetch
-      const { fetch: userAFetch, userId: userAId } = await fetchFactory('userA');
+      const { fetch: userAFetch, userName: userAId } = await fetchFactory('userA');
 
       // Try to access userA's key with userA's credentials - should work
       const request = new Request(

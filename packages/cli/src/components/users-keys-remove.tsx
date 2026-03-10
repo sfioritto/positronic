@@ -4,20 +4,19 @@ import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
 
 interface UsersKeysRemoveProps {
-  userId: string;
+  userName: string;
   fingerprint: string;
   force: boolean;
 }
 
 interface User {
-  id: string;
   name: string;
   createdAt: number;
 }
 
-export const UsersKeysRemove = ({ userId, fingerprint, force }: UsersKeysRemoveProps) => {
+export const UsersKeysRemove = ({ userName, fingerprint, force }: UsersKeysRemoveProps) => {
   const { exit } = useApp();
-  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userId}`);
+  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userName}`);
   const { loading: deleting, error: deleteError, execute } = useApiDelete('key');
   const [confirmed, setConfirmed] = useState(force);
   const [deleted, setDeleted] = useState(false);
@@ -27,12 +26,12 @@ export const UsersKeysRemove = ({ userId, fingerprint, force }: UsersKeysRemoveP
     if (deletionStarted) return;
     setDeletionStarted(true);
     try {
-      await execute(`/users/${userId}/keys/${encodeURIComponent(fingerprint)}`);
+      await execute(`/users/${userName}/keys/${encodeURIComponent(fingerprint)}`);
       setDeleted(true);
     } catch {
       // Error is handled by the hook
     }
-  }, [execute, userId, fingerprint, deletionStarted]);
+  }, [execute, userName, fingerprint, deletionStarted]);
 
   useEffect(() => {
     if (confirmed && user && !deleted && !deletionStarted) {
@@ -69,7 +68,7 @@ export const UsersKeysRemove = ({ userId, fingerprint, force }: UsersKeysRemoveP
   if (!user) {
     return (
       <Box>
-        <Text color="red">User not found: {userId}</Text>
+        <Text color="red">User not found: {userName}</Text>
       </Box>
     );
   }
