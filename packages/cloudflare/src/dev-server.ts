@@ -635,8 +635,8 @@ export class CloudflareDevServer implements PositronicDevServer {
       await fsPromises.writeFile(tempBundlePath, bundleContent);
 
       try {
-        const localFlag = options.local ? ' --local' : '';
-        execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}"${localFlag}`, {
+        const locationFlag = options.local ? ' --local' : ' --remote';
+        execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}"${locationFlag}`, {
           cwd: serverDir,
           stdio: 'pipe',
         });
@@ -683,8 +683,8 @@ export class CloudflareDevServer implements PositronicDevServer {
     await fsPromises.writeFile(tempFilePath, origin);
 
     try {
-      const localFlag = options.local ? ' --local' : '';
-      execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempFilePath}"${localFlag}`, {
+      const locationFlag = options.local ? ' --local' : ' --remote';
+      execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempFilePath}"${locationFlag}`, {
         cwd: serverDir,
         stdio: 'pipe',
       });
