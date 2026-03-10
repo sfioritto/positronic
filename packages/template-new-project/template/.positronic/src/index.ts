@@ -7,6 +7,7 @@ import {
   MonitorDO,
   ScheduleDO,
   GovernorDO,
+  AuthDO,
   PositronicManifest,
 } from "@positronic/cloudflare";
 // Import the generated manifests - NOTE the .js extension for runtime compatibility
@@ -38,4 +39,4 @@ export default {
   fetch: app.fetch,
 } satisfies ExportedHandler<Env>;
 
-export { BrainRunnerDO, MonitorDO, ScheduleDO, GovernorDO };
+export { BrainRunnerDO, MonitorDO, ScheduleDO, GovernorDO, AuthDO };

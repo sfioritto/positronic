@@ -17,6 +17,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["GovernorDO"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["AuthDO"]
     }
   ],
   "durable_objects": {
@@ -24,7 +28,8 @@
       { "name": "BRAIN_RUNNER_DO", "class_name": "BrainRunnerDO" },
       { "name": "MONITOR_DO", "class_name": "MonitorDO" },
       { "name": "SCHEDULE_DO", "class_name": "ScheduleDO" },
-      { "name": "GOVERNOR_DO", "class_name": "GovernorDO" }
+      { "name": "GOVERNOR_DO", "class_name": "GovernorDO" },
+      { "name": "AUTH_DO", "class_name": "AuthDO" }
     ]
   },
   "r2_buckets": [
@@ -65,7 +70,8 @@
           { "name": "BRAIN_RUNNER_DO", "class_name": "BrainRunnerDO" },
           { "name": "MONITOR_DO", "class_name": "MonitorDO" },
           { "name": "SCHEDULE_DO", "class_name": "ScheduleDO" },
-          { "name": "GOVERNOR_DO", "class_name": "GovernorDO" }
+          { "name": "GOVERNOR_DO", "class_name": "GovernorDO" },
+          { "name": "AUTH_DO", "class_name": "AuthDO" }
         ]
       },
       "r2_buckets": [
