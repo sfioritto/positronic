@@ -67,6 +67,18 @@ The project uses npm workspaces with the following packages:
 
 5. **Event-Driven**: Brains emit events (start, complete, error, step status) for monitoring
 
+## Keeping the Project Template in Sync
+
+The project template (`packages/template-new-project/template/.positronic/`) is what `px project new` uses to scaffold new projects. It has its own `wrangler.jsonc` and `src/index.ts` that are **separate from** the cloudflare test-project's versions. There are no tests that verify the template produces a working project, so you must keep it in sync manually.
+
+**When adding a new Durable Object**, update all three places:
+1. `packages/cloudflare/test-project/wrangler.jsonc` — migration + binding
+2. `packages/cloudflare/test-project/src/index.ts` — import + export
+3. `packages/template-new-project/template/.positronic/wrangler.jsonc` — migration + binding (both top-level AND the `env.production` section)
+4. `packages/template-new-project/template/.positronic/src/index.ts` — import + export
+
+**When adding a new API endpoint or binding**, check whether the template's `wrangler.jsonc` and `index.ts` need updates. The test-project and template must stay in sync — if one has it, the other should too.
+
 ## Development Notes
 
 ### New Command Creation Guide
