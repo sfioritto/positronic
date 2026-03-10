@@ -10,6 +10,7 @@ export { bundle } from './bundle.js';
 export { users } from './users.js';
 export { auth } from './auth.js';
 export { scoping } from './scoping.js';
+export { store } from './store.js';
 export type { User, UserKey } from './users.js';
 export type { AuthSetupResponse } from './auth.js';
 export type { Fetch, FetchFactory } from './types.js';

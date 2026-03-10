@@ -7,6 +7,7 @@ import pages from './pages.js';
 import secrets from './secrets.js';
 import bundle from './bundle.js';
 import users from './users.js';
+import store from './store.js';
 import { authMiddleware } from './auth-middleware.js';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -73,6 +74,7 @@ app.route('/pages', pages);
 app.route('/secrets', secrets);
 app.route('/bundle', bundle);
 app.route('/users', users);
+app.route('/store', store);
 
 export default app;
 

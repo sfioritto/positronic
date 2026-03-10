@@ -10,6 +10,7 @@ import { SecretCommand } from './commands/secret.js';
 import { PagesCommand } from './commands/pages.js';
 import { UsersCommand } from './commands/users.js';
 import { AuthCommand } from './commands/auth.js';
+import { StoreCommand } from './commands/store.js';
 import type { PositronicDevServer } from '@positronic/spec';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -1375,6 +1376,18 @@ export function buildCli(options: CliOptions) {
         .demandCommand(1, 'You need to specify a users command (list, create, delete, keys)');
 
       return yargsUsers;
+    }
+  );
+
+  // --- Store Explorer Command ---
+  const storeCommand = new StoreCommand();
+  cli = cli.command(
+    'store',
+    'Browse and manage brain store data\n',
+    () => {},
+    () => {
+      const element = storeCommand.explore();
+      render(element);
     }
   );
 

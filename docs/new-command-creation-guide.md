@@ -249,9 +249,12 @@ nockInstance.get(/^\/your\/endpoint\/(.+)$/).reply((uri) => {
 
 #### 4.2 Write Comprehensive Tests
 
-In `packages/cli/src/commands/your-category.test.ts`:
+In `packages/cli/tests/your-category.test.ts`:
 
 ```typescript
+import { describe, it, expect } from '@jest/globals';
+import { createTestEnv, px } from './test-utils.js';
+
 describe('your command', () => {
   it('should show items when data exists', async () => {
     const env = await createTestEnv();
