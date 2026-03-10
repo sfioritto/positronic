@@ -1,5 +1,6 @@
 import { STATUS, BRAIN_EVENTS } from '@positronic/core';
 import type { Fetch } from './types.js';
+import { startBrainRun, readSseUntil } from './helpers.js';
 
 export const brains = {
   /**
@@ -10,43 +11,43 @@ export const brains = {
     identifier: string,
     options?: Record<string, string>
   ): Promise<string | null> {
-    try {
-      const body: any = { identifier };
-      if (options && Object.keys(options).length > 0) {
-        body.options = options;
-      }
+    if (options && Object.keys(options).length > 0) {
+      // When options are provided, we need the full request (can't use startBrainRun)
+      try {
+        const request = new Request('http://example.com/brains/runs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ identifier, options }),
+        });
 
-      const request = new Request('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
+        const response = await fetch(request);
 
-      const response = await fetch(request);
+        if (response.status !== 201) {
+          console.error(
+            `POST /brains/runs returned ${response.status}, expected 201`
+          );
+          return null;
+        }
 
-      if (response.status !== 201) {
-        console.error(
-          `POST /brains/runs returned ${response.status}, expected 201`
-        );
+        const data = (await response.json()) as { brainRunId: string };
+
+        if (!data.brainRunId || typeof data.brainRunId !== 'string') {
+          console.error(
+            `Expected brainRunId to be string, got ${typeof data.brainRunId}`
+          );
+          return null;
+        }
+
+        return data.brainRunId;
+      } catch (error) {
+        console.error(`Failed to test POST /brains/runs:`, error);
         return null;
       }
-
-      const data = (await response.json()) as { brainRunId: string };
-
-      if (!data.brainRunId || typeof data.brainRunId !== 'string') {
-        console.error(
-          `Expected brainRunId to be string, got ${typeof data.brainRunId}`
-        );
-        return null;
-      }
-
-      return data.brainRunId;
-    } catch (error) {
-      console.error(`Failed to test POST /brains/runs:`, error);
-      return null;
     }
+
+    return startBrainRun(fetch, identifier);
   },
 
   /**
@@ -996,23 +997,8 @@ export const brains = {
   ): Promise<boolean> {
     try {
       // Step 1: Start the loop brain
-      const runRequest = new Request('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: loopBrainIdentifier }),
-      });
-
-      const runResponse = await fetch(runRequest);
-      if (runResponse.status !== 201) {
-        console.error(
-          `POST /brains/runs returned ${runResponse.status}, expected 201`
-        );
-        return false;
-      }
-
-      const { brainRunId } = (await runResponse.json()) as {
-        brainRunId: string;
-      };
+      const brainRunId = await startBrainRun(fetch, loopBrainIdentifier);
+      if (!brainRunId) return false;
 
       // Step 2: Watch until WEBHOOK event (brain pauses)
       const watchRequest = new Request(
@@ -1028,51 +1014,32 @@ export const brains = {
         return false;
       }
 
-      let foundWebhookEvent = false;
-      if (watchResponse.body) {
-        const reader = watchResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-          while (!foundWebhookEvent) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            let eventEndIndex;
-            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-              const message = buffer.substring(0, eventEndIndex);
-              buffer = buffer.substring(eventEndIndex + 2);
-
-              if (message.startsWith('data: ')) {
-                try {
-                  const event = JSON.parse(message.substring(6));
-                  if (event.type === BRAIN_EVENTS.WEBHOOK) {
-                    foundWebhookEvent = true;
-                    break;
-                  }
-                  if (
-                    event.type === BRAIN_EVENTS.COMPLETE ||
-                    event.type === BRAIN_EVENTS.ERROR
-                  ) {
-                    console.error(
-                      `Brain completed/errored before WEBHOOK event: ${event.type}`
-                    );
-                    return false;
-                  }
-                } catch (e) {
-                  // Ignore parse errors
-                }
-              }
-            }
-          }
-        } finally {
-          await reader.cancel();
-        }
+      if (!watchResponse.body) {
+        console.error('Watch response has no body');
+        return false;
       }
 
+      let earlyTermination = false;
+      const events = await readSseUntil(watchResponse.body, (event) => {
+        if (event.type === BRAIN_EVENTS.WEBHOOK) return true;
+        if (
+          event.type === BRAIN_EVENTS.COMPLETE ||
+          event.type === BRAIN_EVENTS.ERROR
+        ) {
+          console.error(
+            `Brain completed/errored before WEBHOOK event: ${event.type}`
+          );
+          earlyTermination = true;
+          return true;
+        }
+        return false;
+      });
+
+      if (earlyTermination) return false;
+
+      const foundWebhookEvent = events.some(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      );
       if (!foundWebhookEvent) {
         console.error('Brain did not emit WEBHOOK event');
         return false;
@@ -1198,23 +1165,8 @@ export const brains = {
   ): Promise<boolean> {
     try {
       // Start the agent brain
-      const runRequest = new Request('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: agentBrainIdentifier }),
-      });
-
-      const runResponse = await fetch(runRequest);
-      if (runResponse.status !== 201) {
-        console.error(
-          `POST /brains/runs returned ${runResponse.status}, expected 201`
-        );
-        return false;
-      }
-
-      const { brainRunId } = (await runResponse.json()) as {
-        brainRunId: string;
-      };
+      const brainRunId = await startBrainRun(fetch, agentBrainIdentifier);
+      if (!brainRunId) return false;
 
       // Watch the brain run
       const watchRequest = new Request(
@@ -1231,50 +1183,13 @@ export const brains = {
       }
 
       // Read SSE events until we get WEBHOOK or COMPLETE/ERROR
-      const events: any[] = [];
-      if (watchResponse.body) {
-        const reader = watchResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let done = false;
-
-        try {
-          while (!done) {
-            const { value, done: streamDone } = await reader.read();
-            if (streamDone) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            // Process complete SSE messages
-            let eventEndIndex;
-            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-              const message = buffer.substring(0, eventEndIndex);
-              buffer = buffer.substring(eventEndIndex + 2);
-
-              if (message.startsWith('data: ')) {
-                try {
-                  const event = JSON.parse(message.substring(6));
-                  events.push(event);
-
-                  // Stop on terminal events
-                  if (
-                    event.type === BRAIN_EVENTS.WEBHOOK ||
-                    event.type === BRAIN_EVENTS.COMPLETE ||
-                    event.type === BRAIN_EVENTS.ERROR
-                  ) {
-                    done = true;
-                    break;
-                  }
-                } catch (e) {
-                  // Ignore parse errors
-                }
-              }
-            }
-          }
-        } finally {
-          await reader.cancel();
-        }
-      }
+      const events = watchResponse.body
+        ? await readSseUntil(watchResponse.body, (event) =>
+            event.type === BRAIN_EVENTS.WEBHOOK ||
+            event.type === BRAIN_EVENTS.COMPLETE ||
+            event.type === BRAIN_EVENTS.ERROR
+          )
+        : [];
 
       // Verify required agent events are present
       const hasAgentStart = events.some(
@@ -1369,23 +1284,8 @@ export const brains = {
   ): Promise<boolean> {
     try {
       // Step 1: Start the agent brain
-      const runRequest = new Request('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: agentBrainIdentifier }),
-      });
-
-      const runResponse = await fetch(runRequest);
-      if (runResponse.status !== 201) {
-        console.error(
-          `POST /brains/runs returned ${runResponse.status}, expected 201`
-        );
-        return false;
-      }
-
-      const { brainRunId } = (await runResponse.json()) as {
-        brainRunId: string;
-      };
+      const brainRunId = await startBrainRun(fetch, agentBrainIdentifier);
+      if (!brainRunId) return false;
 
       // Step 2: Watch until WEBHOOK event (brain pauses)
       const watchRequest = new Request(
@@ -1401,51 +1301,32 @@ export const brains = {
         return false;
       }
 
-      let foundWebhookEvent = false;
-      if (watchResponse.body) {
-        const reader = watchResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-          while (!foundWebhookEvent) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            let eventEndIndex;
-            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-              const message = buffer.substring(0, eventEndIndex);
-              buffer = buffer.substring(eventEndIndex + 2);
-
-              if (message.startsWith('data: ')) {
-                try {
-                  const event = JSON.parse(message.substring(6));
-                  if (event.type === BRAIN_EVENTS.WEBHOOK) {
-                    foundWebhookEvent = true;
-                    break;
-                  }
-                  if (
-                    event.type === BRAIN_EVENTS.COMPLETE ||
-                    event.type === BRAIN_EVENTS.ERROR
-                  ) {
-                    console.error(
-                      `Brain completed/errored before WEBHOOK event: ${event.type}`
-                    );
-                    return false;
-                  }
-                } catch (e) {
-                  // Ignore parse errors
-                }
-              }
-            }
-          }
-        } finally {
-          await reader.cancel();
-        }
+      if (!watchResponse.body) {
+        console.error('Watch response has no body');
+        return false;
       }
 
+      let earlyTermination = false;
+      const watchEvents = await readSseUntil(watchResponse.body, (event) => {
+        if (event.type === BRAIN_EVENTS.WEBHOOK) return true;
+        if (
+          event.type === BRAIN_EVENTS.COMPLETE ||
+          event.type === BRAIN_EVENTS.ERROR
+        ) {
+          console.error(
+            `Brain completed/errored before WEBHOOK event: ${event.type}`
+          );
+          earlyTermination = true;
+          return true;
+        }
+        return false;
+      });
+
+      if (earlyTermination) return false;
+
+      const foundWebhookEvent = watchEvents.some(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      );
       if (!foundWebhookEvent) {
         console.error('Brain did not emit WEBHOOK event');
         return false;
@@ -1500,47 +1381,12 @@ export const brains = {
         return false;
       }
 
-      const resumeEvents: any[] = [];
-      if (resumeWatchResponse.body) {
-        const reader = resumeWatchResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let done = false;
-
-        try {
-          while (!done) {
-            const { value, done: streamDone } = await reader.read();
-            if (streamDone) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            let eventEndIndex;
-            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-              const message = buffer.substring(0, eventEndIndex);
-              buffer = buffer.substring(eventEndIndex + 2);
-
-              if (message.startsWith('data: ')) {
-                try {
-                  const event = JSON.parse(message.substring(6));
-                  resumeEvents.push(event);
-
-                  if (
-                    event.type === BRAIN_EVENTS.COMPLETE ||
-                    event.type === BRAIN_EVENTS.ERROR
-                  ) {
-                    done = true;
-                    break;
-                  }
-                } catch (e) {
-                  // Ignore parse errors
-                }
-              }
-            }
-          }
-        } finally {
-          await reader.cancel();
-        }
-      }
+      const resumeEvents = resumeWatchResponse.body
+        ? await readSseUntil(resumeWatchResponse.body, (event) =>
+            event.type === BRAIN_EVENTS.COMPLETE ||
+            event.type === BRAIN_EVENTS.ERROR
+          )
+        : [];
 
       // Verify WEBHOOK_RESPONSE event is present
       const hasWebhookResponse = resumeEvents.some(
@@ -1608,23 +1454,8 @@ export const brains = {
   ): Promise<boolean> {
     try {
       // Step 1: Start the outer brain
-      const runRequest = new Request('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: outerBrainIdentifier }),
-      });
-
-      const runResponse = await fetch(runRequest);
-      if (runResponse.status !== 201) {
-        console.error(
-          `POST /brains/runs returned ${runResponse.status}, expected 201`
-        );
-        return false;
-      }
-
-      const { brainRunId } = (await runResponse.json()) as {
-        brainRunId: string;
-      };
+      const brainRunId = await startBrainRun(fetch, outerBrainIdentifier);
+      if (!brainRunId) return false;
 
       // Step 2: Watch SSE until WEBHOOK event from outer brain (after inner completes)
       const watchRequest = new Request(
@@ -1640,58 +1471,31 @@ export const brains = {
         return false;
       }
 
-      let foundOuterWebhook = false;
-      let innerCompleteCount = 0;
-      if (watchResponse.body) {
-        const reader = watchResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-          while (!foundOuterWebhook) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            let eventEndIndex;
-            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-              const message = buffer.substring(0, eventEndIndex);
-              buffer = buffer.substring(eventEndIndex + 2);
-
-              if (message.startsWith('data: ')) {
-                try {
-                  const event = JSON.parse(message.substring(6));
-
-                  // Track inner brain completes
-                  if (event.type === BRAIN_EVENTS.COMPLETE) {
-                    innerCompleteCount++;
-                    // First complete is inner brain, second would be outer
-                  }
-
-                  // Outer brain webhook (happens after inner brain completes)
-                  if (event.type === BRAIN_EVENTS.WEBHOOK) {
-                    foundOuterWebhook = true;
-                    break;
-                  }
-
-                  if (event.type === BRAIN_EVENTS.ERROR) {
-                    console.error(
-                      `Brain errored: ${JSON.stringify(event.error)}`
-                    );
-                    return false;
-                  }
-                } catch {
-                  // Ignore parse errors
-                }
-              }
-            }
-          }
-        } finally {
-          await reader.cancel();
-        }
+      if (!watchResponse.body) {
+        console.error('Watch response has no body');
+        return false;
       }
 
+      let innerCompleteCount = 0;
+      let hitError = false;
+      const watchEvents = await readSseUntil(watchResponse.body, (event) => {
+        if (event.type === BRAIN_EVENTS.COMPLETE) {
+          innerCompleteCount++;
+        }
+        if (event.type === BRAIN_EVENTS.WEBHOOK) return true;
+        if (event.type === BRAIN_EVENTS.ERROR) {
+          console.error(`Brain errored: ${JSON.stringify(event.error)}`);
+          hitError = true;
+          return true;
+        }
+        return false;
+      });
+
+      if (hitError) return false;
+
+      const foundOuterWebhook = watchEvents.some(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      );
       if (!foundOuterWebhook) {
         console.error('Did not receive outer brain WEBHOOK event');
         return false;
@@ -1769,49 +1573,17 @@ export const brains = {
       // Wait for the OUTER brain's COMPLETE event specifically (by tracking depth)
       // When resuming, the SSE stream includes historical events, so we need to
       // track START/COMPLETE events to know when the outer brain truly finishes
-      let foundFinalComplete = false;
-      let depth = 0;
       if (resumeWatchResponse.body) {
-        const reader = resumeWatchResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-          while (!foundFinalComplete) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            let eventEndIndex;
-            while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-              const message = buffer.substring(0, eventEndIndex);
-              buffer = buffer.substring(eventEndIndex + 2);
-
-              if (message.startsWith('data: ')) {
-                try {
-                  const event = JSON.parse(message.substring(6));
-
-                  // Track depth to find the outer brain's COMPLETE
-                  if (event.type === BRAIN_EVENTS.START) {
-                    depth++;
-                  } else if (event.type === BRAIN_EVENTS.COMPLETE) {
-                    depth--;
-                    // When depth reaches 0, the outer brain has completed
-                    if (depth <= 0) {
-                      foundFinalComplete = true;
-                      break;
-                    }
-                  }
-                } catch {
-                  // Ignore parse errors
-                }
-              }
-            }
+        let depth = 0;
+        await readSseUntil(resumeWatchResponse.body, (event) => {
+          if (event.type === BRAIN_EVENTS.START) {
+            depth++;
+          } else if (event.type === BRAIN_EVENTS.COMPLETE) {
+            depth--;
+            if (depth <= 0) return true;
           }
-        } finally {
-          await reader.cancel();
-        }
+          return false;
+        });
       }
 
       // Step 6: Verify final status is COMPLETE
