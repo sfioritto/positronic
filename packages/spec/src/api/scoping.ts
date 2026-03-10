@@ -1,48 +1,6 @@
 import { BRAIN_EVENTS } from '@positronic/core';
 import type { Fetch, FetchFactory } from './types.js';
-
-/**
- * Helper: read an SSE stream until a terminal event (COMPLETE or ERROR).
- * Cancels the reader once done. Does not throw on errors.
- */
-async function readSseUntilTerminal(
-  stream: ReadableStream<Uint8Array>
-): Promise<void> {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      let eventEndIndex;
-      while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
-        const message = buffer.substring(0, eventEndIndex);
-        buffer = buffer.substring(eventEndIndex + 2);
-
-        if (message.startsWith('data: ')) {
-          try {
-            const event = JSON.parse(message.substring(6));
-            if (
-              event.type === BRAIN_EVENTS.COMPLETE ||
-              event.type === BRAIN_EVENTS.ERROR
-            ) {
-              return;
-            }
-          } catch {
-            // Ignore parse errors
-          }
-        }
-      }
-    }
-  } finally {
-    await reader.cancel();
-  }
-}
+import { startBrainRun, readSseUntil } from './helpers.js';
 
 /**
  * Helper: start a brain run as a specific user's fetch, wait for completion,
@@ -53,22 +11,8 @@ async function runBrainAndWait(
   brainIdentifier: string
 ): Promise<string | null> {
   try {
-    const response = await fetchFn(
-      new Request('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: brainIdentifier }),
-      })
-    );
-
-    if (response.status !== 201) {
-      console.error(
-        `POST /brains/runs returned ${response.status}, expected 201`
-      );
-      return null;
-    }
-
-    const { brainRunId } = (await response.json()) as { brainRunId: string };
+    const brainRunId = await startBrainRun(fetchFn, brainIdentifier);
+    if (!brainRunId) return null;
 
     // Watch until completion
     const watchResponse = await fetchFn(
@@ -82,7 +26,10 @@ async function runBrainAndWait(
       return null;
     }
 
-    await readSseUntilTerminal(watchResponse.body);
+    await readSseUntil(watchResponse.body, (event) =>
+      event.type === BRAIN_EVENTS.COMPLETE ||
+      event.type === BRAIN_EVENTS.ERROR
+    );
 
     return brainRunId;
   } catch (error) {
@@ -213,19 +160,8 @@ export const scoping = {
       const userB = await fetchFactory('scoping-bob-active');
 
       // Start a delayed brain as userA (will be running for a while)
-      const response = await userA.fetch(
-        new Request('http://example.com/brains/runs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: delayedBrainIdentifier }),
-        })
-      );
-      if (response.status !== 201) {
-        console.error(
-          `POST /brains/runs returned ${response.status}, expected 201`
-        );
-        return false;
-      }
+      const brainRunId = await startBrainRun(userA.fetch, delayedBrainIdentifier);
+      if (!brainRunId) return false;
 
       // userB checks active runs — should be empty
       const responseB = await userB.fetch(
