@@ -1,5 +1,18 @@
 # @positronic/template-new-project
 
+## 0.0.69
+
+### Patch Changes
+
+- - Add first-class currentUser identity to brain execution pipeline with automatic scoping
+  - Add typed key-value store for brains with Zod schema declaration and provider factory pattern
+  - Auto-scope memory to currentUser, removing manual userId threading
+  - Scope reads by user ownership in MonitorDO, ScheduleDO, and brains API
+  - Gate secrets endpoints to root-only access, handle 403 in CLI
+  - Scheduled brain runs now execute as the user who created the schedule
+  - Extract shared SSE and brain-run helpers, move user-scoping tests to spec package as reusable conformance tests
+  - Add store multi-user isolation tests and DSL guide documentation
+
 ## 0.0.68
 
 ### Patch Changes
