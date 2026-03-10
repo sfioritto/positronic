@@ -5,7 +5,7 @@ import type { RuntimeEnv } from '../types.js';
  * This ensures backward compatibility with existing code.
  */
 export const DEFAULT_ENV: RuntimeEnv = {
-  origin: 'http://localhost:3000',
+  origin: 'http://localhost:8787',
   secrets: {},
 };
 

@@ -20,8 +20,6 @@ export type Bindings = {
   CLOUDFLARE_API_TOKEN?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CF_SCRIPT_NAME?: string;
-  // Origin URL for constructing page URLs
-  WORKER_URL?: string;
   // Root public key for bootstrapping first user (JWK format)
   ROOT_PUBLIC_KEY?: string;
 };

@@ -67,6 +67,8 @@ The project uses npm workspaces with the following packages:
 
 5. **Event-Driven**: Brains emit events (start, complete, error, step status) for monitoring
 
+6. **Origin URL**: The origin URL (e.g., `https://myapp.workers.dev`) is stored in R2 at `__config/origin`, written at deploy time and dev server startup. To read it, use `getOrigin(bucket)` from `packages/cloudflare/src/origin.ts`. Never use environment variables for origin — R2 is the single source of truth.
+
 ## Keeping the Project Template in Sync
 
 The project template (`packages/template-new-project/template/.positronic/`) is what `px project new` uses to scaffold new projects. It has its own `wrangler.jsonc` and `src/index.ts` that are **separate from** the cloudflare test-project's versions. There are no tests that verify the template produces a working project, so you must keep it in sync manually.
