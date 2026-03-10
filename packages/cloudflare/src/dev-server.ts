@@ -337,6 +337,9 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     // Build and upload component bundle
     await this.buildAndUploadBundle(projectRoot);
+
+    // Write origin URL to local R2 for dev server
+    await this.writeOriginToR2(projectRoot, 'http://localhost:8787', { local: true });
   }
 
   private async ensureServerDirectory(
@@ -652,6 +655,44 @@ export class CloudflareDevServer implements PositronicDevServer {
     }
   }
 
+  /**
+   * Write the origin URL to R2 at __config/origin.
+   * Used by brain-runner-do and pages API to construct public URLs.
+   */
+  private async writeOriginToR2(
+    projectRoot: string,
+    origin: string,
+    options: { local?: boolean } = { local: true }
+  ): Promise<void> {
+    const serverDir = path.join(projectRoot, '.positronic');
+    const wranglerConfigPath = path.join(serverDir, 'wrangler.jsonc');
+
+    if (!fs.existsSync(wranglerConfigPath)) {
+      return;
+    }
+
+    const wranglerConfig = JSON.parse(fs.readFileSync(wranglerConfigPath, 'utf-8'));
+    const bucketName = wranglerConfig.r2_buckets?.[0]?.bucket_name;
+
+    if (!bucketName) {
+      return;
+    }
+
+    const r2Path = `${bucketName}/__config/origin`;
+    const tempFilePath = path.join(os.tmpdir(), `positronic-origin-${Date.now()}.txt`);
+    await fsPromises.writeFile(tempFilePath, origin);
+
+    try {
+      const localFlag = options.local ? ' --local' : '';
+      execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempFilePath}"${localFlag}`, {
+        cwd: serverDir,
+        stdio: 'pipe',
+      });
+    } finally {
+      await fsPromises.unlink(tempFilePath).catch(() => {});
+    }
+  }
+
   async start(port?: number): Promise<ServerHandle> {
     const serverDir = path.join(this.projectRootDir, '.positronic');
 
@@ -826,6 +867,7 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     // Deploy to production using wrangler
     return new Promise<void>((resolve, reject) => {
+      let stdoutAccumulator = '';
       const wranglerProcess = spawn(
         'npx',
         ['wrangler', 'deploy', '--env', 'production'],
@@ -843,6 +885,7 @@ export class CloudflareDevServer implements PositronicDevServer {
       // Capture and forward stdout
       wranglerProcess.stdout?.on('data', (data) => {
         const message = data.toString();
+        stdoutAccumulator += message;
         this.logCallbacks.forEach((cb) => cb(message));
         process.stdout.write(data);
       });
@@ -868,6 +911,17 @@ export class CloudflareDevServer implements PositronicDevServer {
       wranglerProcess.on('exit', async (code) => {
         if (code === 0) {
           console.log('✅ Deployment complete!');
+
+          // Parse worker URL from wrangler output and write origin to production R2
+          const urlMatch = stdoutAccumulator.match(/https:\/\/[^\s]+\.workers\.dev/);
+          if (urlMatch) {
+            try {
+              await this.writeOriginToR2(projectRoot, urlMatch[0], { local: false });
+              console.log(`🌐 Origin URL written to R2: ${urlMatch[0]}`);
+            } catch (originError) {
+              console.warn('⚠️  Warning: Could not write origin URL to R2:', originError);
+            }
+          }
 
           // Set up secrets for the secrets management API
           console.log('🔐 Configuring secrets management...');

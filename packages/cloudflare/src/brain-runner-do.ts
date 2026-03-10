@@ -17,6 +17,7 @@ import { setGovernorBinding, rateGoverned } from './governor-client-wrapper.js';
 import { CloudflareR2Loader } from './r2-loader.js';
 import { createR2Backend } from './create-r2-store.js';
 import { createResources, type ResourceManifest } from '@positronic/core';
+import { getOrigin } from './origin.js';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
 let manifest: PositronicManifest | null = null;
@@ -48,7 +49,6 @@ export interface Env {
   SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
   GOVERNOR_DO: DurableObjectNamespace<GovernorDO>;
   RESOURCES_BUCKET: R2Bucket;
-  WORKER_URL?: string; // Base URL for the worker (e.g., "https://myapp.workers.dev")
 }
 
 class EventStreamAdapter implements Adapter {
@@ -386,7 +386,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * Build the RuntimeEnv for brain execution.
    * Extracts secrets from Cloudflare env bindings (string values only).
    */
-  private buildRuntimeEnv(): RuntimeEnv {
+  private async buildRuntimeEnv(): Promise<RuntimeEnv> {
     // Extract secrets: filter this.env to only string values
     // This automatically excludes infrastructure bindings (R2Bucket, DurableObjectNamespace are objects)
     const secrets: Record<string, string | undefined> = {};
@@ -396,8 +396,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
       }
     }
 
+    const origin = await getOrigin(this.env.RESOURCES_BUCKET);
+
     return {
-      origin: this.env.WORKER_URL || 'http://localhost:3000',
+      origin,
       // Cast to Secrets - the generated secrets.d.ts augments Secrets with specific keys
       secrets: secrets as unknown as RuntimeEnv['secrets'],
     };
@@ -551,7 +553,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     this.pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
     // Create runtime environment with origin and secrets
-    const env = this.buildRuntimeEnv();
+    const env = await this.buildRuntimeEnv();
 
     // Create pages service for brain to use
     const pagesService = createPagesService(
@@ -732,7 +734,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     this.pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
 
     // Create runtime environment with origin and secrets
-    const env = this.buildRuntimeEnv();
+    const env = await this.buildRuntimeEnv();
 
     // Create pages service for brain to use
     const pagesService = createPagesService(

@@ -1,18 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { R2Object } from '@cloudflare/workers-types';
 import type { Bindings } from './types.js';
-
-/**
- * Get the origin URL for constructing page URLs.
- * Uses WORKER_URL env var if set, otherwise falls back to request URL.
- */
-function getOrigin(context: Context): string {
-  if (context.env.WORKER_URL) {
-    return context.env.WORKER_URL;
-  }
-  const url = new URL(context.req.url);
-  return `${url.protocol}//${url.host}`;
-}
+import { getOrigin } from '../origin.js';
 
 /**
  * Generates a unique slug for pages that don't provide one.
@@ -75,7 +64,8 @@ pages.post('/', async (context: Context) => {
     await monitorStub.registerPage(slug, brainRunId, persist === true);
 
     // Build the public URL for this page
-    const pageUrl = `${getOrigin(context)}/pages/${slug}`;
+    const origin = await getOrigin(context.env.RESOURCES_BUCKET);
+    const pageUrl = `${origin}/pages/${slug}`;
 
     return context.json(
       {
@@ -107,6 +97,7 @@ pages.get('/', async (context: Context) => {
 
   try {
     const listed = await bucket.list({ prefix: 'pages/' });
+    const origin = await getOrigin(bucket);
 
     const pageList = await Promise.all(
       listed.objects.map(async (object: R2Object) => {
@@ -120,7 +111,7 @@ pages.get('/', async (context: Context) => {
         const slug = metadata.slug || object.key.replace('pages/', '').replace('.html', '');
 
         // Build the public URL
-        const pageUrl = `${getOrigin(context)}/pages/${slug}`;
+        const pageUrl = `${origin}/pages/${slug}`;
 
         return {
           slug,
@@ -257,7 +248,8 @@ pages.put('/:slug', async (context: Context) => {
     });
 
     // Build the public URL
-    const pageUrl = `${getOrigin(context)}/pages/${slug}`;
+    const origin = await getOrigin(bucket);
+    const pageUrl = `${origin}/pages/${slug}`;
 
     return context.json({
       slug,
