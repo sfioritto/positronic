@@ -174,6 +174,16 @@ interface MockUserKey {
   addedAt: number;
 }
 
+interface MockStoreEntry {
+  brainTitle: string;
+  key: string;
+  scope: 'shared' | 'user';
+  userId?: string;
+  value: any;
+  size: number;
+  lastModified: string;
+}
+
 export class TestDevServer implements PositronicDevServer {
   private resources: Map<string, MockResource> = new Map();
   private schedules: Map<string, MockSchedule> = new Map();
@@ -186,6 +196,7 @@ export class TestDevServer implements PositronicDevServer {
   private pages: Map<string, MockPage> = new Map();
   private users: Map<string, MockUser> = new Map();
   private userKeys: Map<string, MockUserKey> = new Map();
+  private storeEntries: MockStoreEntry[] = [];
   public port: number = 0;
   private callLog: MethodCall[] = [];
   private nockScope: nock.Scope | null = null;
@@ -1449,6 +1460,137 @@ export class TestDevServer implements PositronicDevServer {
       return [404, 'Not Found'];
     });
 
+    // Store Management Endpoints
+
+    // GET /store/:brainTitle/shared/:key
+    nockInstance.get(/^\/store\/([^/]+)\/shared\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/store\/([^/]+)\/shared\/(.+)$/);
+      if (match) {
+        const brainTitle = decodeURIComponent(match[1]);
+        const key = decodeURIComponent(match[2]);
+        this.logCall('getSharedValue', [brainTitle, key]);
+
+        const entry = this.storeEntries.find(
+          (e) => e.brainTitle === brainTitle && e.key === key && e.scope === 'shared'
+        );
+
+        if (!entry) {
+          return [404, { error: `Key '${key}' not found` }];
+        }
+
+        return [200, { key, value: entry.value, scope: 'shared' }];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // GET /store/:brainTitle/user/:key
+    nockInstance.get(/^\/store\/([^/]+)\/user\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/store\/([^/]+)\/user\/(.+)$/);
+      if (match) {
+        const brainTitle = decodeURIComponent(match[1]);
+        const key = decodeURIComponent(match[2]);
+        this.logCall('getUserValue', [brainTitle, key]);
+
+        const entry = this.storeEntries.find(
+          (e) => e.brainTitle === brainTitle && e.key === key && e.scope === 'user'
+        );
+
+        if (!entry) {
+          return [404, { error: `Key '${key}' not found` }];
+        }
+
+        return [200, { key, value: entry.value, scope: 'user', userId: entry.userId }];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // DELETE /store/:brainTitle/shared/:key
+    nockInstance.delete(/^\/store\/([^/]+)\/shared\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/store\/([^/]+)\/shared\/(.+)$/);
+      if (match) {
+        const brainTitle = decodeURIComponent(match[1]);
+        const key = decodeURIComponent(match[2]);
+        this.logCall('deleteSharedKey', [brainTitle, key]);
+
+        this.storeEntries = this.storeEntries.filter(
+          (e) => !(e.brainTitle === brainTitle && e.key === key && e.scope === 'shared')
+        );
+
+        return [204, ''];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // DELETE /store/:brainTitle/user/:key
+    nockInstance.delete(/^\/store\/([^/]+)\/user\/(.+)$/).reply((uri) => {
+      const match = uri.match(/^\/store\/([^/]+)\/user\/(.+)$/);
+      if (match) {
+        const brainTitle = decodeURIComponent(match[1]);
+        const key = decodeURIComponent(match[2]);
+        this.logCall('deleteUserKey', [brainTitle, key]);
+
+        this.storeEntries = this.storeEntries.filter(
+          (e) => !(e.brainTitle === brainTitle && e.key === key && e.scope === 'user')
+        );
+
+        return [204, ''];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // GET /store/:brainTitle - List keys for a brain
+    nockInstance.get(/^\/store\/([^/]+)$/).reply((uri) => {
+      const match = uri.match(/^\/store\/([^/]+)$/);
+      if (match) {
+        const brainTitle = decodeURIComponent(match[1]);
+        this.logCall('listStoreKeys', [brainTitle]);
+
+        const keys = this.storeEntries
+          .filter((e) => e.brainTitle === brainTitle)
+          .map((e) => ({
+            key: e.key,
+            scope: e.scope,
+            ...(e.userId && { userId: e.userId }),
+            size: e.size,
+            lastModified: e.lastModified,
+          }));
+
+        return [200, { keys, count: keys.length }];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // DELETE /store/:brainTitle - Clear all keys for a brain
+    nockInstance.delete(/^\/store\/([^/]+)$/).reply((uri) => {
+      const match = uri.match(/^\/store\/([^/]+)$/);
+      if (match) {
+        const brainTitle = decodeURIComponent(match[1]);
+        this.logCall('clearBrainStore', [brainTitle]);
+
+        const before = this.storeEntries.length;
+        this.storeEntries = this.storeEntries.filter(
+          (e) => e.brainTitle !== brainTitle
+        );
+        const deleted = before - this.storeEntries.length;
+
+        return [200, { deleted }];
+      }
+      return [404, 'Not Found'];
+    });
+
+    // GET /store - List brains with store data
+    nockInstance.get('/store').reply(200, () => {
+      this.logCall('listStoreBrains', []);
+
+      const brainTitles = new Set(this.storeEntries.map((e) => e.brainTitle));
+      const brains = Array.from(brainTitles).sort();
+
+      return {
+        brains,
+        count: brains.length,
+      };
+    });
+
     this.nockScope = nockInstance;
 
     // Simulate some initial log output after server starts
@@ -1588,6 +1730,19 @@ export class TestDevServer implements PositronicDevServer {
 
   getUserKeys(userId: string): MockUserKey[] {
     return Array.from(this.userKeys.values()).filter(k => k.userId === userId);
+  }
+
+  // Store helper methods
+  addStoreEntry(entry: MockStoreEntry) {
+    this.storeEntries.push(entry);
+  }
+
+  clearStoreEntries() {
+    this.storeEntries = [];
+  }
+
+  getStoreEntries(): MockStoreEntry[] {
+    return [...this.storeEntries];
   }
 
   setKillBrainRunError(runId: string, statusCode: number) {
