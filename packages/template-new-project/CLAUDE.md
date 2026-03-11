@@ -4,6 +4,16 @@ This document serves as the complete guide for maintainers of the `@positronic/t
 
 This guide assumes no prior knowledge of the `caz` codebase.
 
+## Escape Rule for Template Files
+
+**Every file in `template/` is processed by the caz template engine.** Any `${...}` or `<%= ... %>` syntax will be interpreted as a template variable — if the variable doesn't exist, project creation will crash.
+
+When editing files in `template/`, you MUST escape these patterns:
+- `${foo}` must be written as `<%= '${foo}' %>`
+- `<%= foo %>` must be written as `<%= '\<%= foo %\>' %>`
+
+This applies to ALL files — code examples in markdown, inline HTML, comments, etc. The only exceptions are files marked as binary in the `prepare` hook of `index.js` (currently `docs/*.md` files).
+
 ## Part 1: The `@positronic/template-new-project`
 
 This project is a `caz` template. Its sole purpose is to generate new Positronic projects by running a command like `npx @positronic/template-new-project <new-project-name>`.
