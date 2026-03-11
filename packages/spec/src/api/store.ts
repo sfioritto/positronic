@@ -64,7 +64,7 @@ export const store = {
         keys: Array<{
           key: string;
           scope: 'shared' | 'user';
-          userId?: string;
+          userName?: string;
           size: number;
           lastModified: string;
         }>;
@@ -190,7 +190,7 @@ export const store = {
         key: string;
         value: any;
         scope: 'user';
-        userId: string;
+        userName: string;
       };
 
       if (data.key !== key) {
@@ -203,8 +203,8 @@ export const store = {
         return false;
       }
 
-      if (typeof data.userId !== 'string') {
-        console.error(`Expected userId to be string, got ${typeof data.userId}`);
+      if (typeof data.userName !== 'string') {
+        console.error(`Expected userName to be string, got ${typeof data.userName}`);
         return false;
       }
 

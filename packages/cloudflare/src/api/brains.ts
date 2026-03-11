@@ -9,13 +9,13 @@ import type { Bindings, CreateBrainRunRequest, CreateBrainRunResponse } from './
 const brains = new Hono<{ Bindings: Bindings }>();
 
 /**
- * Get the userId for ownership filtering from the auth context.
+ * Get the userName for ownership filtering from the auth context.
  * Root users get null (no filter — sees everything).
- * Non-root users get their userId (sees only their own).
+ * Non-root users get their userName (sees only their own).
  */
-function scopeUserId(context: Context): string | null {
+function scopeUserName(context: Context): string | null {
   const auth = context.get('auth');
-  return auth?.isRoot ? null : auth?.userId ?? null;
+  return auth?.isRoot ? null : auth?.userName ?? null;
 }
 
 brains.post('/runs', async (context: Context) => {
@@ -59,10 +59,10 @@ brains.post('/runs', async (context: Context) => {
 
   // Read auth context for currentUser (every brain run must have an owner)
   const auth = context.get('auth');
-  if (!auth?.userId && !auth?.isRoot) {
+  if (!auth?.userName && !auth?.isRoot) {
     return context.json({ error: 'Authentication required to run a brain' }, 401);
   }
-  const currentUser = { id: auth.userId || 'root' };
+  const currentUser = { name: auth.userName || 'root' };
 
   // Pass options to the brain runner if provided
   const initialData = options ? { options } : undefined;
@@ -123,10 +123,10 @@ brains.post('/runs/rerun', async (context: Context) => {
 
   // Read auth context for currentUser (every brain run must have an owner)
   const auth = context.get('auth');
-  if (!auth?.userId && !auth?.isRoot) {
+  if (!auth?.userName && !auth?.isRoot) {
     return context.json({ error: 'Authentication required to run a brain' }, 401);
   }
-  const currentUser = { id: auth.userId || 'root' };
+  const currentUser = { name: auth.userName || 'root' };
 
   // Create a new brain run with rerun parameters
   const newBrainRunId = uuidv4();
@@ -162,11 +162,11 @@ brains.get('/runs/:runId/watch', async (context: Context) => {
 
 brains.get('/runs/:runId', async (context: Context) => {
   const runId = context.req.param('runId');
-  const userId = scopeUserId(context);
+  const userName = scopeUserName(context);
 
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
-  const run = await monitorStub.getRun(runId, userId);
+  const run = await monitorStub.getRun(runId, userName);
 
   if (!run) {
     return context.json({ error: `Brain run '${runId}' not found` }, 404);
@@ -317,8 +317,8 @@ brains.get('/:identifier/history', async (context: Context) => {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
 
-  const userId = scopeUserId(context);
-  const runs = await monitorStub.history(brainTitle, limit, userId);
+  const userName = scopeUserName(context);
+  const runs = await monitorStub.history(brainTitle, limit, userName);
   return context.json({ runs });
 });
 
@@ -352,8 +352,8 @@ brains.get('/:identifier/active-runs', async (context: Context) => {
   const monitorId = context.env.MONITOR_DO.idFromName('singleton');
   const monitorStub = context.env.MONITOR_DO.get(monitorId);
 
-  const userId = scopeUserId(context);
-  const runs = await monitorStub.activeRuns(brainTitle, userId);
+  const userName = scopeUserName(context);
+  const runs = await monitorStub.activeRuns(brainTitle, userName);
   return context.json({ runs });
 });
 
@@ -517,10 +517,10 @@ brains.post('/schedules', async (context: Context) => {
 
     // Require authentication — scheduled runs will execute as this user
     const auth = context.get('auth');
-    if (!auth?.userId && !auth?.isRoot) {
+    if (!auth?.userName && !auth?.isRoot) {
       return context.json({ error: 'Authentication required to create a schedule' }, 401);
     }
-    const runAsUserId = auth.userId || 'root';
+    const runAsUserName = auth.userName || 'root';
 
     // Determine timezone: use provided value, fall back to project timezone
     let timezone = body.timezone;
@@ -539,7 +539,7 @@ brains.post('/schedules', async (context: Context) => {
       brainTitle,
       cronExpression,
       timezone,
-      runAsUserId
+      runAsUserName
     );
     return context.json(schedule, 201);
   } catch (error) {
@@ -554,8 +554,8 @@ brains.get('/schedules', async (context: Context) => {
   const scheduleId = context.env.SCHEDULE_DO.idFromName('singleton');
   const scheduleStub = context.env.SCHEDULE_DO.get(scheduleId);
 
-  const userId = scopeUserId(context);
-  const result = await scheduleStub.listSchedules(userId);
+  const userName = scopeUserName(context);
+  const result = await scheduleStub.listSchedules(userName);
   return context.json(result);
 });
 
@@ -567,8 +567,8 @@ brains.get('/schedules/runs', async (context: Context) => {
   const scheduleDoId = context.env.SCHEDULE_DO.idFromName('singleton');
   const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
-  const userId = scopeUserId(context);
-  const result = await scheduleStub.getAllRuns(scheduleIdParam, limit, userId);
+  const userName = scopeUserName(context);
+  const result = await scheduleStub.getAllRuns(scheduleIdParam, limit, userName);
   return context.json(result);
 });
 

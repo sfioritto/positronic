@@ -556,7 +556,7 @@ describe('Positronic Spec', () => {
         JSON.stringify({ maxRetries: 3 })
       );
 
-      // Per-user key (using a fake userId)
+      // Per-user key (using a fake userName)
       await bucket.put(
         'store/test-brain/user/test-user-123/preferences.json',
         JSON.stringify({ notifications: true })
@@ -585,20 +585,20 @@ describe('Positronic Spec', () => {
     });
 
     it('passes GET /store/:brainTitle/user/:key test', async () => {
-      // Root user won't have a userId for per-user lookup, so we seed one for root
-      // Actually, root user has userId=null, so per-user endpoint needs a real user.
+      // Root user won't have a userName for per-user lookup, so we seed one for root
+      // Actually, root user has userName=null, so per-user endpoint needs a real user.
       // Let's test this with a user-scoped fetch instead.
       // For now, test that the endpoint returns properly for existing data.
-      // Root can't access per-user keys via /user/:key since userId is null.
+      // Root can't access per-user keys via /user/:key since userName is null.
       // We'll skip this for the root-only fetch and test it in userKeyIsolation.
 
-      // Seed a per-user key for root test (won't match since root has no userId)
-      // Instead, just verify the endpoint returns 404 for root (no userId)
+      // Seed a per-user key for root test (won't match since root has no userName)
+      // Instead, just verify the endpoint returns 404 for root (no userName)
       const request = new Request('http://example.com/store/test-brain/user/preferences', {
         method: 'GET',
       });
       const response = await createFetch()(request);
-      // Root user has null userId, so the key path won't match - expect 404
+      // Root user has null userName, so the key path won't match - expect 404
       expect(response.status).toBe(404);
     });
 
@@ -639,7 +639,7 @@ describe('Positronic Spec', () => {
       expect(response.status).toBe(200);
 
       const data = await response.json() as {
-        keys: Array<{ key: string; scope: string; userId?: string }>;
+        keys: Array<{ key: string; scope: string; userName?: string }>;
         count: number;
       };
 

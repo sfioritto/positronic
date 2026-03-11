@@ -251,11 +251,11 @@ export const scoping = {
       }
       const schedule = (await createResponse.json()) as {
         id: string;
-        runAsUserId: string;
+        runAsUserName: string;
       };
-      if (schedule.runAsUserId !== userA.userName) {
+      if (schedule.runAsUserName !== userA.userName) {
         console.error(
-          `Expected runAsUserId to be '${userA.userName}', got '${schedule.runAsUserId}'`
+          `Expected runAsUserName to be '${userA.userName}', got '${schedule.runAsUserName}'`
         );
         return false;
       }

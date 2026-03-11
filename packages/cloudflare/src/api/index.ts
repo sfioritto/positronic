@@ -71,7 +71,7 @@ app.get('/auth/whoami', async (context: Context) => {
   if (auth.isRoot) {
     return context.json({ name: 'root', isRoot: true });
   }
-  return context.json({ name: auth.userId, isRoot: false });
+  return context.json({ name: auth.userName, isRoot: false });
 });
 
 // Mount route modules

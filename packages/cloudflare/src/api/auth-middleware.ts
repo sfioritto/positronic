@@ -4,7 +4,7 @@ import type { AuthDO } from '../auth-do.js';
 import { jwtVerify, decodeJwt, importJWK, type JWK } from 'jose';
 
 export interface AuthContext {
-  userId: string | null;
+  userName: string | null;
   isRoot: boolean;
 }
 
@@ -103,7 +103,7 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
           algorithms: [algorithm],
         });
 
-        c.set('auth', { userId: userKey.userName, isRoot: false });
+        c.set('auth', { userName: userKey.userName, isRoot: false });
         return next();
       } catch (error) {
         // Log error type only - avoid logging key material or token data
@@ -125,7 +125,7 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
           algorithms: [algorithm],
         });
 
-        c.set('auth', { userId: null, isRoot: true });
+        c.set('auth', { userName: null, isRoot: true });
         return next();
       } catch (error) {
         // Log error type only - avoid logging key material

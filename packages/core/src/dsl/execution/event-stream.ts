@@ -144,7 +144,7 @@ export class BrainEventStream<
 
     // Create scoped memory if provider is configured
     if (memoryProvider) {
-      this.scopedMemory = createScopedMemory(memoryProvider, title, this.currentUser.id);
+      this.scopedMemory = createScopedMemory(memoryProvider, title, this.currentUser.name);
     }
 
     // Initialize steps - track guard and wait blocks by index

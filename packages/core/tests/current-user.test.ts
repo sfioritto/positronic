@@ -38,12 +38,12 @@ describe('currentUser', () => {
       testBrain.run({
         client: mockClient,
         resources: {} as any,
-        currentUser: { id: 'user-123' },
+        currentUser: { name: 'user-123' },
       })
     );
 
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
-    expect(receivedUser).toEqual({ id: 'user-123' });
+    expect(receivedUser).toEqual({ name: 'user-123' });
   });
 
   it('should appear in the START event payload', async () => {
@@ -56,7 +56,7 @@ describe('currentUser', () => {
       testBrain.run({
         client: mockClient,
         resources: {} as any,
-        currentUser: { id: 'user-456' },
+        currentUser: { name: 'user-456' },
       })
     );
 
@@ -64,7 +64,7 @@ describe('currentUser', () => {
       (e) => e.type === BRAIN_EVENTS.START
     ) as BrainStartEvent;
     expect(startEvent).toBeDefined();
-    expect(startEvent.currentUser).toEqual({ id: 'user-456' });
+    expect(startEvent.currentUser).toEqual({ name: 'user-456' });
   });
 
   it('should be available in agent tool execute context', async () => {
@@ -130,11 +130,11 @@ describe('currentUser', () => {
       testBrain.run({
         client: mockClient,
         resources: {} as any,
-        currentUser: { id: 'user-789' },
+        currentUser: { name: 'user-789' },
       })
     );
 
-    expect(toolReceivedUser).toEqual({ id: 'user-789' });
+    expect(toolReceivedUser).toEqual({ name: 'user-789' });
   });
 
   it('should persist through step chains (same value in all steps)', async () => {
@@ -159,14 +159,14 @@ describe('currentUser', () => {
       testBrain.run({
         client: mockClient,
         resources: {} as any,
-        currentUser: { id: 'persistent-user' },
+        currentUser: { name: 'persistent-user' },
       })
     );
 
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
     expect(usersReceived).toHaveLength(3);
-    expect(usersReceived[0]).toEqual({ id: 'persistent-user' });
-    expect(usersReceived[1]).toEqual({ id: 'persistent-user' });
-    expect(usersReceived[2]).toEqual({ id: 'persistent-user' });
+    expect(usersReceived[0]).toEqual({ name: 'persistent-user' });
+    expect(usersReceived[1]).toEqual({ name: 'persistent-user' });
+    expect(usersReceived[2]).toEqual({ name: 'persistent-user' });
   });
 });

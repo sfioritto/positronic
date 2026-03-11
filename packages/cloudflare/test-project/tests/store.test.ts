@@ -21,7 +21,7 @@ describe('createR2Backend', () => {
     }
   });
 
-  function createStore(schema: Record<string, any> = { key: z.string() }, currentUser?: { id: string }): Store<any> {
+  function createStore(schema: Record<string, any> = { key: z.string() }, currentUser?: { name: string }): Store<any> {
     const factory = createR2Backend(testEnv.TEST_RESOURCES_BUCKET);
     return factory({ schema, brainTitle: 'test-brain', currentUser });
   }
@@ -99,10 +99,10 @@ describe('createR2Backend', () => {
     expect(JSON.parse(text)).toBe('myvalue');
   });
 
-  it('should store per-user keys at store/{brainTitle}/user/{userId}/{key}.json in R2', async () => {
+  it('should store per-user keys at store/{brainTitle}/user/{userName}/{key}.json in R2', async () => {
     const store = createStore(
       { pref: { type: z.string(), perUser: true } },
-      { id: 'user-42' }
+      { name: 'user-42' }
     );
     await store.set('pref', 'dark');
 
@@ -115,8 +115,8 @@ describe('createR2Backend', () => {
   it('should isolate per-user data between different users', async () => {
     const schema = { pref: { type: z.string(), perUser: true } };
 
-    const storeUserA = createStore(schema, { id: 'user-A' });
-    const storeUserB = createStore(schema, { id: 'user-B' });
+    const storeUserA = createStore(schema, { name: 'user-A' });
+    const storeUserB = createStore(schema, { name: 'user-B' });
 
     await storeUserA.set('pref', 'dark');
     await storeUserB.set('pref', 'light');
@@ -131,8 +131,8 @@ describe('createR2Backend', () => {
       userPref: { type: z.string(), perUser: true },
     };
 
-    const storeUserA = createStore(schema, { id: 'user-A' });
-    const storeUserB = createStore(schema, { id: 'user-B' });
+    const storeUserA = createStore(schema, { name: 'user-A' });
+    const storeUserB = createStore(schema, { name: 'user-B' });
 
     await storeUserA.set('globalConfig', 'v2');
     await storeUserA.set('userPref', 'dark');

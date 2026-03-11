@@ -234,7 +234,7 @@ const api = {
 
 ## currentUser
 
-Every brain run requires a `currentUser` — an object with at least an `id` field that identifies who is running the brain. This identity is used to scope per-user data like memory and store fields.
+Every brain run requires a `currentUser` — an object with at least a `name` field that identifies who is running the brain. This identity is used to scope per-user data like memory and store fields.
 
 ### How currentUser Gets Set
 
@@ -251,7 +251,7 @@ import { runner } from './runner.js';
 import myBrain from './brains/my-brain.js';
 
 await runner.run(myBrain, {
-  currentUser: { id: 'local-dev-user' },
+  currentUser: { name: 'local-dev-user' },
 });
 ```
 
@@ -261,7 +261,7 @@ await runner.run(myBrain, {
 const events = await collectEvents(
   testBrain.run({
     client: mockClient,
-    currentUser: { id: 'test-user' },
+    currentUser: { name: 'test-user' },
   })
 );
 ```
@@ -278,7 +278,7 @@ const events = await collectEvents(
 ```typescript
 export default brain('greet')
   .step('Hello', ({ currentUser }) => ({
-    greeting: 'Hello, user ' + currentUser.id,
+    greeting: 'Hello, user ' + currentUser.name,
   }));
 ```
 

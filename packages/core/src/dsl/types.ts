@@ -32,7 +32,7 @@ export interface Secrets {
  * Contains deployment-specific values that brains need at runtime.
  */
 export interface CurrentUser {
-  id: string;
+  name: string;
 }
 
 export interface RuntimeEnv {

@@ -38,7 +38,7 @@ const createInMemoryStoreProvider = (): StoreProvider & { data: Map<string, any>
               `Per-user store keys require a currentUser in run params.`
             );
           }
-          return `store/${brainTitle}/user/${currentUser.id}/${key}`;
+          return `store/${brainTitle}/user/${currentUser.name}/${key}`;
         }
         return `store/${brainTitle}/${key}`;
       }
@@ -81,7 +81,7 @@ describe('Brain.withStore', () => {
     const events = await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         storeProvider: storeFactory,
       })
@@ -108,7 +108,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         storeProvider: storeFactory,
       })
@@ -139,7 +139,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         storeProvider: storeFactory,
       })
@@ -175,7 +175,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         storeProvider: storeFactory,
       })
@@ -198,7 +198,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
       })
     );
@@ -221,7 +221,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         // No store factory
       })
@@ -248,7 +248,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'user-42' },
+        currentUser: { name: 'user-42' },
         resources: {} as any,
         storeProvider: storeFactory,
       })
@@ -282,7 +282,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       brainA.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         storeProvider: storeFactory,
       })
@@ -291,7 +291,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       brainB.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         storeProvider: storeFactory,
       })
@@ -322,7 +322,7 @@ describe('Brain.withStore', () => {
     await collectEvents(
       testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: {} as any,
         storeProvider: storeFactory,
       })

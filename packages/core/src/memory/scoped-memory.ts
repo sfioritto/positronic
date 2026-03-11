@@ -15,7 +15,7 @@ import type {
  *
  * @param provider - The underlying memory provider
  * @param agentId - The agent/brain ID to scope memories to
- * @param userId - The user ID to scope memories to (from currentUser.id)
+ * @param userId - The user name to scope memories to (from currentUser.name)
  * @returns A ScopedMemory instance
  *
  * @example

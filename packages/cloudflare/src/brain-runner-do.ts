@@ -136,7 +136,7 @@ class BatchChunkAdapter implements Adapter {
 // SQL to initialize the run owner table (stores who started this brain run)
 const runOwnerTableSQL = `
 CREATE TABLE IF NOT EXISTS run_owner (
-  user_id TEXT NOT NULL
+  user_name TEXT NOT NULL
 );
 `;
 
@@ -182,17 +182,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
   }
 
-  private storeRunOwner(userId: string) {
+  private storeRunOwner(userName: string) {
     this.initializeRunOwnerTable();
-    this.sql.exec(`INSERT INTO run_owner (user_id) VALUES (?)`, userId);
+    this.sql.exec(`INSERT INTO run_owner (user_name) VALUES (?)`, userName);
   }
 
   private getRunOwner(): string | null {
     this.initializeRunOwnerTable();
     const results = this.sql
-      .exec<{ user_id: string }>(`SELECT user_id FROM run_owner LIMIT 1`)
+      .exec<{ user_name: string }>(`SELECT user_name FROM run_owner LIMIT 1`)
       .toArray();
-    return results.length > 0 ? results[0].user_id : null;
+    return results.length > 0 ? results[0].user_name : null;
   }
 
   private initializeSignalsTable() {
@@ -508,7 +508,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
   async start(
     brainTitle: string,
     brainRunId: string,
-    currentUser: { id: string },
+    currentUser: { name: string },
     initialData?: Record<string, any>
   ) {
     const { sql } = this;
@@ -596,7 +596,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const initialState = initialData && !initialData.options ? initialData : {};
 
     // Persist run owner durably (immutable, not derived from events)
-    this.storeRunOwner(currentUser.id);
+    this.storeRunOwner(currentUser.name);
 
     // Create abort controller for this run
     this.abortController = new AbortController();
@@ -678,7 +678,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     if (!ownerId) {
       throw new Error(`No run owner found for brain run ${brainRunId}`);
     }
-    const currentUser = { id: ownerId };
+    const currentUser = { name: ownerId };
 
     // Use the brainRunId from the START event, not the parameter.
     // alarm() passes state.id.toString() (the DO hex ID), but the brain was

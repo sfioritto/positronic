@@ -81,7 +81,7 @@ import { components } from './components/index.js';
  * const memoryTools = createMem0Tools();
  * ```
  *
- * Memory is automatically scoped to the current user (via currentUser.id)
+ * Memory is automatically scoped to the current user (via currentUser.name)
  * and the brain name. No need to pass userId manually.
  *
  * See docs/memory-guide.md for full details.

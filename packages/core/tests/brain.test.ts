@@ -106,7 +106,7 @@ describe('brain creation', () => {
 
     const brainRun = testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     });
 
     // Check start event
@@ -262,7 +262,7 @@ describe('brain creation', () => {
       }));
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -327,7 +327,7 @@ describe('brain creation', () => {
 
     const brainRun = testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     });
     const startResult = await brainRun.next();
     expect(startResult.value).toEqual(
@@ -345,7 +345,7 @@ describe('brain creation', () => {
     const testBrain = brain('simple brain');
     const brainRun = testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     });
     const startResult = await brainRun.next();
     expect(startResult.value).toEqual(
@@ -392,7 +392,7 @@ describe('brain creation', () => {
     let finalState = {};
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       events.push(event);
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
@@ -440,7 +440,7 @@ describe('brain creation', () => {
 
     const events = [];
     let finalState: any = {};
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -465,7 +465,7 @@ describe('brain creation', () => {
 
     const brainRun = testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       brainRunId: providedId,
     });
 
@@ -494,7 +494,7 @@ describe('brain creation', () => {
 
       const run = testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: mockResources,
       });
       // Iterate through to completion
@@ -524,7 +524,7 @@ describe('brain creation', () => {
 
       const run = testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: mockResources,
       });
 
@@ -570,7 +570,7 @@ describe('brain creation', () => {
 
       const run = testBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: mockResources,
       });
 
@@ -619,7 +619,7 @@ describe('brain creation', () => {
 
       const run = outerBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resources: mockResources,
       });
       for await (const _ of run) {
@@ -656,7 +656,7 @@ describe('error handling', () => {
     try {
       for await (const event of errorBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
       })) {
         if (event.type === BRAIN_EVENTS.ERROR) {
           errorEvent = event;
@@ -724,7 +724,7 @@ describe('error handling', () => {
     try {
       for await (const event of outerBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
       })) {
         events.push(event);
         if (event.type === BRAIN_EVENTS.START && !mainBrainId) {
@@ -871,7 +871,7 @@ describe('step creation', () => {
     let finalState = {};
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       events.push(event);
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
@@ -975,7 +975,7 @@ describe('step creation', () => {
     const patches = [];
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         patches.push(...event.patch);
@@ -1019,7 +1019,7 @@ describe('brain resumption', () => {
     // Run brain until we get the first step completed
     for await (const event of threeStepBrain.run({
       client: mockClient as ObjectGenerator,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       initialState,
     })) {
       if (
@@ -1040,7 +1040,7 @@ describe('brain resumption', () => {
 
     for await (const event of threeStepBrain.run({
       client: mockClient as ObjectGenerator,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       resumeContext: {
         stepIndex: 1, // Resume from step index 1 (Step 2)
         state: stateAfterStep1,
@@ -1091,7 +1091,7 @@ describe('nested brains', () => {
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       events.push(event);
     }
@@ -1281,7 +1281,7 @@ describe('nested brains', () => {
     try {
       for await (const event of outerBrain.run({
         client: mockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
       })) {
         events.push(event);
         if (event.type === BRAIN_EVENTS.START && !mainBrainId) {
@@ -1450,7 +1450,7 @@ describe('nested brains', () => {
     let finalStepStatus;
     for await (const event of outerBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
@@ -1514,7 +1514,7 @@ describe('nested brains', () => {
 
     for await (const _ of outerBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       resources: mockResources,
       pages: mockPages as any,
       env: mockEnv,
@@ -1546,7 +1546,7 @@ describe('nested brains', () => {
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       brainRunId: 'test-run-id-123',
     })) {
       events.push(event);
@@ -1608,7 +1608,7 @@ describe('nested brains', () => {
     const firstRunEvents: BrainEvent<any>[] = [];
     const brainRun = outerBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       brainRunId: 'test-run-id',
     });
     for await (const event of brainRun) {
@@ -1651,7 +1651,7 @@ describe('nested brains', () => {
     const resumeEvents: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       brainRunId: 'test-run-id',
       resumeContext,
     })) {
@@ -1707,7 +1707,7 @@ describe('brain options', () => {
     let finalEvent, finalStepStatus;
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       options: brainOptions,
     })) {
       if (event.type === BRAIN_EVENTS.STEP_STATUS) {
@@ -1750,7 +1750,7 @@ describe('brain options', () => {
 
     const brainRun = testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     });
 
     // Skip start event
@@ -1808,7 +1808,7 @@ describe('services support', () => {
     let finalState = {};
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -1888,7 +1888,7 @@ describe('type inference', () => {
 
     for await (const event of complexBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       options: { features: ['fast', 'secure'] },
     })) {
       events.push(event);
@@ -2016,7 +2016,7 @@ describe('type inference', () => {
 
     for await (const event of outerBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       // Track brain nesting depth
       if (event.type === BRAIN_EVENTS.START) {
@@ -2073,7 +2073,7 @@ describe('type inference', () => {
 
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       if (event.type === BRAIN_EVENTS.START && !mainBrainId) {
         mainBrainId = event.brainRunId;
@@ -2131,7 +2131,7 @@ describe('type inference', () => {
     let finalState = {};
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
     })) {
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -2242,7 +2242,7 @@ describe('brain structure', () => {
       let error: Error | undefined;
 
       try {
-        for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+        for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
           events.push(event);
         }
       } catch (e) {
@@ -2322,7 +2322,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2369,7 +2369,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2404,7 +2404,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2439,7 +2439,7 @@ describe('batch prompt', () => {
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         events.push(event);
       }
 
@@ -2513,7 +2513,7 @@ describe('batch prompt', () => {
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         events.push(event);
       }
 
@@ -2563,7 +2563,7 @@ describe('batch prompt', () => {
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         events.push(event);
       }
 
@@ -2623,7 +2623,7 @@ describe('batch prompt', () => {
       const events: any[] = [];
       for await (const event of testBrain.run({
         client: batchMockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resumeContext,
         brainRunId: 'test-resume-batch',
       })) {
@@ -2708,7 +2708,7 @@ describe('batch prompt', () => {
       const events: any[] = [];
       for await (const event of testBrain.run({
         client: batchMockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         resumeContext,
         brainRunId: 'test-null-filter',
       })) {
@@ -2776,7 +2776,7 @@ describe('batch prompt', () => {
       const events: any[] = [];
       for await (const event of testBrain.run({
         client: batchMockClient,
-        currentUser: { id: 'test-user' },
+        currentUser: { name: 'test-user' },
         signalProvider: mockSignalProvider,
       })) {
         events.push(event);
@@ -2829,7 +2829,7 @@ describe('batch prompt', () => {
 
       let error: Error | undefined;
       try {
-        for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+        for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
           // Just consume events
         }
       } catch (e) {
@@ -2869,7 +2869,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2912,7 +2912,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2954,7 +2954,7 @@ describe('batch prompt', () => {
           }
         );
 
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         // Just consume events
       }
 
@@ -3009,7 +3009,7 @@ describe('batch prompt', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3053,7 +3053,7 @@ describe('batch prompt', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3084,7 +3084,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3119,7 +3119,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3159,7 +3159,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3198,7 +3198,7 @@ describe('batch prompt', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: schemaLessMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: schemaLessMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3233,7 +3233,7 @@ describe('batch prompt', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: schemaLessMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: schemaLessMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3258,7 +3258,7 @@ describe('batch prompt', () => {
           return { ...state, result: text };
         });
 
-      for await (const _ of testBrain.run({ client: schemaLessMockClient, currentUser: { id: 'test-user' } })) {
+      for await (const _ of testBrain.run({ client: schemaLessMockClient, currentUser: { name: 'test-user' } })) {
         // Just run to verify it works
       }
     });
