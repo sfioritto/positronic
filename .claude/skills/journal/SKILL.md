@@ -1,12 +1,32 @@
 ---
 name: journal
-description: Developer journal that documents work as it happens — paths tried, dead ends, and solutions found. Activates when working on non-trivial tasks to maintain a living record of development decisions. Also captures high-level design discussions and brainstorming that happen before execution begins.
+description: Developer journal that captures learnings and reasoning as work happens — why decisions were made, what was learned from dead ends, and the thinking behind design choices. Activates during non-trivial work, design discussions, and brainstorming.
 user-invocable: false
 ---
 
 # Developer Journal
 
-You maintain a developer journal that captures the story of work as it happens. This runs in the background — you don't ask the user for permission to journal, you just do it.
+You maintain a developer journal that captures **why** things happen, not just what. The most valuable thing in this journal is reasoning and learnings — the stuff that normally evaporates between sessions.
+
+This runs in the background — you don't ask the user for permission to journal, you just do it.
+
+## The core principle: Why > What
+
+The journal is NOT a changelog. Don't just record "we refactored the auth module." Record:
+- **Why** we refactored it (the old design couldn't handle X)
+- **What we learned** along the way (turns out Y doesn't work because of Z)
+- **What we considered** and rejected (we almost did A but realized B)
+
+If you find yourself writing a journal entry that's just "did X, then did Y, then did Z" — stop. That's a git log. Ask yourself: what did we *learn*? Why did we make *these* choices?
+
+## When you don't know the "why"
+
+**Ask the user.** This is critical. After executing a plan or completing a chunk of work, if you don't have the reasoning behind decisions, ask. For example:
+
+- "We just finished restructuring the store layer — what was the main motivation? Was it the performance issue you mentioned earlier, or something else?"
+- "We tried three approaches for the caching layer before landing on this one. What made you want to tackle caching in the first place?"
+
+Don't ask about every little thing. Apply an **interestingness threshold**: ask about decisions that were non-obvious, where alternatives existed, or where someone reading the journal later would wonder "but why?"
 
 ## Journal location
 
@@ -15,15 +35,15 @@ All journal pages live in `docs/journal/`. Each effort gets its own file.
 ## When to start a new journal page
 
 Start a new page when:
-- The user begins a non-trivial task (not a one-liner fix or quick question)
-- The user is discussing design decisions, brainstorming approaches, or planning before execution
+- The user begins discussing or planning a non-trivial effort
+- Design decisions are being debated or brainstormed
 - There's no active journal page for the current effort
 - The user explicitly starts a new effort
 
 Do NOT journal for:
 - Simple questions or explanations unrelated to active development
 - Trivial one-line fixes
-- Reading/exploring code without making changes
+- Reading/exploring code without intent to change it
 
 ## File naming
 
@@ -42,39 +62,48 @@ If continuing work from a previous session, reuse the existing file — don't cr
 
 ## Goal
 
-One or two sentences describing what we're trying to accomplish.
+What we're trying to accomplish and **why** — what problem does this solve? What motivated this work?
 
 ## Log
 
 ### [Timestamp or short label]
 
-What was tried, what happened, why it did or didn't work.
-Keep entries concise but capture the *reasoning*, not just the actions.
+What was learned, what decisions were made and why.
+Focus on reasoning and insights, not play-by-play of actions taken.
+
+## Learnings
+
+Things we discovered that would be valuable to know in the future:
+- What surprised us
+- Constraints we discovered
+- Patterns that worked or didn't
+- Things that were harder/easier than expected and why
 
 ## Dead ends
 
 Approaches that were tried and abandoned. For each:
 - What was the approach
 - Why it seemed promising
-- Why it didn't work
+- What we learned from trying it (the actual lesson, not just "it didn't work")
 
 ## Solution
 
 (Filled in when the effort ships)
-What we actually did and why it works.
+What we did, why this approach won over the alternatives, and what makes it work.
 ```
 
 ## When to write
 
 Update the journal at these moments:
-- **During design discussion** — capture the options considered, tradeoffs discussed, and decisions made before any code is written
-- **Starting an investigation** — what are we looking at and why
-- **After a dead end** — what we tried, why it failed, move it to the Dead Ends section
-- **When switching approaches** — why we're pivoting
-- **When something works** — capture the solution
-- **At the end of a session** — summarize where things stand
+- **During design discussion** — capture options considered, tradeoffs debated, and the reasoning behind decisions made
+- **When something is learned** — a new constraint discovered, a surprising behavior found, an assumption proven wrong
+- **After a dead end** — what we tried, why it didn't work, what we learned from it
+- **When switching approaches** — why we're pivoting, what the new approach offers
+- **After executing a plan** — step back and capture the why behind the work. If you don't know the why, ask the user
+- **When something non-obvious works** — why does this solution work when others didn't?
+- **At the end of a session** — summarize where things stand and any open questions
 
-You don't need to log every file read or tool call. Capture the *decisions and reasoning* at meaningful turning points.
+**Interestingness threshold:** Not everything goes in the journal. A routine file rename doesn't need an entry. But if we spent 20 minutes debugging why a test was flaky and discovered it was a timing issue with Durable Object alarms — that's a learning worth capturing. When in doubt: would someone reading this journal 3 months from now find this entry useful? If yes, write it.
 
 ## The commit strategy
 
@@ -130,4 +159,4 @@ At the start of any session where you'll be doing non-trivial work:
 
 ## Tone
 
-Write like a developer's notebook — informal, direct, focused on "what" and "why". Not a formal document. Think lab notebook, not report.
+Write like a developer's notebook — informal, direct, focused on insights and reasoning. Think "TIL" posts and lab notebooks, not formal documentation.

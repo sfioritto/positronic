@@ -542,7 +542,7 @@ describe('Positronic Spec', () => {
   describe('Store', () => {
     // Seed R2 with test store data before each test
     beforeEach(async () => {
-      const bucket = env.RESOURCES_BUCKET;
+      const bucket = (env as { RESOURCES_BUCKET: R2Bucket }).RESOURCES_BUCKET;
 
       // Shared key
       await bucket.put(
@@ -607,7 +607,7 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
 
       // Verify it's actually deleted
-      const bucket = env.RESOURCES_BUCKET;
+      const bucket = (env as { RESOURCES_BUCKET: R2Bucket }).RESOURCES_BUCKET;
       const object = await bucket.get('store/test-brain/config.json');
       expect(object).toBeNull();
     });
