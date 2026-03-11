@@ -9,7 +9,7 @@ type Mode = 'brains' | 'keys' | 'value';
 interface StoreKey {
   key: string;
   scope: 'shared' | 'user';
-  userId?: string;
+  userName?: string;
   size: number;
   lastModified: string;
 }
@@ -18,7 +18,7 @@ interface StoreValue {
   key: string;
   value: any;
   scope: 'shared' | 'user';
-  userId?: string;
+  userName?: string;
 }
 
 type ErrorObject = { title: string; message: string; details?: string };
@@ -387,14 +387,14 @@ export const StoreExplorer = () => {
         </Box>
 
         {keys.map((entry, i) => (
-          <Box key={`${entry.scope}-${entry.key}-${entry.userId || ''}`}>
+          <Box key={`${entry.scope}-${entry.key}-${entry.userName || ''}`}>
             <Text color={i === selectedIndex ? 'cyan' : undefined}>
               {i === selectedIndex ? '> ' : '  '}
               {entry.key}
               <Text dimColor>
                 {' '}
                 [{entry.scope}
-                {entry.userId ? `:${entry.userId}` : ''}] {entry.size}B
+                {entry.userName ? `:${entry.userName}` : ''}] {entry.size}B
               </Text>
             </Text>
           </Box>

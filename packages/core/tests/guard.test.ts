@@ -44,7 +44,7 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -61,7 +61,7 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -85,7 +85,7 @@ describe('guard', () => {
       .guard(({ state }) => state.value > 0);
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -103,7 +103,7 @@ describe('guard', () => {
       .step('After B', ({ state }) => ({ ...state, passedB: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -121,7 +121,7 @@ describe('guard', () => {
       .step('After B', ({ state }) => ({ ...state, passedB: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -144,7 +144,7 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -159,7 +159,7 @@ describe('guard', () => {
       .step('Never runs', ({ state }) => ({ ...state, modified: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -174,7 +174,7 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -207,7 +207,7 @@ describe('guard', () => {
       .step('B', ({ state }) => ({ ...state, b: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -239,7 +239,7 @@ describe('guard', () => {
       .step('B', ({ state }) => ({ ...state, b: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -274,7 +274,7 @@ describe('guard', () => {
     const events: BrainEvent[] = [];
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       resumeContext,
       brainRunId: 'test-run-id',
     })) {
@@ -311,7 +311,7 @@ describe('guard', () => {
     const events: BrainEvent[] = [];
     for await (const event of testBrain.run({
       client: mockClient,
-      currentUser: { id: 'test-user' },
+      currentUser: { name: 'test-user' },
       resumeContext,
       brainRunId: 'test-run-id',
     })) {
@@ -370,7 +370,7 @@ describe('guard', () => {
 
     // Guard should fail (5 is not > 10)
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' }, options: { threshold: 10 } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' }, options: { threshold: 10 } })) {
       events.push(event);
     }
 
@@ -379,7 +379,7 @@ describe('guard', () => {
 
     // Guard should pass (5 > 3)
     const events2: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' }, options: { threshold: 3 } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' }, options: { threshold: 3 } })) {
       events2.push(event);
     }
 

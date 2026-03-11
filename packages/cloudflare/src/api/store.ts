@@ -5,13 +5,13 @@ import type { Bindings } from './types.js';
 const store = new Hono<{ Bindings: Bindings }>();
 
 /**
- * Get the userId for ownership filtering from the auth context.
+ * Get the userName for ownership filtering from the auth context.
  * Root users get null (no filter — sees everything).
- * Non-root users get their userId.
+ * Non-root users get their userName.
  */
-function scopeUserId(context: Context): string | null {
+function scopeUserName(context: Context): string | null {
   const auth = context.get('auth');
-  return auth?.isRoot ? null : auth?.userId ?? null;
+  return auth?.isRoot ? null : auth?.userName ?? null;
 }
 
 /**
@@ -27,18 +27,18 @@ function isRoot(context: Context): boolean {
  *
  * R2 key patterns:
  *   shared:   store/{brainTitle}/{key}.json
- *   per-user: store/{brainTitle}/user/{userId}/{key}.json
+ *   per-user: store/{brainTitle}/user/{userName}/{key}.json
  */
 function parseStoreKey(r2Key: string): {
   brainTitle: string;
   key: string;
   scope: 'shared' | 'user';
-  userId?: string;
+  userName?: string;
 } | null {
   // Remove "store/" prefix
   const withoutPrefix = r2Key.slice('store/'.length);
 
-  // Check for per-user pattern: {brainTitle}/user/{userId}/{key}.json
+  // Check for per-user pattern: {brainTitle}/user/{userName}/{key}.json
   const userMatch = withoutPrefix.match(
     /^([^/]+)\/user\/([^/]+)\/(.+)\.json$/
   );
@@ -47,7 +47,7 @@ function parseStoreKey(r2Key: string): {
       brainTitle: userMatch[1],
       key: userMatch[3],
       scope: 'user',
-      userId: userMatch[2],
+      userName: userMatch[2],
     };
   }
 
@@ -96,9 +96,9 @@ store.get('/:brainTitle/shared/:key', async (context: Context) => {
 
 // GET /store/:brainTitle/user/:key - Get per-user key value
 store.get('/:brainTitle/user/:key', async (context: Context) => {
-  const userId = scopeUserId(context);
+  const userName = scopeUserName(context);
 
-  if (!userId && !isRoot(context)) {
+  if (!userName && !isRoot(context)) {
     return context.json({ error: 'Authentication required' }, 401);
   }
 
@@ -108,8 +108,8 @@ store.get('/:brainTitle/user/:key', async (context: Context) => {
 
   // For root users, they could be looking at any user's key
   // But for non-root, it's always their own
-  const targetUserId = userId!;
-  const r2Key = `store/${brainTitle}/user/${targetUserId}/${key}.json`;
+  const targetUserName = userName!;
+  const r2Key = `store/${brainTitle}/user/${targetUserName}/${key}.json`;
   const object = await bucket.get(r2Key);
 
   if (!object) {
@@ -122,7 +122,7 @@ store.get('/:brainTitle/user/:key', async (context: Context) => {
     key,
     value,
     scope: 'user',
-    userId: targetUserId,
+    userName: targetUserName,
   });
 });
 
@@ -144,9 +144,9 @@ store.delete('/:brainTitle/shared/:key', async (context: Context) => {
 
 // DELETE /store/:brainTitle/user/:key - Delete per-user key
 store.delete('/:brainTitle/user/:key', async (context: Context) => {
-  const userId = scopeUserId(context);
+  const userName = scopeUserName(context);
 
-  if (!userId && !isRoot(context)) {
+  if (!userName && !isRoot(context)) {
     return context.json({ error: 'Authentication required' }, 401);
   }
 
@@ -154,8 +154,8 @@ store.delete('/:brainTitle/user/:key', async (context: Context) => {
   const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
   const key = decodeURIComponent(context.req.param('key'));
 
-  const targetUserId = userId!;
-  const r2Key = `store/${brainTitle}/user/${targetUserId}/${key}.json`;
+  const targetUserName = userName!;
+  const r2Key = `store/${brainTitle}/user/${targetUserName}/${key}.json`;
   await bucket.delete(r2Key);
 
   return new Response(null, { status: 204 });
@@ -165,14 +165,14 @@ store.delete('/:brainTitle/user/:key', async (context: Context) => {
 store.get('/:brainTitle', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
   const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
-  const userId = scopeUserId(context);
+  const userName = scopeUserName(context);
   const rootUser = isRoot(context);
 
   const prefix = `store/${brainTitle}/`;
   const keys: Array<{
     key: string;
     scope: 'shared' | 'user';
-    userId?: string;
+    userName?: string;
     size: number;
     lastModified: string;
   }> = [];
@@ -188,13 +188,13 @@ store.get('/:brainTitle', async (context: Context) => {
       // Access control: non-root only sees their own per-user keys
       if (!rootUser) {
         if (parsed.scope === 'shared') continue;
-        if (parsed.scope === 'user' && parsed.userId !== userId) continue;
+        if (parsed.scope === 'user' && parsed.userName !== userName) continue;
       }
 
       keys.push({
         key: parsed.key,
         scope: parsed.scope,
-        ...(parsed.userId && { userId: parsed.userId }),
+        ...(parsed.userName && { userName: parsed.userName }),
         size: object.size,
         lastModified: object.uploaded.toISOString(),
       });
@@ -213,7 +213,7 @@ store.get('/:brainTitle', async (context: Context) => {
 store.delete('/:brainTitle', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
   const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
-  const userId = scopeUserId(context);
+  const userName = scopeUserName(context);
   const rootUser = isRoot(context);
 
   const prefix = `store/${brainTitle}/`;
@@ -230,7 +230,7 @@ store.delete('/:brainTitle', async (context: Context) => {
       // Access control: non-root only deletes their own per-user keys
       if (!rootUser) {
         if (parsed.scope === 'shared') continue;
-        if (parsed.scope === 'user' && parsed.userId !== userId) continue;
+        if (parsed.scope === 'user' && parsed.userName !== userName) continue;
       }
 
       await bucket.delete(object.key);
@@ -246,7 +246,7 @@ store.delete('/:brainTitle', async (context: Context) => {
 // GET /store - List brains with store data
 store.get('/', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
-  const userId = scopeUserId(context);
+  const userName = scopeUserName(context);
   const rootUser = isRoot(context);
 
   const brainTitles = new Set<string>();
@@ -272,7 +272,7 @@ store.get('/', async (context: Context) => {
         const parsed = parseStoreKey(object.key);
         if (!parsed) continue;
 
-        if (parsed.scope === 'user' && parsed.userId === userId) {
+        if (parsed.scope === 'user' && parsed.userName === userName) {
           brainTitles.add(parsed.brainTitle);
         }
       }

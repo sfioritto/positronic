@@ -102,7 +102,7 @@ async function createJwtWithFingerprint(fingerprint: string): Promise<string> {
  * 3. Return a fetch wrapper that signs JWTs with that user's fingerprint
  *
  * The auth middleware will find the fingerprint in AuthDO, verify the JWT
- * with the stored public key (same test key), and set auth.userId.
+ * with the stored public key (same test key), and set auth.userName.
  */
 export async function createUserFetch(
   baseFetch: (request: Request) => Promise<Response>,

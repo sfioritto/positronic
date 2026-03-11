@@ -19,7 +19,7 @@ function isPerUserField(value: unknown): value is { type: unknown; perUser: true
  *
  * Key resolution:
  *   shared:   store/{brainTitle}/{key}.json
- *   per-user: store/{brainTitle}/user/{userId}/{key}.json
+ *   per-user: store/{brainTitle}/user/{userName}/{key}.json
  *
  * The factory receives the store schema, brain title, and currentUser,
  * and returns a typed Store<any> with full key resolution built in.
@@ -42,7 +42,7 @@ export function createR2Backend(bucket: R2Bucket): StoreProvider {
             `Per-user store keys require a currentUser in run params.`
           );
         }
-        return `store/${brainTitle}/user/${currentUser.id}/${key}`;
+        return `store/${brainTitle}/user/${currentUser.name}/${key}`;
       }
       return `store/${brainTitle}/${key}`;
     }

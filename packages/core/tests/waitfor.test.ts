@@ -107,7 +107,7 @@ describe('wait step timeout', () => {
       .wait('Wait', () => testWebhook('id1'));
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -122,7 +122,7 @@ describe('wait step timeout', () => {
       .wait('Wait', () => testWebhook('id1'), { timeout: '24h' });
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
@@ -137,7 +137,7 @@ describe('wait step timeout', () => {
       .wait('Wait', () => testWebhook('id1'), { timeout: 30000 });
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { id: 'test-user' } })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 

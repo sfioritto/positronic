@@ -102,7 +102,7 @@ interface MockSchedule {
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
-  runAsUserId?: string;
+  runAsUserName?: string;
 }
 
 interface MockScheduleRun {
@@ -177,7 +177,7 @@ interface MockStoreEntry {
   brainTitle: string;
   key: string;
   scope: 'shared' | 'user';
-  userId?: string;
+  userName?: string;
   value: any;
   size: number;
   lastModified: string;
@@ -998,7 +998,7 @@ export class TestDevServer implements PositronicDevServer {
       const schedules = Array.from(this.schedules.values()).map((s) => ({
         ...s,
         timezone: s.timezone || 'UTC',
-        runAsUserId: s.runAsUserId || 'test-user',
+        runAsUserName: s.runAsUserName || 'test-user',
       }));
       this.logCall('getSchedules', []);
       return {
@@ -1025,7 +1025,7 @@ export class TestDevServer implements PositronicDevServer {
         enabled: true,
         createdAt: Date.now(),
         nextRunAt: Date.now() + 3600000, // 1 hour from now
-        runAsUserId: 'test-user',
+        runAsUserName: 'test-user',
       };
       this.schedules.set(scheduleId, schedule);
       this.logCall('createSchedule', [body]);
@@ -1501,7 +1501,7 @@ export class TestDevServer implements PositronicDevServer {
           return [404, { error: `Key '${key}' not found` }];
         }
 
-        return [200, { key, value: entry.value, scope: 'user', userId: entry.userId }];
+        return [200, { key, value: entry.value, scope: 'user', userName: entry.userName }];
       }
       return [404, 'Not Found'];
     });
@@ -1552,7 +1552,7 @@ export class TestDevServer implements PositronicDevServer {
           .map((e) => ({
             key: e.key,
             scope: e.scope,
-            ...(e.userId && { userId: e.userId }),
+            ...(e.userName && { userName: e.userName }),
             size: e.size,
             lastModified: e.lastModified,
           }));

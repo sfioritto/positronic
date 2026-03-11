@@ -15,7 +15,7 @@ interface Schedule {
   enabled: boolean;
   createdAt: number;
   nextRunAt?: number;
-  runAsUserId: string;
+  runAsUserName: string;
 }
 
 interface SchedulesResponse {
@@ -175,7 +175,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
                 {padRight(schedule.enabled ? 'Enabled' : 'Disabled', columns.status.width)}
               </Text>
               <Text>  </Text>
-              <Text dimColor>{padRight(truncate(schedule.runAsUserId, columns.runAs.width), columns.runAs.width)}</Text>
+              <Text dimColor>{padRight(truncate(schedule.runAsUserName, columns.runAs.width), columns.runAs.width)}</Text>
               <Text>  </Text>
               <Text dimColor>{padRight(truncate(schedule.timezone || 'UTC', columns.timezone.width), columns.timezone.width)}</Text>
               <Text>  </Text>

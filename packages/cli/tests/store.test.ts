@@ -84,7 +84,7 @@ describe('store command', () => {
         brainTitle: 'test-brain',
         key: 'prefs',
         scope: 'user',
-        userId: 'user-1',
+        userName: 'user-1',
         value: { lang: 'en' },
         size: 12,
         lastModified: new Date().toISOString(),

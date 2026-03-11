@@ -90,9 +90,9 @@ export class MonitorDO extends DurableObject<Env> {
       // Column already exists
     }
 
-    // Migration: add user_id column to brain_runs for ownership tracking
+    // Migration: add user_name column to brain_runs for ownership tracking
     try {
-      this.storage.exec(`ALTER TABLE brain_runs ADD COLUMN user_id TEXT`);
+      this.storage.exec(`ALTER TABLE brain_runs ADD COLUMN user_name TEXT`);
     } catch {
       // Column already exists
     }
@@ -177,16 +177,16 @@ export class MonitorDO extends DurableObject<Env> {
         // All other events have brainTitle/brainDescription (BrainBaseEvent types)
         const brainEvent = event as { brainTitle: string; brainDescription?: string };
 
-        // Extract user_id from START event (set once, never updated)
-        const userId = event.type === BRAIN_EVENTS.START
-          ? (event as any).currentUser.id
+        // Extract user_name from START event (set once, never updated)
+        const userName = event.type === BRAIN_EVENTS.START
+          ? (event as any).currentUser.name
           : null;
 
         this.storage.exec(
           `
           INSERT INTO brain_runs (
             run_id, brain_title, brain_description, type, status,
-            options, error, created_at, started_at, completed_at, user_id
+            options, error, created_at, started_at, completed_at, user_name
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(run_id) DO UPDATE SET
             type = excluded.type,
@@ -204,7 +204,7 @@ export class MonitorDO extends DurableObject<Env> {
           currentTime,
           startTime,
           completeTime,
-          userId
+          userName
         );
       }
 
@@ -330,10 +330,10 @@ export class MonitorDO extends DurableObject<Env> {
 
   /**
    * Get detailed information about a specific brain run
-   * Returns null if run not found or not owned by userId
-   * Pass null for userId to skip ownership check (root access)
+   * Returns null if run not found or not owned by userName
+   * Pass null for userName to skip ownership check (root access)
    */
-  getRun(brainRunId: string, userId: string | null = null) {
+  getRun(brainRunId: string, userName: string | null = null) {
     const results = this.storage
       .exec(
         `
@@ -348,14 +348,14 @@ export class MonitorDO extends DurableObject<Env> {
         created_at as createdAt,
         started_at as startedAt,
         completed_at as completedAt,
-        user_id as userId
+        user_name as userName
       FROM brain_runs
       WHERE run_id = ?
-        AND (? IS NULL OR user_id = ?)
+        AND (? IS NULL OR user_name = ?)
     `,
         brainRunId,
-        userId,
-        userId
+        userName,
+        userName
       )
       .toArray();
 
@@ -375,9 +375,9 @@ export class MonitorDO extends DurableObject<Env> {
 
   /**
    * Get run history for a brain.
-   * Pass null for userId to skip ownership filter (root access).
+   * Pass null for userName to skip ownership filter (root access).
    */
-  history(brainTitle: string, limit: number = 10, userId: string | null = null) {
+  history(brainTitle: string, limit: number = 10, userName: string | null = null) {
     return this.storage
       .exec(
         `
@@ -392,16 +392,16 @@ export class MonitorDO extends DurableObject<Env> {
         created_at as createdAt,
         started_at as startedAt,
         completed_at as completedAt,
-        user_id as userId
+        user_name as userName
       FROM brain_runs
       WHERE brain_title = ?
-        AND (? IS NULL OR user_id = ?)
+        AND (? IS NULL OR user_name = ?)
       ORDER BY created_at DESC
       LIMIT ?
     `,
         brainTitle,
-        userId,
-        userId,
+        userName,
+        userName,
         limit
       )
       .toArray();
@@ -409,9 +409,9 @@ export class MonitorDO extends DurableObject<Env> {
 
   /**
    * Get active brain runs for a specific brain (running, paused, or waiting).
-   * Pass null for userId to skip ownership filter (root access).
+   * Pass null for userName to skip ownership filter (root access).
    */
-  activeRuns(brainTitle: string, userId: string | null = null) {
+  activeRuns(brainTitle: string, userName: string | null = null) {
     return this.storage
       .exec(
         `
@@ -426,18 +426,18 @@ export class MonitorDO extends DurableObject<Env> {
         created_at as createdAt,
         started_at as startedAt,
         completed_at as completedAt,
-        user_id as userId
+        user_name as userName
       FROM brain_runs
       WHERE brain_title = ? AND status IN (?, ?, ?)
-        AND (? IS NULL OR user_id = ?)
+        AND (? IS NULL OR user_name = ?)
       ORDER BY created_at DESC
     `,
         brainTitle,
         STATUS.RUNNING,
         STATUS.PAUSED,
         STATUS.WAITING,
-        userId,
-        userId
+        userName,
+        userName
       )
       .toArray();
   }

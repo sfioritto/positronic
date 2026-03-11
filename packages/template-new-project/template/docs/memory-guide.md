@@ -277,7 +277,7 @@ brain('sales-agent').withMemory(memory)    // agentId = 'sales-agent'
 
 ### userId
 
-Automatically set from `currentUser.id` when the brain runs. All memory operations are automatically scoped to the current user — no need to pass userId manually:
+Automatically set from `currentUser.name` when the brain runs. All memory operations are automatically scoped to the current user — no need to pass userId manually:
 
 ```typescript
 // userId is auto-bound from currentUser — just use memory directly

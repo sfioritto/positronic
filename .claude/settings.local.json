@@ -61,7 +61,11 @@
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:discuss.ai.google.dev)",
       "Bash(git stash:*)",
-      "Bash(git stash pop:*)"
+      "Bash(git stash pop:*)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic log --oneline --since=\"2025-01-01\" --format=\"%h %s\")",
+      "Bash(git -C /Users/seanfioritto/projects/positronic log:*)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic tag -l)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic branch:*)"
     ],
     "deny": []
   }

@@ -25,67 +25,24 @@ export class AuthDO extends DurableObject<AuthEnv> {
     super(state, env);
     this.storage = state.storage.sql;
 
-    // Detect old schema (has `id` column) and migrate
-    const tableInfo = this.storage
-      .exec(`PRAGMA table_info(users)`)
-      .toArray();
+    this.storage.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        name TEXT PRIMARY KEY,
+        created_at INTEGER NOT NULL
+      );
 
-    const hasIdColumn = tableInfo.some((col) => col.name === 'id');
+      CREATE TABLE IF NOT EXISTS keys (
+        fingerprint TEXT PRIMARY KEY,
+        user_name TEXT NOT NULL,
+        jwk TEXT NOT NULL,
+        label TEXT DEFAULT '',
+        added_at INTEGER NOT NULL,
+        FOREIGN KEY (user_name) REFERENCES users(name) ON DELETE CASCADE
+      );
 
-    if (hasIdColumn && tableInfo.length > 0) {
-      // Old schema detected — migrate to name-based schema
-      this.storage.exec(`
-        CREATE TABLE IF NOT EXISTS users_new (
-          name TEXT PRIMARY KEY,
-          created_at INTEGER NOT NULL
-        );
-
-        INSERT OR IGNORE INTO users_new (name, created_at)
-        SELECT name, created_at FROM users;
-
-        CREATE TABLE IF NOT EXISTS keys_new (
-          fingerprint TEXT PRIMARY KEY,
-          user_name TEXT NOT NULL,
-          jwk TEXT NOT NULL,
-          label TEXT DEFAULT '',
-          added_at INTEGER NOT NULL,
-          FOREIGN KEY (user_name) REFERENCES users_new(name) ON DELETE CASCADE
-        );
-
-        INSERT OR IGNORE INTO keys_new (fingerprint, user_name, jwk, label, added_at)
-        SELECT k.fingerprint, u.name, k.jwk, k.label, k.added_at
-        FROM keys k
-        JOIN users u ON k.user_id = u.id;
-
-        DROP TABLE IF EXISTS keys;
-        DROP TABLE IF EXISTS users;
-        ALTER TABLE users_new RENAME TO users;
-        ALTER TABLE keys_new RENAME TO keys;
-
-        CREATE INDEX IF NOT EXISTS idx_keys_user
-        ON keys(user_name);
-      `);
-    } else {
-      // Fresh database or already migrated
-      this.storage.exec(`
-        CREATE TABLE IF NOT EXISTS users (
-          name TEXT PRIMARY KEY,
-          created_at INTEGER NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS keys (
-          fingerprint TEXT PRIMARY KEY,
-          user_name TEXT NOT NULL,
-          jwk TEXT NOT NULL,
-          label TEXT DEFAULT '',
-          added_at INTEGER NOT NULL,
-          FOREIGN KEY (user_name) REFERENCES users(name) ON DELETE CASCADE
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_keys_user
-        ON keys(user_name);
-      `);
-    }
+      CREATE INDEX IF NOT EXISTS idx_keys_user
+      ON keys(user_name);
+    `);
   }
 
   async createUser(name: string): Promise<User> {
