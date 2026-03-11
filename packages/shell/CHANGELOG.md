@@ -1,5 +1,11 @@
 # @positronic/shell
 
+## 0.0.74
+
+### Patch Changes
+
+- Simplify auth & user management: switch to name-based user IDs, flatten CLI commands, add `px whoami` command. Fix `px new` crash caused by unescaped template tokens. Fix RESOURCES_BUCKET type error in spec tests. Rename userId/user_id to userName/user_name throughout the codebase.
+
 ## 0.0.73
 
 ### Patch Changes
