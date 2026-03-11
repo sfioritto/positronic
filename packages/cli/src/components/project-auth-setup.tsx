@@ -9,7 +9,7 @@ import {
 } from '../lib/ssh-key-utils.js';
 import { resetJwtAuthProvider } from '../lib/jwt-auth.js';
 import { SelectList, type SelectListItem } from './select-list.js';
-import { appendFileSync, existsSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 interface ProjectAuthSetupProps {
@@ -95,7 +95,10 @@ export const ProjectAuthSetup = ({ projectDir, onComplete }: ProjectAuthSetupPro
       const envLine = `ROOT_PUBLIC_KEY='${jwkString}'\n`;
 
       if (existsSync(envPath)) {
-        appendFileSync(envPath, envLine);
+        // Ensure we start on a new line if the file doesn't end with one
+        const existing = readFileSync(envPath, 'utf-8');
+        const prefix = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+        appendFileSync(envPath, prefix + envLine);
       } else {
         writeFileSync(envPath, envLine);
       }

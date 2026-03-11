@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { brain } from '../brain.js';
 
+// This brain uses the AI client configured in runner.ts.
+// By default it uses Google Gemini (requires GOOGLE_GENERATIVE_AI_API_KEY in .env).
+// See runner.ts to switch to Anthropic, OpenAI, or any other Vercel AI SDK provider.
+
 const exampleBrain = brain('example')
   .step('Start', ({ state }) => ({
     ...state,
