@@ -102,11 +102,17 @@ export const ProjectCreate = ({ projectPathArg }: ProjectCreateProps) => {
             <Text bold>2.</Text> Install dependencies if you didn't choose to during setup (e.g., npm install)
           </Text>
           <Text>
-            <Text bold>3.</Text> Run the development server: px s or positronic server
+            <Text bold>3.</Text> Add your AI provider API key to .env (e.g., GOOGLE_GENERATIVE_AI_API_KEY)
           </Text>
           <Text>
-            <Text bold>4.</Text> Open a new terminal in '{projectName}' and run a brain: px run example --watch
+            <Text bold>4.</Text> Run the development server: px s or positronic server
           </Text>
+          <Text>
+            <Text bold>5.</Text> Open a new terminal in '{projectName}' and run a brain: px run example --watch
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>See runner.ts to switch to a different AI provider (e.g., Anthropic, OpenAI)</Text>
         </Box>
       </Box>
     </Box>
