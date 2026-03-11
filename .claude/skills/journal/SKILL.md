@@ -59,6 +59,7 @@ If continuing work from a previous session, reuse the existing file — don't cr
 **Status:** active | shipped | abandoned
 **Started:** YYYY-MM-DD
 **Shipped:** YYYY-MM-DD (when applicable)
+**Commit:** abc1234 (short hash of the final commit, added at ship time)
 
 ## Goal
 
@@ -109,6 +110,8 @@ Update the journal at these moments:
 
 The journal commit always rides on top of HEAD. Here's the protocol:
 
+**Never amend or reset a commit that has already been pushed to the remote.** Amending rewrites the commit hash, which diverges local history from the remote and forces a force-push. Before amending or resetting, check whether HEAD has been pushed — if it has, make a new commit instead.
+
 ### Creating the initial journal commit
 
 1. Create/edit the journal file in `docs/journal/`
@@ -141,7 +144,8 @@ This slots the real commit underneath and puts the journal back on top.
 When the user says the work is done, or it's clear the effort has concluded:
 
 1. Update the journal page: set status to `shipped`, fill in the Solution section
-2. The journal commit becomes a real commit — stop amending it, it's now part of history
+2. Add the `Commit:` field — run `git rev-parse --short HEAD` (or the relevant commit if the work landed earlier) and add it to the metadata. This gives a direct pointer from the journal entry to the code.
+3. The journal commit becomes a real commit — stop amending it, it's now part of history
 
 ### When the effort is abandoned
 
