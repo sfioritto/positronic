@@ -2271,17 +2271,17 @@ describe('brain structure', () => {
   });
 });
 
-describe('batch prompt', () => {
-  // Use a separate mock for batch tests to avoid conflicts with module-level mock
-  const batchMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-  const batchMockStreamText = jest.fn<ObjectGenerator['streamText']>();
-  const batchMockClient = {
-    generateObject: batchMockGenerateObject,
-    streamText: batchMockStreamText,
+describe('prompt with over (iterate)', () => {
+  // Use a separate mock for iterate tests to avoid conflicts with module-level mock
+  const iterateMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const iterateMockStreamText = jest.fn<ObjectGenerator['streamText']>();
+  const iterateMockClient = {
+    generateObject: iterateMockGenerateObject,
+    streamText: iterateMockStreamText,
   };
 
   beforeEach(() => {
-    batchMockGenerateObject.mockClear();
+    iterateMockGenerateObject.mockClear();
   });
 
   describe('basic execution', () => {
@@ -2290,13 +2290,13 @@ describe('batch prompt', () => {
       const templateCalls: string[] = [];
 
       // Mock client to return category based on email content
-      batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
+      iterateMockGenerateObject.mockImplementation(async ({ prompt }) => {
         if (prompt?.includes('urgent')) return { object: { category: 'urgent' } };
         if (prompt?.includes('newsletter')) return { object: { category: 'newsletter' } };
         return { object: { category: 'general' } };
       });
 
-      const testBrain = brain('Batch Test')
+      const testBrain = brain('Iterate Test')
         .step('Init', () => ({
           emails: [
             { id: '1', subject: 'urgent: meeting', body: 'This is urgent' },
@@ -2322,7 +2322,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2348,7 +2348,7 @@ describe('batch prompt', () => {
     });
 
     it('should store results under outputSchema.name', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { sentiment: 'positive' } });
+      iterateMockGenerateObject.mockResolvedValue({ object: { sentiment: 'positive' } });
 
       const testBrain = brain('Named Results Test')
         .step('Init', () => ({
@@ -2369,7 +2369,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2381,7 +2381,7 @@ describe('batch prompt', () => {
     });
 
     it('should maintain item order in results', async () => {
-      batchMockGenerateObject.mockImplementation(async () => {
+      iterateMockGenerateObject.mockImplementation(async () => {
         return { object: { order: 1 } };
       });
 
@@ -2404,7 +2404,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2416,10 +2416,10 @@ describe('batch prompt', () => {
       expect(finalState.results[2][0]).toEqual({ id: 'c' });
     });
 
-    it('should yield BATCH_CHUNK_COMPLETE events per chunk', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { category: 'general' } });
+    it('should yield ITERATE_ITEM_COMPLETE events per item', async () => {
+      iterateMockGenerateObject.mockResolvedValue({ object: { category: 'general' } });
 
-      const testBrain = brain('Batch Events Test')
+      const testBrain = brain('Iterate Events Test')
         .step('Init', () => ({
           items: [{ id: 1 }, { id: 2 }, { id: 3 }],
         }))
@@ -2434,40 +2434,42 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            concurrency: 2,
           }
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         events.push(event);
       }
 
-      // Filter batch chunk events
-      const batchEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      // Filter iterate item events
+      const iterateEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
       );
 
-      // Should have 2 chunks: [0,1] and [2]
-      expect(batchEvents).toHaveLength(2);
+      // Should have 3 events (one per item)
+      expect(iterateEvents).toHaveLength(3);
 
-      // First chunk
-      expect(batchEvents[0].chunkStartIndex).toBe(0);
-      expect(batchEvents[0].processedCount).toBe(2);
-      expect(batchEvents[0].totalItems).toBe(3);
-      expect(batchEvents[0].chunkResults).toHaveLength(2);
-      expect(batchEvents[0].schemaName).toBe('categories');
+      // First item
+      expect(iterateEvents[0].itemIndex).toBe(0);
+      expect(iterateEvents[0].item).toEqual({ id: 1 });
+      expect(iterateEvents[0].result).toEqual({ category: 'general' });
+      expect(iterateEvents[0].processedCount).toBe(1);
+      expect(iterateEvents[0].totalItems).toBe(3);
+      expect(iterateEvents[0].schemaName).toBe('categories');
 
-      // Second chunk
-      expect(batchEvents[1].chunkStartIndex).toBe(2);
-      expect(batchEvents[1].processedCount).toBe(3);
-      expect(batchEvents[1].totalItems).toBe(3);
-      expect(batchEvents[1].chunkResults).toHaveLength(1);
+      // Second item
+      expect(iterateEvents[1].itemIndex).toBe(1);
+      expect(iterateEvents[1].processedCount).toBe(2);
+
+      // Third item
+      expect(iterateEvents[2].itemIndex).toBe(2);
+      expect(iterateEvents[2].processedCount).toBe(3);
 
       // Should include stepTitle
-      expect(batchEvents[0].stepTitle).toBe('Categorize');
+      expect(iterateEvents[0].stepTitle).toBe('Categorize');
 
-      // Batch events should appear between STEP_START and STEP_COMPLETE for the batch step
+      // Iterate events should appear between STEP_START and STEP_COMPLETE
       const stepStartIndex = events.findIndex(
         (e) => e.type === BRAIN_EVENTS.STEP_START && e.stepTitle === 'Categorize'
       );
@@ -2475,16 +2477,16 @@ describe('batch prompt', () => {
         (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE && e.stepTitle === 'Categorize'
       );
 
-      for (const batchEvent of batchEvents) {
-        const batchIndex = events.indexOf(batchEvent);
-        expect(batchIndex).toBeGreaterThan(stepStartIndex);
-        expect(batchIndex).toBeLessThan(stepCompleteIndex);
+      for (const iterateEvent of iterateEvents) {
+        const iterateIndex = events.indexOf(iterateEvent);
+        expect(iterateIndex).toBeGreaterThan(stepStartIndex);
+        expect(iterateIndex).toBeLessThan(stepCompleteIndex);
       }
     });
 
-    it('should handle errors within chunks using error handler', async () => {
+    it('should handle errors using error handler and emit per-item events', async () => {
       let callCount = 0;
-      batchMockGenerateObject.mockImplementation(async () => {
+      iterateMockGenerateObject.mockImplementation(async () => {
         callCount++;
         if (callCount === 2) {
           throw new Error('Failed for item 2');
@@ -2492,7 +2494,7 @@ describe('batch prompt', () => {
         return { object: { status: 'success' } };
       });
 
-      const testBrain = brain('Batch Error Events Test')
+      const testBrain = brain('Iterate Error Events Test')
         .step('Init', () => ({
           items: [{ id: 1 }, { id: 2 }, { id: 3 }],
         }))
@@ -2508,42 +2510,38 @@ describe('batch prompt', () => {
           {
             over: (state) => state.items,
             error: (item, err) => ({ status: 'failed' }),
-            concurrency: 10, // All in one chunk
           }
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         events.push(event);
       }
 
-      const chunkEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      const itemEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
       );
 
-      // One chunk with all 3 items (chunk size 10 > 3 items)
-      expect(chunkEvents).toHaveLength(1);
+      // One event per item (3 items)
+      expect(itemEvents).toHaveLength(3);
 
-      // Chunk should include results - 2 successes and 1 fallback
-      const chunkResults = chunkEvents[0].chunkResults;
-      expect(chunkResults).toHaveLength(3);
       // Item 1: success
-      expect(chunkResults[0][1]).toEqual({ status: 'success' });
+      expect(itemEvents[0].result).toEqual({ status: 'success' });
       // Item 2: fallback from error handler
-      expect(chunkResults[1][1]).toEqual({ status: 'failed' });
+      expect(itemEvents[1].result).toEqual({ status: 'failed' });
       // Item 3: success
-      expect(chunkResults[2][1]).toEqual({ status: 'success' });
+      expect(itemEvents[2].result).toEqual({ status: 'success' });
     });
 
-    it('should process items in chunks concurrently', async () => {
+    it('should process all items sequentially', async () => {
       const processedIds: number[] = [];
-      batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
+      iterateMockGenerateObject.mockImplementation(async ({ prompt }) => {
         const id = parseInt(prompt?.split(' ')[1] ?? '0');
         processedIds.push(id);
         return { object: { done: true } };
       });
 
-      const testBrain = brain('Chunk Test')
+      const testBrain = brain('Sequential Test')
         .step('Init', () => ({
           items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
         }))
@@ -2558,33 +2556,28 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            concurrency: 2,
           }
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         events.push(event);
       }
 
-      // All items should be processed
-      expect(processedIds).toHaveLength(4);
-      expect(processedIds).toContain(1);
-      expect(processedIds).toContain(2);
-      expect(processedIds).toContain(3);
-      expect(processedIds).toContain(4);
+      // All items should be processed in order
+      expect(processedIds).toEqual([1, 2, 3, 4]);
 
-      // Should produce 2 chunk events (chunk size 2, 4 items)
-      const chunkEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      // Should produce one event per item
+      const itemEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
       );
-      expect(chunkEvents).toHaveLength(2);
+      expect(itemEvents).toHaveLength(4);
     });
 
-    it('should resume batch from batchProgress', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { done: true } });
+    it('should resume iterate from iterateProgress', async () => {
+      iterateMockGenerateObject.mockResolvedValue({ object: { done: true } });
 
-      const testBrain = brain('Batch Resume Test')
+      const testBrain = brain('Iterate Resume Test')
         .step('Init', () => ({
           items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
         }))
@@ -2599,15 +2592,14 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            concurrency: 2,
           }
         );
 
       // Resume with first 2 items already processed
       const resumeContext: ResumeContext = {
-        stepIndex: 1, // At the batch step (step 0 = Init, step 1 = Process)
+        stepIndex: 1, // At the iterate step (step 0 = Init, step 1 = Process)
         state: { items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }] },
-        batchProgress: {
+        iterateProgress: {
           accumulatedResults: [
             [{ id: 1 }, { done: true }],
             [{ id: 2 }, { done: true }],
@@ -2622,24 +2614,26 @@ describe('batch prompt', () => {
 
       const events: any[] = [];
       for await (const event of testBrain.run({
-        client: batchMockClient,
+        client: iterateMockClient,
         currentUser: { name: 'test-user' },
         resumeContext,
-        brainRunId: 'test-resume-batch',
+        brainRunId: 'test-resume-iterate',
       })) {
         events.push(event);
       }
 
       // Should only have processed the remaining 2 items (not all 4)
-      expect(batchMockGenerateObject).toHaveBeenCalledTimes(2);
+      expect(iterateMockGenerateObject).toHaveBeenCalledTimes(2);
 
-      // Should produce 1 chunk event for the remaining items
-      const chunkEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      // Should produce 2 item events for the remaining items
+      const itemEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
       );
-      expect(chunkEvents).toHaveLength(1);
-      expect(chunkEvents[0].chunkStartIndex).toBe(2);
-      expect(chunkEvents[0].processedCount).toBe(4);
+      expect(itemEvents).toHaveLength(2);
+      expect(itemEvents[0].itemIndex).toBe(2);
+      expect(itemEvents[0].processedCount).toBe(3);
+      expect(itemEvents[1].itemIndex).toBe(3);
+      expect(itemEvents[1].processedCount).toBe(4);
 
       // Final state should have all 4 results
       let finalState: any = {};
@@ -2651,10 +2645,10 @@ describe('batch prompt', () => {
       expect(finalState.results).toHaveLength(4);
     });
 
-    it('should filter out null entries from batch results after JSON round-trip', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { done: true } });
+    it('should filter out null entries from iterate results after JSON round-trip', async () => {
+      iterateMockGenerateObject.mockResolvedValue({ object: { done: true } });
 
-      const testBrain = brain('Batch Null Filter Test')
+      const testBrain = brain('Iterate Null Filter Test')
         .step('Init', () => ({
           items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
         }))
@@ -2669,7 +2663,6 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            concurrency: 2,
             error: () => null, // Skip failed items
           }
         )
@@ -2682,9 +2675,9 @@ describe('batch prompt', () => {
           return { ...state, processed };
         });
 
-      // Simulate resume where batchProgress has been through JSON round-trip
+      // Simulate resume where iterateProgress has been through JSON round-trip
       // (stored in SQLite, loaded back). JSON.stringify converts undefined to null.
-      const batchProgress = JSON.parse(JSON.stringify({
+      const iterateProgress = JSON.parse(JSON.stringify({
         accumulatedResults: [
           [{ id: 1 }, { done: true }],
           undefined,  // Error item — becomes null after JSON round-trip
@@ -2697,17 +2690,17 @@ describe('batch prompt', () => {
       }));
 
       // Verify the JSON round-trip actually converted undefined to null
-      expect(batchProgress.accumulatedResults[1]).toBeNull();
+      expect(iterateProgress.accumulatedResults[1]).toBeNull();
 
       const resumeContext: ResumeContext = {
         stepIndex: 1,
         state: { items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }] },
-        batchProgress,
+        iterateProgress,
       };
 
       const events: any[] = [];
       for await (const event of testBrain.run({
-        client: batchMockClient,
+        client: iterateMockClient,
         currentUser: { name: 'test-user' },
         resumeContext,
         brainRunId: 'test-null-filter',
@@ -2729,8 +2722,8 @@ describe('batch prompt', () => {
       expect(finalState.processed).toHaveLength(3);
     });
 
-    it('should stop when PAUSE signal is received between chunks', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { done: true } });
+    it('should stop when PAUSE signal is received between items', async () => {
+      iterateMockGenerateObject.mockResolvedValue({ object: { done: true } });
 
       let controlSignalCallCount = 0;
       const mockSignalProvider = {
@@ -2740,10 +2733,11 @@ describe('batch prompt', () => {
             // Control signal checks:
             // 1 = main loop before Init step
             // 2 = main loop before Process step
-            // 3 = inside executeBatchPrompt before first chunk
-            // 4 = inside executeBatchPrompt before second chunk
-            // Return PAUSE before the second chunk
-            if (controlSignalCallCount === 4) {
+            // 3 = inside executeIteratePrompt before first item
+            // 4 = inside executeIteratePrompt before second item
+            // 5 = inside executeIteratePrompt before third item
+            // Return PAUSE before the third item
+            if (controlSignalCallCount === 5) {
               return [{ type: 'PAUSE' as const }];
             }
           }
@@ -2754,7 +2748,7 @@ describe('batch prompt', () => {
         },
       };
 
-      const testBrain = brain('Batch Pause Test')
+      const testBrain = brain('Iterate Pause Test')
         .step('Init', () => ({
           items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
         }))
@@ -2769,35 +2763,34 @@ describe('batch prompt', () => {
           },
           {
             over: (state) => state.items,
-            concurrency: 2,
           }
         );
 
       const events: any[] = [];
       for await (const event of testBrain.run({
-        client: batchMockClient,
+        client: iterateMockClient,
         currentUser: { name: 'test-user' },
         signalProvider: mockSignalProvider,
       })) {
         events.push(event);
       }
 
-      // Should have processed only the first chunk (2 items)
-      expect(batchMockGenerateObject).toHaveBeenCalledTimes(2);
+      // Should have processed only the first 2 items before PAUSE
+      expect(iterateMockGenerateObject).toHaveBeenCalledTimes(2);
 
-      // Should have 1 chunk event and NO PAUSED event
-      // (pausing between batch chunks is a backend implementation detail)
-      const chunkEvents = events.filter(
-        (e) => e.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE
+      // Should have 2 item events and NO PAUSED event
+      // (pausing between iterate items is a backend implementation detail)
+      const itemEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
       );
-      expect(chunkEvents).toHaveLength(1);
+      expect(itemEvents).toHaveLength(2);
 
       const pausedEvent = events.find(
         (e) => e.type === BRAIN_EVENTS.PAUSED
       );
       expect(pausedEvent).toBeUndefined();
 
-      // Should NOT have a COMPLETE event (execution stopped mid-batch)
+      // Should NOT have a COMPLETE event (execution stopped mid-iterate)
       const completeEvent = events.find(
         (e) => e.type === BRAIN_EVENTS.COMPLETE
       );
@@ -2807,7 +2800,7 @@ describe('batch prompt', () => {
 
   describe('error handling', () => {
     it('should fail whole step when no error handler and item fails', async () => {
-      batchMockGenerateObject.mockRejectedValue(new Error('API error'));
+      iterateMockGenerateObject.mockRejectedValue(new Error('API error'));
 
       const testBrain = brain('Fail Test')
         .step('Init', () => ({
@@ -2829,7 +2822,7 @@ describe('batch prompt', () => {
 
       let error: Error | undefined;
       try {
-        for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+        for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
           // Just consume events
         }
       } catch (e) {
@@ -2841,7 +2834,7 @@ describe('batch prompt', () => {
 
     it('should use error handler return value as fallback', async () => {
       let callCount = 0;
-      batchMockGenerateObject.mockImplementation(async () => {
+      iterateMockGenerateObject.mockImplementation(async () => {
         callCount++;
         if (callCount === 2) {
           throw new Error('Failed for item 2');
@@ -2869,7 +2862,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2884,7 +2877,7 @@ describe('batch prompt', () => {
 
     it('should skip item when error handler returns null', async () => {
       let callCount = 0;
-      batchMockGenerateObject.mockImplementation(async () => {
+      iterateMockGenerateObject.mockImplementation(async () => {
         callCount++;
         if (callCount === 2) {
           throw new Error('Failed for item 2');
@@ -2912,7 +2905,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2926,7 +2919,7 @@ describe('batch prompt', () => {
 
     it('should continue processing other items after handled error', async () => {
       const processedItems: number[] = [];
-      batchMockGenerateObject.mockImplementation(async ({ prompt }) => {
+      iterateMockGenerateObject.mockImplementation(async ({ prompt }) => {
         const id = parseInt(prompt?.split(' ')[1] ?? '0');
         processedItems.push(id);
         if (id === 2) {
@@ -2954,7 +2947,7 @@ describe('batch prompt', () => {
           }
         );
 
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         // Just consume events
       }
 
@@ -2968,7 +2961,7 @@ describe('batch prompt', () => {
 
   describe('type inference', () => {
     it('should infer TItem from over function', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { label: 'test' } });
+      iterateMockGenerateObject.mockResolvedValue({ object: { label: 'test' } });
 
       const testBrain = brain('Type Inference Test')
         .step('Init', () => ({
@@ -3009,7 +3002,7 @@ describe('batch prompt', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3020,7 +3013,7 @@ describe('batch prompt', () => {
     });
 
     it('should provide correct state type to subsequent steps', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { score: 10 } });
+      iterateMockGenerateObject.mockResolvedValue({ object: { score: 10 } });
 
       const testBrain = brain('Subsequent Step Type Test')
         .step('Init', () => ({
@@ -3053,7 +3046,7 @@ describe('batch prompt', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3084,18 +3077,18 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
       }
 
       expect(finalState.results).toEqual([]);
-      expect(batchMockGenerateObject).not.toHaveBeenCalled();
+      expect(iterateMockGenerateObject).not.toHaveBeenCalled();
     });
 
     it('should work with async template function', async () => {
-      batchMockGenerateObject.mockResolvedValue({ object: { processed: true } });
+      iterateMockGenerateObject.mockResolvedValue({ object: { processed: true } });
 
       const testBrain = brain('Async Template Test')
         .step('Init', () => ({
@@ -3119,13 +3112,13 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
       }
 
-      expect(batchMockGenerateObject).toHaveBeenCalledWith(
+      expect(iterateMockGenerateObject).toHaveBeenCalledWith(
         expect.objectContaining({
           prompt: 'Async item 1',
         })
@@ -3159,7 +3152,7 @@ describe('batch prompt', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: batchMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3167,7 +3160,7 @@ describe('batch prompt', () => {
 
       // Should have used the custom client, not the run client
       expect(customGenerateObject).toHaveBeenCalled();
-      expect(batchMockGenerateObject).not.toHaveBeenCalled();
+      expect(iterateMockGenerateObject).not.toHaveBeenCalled();
       expect(finalState.results[0][1]).toEqual({ custom: true });
     });
   });

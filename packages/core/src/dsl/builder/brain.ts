@@ -432,7 +432,7 @@ export class Brain<
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
-  // Overload 2: Batch execution - runs prompt for each item in array
+  // Overload 2: Iterate execution - runs prompt for each item in array
   prompt<
     TItem,
     TResponseKey extends string & { readonly brand?: unique symbol },
@@ -450,10 +450,9 @@ export class Brain<
       };
       client?: ObjectGenerator;
     },
-    batchConfig: {
+    iterateConfig: {
       over: (state: TState) => TItem[];
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
-      concurrency?: number;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -480,10 +479,9 @@ export class Brain<
       };
       client?: ObjectGenerator;
     },
-    batchConfig?: {
+    iterateConfig?: {
       over: (state: any) => any[];
       error?: (item: any, error: Error) => any | null;
-      concurrency?: number;
     }
   ): any {
     // Schema-less prompt - returns text response for next step
@@ -519,8 +517,8 @@ export class Brain<
     // At this point, outputSchema is guaranteed to exist (schema-less case returned early)
     const outputSchema = config.outputSchema!;
 
-    if (batchConfig) {
-      // Batch mode - store config on block for event-stream to execute with per-item events
+    if (iterateConfig) {
+      // Iterate mode - store config on block for event-stream to execute with per-item events
       const promptBlock: StepBlock<
         TState,
         any,
@@ -532,14 +530,13 @@ export class Brain<
         type: 'step',
         title,
         action: async ({ state }) => state,
-        batchConfig: {
-          over: batchConfig.over,
-          error: batchConfig.error,
+        iterateConfig: {
+          over: iterateConfig.over,
+          error: iterateConfig.error,
           template: config.template,
           schema: outputSchema.schema,
           schemaName: outputSchema.name,
           client: config.client,
-          concurrency: batchConfig.concurrency,
         },
       };
       this.blocks.push(promptBlock);

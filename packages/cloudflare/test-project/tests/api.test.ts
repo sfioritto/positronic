@@ -1600,13 +1600,13 @@ describe('Hono API Tests', () => {
     });
   });
 
-  describe('Batch + Webhook Resumption', () => {
-    it('should preserve brainRunId across alarm-based batch restarts so webhooks work', async () => {
+  describe('Iterate + Webhook Resumption', () => {
+    it('should preserve brainRunId across alarm-based iterate restarts so webhooks work', async () => {
       const testEnv = env as TestEnv;
-      const brainName = 'batch-webhook-brain';
-      const webhookIdentifier = 'batch-webhook-test';
+      const brainName = 'iterate-webhook-brain';
+      const webhookIdentifier = 'iterate-webhook-test';
 
-      // Step 1: Start the brain (has batch step followed by webhook wait)
+      // Step 1: Start the brain (has iterate step followed by webhook wait)
       const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1624,7 +1624,7 @@ describe('Hono API Tests', () => {
       }>();
       await waitOnExecutionContext(createContext);
 
-      // Step 2: Watch the brain - it should process batch chunks (with alarm restarts)
+      // Step 2: Watch the brain - it should process iterate items (with alarm restarts)
       // and then pause with WEBHOOK event
       const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
       const watchRequest = await createAuthenticatedRequest(watchUrl);
@@ -1640,7 +1640,7 @@ describe('Hono API Tests', () => {
         throw new Error('Watch response body is null');
       }
 
-      // Read events until we get the WEBHOOK event (brain pauses after batch + webhook)
+      // Read events until we get the WEBHOOK event (brain pauses after iterate + webhook)
       const reader = watchResponse.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -1671,7 +1671,7 @@ describe('Hono API Tests', () => {
         }
       }
 
-      // Verify we got WEBHOOK event after batch processing
+      // Verify we got WEBHOOK event after iterate processing
       expect(foundWebhookEvent).toBe(true);
       const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
       expect(webhookEvent).toBeDefined();
@@ -1693,7 +1693,7 @@ describe('Hono API Tests', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: 'Webhook after batch',
+            text: 'Webhook after iterate',
             user: 'test-user',
             threadId: webhookIdentifier,
           }),
@@ -1755,7 +1755,7 @@ describe('Hono API Tests', () => {
       const webhookMessageOp = patch?.find(
         (op) => op.op === 'add' && op.path === '/webhookMessage'
       );
-      expect(webhookMessageOp?.value).toBe('Webhook after batch');
+      expect(webhookMessageOp?.value).toBe('Webhook after iterate');
     });
   });
 

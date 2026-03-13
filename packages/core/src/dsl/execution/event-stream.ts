@@ -25,36 +25,6 @@ import { defaultDoneSchema } from '../../tools/index.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
-function createSemaphore(limit: number) {
-  let running = 0;
-  const queue: (() => void)[] = [];
-  return {
-    async acquire(): Promise<() => void> {
-      if (running < limit) {
-        running++;
-        return () => {
-          running--;
-          if (queue.length > 0) {
-            running++;
-            queue.shift()!();
-          }
-        };
-      }
-      return new Promise<() => void>((resolve) => {
-        queue.push(() =>
-          resolve(() => {
-            running--;
-            if (queue.length > 0) {
-              running++;
-              queue.shift()!();
-            }
-          })
-        );
-      });
-    },
-  };
-}
-
 export class BrainEventStream<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
@@ -367,7 +337,7 @@ export class BrainEventStream<
         // all events from inner brains if any
         yield* this.executeStep(step);
 
-        // Backend requested a stop (e.g. batch chunk pause for DO restart)
+        // Backend requested a stop (e.g. iterate item pause for DO restart)
         if (this.stopped) {
           return;
         }
@@ -440,9 +410,9 @@ export class BrainEventStream<
         return;
       }
 
-      // Check if this is a batch prompt step - handle specially
-      if (stepBlock.batchConfig) {
-        yield* this.executeBatchPrompt(step);
+      // Check if this is an iterate prompt step - handle specially
+      if (stepBlock.iterateConfig) {
+        yield* this.executeIteratePrompt(step);
         return;
       }
     }
@@ -1173,37 +1143,35 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
   }
 
   /**
-   * Execute a batch prompt step in chunks, yielding one BATCH_CHUNK_COMPLETE
-   * event per chunk. Between chunks, checks for PAUSE/KILL signals so
+   * Execute an iterate prompt step, yielding one ITERATE_ITEM_COMPLETE
+   * event per item. Between items, checks for PAUSE/KILL signals so
    * Cloudflare backends can restart the DO to reclaim memory.
    */
-  private async *executeBatchPrompt(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
+  private async *executeIteratePrompt(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as StepBlock<any, any, TOptions, TServices, any, any>;
-    const batchConfig = block.batchConfig!;
+    const iterateConfig = block.iterateConfig!;
     const prevState = this.currentState;
-    const rawClient = batchConfig.client;
+    const rawClient = iterateConfig.client;
     const client = rawClient
       ? (this.governor ? this.governor(rawClient) : rawClient)
       : this.client;
-    const items = batchConfig.over(this.currentState);
+    const items = iterateConfig.over(this.currentState);
     const totalItems = items.length;
-    const concurrency = batchConfig.concurrency ?? 10;
-    const semaphore = createSemaphore(concurrency);
 
     // Resume support: pick up from where we left off
-    const batchProgress = this.resumeContext?.batchProgress;
-    const startIndex = batchProgress?.processedCount ?? 0;
-    const results: ([any, any] | undefined)[] = batchProgress?.accumulatedResults
-      ? [...batchProgress.accumulatedResults]
+    const iterateProgress = this.resumeContext?.iterateProgress;
+    const startIndex = iterateProgress?.processedCount ?? 0;
+    const results: ([any, any] | undefined)[] = iterateProgress?.accumulatedResults
+      ? [...iterateProgress.accumulatedResults]
       : new Array(totalItems);
 
-    // Clear resumeContext after consuming batchProgress
-    if (batchProgress) {
+    // Clear resumeContext after consuming iterateProgress
+    if (iterateProgress) {
       this.resumeContext = undefined;
     }
 
-    for (let chunkStart = startIndex; chunkStart < totalItems; chunkStart += concurrency) {
-      // Check signals before each chunk (allows Cloudflare adapter to pause between chunks)
+    for (let i = startIndex; i < totalItems; i++) {
+      // Check signals before each item (allows Cloudflare adapter to pause between items)
       if (this.signalProvider) {
         const signals = await this.signalProvider.getSignals('CONTROL');
         for (const signal of signals) {
@@ -1219,7 +1187,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             return;
           }
           if (signal.type === 'PAUSE') {
-            // Don't yield PAUSED - pausing between batch chunks is a backend
+            // Don't yield PAUSED - pausing between iterate items is a backend
             // implementation detail (e.g. Cloudflare DO restart for memory).
             // Just stop execution silently; the backend handles resume.
             this.stopped = true;
@@ -1228,56 +1196,47 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         }
       }
 
-      const chunkEnd = Math.min(chunkStart + concurrency, totalItems);
-      const chunk = items.slice(chunkStart, chunkEnd);
+      const item = items[i];
+      let result: any;
 
-      // Process chunk with concurrency-limited pool
-      const chunkResults = await Promise.all(
-        chunk.map(async (item: any) => {
-          const release = await semaphore.acquire();
-          try {
-            const promptText = await batchConfig.template(item, this.resources);
-            const result = await client.generateObject({
-              schema: batchConfig.schema,
-              schemaName: batchConfig.schemaName,
-              prompt: promptText,
-            });
-            return [item, result.object] as [any, any];
-          } catch (error) {
-            if (batchConfig.error) {
-              const fallback = batchConfig.error(item, error as Error);
-              return fallback !== null ? ([item, fallback] as [any, any]) : undefined;
-            }
-            throw error;
-          } finally {
-            release();
-          }
-        })
-      );
-
-      // Store chunk results at correct indices
-      for (let i = 0; i < chunkResults.length; i++) {
-        results[chunkStart + i] = chunkResults[i];
+      try {
+        const promptText = await iterateConfig.template(item, this.resources);
+        const response = await client.generateObject({
+          schema: iterateConfig.schema,
+          schemaName: iterateConfig.schemaName,
+          prompt: promptText,
+        });
+        result = [item, response.object] as [any, any];
+      } catch (error) {
+        if (iterateConfig.error) {
+          const fallback = iterateConfig.error(item, error as Error);
+          result = fallback !== null ? ([item, fallback] as [any, any]) : undefined;
+        } else {
+          throw error;
+        }
       }
 
-      // Yield ONE event per chunk
+      results[i] = result;
+
+      // Yield one event per item
       yield {
-        type: BRAIN_EVENTS.BATCH_CHUNK_COMPLETE,
+        type: BRAIN_EVENTS.ITERATE_ITEM_COMPLETE,
         stepTitle: step.block.title,
         stepId: step.id,
-        chunkStartIndex: chunkStart,
-        processedCount: chunkEnd,
+        itemIndex: i,
+        item,
+        result: result ? result[1] : undefined,
+        processedCount: i + 1,
         totalItems,
-        chunkResults,
-        schemaName: batchConfig.schemaName,
+        schemaName: iterateConfig.schemaName,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
       };
     }
 
-    // All chunks done - update state and complete step
+    // All items done - update state and complete step
     const finalResults = results.filter((r): r is [any, any] => r != null);
-    this.currentState = { ...this.currentState, [batchConfig.schemaName]: finalResults };
+    this.currentState = { ...this.currentState, [iterateConfig.schemaName]: finalResults };
     yield* this.completeStep(step, prevState);
   }
 
