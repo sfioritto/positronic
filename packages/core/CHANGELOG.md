@@ -1,5 +1,15 @@
 # @positronic/core
 
+## 0.0.75
+
+### Patch Changes
+
+- - Add `-o` options support to `px schedule create` for passing key=value options to brains on each scheduled run
+  - Fix 'b' back key not working in store value view
+  - Fix ROOT_PUBLIC_KEY not syncing to .dev.vars and improve new project onboarding instructions
+  - Fix root key env newline bug when appending to existing .env files
+  - Add project roadmap
+
 ## 0.0.74
 
 ### Patch Changes

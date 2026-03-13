@@ -1,6 +1,6 @@
 {
   "name": "@positronic/template-new-project",
-  "version": "0.0.74",
+  "version": "0.0.75",
   "publishConfig": {
     "access": "public"
   },
