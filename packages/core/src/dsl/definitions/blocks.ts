@@ -115,6 +115,12 @@ export type BrainBlock<
     innerState: TInnerState,
     services: TServices
   ) => TNewState;
+  iterateConfig?: {
+    over: (state: any) => any[];
+    initialState: (item: any, outerState: any) => State;
+    outputKey: string;
+    error?: (item: any, error: Error) => any | null;
+  };
 };
 
 export type AgentBlock<
@@ -139,6 +145,11 @@ export type AgentBlock<
       env: RuntimeEnv;
     } & TServices
   ) => AgentConfig<TTools, TOutputSchema> | Promise<AgentConfig<TTools, TOutputSchema>>;
+  iterateConfig?: {
+    over: (state: any) => any[];
+    outputKey: string;
+    error?: (item: any, error: Error) => any | null;
+  };
 };
 
 export type GuardBlock<
