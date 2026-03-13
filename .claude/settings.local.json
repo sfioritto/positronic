@@ -73,7 +73,8 @@
       "WebFetch(domain:composio.dev)",
       "WebFetch(domain:docs.nango.dev)",
       "WebFetch(domain:nango.dev)",
-      "WebFetch(domain:docs.composio.dev)"
+      "WebFetch(domain:docs.composio.dev)",
+      "WebFetch(domain:vite.dev)"
     ],
     "deny": []
   }
