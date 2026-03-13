@@ -296,7 +296,7 @@ export const StoreExplorer = () => {
   }, []);
 
   // Keyboard handling - uses stable callback to avoid stale closure issues
-  useInput(stableInputHandler, { isActive: mode !== 'value' });
+  useInput(stableInputHandler);
 
   // Adjust selectedIndex if list shrinks
   useEffect(() => {
