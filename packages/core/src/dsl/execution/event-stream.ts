@@ -419,6 +419,10 @@ export class BrainEventStream<
 
     if (block.type === 'brain') {
       const brainBlock = block as BrainBlock<any, any, any, TOptions, TServices>;
+      if (brainBlock.iterateConfig) {
+        yield* this.executeIterateBrain(step);
+        return;
+      }
       const initialState =
         typeof brainBlock.initialState === 'function'
           ? brainBlock.initialState(this.currentState)
@@ -493,7 +497,14 @@ export class BrainEventStream<
       );
       yield* this.completeStep(step, prevState);
     } else if (block.type === 'agent') {
+      const agentBlock = block as AgentBlock<any, any, TOptions, TServices, any, any, any>;
+      if (agentBlock.iterateConfig) {
+        yield* this.executeIterateAgent(step);
+        return;
+      }
+      const prevState = this.currentState;
       yield* this.executeAgent(step);
+      yield* this.completeStep(step, prevState);
     } else {
       // Get previous state before action
       const prevState = this.currentState;
@@ -813,7 +824,6 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
-        yield* this.completeStep(step, prevState);
         return;
       }
 
@@ -921,7 +931,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
-        yield* this.completeStep(step, prevState);
         return;
       }
 
@@ -942,7 +951,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
       // If no tool calls, agent is done
       if (!response.toolCalls || response.toolCalls.length === 0) {
-        yield* this.completeStep(step, prevState);
         return;
       }
 
@@ -1000,7 +1008,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             // Default behavior: spread into state root (for other terminal tools)
             this.currentState = { ...this.currentState, ...(toolCall.args as JsonObject) };
           }
-          yield* this.completeStep(step, prevState);
           return;
         }
 
@@ -1176,6 +1183,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         const signals = await this.signalProvider.getSignals('CONTROL');
         for (const signal of signals) {
           if (signal.type === 'KILL') {
+            this.stopped = true;
             yield {
               type: BRAIN_EVENTS.CANCELLED,
               status: STATUS.CANCELLED,
@@ -1237,6 +1245,228 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // All items done - update state and complete step
     const finalResults = results.filter((r): r is [any, any] => r != null);
     this.currentState = { ...this.currentState, [iterateConfig.schemaName]: finalResults };
+    yield* this.completeStep(step, prevState);
+  }
+
+  /**
+   * Execute a nested brain iterate step. Runs the inner brain once per item
+   * from the `over` list, collects [item, innerState] tuples under `outputKey`.
+   */
+  private async *executeIterateBrain(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as BrainBlock<any, any, any, TOptions, TServices>;
+    const iterateConfig = block.iterateConfig!;
+    const prevState = this.currentState;
+    const items = iterateConfig.over(this.currentState);
+    const totalItems = items.length;
+
+    // Resume support
+    const iterateProgress = this.resumeContext?.iterateProgress;
+    const startIndex = iterateProgress?.processedCount ?? 0;
+    const results: ([any, any] | undefined)[] = iterateProgress?.accumulatedResults
+      ? [...iterateProgress.accumulatedResults]
+      : new Array(totalItems);
+
+    if (iterateProgress) {
+      this.resumeContext = undefined;
+    }
+
+    for (let i = startIndex; i < totalItems; i++) {
+      // Check signals before each item
+      if (this.signalProvider) {
+        const signals = await this.signalProvider.getSignals('CONTROL');
+        for (const signal of signals) {
+          if (signal.type === 'KILL') {
+            this.stopped = true;
+            yield {
+              type: BRAIN_EVENTS.CANCELLED,
+              status: STATUS.CANCELLED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+          if (signal.type === 'PAUSE') {
+            this.stopped = true;
+            return;
+          }
+        }
+      }
+
+      const item = items[i];
+      let result: [any, any] | undefined;
+
+      try {
+        const initialState = iterateConfig.initialState(item, this.currentState);
+
+        const innerRun = block.innerBrain.run({
+          resources: this.resources,
+          client: this.client,
+          currentUser: this.currentUser,
+          initialState,
+          options: this.options ?? ({} as TOptions),
+          pages: this.pages,
+          env: this.env,
+          brainRunId: this.brainRunId,
+          governor: this.governor,
+        });
+
+        let patches: any[] = [];
+        for await (const event of innerRun) {
+          // Throw on WEBHOOK — not supported in iterate (Phase 2)
+          if (event.type === BRAIN_EVENTS.WEBHOOK) {
+            throw new Error(
+              `Webhook/wait inside brain iterate is not supported. ` +
+              `Step "${block.title}" item ${i} triggered a webhook. ` +
+              `Remove .wait() from the inner brain or process items outside of iterate.`
+            );
+          }
+          // Don't forward inner brain ERROR events when we have an error handler —
+          // the outer brain will continue and the error event would confuse the state machine
+          if (event.type === BRAIN_EVENTS.ERROR && iterateConfig.error) {
+            continue;
+          }
+          yield event; // Forward all inner events
+          if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+            patches.push(event.patch);
+          }
+          if (event.type === BRAIN_EVENTS.COMPLETE) {
+            break;
+          }
+        }
+
+        const innerState = applyPatches(initialState, patches);
+        result = [item, innerState];
+      } catch (error) {
+        if (iterateConfig.error) {
+          const fallback = iterateConfig.error(item, error as Error);
+          result = fallback !== null ? [item, fallback] : undefined;
+        } else {
+          throw error;
+        }
+      }
+
+      results[i] = result;
+
+      yield {
+        type: BRAIN_EVENTS.ITERATE_ITEM_COMPLETE,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        itemIndex: i,
+        item,
+        result: result ? result[1] : undefined,
+        processedCount: i + 1,
+        totalItems,
+        schemaName: iterateConfig.outputKey,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+    }
+
+    const finalResults = results.filter((r): r is [any, any] => r != null);
+    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: finalResults };
+    yield* this.completeStep(step, prevState);
+  }
+
+  /**
+   * Execute an agent config iterate step. Runs the agent once per item
+   * from the `over` list, collects [item, agentResult] tuples under `outputKey`.
+   */
+  private async *executeIterateAgent(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as AgentBlock<any, any, TOptions, TServices, any, any, any>;
+    const iterateConfig = block.iterateConfig!;
+    const prevState = this.currentState;
+    const items = iterateConfig.over(this.currentState);
+    const totalItems = items.length;
+
+    // Resume support
+    const iterateProgress = this.resumeContext?.iterateProgress;
+    const startIndex = iterateProgress?.processedCount ?? 0;
+    const results: ([any, any] | undefined)[] = iterateProgress?.accumulatedResults
+      ? [...iterateProgress.accumulatedResults]
+      : new Array(totalItems);
+
+    if (iterateProgress) {
+      this.resumeContext = undefined;
+    }
+
+    for (let i = startIndex; i < totalItems; i++) {
+      // Check signals before each item
+      if (this.signalProvider) {
+        const signals = await this.signalProvider.getSignals('CONTROL');
+        for (const signal of signals) {
+          if (signal.type === 'KILL') {
+            this.stopped = true;
+            yield {
+              type: BRAIN_EVENTS.CANCELLED,
+              status: STATUS.CANCELLED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+          if (signal.type === 'PAUSE') {
+            this.stopped = true;
+            return;
+          }
+        }
+      }
+
+      const item = items[i];
+      let result: [any, any] | undefined;
+
+      try {
+        // Save outer state; agent will modify this.currentState
+        const savedState = this.currentState;
+
+        // Create a wrapper configFn that injects the item as the first argument
+        const itemConfigFn = (params: any) => (block.configFn as any)(item, params);
+
+        // Create a temporary agent block with the per-item configFn
+        const tempBlock: AgentBlock<any, any, TOptions, TServices, any, any, any> = {
+          type: 'agent',
+          title: block.title,
+          configFn: itemConfigFn,
+        };
+        const tempStep = new Step(tempBlock);
+
+        yield* this.executeAgent(tempStep);
+
+        // Capture agent result from this.currentState, then restore outer state
+        const agentResult = this.currentState;
+        this.currentState = savedState;
+        result = [item, agentResult];
+      } catch (error) {
+        if (iterateConfig.error) {
+          const fallback = iterateConfig.error(item, error as Error);
+          result = fallback !== null ? [item, fallback] : undefined;
+        } else {
+          throw error;
+        }
+      }
+
+      results[i] = result;
+
+      yield {
+        type: BRAIN_EVENTS.ITERATE_ITEM_COMPLETE,
+        stepTitle: step.block.title,
+        stepId: step.id,
+        itemIndex: i,
+        item,
+        result: result ? result[1] : undefined,
+        processedCount: i + 1,
+        totalItems,
+        schemaName: iterateConfig.outputKey,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+    }
+
+    const finalResults = results.filter((r): r is [any, any] => r != null);
+    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: finalResults };
     yield* this.completeStep(step, prevState);
   }
 

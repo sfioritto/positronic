@@ -15,6 +15,7 @@ import { ObjectGenerator } from '../src/clients/types.js';
 import { createResources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
 import { createWebhook } from '../src/index.js';
+import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
 
 // Helper function to get the next value from an AsyncIterator
 const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
@@ -3255,5 +3256,628 @@ describe('prompt with over (iterate)', () => {
         // Just run to verify it works
       }
     });
+  });
+});
+
+describe('.brain() with over — nested brain iterate', () => {
+  beforeEach(() => {
+    mockGenerateObject.mockClear();
+  });
+
+  // Helper: run brain, feed events into state machine, return { events, finalState }
+  const runWithStateMachine = async (brainInstance: any, runParams: any) => {
+    const sm = createBrainExecutionMachine();
+    const events: BrainEvent<any>[] = [];
+    for await (const event of brainInstance.run(runParams)) {
+      events.push(event);
+      sendEvent(sm, event as any);
+    }
+    return { events, finalState: sm.context.currentState, sm };
+  };
+
+  it('should run inner brain per item and collect results as tuples', async () => {
+    const innerBrain = brain<{}, { value: number }>('Doubler').step(
+      'Double',
+      ({ state }) => ({ value: state.value * 2 })
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ n: 3 }, { n: 5 }, { n: 7 }],
+      }))
+      .brain('Process Items', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item, state) => ({ value: item.n }),
+        outputKey: 'results' as const,
+      });
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    expect(finalState.results).toHaveLength(3);
+    expect(finalState.results[0]).toEqual([{ n: 3 }, { value: 6 }]);
+    expect(finalState.results[1]).toEqual([{ n: 5 }, { value: 10 }]);
+    expect(finalState.results[2]).toEqual([{ n: 7 }, { value: 14 }]);
+  });
+
+  it('should forward inner brain events', async () => {
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => ({ value: state.value + 1 })
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+      });
+
+    const { events } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Should see inner brain START events for each item
+    const innerStarts = events.filter(
+      (e) => e.type === BRAIN_EVENTS.START && 'brainTitle' in e && e.brainTitle === 'Inner'
+    );
+    expect(innerStarts).toHaveLength(2);
+
+    // Should see inner brain COMPLETE events for each item
+    const innerCompletes = events.filter(
+      (e) => e.type === BRAIN_EVENTS.COMPLETE && 'brainTitle' in e && e.brainTitle === 'Inner'
+    );
+    expect(innerCompletes).toHaveLength(2);
+
+    // Should see STEP_COMPLETE for inner brain steps
+    const innerStepCompletes = events.filter(
+      (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE && 'stepTitle' in e && e.stepTitle === 'Process'
+    );
+    expect(innerStepCompletes).toHaveLength(2);
+  });
+
+  it('should emit ITERATE_ITEM_COMPLETE per item', async () => {
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => ({ value: state.value * 10 })
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+      });
+
+    const { events } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    const iterateEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
+
+    expect(iterateEvents).toHaveLength(3);
+    expect((iterateEvents[0] as any).itemIndex).toBe(0);
+    expect((iterateEvents[0] as any).processedCount).toBe(1);
+    expect((iterateEvents[0] as any).totalItems).toBe(3);
+    expect((iterateEvents[0] as any).result).toEqual({ value: 10 });
+    expect((iterateEvents[0] as any).schemaName).toBe('results');
+
+    expect((iterateEvents[1] as any).itemIndex).toBe(1);
+    expect((iterateEvents[1] as any).processedCount).toBe(2);
+    expect((iterateEvents[1] as any).result).toEqual({ value: 20 });
+
+    expect((iterateEvents[2] as any).itemIndex).toBe(2);
+    expect((iterateEvents[2] as any).processedCount).toBe(3);
+    expect((iterateEvents[2] as any).result).toEqual({ value: 30 });
+  });
+
+  it('should use error handler as fallback when item fails', async () => {
+    let callCount = 0;
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => {
+        callCount++;
+        if (callCount === 2) throw new Error('Item 2 failed');
+        return { value: state.value * 2 };
+      }
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+        error: (item, err) => ({ value: -1 }),
+      });
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      events.push(event);
+    }
+
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    ) as any[];
+    expect(itemEvents).toHaveLength(3);
+    expect(itemEvents[0].result).toEqual({ value: 2 });
+    expect(itemEvents[1].result).toEqual({ value: -1 }); // fallback
+    expect(itemEvents[2].result).toEqual({ value: 6 });
+  });
+
+  it('should skip item when error handler returns null', async () => {
+    let callCount = 0;
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => {
+        callCount++;
+        if (callCount === 2) throw new Error('Skip me');
+        return { value: state.value };
+      }
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+        error: () => null,
+      });
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      events.push(event);
+    }
+
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    ) as any[];
+    expect(itemEvents).toHaveLength(3);
+    // Item 2 has undefined result (skipped)
+    expect(itemEvents[0].result).toEqual({ value: 1 });
+    expect(itemEvents[1].result).toBeUndefined();
+    expect(itemEvents[2].result).toEqual({ value: 3 });
+  });
+
+  it('should stop on PAUSE between items', async () => {
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => ({ value: state.value })
+    );
+
+    let controlSignalCallCount = 0;
+    const mockSignalProvider = {
+      getSignals: async (filter: string) => {
+        if (filter === 'CONTROL') {
+          controlSignalCallCount++;
+          // 1 = main loop before Init
+          // 2 = main loop before Iterate step
+          // 3 = iterate before first item
+          // 4 = iterate before second item — PAUSE here
+          if (controlSignalCallCount === 4) {
+            return [{ type: 'PAUSE' as const }];
+          }
+        }
+        if (filter === 'WEBHOOK') return [];
+        return [];
+      },
+    };
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+      });
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      signalProvider: mockSignalProvider,
+    })) {
+      events.push(event);
+    }
+
+    // Should have processed 1 item before PAUSE stopped
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
+    expect(itemEvents).toHaveLength(1);
+
+    // No PAUSED event (silent stop for backend restart)
+    expect(events.some((e) => e.type === BRAIN_EVENTS.PAUSED)).toBe(false);
+
+    // No outer brain COMPLETE event (inner brain completes are expected)
+    const outerComplete = events.find(
+      (e) => e.type === BRAIN_EVENTS.COMPLETE && 'brainTitle' in e && e.brainTitle === 'Outer'
+    );
+    expect(outerComplete).toBeUndefined();
+  });
+
+  it('should stop on KILL signal', async () => {
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => ({ value: state.value })
+    );
+
+    let controlSignalCallCount = 0;
+    const mockSignalProvider = {
+      getSignals: async (filter: string) => {
+        if (filter === 'CONTROL') {
+          controlSignalCallCount++;
+          if (controlSignalCallCount === 4) {
+            return [{ type: 'KILL' as const }];
+          }
+        }
+        if (filter === 'WEBHOOK') return [];
+        return [];
+      },
+    };
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+      });
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      signalProvider: mockSignalProvider,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.some((e) => e.type === BRAIN_EVENTS.CANCELLED)).toBe(true);
+    // No outer brain COMPLETE event
+    const outerComplete = events.find(
+      (e) => e.type === BRAIN_EVENTS.COMPLETE && 'brainTitle' in e && e.brainTitle === 'Outer'
+    );
+    expect(outerComplete).toBeUndefined();
+  });
+
+  it('should throw on inner brain webhook', async () => {
+    const innerBrain = brain<{}, { value: number }>('Inner')
+      .step('Process', ({ state }) => state)
+      .wait('Wait for webhook', () => ({
+        slug: 'test',
+        identifier: 'test-id',
+        schema: z.object({ data: z.string() }),
+        token: 'token',
+      }));
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+      });
+
+    let error: Error | undefined;
+    try {
+      for await (const event of outerBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+        // consume events
+      }
+    } catch (e) {
+      error = e as Error;
+    }
+
+    expect(error?.message).toContain('Webhook/wait inside brain iterate is not supported');
+  });
+
+  it('should resume from iterateProgress', async () => {
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Double',
+      ({ state }) => ({ value: state.value * 2 })
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+      });
+
+    const resumeContext: ResumeContext = {
+      stepIndex: 1,
+      state: { items: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }] },
+      iterateProgress: {
+        accumulatedResults: [
+          [{ n: 1 }, { value: 2 }],
+          [{ n: 2 }, { value: 4 }],
+          undefined,
+          undefined,
+        ],
+        processedCount: 2,
+        totalItems: 4,
+        schemaName: 'results',
+      },
+    };
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      resumeContext,
+      brainRunId: 'test-resume',
+    })) {
+      events.push(event);
+    }
+
+    // Should only have processed 2 remaining items
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
+    expect(itemEvents).toHaveLength(2);
+    expect((itemEvents[0] as any).itemIndex).toBe(2);
+    expect((itemEvents[0] as any).processedCount).toBe(3);
+    expect((itemEvents[1] as any).itemIndex).toBe(3);
+    expect((itemEvents[1] as any).processedCount).toBe(4);
+
+    // Verify all 4 results present in the outer step complete patch
+    const outerStepComplete = events.find(
+      (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE && 'stepTitle' in e && e.stepTitle === 'Iterate'
+    );
+    expect(outerStepComplete).toBeDefined();
+  });
+});
+
+describe('.brain() with over — agent config iterate', () => {
+  const agentMockGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+  const agentMockClient: jest.Mocked<ObjectGenerator> = {
+    generateObject: mockGenerateObject,
+    generateText: agentMockGenerateText,
+    streamText: mockStreamText,
+  };
+
+  beforeEach(() => {
+    mockGenerateObject.mockReset();
+    agentMockGenerateText.mockReset();
+  });
+
+  // Helper: run brain, feed events into state machine, return { events, finalState }
+  const runWithStateMachine = async (brainInstance: any, runParams: any) => {
+    const sm = createBrainExecutionMachine();
+    const events: BrainEvent<any>[] = [];
+    for await (const event of brainInstance.run(runParams)) {
+      events.push(event);
+      sendEvent(sm, event as any);
+    }
+    return { events, finalState: sm.context.currentState, sm };
+  };
+
+  it('should run agent config per item and collect results', async () => {
+    // Each item triggers an agent that calls done with a result
+    let callIndex = 0;
+    agentMockGenerateText.mockImplementation(async () => {
+      callIndex++;
+      return {
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: `call-${callIndex}`,
+            toolName: 'done',
+            args: { processed: true, index: callIndex },
+          },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [],
+      };
+    });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
+      }))
+      .brain(
+        'Process Items',
+        (item: { url: string }, { state }) => ({
+          prompt: `Process ${item.url}`,
+          outputSchema: {
+            schema: z.object({ processed: z.boolean(), index: z.number() }),
+            name: 'result' as const,
+          },
+        }),
+        {
+          over: (state) => state.items,
+          outputKey: 'results' as const,
+        }
+      );
+
+    const { events, finalState } = await runWithStateMachine(outerBrain, {
+      client: agentMockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    expect(finalState.results).toHaveLength(3);
+    // Each result is [item, agentState]
+    expect(finalState.results[0][0]).toEqual({ url: 'a.com' });
+    expect(finalState.results[0][1].result).toEqual({ processed: true, index: 1 });
+    expect(finalState.results[1][0]).toEqual({ url: 'b.com' });
+    expect(finalState.results[2][0]).toEqual({ url: 'c.com' });
+
+    // Should have agent events forwarded
+    const agentStarts = events.filter((e) => e.type === BRAIN_EVENTS.AGENT_START);
+    expect(agentStarts).toHaveLength(3);
+
+    const agentCompletes = events.filter((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE);
+    expect(agentCompletes).toHaveLength(3);
+  });
+
+  it('should emit ITERATE_ITEM_COMPLETE per item', async () => {
+    let callIndex = 0;
+    agentMockGenerateText.mockImplementation(async () => {
+      callIndex++;
+      return {
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: `call-${callIndex}`,
+            toolName: 'done',
+            args: { value: callIndex },
+          },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [],
+      };
+    });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ id: 1 }, { id: 2 }] }))
+      .brain(
+        'Process',
+        (item: { id: number }, { state }) => ({
+          prompt: `Process ${item.id}`,
+          outputSchema: {
+            schema: z.object({ value: z.number() }),
+            name: 'result' as const,
+          },
+        }),
+        {
+          over: (state) => state.items,
+          outputKey: 'results' as const,
+        }
+      );
+
+    const { events } = await runWithStateMachine(outerBrain, {
+      client: agentMockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    const iterateEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
+    expect(iterateEvents).toHaveLength(2);
+    expect((iterateEvents[0] as any).itemIndex).toBe(0);
+    expect((iterateEvents[0] as any).processedCount).toBe(1);
+    expect((iterateEvents[0] as any).totalItems).toBe(2);
+    expect((iterateEvents[0] as any).schemaName).toBe('results');
+    expect((iterateEvents[1] as any).itemIndex).toBe(1);
+    expect((iterateEvents[1] as any).processedCount).toBe(2);
+  });
+
+  it('should use error handler when agent fails', async () => {
+    let callIndex = 0;
+    agentMockGenerateText.mockImplementation(async () => {
+      callIndex++;
+      if (callIndex === 2) throw new Error('Agent failed on item 2');
+      return {
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: `call-${callIndex}`,
+            toolName: 'done',
+            args: { status: 'ok' },
+          },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [],
+      };
+    });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ id: 1 }, { id: 2 }, { id: 3 }] }))
+      .brain(
+        'Process',
+        (item: { id: number }, { state }) => ({
+          prompt: `Process ${item.id}`,
+        }),
+        {
+          over: (state) => state.items,
+          outputKey: 'results' as const,
+          error: (item, err) => ({ status: 'failed', id: item.id }),
+        }
+      );
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: agentMockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    expect(finalState.results).toHaveLength(3);
+    expect(finalState.results[1][1]).toEqual({ status: 'failed', id: 2 });
+  });
+
+  it('should stop on PAUSE between items', async () => {
+    let callIndex = 0;
+    agentMockGenerateText.mockImplementation(async () => {
+      callIndex++;
+      return {
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: `call-${callIndex}`,
+            toolName: 'done',
+            args: { result: 'done' },
+          },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [],
+      };
+    });
+
+    let controlSignalCallCount = 0;
+    const mockSignalProvider = {
+      getSignals: async (filter: string) => {
+        if (filter === 'CONTROL') {
+          controlSignalCallCount++;
+          // 1 = main loop before Init
+          // 2 = main loop before Process step
+          // 3 = iterate before first item
+          // 4 = iterate before second item — PAUSE here
+          if (controlSignalCallCount === 4) {
+            return [{ type: 'PAUSE' as const }];
+          }
+        }
+        if (filter === 'WEBHOOK') return [];
+        if (filter === 'ALL') return [];
+        return [];
+      },
+    };
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ id: 1 }, { id: 2 }, { id: 3 }] }))
+      .brain(
+        'Process',
+        (item: { id: number }, { state }) => ({
+          prompt: `Process ${item.id}`,
+        }),
+        {
+          over: (state) => state.items,
+          outputKey: 'results' as const,
+        }
+      );
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: agentMockClient,
+      currentUser: { name: 'test-user' },
+      signalProvider: mockSignalProvider,
+    })) {
+      events.push(event);
+    }
+
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
+    expect(itemEvents).toHaveLength(1);
+    expect(events.some((e) => e.type === BRAIN_EVENTS.PAUSED)).toBe(false);
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(false);
   });
 });

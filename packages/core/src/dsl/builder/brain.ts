@@ -360,16 +360,83 @@ export class Brain<
     ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
+  // Overload 6: Nested brain with iterate
+  brain<
+    TItem,
+    TInnerState extends State,
+    TOutputKey extends string & { readonly brand?: unique symbol },
+    TNewState extends State = TState & { [K in TOutputKey]: [TItem, TInnerState][] }
+  >(
+    title: string,
+    innerBrain: Brain<TOptions, TInnerState, TServices>,
+    iterateConfig: {
+      over: (state: TState) => TItem[];
+      initialState: (item: TItem, outerState: TState) => State;
+      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      error?: (item: TItem, error: Error) => TInnerState | null;
+    }
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
+
+  // Overload 7: Agent config function with iterate, WITH outputSchema
+  brain<
+    TItem,
+    TTools extends Record<string, AgentTool<any>>,
+    TName extends string & { readonly brand?: unique symbol },
+    TSchema extends z.ZodObject<any>,
+    TOutputKey extends string & { readonly brand?: unique symbol },
+    TNewState extends State = TState & { [K in TOutputKey]: [TItem, z.infer<TSchema>][] }
+  >(
+    title: string,
+    configFn: (
+      item: TItem,
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & StoreContext<TStore> & {
+        tools: Record<string, AgentTool<any>>;
+      }
+    ) => AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>,
+    iterateConfig: {
+      over: (state: TState) => TItem[];
+      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
+    }
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
+
+  // Overload 8: Agent config function with iterate, no outputSchema
+  brain<
+    TItem,
+    TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
+    TOutputKey extends string = string,
+    TNewState extends State = TState & { [K in TOutputKey]: [TItem, any][] }
+  >(
+    title: string,
+    configFn: (
+      item: TItem,
+      params: StepContext<TState, TOptions, TResponse, TPage> & TServices & StoreContext<TStore> & {
+        tools: Record<string, AgentTool<any>>;
+      }
+    ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>,
+    iterateConfig: {
+      over: (state: TState) => TItem[];
+      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      error?: (item: TItem, error: Error) => any | null;
+    }
+  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
+
   // Implementation
   brain(
     title: string,
     innerBrainOrConfig:
       | Brain<any, any, any, any, any>
       | AgentConfig<any, any>
-      | ((params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
-    action?: (params: any) => any,
+      | ((params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
+      | ((item: any, params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
+    actionOrIterateConfig?: ((params: any) => any) | { over: (state: any) => any[]; [key: string]: any },
     initialState?: State | ((state: TState) => State)
   ): any {
+    // Detect iterate config: 3rd arg is an object with `over` property
+    const isIterateConfig = actionOrIterateConfig &&
+      typeof actionOrIterateConfig === 'object' &&
+      'over' in actionOrIterateConfig;
+
     // Case 1: Nested brain instance
     if (
       innerBrainOrConfig &&
@@ -377,6 +444,28 @@ export class Brain<
       'type' in innerBrainOrConfig &&
       innerBrainOrConfig.type === 'brain'
     ) {
+      if (isIterateConfig) {
+        // Case 1b: Nested brain with iterate
+        const iterateConfig = actionOrIterateConfig as {
+          over: (state: any) => any[];
+          initialState: (item: any, outerState: any) => State;
+          outputKey: string;
+          error?: (item: any, error: Error) => any | null;
+        };
+        const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
+          type: 'brain',
+          title,
+          innerBrain: innerBrainOrConfig,
+          initialState: () => ({} as State), // placeholder — iterate uses iterateConfig.initialState per item
+          action: () => ({}), // placeholder — iterate accumulates results under outputKey
+          iterateConfig,
+        };
+        this.blocks.push(nestedBlock);
+        return this.nextBrain<any>();
+      }
+
+      // Case 1a: Single nested brain (existing behavior)
+      const action = actionOrIterateConfig as (params: any) => any;
       const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
         type: 'brain',
         title,
@@ -390,6 +479,24 @@ export class Brain<
     }
 
     // Case 2 & 3: Agent config (object or function)
+    if (isIterateConfig) {
+      // Agent config with iterate — configFn receives (item, params)
+      const iterateConfig = actionOrIterateConfig as {
+        over: (state: any) => any[];
+        outputKey: string;
+        error?: (item: any, error: Error) => any | null;
+      };
+      const configFn = innerBrainOrConfig as (item: any, params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>;
+      const agentBlock: AgentBlock<TState, any, TOptions, TServices, TResponse, any, any> = {
+        type: 'agent',
+        title,
+        configFn: configFn as any, // stored as the item-receiving configFn
+        iterateConfig,
+      };
+      this.blocks.push(agentBlock);
+      return this.nextBrain<any, TResponse, undefined>();
+    }
+
     const configFn =
       typeof innerBrainOrConfig === 'function'
         ? innerBrainOrConfig
