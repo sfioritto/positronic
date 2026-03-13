@@ -8,12 +8,16 @@ export const schedules = {
     fetch: Fetch,
     identifier: string,
     cronExpression: string,
-    timezone?: string
+    timezone?: string,
+    options?: Record<string, string>
   ): Promise<string | null> {
     try {
-      const body: Record<string, string> = { identifier, cronExpression };
+      const body: Record<string, any> = { identifier, cronExpression };
       if (timezone) {
         body.timezone = timezone;
+      }
+      if (options) {
+        body.options = options;
       }
 
       const request = new Request('http://example.com/brains/schedules', {

@@ -989,6 +989,13 @@ export function buildCli(options: CliOptions) {
                 type: 'string',
                 demandOption: true,
               })
+              .option('options', {
+                describe: 'Options to pass to the brain on each run (key=value format)',
+                type: 'array',
+                alias: 'o',
+                string: true,
+                coerce: parseKeyValueOptions
+              })
               .example(
                 '$0 schedule create my-brain "0 3 * * *"',
                 'Run my-brain daily at 3am'
@@ -1004,6 +1011,10 @@ export function buildCli(options: CliOptions) {
               .example(
                 '$0 schedule create weekly-report "0 9 * * 1"',
                 'Run weekly-report every Monday at 9am'
+              )
+              .example(
+                '$0 schedule create my-brain "0 8 * * 1" -o notify=sean,jim',
+                'Run with options passed to the brain'
               );
           },
           (argv) => {

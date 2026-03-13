@@ -10,6 +10,7 @@ import { BrainResolver } from '../components/brain-resolver.js';
 interface ScheduleCreateArgs {
   brain: string;
   cronExpression: string;
+  options?: Record<string, string>;
 }
 
 interface ScheduleListArgs {
@@ -37,6 +38,7 @@ export class ScheduleCommand {
   create({
     brain,
     cronExpression,
+    options,
   }: ArgumentsCamelCase<ScheduleCreateArgs>): React.ReactElement {
     return React.createElement(BrainResolver, {
       identifier: brain,
@@ -44,6 +46,7 @@ export class ScheduleCommand {
         React.createElement(ScheduleCreate, {
           identifier: resolvedBrainTitle,
           cronExpression,
+          options,
         }),
     });
   }

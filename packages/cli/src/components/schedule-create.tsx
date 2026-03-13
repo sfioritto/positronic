@@ -6,6 +6,7 @@ import { useApiPost } from '../hooks/useApi.js';
 interface ScheduleCreateProps {
   identifier: string;
   cronExpression: string;
+  options?: Record<string, string>;
 }
 
 interface CreateScheduleResponse {
@@ -18,7 +19,7 @@ interface CreateScheduleResponse {
   nextRunAt?: number;
 }
 
-export const ScheduleCreate = ({ identifier, cronExpression }: ScheduleCreateProps) => {
+export const ScheduleCreate = ({ identifier, cronExpression, options }: ScheduleCreateProps) => {
   const [created, setCreated] = useState(false);
   const [schedule, setSchedule] = useState<CreateScheduleResponse | null>(null);
 
@@ -31,7 +32,7 @@ export const ScheduleCreate = ({ identifier, cronExpression }: ScheduleCreatePro
   useEffect(() => {
     const createSchedule = async () => {
       try {
-        const result = await execute({ identifier, cronExpression });
+        const result = await execute({ identifier, cronExpression, options });
         setSchedule(result);
         setCreated(true);
       } catch (err) {
@@ -74,6 +75,12 @@ export const ScheduleCreate = ({ identifier, cronExpression }: ScheduleCreatePro
           <Text>
             <Text bold>Status:</Text> {schedule.enabled ? 'Enabled' : 'Disabled'}
           </Text>
+          {options && Object.keys(options).length > 0 && (
+            <Text>
+              <Text bold>Options:</Text>{' '}
+              {Object.entries(options).map(([k, v]) => `${k}=${v}`).join(', ')}
+            </Text>
+          )}
           {schedule.nextRunAt && (
             <Text>
               <Text bold>Next Run:</Text>{' '}

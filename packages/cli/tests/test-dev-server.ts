@@ -103,6 +103,7 @@ interface MockSchedule {
   createdAt: number;
   nextRunAt?: number;
   runAsUserName?: string;
+  options?: Record<string, string>;
 }
 
 interface MockScheduleRun {
@@ -1026,6 +1027,7 @@ export class TestDevServer implements PositronicDevServer {
         createdAt: Date.now(),
         nextRunAt: Date.now() + 3600000, // 1 hour from now
         runAsUserName: 'test-user',
+        options: body.options,
       };
       this.schedules.set(scheduleId, schedule);
       this.logCall('createSchedule', [body]);

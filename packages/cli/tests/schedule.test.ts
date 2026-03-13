@@ -63,6 +63,60 @@ describe('schedule command', () => {
       }
     });
 
+    it('should create a schedule with options', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      // Add brain to mock server for fuzzy search resolution
+      server.addBrain({
+        filename: 'weekly-dev-summary',
+        title: 'weekly-dev-summary',
+        description: 'A weekly dev summary brain',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px([
+          'schedule',
+          'create',
+          'weekly-dev-summary',
+          '0 8 * * 1',
+          '-o',
+          'notify=sean,jim',
+          '-o',
+          'channel=#general',
+        ]);
+
+        // Wait for success message
+        const foundSuccess = await waitForOutput(
+          /Schedule created successfully/i,
+          50
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify the output contains options
+        const output = instance.lastFrame() || '';
+        expect(output).toContain('notify=sean,jim');
+        expect(output).toContain('channel=#general');
+
+        // Verify the API call included options
+        const methodCalls = env.server.getLogs();
+        const createCall = methodCalls.find(
+          (call) => call.method === 'createSchedule'
+        );
+        expect(createCall).toBeDefined();
+        expect(createCall!.args[0].options).toEqual({
+          notify: 'sean,jim',
+          channel: '#general',
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
     it('should handle server connection errors gracefully', async () => {
       const env = await createTestEnv();
       // Don't start the server to simulate connection error
