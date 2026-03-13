@@ -73,7 +73,7 @@ export type {
   AgentUserMessageEvent,
   WebhookResponseEvent,
   BrainPausedEvent,
-  BatchChunkCompleteEvent,
+  IterateItemCompleteEvent,
 } from './dsl/definitions/events.js';
 
 // Default tools
@@ -139,7 +139,7 @@ export type {
   ExecutionState,
   CreateMachineOptions,
   AgentContext,
-  BatchContext,
+  IterateContext,
   ExecutionNode,
 } from './dsl/brain-state-machine.js';
 export type { AgentResumeContext } from './dsl/agent-messages.js';

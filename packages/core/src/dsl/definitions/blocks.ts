@@ -60,15 +60,14 @@ export type StepBlock<
   };
   /** Per-step client override for prompt steps */
   client?: ObjectGenerator;
-  /** Configuration for batch prompt execution (prompt with `over`) */
-  batchConfig?: {
+  /** Configuration for iterate prompt execution (prompt with `over`) */
+  iterateConfig?: {
     over: (state: any) => any[];
     error?: (item: any, error: Error) => any | null;
     template: (item: any, resources: Resources) => string | Promise<string>;
     schema: z.ZodObject<any>;
     schemaName: string;
     client?: ObjectGenerator;
-    concurrency?: number;
   };
 };
 

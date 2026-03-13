@@ -106,23 +106,23 @@ class ScheduleAdapter implements Adapter {
 }
 
 /**
- * Adapter that intercepts BATCH_CHUNK_COMPLETE events and triggers a
- * DO alarm-based restart to reclaim memory between chunks.
- * After each chunk, it queues a PAUSE signal and sets an immediate alarm.
+ * Adapter that intercepts ITERATE_ITEM_COMPLETE events and triggers a
+ * DO alarm-based restart to reclaim memory between items.
+ * After each item, it queues a PAUSE signal and sets an immediate alarm.
  * The alarm fires, calls wakeUp(), which replays events, reconstructs
- * batch progress, and resumes from the next chunk.
+ * iterate progress, and resumes from the next item.
  */
-class BatchChunkAdapter implements Adapter {
+class IterateItemAdapter implements Adapter {
   constructor(
     private doQueueSignal: (signal: { type: string }) => Promise<any>,
     private doSetAlarm: (time: number) => Promise<void>
   ) {}
 
   async dispatch(event: BrainEvent<any>): Promise<void> {
-    if (event.type === BRAIN_EVENTS.BATCH_CHUNK_COMPLETE) {
-      // Only pause and restart between chunks, not after the last chunk.
-      // After the last chunk the brain continues to subsequent steps naturally.
-      // A spurious alarm after the last chunk would call wakeUp() while the
+    if (event.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE) {
+      // Only pause and restart between items, not after the last item.
+      // After the last item the brain continues to subsequent steps naturally.
+      // A spurious alarm after the last item would call wakeUp() while the
       // brain is still running, corrupting execution state.
       const { processedCount, totalItems } = event as any;
       if (processedCount < totalItems) {
@@ -601,7 +601,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Create abort controller for this run
     this.abortController = new AbortController();
 
-    const batchChunkAdapter = new BatchChunkAdapter(
+    const iterateItemAdapter = new IterateItemAdapter(
       (signal) => this.queueSignal(signal),
       (time) => this.ctx.storage.setAlarm(time)
     );
@@ -619,7 +619,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         scheduleAdapter,
         webhookAdapter,
         this.pageAdapter,
-        batchChunkAdapter,
+        iterateItemAdapter,
         timeoutAdapter,
       ])
       .run(brainToRun, {
@@ -649,7 +649,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // Clear any pending timeout and cancel the alarm to prevent spurious alarm
     // fires after explicit resume. Safe because wakeUp() is only called when a
-    // brain is suspended (waiting/paused), never during active batch execution.
+    // brain is suspended (waiting/paused), never during active iterate execution.
     const pendingTimeout = this.getWaitTimeout();
     if (pendingTimeout) {
       this.clearWaitTimeout(pendingTimeout.brainRunId);
@@ -774,7 +774,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Create abort controller for this run
     this.abortController = new AbortController();
 
-    const batchChunkAdapter = new BatchChunkAdapter(
+    const iterateItemAdapter = new IterateItemAdapter(
       (signal) => this.queueSignal(signal),
       (time) => this.ctx.storage.setAlarm(time)
     );
@@ -792,7 +792,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         scheduleAdapter,
         webhookAdapter,
         this.pageAdapter,
-        batchChunkAdapter,
+        iterateItemAdapter,
         timeoutAdapter,
       ])
       .resume(brainToRun, {

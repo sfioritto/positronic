@@ -352,10 +352,10 @@ const largeStateWebhookBrain = brain({ title: 'large-state-webhook-brain', descr
     largeData: 'cleared',
   }));
 
-// Brain that does batch processing followed by a webhook wait.
-// Tests that alarm-based DO restart (for batch chunk processing) preserves the brainRunId
+// Brain that does iterate processing followed by a webhook wait.
+// Tests that alarm-based DO restart (for iterate item processing) preserves the brainRunId
 // so that MonitorDO can correctly track state and validate webhook responses.
-const batchWebhookBrain = brain({ title: 'batch-webhook-brain', description: 'Batch processing followed by webhook' })
+const iterateWebhookBrain = brain({ title: 'iterate-webhook-brain', description: 'Iterate processing followed by webhook' })
   .step('Init items', ({ state }) => ({
     ...state,
     items: ['item-a', 'item-b', 'item-c'],
@@ -366,18 +366,17 @@ const batchWebhookBrain = brain({ title: 'batch-webhook-brain', description: 'Ba
       template: (item: string) => `Process: ${item}`,
       outputSchema: {
         schema: z.object({ result: z.string() }),
-        name: 'batchResults' as const,
+        name: 'iterateResults' as const,
       },
     },
     {
       over: (state) => state.items,
-      concurrency: 2,
     }
   )
   .step('Prepare webhook wait', ({ state }) => ({
     ...state, waiting: true,
   }))
-  .wait('Wait for webhook', () => testWebhook('batch-webhook-test'))
+  .wait('Wait for webhook', () => testWebhook('iterate-webhook-test'))
   .step('Process webhook response', ({ state, response }) => ({
     ...state,
     waiting: false,
@@ -499,10 +498,10 @@ const brainManifest = {
     path: 'brains/large-state-webhook-brain.ts',
     brain: largeStateWebhookBrain,
   },
-  'batch-webhook-brain': {
-    filename: 'batch-webhook-brain',
-    path: 'brains/batch-webhook-brain.ts',
-    brain: batchWebhookBrain,
+  'iterate-webhook-brain': {
+    filename: 'iterate-webhook-brain',
+    path: 'brains/iterate-webhook-brain.ts',
+    brain: iterateWebhookBrain,
   },
   'timeout-webhook-brain': {
     filename: 'timeout-webhook-brain',
