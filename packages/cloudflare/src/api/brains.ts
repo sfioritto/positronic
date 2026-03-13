@@ -539,7 +539,8 @@ brains.post('/schedules', async (context: Context) => {
       brainTitle,
       cronExpression,
       timezone,
-      runAsUserName
+      runAsUserName,
+      body.options
     );
     return context.json(schedule, 201);
   } catch (error) {
