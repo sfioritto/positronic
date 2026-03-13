@@ -65,7 +65,15 @@
       "Bash(git -C /Users/seanfioritto/projects/positronic log --oneline --since=\"2025-01-01\" --format=\"%h %s\")",
       "Bash(git -C /Users/seanfioritto/projects/positronic log:*)",
       "Bash(git -C /Users/seanfioritto/projects/positronic tag -l)",
-      "Bash(git -C /Users/seanfioritto/projects/positronic branch:*)"
+      "Bash(git -C /Users/seanfioritto/projects/positronic branch:*)",
+      "WebFetch(domain:docs.arcade.dev)",
+      "WebFetch(domain:api.arcade.dev)",
+      "WebFetch(domain:www.nango.dev)",
+      "WebFetch(domain:smithery.ai)",
+      "WebFetch(domain:composio.dev)",
+      "WebFetch(domain:docs.nango.dev)",
+      "WebFetch(domain:nango.dev)",
+      "WebFetch(domain:docs.composio.dev)"
     ],
     "deny": []
   }
