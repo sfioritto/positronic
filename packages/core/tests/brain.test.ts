@@ -3226,7 +3226,7 @@ describe('.brain() with over — nested brain iterate', () => {
       events.push(event);
       sendEvent(sm, event as any);
     }
-    return { events, finalState: sm.context.currentState, sm };
+    return { events, finalState: sm.context.currentState as any, sm };
   };
 
   it('should run inner brain per item and collect results as tuples', async () => {
@@ -3516,9 +3516,9 @@ describe('.brain() with over — nested brain iterate', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }] }))
-      .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
-        initialState: (item) => ({ value: item.n }),
+      .brain('Iterate', innerBrain as any, {
+        over: (state: any) => state.items,
+        initialState: (item: any) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
 
@@ -3613,7 +3613,7 @@ describe('.brain() with over — agent config iterate', () => {
       events.push(event);
       sendEvent(sm, event as any);
     }
-    return { events, finalState: sm.context.currentState, sm };
+    return { events, finalState: sm.context.currentState as any, sm };
   };
 
   it('should run agent config per item and collect results', async () => {
