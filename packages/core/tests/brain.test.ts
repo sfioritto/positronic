@@ -3211,6 +3211,85 @@ describe('prompt with over (iterate)', () => {
       }
     });
   });
+
+  it('should apply mapOutput to transform iterate results', async () => {
+    iterateMockGenerateObject.mockImplementation(async ({ prompt }) => {
+      if (prompt?.includes('urgent')) return { object: { category: 'urgent', confidence: 0.9 } };
+      if (prompt?.includes('newsletter')) return { object: { category: 'newsletter', confidence: 0.7 } };
+      return { object: { category: 'general', confidence: 0.5 } };
+    });
+
+    const testBrain = brain('MapOutput Test')
+      .step('Init', () => ({
+        emails: [
+          { id: '1', body: 'urgent meeting' },
+          { id: '2', body: 'Monthly newsletter' },
+        ],
+      }))
+      .prompt(
+        'Categorize',
+        {
+          template: (email: { id: string; body: string }) => `Categorize: ${email.body}`,
+          outputSchema: {
+            schema: z.object({ category: z.string(), confidence: z.number() }),
+            name: 'categories' as const,
+          },
+        },
+        {
+          over: (state) => state.emails,
+          mapOutput: (result) => result.category,
+        }
+      );
+
+    let finalState: any = {};
+    for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    // Results should be mapped values, not tuples
+    expect(finalState.categories).toEqual(['urgent', 'newsletter']);
+  });
+
+  it('should filter nulls before applying mapOutput', async () => {
+    let callCount = 0;
+    iterateMockGenerateObject.mockImplementation(async () => {
+      callCount++;
+      if (callCount === 2) throw new Error('API error');
+      return { object: { category: 'ok' } };
+    });
+
+    const testBrain = brain('MapOutput Null Filter Test')
+      .step('Init', () => ({
+        items: ['a', 'b', 'c'],
+      }))
+      .prompt(
+        'Process',
+        {
+          template: (item: string) => `Process: ${item}`,
+          outputSchema: {
+            schema: z.object({ category: z.string() }),
+            name: 'results' as const,
+          },
+        },
+        {
+          over: (state) => state.items,
+          error: () => null,
+          mapOutput: (result) => result.category,
+        }
+      );
+
+    let finalState: any = {};
+    for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    // Item 'b' errored and was filtered out (null), mapOutput applied to remaining
+    expect(finalState.results).toEqual(['ok', 'ok']);
+  });
 });
 
 describe('.brain() with over — nested brain iterate', () => {
@@ -3590,6 +3669,32 @@ describe('.brain() with over — nested brain iterate', () => {
     );
     expect(outerStepComplete).toBeDefined();
   });
+
+  it('should apply mapOutput to transform nested brain iterate results', async () => {
+    const innerBrain = brain<{}, { value: number }>('Doubler').step(
+      'Double',
+      ({ state }) => ({ value: state.value * 2 })
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ n: 3 }, { n: 5 }, { n: 7 }],
+      }))
+      .brain('Process Items', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'doubled' as const,
+        mapOutput: (result) => result.value,
+      });
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Results should be mapped values, not tuples
+    expect(finalState.doubled).toEqual([6, 10, 14]);
+  });
 });
 
 describe('.brain() with over — agent config iterate', () => {
@@ -3833,5 +3938,54 @@ describe('.brain() with over — agent config iterate', () => {
     expect(itemEvents).toHaveLength(1);
     expect(events.some((e) => e.type === BRAIN_EVENTS.PAUSED)).toBe(false);
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(false);
+  });
+
+  it('should apply mapOutput to transform agent iterate results', async () => {
+    let callIndex = 0;
+    agentMockGenerateText.mockImplementation(async () => {
+      callIndex++;
+      return {
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: `call-${callIndex}`,
+            toolName: 'done',
+            args: { processed: true, index: callIndex },
+          },
+        ],
+        usage: { totalTokens: 50 },
+        responseMessages: [],
+      };
+    });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
+      }))
+      .brain(
+        'Process Items',
+        (item: { url: string }, { state }) => ({
+          prompt: `Process ${item.url}`,
+          outputSchema: {
+            schema: z.object({ processed: z.boolean(), index: z.number() }),
+            name: 'result' as const,
+          },
+        }),
+        {
+          over: (state) => state.items,
+          outputKey: 'indices' as const,
+          // At runtime, the agent result is the full agent state: { result: { processed, index } }
+          // The type says z.infer<TSchema>, so we cast to any to access the runtime shape
+          mapOutput: (agentState: any) => agentState.result.index,
+        }
+      );
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: agentMockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Results should be mapped values, not tuples
+    expect(finalState.indices).toEqual([1, 2, 3]);
   });
 });

@@ -68,6 +68,7 @@ export type StepBlock<
     schema: z.ZodObject<any>;
     schemaName: string;
     client?: ObjectGenerator;
+    mapOutput?: (result: any, item: any) => any;
   };
 };
 
@@ -120,6 +121,7 @@ export type BrainBlock<
     initialState: (item: any, outerState: any) => State;
     outputKey: string;
     error?: (item: any, error: Error) => any | null;
+    mapOutput?: (result: any, item: any) => any;
   };
 };
 
@@ -149,6 +151,7 @@ export type AgentBlock<
     over: (state: any) => any[];
     outputKey: string;
     error?: (item: any, error: Error) => any | null;
+    mapOutput?: (result: any, item: any) => any;
   };
 };
 

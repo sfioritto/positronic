@@ -365,7 +365,8 @@ export class Brain<
     TItem,
     TInnerState extends State,
     TOutputKey extends string & { readonly brand?: unique symbol },
-    TNewState extends State = TState & { [K in TOutputKey]: [TItem, TInnerState][] }
+    TMapped = never,
+    TNewState extends State = TState & { [K in TOutputKey]: [TMapped] extends [never] ? [TItem, TInnerState][] : TMapped[] }
   >(
     title: string,
     innerBrain: Brain<TOptions, TInnerState, TServices>,
@@ -374,6 +375,7 @@ export class Brain<
       initialState: (item: TItem, outerState: TState) => State;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => TInnerState | null;
+      mapOutput?: (result: TInnerState, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -384,7 +386,8 @@ export class Brain<
     TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TOutputKey extends string & { readonly brand?: unique symbol },
-    TNewState extends State = TState & { [K in TOutputKey]: [TItem, z.infer<TSchema>][] }
+    TMapped = never,
+    TNewState extends State = TState & { [K in TOutputKey]: [TMapped] extends [never] ? [TItem, z.infer<TSchema>][] : TMapped[] }
   >(
     title: string,
     configFn: (
@@ -397,6 +400,7 @@ export class Brain<
       over: (state: TState) => TItem[];
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
+      mapOutput?: (result: z.infer<TSchema>, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -405,7 +409,8 @@ export class Brain<
     TItem,
     TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
     TOutputKey extends string = string,
-    TNewState extends State = TState & { [K in TOutputKey]: [TItem, any][] }
+    TMapped = never,
+    TNewState extends State = TState & { [K in TOutputKey]: [TMapped] extends [never] ? [TItem, any][] : TMapped[] }
   >(
     title: string,
     configFn: (
@@ -418,6 +423,7 @@ export class Brain<
       over: (state: TState) => TItem[];
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => any | null;
+      mapOutput?: (result: any, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -451,6 +457,7 @@ export class Brain<
           initialState: (item: any, outerState: any) => State;
           outputKey: string;
           error?: (item: any, error: Error) => any | null;
+          mapOutput?: (result: any, item: any) => any;
         };
         const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
           type: 'brain',
@@ -485,6 +492,7 @@ export class Brain<
         over: (state: any) => any[];
         outputKey: string;
         error?: (item: any, error: Error) => any | null;
+        mapOutput?: (result: any, item: any) => any;
       };
       const configFn = innerBrainOrConfig as (item: any, params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>;
       const agentBlock: AgentBlock<TState, any, TOptions, TServices, TResponse, any, any> = {
@@ -544,8 +552,9 @@ export class Brain<
     TItem,
     TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
+    TMapped = never,
     TNewState extends State = TState & {
-      [K in TResponseKey]: [TItem, z.infer<TSchema>][];
+      [K in TResponseKey]: [TMapped] extends [never] ? [TItem, z.infer<TSchema>][] : TMapped[];
     }
   >(
     title: string,
@@ -560,6 +569,7 @@ export class Brain<
     iterateConfig: {
       over: (state: TState) => TItem[];
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
+      mapOutput?: (result: z.infer<TSchema>, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -589,6 +599,7 @@ export class Brain<
     iterateConfig?: {
       over: (state: any) => any[];
       error?: (item: any, error: Error) => any | null;
+      mapOutput?: (result: any, item: any) => any;
     }
   ): any {
     // Schema-less prompt - returns text response for next step
@@ -644,6 +655,7 @@ export class Brain<
           schema: outputSchema.schema,
           schemaName: outputSchema.name,
           client: config.client,
+          mapOutput: iterateConfig.mapOutput,
         },
       };
       this.blocks.push(promptBlock);
