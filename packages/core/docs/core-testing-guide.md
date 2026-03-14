@@ -28,31 +28,34 @@ for await (const event of brain.run()) {
 }
 ```
 
-### 2. State Reconstruction from Patches
+### 2. State Reconstruction via State Machine
 
-**The Challenge**: Brain state is represented as JSON patches, not direct state objects.
+**The Challenge**: Brain state is represented as JSON patches, not direct state objects. Manually applying patches breaks for nested brains and iterate steps because inner-brain patches are scoped differently — the state machine handles depth tracking automatically.
 
-**Solution**: Apply patches to reconstruct final state:
+**Solution**: Replay events through the brain execution state machine:
 
 ```typescript
-import { applyPatches } from '@positronic/core';
+import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
 
-// Helper to reconstruct state
-function reconstructState(events: BrainEvent[]) {
-  let state = {};
+// Helper defined at the top of brain.test.ts
+function finalStateFromEvents(events: BrainEvent<any>[]): any {
+  const sm = createBrainExecutionMachine();
   for (const event of events) {
-    if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-      state = applyPatches(state, [event.patch]);
-    }
+    sendEvent(sm, event as any);
   }
-  return state;
+  return sm.context.currentState;
 }
 
 // Usage
-const events = await collectAllEvents(brain.run());
-const finalState = reconstructState(events);
+const events = [];
+for await (const event of brain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+  events.push(event);
+}
+const finalState = finalStateFromEvents(events);
 expect(finalState).toEqual({ expected: 'state' });
 ```
+
+**Why not manual `applyPatches`?** For flat brains it works, but nested brains and iterate steps emit inner-brain `STEP_COMPLETE` events whose patches should not be applied to the outer state. The state machine correctly scopes patches by nesting depth.
 
 ### 3. Mock Setup for AI Clients
 
@@ -231,8 +234,19 @@ expect(events.map(e => e.type)).toEqual([
 ## Quick Test Template
 
 ```typescript
-import { brain, BRAIN_EVENTS, applyPatches } from '@positronic/core';
+import { brain, BRAIN_EVENTS } from '@positronic/core';
+import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
+import type { BrainEvent } from '../src/dsl/brain.js';
 import type { ObjectGenerator, ResourceLoader } from '@positronic/core';
+
+// Helper: replay events through state machine to get final state
+function finalStateFromEvents(events: BrainEvent<any>[]): any {
+  const sm = createBrainExecutionMachine();
+  for (const event of events) {
+    sendEvent(sm, event as any);
+  }
+  return sm.context.currentState;
+}
 
 describe('my brain feature', () => {
   // Setup mocks
@@ -258,17 +272,12 @@ describe('my brain feature', () => {
 
     // Collect all events
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient })) {
+    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
       events.push(event);
     }
 
     // Verify final state
-    let finalState = {};
-    for (const event of events) {
-      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-        finalState = applyPatches(finalState, [event.patch]);
-      }
-    }
+    const finalState = finalStateFromEvents(events);
     expect(finalState).toEqual({ processed: 'test' });
 
     // Verify completion
