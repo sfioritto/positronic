@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ObjectGenerator, ToolMessage, ResponseMessage } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, StepContext, SignalProvider, CurrentUser } from '../types.js';
+import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, SignalProvider, CurrentUser } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
 import type { Resources } from '../../resources/resources.js';
@@ -1012,7 +1012,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         }
 
         if (tool.execute) {
-          const toolContext: StepContext = {
+          const toolContext = {
             state: this.currentState,
             options: this.options ?? ({} as JsonObject),
             client: this.client,
