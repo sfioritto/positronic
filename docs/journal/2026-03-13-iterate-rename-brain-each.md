@@ -55,6 +55,16 @@ Phase 2 adds iterate support for `.brain()` steps — both nested brains (BrainB
 - **State reconstruction in tests should use the brain state machine**, not manual patch application. The state machine handles depth tracking, patch accumulation, and iterate result collection — reimplementing that logic in tests is error-prone and duplicative.
 - Generator-based event streams (using `yield*` delegation) make it easy to compose iterate logic — the inner brain's event stream flows through naturally, and we only need to intercept specific events (ERROR for error handler, STEP_COMPLETE for patches, WEBHOOK to reject).
 
+### Phase 3: `mapOutput` for All Iterate Patterns
+
+Added an optional `mapOutput` callback to all three iterate variants (prompt, brain, agent). This transforms results from `[item, result][]` tuples to `Mapped[]`, eliminating the common pattern where the next step exists solely to destructure tuples.
+
+**Type-level approach:** Used `TMapped = never` default with `[TMapped] extends [never]` conditional to determine the output type. When `mapOutput` is omitted, `TMapped` stays `never` and the conditional resolves to the original tuple type. When provided, TypeScript infers `TMapped` from the callback return type and the output becomes `TMapped[]`. The `[TMapped] extends [never]` wrapping (vs bare `TMapped extends never`) prevents distributive conditional behavior.
+
+**Runtime is trivial** — three identical two-line additions between filtering nulls and assigning to state. Null items from error handlers are filtered *before* `mapOutput` runs, so the callback never sees undefined results.
+
+**Agent iterate type mismatch** — the overload types say the result parameter in `mapOutput` is `z.infer<TSchema>`, but at runtime the agent stores results as the full agent state (which nests the output under `outputSchema.name`, e.g., `{ result: { processed: true } }`). This is a pre-existing mismatch in how agent iterate types the tuple's second element. The test uses `any` cast to access the runtime shape. Not worth fixing now since it would be a breaking type change to the existing tuple type too.
+
 ## Dead ends
 
 - **Manual patch application in tests** — initially tried to reconstruct state by collecting all STEP_COMPLETE patches and applying them. Inner brain patches are relative to inner state, not outer state, causing OPERATION_PATH_UNRESOLVABLE errors. The state machine handles this correctly by tracking depth.
