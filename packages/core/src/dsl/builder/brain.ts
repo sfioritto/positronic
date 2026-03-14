@@ -32,6 +32,7 @@ export class Brain<
   private optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool<any>>;
+  private extraTools?: Record<string, AgentTool<any>>;
   private memoryProvider?: MemoryProvider;
   private storeSchema?: StoreSchema;
 
@@ -89,6 +90,7 @@ export class Brain<
     nextBrain.optionsSchema = this.optionsSchema;
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
+    nextBrain.extraTools = this.extraTools;
     nextBrain.memoryProvider = this.memoryProvider;
     nextBrain.storeSchema = this.storeSchema;
 
@@ -107,6 +109,7 @@ export class Brain<
     nextBrain.services = this.services;
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
+    nextBrain.extraTools = this.extraTools;
     nextBrain.memoryProvider = this.memoryProvider;
     nextBrain.storeSchema = this.storeSchema;
 
@@ -139,6 +142,7 @@ export class Brain<
     nextBrain.services = this.services;
     nextBrain.components = components;
     nextBrain.defaultTools = this.defaultTools;
+    nextBrain.extraTools = this.extraTools;
     nextBrain.memoryProvider = this.memoryProvider;
     nextBrain.storeSchema = this.storeSchema;
 
@@ -170,6 +174,32 @@ export class Brain<
   ): Brain<TOptions, TState, TServices, TResponse, TPage, TStore> {
     const next = this.nextBrain<TState, TResponse, TPage>();
     next.defaultTools = tools;
+    return next;
+  }
+
+  /**
+   * Add extra tools on top of whatever default tools are already configured.
+   * Unlike `withTools()` which replaces defaults, this merges additively.
+   *
+   * @param tools - Record of additional tool definitions
+   *
+   * @example
+   * ```typescript
+   * const myBrain = createBrain({ defaultTools })
+   *   ('my-brain')
+   *   .withExtraTools({ myCustomTool })
+   *   .brain('agent', ({ tools }) => ({
+   *     system: 'You are helpful',
+   *     prompt: 'Do something',
+   *     tools  // includes both defaults and myCustomTool
+   *   }));
+   * ```
+   */
+  withExtraTools<TTools extends Record<string, AgentTool<any>>>(
+    tools: TTools
+  ): Brain<TOptions, TState, TServices, TResponse, TPage, TStore> {
+    const next = this.nextBrain<TState, TResponse, TPage>();
+    next.extraTools = tools;
     return next;
   }
 
@@ -234,6 +264,7 @@ export class Brain<
     nextBrain.services = this.services as any;
     nextBrain.components = this.components;
     nextBrain.defaultTools = this.defaultTools;
+    nextBrain.extraTools = this.extraTools;
     nextBrain.memoryProvider = this.memoryProvider;
     nextBrain.storeSchema = storeSchema;
 
@@ -814,6 +845,7 @@ export class Brain<
       services: this.services,
       components: this.components,
       defaultTools: this.defaultTools,
+      extraTools: this.extraTools,
       memoryProvider: this.memoryProvider,
       store,
     });
@@ -847,6 +879,8 @@ export class Brain<
     nextBrain.components = this.components;
     // Copy defaultTools to the next brain
     nextBrain.defaultTools = this.defaultTools;
+    // Copy extraTools to the next brain
+    nextBrain.extraTools = this.extraTools;
     // Copy memoryProvider to the next brain
     nextBrain.memoryProvider = this.memoryProvider;
     // Copy store schema to the next brain

@@ -47,6 +47,7 @@ export class BrainEventStream<
   private resumeContext?: ResumeContext;
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool<any>>;
+  private extraTools?: Record<string, AgentTool<any>>;
   private signalProvider?: SignalProvider;
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
@@ -65,6 +66,7 @@ export class BrainEventStream<
       services: TServices;
       components?: Record<string, UIComponent<any>>;
       defaultTools?: Record<string, AgentTool<any>>;
+      extraTools?: Record<string, AgentTool<any>>;
       memoryProvider?: MemoryProvider;
       store?: Store<any>;
     }
@@ -82,6 +84,7 @@ export class BrainEventStream<
       env,
       components,
       defaultTools,
+      extraTools,
       signalProvider,
       memoryProvider,
       store,
@@ -108,6 +111,7 @@ export class BrainEventStream<
     this.resumeContext = resumeContext;
     this.components = components;
     this.defaultTools = defaultTools;
+    this.extraTools = extraTools;
     this.signalProvider = signalProvider;
     this.memoryProvider = memoryProvider;
     this.store = store;
@@ -555,15 +559,18 @@ export class BrainEventStream<
     const block = step.block as AgentBlock<any, any, TOptions, TServices, any, any, any>;
     const prevState = this.currentState;
 
-    // Get default tools and components for injection into configFn
-    const defaultTools = this.defaultTools ?? {};
+    // Combine default tools and extra tools for injection into configFn
+    const allTools: Record<string, AgentTool<any>> = {
+      ...(this.defaultTools ?? {}),
+      ...(this.extraTools ?? {}),
+    };
     const components = this.components ?? {};
 
     // Get agent configuration - inject tools and components
     const config = await block.configFn({
       state: this.currentState,
       options: this.options ?? ({} as TOptions),
-      tools: defaultTools,
+      tools: allTools,
       components,
       client: this.client,
       resources: this.resources,
@@ -580,8 +587,8 @@ export class BrainEventStream<
     // Reset currentPage after configFn consumes it (page is ephemeral)
     this.currentPage = undefined;
 
-    // Merge tools: step tools override defaults
-    const mergedTools: Record<string, AgentTool<any>> = { ...defaultTools, ...(config.tools ?? {}) };
+    // Merge tools: step tools override defaults + extras
+    const mergedTools: Record<string, AgentTool<any>> = { ...allTools, ...(config.tools ?? {}) };
 
     // Always generate a 'done' terminal tool for every agent
     // If outputSchema is provided, use that schema; otherwise use defaultDoneSchema
