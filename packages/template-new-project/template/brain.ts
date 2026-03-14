@@ -18,6 +18,10 @@ import { components } from './components/index.js';
  * - consoleLog: Log messages for debugging
  * - done: Complete the agent and return a result
  *
+ * Tool configuration:
+ * - `withTools({ ... })` — replaces the default tools entirely
+ * - `withExtraTools({ ... })` — adds tools alongside the defaults
+ *
  * To add services (e.g., Slack, Gmail, database clients):
  *
  * ```typescript
