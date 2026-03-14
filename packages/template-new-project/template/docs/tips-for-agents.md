@@ -6,6 +6,40 @@ This document contains helpful tips and patterns for AI agents working with Posi
 
 Run `npm run typecheck` frequently as you make changes to ensure your TypeScript code compiles correctly. This will catch type errors early and help maintain code quality.
 
+## Prefer Type Inference
+
+Never add explicit type annotations unless `npm run typecheck` tells you to. TypeScript's inference is very strong — especially within the Brain DSL chain — and explicit types add noise without value.
+
+Start by writing code with no annotations. If `typecheck` fails, add the minimum annotation or cast needed to fix it.
+
+```typescript
+// ❌ DON'T DO THIS - explicit types on callback parameters
+.filter(([_, result]: [any, any]) => result !== null)
+.map((pr: any) => pr.author)
+.map((n: string) => n.trim())
+error: (thread: any, error: any) => { ... }
+
+// ✅ DO THIS - let inference work
+.filter(([_, result]) => result !== null)
+.map(pr => pr.author)
+.map(n => n.trim())
+error: (thread, error) => { ... }
+```
+
+This also applies to variable declarations and function parameters:
+
+```typescript
+// ❌ DON'T DO THIS
+const names: string[] = options.notify.split(',');
+template: (state: any) => { ... }
+
+// ✅ DO THIS
+const names = options.notify.split(',');
+template: (state) => { ... }
+```
+
+If you genuinely need a cast to fix a type error, prefer the narrowest cast possible and add it only after seeing the error.
+
 ## Running the Development Server
 
 When you need to run a development server, use the `--log-file` option to capture server output. **Important**: Always place the server log file in the `/tmp` directory so it gets cleaned up automatically by the operating system.
@@ -125,9 +159,29 @@ Key rules:
 - Optional title as second argument: `.guard(predicate, 'Check condition')`
 - See `/docs/brain-dsl-guide.md` for more details
 
+**Guards vs exceptions**: Use guards for conditions that are an expected part of the brain's flow — like "no audio URL was found" after a discovery step. Guards are documented in the DSL and show up when viewing the brain's steps. Reserve `throw` for truly unexpected errors. If a missing value is a normal possible outcome of a previous step, handle it with a guard, not an exception.
+
+```typescript
+// ❌ DON'T DO THIS - throwing for an expected outcome
+.step('Transcribe', async ({ state }) => {
+    if (!state.discovery.audioUrl) {
+      throw new Error('No audio URL found');
+    }
+    const transcript = await whisper.transcribe(state.discovery.audioUrl);
+    return { ...state, transcript };
+  })
+
+// ✅ DO THIS - guard for expected flow, keep the step focused
+.guard(({ state: { discovery } }) => !!discovery.audioUrl, 'Has audio URL')
+.step('Transcribe', async ({ state: { discovery } }) => {
+    const transcript = await whisper.transcribe(discovery.audioUrl!);
+    return { ...state, transcript };
+  })
+```
+
 ## Destructure State in Steps
 
-Always destructure properties off of `state` rather than accessing them through `state.property`. This keeps templates and logic cleaner and more readable.
+Always destructure properties off of `state` rather than accessing them through `state.property`. This applies to steps, prompt templates, brain callbacks, and guards — anywhere state is accessed.
 
 ```typescript
 // ❌ DON'T DO THIS - accessing properties through state
@@ -139,6 +193,16 @@ Always destructure properties off of `state` rather than accessing them through 
 .brain('Find data', ({ state: { user } }) => ({
     prompt: `Process <%= '${user.name}' %> from <%= '${user.email}' %>`,
   }))
+```
+
+The same applies to prompt templates:
+
+```typescript
+// ❌ DON'T DO THIS
+template: (state) => `Hello <%= '${state.user.name}' %>, your order <%= '${state.order.id}' %> is ready.`,
+
+// ✅ DO THIS
+template: ({ user, order }) => `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.`,
 ```
 
 When you still need `state` (e.g. for `...state` in the return value), destructure in the function body instead:
@@ -157,6 +221,47 @@ When you still need `state` (e.g. for `...state` in the return value), destructu
       ...state,
       summary: `<%= '${title}' %> by <%= '${author}' %>`,
     };
+  })
+```
+
+## State Shape
+
+### Each step should have one clear purpose, and add one thing to state
+
+Don't let steps do multiple unrelated things. Each step should have a clear name that describes its single purpose, and it should add one key to state. If a step produces multiple data points, namespace them under a single key.
+
+```typescript
+// ❌ DON'T DO THIS - step does too much and adds multiple keys
+.step('Process', async ({ state }) => ({
+    ...state,
+    transcript: await transcribe(state.audioUrl),
+    episodeTitle: state.discovery.episodeTitle,
+    podcastName: state.podcast.source,
+    podcastUrl: state.podcast.url,
+  }))
+
+// ✅ DO THIS - step has one purpose, adds one thing
+.step('Transcribe', async ({ state }) => {
+    const { discovery } = state;
+    const transcript = await whisper.transcribe(discovery.audioUrl!);
+    return { ...state, transcript };
+  })
+```
+
+Previous steps already namespace their results on state (e.g. `state.discovery`, `state.podcast`). Don't copy their fields to the top level — it duplicates data and makes it unclear which version is canonical.
+
+### Reshape state at phase boundaries
+
+As steps build up state, it can accumulate intermediate artifacts. At major phase transitions in a brain — like going from "gathering data" to "analyzing it" — reshape state to a clean form for the next phase. Return only what the next phase needs instead of spreading everything forward.
+
+The smell to watch for: if you're reading a brain and can't quickly answer "what's the canonical version of X on state?" then state needs reshaping.
+
+```typescript
+// After a data-gathering phase, clean up for analysis
+.step('Prepare for analysis', ({ state }) => {
+    const { discovery, transcript, podcast } = state;
+    // Only carry forward what the analysis phase needs
+    return { podcast, discovery, transcript };
   })
 ```
 
@@ -371,14 +476,14 @@ const alertBrain = brain('Alert System')
   }))
   .step('Send Alerts', async ({ state, options, slack }) => {
     if (!state.shouldAlert) return state;
-    
+
     await slack.post(options.slackChannel, state.message);
-    
+
     if (options.emailEnabled === 'true') {
       // Note: CLI options come as strings
       await email.send('admin@example.com', state.message);
     }
-    
+
     return { ...state, alerted: true };
   });
 ```
