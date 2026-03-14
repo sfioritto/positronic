@@ -9,7 +9,8 @@ export const schedules = {
     identifier: string,
     cronExpression: string,
     timezone?: string,
-    options?: Record<string, string>
+    options?: Record<string, string>,
+    initialState?: Record<string, unknown>
   ): Promise<string | null> {
     try {
       const body: Record<string, any> = { identifier, cronExpression };
@@ -18,6 +19,9 @@ export const schedules = {
       }
       if (options) {
         body.options = options;
+      }
+      if (initialState) {
+        body.initialState = initialState;
       }
 
       const request = new Request('http://example.com/brains/schedules', {

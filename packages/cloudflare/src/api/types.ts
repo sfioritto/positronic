@@ -29,6 +29,7 @@ export type HonoApp = Hono<{ Bindings: Bindings }>;
 export type CreateBrainRunRequest = {
   brainTitle: string;
   options?: Record<string, string>;
+  initialState?: Record<string, unknown>;
 };
 
 export type CreateBrainRunResponse = {

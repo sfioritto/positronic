@@ -32,6 +32,7 @@ interface BrainRunArgs {
   brain: string;
   watch?: boolean;
   options?: Record<string, string>;
+  initialState?: Record<string, unknown>;
 }
 interface BrainWatchArgs {
   identifier: string;
@@ -104,11 +105,12 @@ export class BrainCommand {
     });
   }
 
-  run({ brain, watch, options }: ArgumentsCamelCase<BrainRunArgs>): React.ReactElement {
+  run({ brain, watch, options, initialState }: ArgumentsCamelCase<BrainRunArgs>): React.ReactElement {
     return React.createElement(BrainRun, {
       identifier: brain,
       watch,
       options,
+      initialState,
     });
   }
 

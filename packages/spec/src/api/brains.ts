@@ -9,17 +9,18 @@ export const brains = {
   async run(
     fetch: Fetch,
     identifier: string,
-    options?: Record<string, string>
+    options?: Record<string, string>,
+    initialState?: Record<string, unknown>
   ): Promise<string | null> {
-    if (options && Object.keys(options).length > 0) {
-      // When options are provided, we need the full request (can't use startBrainRun)
+    if ((options && Object.keys(options).length > 0) || (initialState && Object.keys(initialState).length > 0)) {
+      // When options or initialState are provided, we need the full request (can't use startBrainRun)
       try {
         const request = new Request('http://example.com/brains/runs', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ identifier, options }),
+          body: JSON.stringify({ identifier, ...(options && { options }), ...(initialState && { initialState }) }),
         });
 
         const response = await fetch(request);
@@ -56,7 +57,8 @@ export const brains = {
   async runWithOptions(
     fetch: Fetch,
     identifier: string,
-    options: Record<string, string>
+    options: Record<string, string>,
+    initialState?: Record<string, unknown>
   ): Promise<string | null> {
     try {
       const request = new Request('http://example.com/brains/runs', {
@@ -64,7 +66,7 @@ export const brains = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ identifier, options }),
+        body: JSON.stringify({ identifier, options, ...(initialState && { initialState }) }),
       });
 
       const response = await fetch(request);

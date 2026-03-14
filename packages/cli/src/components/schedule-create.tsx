@@ -7,6 +7,7 @@ interface ScheduleCreateProps {
   identifier: string;
   cronExpression: string;
   options?: Record<string, string>;
+  initialState?: Record<string, unknown>;
 }
 
 interface CreateScheduleResponse {
@@ -19,7 +20,7 @@ interface CreateScheduleResponse {
   nextRunAt?: number;
 }
 
-export const ScheduleCreate = ({ identifier, cronExpression, options }: ScheduleCreateProps) => {
+export const ScheduleCreate = ({ identifier, cronExpression, options, initialState }: ScheduleCreateProps) => {
   const [created, setCreated] = useState(false);
   const [schedule, setSchedule] = useState<CreateScheduleResponse | null>(null);
 
@@ -32,7 +33,7 @@ export const ScheduleCreate = ({ identifier, cronExpression, options }: Schedule
   useEffect(() => {
     const createSchedule = async () => {
       try {
-        const result = await execute({ identifier, cronExpression, options });
+        const result = await execute({ identifier, cronExpression, options, ...(initialState && { initialState }) });
         setSchedule(result);
         setCreated(true);
       } catch (err) {
@@ -79,6 +80,12 @@ export const ScheduleCreate = ({ identifier, cronExpression, options }: Schedule
             <Text>
               <Text bold>Options:</Text>{' '}
               {Object.entries(options).map(([k, v]) => `${k}=${v}`).join(', ')}
+            </Text>
+          )}
+          {initialState && Object.keys(initialState).length > 0 && (
+            <Text>
+              <Text bold>Initial State:</Text>{' '}
+              {JSON.stringify(initialState)}
             </Text>
           )}
           {schedule.nextRunAt && (

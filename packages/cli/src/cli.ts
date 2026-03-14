@@ -27,17 +27,44 @@ export interface CliOptions {
 // Helper function to parse key=value options
 function parseKeyValueOptions(opts: string[] | undefined): Record<string, string> | undefined {
   if (!opts || opts.length === 0) return undefined;
-  
+
   const parsed: Record<string, string> = {};
   for (const opt of opts) {
     const [key, ...valueParts] = opt.split('=');
     const value = valueParts.join('=');
-    
+
     if (!key || !value) {
       throw new Error(`Invalid option format: "${opt}". Options must be in key=value format.`);
     }
-    
+
     parsed[key] = value;
+  }
+  return parsed;
+}
+
+// Helper function to parse key=value state values with type coercion
+function parseStateValues(opts: string[] | undefined): Record<string, unknown> | undefined {
+  if (!opts || opts.length === 0) return undefined;
+
+  const parsed: Record<string, unknown> = {};
+  for (const opt of opts) {
+    const [key, ...valueParts] = opt.split('=');
+    const raw = valueParts.join('=');
+
+    if (!key || raw === undefined || raw === '') {
+      throw new Error(`Invalid state format: "${opt}". State values must be in key=value format.`);
+    }
+
+    // Type coercion
+    if (raw === 'true') {
+      parsed[key] = true;
+    } else if (raw === 'false') {
+      parsed[key] = false;
+    } else if (raw !== '' && !isNaN(Number(raw))) {
+      parsed[key] = Number(raw);
+    } else {
+      parsed[key] = raw;
+    }
   }
   return parsed;
 }
@@ -424,6 +451,23 @@ export function buildCli(options: CliOptions) {
           string: true,
           coerce: parseKeyValueOptions
         })
+        .option('state', {
+          describe: 'Initial state values (key=value format, with type coercion)',
+          type: 'array',
+          alias: 's',
+          string: true,
+          coerce: parseStateValues
+        })
+        .option('state-json', {
+          describe: 'Initial state as a JSON string',
+          type: 'string',
+        })
+        .check((argv) => {
+          if (argv.state && argv.stateJson) {
+            throw new Error('Cannot use both --state/-s and --state-json at the same time.');
+          }
+          return true;
+        })
         .example('$0 run my-brain', 'Run a brain by filename')
         .example('$0 run "Email Digest"', 'Run a brain by title')
         .example('$0 run email', 'Fuzzy search for brains matching "email"')
@@ -434,10 +478,29 @@ export function buildCli(options: CliOptions) {
         .example(
           '$0 run my-brain -o channel=#general -o debug=true',
           'Run a brain with options'
+        )
+        .example(
+          '$0 run my-brain -s count=0 -s name=sean',
+          'Run a brain with initial state'
+        )
+        .example(
+          '$0 run my-brain --state-json \'{"items": [], "config": {"debug": true}}\'',
+          'Run a brain with initial state from JSON'
         );
     },
     (argv) => {
-      const element = brainCommand.run(argv);
+      let initialState: Record<string, unknown> | undefined;
+      if (argv.stateJson) {
+        try {
+          initialState = JSON.parse(argv.stateJson as string);
+        } catch {
+          console.error(`Invalid JSON for --state-json: ${argv.stateJson}`);
+          process.exit(1);
+        }
+      } else if (argv.state) {
+        initialState = argv.state as Record<string, unknown>;
+      }
+      const element = brainCommand.run({ ...argv, initialState } as any);
       render(element);
     }
   );
@@ -634,6 +697,23 @@ export function buildCli(options: CliOptions) {
               string: true,
               coerce: parseKeyValueOptions
             })
+            .option('state', {
+              describe: 'Initial state values (key=value format, with type coercion)',
+              type: 'array',
+              alias: 's',
+              string: true,
+              coerce: parseStateValues
+            })
+            .option('state-json', {
+              describe: 'Initial state as a JSON string',
+              type: 'string',
+            })
+            .check((argv) => {
+              if (argv.state && argv.stateJson) {
+                throw new Error('Cannot use both --state/-s and --state-json at the same time.');
+              }
+              return true;
+            })
             .example('$0 brain run my-brain', 'Run a brain by filename')
             .example('$0 brain run "Email Digest"', 'Run a brain by title')
             .example('$0 brain run email', 'Fuzzy search for brains matching "email"')
@@ -644,10 +724,25 @@ export function buildCli(options: CliOptions) {
             .example(
               '$0 brain run my-brain -o channel=#general -o debug=true',
               'Run a brain with options'
+            )
+            .example(
+              '$0 brain run my-brain -s count=0 -s name=sean',
+              'Run a brain with initial state'
             );
         },
         (argv) => {
-          const element = brainCommand.run(argv);
+          let initialState: Record<string, unknown> | undefined;
+          if (argv.stateJson) {
+            try {
+              initialState = JSON.parse(argv.stateJson as string);
+            } catch {
+              console.error(`Invalid JSON for --state-json: ${argv.stateJson}`);
+              process.exit(1);
+            }
+          } else if (argv.state) {
+            initialState = argv.state as Record<string, unknown>;
+          }
+          const element = brainCommand.run({ ...argv, initialState } as any);
           render(element);
         }
       )
@@ -996,6 +1091,23 @@ export function buildCli(options: CliOptions) {
                 string: true,
                 coerce: parseKeyValueOptions
               })
+              .option('state', {
+                describe: 'Initial state values for each run (key=value format, with type coercion)',
+                type: 'array',
+                alias: 's',
+                string: true,
+                coerce: parseStateValues
+              })
+              .option('state-json', {
+                describe: 'Initial state as a JSON string',
+                type: 'string',
+              })
+              .check((argv) => {
+                if (argv.state && argv.stateJson) {
+                  throw new Error('Cannot use both --state/-s and --state-json at the same time.');
+                }
+                return true;
+              })
               .example(
                 '$0 schedule create my-brain "0 3 * * *"',
                 'Run my-brain daily at 3am'
@@ -1015,10 +1127,25 @@ export function buildCli(options: CliOptions) {
               .example(
                 '$0 schedule create my-brain "0 8 * * 1" -o notify=sean,jim',
                 'Run with options passed to the brain'
+              )
+              .example(
+                '$0 schedule create my-brain "0 3 * * *" -s environment=staging',
+                'Run with initial state'
               );
           },
           (argv) => {
-            const element = scheduleCommand.create(argv);
+            let initialState: Record<string, unknown> | undefined;
+            if (argv.stateJson) {
+              try {
+                initialState = JSON.parse(argv.stateJson as string);
+              } catch {
+                console.error(`Invalid JSON for --state-json: ${argv.stateJson}`);
+                process.exit(1);
+              }
+            } else if (argv.state) {
+              initialState = argv.state as Record<string, unknown>;
+            }
+            const element = scheduleCommand.create({ ...argv, initialState } as any);
             render(element);
           }
         )

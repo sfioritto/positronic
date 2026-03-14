@@ -165,6 +165,149 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
+    it('should run a brain with initial state using -s flag', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'run',
+          'test-brain',
+          '-s',
+          'count=0',
+          '-s',
+          'name=sean'
+        ]);
+
+        const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
+        expect(isOutputRendered).toBe(true);
+
+        // Verify API was called with initialState (type-coerced)
+        const calls = env.server.getLogs();
+        const runCall = calls.find(c => c.method === 'createBrainRun');
+        expect(runCall).toBeDefined();
+        expect(runCall?.args[0]).toBe('test-brain');
+        expect(runCall?.args[2]).toEqual({
+          count: 0,
+          name: 'sean'
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should run a brain with initial state using --state-json flag', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'run',
+          'test-brain',
+          '--state-json',
+          '{"items": [], "config": {"debug": true}}'
+        ]);
+
+        const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
+        expect(isOutputRendered).toBe(true);
+
+        // Verify API was called with initialState
+        const calls = env.server.getLogs();
+        const runCall = calls.find(c => c.method === 'createBrainRun');
+        expect(runCall).toBeDefined();
+        expect(runCall?.args[2]).toEqual({
+          items: [],
+          config: { debug: true }
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should reject using both -s and --state-json together', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        await expect(px([
+          'run',
+          'test-brain',
+          '-s',
+          'count=0',
+          '--state-json',
+          '{"items": []}'
+        ])).rejects.toThrow(/Cannot use both --state/);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should coerce state values: booleans and numbers', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'run',
+          'test-brain',
+          '-s',
+          'active=true',
+          '-s',
+          'count=42',
+          '-s',
+          'disabled=false',
+          '-s',
+          'label=hello'
+        ]);
+
+        const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
+        expect(isOutputRendered).toBe(true);
+
+        // Verify type coercion
+        const calls = env.server.getLogs();
+        const runCall = calls.find(c => c.method === 'createBrainRun');
+        expect(runCall).toBeDefined();
+        expect(runCall?.args[2]).toEqual({
+          active: true,
+          count: 42,
+          disabled: false,
+          label: 'hello'
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
     it('should handle invalid option format', async () => {
       const env = await createTestEnv();
       const px = await env.start();

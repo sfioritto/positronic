@@ -591,9 +591,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
       .withGovernor((c) => rateGoverned(c))
       .withStoreProvider(createR2Backend(this.env.RESOURCES_BUCKET));
 
-    // Extract options from initialData if present
+    // Extract options and initialState from initialData if present
     const options = initialData?.options;
-    const initialState = initialData && !initialData.options ? initialData : {};
+    const initialState = initialData?.initialState ?? (initialData && !initialData.options && !initialData.initialState ? initialData : {});
 
     // Persist run owner durably (immutable, not derived from events)
     this.storeRunOwner(currentUser.name);
