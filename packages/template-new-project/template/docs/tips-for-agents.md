@@ -125,6 +125,41 @@ Key rules:
 - Optional title as second argument: `.guard(predicate, 'Check condition')`
 - See `/docs/brain-dsl-guide.md` for more details
 
+## Destructure State in Steps
+
+Always destructure properties off of `state` rather than accessing them through `state.property`. This keeps templates and logic cleaner and more readable.
+
+```typescript
+// ❌ DON'T DO THIS - accessing properties through state
+.brain('Find data', ({ state }) => ({
+    prompt: `Process <%= '${state.user.name}' %> from <%= '${state.user.email}' %>`,
+  }))
+
+// ✅ DO THIS - destructure in the parameter when state itself isn't needed
+.brain('Find data', ({ state: { user } }) => ({
+    prompt: `Process <%= '${user.name}' %> from <%= '${user.email}' %>`,
+  }))
+```
+
+When you still need `state` (e.g. for `...state` in the return value), destructure in the function body instead:
+
+```typescript
+// ❌ DON'T DO THIS
+.step('Format', ({ state }) => ({
+    ...state,
+    summary: `<%= '${state.title}' %> by <%= '${state.author}' %>`,
+  }))
+
+// ✅ DO THIS - destructure in the body when you also need ...state
+.step('Format', ({ state }) => {
+    const { title, author } = state;
+    return {
+      ...state,
+      summary: `<%= '${title}' %> by <%= '${author}' %>`,
+    };
+  })
+```
+
 ## Brain DSL Type Inference
 
 The Brain DSL has very strong type inference capabilities. **Important**: You should NOT explicitly specify types on the state object as it flows through steps. The types are automatically inferred from the previous step.
