@@ -1042,12 +1042,16 @@ Extract prompts to separate files when:
 - The prompt might be reused in other brains
 - You want to test the prompt logic separately
 
-## Batch Prompt Mode
+## Iterating Over Items
 
-When you need to run the same prompt over multiple items, use batch mode with the `over` option:
+When you need to run the same prompt, brain, or agent over multiple items, use the `over` option.
+
+### Prompt Iterate
+
+Run the same prompt once per item in a list:
 
 ```typescript
-brain('Batch Processor')
+brain('Item Processor')
   .step('Initialize', () => ({
     items: [
       { id: 1, title: 'First item' },
@@ -1062,9 +1066,8 @@ brain('Batch Processor')
       name: 'summaries' as const
     }
   }, {
-    over: (state) => state.items,  // Array to iterate over
-    concurrency: 10,               // Parallel requests (default: 10)
-    error: (item, error) => ({ summary: 'Failed to summarize' })  // Fallback on error
+    over: (state) => state.items,
+    error: (item, error) => ({ summary: 'Failed to summarize' })
   })
   .step('Process Results', ({ state }) => ({
     ...state,
@@ -1076,17 +1079,83 @@ brain('Batch Processor')
   }));
 ```
 
-### Batch Options
+Prompt iterate also supports per-step `client` overrides (see Prompt Steps above), so you can use a different model for processing.
+
+### Brain Iterate
+
+Run a nested brain once per item:
+
+```typescript
+const processBrain = brain('Process Item')
+  .step('Transform', ({ state }) => ({
+    ...state,
+    result: state.value * 2,
+  }));
+
+brain('Process All Items')
+  .step('Initialize', () => ({
+    items: [{ value: 1 }, { value: 2 }, { value: 3 }]
+  }))
+  .brain('Process Each', processBrain, {
+    over: (state) => state.items,
+    initialState: (item) => ({ value: item.value }),
+    outputKey: 'results' as const,
+    error: (item, error) => ({ value: item.value, failed: true }),
+  })
+  .step('Use Results', ({ state }) => ({
+    ...state,
+    // results is [item, innerState][] - array of tuples
+    totals: state.results.map(([item, result]) => result.result),
+  }));
+```
+
+### Agent Iterate
+
+Run an agent config once per item. The `configFn` receives the item as its first argument:
+
+```typescript
+brain('Research Topics')
+  .step('Initialize', () => ({
+    topics: [{ name: 'AI' }, { name: 'Robotics' }]
+  }))
+  .brain('Research Each', (item, { state, tools }) => ({
+    system: 'You are a research assistant.',
+    prompt: `Research this topic: <%= '${item.name}' %>`,
+    tools: {
+      search: tools.search,
+    },
+    outputSchema: {
+      schema: z.object({ summary: z.string() }),
+      name: 'research' as const,
+    },
+  }), {
+    over: (state) => state.topics,
+    outputKey: 'results' as const,
+  })
+  .step('Use Results', ({ state }) => ({
+    ...state,
+    summaries: state.results.map(([topic, result]) => result.summary),
+  }));
+```
+
+### Iterate Options
+
+All iterate variants share these options:
 
 - `over: (state) => T[]` - Function returning the array to iterate over
-- `concurrency: number` - Maximum number of items processed in parallel (default: 10)
-- `error: (item, error) => Response` - Fallback function when a request fails
+- `error: (item, error) => Result | null` - Fallback when an item fails. Return `null` to skip the item entirely.
 
-Batch prompts also support per-step `client` overrides (see Prompt Steps above), so you can use a different model for batch processing.
+Brain and agent iterate also require:
+
+- `outputKey: string` - Key under which results are stored in state (use `as const` for type inference)
+
+Brain iterate additionally requires:
+
+- `initialState: (item, outerState) => State` - Function to create the inner brain's initial state from each item
 
 ### Result Format
 
-The result is stored as an array of `[item, response]` tuples, preserving the relationship between each input item and its generated response.
+Results are stored as `[item, result][]` tuples, preserving the relationship between each input item and its output. For prompts, the key comes from `outputSchema.name`. For brain and agent iterate, it comes from `outputKey`.
 
 ## Agent Steps
 
