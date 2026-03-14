@@ -20,7 +20,7 @@ function scopeUserName(context: Context): string | null {
 
 brains.post('/runs', async (context: Context) => {
   const requestBody = await context.req.json<CreateBrainRunRequest & { identifier?: string }>();
-  const { options } = requestBody;
+  const { options, initialState } = requestBody;
 
   // Support both identifier and brainTitle for backward compatibility
   const identifier = requestBody.identifier || requestBody.brainTitle;
@@ -64,8 +64,10 @@ brains.post('/runs', async (context: Context) => {
   }
   const currentUser = { name: auth.userName || 'root' };
 
-  // Pass options to the brain runner if provided
-  const initialData = options ? { options } : undefined;
+  // Pass options and initialState to the brain runner if provided
+  const initialData = (options || initialState)
+    ? { ...(options && { options }), ...(initialState && { initialState }) }
+    : undefined;
   // Get the actual brain title from the resolved brain
   const brainTitle = (brain as any).title || identifier;
   await stub.start(brainTitle, brainRunId, currentUser, initialData);
@@ -540,7 +542,8 @@ brains.post('/schedules', async (context: Context) => {
       cronExpression,
       timezone,
       runAsUserName,
-      body.options
+      body.options,
+      body.initialState
     );
     return context.json(schedule, 201);
   } catch (error) {

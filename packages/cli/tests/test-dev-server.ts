@@ -350,7 +350,7 @@ export class TestDevServer implements PositronicDevServer {
         brainRunId = 'test-multi-status';
       }
 
-      this.logCall('createBrainRun', [identifier, body.options]);
+      this.logCall('createBrainRun', [identifier, body.options, body.initialState]);
       return [201, { brainRunId }];
     });
 
@@ -1018,7 +1018,7 @@ export class TestDevServer implements PositronicDevServer {
       const timezone = body.timezone || this.projectTimezone || 'UTC';
 
       const scheduleId = `schedule-${Date.now()}`;
-      const schedule: MockSchedule = {
+      const schedule: MockSchedule & { initialState?: Record<string, unknown> } = {
         id: scheduleId,
         brainTitle: brainTitle,
         cronExpression: body.cronExpression,
@@ -1028,6 +1028,7 @@ export class TestDevServer implements PositronicDevServer {
         nextRunAt: Date.now() + 3600000, // 1 hour from now
         runAsUserName: 'test-user',
         options: body.options,
+        initialState: body.initialState,
       };
       this.schedules.set(scheduleId, schedule);
       this.logCall('createSchedule', [body]);

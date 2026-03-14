@@ -11,6 +11,7 @@ interface ScheduleCreateArgs {
   brain: string;
   cronExpression: string;
   options?: Record<string, string>;
+  initialState?: Record<string, unknown>;
 }
 
 interface ScheduleListArgs {
@@ -39,6 +40,7 @@ export class ScheduleCommand {
     brain,
     cronExpression,
     options,
+    initialState,
   }: ArgumentsCamelCase<ScheduleCreateArgs>): React.ReactElement {
     return React.createElement(BrainResolver, {
       identifier: brain,
@@ -47,6 +49,7 @@ export class ScheduleCommand {
           identifier: resolvedBrainTitle,
           cronExpression,
           options,
+          initialState,
         }),
     });
   }

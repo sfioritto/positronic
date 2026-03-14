@@ -28,6 +28,7 @@ interface BrainRunContext {
   identifier: string;
   watch: boolean;
   options: Record<string, string> | undefined;
+  initialState: Record<string, unknown> | undefined;
   brainSearchResult: BrainsResponse | null;
   brains: Brain[];
   selectedBrainTitle: string | null;
@@ -39,6 +40,7 @@ interface BrainRunProps {
   identifier: string;
   watch?: boolean;
   options?: Record<string, string>;
+  initialState?: Record<string, unknown>;
 }
 
 // Helper to get connection error message
@@ -90,7 +92,11 @@ const startRun = async (ctx: BrainRunContext) => {
   const response = await apiClient.fetch('/brains/runs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier: ctx.selectedBrainTitle, options: ctx.options }),
+    body: JSON.stringify({
+      identifier: ctx.selectedBrainTitle,
+      options: ctx.options,
+      ...(ctx.initialState && { initialState: ctx.initialState }),
+    }),
   });
 
   if (response.status === 201) {
@@ -158,7 +164,7 @@ const brainNotFoundGuard = guard<BrainRunContext, object>((ctx) => ctx.brainSear
 const brainsMultipleGuard = guard<BrainRunContext, object>((ctx) => (ctx.brainSearchResult?.count ?? 0) > 1);
 
 // State machine definition
-const createBrainRunMachine = (identifier: string, watch: boolean, options: Record<string, string> | undefined) =>
+const createBrainRunMachine = (identifier: string, watch: boolean, options: Record<string, string> | undefined, initialState: Record<string, unknown> | undefined) =>
   createMachine(
     'searching',
     {
@@ -194,6 +200,7 @@ const createBrainRunMachine = (identifier: string, watch: boolean, options: Reco
       identifier,
       watch,
       options,
+      initialState,
       brainSearchResult: null,
       brains: [],
       selectedBrainTitle: null,
@@ -212,10 +219,10 @@ const createBrainRunMachine = (identifier: string, watch: boolean, options: Reco
  * 3. Start the brain run
  * 4. Show run ID or Watch component based on watch flag
  */
-export const BrainRun = ({ identifier, watch = false, options }: BrainRunProps) => {
+export const BrainRun = ({ identifier, watch = false, options, initialState }: BrainRunProps) => {
   const machine = useMemo(
-    () => createBrainRunMachine(identifier, watch, options),
-    [identifier, watch, options]
+    () => createBrainRunMachine(identifier, watch, options, initialState),
+    [identifier, watch, options, initialState]
   );
   const [current, send] = useMachine(machine);
   const { exit } = useApp();

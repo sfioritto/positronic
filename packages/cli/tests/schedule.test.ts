@@ -117,6 +117,98 @@ describe('schedule command', () => {
       }
     });
 
+    it('should create a schedule with initial state using -s flag', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px([
+          'schedule',
+          'create',
+          'test-brain',
+          '0 3 * * *',
+          '-s',
+          'environment=staging',
+          '-s',
+          'count=0',
+        ]);
+
+        const foundSuccess = await waitForOutput(
+          /Schedule created successfully/i,
+          50
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify the API call included initialState
+        const methodCalls = env.server.getLogs();
+        const createCall = methodCalls.find(
+          (call) => call.method === 'createSchedule'
+        );
+        expect(createCall).toBeDefined();
+        expect(createCall!.args[0].initialState).toEqual({
+          environment: 'staging',
+          count: 0,
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should create a schedule with initial state using --state-json flag', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'test-brain',
+        title: 'test-brain',
+        description: 'A test brain for testing',
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px([
+          'schedule',
+          'create',
+          'test-brain',
+          '0 3 * * *',
+          '--state-json',
+          '{"items": [], "debug": true}',
+        ]);
+
+        const foundSuccess = await waitForOutput(
+          /Schedule created successfully/i,
+          50
+        );
+        expect(foundSuccess).toBe(true);
+
+        // Verify the API call included initialState
+        const methodCalls = env.server.getLogs();
+        const createCall = methodCalls.find(
+          (call) => call.method === 'createSchedule'
+        );
+        expect(createCall).toBeDefined();
+        expect(createCall!.args[0].initialState).toEqual({
+          items: [],
+          debug: true,
+        });
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
     it('should handle server connection errors gracefully', async () => {
       const env = await createTestEnv();
       // Don't start the server to simulate connection error
