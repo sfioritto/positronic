@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { brain as coreBrain, Brain } from './builder/brain.js';
-import type { AgentConfig, AgentTool, AgentOutputSchema, StepContext, State } from './types.js';
+import type { AgentConfig, AgentTool, AgentOutputSchema, StepContext, State, JsonObject } from './types.js';
 import type { UIComponent } from '../ui/types.js';
 import type { MemoryProvider } from '../memory/types.js';
 import type { StoreSchema } from '../store/types.js';
@@ -117,10 +117,14 @@ export function createBrain<
   ): BrainReturn;
 
   // Overload 5: Builder pattern with title string
-  function brain(title: string): BrainReturn;
+  function brain<TOptions extends JsonObject = {}, TState extends State = object>(
+    title: string
+  ): Brain<TOptions, TState, TServices, undefined, undefined>;
 
   // Overload 6: Builder pattern with config object
-  function brain(config: { title: string; description?: string }): BrainReturn;
+  function brain<TOptions extends JsonObject = {}, TState extends State = object>(
+    config: { title: string; description?: string }
+  ): Brain<TOptions, TState, TServices, undefined, undefined>;
 
   // Implementation
   function brain(
