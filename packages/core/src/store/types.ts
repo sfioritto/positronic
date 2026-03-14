@@ -29,7 +29,7 @@ export type InferStoreTypes<T extends StoreSchema> = {
  * Raw backend: Store<any> (string keys, any values)
  * Typed store: Store<{counter: number, pref: string}> (constrained keys, typed values)
  */
-export interface Store<T extends Record<string, JsonValue>> {
+export interface Store<T extends Record<string, JsonValue | undefined>> {
   get<K extends keyof T & string>(key: K): Promise<T[K] | undefined>;
   set<K extends keyof T & string>(key: K, value: T[K]): Promise<void>;
   delete<K extends keyof T & string>(key: K): Promise<void>;
@@ -53,6 +53,6 @@ export type StoreProvider = (config: {
  */
 export type StoreContext<TStore> = [TStore] extends [never]
   ? {}
-  : TStore extends Record<string, JsonValue>
+  : TStore extends Record<string, JsonValue | undefined>
     ? { store: Store<TStore> }
     : {};
