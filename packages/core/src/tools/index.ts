@@ -104,13 +104,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       );
     }
 
-    if (!pages) {
-      throw new Error(
-        'generateUI requires pages service to be configured. ' +
-        'This is typically provided by the backend runtime.'
-      );
-    }
-
     // Generate the UI using the core generateUI function
     const uiResult = await generateUICore({
       client,

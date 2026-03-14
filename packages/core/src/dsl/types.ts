@@ -94,7 +94,7 @@ export interface StepContext<
   /** Generated page from a previous UI step */
   page: TPage;
   /** Page service for creating UI pages */
-  pages?: import('./pages.js').PagesService;
+  pages: import('./pages.js').PagesService;
   /** Runtime environment (origin, secrets) */
   env: RuntimeEnv;
   /** UI components available for generateUI */

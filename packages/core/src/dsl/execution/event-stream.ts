@@ -1019,7 +1019,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             resources: this.resources,
             response: this.currentResponse,
             page: this.currentPage,
-            pages: this.pages,
+            pages: this.pages!,
             env: this.env,
             components: this.components,
             brainRunId: this.brainRunId,
