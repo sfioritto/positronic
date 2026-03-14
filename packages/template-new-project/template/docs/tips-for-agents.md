@@ -160,6 +160,33 @@ When you still need `state` (e.g. for `...state` in the return value), destructu
   })
 ```
 
+## Iterate `mapOutput`
+
+When iterating over items with `.prompt()`, `.brain()`, or agent iterate, use `mapOutput` to transform results inline instead of destructuring tuples in the next step.
+
+**Always use `mapOutput`** when the next step just destructures the tuple to extract one field — that's exactly what `mapOutput` is for:
+
+```typescript
+// ❌ DON'T DO THIS — tuple destructuring in the next step
+.prompt('Categorize', { ... }, {
+    over: (state) => state.emails,
+  })
+  .step('Extract', ({ state }) => ({
+    ...state,
+    categories: state.categories.map(([_, result]) => result.category),
+  }))
+
+// ✅ DO THIS — mapOutput eliminates the next step entirely
+.prompt('Categorize', { ... }, {
+    over: (state) => state.emails,
+    mapOutput: (result) => result.category,
+  })
+```
+
+**Don't use `mapOutput`** when the next step needs both the input item and the result — the tuple is the right shape already.
+
+**Name the `outputKey` after the mapped value.** If mapping to `result.analysis`, use `outputKey: 'analyses' as const`, not `outputKey: 'processedItems' as const`.
+
 ## Brain DSL Type Inference
 
 The Brain DSL has very strong type inference capabilities. **Important**: You should NOT explicitly specify types on the state object as it flows through steps. The types are automatically inferred from the previous step.

@@ -1244,7 +1244,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     // All items done - update state and complete step
     const finalResults = results.filter((r): r is [any, any] => r != null);
-    this.currentState = { ...this.currentState, [iterateConfig.schemaName]: finalResults };
+    const outputResults = iterateConfig.mapOutput
+      ? finalResults.map(([item, result]) => iterateConfig.mapOutput!(result, item))
+      : finalResults;
+    this.currentState = { ...this.currentState, [iterateConfig.schemaName]: outputResults };
     yield* this.completeStep(step, prevState);
   }
 
@@ -1365,7 +1368,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     const finalResults = results.filter((r): r is [any, any] => r != null);
-    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: finalResults };
+    const outputResults = iterateConfig.mapOutput
+      ? finalResults.map(([item, result]) => iterateConfig.mapOutput!(result, item))
+      : finalResults;
+    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: outputResults };
     yield* this.completeStep(step, prevState);
   }
 
@@ -1466,7 +1472,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     const finalResults = results.filter((r): r is [any, any] => r != null);
-    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: finalResults };
+    const outputResults = iterateConfig.mapOutput
+      ? finalResults.map(([item, result]) => iterateConfig.mapOutput!(result, item))
+      : finalResults;
+    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: outputResults };
     yield* this.completeStep(step, prevState);
   }
 
