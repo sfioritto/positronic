@@ -773,6 +773,39 @@ export const brain = createBrain({
 
 All brains created with this factory will have access to the configured services, tools, components, and store.
 
+#### Typing Initial State and Options
+
+By default, the first `.step()` establishes the state type and inference flows from there. But when a brain receives its initial state from outside — via `initialState` in `.run()`, from the CLI, or from a parent brain — the first step's `state` parameter is untyped.
+
+You can provide type parameters to `brain()` to type the initial state and options:
+
+```typescript
+// brain<TOptions, TState>(title)
+// Both parameters are optional and default to {} and object respectively.
+
+// Type just the initial state (pass {} for options)
+const myBrain = brain<{}, { userId: string; email: string }>('process-user')
+  .step('Greet', ({ state }) => {
+    // state.userId and state.email are correctly typed
+    return { ...state, greeting: 'Hello ' + state.email };
+  });
+
+// Type both options and initial state
+const myBrain = brain<{ verbose: boolean }, { count: number }>('counter')
+  .step('Process', ({ state, options }) => {
+    if (options.verbose) console.log('Count:', state.count);
+    return { ...state, doubled: state.count * 2 };
+  });
+```
+
+This is useful in several situations:
+
+- **Brains run with `initialState`**: When calling `.run({ initialState: { ... } })` or passing initial state from the CLI
+- **Sub-brains**: When a parent brain provides initial state via `.brain()` or iterate's `initialState` option
+- **Any brain where the first step receives rather than creates state**
+
+Existing `brain('title')` calls without type parameters continue to work unchanged.
+
 ## Running Brains
 
 ### Basic Execution
