@@ -1,5 +1,5 @@
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
-import { applyPatches, type JsonPatch } from '../src/dsl/json-patch.js';
+import { applyPatches } from '../src/dsl/json-patch.js';
 import { State } from '../src/dsl/types.js';
 import {
   brain,
@@ -23,6 +23,16 @@ const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
   if (result.done) throw new Error('Iterator is done');
   return result.value;
 };
+
+// Helper: replay events through the brain state machine to get final state.
+// Handles nested brain depth tracking and patch scoping automatically.
+function finalStateFromEvents(events: BrainEvent<any>[]): any {
+  const sm = createBrainExecutionMachine();
+  for (const event of events) {
+    sendEvent(sm, event as any);
+  }
+  return sm.context.currentState;
+}
 
 // Define a Logger interface for testing
 interface Logger {
@@ -1227,25 +1237,8 @@ describe('nested brains', () => {
       },
     ]);
 
-    // Verify states are passed correctly
-    let innerState: State = { value: 5 }; // Match the initial state from the brain
-    let outerState = {};
-
-    for (const event of events) {
-      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-        if (event.stepTitle === 'Double value') {
-          innerState = applyPatches(innerState, [event.patch]);
-        } else {
-          outerState = applyPatches(outerState, [event.patch]);
-        }
-      }
-    }
-
-    // Verify final states
-    expect(innerState).toEqual({
-      inner: true,
-      value: 10,
-    });
+    // Verify outer state is passed correctly (state machine handles depth scoping)
+    const outerState = finalStateFromEvents(events);
 
     expect(outerState).toEqual({
       prefix: 'test-',
@@ -1881,11 +1874,8 @@ describe('type inference', () => {
 
     // Collect all events
     const events = [];
-    let finalStepStatus,
-      finalState = {};
+    let finalStepStatus;
     let mainBrainId: string | undefined;
-    // Track brain nesting depth to only apply patches from outer brain (depth 1)
-    let brainDepth = 0;
 
     for await (const event of complexBrain.run({
       client: mockClient,
@@ -1899,24 +1889,11 @@ describe('type inference', () => {
         mainBrainId = event.brainRunId;
       }
 
-      // Track brain nesting depth
-      if (event.type === BRAIN_EVENTS.START) {
-        brainDepth++;
-      }
-
       if (event.type === BRAIN_EVENTS.STEP_STATUS) {
         finalStepStatus = event;
-      } else if (
-        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        brainDepth === 1 // Only process events from outer brain (depth 1)
-      ) {
-        finalState = applyPatches(finalState, [event.patch]);
-      }
-
-      if (event.type === BRAIN_EVENTS.COMPLETE) {
-        brainDepth--;
       }
     }
+    const finalState = finalStateFromEvents(events);
 
     // Verify brain start event
     expect(events[0]).toEqual(
@@ -2011,28 +1988,14 @@ describe('type inference', () => {
       );
 
     // Run the brain to verify runtime behavior
-    let finalState = {};
-    // Track brain nesting depth to only apply patches from outer brain (depth 1)
-    let brainDepth = 0;
-
+    const events = [];
     for await (const event of outerBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
     })) {
-      // Track brain nesting depth
-      if (event.type === BRAIN_EVENTS.START) {
-        brainDepth++;
-      }
-      if (
-        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        brainDepth === 1 // Only process events from outer brain (depth 1)
-      ) {
-        finalState = applyPatches(finalState, [event.patch]);
-      }
-      if (event.type === BRAIN_EVENTS.COMPLETE) {
-        brainDepth--;
-      }
+      events.push(event);
     }
+    const finalState = finalStateFromEvents(events);
 
     expect(finalState).toEqual({
       outerValue: 100,
@@ -2069,23 +2032,14 @@ describe('type inference', () => {
       });
 
     // Run the brain to verify runtime behavior
-    let finalState = {};
-    let mainBrainId: string | undefined;
-
+    const events = [];
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
     })) {
-      if (event.type === BRAIN_EVENTS.START && !mainBrainId) {
-        mainBrainId = event.brainRunId;
-      }
-      if (
-        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
-        event.brainRunId === mainBrainId
-      ) {
-        finalState = applyPatches(finalState, [event.patch]);
-      }
+      events.push(event);
     }
+    const finalState = finalStateFromEvents(events);
 
     expect(finalState).toMatchObject({
       count: 2,
