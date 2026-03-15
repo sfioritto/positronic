@@ -78,6 +78,16 @@ function getEventSymbol(event: BrainEvent): { symbol: string; color: string } {
       return { symbol: '[!]', color: 'red' };
     case BRAIN_EVENTS.AGENT_WEBHOOK:
       return { symbol: '[W]', color: 'cyan' };
+    case BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE:
+      return { symbol: '[~]', color: 'gray' };
+    case BRAIN_EVENTS.PAUSED:
+      return { symbol: '[||]', color: 'cyan' };
+    case BRAIN_EVENTS.RESUMED:
+      return { symbol: '[>]', color: 'green' };
+    case BRAIN_EVENTS.ITERATE_ITEM_COMPLETE:
+      return { symbol: '[i]', color: 'green' };
+    case BRAIN_EVENTS.AGENT_USER_MESSAGE:
+      return { symbol: '[U]', color: 'cyan' };
     default:
       return { symbol: '[?]', color: 'gray' };
   }
@@ -221,6 +231,44 @@ function getEventDetailContent(event: BrainEvent): string {
         `Tool Call ID: ${event.toolCallId}`,
         '',
         'Agent waiting for webhook response...',
+      ].join('\n');
+
+    case BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Iteration: ${event.iteration}`,
+        '',
+        'Raw Response Message:',
+        JSON.stringify(event.message, null, 2),
+      ].join('\n');
+
+    case BRAIN_EVENTS.PAUSED:
+      return [`Brain: ${event.brainTitle}`, '', 'Brain paused.'].join('\n');
+
+    case BRAIN_EVENTS.RESUMED:
+      return [`Brain: ${event.brainTitle}`, '', 'Brain resumed.'].join('\n');
+
+    case BRAIN_EVENTS.ITERATE_ITEM_COMPLETE:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Progress: ${event.processedCount}/${event.totalItems}`,
+        `Item Index: ${event.itemIndex}`,
+        `Schema: ${event.schemaName}`,
+        '',
+        'Item:',
+        JSON.stringify(event.item, null, 2),
+        '',
+        'Result:',
+        JSON.stringify(event.result, null, 2),
+      ].join('\n');
+
+    case BRAIN_EVENTS.AGENT_USER_MESSAGE:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Step ID: ${event.stepId}`,
+        '',
+        'Message:',
+        event.content,
       ].join('\n');
 
     default:

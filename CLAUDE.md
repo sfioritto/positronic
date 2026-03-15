@@ -81,6 +81,11 @@ The project template (`packages/template-new-project/template/.positronic/`) is 
 
 **When adding a new API endpoint or binding**, check whether the template's `wrangler.jsonc` and `index.ts` need updates. The test-project and template must stay in sync — if one has it, the other should too.
 
+**When adding a new brain event type** (`BRAIN_EVENTS` in `packages/core/src/dsl/constants.ts`), update all three places:
+1. `packages/cli/src/components/events-view.tsx` — `formatEvent()` switch statement (list view symbol, text, color)
+2. `packages/cli/src/components/event-detail.tsx` — `getEventSymbol()` (detail view symbol/color) AND `getEventDetailContent()` (detail view content)
+3. `packages/core/src/dsl/definitions/events.ts` — TypeScript interface and add to the `BrainEvent` union type
+
 ## Development Notes
 
 ### New Command Creation Guide
