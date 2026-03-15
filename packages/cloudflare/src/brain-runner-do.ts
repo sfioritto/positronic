@@ -835,8 +835,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
               // Load all historical events using EventLoader
               const existingEvents = await eventLoader.loadAllEvents();
 
-              for (const event of existingEvents) {
-                sendEvent(controller, event);
+              // Send all historical events as a single array message
+              // so clients can process them in one batch instead of re-rendering per event
+              if (existingEvents.length > 0) {
+                sendEvent(controller, existingEvents);
               }
 
               eventStreamAdapter.subscribe(controller);

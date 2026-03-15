@@ -278,7 +278,9 @@ describe('Hono API Tests', () => {
 
     const { value } = await reader.read();
     const chunk = new TextDecoder().decode(value);
-    const event = parseSseEvent(chunk);
+    const parsed = parseSseEvent(chunk);
+    // Server sends historical events as an array — grab the first event
+    const event = Array.isArray(parsed) ? parsed[0] : parsed;
 
     // Cleanup
     reader.cancel();
@@ -1104,8 +1106,9 @@ describe('Hono API Tests', () => {
           buffer = buffer.substring(eventEndIndex + 2);
 
           if (message.startsWith('data:')) {
-            const event = parseSseEvent(message);
-            if (event) {
+            const parsed = parseSseEvent(message);
+            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
                 foundWebhookEvent = true;
@@ -1113,6 +1116,7 @@ describe('Hono API Tests', () => {
                 break;
               }
             }
+            if (foundWebhookEvent) break;
           }
         }
       }
@@ -1292,8 +1296,9 @@ describe('Hono API Tests', () => {
           buffer = buffer.substring(eventEndIndex + 2);
 
           if (message.startsWith('data:')) {
-            const event = parseSseEvent(message);
-            if (event) {
+            const parsed = parseSseEvent(message);
+            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
                 foundWebhookEvent = true;
@@ -1301,6 +1306,7 @@ describe('Hono API Tests', () => {
                 break;
               }
             }
+            if (foundWebhookEvent) break;
           }
         }
       }
@@ -1460,8 +1466,9 @@ describe('Hono API Tests', () => {
           buffer = buffer.substring(eventEndIndex + 2);
 
           if (message.startsWith('data:')) {
-            const event = parseSseEvent(message);
-            if (event) {
+            const parsed = parseSseEvent(message);
+            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
                 foundWebhookEvent = true;
@@ -1469,6 +1476,7 @@ describe('Hono API Tests', () => {
                 break;
               }
             }
+            if (foundWebhookEvent) break;
           }
         }
       }
@@ -1658,8 +1666,9 @@ describe('Hono API Tests', () => {
           buffer = buffer.substring(eventEndIndex + 2);
 
           if (message.startsWith('data:')) {
-            const event = parseSseEvent(message);
-            if (event) {
+            const parsed = parseSseEvent(message);
+            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
                 foundWebhookEvent = true;
@@ -1667,6 +1676,7 @@ describe('Hono API Tests', () => {
                 break;
               }
             }
+            if (foundWebhookEvent) break;
           }
         }
       }

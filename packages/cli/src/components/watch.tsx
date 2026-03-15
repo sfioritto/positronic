@@ -300,21 +300,27 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
 
     es.onmessage = (event: MessageEvent) => {
       try {
-        const eventData = JSON.parse(event.data) as BrainEvent;
+        const parsed = JSON.parse(event.data);
 
-        // Store event for events view (keep last 500 events to prevent memory issues)
+        // Server sends historical events as an array in the first message
+        const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : [parsed];
+
+        // Add all events in one setEvents call for batch rendering
         setEvents((prev) => {
-          const newEvents = [...prev, { timestamp: new Date(), event: eventData }];
+          const newEvents = [
+            ...prev,
+            ...eventList.map((e) => ({ timestamp: new Date(), event: e })),
+          ];
           return newEvents.slice(-500);
         });
 
-        // Send event to state machine - useMachine handles re-renders automatically
-        // Use ref to ensure we always call the latest send function
-        sendRef.current(eventData);
+        // Send each event to state machine - React 18 batches these into one render
+        for (const eventData of eventList) {
+          sendRef.current(eventData);
 
-        // Capture error event for display (error state is separate from machine)
-        if (eventData.type === BRAIN_EVENTS.ERROR) {
-          setBrainError(eventData as BrainErrorEvent);
+          if (eventData.type === BRAIN_EVENTS.ERROR) {
+            setBrainError(eventData as BrainErrorEvent);
+          }
         }
       } catch (e: any) {
         setConnectionError(new Error(`Error parsing event data: ${e.message}`));

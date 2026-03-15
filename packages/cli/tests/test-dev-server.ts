@@ -467,19 +467,23 @@ export class TestDevServer implements PositronicDevServer {
         if (match) {
           const runId = match[1];
 
+          // Helper: send all events as a single array SSE message (matches server behavior)
+          const batchEvents = (events: any[]) =>
+            `data: ${JSON.stringify(events)}\n\n`;
+
           // Different scenarios based on runId
           if (runId === 'test-error-brain') {
             // Error scenario
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Error Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'brain:error',
                 brainRunId: runId,
                 brainTitle: 'Error Brain',
@@ -490,20 +494,20 @@ export class TestDevServer implements PositronicDevServer {
                   message: 'Something went wrong in the brain',
                   stack: 'Error: Something went wrong\n    at test.js:1:1',
                 },
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-restart-brain') {
             // Restart scenario
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:restart',
                 brainTitle: 'Restarted Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -514,20 +518,20 @@ export class TestDevServer implements PositronicDevServer {
                     status: 'pending',
                   },
                 ],
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-multi-status') {
             // Multiple step statuses
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Multi Status Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -537,20 +541,20 @@ export class TestDevServer implements PositronicDevServer {
                   { id: 'step-3', title: 'Running Step', status: 'running' },
                   { id: 'step-4', title: 'Pending Step', status: 'pending' },
                 ],
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-complete-flow') {
             // Full flow from start to complete
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Complete Flow Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -558,27 +562,27 @@ export class TestDevServer implements PositronicDevServer {
                   { id: 'step-1', title: 'First Step', status: 'complete' },
                   { id: 'step-2', title: 'Second Step', status: 'complete' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'brain:complete',
                 brainRunId: runId,
                 brainTitle: 'Complete Flow Brain',
                 options: {},
                 status: 'complete',
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-brain-error') {
             // Brain error scenario
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Error Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'brain:error',
                 brainRunId: runId,
                 brainTitle: 'Error Brain',
@@ -588,44 +592,44 @@ export class TestDevServer implements PositronicDevServer {
                   stack:
                     'Error: Something went wrong during brain execution\n    at BrainRunner.run',
                 },
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-malformed-event') {
             // Send malformed JSON
             return 'data: {invalid json here}\n\n';
           } else if (runId === 'test-no-steps') {
             // Brain with no steps initially
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'No Steps Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
                 steps: [],
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-connection-error') {
             // Simulate connection error by returning error
             throw new Error('ECONNREFUSED');
           } else if (runId === 'test-state-view') {
             // Scenario for testing state view with proper initialState and patches
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'State View Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: { count: 0, name: 'initial' },
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -633,8 +637,8 @@ export class TestDevServer implements PositronicDevServer {
                   { id: 'step-1', title: 'Step One', status: 'running' },
                   { id: 'step-2', title: 'Step Two', status: 'pending' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:complete',
                 brainRunId: runId,
                 stepTitle: 'Step One',
@@ -642,8 +646,8 @@ export class TestDevServer implements PositronicDevServer {
                 options: {},
                 status: 'running',
                 patch: [{ op: 'replace', path: '/count', value: 1 }],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -651,8 +655,8 @@ export class TestDevServer implements PositronicDevServer {
                   { id: 'step-1', title: 'Step One', status: 'complete' },
                   { id: 'step-2', title: 'Step Two', status: 'running' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:complete',
                 brainRunId: runId,
                 stepTitle: 'Step Two',
@@ -663,36 +667,36 @@ export class TestDevServer implements PositronicDevServer {
                   { op: 'replace', path: '/count', value: 2 },
                   { op: 'replace', path: '/name', value: 'completed' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'brain:complete',
                 brainRunId: runId,
                 brainTitle: 'State View Brain',
                 options: {},
                 status: 'complete',
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-agent-brain') {
             // Scenario for testing agent loops with agent:start event
             // Note: This scenario does NOT complete, allowing interactive testing
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Agent Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
                 steps: [
                   { id: 'agent-step-1', title: 'AI Agent', status: 'running' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:start',
                 brainRunId: runId,
                 options: {},
@@ -701,8 +705,8 @@ export class TestDevServer implements PositronicDevServer {
                 prompt: 'Hello, I am an AI agent',
                 system: 'You are helpful',
                 tools: ['search', 'calculate'],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:raw_response_message',
                 brainRunId: runId,
                 options: {},
@@ -713,28 +717,28 @@ export class TestDevServer implements PositronicDevServer {
                   role: 'assistant',
                   content: [{ type: 'text', text: 'I am thinking...' }],
                 },
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-agent-brain-complete') {
             // Scenario for testing agent loops that completes
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Agent Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
                 steps: [
                   { id: 'agent-step-1', title: 'AI Agent', status: 'running' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:start',
                 brainRunId: runId,
                 options: {},
@@ -743,8 +747,8 @@ export class TestDevServer implements PositronicDevServer {
                 prompt: 'Hello, I am an AI agent',
                 system: 'You are helpful',
                 tools: ['search', 'calculate'],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:raw_response_message',
                 brainRunId: runId,
                 options: {},
@@ -755,35 +759,35 @@ export class TestDevServer implements PositronicDevServer {
                   role: 'assistant',
                   content: [{ type: 'text', text: 'I am thinking...' }],
                 },
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
                 steps: [
                   { id: 'agent-step-1', title: 'AI Agent', status: 'complete' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'brain:complete',
                 brainRunId: runId,
                 brainTitle: 'Agent Brain',
                 options: {},
                 status: 'complete',
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-multi-agent-brain') {
             // Scenario for testing multiple agent loops (picker flow)
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Multi Agent Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -791,8 +795,8 @@ export class TestDevServer implements PositronicDevServer {
                   { id: 'agent-step-1', title: 'Research Agent', status: 'complete' },
                   { id: 'agent-step-2', title: 'Analysis Agent', status: 'running' },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:start',
                 brainRunId: runId,
                 options: {},
@@ -801,8 +805,8 @@ export class TestDevServer implements PositronicDevServer {
                 prompt: 'Research the topic',
                 system: 'You are a research agent',
                 tools: ['search'],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:raw_response_message',
                 brainRunId: runId,
                 options: {},
@@ -813,8 +817,8 @@ export class TestDevServer implements PositronicDevServer {
                   role: 'assistant',
                   content: [{ type: 'text', text: 'Researching...' }],
                 },
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:start',
                 brainRunId: runId,
                 options: {},
@@ -823,8 +827,8 @@ export class TestDevServer implements PositronicDevServer {
                 prompt: 'Analyze the data',
                 system: 'You are an analysis agent',
                 tools: ['calculate'],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'agent:raw_response_message',
                 brainRunId: runId,
                 options: {},
@@ -835,21 +839,21 @@ export class TestDevServer implements PositronicDevServer {
                   role: 'assistant',
                   content: [{ type: 'text', text: 'Analyzing...' }],
                 },
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else if (runId === 'test-running-brain') {
             // Scenario for a brain that stays running (doesn't complete)
             // Used for testing kill, pause, message features
-            return [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'Running Brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -857,20 +861,20 @@ export class TestDevServer implements PositronicDevServer {
                   { id: 'step-1', title: 'Long Running Step', status: 'running' },
                   { id: 'step-2', title: 'Pending Step', status: 'pending' },
                 ],
-              })}\n\n`,
-            ].join('');
+              },
+            ]);
           } else {
             // Default scenario
-            const mockEvents = [
-              `data: ${JSON.stringify({
+            return batchEvents([
+              {
                 type: 'brain:start',
                 brainTitle: 'test-brain',
                 brainRunId: runId,
                 options: {},
                 status: 'running',
                 initialState: {},
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'step:status',
                 brainRunId: runId,
                 options: {},
@@ -881,16 +885,15 @@ export class TestDevServer implements PositronicDevServer {
                     status: 'running',
                   },
                 ],
-              })}\n\n`,
-              `data: ${JSON.stringify({
+              },
+              {
                 type: 'brain:complete',
                 brainRunId: runId,
                 brainTitle: 'test-brain',
                 options: {},
                 status: 'complete',
-              })}\n\n`,
-            ];
-            return mockEvents.join('');
+              },
+            ]);
           }
         }
         return 'data: {"type":"ERROR","error":{"message":"Invalid run ID"}}\n\n';
