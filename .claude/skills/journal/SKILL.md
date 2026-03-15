@@ -10,15 +10,19 @@ You maintain a developer journal that captures **why** things happen, not just w
 
 This runs in the background — you don't ask the user for permission to journal, you just do it.
 
-## The core principle: Why > What
+## The core principle: Why and What We Learned
 
-The journal is NOT a changelog. Don't just record "we refactored the auth module." Record:
+The journal captures the stuff git can't tell you. Git already has the file-by-file details — the journal exists for the reasoning, the learnings, and the dead ends.
 
-- **Why** we refactored it (the old design couldn't handle X)
-- **What we learned** along the way (turns out Y doesn't work because of Z)
+**"What we did" should be 1-3 sentences max.** A concise summary of the change, not a list of files touched. If someone needs the diff, that's what git history is for.
+
+The bulk of every entry should be:
+
+- **Why** we did it (the old design couldn't handle X, the user needed Y)
+- **What we learned** along the way (turns out Y doesn't work because of Z, this pattern makes X easier)
 - **What we considered** and rejected (we almost did A but realized B)
 
-If you find yourself writing a journal entry that's just "did X, then did Y, then did Z" — stop. That's a git log. Ask yourself: what did we _learn_? Why did we make _these_ choices?
+If you find yourself listing files changed or writing "updated X, renamed Y, deleted Z" — stop. That's a PR description. Ask yourself: what did we _learn_? Why did we make _these_ choices? Even for mechanical refactors, there are learnings — what made the refactor safe? What patterns helped or hurt?
 
 ## When you don't know the "why"
 
@@ -73,7 +77,7 @@ What we're trying to accomplish and **why** — what problem does this solve? Wh
 ### [Timestamp or short label]
 
 What was learned, what decisions were made and why.
-Focus on reasoning and insights, not play-by-play of actions taken.
+Keep "what we did" to 1-3 sentences. The value is in reasoning, insights, and surprises — not play-by-play of actions taken. If it reads like a PR description, rewrite it.
 
 ## Learnings
 
