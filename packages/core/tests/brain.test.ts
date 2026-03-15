@@ -3696,6 +3696,206 @@ describe('.brain() with over — nested brain iterate', () => {
     // Results should be mapped values, not tuples
     expect(finalState.doubled).toEqual([6, 10, 14]);
   });
+
+  // Helper: creates an agent client where odd calls return a non-terminal tool
+  // call and even calls return the terminal 'done' tool call. The non-terminal
+  // tool's execute function throws on the Nth invocation (controlled by caller).
+  function createAgentWithThrowingTool(shouldThrow: (callCount: number) => boolean) {
+    const agentGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+    let agentCallCount = 0;
+    agentGenerateText.mockImplementation(async () => {
+      agentCallCount++;
+      if (agentCallCount % 2 === 1) {
+        return {
+          text: undefined,
+          toolCalls: [{ toolCallId: `call-${agentCallCount}`, toolName: 'crawl', args: { url: 'http://example.com' } }],
+          usage: { totalTokens: 50 },
+          responseMessages: [],
+        };
+      }
+      return {
+        text: undefined,
+        toolCalls: [{ toolCallId: `call-${agentCallCount}`, toolName: 'done', args: { result: 'finished' } }],
+        usage: { totalTokens: 50 },
+        responseMessages: [],
+      };
+    });
+
+    let crawlCallCount = 0;
+    const tools = {
+      crawl: {
+        description: 'Crawl a URL',
+        inputSchema: z.object({ url: z.string() }),
+        execute: async () => {
+          crawlCallCount++;
+          if (shouldThrow(crawlCallCount)) {
+            throw new Error('Service unavailable: 503');
+          }
+          return { content: 'page content' };
+        },
+      },
+      done: {
+        description: 'Done',
+        inputSchema: z.object({ result: z.string() }),
+        terminal: true,
+      },
+    };
+
+    const client: jest.Mocked<ObjectGenerator> = {
+      generateObject: mockGenerateObject,
+      generateText: agentGenerateText,
+      streamText: mockStreamText,
+    };
+
+    return { client, tools };
+  }
+
+  // Helper: signal provider that PAUSEs on the Nth CONTROL signal check.
+  // Simulates IterateItemAdapter on Cloudflare triggering a DO restart.
+  function createPausingSignalProvider(pauseOnCall: number) {
+    let controlSignalCallCount = 0;
+    return {
+      getSignals: async (filter: string) => {
+        if (filter === 'CONTROL') {
+          controlSignalCallCount++;
+          if (controlSignalCallCount === pauseOnCall) {
+            return [{ type: 'PAUSE' as const }];
+          }
+        }
+        return [];
+      },
+    };
+  }
+
+  // These three tests verify that when an inner brain throws during iterate,
+  // the execution stack stays balanced after replaying events through the
+  // state machine. An imbalanced stack causes executionStackToResumeContext
+  // to place iterateProgress at the wrong nesting level, making the iterate
+  // restart from item 0 on every Cloudflare PAUSE/resume cycle (infinite loop).
+
+  it('should keep execution stack balanced when inner brain step throws', async () => {
+    let callCount = 0;
+    const innerBrain = brain<{}, { value: number }>('FailInner').step(
+      'Process',
+      ({ state }) => {
+        callCount++;
+        if (callCount === 2) throw new Error('Item 2 exploded');
+        return { value: state.value * 2 };
+      }
+    );
+
+    // PAUSE on 5th signal check (after items 0 and 1 are processed)
+    const signalProvider = createPausingSignalProvider(5);
+
+    const outerBrain = brain('StackOuter')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ value: item.n }),
+        outputKey: 'results' as const,
+        error: (item, err) => ({ value: -1 }),
+      });
+
+    const { events, sm } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      signalProvider,
+    });
+
+    const itemEvents = events.filter((e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE);
+    expect(itemEvents).toHaveLength(2);
+
+    // Execution stack should have exactly 1 entry (the outer brain).
+    // Bug: the errored inner brain's START is never balanced by COMPLETE,
+    // so executionStack has 2 entries and iterateProgress ends up nested
+    // inside innerResumeContext on resume.
+    expect(sm.context.executionStack).toHaveLength(1);
+    expect(sm.context.executionStack[0].stepIndex).toBe(1);
+    expect(sm.context.iterateContext).not.toBeNull();
+    expect(sm.context.iterateContext!.processedCount).toBe(2);
+    expect(sm.context.iterateContext!.totalItems).toBe(3);
+  });
+
+  it('should keep execution stack balanced when inner brain agent throws mid-execution', async () => {
+    // When a non-terminal tool throws during an agent step, the state machine
+    // is stuck in 'agentLoop' (entered via AGENT_START, never exited). That
+    // state has no transition for COMPLETE or ITERATE_ITEM_COMPLETE, so those
+    // events are silently dropped and the stack stays imbalanced.
+    const { client: agentClient, tools } = createAgentWithThrowingTool((n) => n === 2);
+    const signalProvider = createPausingSignalProvider(5);
+
+    const innerBrain = brain<{}, { url: string }>('AgentInner')
+      .brain('Crawl page', ({ state }) => ({
+        prompt: `Crawl ${state.url}`,
+        tools,
+        maxIterations: 2,
+      }));
+
+    const outerBrain = brain('AgentStackOuter')
+      .step('Init', () => ({ items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ url: item.url }),
+        outputKey: 'results' as const,
+        error: (item, err) => null,
+      });
+
+    const { events, sm } = await runWithStateMachine(outerBrain, {
+      client: agentClient,
+      currentUser: { name: 'test-user' },
+      signalProvider,
+    });
+
+    const itemEvents = events.filter((e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE);
+    expect(itemEvents).toHaveLength(2);
+
+    expect(sm.context.executionStack).toHaveLength(1);
+    expect(sm.context.executionStack[0].stepIndex).toBe(1);
+    expect(sm.context.iterateContext).not.toBeNull();
+    expect(sm.context.iterateContext!.processedCount).toBe(2);
+    expect(sm.context.iterateContext!.totalItems).toBe(3);
+  });
+
+  it('should keep execution stack balanced when nested brain-inside-brain agent throws', async () => {
+    // The inner brain itself has a .brain() agent step followed by a .step(),
+    // creating two levels of nesting. When the agent throws, there are two
+    // unbalanced STARTs on the execution stack (inner brain + its nested agent
+    // brain), not just one.
+    const { client: agentClient, tools } = createAgentWithThrowingTool((n) => n === 2);
+    const signalProvider = createPausingSignalProvider(5);
+
+    const innerBrain = brain<{}, { url: string }>('NestedAgentInner')
+      .brain('Crawl page', ({ state }) => ({
+        prompt: `Crawl ${state.url}`,
+        tools,
+        maxIterations: 2,
+      }))
+      .step('Verify', ({ state }) => state);
+
+    const outerBrain = brain('NestedAgentStackOuter')
+      .step('Init', () => ({ items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }] }))
+      .brain('Iterate', innerBrain, {
+        over: (state) => state.items,
+        initialState: (item) => ({ url: item.url }),
+        outputKey: 'results' as const,
+        error: (item, err) => null,
+      });
+
+    const { events, sm } = await runWithStateMachine(outerBrain, {
+      client: agentClient,
+      currentUser: { name: 'test-user' },
+      signalProvider,
+    });
+
+    const itemEvents = events.filter((e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE);
+    expect(itemEvents).toHaveLength(2);
+
+    expect(sm.context.executionStack).toHaveLength(1);
+    expect(sm.context.executionStack[0].stepIndex).toBe(1);
+    expect(sm.context.iterateContext).not.toBeNull();
+    expect(sm.context.iterateContext!.processedCount).toBe(2);
+    expect(sm.context.iterateContext!.totalItems).toBe(3);
+  });
 });
 
 describe('.brain() with over — agent config iterate', () => {
