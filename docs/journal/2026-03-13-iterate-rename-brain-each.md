@@ -61,7 +61,7 @@ Added an optional `mapOutput` callback to all three iterate variants (prompt, br
 
 **Type-level approach:** Used `TMapped = never` default with `[TMapped] extends [never]` conditional to determine the output type. When `mapOutput` is omitted, `TMapped` stays `never` and the conditional resolves to the original tuple type. When provided, TypeScript infers `TMapped` from the callback return type and the output becomes `TMapped[]`. The `[TMapped] extends [never]` wrapping (vs bare `TMapped extends never`) prevents distributive conditional behavior.
 
-**Runtime is trivial** — three identical two-line additions between filtering nulls and assigning to state. Null items from error handlers are filtered *before* `mapOutput` runs, so the callback never sees undefined results.
+**Runtime is trivial** — three identical two-line additions between filtering nulls and assigning to state. Null items from error handlers are filtered _before_ `mapOutput` runs, so the callback never sees undefined results.
 
 **Agent iterate type mismatch** — the overload types say the result parameter in `mapOutput` is `z.infer<TSchema>`, but at runtime the agent stores results as the full agent state (which nests the output under `outputSchema.name`, e.g., `{ result: { processed: true } }`). This is a pre-existing mismatch in how agent iterate types the tuple's second element. The test uses `any` cast to access the runtime shape. Not worth fixing now since it would be a breaking type change to the existing tuple type too.
 

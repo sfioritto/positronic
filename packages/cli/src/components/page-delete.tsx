@@ -31,12 +31,14 @@ export const PageDelete = ({ slug, force }: PageDeleteProps) => {
           } else {
             exit();
           }
-        } else if (char === '\u0003') { // Ctrl+C
+        } else if (char === '\u0003') {
+          // Ctrl+C
           exit();
-        } else if (char === '\u007F' || char === '\b') { // Backspace
-          setInput(prev => prev.slice(0, -1));
+        } else if (char === '\u007F' || char === '\b') {
+          // Backspace
+          setInput((prev) => prev.slice(0, -1));
         } else {
-          setInput(prev => prev + char);
+          setInput((prev) => prev + char);
         }
       };
 
@@ -102,8 +104,15 @@ export const PageDelete = ({ slug, force }: PageDeleteProps) => {
   if (!confirmed) {
     return (
       <Box flexDirection="column">
-        <Text bold color="yellow">Warning: This will permanently delete the page</Text>
-        <Box marginTop={1} marginBottom={1} paddingLeft={2} flexDirection="column">
+        <Text bold color="yellow">
+          Warning: This will permanently delete the page
+        </Text>
+        <Box
+          marginTop={1}
+          marginBottom={1}
+          paddingLeft={2}
+          flexDirection="column"
+        >
           <Text>Slug: {slug}</Text>
           <Text dimColor>The page will no longer be accessible.</Text>
         </Box>

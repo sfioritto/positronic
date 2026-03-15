@@ -1,9 +1,20 @@
 import { z } from 'zod';
 import { brain as coreBrain, Brain } from './builder/brain.js';
-import type { AgentConfig, AgentTool, AgentOutputSchema, StepContext, State, JsonObject } from './types.js';
+import type {
+  AgentConfig,
+  AgentTool,
+  AgentOutputSchema,
+  StepContext,
+  State,
+  JsonObject,
+} from './types.js';
 import type { UIComponent } from '../ui/types.js';
 import type { MemoryProvider } from '../memory/types.js';
-import type { StoreSchema, InferStoreTypes, StoreContext } from '../store/types.js';
+import type {
+  StoreSchema,
+  InferStoreTypes,
+  StoreContext,
+} from '../store/types.js';
 
 /**
  * Configuration for creating a project-level brain function.
@@ -77,15 +88,26 @@ export function createBrain<
   const { services, components, defaultTools, memory, store } = config;
 
   // Derive the store type from the schema
-  type InferredStore = TStoreSchema extends StoreSchema ? InferStoreTypes<TStoreSchema> : never;
+  type InferredStore = TStoreSchema extends StoreSchema
+    ? InferStoreTypes<TStoreSchema>
+    : never;
 
   // The params available in agent config functions - uses StepContext for consistency
-  type AgentParams = StepContext<object, {}, undefined, undefined> & TServices & StoreContext<InferredStore> & {
-    tools: TTools extends {} ? Record<string, AgentTool<any>> : TTools;
-  };
+  type AgentParams = StepContext<object, {}, undefined, undefined> &
+    TServices &
+    StoreContext<InferredStore> & {
+      tools: TTools extends {} ? Record<string, AgentTool<any>> : TTools;
+    };
 
   // Return type for the brain function
-  type BrainReturn = Brain<{}, object, TServices, undefined, undefined, InferredStore>;
+  type BrainReturn = Brain<
+    {},
+    object,
+    TServices,
+    undefined,
+    undefined,
+    InferredStore
+  >;
 
   // Overload 1: Direct agent with config object WITH outputSchema
   function brain<
@@ -106,7 +128,11 @@ export function createBrain<
     TNewState extends State = { [K in TName]: z.infer<TSchema> }
   >(
     title: string,
-    configFn: (params: AgentParams) => AgentConfig<T, AgentOutputSchema<TSchema, TName>> | Promise<AgentConfig<T, AgentOutputSchema<TSchema, TName>>>
+    configFn: (
+      params: AgentParams
+    ) =>
+      | AgentConfig<T, AgentOutputSchema<TSchema, TName>>
+      | Promise<AgentConfig<T, AgentOutputSchema<TSchema, TName>>>
   ): Brain<{}, TNewState, TServices, undefined, undefined, InferredStore>;
 
   // Overload 3: Direct agent with config function (no outputSchema)
@@ -122,19 +148,30 @@ export function createBrain<
   ): BrainReturn;
 
   // Overload 5: Builder pattern with title string
-  function brain<TOptions extends JsonObject = {}, TState extends State = object>(
+  function brain<
+    TOptions extends JsonObject = {},
+    TState extends State = object
+  >(
     title: string
   ): Brain<TOptions, TState, TServices, undefined, undefined, InferredStore>;
 
   // Overload 6: Builder pattern with config object
-  function brain<TOptions extends JsonObject = {}, TState extends State = object>(
-    config: { title: string; description?: string }
-  ): Brain<TOptions, TState, TServices, undefined, undefined, InferredStore>;
+  function brain<
+    TOptions extends JsonObject = {},
+    TState extends State = object
+  >(config: {
+    title: string;
+    description?: string;
+  }): Brain<TOptions, TState, TServices, undefined, undefined, InferredStore>;
 
   // Implementation
   function brain(
     titleOrConfig: string | { title: string; description?: string },
-    agentConfig?: AgentConfig<any, any> | ((params: AgentParams) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
+    agentConfig?:
+      | AgentConfig<any, any>
+      | ((
+          params: AgentParams
+        ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
   ): any {
     let base = coreBrain(titleOrConfig as any);
 

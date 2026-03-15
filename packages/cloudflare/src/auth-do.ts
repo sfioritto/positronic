@@ -130,7 +130,9 @@ export class AuthDO extends DurableObject<AuthEnv> {
     };
   }
 
-  async listKeys(userName: string): Promise<{ keys: UserKey[]; count: number }> {
+  async listKeys(
+    userName: string
+  ): Promise<{ keys: UserKey[]; count: number }> {
     const keys = this.storage
       .exec(
         `SELECT fingerprint, user_name, jwk, label, added_at FROM keys WHERE user_name = ? ORDER BY added_at DESC`,

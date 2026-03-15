@@ -21,26 +21,30 @@ export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
   const [completed, setCompleted] = useState(false);
   const [result, setResult] = useState<BulkSecretsResponse | null>(null);
 
-  const { execute, loading, error } = useApiPost<BulkSecretsResponse>('/secrets/bulk', {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const { execute, loading, error } = useApiPost<BulkSecretsResponse>(
+    '/secrets/bulk',
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 
   useEffect(() => {
     const bulkUploadSecrets = async () => {
       try {
         // Resolve the file path - use projectDir, env var, or cwd
-        const basePath = projectDir || process.env.POSITRONIC_CONFIG_DIR || process.cwd();
+        const basePath =
+          projectDir || process.env.POSITRONIC_CONFIG_DIR || process.cwd();
         const filePath = path.resolve(basePath, file);
 
         if (!fs.existsSync(filePath)) {
           setValidationError(
             `No .env file found at ${filePath}\n\n` +
-            'To use this command, create a .env file in your project root with your secrets:\n' +
-            '  ANTHROPIC_API_KEY=sk-ant-...\n' +
-            '  DATABASE_URL=postgres://...\n' +
-            '  REDIS_URL=redis://...'
+              'To use this command, create a .env file in your project root with your secrets:\n' +
+              '  ANTHROPIC_API_KEY=sk-ant-...\n' +
+              '  DATABASE_URL=postgres://...\n' +
+              '  REDIS_URL=redis://...'
           );
           return;
         }
@@ -48,14 +52,17 @@ export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
         // Read and parse the env file using dotenv
         const content = fs.readFileSync(filePath, 'utf-8');
         const parsed = parseEnv(content);
-        const secrets = Object.entries(parsed).map(([name, value]) => ({ name, value }));
+        const secrets = Object.entries(parsed).map(([name, value]) => ({
+          name,
+          value,
+        }));
 
         if (secrets.length === 0) {
           setValidationError(
             `No secrets found in ${filePath}\n\n` +
-            'Make sure your .env file contains key=value pairs:\n' +
-            '  ANTHROPIC_API_KEY=sk-ant-...\n' +
-            '  DATABASE_URL=postgres://...'
+              'Make sure your .env file contains key=value pairs:\n' +
+              '  ANTHROPIC_API_KEY=sk-ant-...\n' +
+              '  DATABASE_URL=postgres://...'
           );
           return;
         }
@@ -110,9 +117,7 @@ export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>
-            Tip: Use "px secret list" to view all secrets
-          </Text>
+          <Text dimColor>Tip: Use "px secret list" to view all secrets</Text>
         </Box>
       </Box>
     );

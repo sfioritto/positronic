@@ -1,5 +1,9 @@
 import type { Context } from 'hono';
-import { isSignalValid, brainMachineDefinition, validateWebhookToken } from '@positronic/core';
+import {
+  isSignalValid,
+  brainMachineDefinition,
+  validateWebhookToken,
+} from '@positronic/core';
 
 /**
  * Result from a webhook handler.
@@ -50,18 +54,26 @@ export async function queueWebhookAndWakeUp(
     }
 
     // Warn in dev mode when no token is present — may indicate an unprotected form
-    if (!expectedToken && !submittedToken && context.env.NODE_ENV === 'development') {
+    if (
+      !expectedToken &&
+      !submittedToken &&
+      context.env.NODE_ENV === 'development'
+    ) {
       console.warn(
         `[positronic] Webhook "${slug}" received without a CSRF token. ` +
-        `This is fine if you validate the request in your webhook handler, ` +
-        `but if this webhook receives form submissions from a page, consider ` +
-        `adding a token with generateFormToken(). See the docs for details.`
+          `This is fine if you validate the request in your webhook handler, ` +
+          `but if this webhook receives form submissions from a page, consider ` +
+          `adding a token with generateFormToken(). See the docs for details.`
       );
     }
     // Found a brain - verify it can receive webhook response
     const run = await monitorStub.getRun(brainRunId);
     if (run) {
-      const validation = isSignalValid(brainMachineDefinition, run.status, 'WEBHOOK_RESPONSE');
+      const validation = isSignalValid(
+        brainMachineDefinition,
+        run.status,
+        'WEBHOOK_RESPONSE'
+      );
       if (!validation.valid) {
         return {
           received: true,

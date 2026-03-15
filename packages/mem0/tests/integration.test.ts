@@ -11,10 +11,7 @@ import {
 import { z, type ZodType } from 'zod';
 import { createMem0Adapter } from '../src/adapter.js';
 import { createMem0Tools, rememberFact, recallMemories } from '../src/tools.js';
-import {
-  createMockProvider,
-  collectEvents,
-} from './test-helpers.js';
+import { createMockProvider, collectEvents } from './test-helpers.js';
 
 // Cast memory tools to be compatible with brain's tools type
 // This is needed because AgentTool<T> has variance issues with specific Zod types
@@ -24,7 +21,8 @@ const memoryTools = {
 };
 
 // Mock ObjectGenerator with generateText support
-const mockGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+const mockGenerateText =
+  jest.fn<NonNullable<ObjectGenerator['generateText']>>();
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
 const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 const mockClient: jest.Mocked<ObjectGenerator> = {
@@ -84,7 +82,12 @@ describe('Memory Tools Integration', () => {
           },
         }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } }));
+      const events = await collectEvents(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
 
       // Verify brain completed
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
@@ -142,7 +145,12 @@ describe('Memory Tools Integration', () => {
           },
         }));
 
-      await collectEvents(testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } }));
+      await collectEvents(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
 
       const addCalls = provider.getAddCalls();
       expect(addCalls).toHaveLength(1);
@@ -189,7 +197,12 @@ describe('Memory Tools Integration', () => {
         },
       }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } }));
+      const events = await collectEvents(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
 
       // Should still complete successfully
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
@@ -256,7 +269,12 @@ describe('Memory Tools Integration', () => {
           },
         }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } }));
+      const events = await collectEvents(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
 
       // Verify brain completed
       expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
@@ -322,7 +340,12 @@ describe('Memory Tools Integration', () => {
         },
       }));
 
-      const events = await collectEvents(testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } }));
+      const events = await collectEvents(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
 
       // Find tool result event
       const toolResultEvent = events.find(
@@ -424,7 +447,9 @@ describe('Mem0 Adapter Integration', () => {
     });
 
     // The brain will error
-    await expect(runner.run(testBrain, { currentUser: { name: 'test-user' } })).rejects.toThrow('API error');
+    await expect(
+      runner.run(testBrain, { currentUser: { name: 'test-user' } })
+    ).rejects.toThrow('API error');
 
     // Verify provider.add() was NOT called
     expect(provider.getAddCalls()).toHaveLength(0);

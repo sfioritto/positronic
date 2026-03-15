@@ -1,4 +1,8 @@
-import type { Memory, ScopedMemory, MemorySearchOptions } from '@positronic/core';
+import type {
+  Memory,
+  ScopedMemory,
+  MemorySearchOptions,
+} from '@positronic/core';
 
 /**
  * Options for formatting memories.
@@ -41,11 +45,7 @@ export function formatMemories(
   memories: Memory[],
   options: FormatMemoriesOptions = {}
 ): string {
-  const {
-    header,
-    includeScores = false,
-    emptyText = '',
-  } = options;
+  const { header, includeScores = false, emptyText = '' } = options;
 
   if (!memories || memories.length === 0) {
     return emptyText;

@@ -1,4 +1,13 @@
-import { BrainRunner, type Resources, STATUS, BRAIN_EVENTS, type RuntimeEnv, createBrainExecutionMachine, sendEvent, type BrainSignal } from '@positronic/core';
+import {
+  BrainRunner,
+  type Resources,
+  STATUS,
+  BRAIN_EVENTS,
+  type RuntimeEnv,
+  createBrainExecutionMachine,
+  sendEvent,
+  type BrainSignal,
+} from '@positronic/core';
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Adapter, BrainEvent } from '@positronic/core';
@@ -234,7 +243,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
       )
       .toArray();
     if (results.length === 0) return null;
-    return { brainRunId: results[0].brain_run_id, timeoutAt: results[0].timeout_at };
+    return {
+      brainRunId: results[0].brain_run_id,
+      timeoutAt: results[0].timeout_at,
+    };
   }
 
   /**
@@ -242,13 +254,18 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * Returns the queued signal with timestamp.
    * For WEBHOOK_RESPONSE signals, the response object is JSON-stringified and stored in content.
    */
-  async queueSignal(signal: { type: string; content?: string; response?: Record<string, unknown> }): Promise<{ type: string; queuedAt: number }> {
+  async queueSignal(signal: {
+    type: string;
+    content?: string;
+    response?: Record<string, unknown>;
+  }): Promise<{ type: string; queuedAt: number }> {
     this.initializeSignalsTable();
 
     // For WEBHOOK_RESPONSE, store the response as JSON in the content field
-    const content = signal.type === 'WEBHOOK_RESPONSE' && signal.response
-      ? JSON.stringify(signal.response)
-      : signal.content ?? null;
+    const content =
+      signal.type === 'WEBHOOK_RESPONSE' && signal.response
+        ? JSON.stringify(signal.response)
+        : signal.content ?? null;
 
     const queuedAt = Date.now();
     this.sql.exec(
@@ -295,16 +312,19 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     // Delete the returned signals (consume them)
-    const ids = results.map(r => r.id);
+    const ids = results.map((r) => r.id);
     this.sql.exec(`DELETE FROM brain_signals WHERE id IN (${ids.join(',')})`);
 
     // Convert to BrainSignal format
-    return results.map(r => {
+    return results.map((r) => {
       if (r.signal_type === 'USER_MESSAGE') {
         return { type: 'USER_MESSAGE' as const, content: r.content ?? '' };
       }
       if (r.signal_type === 'WEBHOOK_RESPONSE') {
-        return { type: 'WEBHOOK_RESPONSE' as const, response: JSON.parse(r.content ?? '{}') };
+        return {
+          type: 'WEBHOOK_RESPONSE' as const,
+          response: JSON.parse(r.content ?? '{}'),
+        };
       }
       if (r.signal_type === 'RESUME') {
         return { type: 'RESUME' as const };
@@ -414,7 +434,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * The brainRunId and brainTitle parameters are used as fallbacks when the DO's
    * SQLite state is missing (zombie brain scenario).
    */
-  async kill(brainRunId?: string, brainTitle?: string): Promise<{ success: boolean; message: string }> {
+  async kill(
+    brainRunId?: string,
+    brainTitle?: string
+  ): Promise<{ success: boolean; message: string }> {
     // If brain is actively running, abort it
     if (this.abortController && !this.abortController.signal.aborted) {
       this.abortController.abort();
@@ -435,8 +458,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
     if (!actualBrainRunId) {
       try {
         // Use EventLoader to handle R2 overflow transparently
-        const eventLoader = new EventLoader(this.sql, this.env.RESOURCES_BUCKET);
-        startEvent = await eventLoader.loadEventByType(BRAIN_EVENTS.START, 'DESC');
+        const eventLoader = new EventLoader(
+          this.sql,
+          this.env.RESOURCES_BUCKET
+        );
+        startEvent = await eventLoader.loadEventByType(
+          BRAIN_EVENTS.START,
+          'DESC'
+        );
 
         if (startEvent) {
           actualBrainRunId = startEvent.brainRunId;
@@ -444,13 +473,18 @@ export class BrainRunnerDO extends DurableObject<Env> {
         }
       } catch (err) {
         // Table doesn't exist - brain was killed before any events were written to DO's SQLite
-        console.log(`[DO ${this.brainRunId}] kill() could not query brain_events (table may not exist)`);
+        console.log(
+          `[DO ${this.brainRunId}] kill() could not query brain_events (table may not exist)`
+        );
       }
     }
 
     // If we still don't have a brainRunId, we can't proceed
     if (!actualBrainRunId) {
-      return { success: false, message: 'Brain run not found or never started' };
+      return {
+        success: false,
+        message: 'Brain run not found or never started',
+      };
     }
 
     // Check MonitorDO status
@@ -461,16 +495,24 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // If already completed/cancelled/errored, nothing to do
     // Active statuses that can be killed: RUNNING, PAUSED, WAITING
-    const activeStatuses: string[] = [STATUS.RUNNING, STATUS.PAUSED, STATUS.WAITING];
+    const activeStatuses: string[] = [
+      STATUS.RUNNING,
+      STATUS.PAUSED,
+      STATUS.WAITING,
+    ];
     if (!activeStatuses.includes(existingRun.status as string)) {
-      return { success: false, message: 'Brain run is not active or already completed' };
+      return {
+        success: false,
+        message: 'Brain run is not active or already completed',
+      };
     }
 
     // Emit CANCELLED event
     const cancelledEvent: BrainEvent<any> = {
       type: BRAIN_EVENTS.CANCELLED,
       status: STATUS.CANCELLED,
-      brainTitle: actualBrainTitle || String(existingRun.brain_title) || 'unknown',
+      brainTitle:
+        actualBrainTitle || String(existingRun.brain_title) || 'unknown',
       brainDescription: startEvent?.brainDescription || '',
       brainRunId: actualBrainRunId,
       options: startEvent?.options || {},
@@ -488,7 +530,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // This is needed because when a brain is paused (waiting for webhook), the BrainRunner
     // has already returned and adapters aren't receiving events through the normal pipeline.
     // For zombie brains (server restarted), pageAdapter may be null, so we create one on the fly.
-    const pageAdapter = this.pageAdapter ?? new PageAdapter(monitorStub, this.env.RESOURCES_BUCKET);
+    const pageAdapter =
+      this.pageAdapter ??
+      new PageAdapter(monitorStub, this.env.RESOURCES_BUCKET);
     await pageAdapter.dispatch(cancelledEvent);
 
     await monitorStub.handleBrainEvent(cancelledEvent);
@@ -526,7 +570,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       console.error(JSON.stringify(manifest, null, 2));
       throw new Error(`Brain ${brainTitle} not found`);
     }
-    
+
     if (resolution.matchType === 'multiple') {
       console.error(
         `[DO ${brainRunId}] Multiple brains match identifier ${brainTitle}`,
@@ -534,13 +578,19 @@ export class BrainRunnerDO extends DurableObject<Env> {
       );
       throw new Error(`Multiple brains match identifier ${brainTitle}`);
     }
-    
+
     const brainToRun = resolution.brain;
     if (!brainToRun) {
-      throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
+      throw new Error(
+        `Brain ${brainTitle} resolved but brain object is missing`
+      );
     }
 
-    const sqliteAdapter = new BrainRunSQLiteAdapter(sql, this.env.RESOURCES_BUCKET, brainRunId);
+    const sqliteAdapter = new BrainRunSQLiteAdapter(
+      sql,
+      this.env.RESOURCES_BUCKET,
+      brainRunId
+    );
     const { eventStreamAdapter } = this;
     const monitorDOStub = this.env.MONITOR_DO.get(
       this.env.MONITOR_DO.idFromName('singleton')
@@ -550,7 +600,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
     );
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
-    this.pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
+    this.pageAdapter = new PageAdapter(
+      monitorDOStub,
+      this.env.RESOURCES_BUCKET
+    );
 
     // Create runtime environment with origin and secrets
     const env = await this.buildRuntimeEnv();
@@ -580,11 +633,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     // Add pages service and runtime env
-    runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
+    runnerWithResources = runnerWithResources
+      .withPages(pagesService)
+      .withEnv(env);
 
     // Add signal provider for signal handling
-    const signalProvider = new CloudflareSignalProvider(
-      (filter) => this.getAndConsumeSignals(filter)
+    const signalProvider = new CloudflareSignalProvider((filter) =>
+      this.getAndConsumeSignals(filter)
     );
     runnerWithResources = runnerWithResources
       .withSignalProvider(signalProvider)
@@ -593,7 +648,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // Extract options and initialState from initialData if present
     const options = initialData?.options;
-    const initialState = initialData?.initialState ?? (initialData && !initialData.options && !initialData.initialState ? initialData : {});
+    const initialState =
+      initialData?.initialState ??
+      (initialData && !initialData.options && !initialData.initialState
+        ? initialData
+        : {});
 
     // Persist run owner durably (immutable, not derived from events)
     this.storeRunOwner(currentUser.name);
@@ -664,7 +723,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const eventLoader = new EventLoader(sql, this.env.RESOURCES_BUCKET);
 
     // Get the brain title by loading the FIRST START event
-    const startEvent = await eventLoader.loadEventByType(BRAIN_EVENTS.START, 'ASC');
+    const startEvent = await eventLoader.loadEventByType(
+      BRAIN_EVENTS.START,
+      'ASC'
+    );
 
     if (!startEvent) {
       throw new Error(`No START event found for brain run ${brainRunId}`);
@@ -687,7 +749,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const originalBrainRunId = (startEvent as any).brainRunId || brainRunId;
 
     if (!brainTitle) {
-      throw new Error(`Brain title not found in START event for brain run ${brainRunId}`);
+      throw new Error(
+        `Brain title not found in START event for brain run ${brainRunId}`
+      );
     }
 
     // Resolve the brain using the title
@@ -709,7 +773,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const brainToRun = resolution.brain;
     if (!brainToRun) {
-      throw new Error(`Brain ${brainTitle} resolved but brain object is missing`);
+      throw new Error(
+        `Brain ${brainTitle} resolved but brain object is missing`
+      );
     }
 
     // Load all events and feed them to the state machine to reconstruct execution tree
@@ -721,7 +787,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
       sendEvent(machine, event);
     }
 
-    const sqliteAdapter = new BrainRunSQLiteAdapter(sql, this.env.RESOURCES_BUCKET, brainRunId);
+    const sqliteAdapter = new BrainRunSQLiteAdapter(
+      sql,
+      this.env.RESOURCES_BUCKET,
+      brainRunId
+    );
     const { eventStreamAdapter } = this;
     const monitorDOStub = this.env.MONITOR_DO.get(
       this.env.MONITOR_DO.idFromName('singleton')
@@ -731,7 +801,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
     );
     const webhookAdapter = new WebhookAdapter(monitorDOStub);
-    this.pageAdapter = new PageAdapter(monitorDOStub, this.env.RESOURCES_BUCKET);
+    this.pageAdapter = new PageAdapter(
+      monitorDOStub,
+      this.env.RESOURCES_BUCKET
+    );
 
     // Create runtime environment with origin and secrets
     const env = await this.buildRuntimeEnv();
@@ -759,12 +832,14 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     // Add pages service and runtime env
-    runnerWithResources = runnerWithResources.withPages(pagesService).withEnv(env);
+    runnerWithResources = runnerWithResources
+      .withPages(pagesService)
+      .withEnv(env);
 
     // Add signal provider for signal handling
     // Webhook response comes from signals, consumed by the brain during execution
-    const signalProvider = new CloudflareSignalProvider(
-      (filter) => this.getAndConsumeSignals(filter)
+    const signalProvider = new CloudflareSignalProvider((filter) =>
+      this.getAndConsumeSignals(filter)
     );
     runnerWithResources = runnerWithResources
       .withSignalProvider(signalProvider)
@@ -802,7 +877,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
         signal: this.abortController.signal,
       })
       .catch((err: any) => {
-        console.error(`[DO ${originalBrainRunId}] BrainRunner wakeUp failed:`, err);
+        console.error(
+          `[DO ${originalBrainRunId}] BrainRunner wakeUp failed:`,
+          err
+        );
         throw err;
       })
       .finally(() => {

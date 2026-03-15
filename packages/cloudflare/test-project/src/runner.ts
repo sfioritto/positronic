@@ -37,14 +37,23 @@ export function resetMockState() {
 function buildResponseMessages(
   existingMessages: ResponseMessage[] | undefined,
   text: string | undefined,
-  toolCalls: Array<{ toolCallId: string; toolName: string; args: unknown }> | undefined
+  toolCalls:
+    | Array<{ toolCallId: string; toolName: string; args: unknown }>
+    | undefined
 ): ResponseMessage[] {
-  const messages: ResponseMessage[] = existingMessages ? [...existingMessages] : [];
+  const messages: ResponseMessage[] = existingMessages
+    ? [...existingMessages]
+    : [];
 
   // Add assistant message with text and/or tool calls
   const assistantContent: Array<
     | { type: 'text'; text: string }
-    | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+    | {
+        type: 'tool-call';
+        toolCallId: string;
+        toolName: string;
+        input: unknown;
+      }
   > = [];
 
   if (text) {
@@ -63,7 +72,10 @@ function buildResponseMessages(
   }
 
   if (assistantContent.length > 0) {
-    messages.push({ role: 'assistant', content: assistantContent } as ResponseMessage);
+    messages.push({
+      role: 'assistant',
+      content: assistantContent,
+    } as ResponseMessage);
   }
 
   return messages;
@@ -88,7 +100,8 @@ const mockClient: ObjectGenerator = {
     result: unknown
   ): ResponseMessage {
     // Match the format used by VercelClient - SDK expects { type: 'text', value: ... }
-    const outputValue = typeof result === 'string' ? result : JSON.stringify(result);
+    const outputValue =
+      typeof result === 'string' ? result : JSON.stringify(result);
     return {
       role: 'tool',
       content: [
@@ -138,7 +151,11 @@ const mockClient: ObjectGenerator = {
         text,
         toolCalls,
         usage: { totalTokens: 50 },
-        responseMessages: buildResponseMessages(params.responseMessages, text, toolCalls),
+        responseMessages: buildResponseMessages(
+          params.responseMessages,
+          text,
+          toolCalls
+        ),
       };
     }
 
@@ -155,7 +172,11 @@ const mockClient: ObjectGenerator = {
       text,
       toolCalls,
       usage: { totalTokens: 100 },
-      responseMessages: buildResponseMessages(params.responseMessages, text, toolCalls),
+      responseMessages: buildResponseMessages(
+        params.responseMessages,
+        text,
+        toolCalls
+      ),
     };
   },
 

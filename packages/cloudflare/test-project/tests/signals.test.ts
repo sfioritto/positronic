@@ -30,13 +30,20 @@ describe('Signal API Tests', () => {
     testEnv: TestEnv,
     brainTitle: string
   ): Promise<string> {
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle }),
+      }
+    );
     const createContext = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createContext);
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createContext
+    );
     const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
     await waitOnExecutionContext(createContext);
 
@@ -44,7 +51,11 @@ describe('Signal API Tests', () => {
       `http://example.com/brains/runs/${brainRunId}/watch`
     );
     const watchContext = createExecutionContext();
-    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
     await readSseStream(watchResponse.body!);
     await waitOnExecutionContext(watchContext);
 
@@ -56,14 +67,23 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run first
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'basic-brain' }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: 'basic-brain' }),
+        }
+      );
       const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       await waitOnExecutionContext(createContext);
 
       // Send invalid signal type
@@ -76,7 +96,11 @@ describe('Signal API Tests', () => {
         }
       );
       const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      const signalResponse = await worker.fetch(
+        signalRequest,
+        testEnv,
+        signalContext
+      );
       await waitOnExecutionContext(signalContext);
 
       expect(signalResponse.status).toBe(400);
@@ -88,7 +112,10 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run and wait for it to complete via SSE
-      const brainRunId = await createRunAndWaitForComplete(testEnv, 'basic-brain');
+      const brainRunId = await createRunAndWaitForComplete(
+        testEnv,
+        'basic-brain'
+      );
 
       // Now send PAUSE signal - should be rejected
       const signalRequest = await createAuthenticatedRequest(
@@ -100,7 +127,11 @@ describe('Signal API Tests', () => {
         }
       );
       const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      const signalResponse = await worker.fetch(
+        signalRequest,
+        testEnv,
+        signalContext
+      );
       await waitOnExecutionContext(signalContext);
 
       expect(signalResponse.status).toBe(409);
@@ -112,7 +143,10 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run and wait for it to complete via SSE
-      const brainRunId = await createRunAndWaitForComplete(testEnv, 'basic-brain');
+      const brainRunId = await createRunAndWaitForComplete(
+        testEnv,
+        'basic-brain'
+      );
 
       // Now send KILL signal - should be rejected
       const signalRequest = await createAuthenticatedRequest(
@@ -124,7 +158,11 @@ describe('Signal API Tests', () => {
         }
       );
       const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      const signalResponse = await worker.fetch(
+        signalRequest,
+        testEnv,
+        signalContext
+      );
       await waitOnExecutionContext(signalContext);
 
       expect(signalResponse.status).toBe(409);
@@ -144,7 +182,11 @@ describe('Signal API Tests', () => {
         }
       );
       const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      const signalResponse = await worker.fetch(
+        signalRequest,
+        testEnv,
+        signalContext
+      );
       await waitOnExecutionContext(signalContext);
 
       expect(signalResponse.status).toBe(404);
@@ -154,14 +196,23 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'basic-brain' }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: 'basic-brain' }),
+        }
+      );
       const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       await waitOnExecutionContext(createContext);
 
       // Send PAUSE signal
@@ -174,11 +225,18 @@ describe('Signal API Tests', () => {
         }
       );
       const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      const signalResponse = await worker.fetch(
+        signalRequest,
+        testEnv,
+        signalContext
+      );
       await waitOnExecutionContext(signalContext);
 
       expect(signalResponse.status).toBe(202);
-      const body = await signalResponse.json<{ success: boolean; signal: { type: string; queuedAt: number } }>();
+      const body = await signalResponse.json<{
+        success: boolean;
+        signal: { type: string; queuedAt: number };
+      }>();
       expect(body.success).toBe(true);
       expect(body.signal.type).toBe('PAUSE');
       expect(body.signal.queuedAt).toBeGreaterThan(0);
@@ -188,14 +246,23 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'basic-brain' }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: 'basic-brain' }),
+        }
+      );
       const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       await waitOnExecutionContext(createContext);
 
       // Send USER_MESSAGE signal
@@ -204,15 +271,25 @@ describe('Signal API Tests', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'USER_MESSAGE', content: 'Hello from test!' }),
+          body: JSON.stringify({
+            type: 'USER_MESSAGE',
+            content: 'Hello from test!',
+          }),
         }
       );
       const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      const signalResponse = await worker.fetch(
+        signalRequest,
+        testEnv,
+        signalContext
+      );
       await waitOnExecutionContext(signalContext);
 
       expect(signalResponse.status).toBe(202);
-      const body = await signalResponse.json<{ success: boolean; signal: { type: string; queuedAt: number } }>();
+      const body = await signalResponse.json<{
+        success: boolean;
+        signal: { type: string; queuedAt: number };
+      }>();
       expect(body.success).toBe(true);
       expect(body.signal.type).toBe('USER_MESSAGE');
     });
@@ -230,7 +307,11 @@ describe('Signal API Tests', () => {
         }
       );
       const resumeContext = createExecutionContext();
-      const resumeResponse = await worker.fetch(resumeRequest, testEnv, resumeContext);
+      const resumeResponse = await worker.fetch(
+        resumeRequest,
+        testEnv,
+        resumeContext
+      );
       await waitOnExecutionContext(resumeContext);
 
       expect(resumeResponse.status).toBe(404);
@@ -240,7 +321,10 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a brain run and wait for it to complete via SSE
-      const brainRunId = await createRunAndWaitForComplete(testEnv, 'basic-brain');
+      const brainRunId = await createRunAndWaitForComplete(
+        testEnv,
+        'basic-brain'
+      );
 
       // Try to resume
       const resumeRequest = await createAuthenticatedRequest(
@@ -251,7 +335,11 @@ describe('Signal API Tests', () => {
         }
       );
       const resumeContext = createExecutionContext();
-      const resumeResponse = await worker.fetch(resumeRequest, testEnv, resumeContext);
+      const resumeResponse = await worker.fetch(
+        resumeRequest,
+        testEnv,
+        resumeContext
+      );
       await waitOnExecutionContext(resumeContext);
 
       expect(resumeResponse.status).toBe(409);
@@ -265,14 +353,23 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a delayed brain run (takes 1.5s on first step)
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'delayed-brain' }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: 'delayed-brain' }),
+        }
+      );
       const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       await waitOnExecutionContext(createContext);
 
       // Send PAUSE signal immediately
@@ -285,13 +382,17 @@ describe('Signal API Tests', () => {
         }
       );
       const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(signalRequest, testEnv, signalContext);
+      const signalResponse = await worker.fetch(
+        signalRequest,
+        testEnv,
+        signalContext
+      );
       await waitOnExecutionContext(signalContext);
 
       expect(signalResponse.status).toBe(202);
 
       // Wait for brain to pause (after first step completes)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Verify brain is paused
       const getRunRequest = await createAuthenticatedRequest(
@@ -299,7 +400,11 @@ describe('Signal API Tests', () => {
         { method: 'GET' }
       );
       const getRunContext = createExecutionContext();
-      const getRunResponse = await worker.fetch(getRunRequest, testEnv, getRunContext);
+      const getRunResponse = await worker.fetch(
+        getRunRequest,
+        testEnv,
+        getRunContext
+      );
       await waitOnExecutionContext(getRunContext);
       const runDetails = await getRunResponse.json<{ status: string }>();
       expect(runDetails.status).toBe('paused');
@@ -313,11 +418,18 @@ describe('Signal API Tests', () => {
         }
       );
       const resumeContext = createExecutionContext();
-      const resumeResponse = await worker.fetch(resumeRequest, testEnv, resumeContext);
+      const resumeResponse = await worker.fetch(
+        resumeRequest,
+        testEnv,
+        resumeContext
+      );
       await waitOnExecutionContext(resumeContext);
 
       expect(resumeResponse.status).toBe(202);
-      const resumeBody = await resumeResponse.json<{ success: boolean; action: string }>();
+      const resumeBody = await resumeResponse.json<{
+        success: boolean;
+        action: string;
+      }>();
       expect(resumeBody.success).toBe(true);
       expect(resumeBody.action).toBe('resumed');
     });
@@ -326,14 +438,23 @@ describe('Signal API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a delayed brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'delayed-brain' }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: 'delayed-brain' }),
+        }
+      );
       const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(createRequest, testEnv, createContext);
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const createResponse = await worker.fetch(
+        createRequest,
+        testEnv,
+        createContext
+      );
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       await waitOnExecutionContext(createContext);
 
       // Send PAUSE signal
@@ -350,7 +471,7 @@ describe('Signal API Tests', () => {
       await waitOnExecutionContext(pauseContext);
 
       // Wait for brain to pause
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Send USER_MESSAGE while paused - should succeed (queued for when brain resumes)
       const msgRequest = await createAuthenticatedRequest(
@@ -358,7 +479,10 @@ describe('Signal API Tests', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'USER_MESSAGE', content: 'Message while paused' }),
+          body: JSON.stringify({
+            type: 'USER_MESSAGE',
+            content: 'Message while paused',
+          }),
         }
       );
       const msgContext = createExecutionContext();
@@ -366,7 +490,10 @@ describe('Signal API Tests', () => {
       await waitOnExecutionContext(msgContext);
 
       expect(msgResponse.status).toBe(202);
-      const msgBody = await msgResponse.json<{ success: boolean; signal: { type: string } }>();
+      const msgBody = await msgResponse.json<{
+        success: boolean;
+        signal: { type: string };
+      }>();
       expect(msgBody.success).toBe(true);
       expect(msgBody.signal.type).toBe('USER_MESSAGE');
     });

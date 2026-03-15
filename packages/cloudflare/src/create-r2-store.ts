@@ -4,7 +4,9 @@ import type { StoreProvider, Store } from '@positronic/core';
 /**
  * Type guard for per-user field definitions in a store schema.
  */
-function isPerUserField(value: unknown): value is { type: unknown; perUser: true } {
+function isPerUserField(
+  value: unknown
+): value is { type: unknown; perUser: true } {
   return (
     value !== null &&
     typeof value === 'object' &&
@@ -39,7 +41,7 @@ export function createR2Backend(bucket: R2Bucket): StoreProvider {
         if (!currentUser) {
           throw new Error(
             `Store key "${key}" is per-user but no currentUser was provided. ` +
-            `Per-user store keys require a currentUser in run params.`
+              `Per-user store keys require a currentUser in run params.`
           );
         }
         return `store/${brainTitle}/user/${currentUser.name}/${key}`;

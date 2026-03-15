@@ -85,7 +85,9 @@ export class MonitorDO extends DurableObject<Env> {
 
     // Migration: add token column to webhook_registrations
     try {
-      this.storage.exec(`ALTER TABLE webhook_registrations ADD COLUMN token TEXT`);
+      this.storage.exec(
+        `ALTER TABLE webhook_registrations ADD COLUMN token TEXT`
+      );
     } catch {
       // Column already exists
     }
@@ -152,8 +154,7 @@ export class MonitorDO extends DurableObject<Env> {
       // Use the state machine's computed status (depth-aware)
       const { status } = machine.context;
 
-      const startTime =
-        event.type === BRAIN_EVENTS.START ? currentTime : null;
+      const startTime = event.type === BRAIN_EVENTS.START ? currentTime : null;
 
       // Only set completedAt when status is terminal
       const isTerminalStatus =
@@ -167,7 +168,10 @@ export class MonitorDO extends DurableObject<Env> {
 
       // Update the brain_runs summary table
       // WEBHOOK and WEBHOOK_RESPONSE events don't have brainTitle/brainDescription, so just update status
-      if (event.type === BRAIN_EVENTS.WEBHOOK || event.type === BRAIN_EVENTS.WEBHOOK_RESPONSE) {
+      if (
+        event.type === BRAIN_EVENTS.WEBHOOK ||
+        event.type === BRAIN_EVENTS.WEBHOOK_RESPONSE
+      ) {
         this.storage.exec(
           `UPDATE brain_runs SET status = ? WHERE run_id = ?`,
           status,
@@ -175,12 +179,16 @@ export class MonitorDO extends DurableObject<Env> {
         );
       } else {
         // All other events have brainTitle/brainDescription (BrainBaseEvent types)
-        const brainEvent = event as { brainTitle: string; brainDescription?: string };
+        const brainEvent = event as {
+          brainTitle: string;
+          brainDescription?: string;
+        };
 
         // Extract user_name from START event (set once, never updated)
-        const userName = event.type === BRAIN_EVENTS.START
-          ? (event as any).currentUser.name
-          : null;
+        const userName =
+          event.type === BRAIN_EVENTS.START
+            ? (event as any).currentUser.name
+            : null;
 
         this.storage.exec(
           `
@@ -377,7 +385,11 @@ export class MonitorDO extends DurableObject<Env> {
    * Get run history for a brain.
    * Pass null for userName to skip ownership filter (root access).
    */
-  history(brainTitle: string, limit: number = 10, userName: string | null = null) {
+  history(
+    brainTitle: string,
+    limit: number = 10,
+    userName: string | null = null
+  ) {
     return this.storage
       .exec(
         `
@@ -446,7 +458,12 @@ export class MonitorDO extends DurableObject<Env> {
    * Register a webhook to wait for
    * Called when a brain emits a WEBHOOK event
    */
-  registerWebhook(slug: string, identifier: string, brainRunId: string, token?: string) {
+  registerWebhook(
+    slug: string,
+    identifier: string,
+    brainRunId: string,
+    token?: string
+  ) {
     this.storage.exec(
       `
       INSERT INTO webhook_registrations (slug, identifier, brain_run_id, token, created_at)
@@ -464,7 +481,10 @@ export class MonitorDO extends DurableObject<Env> {
    * Find a brain waiting for this webhook
    * Returns the brain_run_id and token if found, null otherwise
    */
-  findWaitingBrain(slug: string, identifier: string): { brainRunId: string; token: string | null } | null {
+  findWaitingBrain(
+    slug: string,
+    identifier: string
+  ): { brainRunId: string; token: string | null } | null {
     const results = this.storage
       .exec(
         `
@@ -562,7 +582,6 @@ export class MonitorDO extends DurableObject<Env> {
       brainRunId
     );
   }
-
 }
 
 class EventStreamHandler {

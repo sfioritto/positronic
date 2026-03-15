@@ -13,6 +13,7 @@ After the auth overhaul (commit 46ed8b4), `px project new` was supposed to fully
 ### Investigation
 
 The auth setup flow is actually well-wired:
+
 1. `ProjectCreate` triggers `ProjectAuthSetup` after scaffolding
 2. `ProjectAuthSetup` discovers SSH keys, converts to JWK, writes `ROOT_PUBLIC_KEY` to `.env`
 3. `CloudflareDevServer.setup()` calls `syncEnvironmentVariables()` which reads `.env` via `dotenv.parse()` and writes to `.dev.vars`
@@ -38,6 +39,7 @@ The template `_env` file ended with `# CLOUDFLARE_ACCOUNT_ID=` and no trailing n
 ## Solution
 
 Two-pronged fix:
+
 1. Added trailing newline to `packages/template-new-project/template/_env`
 2. Made `project-auth-setup.tsx` defensive: before appending, it reads the existing file and prepends `\n` if the file doesn't end with one
 

@@ -15,8 +15,16 @@ interface User {
 
 export const UsersDelete = ({ userName, force }: UsersDeleteProps) => {
   const { exit } = useApp();
-  const { data: user, loading: loadingUser, error: getUserError } = useApiGet<User>(`/users/${userName}`);
-  const { loading: deleting, error: deleteError, execute } = useApiDelete('user');
+  const {
+    data: user,
+    loading: loadingUser,
+    error: getUserError,
+  } = useApiGet<User>(`/users/${userName}`);
+  const {
+    loading: deleting,
+    error: deleteError,
+    execute,
+  } = useApiDelete('user');
   const [confirmed, setConfirmed] = useState(force);
   const [deleted, setDeleted] = useState(false);
   const [deletionStarted, setDeletionStarted] = useState(false);

@@ -360,11 +360,11 @@ describe('brain-state-machine', () => {
 
       // Verify guard is COMPLETE
       const brain = machine.context.brains['guard-brain'];
-      const guardStep = brain.steps.find(s => s.id === 'guard-step');
+      const guardStep = brain.steps.find((s) => s.id === 'guard-step');
       expect(guardStep?.status).toBe(STATUS.COMPLETE);
 
       // Verify remaining step is HALTED
-      const processStep = brain.steps.find(s => s.id === 'halted-step');
+      const processStep = brain.steps.find((s) => s.id === 'halted-step');
       expect(processStep?.status).toBe(STATUS.HALTED);
 
       // Verify state is unchanged (guard doesn't modify state)
@@ -626,7 +626,11 @@ describe('brain-state-machine', () => {
         type: BRAIN_EVENTS.STEP_STATUS,
         brainRunId: outerBrainRunId,
         steps: [
-          { id: 'outer-step-1', title: 'Run inner brain', status: STATUS.RUNNING },
+          {
+            id: 'outer-step-1',
+            title: 'Run inner brain',
+            status: STATUS.RUNNING,
+          },
         ],
       });
 

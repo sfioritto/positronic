@@ -12,7 +12,10 @@ export const brains = {
     options?: Record<string, string>,
     initialState?: Record<string, unknown>
   ): Promise<string | null> {
-    if ((options && Object.keys(options).length > 0) || (initialState && Object.keys(initialState).length > 0)) {
+    if (
+      (options && Object.keys(options).length > 0) ||
+      (initialState && Object.keys(initialState).length > 0)
+    ) {
       // When options or initialState are provided, we need the full request (can't use startBrainRun)
       try {
         const request = new Request('http://example.com/brains/runs', {
@@ -20,7 +23,11 @@ export const brains = {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ identifier, ...(options && { options }), ...(initialState && { initialState }) }),
+          body: JSON.stringify({
+            identifier,
+            ...(options && { options }),
+            ...(initialState && { initialState }),
+          }),
         });
 
         const response = await fetch(request);
@@ -66,7 +73,11 @@ export const brains = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ identifier, options, ...(initialState && { initialState }) }),
+        body: JSON.stringify({
+          identifier,
+          options,
+          ...(initialState && { initialState }),
+        }),
       });
 
       const response = await fetch(request);
@@ -730,7 +741,8 @@ export const brains = {
         }
         if (!data.error.message || typeof data.error.message !== 'string') {
           console.error(
-            `Expected error.message to be string, got ${typeof data.error.message}`
+            `Expected error.message to be string, got ${typeof data.error
+              .message}`
           );
           return false;
         }
@@ -752,7 +764,9 @@ export const brains = {
   ): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/brains/runs/${encodeURIComponent(nonExistentRunId)}`,
+        `http://example.com/brains/runs/${encodeURIComponent(
+          nonExistentRunId
+        )}`,
         {
           method: 'GET',
         }
@@ -883,7 +897,9 @@ export const brains = {
       if (!Array.isArray(data.candidates) || data.candidates.length < 2) {
         console.error(
           `Expected candidates to be an array with at least 2 items, got ${
-            Array.isArray(data.candidates) ? data.candidates.length : 'non-array'
+            Array.isArray(data.candidates)
+              ? data.candidates.length
+              : 'non-array'
           }`
         );
         return false;
@@ -962,12 +978,9 @@ export const brains = {
    */
   async kill(fetch: Fetch, runId: string): Promise<boolean> {
     try {
-      const request = new Request(
-        `http://example.com/brains/runs/${runId}`,
-        {
-          method: 'DELETE',
-        }
-      );
+      const request = new Request(`http://example.com/brains/runs/${runId}`, {
+        method: 'DELETE',
+      });
       const response = await fetch(request);
       if (response.status !== 204) {
         console.error(
@@ -1186,10 +1199,12 @@ export const brains = {
 
       // Read SSE events until we get WEBHOOK or COMPLETE/ERROR
       const events = watchResponse.body
-        ? await readSseUntil(watchResponse.body, (event) =>
-            event.type === BRAIN_EVENTS.WEBHOOK ||
-            event.type === BRAIN_EVENTS.COMPLETE ||
-            event.type === BRAIN_EVENTS.ERROR
+        ? await readSseUntil(
+            watchResponse.body,
+            (event) =>
+              event.type === BRAIN_EVENTS.WEBHOOK ||
+              event.type === BRAIN_EVENTS.COMPLETE ||
+              event.type === BRAIN_EVENTS.ERROR
           )
         : [];
 
@@ -1384,9 +1399,11 @@ export const brains = {
       }
 
       const resumeEvents = resumeWatchResponse.body
-        ? await readSseUntil(resumeWatchResponse.body, (event) =>
-            event.type === BRAIN_EVENTS.COMPLETE ||
-            event.type === BRAIN_EVENTS.ERROR
+        ? await readSseUntil(
+            resumeWatchResponse.body,
+            (event) =>
+              event.type === BRAIN_EVENTS.COMPLETE ||
+              event.type === BRAIN_EVENTS.ERROR
           )
         : [];
 
@@ -1418,9 +1435,7 @@ export const brains = {
       }
 
       if (completeEvent.status !== STATUS.COMPLETE) {
-        console.error(
-          `Expected COMPLETE status, got ${completeEvent.status}`
-        );
+        console.error(`Expected COMPLETE status, got ${completeEvent.status}`);
         return false;
       }
 
@@ -1510,7 +1525,9 @@ export const brains = {
 
       // Step 3: Query history - status should be RUNNING, not COMPLETE
       const historyRequest = new Request(
-        `http://example.com/brains/${encodeURIComponent(outerBrainIdentifier)}/history?limit=1`,
+        `http://example.com/brains/${encodeURIComponent(
+          outerBrainIdentifier
+        )}/history?limit=1`,
         { method: 'GET' }
       );
 

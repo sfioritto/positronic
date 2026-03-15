@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { z } from 'zod';  // Still needed for schema in tests
+import { z } from 'zod'; // Still needed for schema in tests
 import { generateUI } from '../src/ui/generate-ui.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
 import type { UIComponent } from '../src/ui/types.js';

@@ -16,7 +16,10 @@ import { ObjectGenerator } from '../src/clients/types.js';
 import { createResources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
 import { createWebhook } from '../src/index.js';
-import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
+import {
+  createBrainExecutionMachine,
+  sendEvent,
+} from '../src/dsl/brain-state-machine.js';
 
 // Helper function to get the next value from an AsyncIterator
 const nextStep = async <T>(brainRun: AsyncIterator<T>): Promise<T> => {
@@ -259,7 +262,7 @@ describe('brain creation', () => {
       async (request: Request) => ({
         type: 'webhook' as const,
         identifier: 'test-id',
-        response: { userResponse: 'test' }
+        response: { userResponse: 'test' },
       })
     );
 
@@ -274,7 +277,10 @@ describe('brain creation', () => {
       }));
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -288,7 +294,7 @@ describe('brain creation', () => {
           {
             slug: 'test-webhook',
             identifier: 'test-id',
-          }
+          },
         ],
         brainRunId: expect.any(String),
         options: {},
@@ -325,7 +331,7 @@ describe('brain creation', () => {
     // Verify brain completes normally
     const completeEvent = events.find((e) => e.type === BRAIN_EVENTS.COMPLETE);
     expect(completeEvent).toBeDefined();
-    
+
     // All three steps should have completed
     expect(stepCompleteEvents).toHaveLength(3);
     expect(stepCompleteEvents[2].stepTitle).toBe('Third step');
@@ -380,7 +386,9 @@ describe('brain creation', () => {
     };
 
     // Make sure that for the default prompt the default client returns a known value.
-    mockClient.generateObject.mockResolvedValueOnce({ object: { override: false } });
+    mockClient.generateObject.mockResolvedValueOnce({
+      object: { override: false },
+    });
 
     const testBrain = brain('Client Override Test')
       .prompt('Use default client', {
@@ -440,19 +448,24 @@ describe('brain creation', () => {
       streamText: jest.fn<ObjectGenerator['streamText']>(),
     };
 
-    const testBrain = brain('Client Plain Override Test')
-      .prompt('Use override client', {
+    const testBrain = brain('Client Plain Override Test').prompt(
+      'Use override client',
+      {
         template: () => 'prompt1',
         outputSchema: {
           schema: z.object({ derived: z.boolean() }),
           name: 'overrideResponse' as const,
         },
         client: overrideClient,
-      });
+      }
+    );
 
     const events = [];
     let finalState: any = {};
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
@@ -532,7 +545,9 @@ describe('brain creation', () => {
         }
       );
 
-      mockGenerateObject.mockResolvedValue({ object: { summary: 'Test summary' } });
+      mockGenerateObject.mockResolvedValue({
+        object: { summary: 'Test summary' },
+      });
 
       const run = testBrain.run({
         client: mockClient,
@@ -848,7 +863,8 @@ describe('error handling', () => {
     // Find inner and outer error events by brainTitle
     // (inner brains share the same brainRunId as outer brain)
     const innerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Failing Inner Brain'
+      (e) =>
+        e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Failing Inner Brain'
     ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
@@ -1388,7 +1404,8 @@ describe('nested brains', () => {
     // Find inner and outer error events by brainTitle
     // (inner brains share the same brainRunId as outer brain)
     const innerErrorEvent = events.find(
-      (e) => e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Failing Inner Brain'
+      (e) =>
+        e.type === BRAIN_EVENTS.ERROR && e.brainTitle === 'Failing Inner Brain'
     ) as BrainErrorEvent<any>;
 
     const outerErrorEvent = events.find(
@@ -1567,12 +1584,11 @@ describe('nested brains', () => {
     );
 
     // Inner brain with a webhook wait
-    const innerBrain = brain<{ data: string }, { count: number }>(
-      'Inner Brain'
-    )
+    const innerBrain = brain<{ data: string }, { count: number }>('Inner Brain')
       .step('Inner step 1', ({ state }) => ({ count: state.count + 1 }))
       .step('Prepare wait', ({ state }) => ({
-        ...state, waiting: true,
+        ...state,
+        waiting: true,
       }))
       .wait('Wait for webhook', () => testWebhook('test-id'))
       .step('Process webhook', ({ state, response }) => ({
@@ -1910,9 +1926,7 @@ describe('type inference', () => {
 
     // Verify inner brain events are included (inner brains share brainRunId with outer)
     const innerStartEvent = events.find(
-      (e) =>
-        e.type === BRAIN_EVENTS.START &&
-        e.brainTitle === 'Inner Type Test'
+      (e) => e.type === BRAIN_EVENTS.START && e.brainTitle === 'Inner Type Test'
     );
     expect(innerStartEvent).toEqual(
       expect.objectContaining({
@@ -2103,7 +2117,6 @@ describe('type inference', () => {
       greeting: 'Hello Test User, you are 30 years old',
     });
   });
-
 });
 
 describe('brain structure', () => {
@@ -2189,16 +2202,22 @@ describe('brain structure', () => {
   describe('step error propagation', () => {
     it('should propagate step errors immediately without retry', async () => {
       let callCount = 0;
-      const testBrain = brain('Error Propagation Brain').step('Failing step', () => {
-        callCount++;
-        throw new Error('Step failed');
-      });
+      const testBrain = brain('Error Propagation Brain').step(
+        'Failing step',
+        () => {
+          callCount++;
+          throw new Error('Step failed');
+        }
+      );
 
       const events: BrainEvent<any>[] = [];
       let error: Error | undefined;
 
       try {
-        for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+        for await (const event of testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })) {
           events.push(event);
         }
       } catch (e) {
@@ -2229,7 +2248,8 @@ describe('brain structure', () => {
 
 describe('prompt with over (iterate)', () => {
   // Use a separate mock for iterate tests to avoid conflicts with module-level mock
-  const iterateMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const iterateMockGenerateObject =
+    jest.fn<ObjectGenerator['generateObject']>();
   const iterateMockStreamText = jest.fn<ObjectGenerator['streamText']>();
   const iterateMockClient = {
     generateObject: iterateMockGenerateObject,
@@ -2247,8 +2267,10 @@ describe('prompt with over (iterate)', () => {
 
       // Mock client to return category based on email content
       iterateMockGenerateObject.mockImplementation(async ({ prompt }) => {
-        if (prompt?.includes('urgent')) return { object: { category: 'urgent' } };
-        if (prompt?.includes('newsletter')) return { object: { category: 'newsletter' } };
+        if (prompt?.includes('urgent'))
+          return { object: { category: 'urgent' } };
+        if (prompt?.includes('newsletter'))
+          return { object: { category: 'newsletter' } };
         return { object: { category: 'general' } };
       });
 
@@ -2263,7 +2285,11 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Categorize',
           {
-            template: (email: { id: string; subject: string; body: string }) => {
+            template: (email: {
+              id: string;
+              subject: string;
+              body: string;
+            }) => {
               templateCalls.push(email.id);
               return `Categorize: ${email.subject} - ${email.body}`;
             },
@@ -2278,7 +2304,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2304,7 +2333,9 @@ describe('prompt with over (iterate)', () => {
     });
 
     it('should store results under outputSchema.name', async () => {
-      iterateMockGenerateObject.mockResolvedValue({ object: { sentiment: 'positive' } });
+      iterateMockGenerateObject.mockResolvedValue({
+        object: { sentiment: 'positive' },
+      });
 
       const testBrain = brain('Named Results Test')
         .step('Init', () => ({
@@ -2325,7 +2356,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2360,7 +2394,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2373,7 +2410,9 @@ describe('prompt with over (iterate)', () => {
     });
 
     it('should yield ITERATE_ITEM_COMPLETE events per item', async () => {
-      iterateMockGenerateObject.mockResolvedValue({ object: { category: 'general' } });
+      iterateMockGenerateObject.mockResolvedValue({
+        object: { category: 'general' },
+      });
 
       const testBrain = brain('Iterate Events Test')
         .step('Init', () => ({
@@ -2394,7 +2433,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -2427,10 +2469,12 @@ describe('prompt with over (iterate)', () => {
 
       // Iterate events should appear between STEP_START and STEP_COMPLETE
       const stepStartIndex = events.findIndex(
-        (e) => e.type === BRAIN_EVENTS.STEP_START && e.stepTitle === 'Categorize'
+        (e) =>
+          e.type === BRAIN_EVENTS.STEP_START && e.stepTitle === 'Categorize'
       );
       const stepCompleteIndex = events.findIndex(
-        (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE && e.stepTitle === 'Categorize'
+        (e) =>
+          e.type === BRAIN_EVENTS.STEP_COMPLETE && e.stepTitle === 'Categorize'
       );
 
       for (const iterateEvent of iterateEvents) {
@@ -2470,7 +2514,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -2516,7 +2563,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       const events: any[] = [];
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -2633,17 +2683,19 @@ describe('prompt with over (iterate)', () => {
 
       // Simulate resume where iterateProgress has been through JSON round-trip
       // (stored in SQLite, loaded back). JSON.stringify converts undefined to null.
-      const iterateProgress = JSON.parse(JSON.stringify({
-        accumulatedResults: [
-          [{ id: 1 }, { done: true }],
-          undefined,  // Error item — becomes null after JSON round-trip
-          [{ id: 3 }, { done: true }],
-          [{ id: 4 }, { done: true }],
-        ],
-        processedCount: 4,
-        totalItems: 4,
-        schemaName: 'results',
-      }));
+      const iterateProgress = JSON.parse(
+        JSON.stringify({
+          accumulatedResults: [
+            [{ id: 1 }, { done: true }],
+            undefined, // Error item — becomes null after JSON round-trip
+            [{ id: 3 }, { done: true }],
+            [{ id: 4 }, { done: true }],
+          ],
+          processedCount: 4,
+          totalItems: 4,
+          schemaName: 'results',
+        })
+      );
 
       // Verify the JSON round-trip actually converted undefined to null
       expect(iterateProgress.accumulatedResults[1]).toBeNull();
@@ -2665,7 +2717,7 @@ describe('prompt with over (iterate)', () => {
       }
 
       // Should complete without error
-      expect(events.some(e => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+      expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
 
       // Final state should have 3 results (null entry filtered out)
       let finalState: any = {};
@@ -2741,9 +2793,7 @@ describe('prompt with over (iterate)', () => {
       );
       expect(itemEvents).toHaveLength(2);
 
-      const pausedEvent = events.find(
-        (e) => e.type === BRAIN_EVENTS.PAUSED
-      );
+      const pausedEvent = events.find((e) => e.type === BRAIN_EVENTS.PAUSED);
       expect(pausedEvent).toBeUndefined();
 
       // Should NOT have a COMPLETE event (execution stopped mid-iterate)
@@ -2778,7 +2828,10 @@ describe('prompt with over (iterate)', () => {
 
       let error: Error | undefined;
       try {
-        for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+        for await (const event of testBrain.run({
+          client: iterateMockClient,
+          currentUser: { name: 'test-user' },
+        })) {
           // Just consume events
         }
       } catch (e) {
@@ -2818,7 +2871,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2861,7 +2917,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2903,7 +2962,10 @@ describe('prompt with over (iterate)', () => {
           }
         );
 
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         // Just consume events
       }
 
@@ -2917,7 +2979,9 @@ describe('prompt with over (iterate)', () => {
 
   describe('type inference', () => {
     it('should infer TItem from over function', async () => {
-      iterateMockGenerateObject.mockResolvedValue({ object: { label: 'test' } });
+      iterateMockGenerateObject.mockResolvedValue({
+        object: { label: 'test' },
+      });
 
       const testBrain = brain('Type Inference Test')
         .step('Init', () => ({
@@ -2946,7 +3010,10 @@ describe('prompt with over (iterate)', () => {
         )
         .step('Use Results', ({ state }) => {
           // Access the labeled results - use runtime check for tuple structure
-          const firstTuple = state.labeled[0] as [{ name: string; value: number }, { label: string }];
+          const firstTuple = state.labeled[0] as [
+            { name: string; value: number },
+            { label: string }
+          ];
           const firstItem = firstTuple[0];
           const firstResult = firstTuple[1];
 
@@ -2958,7 +3025,10 @@ describe('prompt with over (iterate)', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -2990,7 +3060,10 @@ describe('prompt with over (iterate)', () => {
         )
         .step('Aggregate', ({ state }) => {
           // Access scores with proper tuple typing
-          const scores = state.scores as [{ text: string }, { score: number }][];
+          const scores = state.scores as [
+            { text: string },
+            { score: number }
+          ][];
           const total = scores.reduce(
             (sum, [_, result]) => sum + result.score,
             0
@@ -3002,7 +3075,10 @@ describe('prompt with over (iterate)', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3033,7 +3109,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3044,7 +3123,9 @@ describe('prompt with over (iterate)', () => {
     });
 
     it('should work with async template function', async () => {
-      iterateMockGenerateObject.mockResolvedValue({ object: { processed: true } });
+      iterateMockGenerateObject.mockResolvedValue({
+        object: { processed: true },
+      });
 
       const testBrain = brain('Async Template Test')
         .step('Init', () => ({
@@ -3068,7 +3149,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3082,7 +3166,9 @@ describe('prompt with over (iterate)', () => {
     });
 
     it('should work with custom client per prompt', async () => {
-      const customGenerateObject = jest.fn<ObjectGenerator['generateObject']>().mockResolvedValue({ object: { custom: true } });
+      const customGenerateObject = jest
+        .fn<ObjectGenerator['generateObject']>()
+        .mockResolvedValue({ object: { custom: true } });
       const customClient = {
         generateObject: customGenerateObject,
         streamText: jest.fn<ObjectGenerator['streamText']>(),
@@ -3108,7 +3194,10 @@ describe('prompt with over (iterate)', () => {
         );
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: iterateMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3122,7 +3211,8 @@ describe('prompt with over (iterate)', () => {
   });
 
   describe('schema-less prompt', () => {
-    const schemaLessMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+    const schemaLessMockGenerateObject =
+      jest.fn<ObjectGenerator['generateObject']>();
     const schemaLessMockClient: jest.Mocked<ObjectGenerator> = {
       generateObject: schemaLessMockGenerateObject,
       streamText: jest.fn(),
@@ -3134,7 +3224,9 @@ describe('prompt with over (iterate)', () => {
 
     it('should return text response available in next step', async () => {
       // Mock the internal text schema response
-      schemaLessMockGenerateObject.mockResolvedValueOnce({ object: { text: 'Generated summary text' } });
+      schemaLessMockGenerateObject.mockResolvedValueOnce({
+        object: { text: 'Generated summary text' },
+      });
 
       const testBrain = brain('Schema-less Prompt Test')
         .step('Init', () => ({ data: 'some data' }))
@@ -3147,7 +3239,10 @@ describe('prompt with over (iterate)', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: schemaLessMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: schemaLessMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3169,7 +3264,9 @@ describe('prompt with over (iterate)', () => {
     });
 
     it('should not modify state in schema-less prompt step', async () => {
-      schemaLessMockGenerateObject.mockResolvedValueOnce({ object: { text: 'Result' } });
+      schemaLessMockGenerateObject.mockResolvedValueOnce({
+        object: { text: 'Result' },
+      });
 
       const testBrain = brain('Schema-less No State Change')
         .step('Init', () => ({ original: 'value' }))
@@ -3182,7 +3279,10 @@ describe('prompt with over (iterate)', () => {
         });
 
       let finalState: any = {};
-      for await (const event of testBrain.run({ client: schemaLessMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: schemaLessMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
           finalState = applyPatches(finalState, [event.patch]);
         }
@@ -3193,7 +3293,9 @@ describe('prompt with over (iterate)', () => {
     });
 
     it('should have correct TypeScript types for response', async () => {
-      schemaLessMockGenerateObject.mockResolvedValueOnce({ object: { text: 'Typed text' } });
+      schemaLessMockGenerateObject.mockResolvedValueOnce({
+        object: { text: 'Typed text' },
+      });
 
       // This test verifies compile-time types - if it compiles, types are correct
       const testBrain = brain('Type Test')
@@ -3207,7 +3309,10 @@ describe('prompt with over (iterate)', () => {
           return { ...state, result: text };
         });
 
-      for await (const _ of testBrain.run({ client: schemaLessMockClient, currentUser: { name: 'test-user' } })) {
+      for await (const _ of testBrain.run({
+        client: schemaLessMockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         // Just run to verify it works
       }
     });
@@ -3215,8 +3320,10 @@ describe('prompt with over (iterate)', () => {
 
   it('should apply mapOutput to transform iterate results', async () => {
     iterateMockGenerateObject.mockImplementation(async ({ prompt }) => {
-      if (prompt?.includes('urgent')) return { object: { category: 'urgent', confidence: 0.9 } };
-      if (prompt?.includes('newsletter')) return { object: { category: 'newsletter', confidence: 0.7 } };
+      if (prompt?.includes('urgent'))
+        return { object: { category: 'urgent', confidence: 0.9 } };
+      if (prompt?.includes('newsletter'))
+        return { object: { category: 'newsletter', confidence: 0.7 } };
       return { object: { category: 'general', confidence: 0.5 } };
     });
 
@@ -3230,7 +3337,8 @@ describe('prompt with over (iterate)', () => {
       .prompt(
         'Categorize',
         {
-          template: (email: { id: string; body: string }) => `Categorize: ${email.body}`,
+          template: (email: { id: string; body: string }) =>
+            `Categorize: ${email.body}`,
           outputSchema: {
             schema: z.object({ category: z.string(), confidence: z.number() }),
             name: 'categories' as const,
@@ -3243,7 +3351,10 @@ describe('prompt with over (iterate)', () => {
       );
 
     let finalState: any = {};
-    for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: iterateMockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
@@ -3282,7 +3393,10 @@ describe('prompt with over (iterate)', () => {
       );
 
     let finalState: any = {};
-    for await (const event of testBrain.run({ client: iterateMockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: iterateMockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
         finalState = applyPatches(finalState, [event.patch]);
       }
@@ -3357,19 +3471,28 @@ describe('.brain() with over — nested brain iterate', () => {
 
     // Should see inner brain START events for each item
     const innerStarts = events.filter(
-      (e) => e.type === BRAIN_EVENTS.START && 'brainTitle' in e && e.brainTitle === 'Inner'
+      (e) =>
+        e.type === BRAIN_EVENTS.START &&
+        'brainTitle' in e &&
+        e.brainTitle === 'Inner'
     );
     expect(innerStarts).toHaveLength(2);
 
     // Should see inner brain COMPLETE events for each item
     const innerCompletes = events.filter(
-      (e) => e.type === BRAIN_EVENTS.COMPLETE && 'brainTitle' in e && e.brainTitle === 'Inner'
+      (e) =>
+        e.type === BRAIN_EVENTS.COMPLETE &&
+        'brainTitle' in e &&
+        e.brainTitle === 'Inner'
     );
     expect(innerCompletes).toHaveLength(2);
 
     // Should see STEP_COMPLETE for inner brain steps
     const innerStepCompletes = events.filter(
-      (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE && 'stepTitle' in e && e.stepTitle === 'Process'
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Process'
     );
     expect(innerStepCompletes).toHaveLength(2);
   });
@@ -3434,7 +3557,10 @@ describe('.brain() with over — nested brain iterate', () => {
       });
 
     const events: BrainEvent<any>[] = [];
-    for await (const event of outerBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -3468,7 +3594,10 @@ describe('.brain() with over — nested brain iterate', () => {
       });
 
     const events: BrainEvent<any>[] = [];
-    for await (const event of outerBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -3534,7 +3663,10 @@ describe('.brain() with over — nested brain iterate', () => {
 
     // No outer brain COMPLETE event (inner brain completes are expected)
     const outerComplete = events.find(
-      (e) => e.type === BRAIN_EVENTS.COMPLETE && 'brainTitle' in e && e.brainTitle === 'Outer'
+      (e) =>
+        e.type === BRAIN_EVENTS.COMPLETE &&
+        'brainTitle' in e &&
+        e.brainTitle === 'Outer'
     );
     expect(outerComplete).toBeUndefined();
   });
@@ -3579,7 +3711,10 @@ describe('.brain() with over — nested brain iterate', () => {
     expect(events.some((e) => e.type === BRAIN_EVENTS.CANCELLED)).toBe(true);
     // No outer brain COMPLETE event
     const outerComplete = events.find(
-      (e) => e.type === BRAIN_EVENTS.COMPLETE && 'brainTitle' in e && e.brainTitle === 'Outer'
+      (e) =>
+        e.type === BRAIN_EVENTS.COMPLETE &&
+        'brainTitle' in e &&
+        e.brainTitle === 'Outer'
     );
     expect(outerComplete).toBeUndefined();
   });
@@ -3604,14 +3739,19 @@ describe('.brain() with over — nested brain iterate', () => {
 
     let error: Error | undefined;
     try {
-      for await (const event of outerBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of outerBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         // consume events
       }
     } catch (e) {
       error = e as Error;
     }
 
-    expect(error?.message).toContain('Webhook/wait inside brain iterate is not supported');
+    expect(error?.message).toContain(
+      'Webhook/wait inside brain iterate is not supported'
+    );
   });
 
   it('should resume from iterateProgress', async () => {
@@ -3666,7 +3806,10 @@ describe('.brain() with over — nested brain iterate', () => {
 
     // Verify all 4 results present in the outer step complete patch
     const outerStepComplete = events.find(
-      (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE && 'stepTitle' in e && e.stepTitle === 'Iterate'
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Iterate'
     );
     expect(outerStepComplete).toBeDefined();
   });
@@ -3700,22 +3843,37 @@ describe('.brain() with over — nested brain iterate', () => {
   // Helper: creates an agent client where odd calls return a non-terminal tool
   // call and even calls return the terminal 'done' tool call. The non-terminal
   // tool's execute function throws on the Nth invocation (controlled by caller).
-  function createAgentWithThrowingTool(shouldThrow: (callCount: number) => boolean) {
-    const agentGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+  function createAgentWithThrowingTool(
+    shouldThrow: (callCount: number) => boolean
+  ) {
+    const agentGenerateText =
+      jest.fn<NonNullable<ObjectGenerator['generateText']>>();
     let agentCallCount = 0;
     agentGenerateText.mockImplementation(async () => {
       agentCallCount++;
       if (agentCallCount % 2 === 1) {
         return {
           text: undefined,
-          toolCalls: [{ toolCallId: `call-${agentCallCount}`, toolName: 'crawl', args: { url: 'http://example.com' } }],
+          toolCalls: [
+            {
+              toolCallId: `call-${agentCallCount}`,
+              toolName: 'crawl',
+              args: { url: 'http://example.com' },
+            },
+          ],
           usage: { totalTokens: 50 },
           responseMessages: [],
         };
       }
       return {
         text: undefined,
-        toolCalls: [{ toolCallId: `call-${agentCallCount}`, toolName: 'done', args: { result: 'finished' } }],
+        toolCalls: [
+          {
+            toolCallId: `call-${agentCallCount}`,
+            toolName: 'done',
+            args: { result: 'finished' },
+          },
+        ],
         usage: { totalTokens: 50 },
         responseMessages: [],
       };
@@ -3802,7 +3960,9 @@ describe('.brain() with over — nested brain iterate', () => {
       signalProvider,
     });
 
-    const itemEvents = events.filter((e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE);
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
     expect(itemEvents).toHaveLength(2);
 
     // Execution stack should have exactly 1 entry (the outer brain).
@@ -3821,18 +3981,24 @@ describe('.brain() with over — nested brain iterate', () => {
     // is stuck in 'agentLoop' (entered via AGENT_START, never exited). That
     // state has no transition for COMPLETE or ITERATE_ITEM_COMPLETE, so those
     // events are silently dropped and the stack stays imbalanced.
-    const { client: agentClient, tools } = createAgentWithThrowingTool((n) => n === 2);
+    const { client: agentClient, tools } = createAgentWithThrowingTool(
+      (n) => n === 2
+    );
     const signalProvider = createPausingSignalProvider(5);
 
-    const innerBrain = brain<{}, { url: string }>('AgentInner')
-      .brain('Crawl page', ({ state }) => ({
+    const innerBrain = brain<{}, { url: string }>('AgentInner').brain(
+      'Crawl page',
+      ({ state }) => ({
         prompt: `Crawl ${state.url}`,
         tools,
         maxIterations: 2,
-      }));
+      })
+    );
 
     const outerBrain = brain('AgentStackOuter')
-      .step('Init', () => ({ items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }] }))
+      .step('Init', () => ({
+        items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
+      }))
       .brain('Iterate', innerBrain, {
         over: (state) => state.items,
         initialState: (item) => ({ url: item.url }),
@@ -3846,7 +4012,9 @@ describe('.brain() with over — nested brain iterate', () => {
       signalProvider,
     });
 
-    const itemEvents = events.filter((e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE);
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
     expect(itemEvents).toHaveLength(2);
 
     expect(sm.context.executionStack).toHaveLength(1);
@@ -3861,7 +4029,9 @@ describe('.brain() with over — nested brain iterate', () => {
     // creating two levels of nesting. When the agent throws, there are two
     // unbalanced STARTs on the execution stack (inner brain + its nested agent
     // brain), not just one.
-    const { client: agentClient, tools } = createAgentWithThrowingTool((n) => n === 2);
+    const { client: agentClient, tools } = createAgentWithThrowingTool(
+      (n) => n === 2
+    );
     const signalProvider = createPausingSignalProvider(5);
 
     const innerBrain = brain<{}, { url: string }>('NestedAgentInner')
@@ -3873,7 +4043,9 @@ describe('.brain() with over — nested brain iterate', () => {
       .step('Verify', ({ state }) => state);
 
     const outerBrain = brain('NestedAgentStackOuter')
-      .step('Init', () => ({ items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }] }))
+      .step('Init', () => ({
+        items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
+      }))
       .brain('Iterate', innerBrain, {
         over: (state) => state.items,
         initialState: (item) => ({ url: item.url }),
@@ -3887,7 +4059,9 @@ describe('.brain() with over — nested brain iterate', () => {
       signalProvider,
     });
 
-    const itemEvents = events.filter((e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE);
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
     expect(itemEvents).toHaveLength(2);
 
     expect(sm.context.executionStack).toHaveLength(1);
@@ -3899,7 +4073,8 @@ describe('.brain() with over — nested brain iterate', () => {
 });
 
 describe('.brain() with over — agent config iterate', () => {
-  const agentMockGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+  const agentMockGenerateText =
+    jest.fn<NonNullable<ObjectGenerator['generateText']>>();
   const agentMockClient: jest.Mocked<ObjectGenerator> = {
     generateObject: mockGenerateObject,
     generateText: agentMockGenerateText,
@@ -3968,15 +4143,22 @@ describe('.brain() with over — agent config iterate', () => {
     expect(finalState.results).toHaveLength(3);
     // Each result is [item, agentState]
     expect(finalState.results[0][0]).toEqual({ url: 'a.com' });
-    expect(finalState.results[0][1].result).toEqual({ processed: true, index: 1 });
+    expect(finalState.results[0][1].result).toEqual({
+      processed: true,
+      index: 1,
+    });
     expect(finalState.results[1][0]).toEqual({ url: 'b.com' });
     expect(finalState.results[2][0]).toEqual({ url: 'c.com' });
 
     // Should have agent events forwarded
-    const agentStarts = events.filter((e) => e.type === BRAIN_EVENTS.AGENT_START);
+    const agentStarts = events.filter(
+      (e) => e.type === BRAIN_EVENTS.AGENT_START
+    );
     expect(agentStarts).toHaveLength(3);
 
-    const agentCompletes = events.filter((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE);
+    const agentCompletes = events.filter(
+      (e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE
+    );
     expect(agentCompletes).toHaveLength(3);
   });
 
@@ -4192,7 +4374,8 @@ describe('.brain() with over — agent config iterate', () => {
 });
 
 describe('withTools vs withExtraTools semantics', () => {
-  const agentMockGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+  const agentMockGenerateText =
+    jest.fn<NonNullable<ObjectGenerator['generateText']>>();
   const agentMockClient: jest.Mocked<ObjectGenerator> = {
     generateObject: mockGenerateObject,
     generateText: agentMockGenerateText,
@@ -4240,7 +4423,9 @@ describe('withTools vs withExtraTools semantics', () => {
       events.push(event);
     }
 
-    const agentStart = events.find((e) => e.type === BRAIN_EVENTS.AGENT_START) as any;
+    const agentStart = events.find(
+      (e) => e.type === BRAIN_EVENTS.AGENT_START
+    ) as any;
     // Should have myTool and done (auto-generated), but NOT the defaults like generateUI, consoleLog, etc.
     expect(agentStart.tools).toContain('myTool');
     expect(agentStart.tools).toContain('done');
@@ -4281,7 +4466,9 @@ describe('withTools vs withExtraTools semantics', () => {
       events.push(event);
     }
 
-    const agentStart = events.find((e) => e.type === BRAIN_EVENTS.AGENT_START) as any;
+    const agentStart = events.find(
+      (e) => e.type === BRAIN_EVENTS.AGENT_START
+    ) as any;
     // Should have both defaultTool and extraTool plus done
     expect(agentStart.tools).toContain('defaultTool');
     expect(agentStart.tools).toContain('extraTool');
@@ -4323,7 +4510,7 @@ describe('withTools vs withExtraTools semantics', () => {
         tools: {
           ...tools,
           defaultTool: overrideTool, // override the default
-          stepOnlyTool,              // add step-specific tool
+          stepOnlyTool, // add step-specific tool
         },
       }));
 
@@ -4335,7 +4522,9 @@ describe('withTools vs withExtraTools semantics', () => {
       events.push(event);
     }
 
-    const agentStart = events.find((e) => e.type === BRAIN_EVENTS.AGENT_START) as any;
+    const agentStart = events.find(
+      (e) => e.type === BRAIN_EVENTS.AGENT_START
+    ) as any;
     // Should have all tools
     expect(agentStart.tools).toContain('defaultTool');
     expect(agentStart.tools).toContain('extraTool');
@@ -4344,7 +4533,9 @@ describe('withTools vs withExtraTools semantics', () => {
 
     // Verify the override took effect by checking which tool description was passed to generateText
     const generateTextCall = agentMockGenerateText.mock.calls[0][0] as any;
-    expect(generateTextCall.tools.defaultTool.description).toBe('Override of default tool');
+    expect(generateTextCall.tools.defaultTool.description).toBe(
+      'Override of default tool'
+    );
   });
 
   it('withTools() after createBrain() replaces project defaults', async () => {
@@ -4382,7 +4573,9 @@ describe('withTools vs withExtraTools semantics', () => {
       events.push(event);
     }
 
-    const agentStart = events.find((e) => e.type === BRAIN_EVENTS.AGENT_START) as any;
+    const agentStart = events.find(
+      (e) => e.type === BRAIN_EVENTS.AGENT_START
+    ) as any;
     // Should have myOnlyTool and done, but NOT projectDefault
     expect(agentStart.tools).toContain('myOnlyTool');
     expect(agentStart.tools).toContain('done');

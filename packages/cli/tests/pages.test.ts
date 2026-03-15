@@ -107,9 +107,17 @@ describe('pages command', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['pages', 'delete', 'page-to-delete', '--force']);
+        const { waitForOutput } = await px([
+          'pages',
+          'delete',
+          'page-to-delete',
+          '--force',
+        ]);
 
-        const foundSuccess = await waitForOutput(/Page deleted successfully/i, 30);
+        const foundSuccess = await waitForOutput(
+          /Page deleted successfully/i,
+          30
+        );
         expect(foundSuccess).toBe(true);
 
         // Verify API call
@@ -130,7 +138,12 @@ describe('pages command', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['pages', 'delete', 'non-existent-page', '--force']);
+        const { waitForOutput } = await px([
+          'pages',
+          'delete',
+          'non-existent-page',
+          '--force',
+        ]);
 
         const foundNotFound = await waitForOutput(/Page not found/i, 30);
         expect(foundNotFound).toBe(true);
@@ -156,10 +169,17 @@ describe('pages command', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['pages', 'delete', 'confirm-delete-page']);
+        const { waitForOutput } = await px([
+          'pages',
+          'delete',
+          'confirm-delete-page',
+        ]);
 
         // Should show confirmation prompt
-        const foundWarning = await waitForOutput(/Warning.*permanently delete/i, 30);
+        const foundWarning = await waitForOutput(
+          /Warning.*permanently delete/i,
+          30
+        );
         expect(foundWarning).toBe(true);
 
         const foundSlug = await waitForOutput(/confirm-delete-page/i, 30);
@@ -183,7 +203,12 @@ describe('pages command', () => {
           .delete('/pages/error-page')
           .reply(500, 'Internal Server Error');
 
-        const { waitForOutput } = await px(['pages', 'delete', 'error-page', '--force']);
+        const { waitForOutput } = await px([
+          'pages',
+          'delete',
+          'error-page',
+          '--force',
+        ]);
 
         // The ErrorComponent will display an error
         const foundError = await waitForOutput(/Error|Failed|500/i, 30);

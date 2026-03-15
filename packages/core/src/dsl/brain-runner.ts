@@ -1,8 +1,26 @@
 import { BRAIN_EVENTS, STATUS } from './constants.js';
-import { createBrainExecutionMachine, sendEvent, type BrainStateMachine, type ExecutionStackEntry, type AgentContext, type IterateContext } from './brain-state-machine.js';
+import {
+  createBrainExecutionMachine,
+  sendEvent,
+  type BrainStateMachine,
+  type ExecutionStackEntry,
+  type AgentContext,
+  type IterateContext,
+} from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
-import { DEFAULT_ENV, type Brain, type BrainEvent, type ResumeContext } from './brain.js';
-import type { State, JsonObject, RuntimeEnv, SignalProvider, CurrentUser } from './types.js';
+import {
+  DEFAULT_ENV,
+  type Brain,
+  type BrainEvent,
+  type ResumeContext,
+} from './brain.js';
+import type {
+  State,
+  JsonObject,
+  RuntimeEnv,
+  SignalProvider,
+  CurrentUser,
+} from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
@@ -123,7 +141,9 @@ export class BrainRunner {
     });
   }
 
-  withGovernor(governor: (client: ObjectGenerator) => ObjectGenerator): BrainRunner {
+  withGovernor(
+    governor: (client: ObjectGenerator) => ObjectGenerator
+  ): BrainRunner {
     return new BrainRunner({
       ...this.options,
       governor,
@@ -151,7 +171,14 @@ export class BrainRunner {
       signal?: AbortSignal;
     }
   ): Promise<TState> {
-    const { initialState = {} as TState, options: brainOptions, brainRunId, endAfter, signal, currentUser } = options;
+    const {
+      initialState = {} as TState,
+      options: brainOptions,
+      brainRunId,
+      endAfter,
+      signal,
+      currentUser,
+    } = options;
 
     return this.execute(brain, {
       initialState,
@@ -181,12 +208,23 @@ export class BrainRunner {
       signal?: AbortSignal;
     }
   ): Promise<TState> {
-    const { machine, brainRunId, options: brainOptions, endAfter, signal, currentUser } = options;
+    const {
+      machine,
+      brainRunId,
+      options: brainOptions,
+      endAfter,
+      signal,
+      currentUser,
+    } = options;
 
     // Build ResumeContext from machine's execution stack
     // Webhook response comes from signals during execution, not from resume parameters
     const { executionStack, agentContext, iterateContext } = machine.context;
-    const resumeContext = executionStackToResumeContext(executionStack, agentContext, iterateContext);
+    const resumeContext = executionStackToResumeContext(
+      executionStack,
+      agentContext,
+      iterateContext
+    );
 
     return this.execute(brain, {
       resumeContext,
@@ -203,7 +241,10 @@ export class BrainRunner {
   /**
    * Internal execution method shared by run() and resume().
    */
-  private async execute<TOptions extends JsonObject = {}, TState extends State = {}>(
+  private async execute<
+    TOptions extends JsonObject = {},
+    TState extends State = {}
+  >(
     brain: Brain<TOptions, TState, any>,
     params: {
       initialState?: TState;
@@ -217,16 +258,37 @@ export class BrainRunner {
       initialStepCount: number;
     }
   ): Promise<TState> {
-    const { adapters, client: rawClient, resources, pages, env, signalProvider, governor, storeProvider } = this.options;
+    const {
+      adapters,
+      client: rawClient,
+      resources,
+      pages,
+      env,
+      signalProvider,
+      governor,
+      storeProvider,
+    } = this.options;
     const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
-    const { initialState, resumeContext, machine: providedMachine, options, brainRunId, endAfter, signal, currentUser, initialStepCount } = params;
+    const {
+      initialState,
+      resumeContext,
+      machine: providedMachine,
+      options,
+      brainRunId,
+      endAfter,
+      signal,
+      currentUser,
+      initialStepCount,
+    } = params;
 
     // Use provided state machine if available (for resumes with historical events),
     // otherwise create a new one
-    const machine = providedMachine ?? createBrainExecutionMachine({
-      initialState: resumeContext?.state ?? initialState ?? {},
-    });
+    const machine =
+      providedMachine ??
+      createBrainExecutionMachine({
+        initialState: resumeContext?.state ?? initialState ?? {},
+      });
 
     const brainRun = resumeContext
       ? brain.run({
@@ -264,7 +326,9 @@ export class BrainRunner {
             machine.context.brainRunId ?? '',
             (options ?? {}) as TOptions
           );
-          await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
+          await Promise.all(
+            adapters.map((adapter) => adapter.dispatch(cancelledEvent))
+          );
           // Cast is safe: state started as TState and patches maintain the structure
           return machine.context.currentState as TState;
         }
@@ -278,8 +342,12 @@ export class BrainRunner {
         // Check if we should stop after this step (only for top-level steps)
         // The machine's topLevelStepCount tracks steps since this run started,
         // so we add initialStepCount to get the total step count.
-        if (event.type === BRAIN_EVENTS.STEP_COMPLETE && machine.context.isTopLevel) {
-          const totalSteps = machine.context.topLevelStepCount + initialStepCount;
+        if (
+          event.type === BRAIN_EVENTS.STEP_COMPLETE &&
+          machine.context.isTopLevel
+        ) {
+          const totalSteps =
+            machine.context.topLevelStepCount + initialStepCount;
           if (endAfter && totalSteps >= endAfter) {
             // Cast is safe: state started as TState and patches maintain the structure
             return machine.context.currentState as TState;
@@ -299,7 +367,9 @@ export class BrainRunner {
           machine.context.brainRunId ?? '',
           (options ?? {}) as TOptions
         );
-        await Promise.all(adapters.map((adapter) => adapter.dispatch(cancelledEvent)));
+        await Promise.all(
+          adapters.map((adapter) => adapter.dispatch(cancelledEvent))
+        );
         // Cast is safe: state started as TState and patches maintain the structure
         return machine.context.currentState as TState;
       }

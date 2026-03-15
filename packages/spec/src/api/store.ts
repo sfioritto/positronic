@@ -54,9 +54,7 @@ export const store = {
       const response = await fetch(request);
 
       if (!response.ok) {
-        console.error(
-          `GET /store/${brainTitle} returned ${response.status}`
-        );
+        console.error(`GET /store/${brainTitle} returned ${response.status}`);
         return false;
       }
 
@@ -72,9 +70,7 @@ export const store = {
       };
 
       if (!Array.isArray(data.keys)) {
-        console.error(
-          `Expected keys to be an array, got ${typeof data.keys}`
-        );
+        console.error(`Expected keys to be an array, got ${typeof data.keys}`);
         return false;
       }
 
@@ -89,7 +85,9 @@ export const store = {
           return false;
         }
         if (entry.scope !== 'shared' && entry.scope !== 'user') {
-          console.error(`Expected scope to be 'shared' or 'user', got '${entry.scope}'`);
+          console.error(
+            `Expected scope to be 'shared' or 'user', got '${entry.scope}'`
+          );
           return false;
         }
         if (typeof entry.size !== 'number') {
@@ -97,7 +95,9 @@ export const store = {
           return false;
         }
         if (typeof entry.lastModified !== 'string') {
-          console.error(`Expected lastModified to be string, got ${typeof entry.lastModified}`);
+          console.error(
+            `Expected lastModified to be string, got ${typeof entry.lastModified}`
+          );
           return false;
         }
       }
@@ -119,7 +119,9 @@ export const store = {
   ): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/store/${encodeURIComponent(brainTitle)}/shared/${encodeURIComponent(key)}`,
+        `http://example.com/store/${encodeURIComponent(
+          brainTitle
+        )}/shared/${encodeURIComponent(key)}`,
         { method: 'GET' }
       );
 
@@ -173,7 +175,9 @@ export const store = {
   ): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/store/${encodeURIComponent(brainTitle)}/user/${encodeURIComponent(key)}`,
+        `http://example.com/store/${encodeURIComponent(
+          brainTitle
+        )}/user/${encodeURIComponent(key)}`,
         { method: 'GET' }
       );
 
@@ -204,7 +208,9 @@ export const store = {
       }
 
       if (typeof data.userName !== 'string') {
-        console.error(`Expected userName to be string, got ${typeof data.userName}`);
+        console.error(
+          `Expected userName to be string, got ${typeof data.userName}`
+        );
         return false;
       }
 
@@ -233,7 +239,9 @@ export const store = {
   ): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/store/${encodeURIComponent(brainTitle)}/shared/${encodeURIComponent(key)}`,
+        `http://example.com/store/${encodeURIComponent(
+          brainTitle
+        )}/shared/${encodeURIComponent(key)}`,
         { method: 'DELETE' }
       );
 
@@ -266,7 +274,9 @@ export const store = {
   ): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/store/${encodeURIComponent(brainTitle)}/user/${encodeURIComponent(key)}`,
+        `http://example.com/store/${encodeURIComponent(
+          brainTitle
+        )}/user/${encodeURIComponent(key)}`,
         { method: 'DELETE' }
       );
 
@@ -292,10 +302,7 @@ export const store = {
   /**
    * Test DELETE /store/:brainTitle - Clear all accessible keys for a brain
    */
-  async clearBrainStore(
-    fetch: Fetch,
-    brainTitle: string
-  ): Promise<boolean> {
+  async clearBrainStore(fetch: Fetch, brainTitle: string): Promise<boolean> {
     try {
       const request = new Request(
         `http://example.com/store/${encodeURIComponent(brainTitle)}`,
@@ -322,10 +329,7 @@ export const store = {
 
       return true;
     } catch (error) {
-      console.error(
-        `Failed to test DELETE /store/${brainTitle}:`,
-        error
-      );
+      console.error(`Failed to test DELETE /store/${brainTitle}:`, error);
       return false;
     }
   },
@@ -367,7 +371,9 @@ export const store = {
   ): Promise<boolean> {
     try {
       // Get userA's fetch
-      const { fetch: userAFetch, userName: userAId } = await fetchFactory('userA');
+      const { fetch: userAFetch, userName: userAId } = await fetchFactory(
+        'userA'
+      );
 
       // Try to access userA's key with userA's credentials - should work
       const request = new Request(

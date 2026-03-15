@@ -1,6 +1,6 @@
 # Literate Commits
 
-*By Pete Corey*
+_By Pete Corey_
 
 ## Overview
 
@@ -24,7 +24,7 @@ This transforms `git log` from mundane record-keeping into an educational artifa
 
 **Improved Quality**: Knowing commits will be visible encourages doing things right the first time.
 
-**Historical Context**: Detailed commits allow developers to understand not just *what* changed, but *why*—providing crucial context when encountering unfamiliar code sections.
+**Historical Context**: Detailed commits allow developers to understand not just _what_ changed, but _why_—providing crucial context when encountering unfamiliar code sections.
 
 **Professional Development**: The practice reinforces good habits through intentional, observed workflow.
 

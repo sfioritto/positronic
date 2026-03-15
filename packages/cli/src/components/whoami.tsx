@@ -71,8 +71,7 @@ export const Whoami = ({ configManager, projectRootPath }: WhoamiProps) => {
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
       <Text>
-        <Text bold>Logged in as:</Text>{' '}
-        <Text color="green">{data.name}</Text>
+        <Text bold>Logged in as:</Text> <Text color="green">{data.name}</Text>
         {data.isRoot && <Text dimColor> (root)</Text>}
       </Text>
       <Box marginTop={1} flexDirection="column" paddingLeft={2}>

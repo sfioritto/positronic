@@ -675,10 +675,7 @@ describe('schedule command', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px([
-          'schedule',
-          'timezone',
-        ]);
+        const { waitForOutput, instance } = await px(['schedule', 'timezone']);
 
         const found = await waitForOutput(/Project timezone/i, 30);
         expect(found).toBe(true);

@@ -6,8 +6,14 @@ const TextAreaPropsSchema = z.object({
   label: z.string().describe('Label displayed above the textarea'),
   placeholder: z.string().optional().describe('Placeholder text when empty'),
   required: z.boolean().optional().describe('Whether field is required'),
-  rows: z.number().optional().describe('Number of visible text rows, defaults to 4'),
-  defaultValue: z.string().optional().describe('Default value for the textarea'),
+  rows: z
+    .number()
+    .optional()
+    .describe('Number of visible text rows, defaults to 4'),
+  defaultValue: z
+    .string()
+    .optional()
+    .describe('Default value for the textarea'),
 });
 
 export type TextAreaProps = z.infer<typeof TextAreaPropsSchema>;
@@ -21,7 +27,9 @@ const TextAreaComponent = ({
   defaultValue,
 }: TextAreaProps) => (
   <div className="flex flex-col gap-1.5">
-    <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
+    <label htmlFor={name} className="text-sm font-medium text-gray-700">
+      {label}
+    </label>
     <textarea
       id={name}
       name={name}

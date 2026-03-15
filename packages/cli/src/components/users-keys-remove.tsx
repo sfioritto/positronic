@@ -14,10 +14,22 @@ interface User {
   createdAt: number;
 }
 
-export const UsersKeysRemove = ({ userName, fingerprint, force }: UsersKeysRemoveProps) => {
+export const UsersKeysRemove = ({
+  userName,
+  fingerprint,
+  force,
+}: UsersKeysRemoveProps) => {
   const { exit } = useApp();
-  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userName}`);
-  const { loading: deleting, error: deleteError, execute } = useApiDelete('key');
+  const {
+    data: user,
+    loading: loadingUser,
+    error: userError,
+  } = useApiGet<User>(`/users/${userName}`);
+  const {
+    loading: deleting,
+    error: deleteError,
+    execute,
+  } = useApiDelete('key');
   const [confirmed, setConfirmed] = useState(force);
   const [deleted, setDeleted] = useState(false);
   const [deletionStarted, setDeletionStarted] = useState(false);
@@ -26,7 +38,9 @@ export const UsersKeysRemove = ({ userName, fingerprint, force }: UsersKeysRemov
     if (deletionStarted) return;
     setDeletionStarted(true);
     try {
-      await execute(`/users/${userName}/keys/${encodeURIComponent(fingerprint)}`);
+      await execute(
+        `/users/${userName}/keys/${encodeURIComponent(fingerprint)}`
+      );
       setDeleted(true);
     } catch {
       // Error is handled by the hook
@@ -96,7 +110,8 @@ export const UsersKeysRemove = ({ userName, fingerprint, force }: UsersKeysRemov
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
         <Text>
-          Are you sure you want to remove this key from user <Text bold>"{user.name}"</Text>?
+          Are you sure you want to remove this key from user{' '}
+          <Text bold>"{user.name}"</Text>?
         </Text>
         <Text dimColor>Fingerprint: {fingerprint}</Text>
         <Box marginTop={1}>

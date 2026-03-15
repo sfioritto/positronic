@@ -1,11 +1,27 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { ObjectGenerator, ToolMessage, ResponseMessage } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentToolWaitFor, SignalProvider, CurrentUser } from '../types.js';
+import type {
+  ObjectGenerator,
+  ToolMessage,
+  ResponseMessage,
+} from '../../clients/types.js';
+import type {
+  State,
+  JsonObject,
+  RuntimeEnv,
+  AgentTool,
+  AgentConfig,
+  AgentToolWaitFor,
+  SignalProvider,
+  CurrentUser,
+} from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
 import type { Resources } from '../../resources/resources.js';
-import type { WebhookRegistration, SerializedWebhookRegistration } from '../webhook.js';
+import type {
+  WebhookRegistration,
+  SerializedWebhookRegistration,
+} from '../webhook.js';
 import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generateUI } from '../../ui/generate-ui.js';
@@ -15,9 +31,20 @@ import { createScopedMemory } from '../../memory/scoped-memory.js';
 import type { Store } from '../../store/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
-import type { Block, StepBlock, BrainBlock, AgentBlock, GuardBlock, WaitBlock } from '../definitions/blocks.js';
+import type {
+  Block,
+  StepBlock,
+  BrainBlock,
+  AgentBlock,
+  GuardBlock,
+  WaitBlock,
+} from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
-import type { InitialRunParams, ResumeRunParams, ResumeContext } from '../definitions/run-params.js';
+import type {
+  InitialRunParams,
+  ResumeRunParams,
+  ResumeContext,
+} from '../definitions/run-params.js';
 
 import { Step } from '../builder/step.js';
 import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT } from './constants.js';
@@ -118,7 +145,11 @@ export class BrainEventStream<
 
     // Create scoped memory if provider is configured
     if (memoryProvider) {
-      this.scopedMemory = createScopedMemory(memoryProvider, title, this.currentUser.name);
+      this.scopedMemory = createScopedMemory(
+        memoryProvider,
+        title,
+        this.currentUser.name
+      );
     }
 
     // Initialize steps - track guard and wait blocks by index
@@ -146,7 +177,11 @@ export class BrainEventStream<
 
       // For inner brains (no signalProvider), check resumeContext for webhookResponse
       // The outer brain will have set this from the signal
-      if (!signalProvider && resumeContext.webhookResponse && !resumeContext.agentContext) {
+      if (
+        !signalProvider &&
+        resumeContext.webhookResponse &&
+        !resumeContext.agentContext
+      ) {
         this.currentResponse = resumeContext.webhookResponse;
       }
       // Agent webhook response is handled via agentContext (checked in executeAgent)
@@ -163,7 +198,9 @@ export class BrainEventStream<
   /**
    * Find webhookResponse anywhere in the resumeContext tree (for nested brain resumes)
    */
-  private findWebhookResponseInResumeContext(context: ResumeContext | undefined): JsonObject | undefined {
+  private findWebhookResponseInResumeContext(
+    context: ResumeContext | undefined
+  ): JsonObject | undefined {
     if (!context) return undefined;
     if (context.webhookResponse) return context.webhookResponse;
     return this.findWebhookResponseInResumeContext(context.innerResumeContext);
@@ -212,7 +249,9 @@ export class BrainEventStream<
           // Outer brain: consume only WEBHOOK signals at resume start
           // Other signals (USER_MESSAGE, CONTROL) remain in queue for processing in step/agent loops
           const signals = await this.signalProvider.getSignals('WEBHOOK');
-          const webhookSignal = signals.find(s => s.type === 'WEBHOOK_RESPONSE');
+          const webhookSignal = signals.find(
+            (s) => s.type === 'WEBHOOK_RESPONSE'
+          );
 
           if (webhookSignal && webhookSignal.type === 'WEBHOOK_RESPONSE') {
             webhookResponse = webhookSignal.response;
@@ -235,7 +274,9 @@ export class BrainEventStream<
         } else {
           // Inner brain (no signalProvider): check resumeContext for webhookResponse
           // The outer brain will have set this from the signal
-          webhookResponse = this.findWebhookResponseInResumeContext(this.resumeContext);
+          webhookResponse = this.findWebhookResponseInResumeContext(
+            this.resumeContext
+          );
         }
 
         if (webhookResponse) {
@@ -293,7 +334,10 @@ export class BrainEventStream<
         const step = steps[this.currentStepIndex];
 
         // Skip completed or skipped steps
-        if (step.serialized.status === STATUS.COMPLETE || step.serialized.status === STATUS.HALTED) {
+        if (
+          step.serialized.status === STATUS.COMPLETE ||
+          step.serialized.status === STATUS.HALTED
+        ) {
           this.currentStepIndex++;
           continue;
         }
@@ -406,7 +450,14 @@ export class BrainEventStream<
     const block = step.block as Block<any, any, TOptions, TServices, any, any>;
 
     if (block.type === 'step') {
-      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
+      const stepBlock = block as StepBlock<
+        any,
+        any,
+        TOptions,
+        TServices,
+        any,
+        any
+      >;
 
       // Check if this is a UI step - handle specially
       if (stepBlock.isUIStep) {
@@ -422,7 +473,13 @@ export class BrainEventStream<
     }
 
     if (block.type === 'brain') {
-      const brainBlock = block as BrainBlock<any, any, any, TOptions, TServices>;
+      const brainBlock = block as BrainBlock<
+        any,
+        any,
+        any,
+        TOptions,
+        TServices
+      >;
       if (brainBlock.iterateConfig) {
         yield* this.executeIterateBrain(step);
         return;
@@ -501,7 +558,15 @@ export class BrainEventStream<
       );
       yield* this.completeStep(step, prevState);
     } else if (block.type === 'agent') {
-      const agentBlock = block as AgentBlock<any, any, TOptions, TServices, any, any, any>;
+      const agentBlock = block as AgentBlock<
+        any,
+        any,
+        TOptions,
+        TServices,
+        any,
+        any,
+        any
+      >;
       if (agentBlock.iterateConfig) {
         yield* this.executeIterateAgent(step);
         return;
@@ -512,12 +577,21 @@ export class BrainEventStream<
     } else {
       // Get previous state before action
       const prevState = this.currentState;
-      const stepBlock = block as StepBlock<any, any, TOptions, TServices, any, any>;
+      const stepBlock = block as StepBlock<
+        any,
+        any,
+        TOptions,
+        TServices,
+        any,
+        any
+      >;
 
       // Resolve per-step client: if the step has an override, apply governor to it;
       // otherwise use the default (already-governed) client
       const stepClient = stepBlock.client
-        ? (this.governor ? this.governor(stepBlock.client) : stepBlock.client)
+        ? this.governor
+          ? this.governor(stepBlock.client)
+          : stepBlock.client
         : this.client;
 
       const result = await Promise.resolve(
@@ -555,8 +629,18 @@ export class BrainEventStream<
     }
   }
 
-  private async *executeAgent(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as AgentBlock<any, any, TOptions, TServices, any, any, any>;
+  private async *executeAgent(
+    step: Step
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as AgentBlock<
+      any,
+      any,
+      TOptions,
+      TServices,
+      any,
+      any,
+      any
+    >;
     const prevState = this.currentState;
 
     // Combine default tools and extra tools for injection into configFn
@@ -588,7 +672,10 @@ export class BrainEventStream<
     this.currentPage = undefined;
 
     // Merge tools: step tools override defaults + extras
-    const mergedTools: Record<string, AgentTool<any>> = { ...allTools, ...(config.tools ?? {}) };
+    const mergedTools: Record<string, AgentTool<any>> = {
+      ...allTools,
+      ...(config.tools ?? {}),
+    };
 
     // Always generate a 'done' terminal tool for every agent
     // If outputSchema is provided, use that schema; otherwise use defaultDoneSchema
@@ -661,9 +748,12 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
     const effectiveStepId = agentContext?.stepId ?? step.id;
 
     if (agentContext) {
-
       // Check if this is a webhook resume (has webhook response) or pause resume
-      if (webhookResponse && agentContext.pendingToolCallId && agentContext.pendingToolName) {
+      if (
+        webhookResponse &&
+        agentContext.pendingToolCallId &&
+        agentContext.pendingToolName
+      ) {
         // WEBHOOK RESUME: Agent was waiting for a webhook response
 
         // Emit WEBHOOK_RESPONSE event to record the response
@@ -690,7 +780,10 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
         // Prepend the user message and append the webhook response
         // Note: reconstructed messages don't include the placeholder (we don't emit events for it),
         // so we just append the real webhook response here.
-        const userMessage: ResponseMessage = { role: 'user', content: agentContext.prompt };
+        const userMessage: ResponseMessage = {
+          role: 'user',
+          content: agentContext.prompt,
+        };
 
         if (this.client.createToolResultMessage) {
           const toolResultMessage = this.client.createToolResultMessage(
@@ -699,7 +792,11 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
             webhookResponse
           );
 
-          responseMessages = [userMessage, ...agentContext.responseMessages, toolResultMessage];
+          responseMessages = [
+            userMessage,
+            ...agentContext.responseMessages,
+            toolResultMessage,
+          ];
 
           // Emit event for this tool result message (for reconstruction if there's another pause)
           yield {
@@ -722,7 +819,10 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
         // PAUSE RESUME: Agent was paused mid-execution (no pending webhook)
         // Restore conversation history and continue from where we left off
 
-        const userMessage: ResponseMessage = { role: 'user', content: agentContext.prompt };
+        const userMessage: ResponseMessage = {
+          role: 'user',
+          content: agentContext.prompt,
+        };
         responseMessages = [userMessage, ...agentContext.responseMessages];
         initialMessages = [];
 
@@ -798,11 +898,17 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
             };
 
             // Inject as user message into conversation
-            const userMessage: ResponseMessage = { role: 'user', content: signal.content };
+            const userMessage: ResponseMessage = {
+              role: 'user',
+              content: signal.content,
+            };
             if (responseMessages) {
               responseMessages = [...responseMessages, userMessage];
             } else {
-              initialMessages = [...initialMessages, { role: 'user', content: signal.content }];
+              initialMessages = [
+                ...initialMessages,
+                { role: 'user', content: signal.content },
+              ];
             }
 
             // Emit raw response message event so it shows up in agent chat view
@@ -851,7 +957,11 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
         let description = tool.description;
 
         // Enrich generateUI description with available component information
-        if (name === 'generateUI' && components && Object.keys(components).length > 0) {
+        if (
+          name === 'generateUI' &&
+          components &&
+          Object.keys(components).length > 0
+        ) {
           const componentList = Object.entries(components)
             .map(([compName, comp]) => {
               const desc = comp.description.split('\n')[0]; // First line only
@@ -1013,7 +1123,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             };
           } else {
             // Default behavior: spread into state root (for other terminal tools)
-            this.currentState = { ...this.currentState, ...(toolCall.args as JsonObject) };
+            this.currentState = {
+              ...this.currentState,
+              ...(toolCall.args as JsonObject),
+            };
           }
           return;
         }
@@ -1072,7 +1185,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               stepId: effectiveStepId,
               toolName: toolCall.toolName,
               toolCallId: toolCall.toolCallId,
-              result: { status: 'waiting_for_webhook', webhooks: pendingWebhook.webhooks },
+              result: {
+                status: 'waiting_for_webhook',
+                webhooks: pendingWebhook.webhooks,
+              },
               options: this.options ?? ({} as TOptions),
               brainRunId: this.brainRunId,
             };
@@ -1085,7 +1201,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               const placeholderMessage = this.client.createToolResultMessage(
                 toolCall.toolCallId,
                 toolCall.toolName,
-                { status: 'waiting_for_webhook', webhooks: pendingWebhook.webhooks }
+                {
+                  status: 'waiting_for_webhook',
+                  webhooks: pendingWebhook.webhooks,
+                }
               );
               responseMessages = [...responseMessages, placeholderMessage];
             }
@@ -1147,7 +1266,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         yield {
           type: BRAIN_EVENTS.WEBHOOK,
           waitFor: pendingWebhook.webhooks,
-          ...(pendingWebhook.timeout !== undefined && { timeout: pendingWebhook.timeout }),
+          ...(pendingWebhook.timeout !== undefined && {
+            timeout: pendingWebhook.timeout,
+          }),
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
@@ -1161,13 +1282,24 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
    * event per item. Between items, checks for PAUSE/KILL signals so
    * Cloudflare backends can restart the DO to reclaim memory.
    */
-  private async *executeIteratePrompt(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as StepBlock<any, any, TOptions, TServices, any, any>;
+  private async *executeIteratePrompt(
+    step: Step
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as StepBlock<
+      any,
+      any,
+      TOptions,
+      TServices,
+      any,
+      any
+    >;
     const iterateConfig = block.iterateConfig!;
     const prevState = this.currentState;
     const rawClient = iterateConfig.client;
     const client = rawClient
-      ? (this.governor ? this.governor(rawClient) : rawClient)
+      ? this.governor
+        ? this.governor(rawClient)
+        : rawClient
       : this.client;
     const items = iterateConfig.over(this.currentState);
     const totalItems = items.length;
@@ -1175,9 +1307,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Resume support: pick up from where we left off
     const iterateProgress = this.resumeContext?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
-    const results: ([any, any] | undefined)[] = iterateProgress?.accumulatedResults
-      ? [...iterateProgress.accumulatedResults]
-      : new Array(totalItems);
+    const results: ([any, any] | undefined)[] =
+      iterateProgress?.accumulatedResults
+        ? [...iterateProgress.accumulatedResults]
+        : new Array(totalItems);
 
     // Clear resumeContext after consuming iterateProgress
     if (iterateProgress) {
@@ -1225,7 +1358,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       } catch (error) {
         if (iterateConfig.error) {
           const fallback = iterateConfig.error(item, error as Error);
-          result = fallback !== null ? ([item, fallback] as [any, any]) : undefined;
+          result =
+            fallback !== null ? ([item, fallback] as [any, any]) : undefined;
         } else {
           throw error;
         }
@@ -1252,9 +1386,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // All items done - update state and complete step
     const finalResults = results.filter((r): r is [any, any] => r != null);
     const outputResults = iterateConfig.mapOutput
-      ? finalResults.map(([item, result]) => iterateConfig.mapOutput!(result, item))
+      ? finalResults.map(([item, result]) =>
+          iterateConfig.mapOutput!(result, item)
+        )
       : finalResults;
-    this.currentState = { ...this.currentState, [iterateConfig.schemaName]: outputResults };
+    this.currentState = {
+      ...this.currentState,
+      [iterateConfig.schemaName]: outputResults,
+    };
     yield* this.completeStep(step, prevState);
   }
 
@@ -1262,7 +1401,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
    * Execute a nested brain iterate step. Runs the inner brain once per item
    * from the `over` list, collects [item, innerState] tuples under `outputKey`.
    */
-  private async *executeIterateBrain(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
+  private async *executeIterateBrain(
+    step: Step
+  ): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as BrainBlock<any, any, any, TOptions, TServices>;
     const iterateConfig = block.iterateConfig!;
     const prevState = this.currentState;
@@ -1272,9 +1413,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Resume support
     const iterateProgress = this.resumeContext?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
-    const results: ([any, any] | undefined)[] = iterateProgress?.accumulatedResults
-      ? [...iterateProgress.accumulatedResults]
-      : new Array(totalItems);
+    const results: ([any, any] | undefined)[] =
+      iterateProgress?.accumulatedResults
+        ? [...iterateProgress.accumulatedResults]
+        : new Array(totalItems);
 
     if (iterateProgress) {
       this.resumeContext = undefined;
@@ -1308,7 +1450,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       let result: [any, any] | undefined;
 
       try {
-        const initialState = iterateConfig.initialState(item, this.currentState);
+        const initialState = iterateConfig.initialState(
+          item,
+          this.currentState
+        );
 
         const innerRun = block.innerBrain.run({
           resources: this.resources,
@@ -1328,8 +1473,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           if (event.type === BRAIN_EVENTS.WEBHOOK) {
             throw new Error(
               `Webhook/wait inside brain iterate is not supported. ` +
-              `Step "${block.title}" item ${i} triggered a webhook. ` +
-              `Remove .wait() from the inner brain or process items outside of iterate.`
+                `Step "${block.title}" item ${i} triggered a webhook. ` +
+                `Remove .wait() from the inner brain or process items outside of iterate.`
             );
           }
           yield event; // Forward all inner events
@@ -1371,9 +1516,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     const finalResults = results.filter((r): r is [any, any] => r != null);
     const outputResults = iterateConfig.mapOutput
-      ? finalResults.map(([item, result]) => iterateConfig.mapOutput!(result, item))
+      ? finalResults.map(([item, result]) =>
+          iterateConfig.mapOutput!(result, item)
+        )
       : finalResults;
-    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: outputResults };
+    this.currentState = {
+      ...this.currentState,
+      [iterateConfig.outputKey]: outputResults,
+    };
     yield* this.completeStep(step, prevState);
   }
 
@@ -1381,8 +1531,18 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
    * Execute an agent config iterate step. Runs the agent once per item
    * from the `over` list, collects [item, agentResult] tuples under `outputKey`.
    */
-  private async *executeIterateAgent(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as AgentBlock<any, any, TOptions, TServices, any, any, any>;
+  private async *executeIterateAgent(
+    step: Step
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as AgentBlock<
+      any,
+      any,
+      TOptions,
+      TServices,
+      any,
+      any,
+      any
+    >;
     const iterateConfig = block.iterateConfig!;
     const prevState = this.currentState;
     const items = iterateConfig.over(this.currentState);
@@ -1391,9 +1551,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Resume support
     const iterateProgress = this.resumeContext?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
-    const results: ([any, any] | undefined)[] = iterateProgress?.accumulatedResults
-      ? [...iterateProgress.accumulatedResults]
-      : new Array(totalItems);
+    const results: ([any, any] | undefined)[] =
+      iterateProgress?.accumulatedResults
+        ? [...iterateProgress.accumulatedResults]
+        : new Array(totalItems);
 
     if (iterateProgress) {
       this.resumeContext = undefined;
@@ -1431,10 +1592,19 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         const savedState = this.currentState;
 
         // Create a wrapper configFn that injects the item as the first argument
-        const itemConfigFn = (params: any) => (block.configFn as any)(item, params);
+        const itemConfigFn = (params: any) =>
+          (block.configFn as any)(item, params);
 
         // Create a temporary agent block with the per-item configFn
-        const tempBlock: AgentBlock<any, any, TOptions, TServices, any, any, any> = {
+        const tempBlock: AgentBlock<
+          any,
+          any,
+          TOptions,
+          TServices,
+          any,
+          any,
+          any
+        > = {
           type: 'agent',
           title: block.title,
           configFn: itemConfigFn,
@@ -1475,9 +1645,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     const finalResults = results.filter((r): r is [any, any] => r != null);
     const outputResults = iterateConfig.mapOutput
-      ? finalResults.map(([item, result]) => iterateConfig.mapOutput!(result, item))
+      ? finalResults.map(([item, result]) =>
+          iterateConfig.mapOutput!(result, item)
+        )
       : finalResults;
-    this.currentState = { ...this.currentState, [iterateConfig.outputKey]: outputResults };
+    this.currentState = {
+      ...this.currentState,
+      [iterateConfig.outputKey]: outputResults,
+    };
     yield* this.completeStep(step, prevState);
   }
 
@@ -1520,20 +1695,20 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       // Provide detailed debug information
       const placementCount = uiResult.placements.length;
       const placementInfo = uiResult.placements
-        .map(p => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
+        .map((p) => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
         .join(', ');
 
       if (placementCount === 0) {
         throw new Error(
           `UI generation failed for step "${stepBlock.title}" - no components were placed. ` +
-          `The LLM may not have called any component tools. ` +
-          `LLM response text: ${uiResult.text ?? '(none)'}`
+            `The LLM may not have called any component tools. ` +
+            `LLM response text: ${uiResult.text ?? '(none)'}`
         );
       } else {
         throw new Error(
           `UI generation failed for step "${stepBlock.title}" - no root component found. ` +
-          `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
-          `The first component should be placed without a parentId to serve as the root.`
+            `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
+            `The first component should be placed without a parentId to serve as the root.`
         );
       }
     }
@@ -1545,7 +1720,11 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const formToken = crypto.randomUUID();
 
     // Construct form action URL for the webhook
-    const formAction = `${this.env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
+    const formAction = `${
+      this.env.origin
+    }/webhooks/system/ui-form?identifier=${encodeURIComponent(
+      webhookIdentifier
+    )}`;
 
     // Generate HTML page
     const html = generatePageHtml({
@@ -1665,7 +1844,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     guard: GuardBlock<any, any>
   ): Generator<BrainEvent<TOptions>> {
     const { steps, options, brainRunId } = this;
-    const predicateResult = guard.predicate({ state: this.currentState, options: this.options });
+    const predicateResult = guard.predicate({
+      state: this.currentState,
+      options: this.options,
+    });
 
     // Emit STEP_START for the guard
     yield {

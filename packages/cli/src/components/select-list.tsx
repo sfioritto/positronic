@@ -57,7 +57,11 @@ export const SelectList = ({
         {items.map((item, index) => {
           const isSelected = index === selectedIndex;
           return (
-            <Box key={item.id} flexDirection="column" marginBottom={item.description ? 1 : 0}>
+            <Box
+              key={item.id}
+              flexDirection="column"
+              marginBottom={item.description ? 1 : 0}
+            >
               <Text color={isSelected ? 'cyan' : undefined}>
                 {isSelected ? '▶ ' : '  '}
                 <Text bold>{item.label}</Text>

@@ -9,7 +9,10 @@ interface ProjectAddProps {
 }
 
 export const ProjectAdd = ({ name, url, projectConfig }: ProjectAddProps) => {
-  const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{
+    success: boolean;
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
     const addResult = projectConfig.addProject(name, url);
@@ -33,7 +36,8 @@ export const ProjectAdd = ({ name, url, projectConfig }: ProjectAddProps) => {
           </Text>
           {isCurrentProject && (
             <Text>
-              <Text bold>Status:</Text> <Text color="cyan">Current project</Text>
+              <Text bold>Status:</Text>{' '}
+              <Text color="cyan">Current project</Text>
             </Text>
           )}
         </Box>

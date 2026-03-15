@@ -6,7 +6,18 @@ import {
   fetchMock,
 } from 'cloudflare:test';
 import worker from '../src/index';
-import { testStatus, resources, brains, schedules, webhooks, pages, secrets, signals, auth, store } from '@positronic/spec';
+import {
+  testStatus,
+  resources,
+  brains,
+  schedules,
+  webhooks,
+  pages,
+  secrets,
+  signals,
+  auth,
+  store,
+} from '@positronic/spec';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedFetchWrapper } from './test-auth-helper';
 
@@ -88,7 +99,7 @@ describe('Positronic Spec', () => {
 
     it('passes POST /brains/runs with options test', async () => {
       const brainRunId = await brains.runWithOptions(
-        createFetch(), 
+        createFetch(),
         'options-brain',
         { environment: 'test', debug: 'true' }
       );
@@ -97,7 +108,10 @@ describe('Positronic Spec', () => {
     });
 
     it('passes POST /brains/runs with non-existent brain test (404)', async () => {
-      const result = await brains.runNotFound(createFetch(), 'non-existent-brain');
+      const result = await brains.runNotFound(
+        createFetch(),
+        'non-existent-brain'
+      );
       expect(result).toBe(true);
     });
 
@@ -122,7 +136,10 @@ describe('Positronic Spec', () => {
     });
 
     it('passes GET /brains/runs/:runId test with non-existent run (404)', async () => {
-      const result = await brains.getRunNotFound(createFetch(), 'non-existent-run-id');
+      const result = await brains.getRunNotFound(
+        createFetch(),
+        'non-existent-run-id'
+      );
       expect(result).toBe(true);
     });
 
@@ -139,7 +156,10 @@ describe('Positronic Spec', () => {
     });
 
     it('passes agent events spec test (AGENT_START, AGENT_ITERATION, AGENT_TOOL_CALL, AGENT_WEBHOOK)', async () => {
-      const result = await brains.watchAgentEvents(createFetch(), 'agent-webhook-brain');
+      const result = await brains.watchAgentEvents(
+        createFetch(),
+        'agent-webhook-brain'
+      );
       expect(result).toBe(true);
     });
 
@@ -224,23 +244,36 @@ describe('Positronic Spec', () => {
     });
 
     it('passes POST /webhooks/:slug with non-existent webhook test (404)', async () => {
-      const result = await webhooks.notFound(createFetch(), 'non-existent-webhook');
+      const result = await webhooks.notFound(
+        createFetch(),
+        'non-existent-webhook'
+      );
       expect(result).toBe(true);
     });
 
     it('passes POST /webhooks/system/ui-form test', async () => {
-      const result = await webhooks.uiForm(createFetch(), 'test-identifier-123', {
-        name: 'Test User',
-        email: 'test@example.com',
-      }, 'test-csrf-token-123');
+      const result = await webhooks.uiForm(
+        createFetch(),
+        'test-identifier-123',
+        {
+          name: 'Test User',
+          email: 'test@example.com',
+        },
+        'test-csrf-token-123'
+      );
       expect(result).toBe(true);
     });
 
     it('passes POST /webhooks/system/ui-form with array values test', async () => {
-      const result = await webhooks.uiForm(createFetch(), 'test-identifier-456', {
-        selectedItems: ['item1', 'item2', 'item3'],
-        name: 'Test User',
-      }, 'test-csrf-token-456');
+      const result = await webhooks.uiForm(
+        createFetch(),
+        'test-identifier-456',
+        {
+          selectedItems: ['item1', 'item2', 'item3'],
+          name: 'Test User',
+        },
+        'test-csrf-token-456'
+      );
       expect(result).toBe(true);
     });
 
@@ -250,15 +283,23 @@ describe('Positronic Spec', () => {
     });
 
     it('passes POST /webhooks/system/ui-form missing token test (403)', async () => {
-      const result = await webhooks.uiFormMissingToken(createFetch(), 'test-identifier-no-token');
+      const result = await webhooks.uiFormMissingToken(
+        createFetch(),
+        'test-identifier-no-token'
+      );
       expect(result).toBe(true);
     });
 
     it('passes POST /webhooks/system/ui-form wrong token test (not 200)', async () => {
-      const result = await webhooks.uiFormWrongToken(createFetch(), 'test-identifier-wrong-token', {
-        name: 'Test User',
-        email: 'test@example.com',
-      }, 'definitely-wrong-token');
+      const result = await webhooks.uiFormWrongToken(
+        createFetch(),
+        'test-identifier-wrong-token',
+        {
+          name: 'Test User',
+          email: 'test@example.com',
+        },
+        'definitely-wrong-token'
+      );
       expect(result).toBe(true);
     });
   });
@@ -294,7 +335,11 @@ describe('Positronic Spec', () => {
       const brainRunId = await brains.run(createFetch(), 'basic-brain');
       expect(brainRunId).toBeTruthy();
 
-      const result = await signals.sendMessage(createFetch(), brainRunId!, 'Hello from test');
+      const result = await signals.sendMessage(
+        createFetch(),
+        brainRunId!,
+        'Hello from test'
+      );
       expect(result).toBe(true);
     });
 
@@ -311,7 +356,7 @@ describe('Positronic Spec', () => {
 
       // Wait for the brain to enter paused state (after first step completes)
       // The delayed-brain has a 1.5s delay in its first step, and PAUSE is checked before second step
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Then resume it
       const result = await signals.resume(createFetch(), brainRunId!);
@@ -327,7 +372,7 @@ describe('Positronic Spec', () => {
       await signals.pause(createFetch(), brainRunId!);
 
       // Wait for the brain to enter paused state (after first step completes)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Then resume using the RESUME signal (alternative to /resume endpoint)
       const result = await signals.resumeSignal(createFetch(), brainRunId!);
@@ -340,7 +385,7 @@ describe('Positronic Spec', () => {
       expect(brainRunId).toBeTruthy();
 
       // Wait for the brain to enter waiting state (after first step completes and emits WEBHOOK event)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Send webhook response via signal endpoint
       const result = await signals.webhookResponse(createFetch(), brainRunId!, {
@@ -361,7 +406,10 @@ describe('Positronic Spec', () => {
     });
 
     it('passes POST /brains/runs/:runId/signals not found (404) test', async () => {
-      const result = await signals.signalNotFound(createFetch(), 'non-existent-run-id');
+      const result = await signals.signalNotFound(
+        createFetch(),
+        'non-existent-run-id'
+      );
       expect(result).toBe(true);
     });
   });
@@ -376,7 +424,8 @@ describe('Positronic Spec', () => {
   describe('Secrets', () => {
     // Mock the Cloudflare API for secrets management
     const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com';
-    const SECRETS_PATH = '/client/v4/accounts/test-account-id/workers/scripts/test-project/secrets';
+    const SECRETS_PATH =
+      '/client/v4/accounts/test-account-id/workers/scripts/test-project/secrets';
 
     // Track mock secrets for realistic responses
     let mockSecrets: Array<{ name: string; type: string }> = [];
@@ -418,7 +467,11 @@ describe('Positronic Spec', () => {
           errors: [],
         });
 
-      const result = await secrets.create(createFetch(), 'TEST_SECRET', 'test-value');
+      const result = await secrets.create(
+        createFetch(),
+        'TEST_SECRET',
+        'test-value'
+      );
       expect(result).toBe(true);
     });
 
@@ -439,7 +492,10 @@ describe('Positronic Spec', () => {
       // Mock delete (delete still uses name in URL)
       fetchMock
         .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: `${SECRETS_PATH}/SECRET_TO_DELETE`, method: 'DELETE' })
+        .intercept({
+          path: `${SECRETS_PATH}/SECRET_TO_DELETE`,
+          method: 'DELETE',
+        })
         .reply(200, {
           success: true,
           result: null,
@@ -580,7 +636,11 @@ describe('Positronic Spec', () => {
     });
 
     it('passes GET /store/:brainTitle/shared/:key test', async () => {
-      const result = await store.getSharedValue(createFetch(), 'test-brain', 'settings');
+      const result = await store.getSharedValue(
+        createFetch(),
+        'test-brain',
+        'settings'
+      );
       expect(result).toBe(true);
     });
 
@@ -594,16 +654,23 @@ describe('Positronic Spec', () => {
 
       // Seed a per-user key for root test (won't match since root has no userName)
       // Instead, just verify the endpoint returns 404 for root (no userName)
-      const request = new Request('http://example.com/store/test-brain/user/preferences', {
-        method: 'GET',
-      });
+      const request = new Request(
+        'http://example.com/store/test-brain/user/preferences',
+        {
+          method: 'GET',
+        }
+      );
       const response = await createFetch()(request);
       // Root user has null userName, so the key path won't match - expect 404
       expect(response.status).toBe(404);
     });
 
     it('passes DELETE /store/:brainTitle/shared/:key test', async () => {
-      const result = await store.deleteSharedKey(createFetch(), 'test-brain', 'config');
+      const result = await store.deleteSharedKey(
+        createFetch(),
+        'test-brain',
+        'config'
+      );
       expect(result).toBe(true);
 
       // Verify it's actually deleted
@@ -613,7 +680,11 @@ describe('Positronic Spec', () => {
     });
 
     it('passes DELETE /store/:brainTitle/user/:key test', async () => {
-      const result = await store.deleteUserKey(createFetch(), 'test-brain', 'preferences');
+      const result = await store.deleteUserKey(
+        createFetch(),
+        'test-brain',
+        'preferences'
+      );
       expect(result).toBe(true);
     });
 
@@ -623,28 +694,35 @@ describe('Positronic Spec', () => {
     });
 
     it('returns correct brain list from GET /store', async () => {
-      const request = new Request('http://example.com/store', { method: 'GET' });
+      const request = new Request('http://example.com/store', {
+        method: 'GET',
+      });
       const response = await createFetch()(request);
       expect(response.status).toBe(200);
 
-      const data = await response.json() as { brains: string[]; count: number };
+      const data = (await response.json()) as {
+        brains: string[];
+        count: number;
+      };
       expect(data.brains).toContain('test-brain');
       expect(data.brains).toContain('other-brain');
       expect(data.count).toBe(2);
     });
 
     it('returns correct keys from GET /store/:brainTitle', async () => {
-      const request = new Request('http://example.com/store/test-brain', { method: 'GET' });
+      const request = new Request('http://example.com/store/test-brain', {
+        method: 'GET',
+      });
       const response = await createFetch()(request);
       expect(response.status).toBe(200);
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         keys: Array<{ key: string; scope: string; userName?: string }>;
         count: number;
       };
 
       // Root sees all: shared + per-user
-      const keyNames = data.keys.map(k => k.key);
+      const keyNames = data.keys.map((k) => k.key);
       expect(keyNames).toContain('settings');
       expect(keyNames).toContain('config');
       expect(keyNames).toContain('preferences');

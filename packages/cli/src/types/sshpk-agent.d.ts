@@ -23,20 +23,14 @@ declare module 'sshpk-agent' {
       callback: (err: Error | null, signature: sshpk.Signature) => void
     ): void;
 
-    addKey(
-      key: sshpk.PrivateKey,
-      callback: (err: Error | null) => void
-    ): void;
+    addKey(key: sshpk.PrivateKey, callback: (err: Error | null) => void): void;
     addKey(
       key: sshpk.PrivateKey,
       options: { expires?: number; confirm?: boolean },
       callback: (err: Error | null) => void
     ): void;
 
-    removeKey(
-      key: sshpk.Key,
-      callback: (err: Error | null) => void
-    ): void;
+    removeKey(key: sshpk.Key, callback: (err: Error | null) => void): void;
 
     removeAllKeys(callback: (err: Error | null) => void): void;
 

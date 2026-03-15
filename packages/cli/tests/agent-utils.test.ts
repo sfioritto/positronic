@@ -47,14 +47,17 @@ describe('getAgentLoops', () => {
         status: 'running',
         initialState: {},
       }),
-      createStoredEvent({
-        type: BRAIN_EVENTS.STEP_START,
-        brainRunId: 'run-1',
-        stepTitle: 'Step 1',
-        stepId: 'step-1',
-        options: {},
-        status: 'running',
-      }, 100),
+      createStoredEvent(
+        {
+          type: BRAIN_EVENTS.STEP_START,
+          brainRunId: 'run-1',
+          stepTitle: 'Step 1',
+          stepId: 'step-1',
+          options: {},
+          status: 'running',
+        },
+        100
+      ),
     ];
 
     const result = getAgentLoops(events);
@@ -94,24 +97,30 @@ describe('getAgentLoops', () => {
         prompt: 'Process this data',
         options: {},
       }),
-      createStoredEvent({
-        type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-        brainRunId: 'run-1',
-        stepTitle: 'process-data',
-        stepId: 'agent-1',
-        iteration: 1,
-        message: { role: 'assistant', content: 'Hello' },
-        options: {},
-      }, 100),
-      createStoredEvent({
-        type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-        brainRunId: 'run-1',
-        stepTitle: 'process-data',
-        stepId: 'agent-1',
-        iteration: 2,
-        message: { role: 'assistant', content: 'World' },
-        options: {},
-      }, 200),
+      createStoredEvent(
+        {
+          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+          brainRunId: 'run-1',
+          stepTitle: 'process-data',
+          stepId: 'agent-1',
+          iteration: 1,
+          message: { role: 'assistant', content: 'Hello' },
+          options: {},
+        },
+        100
+      ),
+      createStoredEvent(
+        {
+          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+          brainRunId: 'run-1',
+          stepTitle: 'process-data',
+          stepId: 'agent-1',
+          iteration: 2,
+          message: { role: 'assistant', content: 'World' },
+          options: {},
+        },
+        200
+      ),
     ];
 
     const result = getAgentLoops(events);
@@ -131,32 +140,41 @@ describe('getAgentLoops', () => {
         prompt: 'First agent',
         options: {},
       }),
-      createStoredEvent({
-        type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-        brainRunId: 'run-1',
-        stepTitle: 'agent-one',
-        stepId: 'agent-1',
-        iteration: 1,
-        message: { role: 'assistant', content: 'Agent 1 response' },
-        options: {},
-      }, 100),
-      createStoredEvent({
-        type: BRAIN_EVENTS.AGENT_START,
-        brainRunId: 'run-1',
-        stepTitle: 'agent-two',
-        stepId: 'agent-2',
-        prompt: 'Second agent',
-        options: {},
-      }, 200),
-      createStoredEvent({
-        type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-        brainRunId: 'run-1',
-        stepTitle: 'agent-two',
-        stepId: 'agent-2',
-        iteration: 1,
-        message: { role: 'assistant', content: 'Agent 2 response' },
-        options: {},
-      }, 300),
+      createStoredEvent(
+        {
+          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+          brainRunId: 'run-1',
+          stepTitle: 'agent-one',
+          stepId: 'agent-1',
+          iteration: 1,
+          message: { role: 'assistant', content: 'Agent 1 response' },
+          options: {},
+        },
+        100
+      ),
+      createStoredEvent(
+        {
+          type: BRAIN_EVENTS.AGENT_START,
+          brainRunId: 'run-1',
+          stepTitle: 'agent-two',
+          stepId: 'agent-2',
+          prompt: 'Second agent',
+          options: {},
+        },
+        200
+      ),
+      createStoredEvent(
+        {
+          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
+          brainRunId: 'run-1',
+          stepTitle: 'agent-two',
+          stepId: 'agent-2',
+          iteration: 1,
+          message: { role: 'assistant', content: 'Agent 2 response' },
+          options: {},
+        },
+        300
+      ),
     ];
 
     const result = getAgentLoops(events);
@@ -225,5 +243,4 @@ describe('getAgentLoops', () => {
     expect(result[0].startEvent.system).toBe('You are a helpful assistant.');
     expect(result[0].startEvent.tools).toEqual(['search', 'calculate']);
   });
-
 });

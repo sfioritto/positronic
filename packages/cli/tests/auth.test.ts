@@ -102,7 +102,13 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     it('should set per-project key when project is selected', async () => {
       // First add and select a project
       await px(
-        ['project', 'add', 'TestProject', '--url', 'https://test.positronic.sh'],
+        [
+          'project',
+          'add',
+          'TestProject',
+          '--url',
+          'https://test.positronic.sh',
+        ],
         { configDir }
       );
 
@@ -154,10 +160,9 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should error when --project flag used without selected project', async () => {
-      const { waitForOutput, instance } = await px(
-        ['logout', '--project'],
-        { configDir }
-      );
+      const { waitForOutput, instance } = await px(['logout', '--project'], {
+        configDir,
+      });
 
       const foundError = await waitForOutput(/no project selected/i);
       expect(foundError).toBe(true);
@@ -166,7 +171,13 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     it('should clear per-project key when project is selected', async () => {
       // First add and select a project
       await px(
-        ['project', 'add', 'TestProject', '--url', 'https://test.positronic.sh'],
+        [
+          'project',
+          'add',
+          'TestProject',
+          '--url',
+          'https://test.positronic.sh',
+        ],
         { configDir }
       );
 
@@ -176,10 +187,9 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
       });
 
       // Then logout with --project flag
-      const { waitForOutput, instance } = await px(
-        ['logout', '--project'],
-        { configDir }
-      );
+      const { waitForOutput, instance } = await px(['logout', '--project'], {
+        configDir,
+      });
 
       const isReady = await waitForOutput(/cleared.*TestProject/i);
       expect(isReady).toBe(true);
@@ -265,16 +275,18 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
 
     it('should clear .positronic-auth.json on logout in dev mode', async () => {
       // First login in dev mode
-      await px(
-        ['login', '--path', testKeyPath],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
+      await px(['login', '--path', testKeyPath], {
+        configDir,
+        projectRootDir: projectDir,
+        skipAuthSetup: true,
+      });
 
       // Then logout in dev mode
-      const { waitForOutput, instance } = await px(
-        ['logout'],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
+      const { waitForOutput, instance } = await px(['logout'], {
+        configDir,
+        projectRootDir: projectDir,
+        skipAuthSetup: true,
+      });
 
       const isReady = await waitForOutput(/cleared/i);
       expect(isReady).toBe(true);
@@ -288,10 +300,11 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should show no local key message on logout when none configured', async () => {
-      const { waitForOutput } = await px(
-        ['logout'],
-        { configDir, projectRootDir: projectDir, skipAuthSetup: true }
-      );
+      const { waitForOutput } = await px(['logout'], {
+        configDir,
+        projectRootDir: projectDir,
+        skipAuthSetup: true,
+      });
 
       const foundMessage = await waitForOutput(/no local project.*configured/i);
       expect(foundMessage).toBe(true);

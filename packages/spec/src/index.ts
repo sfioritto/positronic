@@ -110,7 +110,9 @@ export interface PositronicDevServer {
    * List all secrets for the current environment
    * @returns Array of secret names with optional metadata
    */
-  listSecrets?(): Promise<Array<{ name: string; createdAt?: Date; updatedAt?: Date }>>;
+  listSecrets?(): Promise<
+    Array<{ name: string; createdAt?: Date; updatedAt?: Date }>
+  >;
 
   /**
    * Set or update a secret
@@ -133,5 +135,18 @@ export interface PositronicDevServer {
   bulkSecrets(filePath: string): Promise<void>;
 }
 
-export { testStatus, resources, brains, schedules, secrets, webhooks, signals, pages, bundle, auth, scoping, store } from './api/index.js';
+export {
+  testStatus,
+  resources,
+  brains,
+  schedules,
+  secrets,
+  webhooks,
+  signals,
+  pages,
+  bundle,
+  auth,
+  scoping,
+  store,
+} from './api/index.js';
 export type { AuthSetupResponse, Fetch, FetchFactory } from './api/index.js';

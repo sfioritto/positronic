@@ -33,7 +33,10 @@ let isLocalDevMode: boolean = true;
  * @param baseUrl - The base URL for API requests (e.g., "http://localhost:8787" or "https://api.project.positronic.sh")
  * @param localDevMode - Whether we're in local development mode (affects error messages)
  */
-export function configureApiClient(baseUrl: string, localDevMode: boolean = true): void {
+export function configureApiClient(
+  baseUrl: string,
+  localDevMode: boolean = true
+): void {
   apiBaseUrl = baseUrl;
   isLocalDevMode = localDevMode;
 }
@@ -108,7 +111,10 @@ export const apiClient = {
   /**
    * Fetch without authentication - used for unauthenticated endpoints like /auth/setup
    */
-  fetchUnauthenticated: async (apiPath: string, options?: RequestInit): Promise<Response> => {
+  fetchUnauthenticated: async (
+    apiPath: string,
+    options?: RequestInit
+  ): Promise<Response> => {
     let baseUrl: string;
 
     if (apiBaseUrl) {
@@ -159,7 +165,9 @@ export async function generateProject(projectName: string, projectDir: string) {
     } else {
       // Resolve the installed template package location
       const require = createRequire(import.meta.url);
-      const templatePackageJsonPath = require.resolve('@positronic/template-new-project/package.json');
+      const templatePackageJsonPath = require.resolve(
+        '@positronic/template-new-project/package.json'
+      );
       templateSourcePath = path.dirname(templatePackageJsonPath);
     }
 
@@ -174,7 +182,7 @@ export async function generateProject(projectName: string, projectDir: string) {
       recursive: true,
     });
     newProjectTemplatePath = copiedNewProjectPkg;
-    
+
     // Set CAZ options for both local dev and installed package scenarios
     if (devPath || !process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
       cazOptions = {

@@ -6,11 +6,15 @@ const ButtonPropsSchema = z.object({
   type: z
     .enum(['submit', 'button'])
     .optional()
-    .describe('Button type - submit for form submission, button for other actions'),
+    .describe(
+      'Button type - submit for form submission, button for other actions'
+    ),
   variant: z
     .enum(['primary', 'secondary', 'danger'])
     .optional()
-    .describe('Visual style - primary (main action), secondary (alternative), danger (destructive)'),
+    .describe(
+      'Visual style - primary (main action), secondary (alternative), danger (destructive)'
+    ),
 });
 
 export type ButtonProps = z.infer<typeof ButtonPropsSchema>;
@@ -26,7 +30,10 @@ const ButtonComponent = ({
   type = 'button',
   variant = 'primary',
 }: ButtonProps) => (
-  <button type={type} className={`px-4 py-2 font-medium rounded-md transition-colors ${variantClasses[variant]}`}>
+  <button
+    type={type}
+    className={`px-4 py-2 font-medium rounded-md transition-colors ${variantClasses[variant]}`}
+  >
     {label}
   </button>
 );

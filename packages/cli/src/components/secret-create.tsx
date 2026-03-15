@@ -19,11 +19,14 @@ export const SecretCreate = ({ name, value }: SecretCreateProps) => {
   const [secret, setSecret] = useState<CreateSecretResponse | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const { execute, loading, error } = useApiPost<CreateSecretResponse>('/secrets', {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const { execute, loading, error } = useApiPost<CreateSecretResponse>(
+    '/secrets',
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 
   useEffect(() => {
     const createSecret = async () => {
@@ -79,9 +82,7 @@ export const SecretCreate = ({ name, value }: SecretCreateProps) => {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>
-            Tip: Use "px secret list" to view all secrets
-          </Text>
+          <Text dimColor>Tip: Use "px secret list" to view all secrets</Text>
         </Box>
       </Box>
     );

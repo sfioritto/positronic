@@ -1,4 +1,8 @@
-import { createBrainExecutionMachine, sendEvent, BRAIN_EVENTS } from '@positronic/core';
+import {
+  createBrainExecutionMachine,
+  sendEvent,
+  BRAIN_EVENTS,
+} from '@positronic/core';
 import type { BrainEvent } from '@positronic/core';
 
 /**
@@ -12,7 +16,11 @@ export function parseSseEvent(text: string): any | null {
       try {
         return JSON.parse(line.substring(6));
       } catch (e) {
-        console.error('[TEST_SSE_PARSE] Failed to parse SSE data:', line.substring(6), e);
+        console.error(
+          '[TEST_SSE_PARSE] Failed to parse SSE data:',
+          line.substring(6),
+          e
+        );
         return null;
       }
     }

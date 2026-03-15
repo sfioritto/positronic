@@ -24,7 +24,15 @@ const levelClasses = {
 const HeadingComponent = ({ content, level = '2' }: HeadingProps) => {
   const numLevel = typeof level === 'string' ? parseInt(level, 10) : level;
   const Tag = `h${numLevel}` as keyof JSX.IntrinsicElements;
-  return <Tag className={`font-semibold text-gray-900 ${levelClasses[numLevel as keyof typeof levelClasses]}`}>{content}</Tag>;
+  return (
+    <Tag
+      className={`font-semibold text-gray-900 ${
+        levelClasses[numLevel as keyof typeof levelClasses]
+      }`}
+    >
+      {content}
+    </Tag>
+  );
 };
 
 export const Heading: UIComponent<HeadingProps> = {

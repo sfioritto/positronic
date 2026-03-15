@@ -13,10 +13,12 @@ webhooks.route('/system', system);
 webhooks.get('/', async (context: Context) => {
   const webhookManifest = getWebhookManifest();
 
-  const webhookList = Object.entries(webhookManifest).map(([slug, webhook]: [string, any]) => ({
-    slug,
-    description: webhook.description,
-  }));
+  const webhookList = Object.entries(webhookManifest).map(
+    ([slug, webhook]: [string, any]) => ({
+      slug,
+      description: webhook.description,
+    })
+  );
 
   return context.json({
     webhooks: webhookList,
@@ -50,7 +52,10 @@ webhooks.post('/:slug', async (context: Context) => {
     // Extract CSRF token from form submissions
     let submittedToken: string | null = null;
     const contentType = clonedReq.headers.get('content-type') || '';
-    if (contentType.includes('form-urlencoded') || contentType.includes('form-data')) {
+    if (
+      contentType.includes('form-urlencoded') ||
+      contentType.includes('form-data')
+    ) {
       try {
         const formData = await clonedReq.formData();
         submittedToken = formData.get('__positronic_token') as string | null;

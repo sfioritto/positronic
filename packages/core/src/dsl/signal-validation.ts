@@ -5,11 +5,11 @@ import { BRAIN_EVENTS, STATUS } from './constants.js';
  * These events must have valid transitions from the current state.
  */
 const signalToEvent: Record<string, string> = {
-  'KILL': BRAIN_EVENTS.CANCELLED,
-  'PAUSE': BRAIN_EVENTS.PAUSED,
-  'RESUME': BRAIN_EVENTS.RESUMED,
-  'USER_MESSAGE': BRAIN_EVENTS.AGENT_USER_MESSAGE,
-  'WEBHOOK_RESPONSE': BRAIN_EVENTS.WEBHOOK_RESPONSE,
+  KILL: BRAIN_EVENTS.CANCELLED,
+  PAUSE: BRAIN_EVENTS.PAUSED,
+  RESUME: BRAIN_EVENTS.RESUMED,
+  USER_MESSAGE: BRAIN_EVENTS.AGENT_USER_MESSAGE,
+  WEBHOOK_RESPONSE: BRAIN_EVENTS.WEBHOOK_RESPONSE,
 };
 
 /**
@@ -70,7 +70,10 @@ export function isSignalValid(
 
   const stateObj = machineDefinition.states[stateName];
   if (!stateObj) {
-    return { valid: false, reason: `State '${stateName}' not found in machine` };
+    return {
+      valid: false,
+      reason: `State '${stateName}' not found in machine`,
+    };
   }
 
   const hasTransition = stateObj.transitions.has(eventName);

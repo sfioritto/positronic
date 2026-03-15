@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
-import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
+import {
+  getApiBaseUrl,
+  isApiLocalDevMode,
+  apiClient,
+} from '../commands/helpers.js';
 import { authenticatedFetch } from '../lib/jwt-auth.js';
 import { STATUS } from '@positronic/core';
 import { useApiDelete } from '../hooks/useApi.js';
@@ -162,8 +166,13 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
 
       // List mode navigation (arrows and vim j/k)
       if ((key.upArrow || input === 'k') && filteredBrains.length > 0) {
-        setSelectedIndex((prev) => (prev - 1 + filteredBrains.length) % filteredBrains.length);
-      } else if ((key.downArrow || input === 'j') && filteredBrains.length > 0) {
+        setSelectedIndex(
+          (prev) => (prev - 1 + filteredBrains.length) % filteredBrains.length
+        );
+      } else if (
+        (key.downArrow || input === 'j') &&
+        filteredBrains.length > 0
+      ) {
         setSelectedIndex((prev) => (prev + 1) % filteredBrains.length);
       } else if (key.return && filteredBrains.length > 0) {
         // Drill into watch view
@@ -178,11 +187,12 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
         const brain = filteredBrains[selectedIndex];
         if (brain && brain.status === STATUS.RUNNING) {
           setIsPausing(true);
-          apiClient.fetch(`/brains/runs/${brain.brainRunId}/signals`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'PAUSE' }),
-          })
+          apiClient
+            .fetch(`/brains/runs/${brain.brainRunId}/signals`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'PAUSE' }),
+            })
             .then((res) => {
               if (res.status === 202) {
                 setPauseMessage(`Paused: ${brain.brainTitle}`);
@@ -198,11 +208,12 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
         const brain = filteredBrains[selectedIndex];
         if (brain && brain.status === STATUS.PAUSED) {
           setIsResuming(true);
-          apiClient.fetch(`/brains/runs/${brain.brainRunId}/signals`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'RESUME' }),
-          })
+          apiClient
+            .fetch(`/brains/runs/${brain.brainRunId}/signals`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'RESUME' }),
+            })
             .then((res) => {
               if (res.status === 202) {
                 setResumeMessage(`Resumed: ${brain.brainTitle}`);

@@ -1,5 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
-import { parseRateLimitHeaders, getGoogleModelDefaults } from '../src/rate-limit-headers.js';
+import {
+  parseRateLimitHeaders,
+  getGoogleModelDefaults,
+} from '../src/rate-limit-headers.js';
 
 describe('parseRateLimitHeaders', () => {
   describe('Anthropic headers', () => {
@@ -147,9 +150,15 @@ describe('getGoogleModelDefaults', () => {
 
   it('returns defaults for all listed Google models', () => {
     const models = [
-      'gemini-3.1-pro', 'gemini-3-pro', 'gemini-3-flash',
-      'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-      'gemini-2-flash', 'gemini-2-flash-exp', 'gemini-2-flash-lite',
+      'gemini-3.1-pro',
+      'gemini-3-pro',
+      'gemini-3-flash',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2-flash',
+      'gemini-2-flash-exp',
+      'gemini-2-flash-lite',
     ];
 
     for (const model of models) {

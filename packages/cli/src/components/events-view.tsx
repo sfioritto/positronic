@@ -243,11 +243,15 @@ const EventLine = ({ stored, isSelected }: EventLineProps) => {
 
   return (
     <Box>
-      <Text color={isSelected ? 'cyan' : undefined}>{isSelected ? '› ' : '  '}</Text>
+      <Text color={isSelected ? 'cyan' : undefined}>
+        {isSelected ? '› ' : '  '}
+      </Text>
       <Text dimColor>{timestamp.padEnd(12)} </Text>
       <Text color={isSelected ? 'cyan' : color}>{symbol} </Text>
       <Text color={isSelected ? 'cyan' : undefined}>{text}</Text>
-      {tokens !== undefined && <Text dimColor> ({tokens.toLocaleString()} tokens)</Text>}
+      {tokens !== undefined && (
+        <Text dimColor> ({tokens.toLocaleString()} tokens)</Text>
+      )}
     </Box>
   );
 };
@@ -267,12 +271,16 @@ export const EventsView = ({
   const maxVisible = Math.max(5, terminalHeight - 8);
 
   const [mode, setMode] = useState<InternalMode>('list');
-  const [internalSelectedIndex, setInternalSelectedIndex] = useState<number | null>(null);
+  const [internalSelectedIndex, setInternalSelectedIndex] = useState<
+    number | null
+  >(null);
   const [scrollOffset, setScrollOffset] = useState(0);
 
   // Use controlled value if provided, otherwise use internal state
   const isControlled = controlledSelectedIndex !== undefined;
-  const selectedIndex = isControlled ? controlledSelectedIndex : internalSelectedIndex;
+  const selectedIndex = isControlled
+    ? controlledSelectedIndex
+    : internalSelectedIndex;
 
   const setSelectedIndex = (index: number | null) => {
     if (isControlled) {
@@ -360,21 +368,31 @@ export const EventsView = ({
   }
 
   // List view
-  const { start, end } = calculateVisibleWindow(events.length, selectedIndex, maxVisible);
+  const { start, end } = calculateVisibleWindow(
+    events.length,
+    selectedIndex,
+    maxVisible
+  );
   const visibleEvents = events.slice(start, end);
 
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text bold>Events ({events.length} total)</Text>
-        {selectedIndex !== null && <Text dimColor> • Selected: {selectedIndex + 1}</Text>}
+        {selectedIndex !== null && (
+          <Text dimColor> • Selected: {selectedIndex + 1}</Text>
+        )}
       </Box>
 
       {visibleEvents.length === 0 ? (
         <Text dimColor>Waiting for events...</Text>
       ) : (
         visibleEvents.map((stored, index) => (
-          <EventLine key={start + index} stored={stored} isSelected={selectedIndex === start + index} />
+          <EventLine
+            key={start + index}
+            stored={stored}
+            isSelected={selectedIndex === start + index}
+          />
         ))
       )}
 

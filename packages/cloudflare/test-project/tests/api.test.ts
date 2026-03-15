@@ -45,11 +45,14 @@ describe('Hono API Tests', () => {
   it('POST /brains/runs without brainName should return 400', async () => {
     const testEnv = env as TestEnv;
 
-    const request = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}), // Empty body, check for missing brainTitle
-    });
+    const request = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}), // Empty body, check for missing brainTitle
+      }
+    );
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
     await waitOnExecutionContext(context);
@@ -63,11 +66,14 @@ describe('Hono API Tests', () => {
 
   it('POST /brains/runs with non-existent brain should return 404', async () => {
     const testEnv = env as TestEnv;
-    const request = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: 'non-existent-brain' }),
-    });
+    const request = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'non-existent-brain' }),
+      }
+    );
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
     await waitOnExecutionContext(context);
@@ -83,11 +89,14 @@ describe('Hono API Tests', () => {
     const brainName = 'basic-brain';
 
     // --- Create the brain run ---
-    const request = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: brainName }),
-    });
+    const request = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      }
+    );
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
     expect(response.status).toBe(201);
@@ -158,11 +167,14 @@ describe('Hono API Tests', () => {
     const brainName = 'delayed-brain';
 
     // Create the brain run
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: brainName }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      }
+    );
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
       createRequest,
@@ -245,11 +257,14 @@ describe('Hono API Tests', () => {
     const brainName = 'basic-brain';
 
     // Create brain run
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: brainName }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      }
+    );
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
       createRequest,
@@ -296,11 +311,14 @@ describe('Hono API Tests', () => {
     const brainName = 'basic-brain';
 
     // Start the brain run
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: brainName }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      }
+    );
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
       createRequest,
@@ -340,11 +358,14 @@ describe('Hono API Tests', () => {
     // Run the brain run twice
     for (let i = 0; i < 2; i++) {
       // Start the brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -428,11 +449,14 @@ describe('Hono API Tests', () => {
 
     // Start 3 delayed brains
     for (let i = 0; i < 3; i++) {
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -447,7 +471,9 @@ describe('Hono API Tests', () => {
     }
 
     // Connect to watch endpoint
-    const watchRequest = await createAuthenticatedRequest('http://example.com/brains/watch');
+    const watchRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/watch'
+    );
     const watchContext = createExecutionContext();
     const watchResponse = await worker.fetch(
       watchRequest,
@@ -564,11 +590,14 @@ describe('Hono API Tests', () => {
       }
     );
 
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: brainName }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: brainName }),
+      }
+    );
     const createContext = createExecutionContext();
     const createResponse = await worker.fetch(
       createRequest,
@@ -699,11 +728,14 @@ describe('Hono API Tests', () => {
       const identifier = 'basic-brain';
       const cronExpression = '0 3 * * *'; // Daily at 3am
 
-      const request = await createAuthenticatedRequest('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: identifier, cronExpression }),
-      });
+      const request = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: identifier, cronExpression }),
+        }
+      );
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
       await waitOnExecutionContext(context);
@@ -733,21 +765,26 @@ describe('Hono API Tests', () => {
       // Create a few schedules first
       const brainNames = ['basic-brain', 'delayed-brain', 'resource-brain'];
       for (let i = 0; i < brainNames.length; i++) {
-        const request = await createAuthenticatedRequest('http://example.com/brains/schedules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            brainTitle: brainNames[i],
-            cronExpression: `${i} * * * *`,
-          }),
-        });
+        const request = await createAuthenticatedRequest(
+          'http://example.com/brains/schedules',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              brainTitle: brainNames[i],
+              cronExpression: `${i} * * * *`,
+            }),
+          }
+        );
         const context = createExecutionContext();
         await worker.fetch(request, testEnv, context);
         await waitOnExecutionContext(context);
       }
 
       // List schedules
-      const listRequest = await createAuthenticatedRequest('http://example.com/brains/schedules');
+      const listRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules'
+      );
       const listContext = createExecutionContext();
       const listResponse = await worker.fetch(
         listRequest,
@@ -782,14 +819,17 @@ describe('Hono API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create a schedule
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brainTitle: 'options-brain',
-          cronExpression: '0 0 * * *',
-        }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brainTitle: 'options-brain',
+            cronExpression: '0 0 * * *',
+          }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -830,7 +870,9 @@ describe('Hono API Tests', () => {
     it('GET /brains/schedules/runs lists scheduled run history', async () => {
       const testEnv = env as TestEnv;
 
-      const request = await createAuthenticatedRequest('http://example.com/brains/schedules/runs');
+      const request = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules/runs'
+      );
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
       await waitOnExecutionContext(context);
@@ -883,14 +925,17 @@ describe('Hono API Tests', () => {
     it('POST /brains/schedules validates cron expression', async () => {
       const testEnv = env as TestEnv;
 
-      const request = await createAuthenticatedRequest('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brainTitle: 'invalid-cron-brain',
-          cronExpression: 'invalid cron',
-        }),
-      });
+      const request = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brainTitle: 'invalid-cron-brain',
+            cronExpression: 'invalid cron',
+          }),
+        }
+      );
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
       await waitOnExecutionContext(context);
@@ -905,35 +950,43 @@ describe('Hono API Tests', () => {
       const identifier = 'basic-brain';
 
       // Create first schedule
-      const request1 = await createAuthenticatedRequest('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brainTitle: identifier,
-          cronExpression: '0 9 * * *', // 9am daily
-        }),
-      });
+      const request1 = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brainTitle: identifier,
+            cronExpression: '0 9 * * *', // 9am daily
+          }),
+        }
+      );
       const context1 = createExecutionContext();
       const response1 = await worker.fetch(request1, testEnv, context1);
       await waitOnExecutionContext(context1);
       expect(response1.status).toBe(201);
 
       // Create second schedule for same brain
-      const request2 = await createAuthenticatedRequest('http://example.com/brains/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brainTitle: identifier,
-          cronExpression: '0 17 * * *', // 5pm daily
-        }),
-      });
+      const request2 = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brainTitle: identifier,
+            cronExpression: '0 17 * * *', // 5pm daily
+          }),
+        }
+      );
       const context2 = createExecutionContext();
       const response2 = await worker.fetch(request2, testEnv, context2);
       await waitOnExecutionContext(context2);
       expect(response2.status).toBe(201);
 
       // Verify both schedules exist
-      const listRequest = await createAuthenticatedRequest('http://example.com/brains/schedules');
+      const listRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/schedules'
+      );
       const listContext = createExecutionContext();
       const listResponse = await worker.fetch(
         listRequest,
@@ -958,11 +1011,14 @@ describe('Hono API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create brain run using the brain's title instead of filename
-      const request = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'Brain with Custom Title' }),
-      });
+      const request = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: 'Brain with Custom Title' }),
+        }
+      );
 
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
@@ -1005,11 +1061,14 @@ describe('Hono API Tests', () => {
       const testEnv = env as TestEnv;
 
       // Create brain run using the filename
-      const request = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: 'title-test-brain' }),
-      });
+      const request = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: 'title-test-brain' }),
+        }
+      );
 
       const context = createExecutionContext();
       const response = await worker.fetch(request, testEnv, context);
@@ -1056,11 +1115,14 @@ describe('Hono API Tests', () => {
       const webhookIdentifier = 'test-thread-123';
 
       // Step 1: Start the webhook-brain
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -1107,7 +1169,11 @@ describe('Hono API Tests', () => {
 
           if (message.startsWith('data:')) {
             const parsed = parseSseEvent(message);
-            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            const eventList: BrainEvent[] = Array.isArray(parsed)
+              ? parsed
+              : parsed
+              ? [parsed]
+              : [];
             for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
@@ -1246,11 +1312,14 @@ describe('Hono API Tests', () => {
       const webhookIdentifier = 'inner-test-id';
 
       // Step 1: Start the inner-webhook-brain (outer brain with inner brain that has webhook)
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -1297,7 +1366,11 @@ describe('Hono API Tests', () => {
 
           if (message.startsWith('data:')) {
             const parsed = parseSseEvent(message);
-            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            const eventList: BrainEvent[] = Array.isArray(parsed)
+              ? parsed
+              : parsed
+              ? [parsed]
+              : [];
             for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
@@ -1416,11 +1489,14 @@ describe('Hono API Tests', () => {
       const webhookIdentifier = 'test-escalation-123';
 
       // Step 1: Start the agent-webhook-brain
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -1467,7 +1543,11 @@ describe('Hono API Tests', () => {
 
           if (message.startsWith('data:')) {
             const parsed = parseSseEvent(message);
-            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            const eventList: BrainEvent[] = Array.isArray(parsed)
+              ? parsed
+              : parsed
+              ? [parsed]
+              : [];
             for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
@@ -1506,7 +1586,8 @@ describe('Hono API Tests', () => {
 
       // Should have AGENT_WEBHOOK before WEBHOOK
       const agentWebhookEvent = events.find(
-        (e): e is AgentWebhookEvent<any> => e.type === BRAIN_EVENTS.AGENT_WEBHOOK
+        (e): e is AgentWebhookEvent<any> =>
+          e.type === BRAIN_EVENTS.AGENT_WEBHOOK
       );
       expect(agentWebhookEvent).toBeDefined();
       expect(agentWebhookEvent?.toolName).toBe('escalate');
@@ -1595,7 +1676,8 @@ describe('Hono API Tests', () => {
 
       // Should have AGENT_COMPLETE
       const agentCompleteEvent = resumeEvents.find(
-        (e): e is AgentCompleteEvent<any> => e.type === BRAIN_EVENTS.AGENT_COMPLETE
+        (e): e is AgentCompleteEvent<any> =>
+          e.type === BRAIN_EVENTS.AGENT_COMPLETE
       );
       expect(agentCompleteEvent).toBeDefined();
 
@@ -1615,11 +1697,14 @@ describe('Hono API Tests', () => {
       const webhookIdentifier = 'iterate-webhook-test';
 
       // Step 1: Start the brain (has iterate step followed by webhook wait)
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -1667,7 +1752,11 @@ describe('Hono API Tests', () => {
 
           if (message.startsWith('data:')) {
             const parsed = parseSseEvent(message);
-            const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            const eventList: BrainEvent[] = Array.isArray(parsed)
+              ? parsed
+              : parsed
+              ? [parsed]
+              : [];
             for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
@@ -1768,5 +1857,4 @@ describe('Hono API Tests', () => {
       expect(webhookMessageOp?.value).toBe('Webhook after iterate');
     });
   });
-
 });

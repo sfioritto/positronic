@@ -14,10 +14,7 @@ interface EventRow {
  * Events may be stored inline in SQLite (serialized_event) or overflow to R2 (r2_key).
  */
 export class EventLoader {
-  constructor(
-    private sql: SqlStorage,
-    private bucket: R2Bucket
-  ) {}
+  constructor(private sql: SqlStorage, private bucket: R2Bucket) {}
 
   /**
    * Load all events in order, hydrating from R2 where necessary.

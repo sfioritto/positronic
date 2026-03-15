@@ -20,7 +20,14 @@ export type {
   BrainConfig,
   GeneratedPage,
 } from './dsl/brain.js';
-export type { ObjectGenerator, Message, ToolMessage, ToolCall, ResponseMessage, ToolChoice } from './clients/types.js';
+export type {
+  ObjectGenerator,
+  Message,
+  ToolMessage,
+  ToolCall,
+  ResponseMessage,
+  ToolChoice,
+} from './clients/types.js';
 export type {
   State,
   CurrentUser,
@@ -77,7 +84,15 @@ export type {
 } from './dsl/definitions/events.js';
 
 // Default tools
-export { createTool, defaultTools, defaultDoneSchema, generateUI, waitForWebhook, print, consoleLog } from './tools/index.js';
+export {
+  createTool,
+  defaultTools,
+  defaultDoneSchema,
+  generateUI,
+  waitForWebhook,
+  print,
+  consoleLog,
+} from './tools/index.js';
 
 // Store types
 export type {
@@ -120,10 +135,7 @@ export {
 } from './dsl/brain-state-machine.js';
 
 // Signal validation
-export {
-  isSignalValid,
-  getValidSignals,
-} from './dsl/signal-validation.js';
+export { isSignalValid, getValidSignals } from './dsl/signal-validation.js';
 export type {
   MachineStateDefinition,
   SignalValidationResult,

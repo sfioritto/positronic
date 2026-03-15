@@ -31,12 +31,14 @@ export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
           } else {
             exit();
           }
-        } else if (char === '\u0003') { // Ctrl+C
+        } else if (char === '\u0003') {
+          // Ctrl+C
           exit();
-        } else if (char === '\u007F' || char === '\b') { // Backspace
-          setInput(prev => prev.slice(0, -1));
+        } else if (char === '\u007F' || char === '\b') {
+          // Backspace
+          setInput((prev) => prev.slice(0, -1));
         } else {
-          setInput(prev => prev + char);
+          setInput((prev) => prev + char);
         }
       };
 
@@ -83,7 +85,7 @@ export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
   if (loading) {
     return (
       <Box>
-        <Text>🗑️  Deleting schedule...</Text>
+        <Text>🗑️ Deleting schedule...</Text>
       </Box>
     );
   }
@@ -102,10 +104,19 @@ export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
   if (!confirmed) {
     return (
       <Box flexDirection="column">
-        <Text bold color="yellow">⚠️  Warning: This will permanently delete the schedule</Text>
-        <Box marginTop={1} marginBottom={1} paddingLeft={2} flexDirection="column">
+        <Text bold color="yellow">
+          ⚠️ Warning: This will permanently delete the schedule
+        </Text>
+        <Box
+          marginTop={1}
+          marginBottom={1}
+          paddingLeft={2}
+          flexDirection="column"
+        >
           <Text>Schedule ID: {scheduleId}</Text>
-          <Text dimColor>All future runs for this schedule will be cancelled.</Text>
+          <Text dimColor>
+            All future runs for this schedule will be cancelled.
+          </Text>
         </Box>
         <Text>Type "yes" to confirm deletion: {input}</Text>
       </Box>

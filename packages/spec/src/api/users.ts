@@ -29,9 +29,7 @@ export const users = {
       const response = await fetch(request);
 
       if (response.status !== 201) {
-        console.error(
-          `POST /users returned ${response.status}, expected 201`
-        );
+        console.error(`POST /users returned ${response.status}, expected 201`);
         return null;
       }
 
@@ -91,10 +89,7 @@ export const users = {
 
       // Validate each user has required fields
       for (const user of data.users) {
-        if (
-          !user.name ||
-          typeof user.createdAt !== 'number'
-        ) {
+        if (!user.name || typeof user.createdAt !== 'number') {
           console.error(
             `User missing required fields: ${JSON.stringify(user)}`
           );
@@ -206,7 +201,9 @@ export const users = {
       }
 
       if (data.userName !== userName) {
-        console.error(`Expected userName to be '${userName}', got ${data.userName}`);
+        console.error(
+          `Expected userName to be '${userName}', got ${data.userName}`
+        );
         return false;
       }
 
@@ -236,7 +233,9 @@ export const users = {
       const response = await fetch(request);
 
       if (!response.ok) {
-        console.error(`GET /users/${userName}/keys returned ${response.status}`);
+        console.error(
+          `GET /users/${userName}/keys returned ${response.status}`
+        );
         return false;
       }
 
@@ -284,7 +283,9 @@ export const users = {
   ): Promise<boolean> {
     try {
       const request = new Request(
-        `http://example.com/users/${userName}/keys/${encodeURIComponent(fingerprint)}`,
+        `http://example.com/users/${userName}/keys/${encodeURIComponent(
+          fingerprint
+        )}`,
         {
           method: 'DELETE',
         }

@@ -116,7 +116,9 @@ async function generateProject(
     } else {
       // Resolve the installed template package location
       const require = createRequire(import.meta.url);
-      const templatePackageJsonPath = require.resolve('@positronic/template-new-project/package.json');
+      const templatePackageJsonPath = require.resolve(
+        '@positronic/template-new-project/package.json'
+      );
       templateSourcePath = path.dirname(templatePackageJsonPath);
 
       // Auto-detect local workspace: if the template resolves to a real path
@@ -126,8 +128,10 @@ async function generateProject(
       const realPath = fs.realpathSync(templateSourcePath);
       if (!realPath.includes(`${path.sep}node_modules${path.sep}`)) {
         const potentialRoot = path.resolve(realPath, '..', '..');
-        if (fs.existsSync(path.join(potentialRoot, 'packages', 'core')) &&
-            fs.existsSync(path.join(potentialRoot, 'packages', 'cloudflare'))) {
+        if (
+          fs.existsSync(path.join(potentialRoot, 'packages', 'core')) &&
+          fs.existsSync(path.join(potentialRoot, 'packages', 'cloudflare'))
+        ) {
           devPath = potentialRoot;
           process.env.POSITRONIC_LOCAL_PATH = potentialRoot;
           inferredDevPath = true;
@@ -146,7 +150,7 @@ async function generateProject(
       recursive: true,
     });
     newProjectTemplatePath = copiedNewProjectPkg;
-    
+
     // Set CAZ options for cloudflare backend
     cazOptions = {
       name: projectName,
@@ -189,11 +193,19 @@ export async function discoverBrains(
       .filter((e) => !e.name.startsWith('_'))
       .map(async (entry) => {
         if (entry.isFile() && entry.name.endsWith('.ts')) {
-          return { name: entry.name.replace(/\.ts$/, ''), relativePath: entry.name };
+          return {
+            name: entry.name.replace(/\.ts$/, ''),
+            relativePath: entry.name,
+          };
         }
         const indexPath = path.join(brainsDir, entry.name, 'index.ts');
-        const hasIndex = await fsPromises.access(indexPath).then(() => true, () => false);
-        return hasIndex ? { name: entry.name, relativePath: `${entry.name}/index.ts` } : null;
+        const hasIndex = await fsPromises.access(indexPath).then(
+          () => true,
+          () => false
+        );
+        return hasIndex
+          ? { name: entry.name, relativePath: `${entry.name}/index.ts` }
+          : null;
       })
   );
 
@@ -208,7 +220,9 @@ export async function discoverWebhooks(
     .catch(() => [] as Dirent[]);
 
   const webhooks = entries
-    .filter((e) => !e.name.startsWith('_') && e.isFile() && e.name.endsWith('.ts'))
+    .filter(
+      (e) => !e.name.startsWith('_') && e.isFile() && e.name.endsWith('.ts')
+    )
     .map((entry) => ({
       name: entry.name.replace(/\.ts$/, ''),
       relativePath: entry.name,
@@ -231,14 +245,19 @@ async function regenerateManifestFile(
   const brains = await discoverBrains(brainsDir);
 
   for (const brain of brains) {
-    const importPath = `../../brains/${brain.relativePath.replace(/\.ts$/, '.js')}`;
+    const importPath = `../../brains/${brain.relativePath.replace(
+      /\.ts$/,
+      '.js'
+    )}`;
     const importAlias = `brain_${brain.name.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 
     importStatements += `import * as ${importAlias} from '${importPath}';\n`;
 
     manifestEntries += `  ${JSON.stringify(brain.name)}: {\n`;
     manifestEntries += `    filename: ${JSON.stringify(brain.name)},\n`;
-    manifestEntries += `    path: ${JSON.stringify(`brains/${brain.relativePath}`)},\n`;
+    manifestEntries += `    path: ${JSON.stringify(
+      `brains/${brain.relativePath}`
+    )},\n`;
     manifestEntries += `    brain: ${importAlias}.default as Brain,\n`;
     manifestEntries += `  },\n`;
   }
@@ -274,8 +293,14 @@ async function regenerateWebhookManifestFile(
   let manifestEntries = '';
 
   for (const webhook of webhooks) {
-    const importPath = `../../webhooks/${webhook.relativePath.replace(/\.ts$/, '.js')}`;
-    const importAlias = `webhook_${webhook.name.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+    const importPath = `../../webhooks/${webhook.relativePath.replace(
+      /\.ts$/,
+      '.js'
+    )}`;
+    const importAlias = `webhook_${webhook.name.replace(
+      /[^a-zA-Z0-9_]/g,
+      '_'
+    )}`;
 
     importStatements += `import ${importAlias} from '${importPath}';\n`;
 
@@ -339,7 +364,9 @@ export class CloudflareDevServer implements PositronicDevServer {
     await this.buildAndUploadBundle(projectRoot);
 
     // Write origin URL to local R2 for dev server
-    await this.writeOriginToR2(projectRoot, 'http://localhost:8787', { local: true });
+    await this.writeOriginToR2(projectRoot, 'http://localhost:8787', {
+      local: true,
+    });
   }
 
   private async ensureServerDirectory(
@@ -609,21 +636,31 @@ export class CloudflareDevServer implements PositronicDevServer {
       await fsPromises.mkdir(distDir, { recursive: true });
 
       // Run esbuild to build the bundle
-      execSync(`npx esbuild "${bundleEntryPath}" --bundle --external:react --external:react-dom --format=iife --outfile="${bundleOutputPath}" --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment`, {
-        cwd: projectRoot,
-        stdio: 'inherit',
-      });
+      execSync(
+        `npx esbuild "${bundleEntryPath}" --bundle --external:react --external:react-dom --format=iife --outfile="${bundleOutputPath}" --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment`,
+        {
+          cwd: projectRoot,
+          stdio: 'inherit',
+        }
+      );
 
       // Read the built bundle
-      const bundleContent = await fsPromises.readFile(bundleOutputPath, 'utf-8');
+      const bundleContent = await fsPromises.readFile(
+        bundleOutputPath,
+        'utf-8'
+      );
 
       // Get bucket name from wrangler config
       const wranglerConfigPath = path.join(serverDir, 'wrangler.jsonc');
-      const wranglerConfig = JSON.parse(fs.readFileSync(wranglerConfigPath, 'utf-8'));
+      const wranglerConfig = JSON.parse(
+        fs.readFileSync(wranglerConfigPath, 'utf-8')
+      );
       const bucketName = wranglerConfig.r2_buckets?.[0]?.bucket_name;
 
       if (!bucketName) {
-        console.warn('⚠️  Warning: No R2 bucket configured, skipping bundle upload');
+        console.warn(
+          '⚠️  Warning: No R2 bucket configured, skipping bundle upload'
+        );
         return;
       }
 
@@ -631,15 +668,21 @@ export class CloudflareDevServer implements PositronicDevServer {
       const r2Path = `${bucketName}/${r2Key}`;
 
       // Write bundle to a temp file for wrangler r2 object put
-      const tempBundlePath = path.join(os.tmpdir(), `positronic-bundle-${Date.now()}.js`);
+      const tempBundlePath = path.join(
+        os.tmpdir(),
+        `positronic-bundle-${Date.now()}.js`
+      );
       await fsPromises.writeFile(tempBundlePath, bundleContent);
 
       try {
         const locationFlag = options.local ? ' --local' : ' --remote';
-        execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}"${locationFlag}`, {
-          cwd: serverDir,
-          stdio: 'pipe',
-        });
+        execSync(
+          `npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}"${locationFlag}`,
+          {
+            cwd: serverDir,
+            stdio: 'pipe',
+          }
+        );
         const target = options.local ? 'local' : 'production';
         console.log(`✅ Component bundle built and uploaded to ${target}`);
       } finally {
@@ -671,7 +714,9 @@ export class CloudflareDevServer implements PositronicDevServer {
       return;
     }
 
-    const wranglerConfig = JSON.parse(fs.readFileSync(wranglerConfigPath, 'utf-8'));
+    const wranglerConfig = JSON.parse(
+      fs.readFileSync(wranglerConfigPath, 'utf-8')
+    );
     const bucketName = wranglerConfig.r2_buckets?.[0]?.bucket_name;
 
     if (!bucketName) {
@@ -679,15 +724,21 @@ export class CloudflareDevServer implements PositronicDevServer {
     }
 
     const r2Path = `${bucketName}/__config/origin`;
-    const tempFilePath = path.join(os.tmpdir(), `positronic-origin-${Date.now()}.txt`);
+    const tempFilePath = path.join(
+      os.tmpdir(),
+      `positronic-origin-${Date.now()}.txt`
+    );
     await fsPromises.writeFile(tempFilePath, origin);
 
     try {
       const locationFlag = options.local ? ' --local' : ' --remote';
-      execSync(`npx wrangler r2 object put "${r2Path}" --file="${tempFilePath}"${locationFlag}`, {
-        cwd: serverDir,
-        stdio: 'pipe',
-      });
+      execSync(
+        `npx wrangler r2 object put "${r2Path}" --file="${tempFilePath}"${locationFlag}`,
+        {
+          cwd: serverDir,
+          stdio: 'pipe',
+        }
+      );
     } finally {
       await fsPromises.unlink(tempFilePath).catch(() => {});
     }
@@ -756,13 +807,22 @@ export class CloudflareDevServer implements PositronicDevServer {
     const relativePath = path.relative(projectRoot, filePath);
 
     // Determine if this is a brain, webhook, or component file change
-    if (relativePath.startsWith('brains/') || relativePath.startsWith('brains\\')) {
+    if (
+      relativePath.startsWith('brains/') ||
+      relativePath.startsWith('brains\\')
+    ) {
       console.log(`Brain file ${event}: ${relativePath}`);
       await regenerateManifestFile(projectRoot, srcDir);
-    } else if (relativePath.startsWith('webhooks/') || relativePath.startsWith('webhooks\\')) {
+    } else if (
+      relativePath.startsWith('webhooks/') ||
+      relativePath.startsWith('webhooks\\')
+    ) {
       console.log(`Webhook file ${event}: ${relativePath}`);
       await regenerateWebhookManifestFile(projectRoot, srcDir);
-    } else if (relativePath.startsWith('components/') || relativePath.startsWith('components\\')) {
+    } else if (
+      relativePath.startsWith('components/') ||
+      relativePath.startsWith('components\\')
+    ) {
       console.log(`Component file ${event}: ${relativePath}`);
       await this.buildAndUploadBundle(projectRoot);
     }
@@ -913,13 +973,20 @@ export class CloudflareDevServer implements PositronicDevServer {
           console.log('✅ Deployment complete!');
 
           // Parse worker URL from wrangler output and write origin to production R2
-          const urlMatch = stdoutAccumulator.match(/https:\/\/[^\s]+\.workers\.dev/);
+          const urlMatch = stdoutAccumulator.match(
+            /https:\/\/[^\s]+\.workers\.dev/
+          );
           if (urlMatch) {
             try {
-              await this.writeOriginToR2(projectRoot, urlMatch[0], { local: false });
+              await this.writeOriginToR2(projectRoot, urlMatch[0], {
+                local: false,
+              });
               console.log(`🌐 Origin URL written to R2: ${urlMatch[0]}`);
             } catch (originError) {
-              console.warn('⚠️  Warning: Could not write origin URL to R2:', originError);
+              console.warn(
+                '⚠️  Warning: Could not write origin URL to R2:',
+                originError
+              );
             }
           }
 
@@ -927,17 +994,27 @@ export class CloudflareDevServer implements PositronicDevServer {
           console.log('🔐 Configuring secrets management...');
           try {
             await this.setupSecretsManagement(bucketName);
-            const successMessage = '✅ Deployment and secrets configuration complete!\n';
+            const successMessage =
+              '✅ Deployment and secrets configuration complete!\n';
             this.logCallbacks.forEach((cb) => cb(successMessage));
             console.log('✅ Secrets management configured!');
             resolve();
           } catch (secretsError) {
             // Warn but don't fail deployment if secrets setup fails
-            console.warn('⚠️  Warning: Could not configure secrets management:', secretsError);
+            console.warn(
+              '⚠️  Warning: Could not configure secrets management:',
+              secretsError
+            );
             console.warn('   You can manually set these secrets later with:');
-            console.warn('   wrangler secret put CLOUDFLARE_API_TOKEN --env production');
-            console.warn('   wrangler secret put CLOUDFLARE_ACCOUNT_ID --env production');
-            console.warn('   wrangler secret put CF_SCRIPT_NAME --env production');
+            console.warn(
+              '   wrangler secret put CLOUDFLARE_API_TOKEN --env production'
+            );
+            console.warn(
+              '   wrangler secret put CLOUDFLARE_ACCOUNT_ID --env production'
+            );
+            console.warn(
+              '   wrangler secret put CF_SCRIPT_NAME --env production'
+            );
             resolve();
           }
         } else {
@@ -962,7 +1039,13 @@ export class CloudflareDevServer implements PositronicDevServer {
     ];
 
     for (const secret of secrets) {
-      await this.setWorkerSecret(accountId, projectName, secret.name, secret.value, apiToken);
+      await this.setWorkerSecret(
+        accountId,
+        projectName,
+        secret.name,
+        secret.value,
+        apiToken
+      );
     }
   }
 
@@ -982,7 +1065,7 @@ export class CloudflareDevServer implements PositronicDevServer {
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
-        'Authorization': `Bearer ${apiToken}`,
+        Authorization: `Bearer ${apiToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

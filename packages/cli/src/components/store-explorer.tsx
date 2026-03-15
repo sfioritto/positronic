@@ -73,7 +73,9 @@ export const StoreExplorer = () => {
   // Use a ref to hold the latest input handler so useInput always
   // calls through to current state, avoiding stale closure issues
   // caused by useEffect re-registration timing in ink's useInput.
-  const inputHandlerRef = useRef<(input: string, key: InputKey) => void>(() => {});
+  const inputHandlerRef = useRef<(input: string, key: InputKey) => void>(
+    () => {}
+  );
 
   // Enter alternate screen buffer on mount, exit on unmount
   useEffect(() => {
@@ -104,7 +106,10 @@ export const StoreExplorer = () => {
           });
           return;
         }
-        const data = (await response.json()) as { brains: string[]; count: number };
+        const data = (await response.json()) as {
+          brains: string[];
+          count: number;
+        };
         setBrains(data.brains);
       } catch (err: any) {
         setError({
@@ -141,7 +146,10 @@ export const StoreExplorer = () => {
           });
           return;
         }
-        const data = (await response.json()) as { keys: StoreKey[]; count: number };
+        const data = (await response.json()) as {
+          keys: StoreKey[];
+          count: number;
+        };
         setKeys(data.keys);
       } catch (err: any) {
         setError({
@@ -165,10 +173,11 @@ export const StoreExplorer = () => {
       setLoading(true);
       setError(null);
       try {
-        const scopePath =
-          selectedKey.scope === 'shared' ? 'shared' : 'user';
+        const scopePath = selectedKey.scope === 'shared' ? 'shared' : 'user';
         const response = await apiClient.fetch(
-          `/store/${encodeURIComponent(selectedBrain)}/${scopePath}/${encodeURIComponent(selectedKey.key)}`
+          `/store/${encodeURIComponent(
+            selectedBrain
+          )}/${scopePath}/${encodeURIComponent(selectedKey.key)}`
         );
         if (!response.ok) {
           setError({
@@ -220,10 +229,13 @@ export const StoreExplorer = () => {
           const keyToDelete = keys[selectedIndex];
           if (keyToDelete && selectedBrain) {
             setConfirmingDelete(false);
-            const scopePath = keyToDelete.scope === 'shared' ? 'shared' : 'user';
+            const scopePath =
+              keyToDelete.scope === 'shared' ? 'shared' : 'user';
             apiClient
               .fetch(
-                `/store/${encodeURIComponent(selectedBrain)}/${scopePath}/${encodeURIComponent(keyToDelete.key)}`,
+                `/store/${encodeURIComponent(
+                  selectedBrain
+                )}/${scopePath}/${encodeURIComponent(keyToDelete.key)}`,
                 { method: 'DELETE' }
               )
               .then(() => {

@@ -60,9 +60,7 @@ The fact should be a clear, standalone statement that can be retrieved later.`,
       };
     }
 
-    await context.memory.add(
-      [{ role: 'assistant', content: input.fact }]
-    );
+    await context.memory.add([{ role: 'assistant', content: input.fact }]);
 
     return {
       remembered: true,

@@ -107,7 +107,8 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
         return next();
       } catch (error) {
         // Log error type only - avoid logging key material or token data
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
         console.error('JWT verification failed:', errorMessage);
         return c.json({ error: 'Invalid or expired token' }, 401);
       }
@@ -129,7 +130,8 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
         return next();
       } catch (error) {
         // Log error type only - avoid logging key material
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
         console.error('Root key JWT verification failed:', errorMessage);
       }
     }

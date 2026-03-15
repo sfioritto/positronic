@@ -9,7 +9,10 @@ import type { TestServerHandle } from './test-dev-server.js';
 import { TestDevServer } from './test-dev-server.js';
 import { buildCli } from '../src/cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
-import { resetJwtAuthProvider, setAuthProjectRootPath } from '../src/lib/jwt-auth.js';
+import {
+  resetJwtAuthProvider,
+  setAuthProjectRootPath,
+} from '../src/lib/jwt-auth.js';
 import caz from 'caz';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +31,10 @@ async function getCachedTemplate(): Promise<string> {
 
   // Create cache only once per test run
   const devPath = path.resolve(__dirname, '../../../');
-  const originalTemplate = path.resolve(devPath, 'packages/template-new-project');
+  const originalTemplate = path.resolve(
+    devPath,
+    'packages/template-new-project'
+  );
 
   // First, copy template to temp location so caz can mess with that copy
   const tempCopyDir = fs.mkdtempSync(

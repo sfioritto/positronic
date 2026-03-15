@@ -1,5 +1,9 @@
 import type { Brain } from '@positronic/core';
-import { BrainResolver, type BrainMetadata, type ResolutionResult } from './brain-resolver.js';
+import {
+  BrainResolver,
+  type BrainMetadata,
+  type ResolutionResult,
+} from './brain-resolver.js';
 
 export type { BrainMetadata, ResolutionResult } from './brain-resolver.js';
 
@@ -11,7 +15,7 @@ interface BrainImportStrategy {
 
 class StaticManifestStrategy implements BrainImportStrategy {
   private resolver: BrainResolver;
-  
+
   constructor(private manifest: Record<string, BrainMetadata>) {
     this.resolver = new BrainResolver(manifest);
   }
@@ -19,7 +23,7 @@ class StaticManifestStrategy implements BrainImportStrategy {
   async import(filename: string): Promise<Brain | undefined> {
     return this.manifest[filename]?.brain;
   }
-  
+
   resolve(identifier: string): ResolutionResult {
     return this.resolver.resolve(identifier);
   }
@@ -41,18 +45,22 @@ class DynamicImportStrategy implements BrainImportStrategy {
       return undefined;
     }
   }
-  
+
   resolve(identifier: string): ResolutionResult {
     // For dynamic imports, we can only do simple filename matching
-    return this.import(identifier).then(brain => 
-      brain ? { matchType: 'exact' as const, brain } : { matchType: 'none' as const }
+    return this.import(identifier).then((brain) =>
+      brain
+        ? { matchType: 'exact' as const, brain }
+        : { matchType: 'none' as const }
     ) as any; // Type assertion needed due to async
   }
 
   list(): string[] {
     // For dynamic imports, we can't easily list files at runtime in a worker environment
     // This would need to be handled differently, perhaps by generating a list at build time
-    console.warn('DynamicImportStrategy.list() is not implemented - returning empty array');
+    console.warn(
+      'DynamicImportStrategy.list() is not implemented - returning empty array'
+    );
     return [];
   }
 }
@@ -81,7 +89,7 @@ export class PositronicManifest {
   async import(filename: string): Promise<Brain | undefined> {
     return this.importStrategy.import(filename);
   }
-  
+
   resolve(identifier: string): ResolutionResult {
     return this.importStrategy.resolve(identifier);
   }

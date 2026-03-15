@@ -37,6 +37,7 @@ Positronic is a production-capable framework with:
 ### Remaining Ideas
 
 **OAuth Integration**
+
 - Add OAuth as a first-class auth method (Google, GitHub, etc.)
 - `px login` could open a browser, do the OAuth dance, store tokens locally
 - Backend issues JWT after OAuth verification
@@ -112,11 +113,13 @@ MCP (Model Context Protocol) lets you attach external tool servers to AI agents.
 ### Implementation Ideas
 
 **As MCP Client (brains use MCP tools)**
+
 - Add `.withMCPServer(url)` to the Brain DSL
 - MCP tools auto-discovered and available in agent steps
 - Could be per-brain or project-wide configuration
 
 **As MCP Server (Positronic exposes its API)**
+
 - Wrap the existing API endpoints as MCP tools
 - "Run brain X with these options", "Check status of run Y", "List schedules"
 - Other AI systems (Claude Desktop, Cursor, etc.) could orchestrate Positronic
@@ -132,12 +135,14 @@ This is how Positronic becomes a **platform for AI developers**. The determinist
 ### Current Docs Assessment
 
 **Strong areas:**
+
 - Technical design docs (webhook-design.md, ui-step-design.md)
 - Testing guides (philosophy, CLI testing, core testing)
 - Command creation guide
 - Agent tips (tips-for-agents.md in template)
 
 **Gaps:**
+
 - No getting-started tutorial or quickstart
 - No "common patterns" cookbook (explicitly called out in TODO.md)
 - No deployment guide
@@ -157,6 +162,7 @@ If the primary "developer" using Positronic is an AI agent (Claude Code, Cursor,
 - **Pattern library** — reusable brain patterns with copy-paste templates
 
 For humans, focus on:
+
 - **Conceptual overview** — what is Positronic, why does it exist, what's the mental model
 - **Quickstart** — 5 minutes to a running brain
 - **Architecture guide** — how the pieces fit together
@@ -189,21 +195,25 @@ Positronic's step model creates a natural boundary between what an AI can do (no
 ### Concrete Ideas
 
 **Tool Access Visualization**
+
 - In the CLI (`px show --steps`), highlight which steps have access to which tools
 - Color-code or flag "dangerous" tool access (file writes, API calls with side effects, email sending)
 - Could show this in the watch UI too
 
 **Tool Access Analysis**
+
 - Static analysis at brain definition time
 - "This agent step has access to `sendEmail` and `deleteRecord` — are you sure?"
 - Could be a `px brain audit <name>` command
 - Or automatic warnings during `px run`
 
 **Sandboxing Recommendations**
+
 - Based on tool definitions, recommend whether a step should be behind a `.guard()` or `.ui()` confirmation
 - "Step 'ProcessEmails' can archive emails. Consider adding a confirmation UI step."
 
 **Prompt Injection Mitigation**
+
 - Non-deterministic steps only see tools explicitly declared
 - Framework could analyze which tools process external data (webhooks, API responses) vs internal data
 - Flag steps where external data flows into a step that has side-effect tools
@@ -212,6 +222,7 @@ Positronic's step model creates a natural boundary between what an AI can do (no
 ### Connection to the Platform Vision
 
 This is the pitch for why Positronic is better than "just let the agent run":
+
 - Deterministic steps can't be prompt-injected — they're just code
 - Non-deterministic steps have explicitly declared, auditable tool access
 - The `.ui()` step creates a human checkpoint for sensitive operations
@@ -224,29 +235,32 @@ This is the pitch for why Positronic is better than "just let the agent run":
 ### From TODO.md
 
 **1. Refactor CLI server.ts — Reduce Orchestration Logic**
+
 - Status: Not started
 - The CLI's file watcher holds too much logic about what to do on changes
 - Proposed: Add `onResourceChange()` and `onBrainChange()` to `PositronicDevServer` interface
 - This matters for multi-backend support (if you ever add AWS, etc.)
 
 **2. AI Agent Development Pain Points**
+
 - Status: Partially addressed (docs improved, but action items remain)
 - Remaining items listed in Section 5 above
 
 **3. UI Generation Agentic Loop Design**
+
 - Status: Not investigated
 - The `generateUI()` loop termination is fragile (relies on LLM choosing not to call a tool)
 - Questions: Should there be an explicit `done` tool? Should `validate_template` be required?
 
 ### From webhook-todo.md
 
-| # | Task | Status | Priority |
-|---|------|--------|----------|
-| 1 | Remove `action` property from webhook responses | Pending | TBD |
-| 2 | Add webhook integration specs to spec package | Pending | High |
-| 3 | Rename `restart()` to `resume()` | Done | - |
-| 4 | Reconsider webhook serialization approach | Pending | Low |
-| 5 | Change singleton DO IDs to descriptive names | Pending | Low |
+| #   | Task                                            | Status  | Priority |
+| --- | ----------------------------------------------- | ------- | -------- |
+| 1   | Remove `action` property from webhook responses | Pending | TBD      |
+| 2   | Add webhook integration specs to spec package   | Pending | High     |
+| 3   | Rename `restart()` to `resume()`                | Done    | -        |
+| 4   | Reconsider webhook serialization approach       | Pending | Low      |
+| 5   | Change singleton DO IDs to descriptive names    | Pending | Low      |
 
 ### From webhook-design.md — PLANNED Features
 
@@ -262,12 +276,12 @@ This is the pitch for why Positronic is better than "just let the agent run":
 
 ### In-Code TODOs
 
-| Location | Comment |
-|----------|---------|
-| `spec/src/api/schedules.ts:52` | Validate returned brain matches identifier |
-| `core/src/dsl/brain-state-machine.ts:943` | Add PAUSED transition for waiting brains |
-| `cloudflare/src/dev-server.ts:296` | 5 architectural improvements for .positronic setup |
-| `core/tests/brain-options-schema.test.ts:96` | Verify state default values |
+| Location                                     | Comment                                            |
+| -------------------------------------------- | -------------------------------------------------- |
+| `spec/src/api/schedules.ts:52`               | Validate returned brain matches identifier         |
+| `core/src/dsl/brain-state-machine.ts:943`    | Add PAUSED transition for waiting brains           |
+| `cloudflare/src/dev-server.ts:296`           | 5 architectural improvements for .positronic setup |
+| `core/tests/brain-options-schema.test.ts:96` | Verify state default values                        |
 
 ### Stale Branches
 
@@ -290,6 +304,7 @@ The `feature/loops` branch exists and the agent step (formerly "loop") is the cu
 ### Multi-Backend Support
 
 The `PositronicDevServer` interface exists for backend abstraction, but only Cloudflare is implemented. The server.ts refactoring (TODO #1) is a prerequisite for clean multi-backend support. Potential backends:
+
 - AWS Lambda + DynamoDB + S3
 - Fly.io
 - Local/Docker for development
@@ -321,24 +336,29 @@ The `PositronicDevServer` interface exists for backend abstraction, but only Clo
 If I had to rank these by impact and readiness:
 
 ### Recently Completed
+
 - ~~**Auth UX cleanup**~~ — Done (v0.0.74): automated root key, name-based IDs, consolidated CLI
 - ~~**Developer journal skill**~~ — Done: active and in use
 
 ### Do Soon (foundation for everything else)
+
 1. **Docs overhaul** — unblock AI agent development
 2. **Webhook integration specs** — already designed, just needs implementation
 3. **OAuth integration** — remaining auth work, would dramatically simplify onboarding for non-technical users
 
 ### Do Next (multiplier effects)
+
 4. **MCP client integration** — massive capability expansion with relatively contained scope
 5. **Chat interface** — best demo of the framework's value
 
 ### Do When Ready (vision items)
+
 6. **Positronic meta-agent** — needs docs + patterns first
 7. **Safety/visibility tooling** — differentiator, but needs real users to validate
 8. **Cold-start webhooks** — designed but not yet needed
 
 ### Keep in Mind (background items)
+
 9. **CLI server.ts refactoring** — only matters when adding another backend
 10. **UI generation loop redesign** — works well enough for now
 11. **Component bundle refactoring** — check what's already done vs. what remains

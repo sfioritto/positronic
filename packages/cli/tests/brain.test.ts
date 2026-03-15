@@ -44,7 +44,11 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['run', 'test-brain', '--watch']);
+        const { waitForOutput, instance } = await px([
+          'run',
+          'test-brain',
+          '--watch',
+        ]);
         // The watch component should be rendered - first shows connecting message
         const isOutputRendered = await waitForOutput(/Test Step 1/);
         expect(isOutputRendered).toBe(true);
@@ -71,7 +75,11 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['run', 'test-brain', '-w']);
+        const { waitForOutput, instance } = await px([
+          'run',
+          'test-brain',
+          '-w',
+        ]);
         // The watch component should be rendered - wait for SSE step data
         const isOutputRendered = await waitForOutput(/Test Step 1/);
         expect(isOutputRendered).toBe(true);
@@ -104,7 +112,7 @@ describe('CLI Integration: positronic brain commands', () => {
           '-o',
           'channel=#general',
           '-o',
-          'debug=true'
+          'debug=true',
         ]);
 
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
@@ -112,12 +120,12 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API was called with options
         const calls = env.server.getLogs();
-        const runCall = calls.find(c => c.method === 'createBrainRun');
+        const runCall = calls.find((c) => c.method === 'createBrainRun');
         expect(runCall).toBeDefined();
         expect(runCall?.args[0]).toBe('test-brain');
         expect(runCall?.args[1]).toEqual({
           channel: '#general',
-          debug: 'true'
+          debug: 'true',
         });
       } finally {
         await env.stopAndCleanup();
@@ -145,20 +153,20 @@ describe('CLI Integration: positronic brain commands', () => {
           '--options',
           'environment=production',
           '--options',
-          'rate=100'
+          'rate=100',
         ]);
-        
+
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
         expect(isOutputRendered).toBe(true);
-        
+
         // Verify API was called with options
         const calls = env.server.getLogs();
-        const runCall = calls.find(c => c.method === 'createBrainRun');
+        const runCall = calls.find((c) => c.method === 'createBrainRun');
         expect(runCall).toBeDefined();
         expect(runCall?.args[0]).toBe('test-brain');
         expect(runCall?.args[1]).toEqual({
           environment: 'production',
-          rate: '100'
+          rate: '100',
         });
       } finally {
         await env.stopAndCleanup();
@@ -186,7 +194,7 @@ describe('CLI Integration: positronic brain commands', () => {
           '-s',
           'count=0',
           '-s',
-          'name=sean'
+          'name=sean',
         ]);
 
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
@@ -194,12 +202,12 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API was called with initialState (type-coerced)
         const calls = env.server.getLogs();
-        const runCall = calls.find(c => c.method === 'createBrainRun');
+        const runCall = calls.find((c) => c.method === 'createBrainRun');
         expect(runCall).toBeDefined();
         expect(runCall?.args[0]).toBe('test-brain');
         expect(runCall?.args[2]).toEqual({
           count: 0,
-          name: 'sean'
+          name: 'sean',
         });
       } finally {
         await env.stopAndCleanup();
@@ -225,7 +233,7 @@ describe('CLI Integration: positronic brain commands', () => {
           'run',
           'test-brain',
           '--state-json',
-          '{"items": [], "config": {"debug": true}}'
+          '{"items": [], "config": {"debug": true}}',
         ]);
 
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
@@ -233,11 +241,11 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API was called with initialState
         const calls = env.server.getLogs();
-        const runCall = calls.find(c => c.method === 'createBrainRun');
+        const runCall = calls.find((c) => c.method === 'createBrainRun');
         expect(runCall).toBeDefined();
         expect(runCall?.args[2]).toEqual({
           items: [],
-          config: { debug: true }
+          config: { debug: true },
         });
       } finally {
         await env.stopAndCleanup();
@@ -249,14 +257,16 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        await expect(px([
-          'run',
-          'test-brain',
-          '-s',
-          'count=0',
-          '--state-json',
-          '{"items": []}'
-        ])).rejects.toThrow(/Cannot use both --state/);
+        await expect(
+          px([
+            'run',
+            'test-brain',
+            '-s',
+            'count=0',
+            '--state-json',
+            '{"items": []}',
+          ])
+        ).rejects.toThrow(/Cannot use both --state/);
       } finally {
         await env.stopAndCleanup();
       }
@@ -287,7 +297,7 @@ describe('CLI Integration: positronic brain commands', () => {
           '-s',
           'disabled=false',
           '-s',
-          'label=hello'
+          'label=hello',
         ]);
 
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
@@ -295,13 +305,13 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify type coercion
         const calls = env.server.getLogs();
-        const runCall = calls.find(c => c.method === 'createBrainRun');
+        const runCall = calls.find((c) => c.method === 'createBrainRun');
         expect(runCall).toBeDefined();
         expect(runCall?.args[2]).toEqual({
           active: true,
           count: 42,
           disabled: false,
-          label: 'hello'
+          label: 'hello',
         });
       } finally {
         await env.stopAndCleanup();
@@ -314,12 +324,9 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         // This will throw an error during yargs coercion
-        await expect(px([
-          'run', 
-          'test-brain', 
-          '-o', 
-          'invalid-no-equals'
-        ])).rejects.toThrow(/Invalid option format: "invalid-no-equals"/);
+        await expect(
+          px(['run', 'test-brain', '-o', 'invalid-no-equals'])
+        ).rejects.toThrow(/Invalid option format: "invalid-no-equals"/);
       } finally {
         await env.stopAndCleanup();
       }
@@ -344,7 +351,7 @@ describe('CLI Integration: positronic brain commands', () => {
           'run',
           'test-brain',
           '-o',
-          'webhook=https://example.com/api?key=value&foo=bar'
+          'webhook=https://example.com/api?key=value&foo=bar',
         ]);
 
         const isOutputRendered = await waitForOutput(/Run ID: run-\d+/);
@@ -352,16 +359,15 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API was called with correct URL value
         const calls = env.server.getLogs();
-        const runCall = calls.find(c => c.method === 'createBrainRun');
+        const runCall = calls.find((c) => c.method === 'createBrainRun');
         expect(runCall).toBeDefined();
         expect(runCall?.args[1]).toEqual({
-          webhook: 'https://example.com/api?key=value&foo=bar'
+          webhook: 'https://example.com/api?key=value&foo=bar',
         });
       } finally {
         await env.stopAndCleanup();
       }
     });
-
 
     it('should handle brain not found error with helpful message', async () => {
       const env = await createTestEnv();
@@ -375,10 +381,16 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundErrorTitle = await waitForOutput(/Brain Not Found/i, 30);
         expect(foundErrorTitle).toBe(true);
 
-        const foundErrorMessage = await waitForOutput(/No brains found matching 'non-existent-brain'/i, 30);
+        const foundErrorMessage = await waitForOutput(
+          /No brains found matching 'non-existent-brain'/i,
+          30
+        );
         expect(foundErrorMessage).toBe(true);
 
-        const foundHelpText = await waitForOutput(/brain name is spelled correctly/i, 30);
+        const foundHelpText = await waitForOutput(
+          /brain name is spelled correctly/i,
+          30
+        );
         expect(foundHelpText).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -401,7 +413,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const { waitForOutput } = await px(['run', 'test-brain']);
 
         // Should show server error
-        const foundError = await waitForOutput(/Server Error|Error searching/i, 30);
+        const foundError = await waitForOutput(
+          /Server Error|Error searching/i,
+          30
+        );
         expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -427,7 +442,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const { waitForOutput } = await px(['run', 'test-brain']);
 
         // Should show connection error
-        const foundError = await waitForOutput(/Connection Error|Error connecting/i, 30);
+        const foundError = await waitForOutput(
+          /Connection Error|Error connecting/i,
+          30
+        );
         expect(foundError).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -492,7 +510,10 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         // Use a run ID that exists - should fall back to run lookup
-        const { waitForOutput, instance } = await px(['watch', 'run-direct-456']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'run-direct-456',
+        ]);
 
         // Should connect to watch - wait for SSE step data
         const isOutputRendered = await waitForOutput(/Test Step 1/);
@@ -500,11 +521,11 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify brain search was attempted first
         const calls = server.getLogs();
-        const brainSearchCall = calls.find(c => c.method === 'getBrains');
+        const brainSearchCall = calls.find((c) => c.method === 'getBrains');
         expect(brainSearchCall).toBeDefined();
 
         // Verify run lookup was made (fallback)
-        const runLookupCall = calls.find(c => c.method === 'getRun');
+        const runLookupCall = calls.find((c) => c.method === 'getRun');
         expect(runLookupCall).toBeDefined();
         expect(runLookupCall?.args[0]).toBe('run-direct-456');
 
@@ -526,15 +547,18 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundTitle = await waitForOutput(/Not Found/i, 30);
         expect(foundTitle).toBe(true);
 
-        const foundMessage = await waitForOutput(/No brain or run found matching 'nonexistent-thing'/i, 30);
+        const foundMessage = await waitForOutput(
+          /No brain or run found matching 'nonexistent-thing'/i,
+          30
+        );
         expect(foundMessage).toBe(true);
 
         // Verify both lookups were attempted
         const calls = env.server.getLogs();
-        const brainSearchCall = calls.find(c => c.method === 'getBrains');
+        const brainSearchCall = calls.find((c) => c.method === 'getBrains');
         expect(brainSearchCall).toBeDefined();
 
-        const runLookupCall = calls.find(c => c.method === 'getRun');
+        const runLookupCall = calls.find((c) => c.method === 'getRun');
         expect(runLookupCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
@@ -572,13 +596,15 @@ describe('CLI Integration: positronic brain commands', () => {
         // Should connect to watch the active run - wait for SSE step data
         const isOutputRendered = await waitForOutput(/Test Step 1/);
         expect(isOutputRendered).toBe(true);
-        
+
         // Verify API was called to get active runs
         const calls = server.getLogs();
-        const activeRunsCall = calls.find(c => c.method === 'getBrainActiveRuns');
+        const activeRunsCall = calls.find(
+          (c) => c.method === 'getBrainActiveRuns'
+        );
         expect(activeRunsCall).toBeDefined();
         expect(activeRunsCall?.args[0]).toBe('test-brain');
-        
+
         // Unmount the component to trigger EventSource cleanup
         instance.unmount();
       } finally {
@@ -608,15 +634,23 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundTitle = await waitForOutput(/No Active Runs/i, 30);
         expect(foundTitle).toBe(true);
 
-        const foundMessage = await waitForOutput(/No currently running brain runs found for brain "test-brain"/i, 30);
+        const foundMessage = await waitForOutput(
+          /No currently running brain runs found for brain "test-brain"/i,
+          30
+        );
         expect(foundMessage).toBe(true);
 
-        const foundDetails = await waitForOutput(/positronic run test-brain/i, 30);
+        const foundDetails = await waitForOutput(
+          /positronic run test-brain/i,
+          30
+        );
         expect(foundDetails).toBe(true);
 
         // Verify API was called
         const calls = env.server.getLogs();
-        const activeRunsCall = calls.find(c => c.method === 'getBrainActiveRuns');
+        const activeRunsCall = calls.find(
+          (c) => c.method === 'getBrainActiveRuns'
+        );
         expect(activeRunsCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
@@ -659,15 +693,21 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         const { waitForOutput } = await px(['watch', 'test-brain']);
-        
+
         // Should show multiple active runs error
         const foundTitle = await waitForOutput(/Multiple Active Runs/i, 30);
         expect(foundTitle).toBe(true);
-        
-        const foundMessage = await waitForOutput(/Found 2 active runs for brain "test-brain"/i, 30);
+
+        const foundMessage = await waitForOutput(
+          /Found 2 active runs for brain "test-brain"/i,
+          30
+        );
         expect(foundMessage).toBe(true);
-        
-        const foundDetails = await waitForOutput(/positronic watch run-active-/i, 30);
+
+        const foundDetails = await waitForOutput(
+          /positronic watch run-active-/i,
+          30
+        );
         expect(foundDetails).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -712,7 +752,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const foundTitle = await waitForOutput(/API Error/i, 30);
         expect(foundTitle).toBe(true);
 
-        const foundMessage = await waitForOutput(/Failed to get active runs for brain "test-brain"/i, 30);
+        const foundMessage = await waitForOutput(
+          /Failed to get active runs for brain "test-brain"/i,
+          30
+        );
         expect(foundMessage).toBe(true);
 
         const foundDetails = await waitForOutput(/Server returned 500/i, 30);
@@ -727,15 +770,20 @@ describe('CLI Integration: positronic brain commands', () => {
       // Don't start the server to simulate connection error
 
       try {
-        const { waitForOutput } = await px(['watch', 'test-brain'], { server: env.server });
-        
+        const { waitForOutput } = await px(['watch', 'test-brain'], {
+          server: env.server,
+        });
+
         // Should show connection error
         const foundTitle = await waitForOutput(/Connection Error/i, 30);
         expect(foundTitle).toBe(true);
-        
-        const foundMessage = await waitForOutput(/Error connecting to the local development server/i, 30);
+
+        const foundMessage = await waitForOutput(
+          /Error connecting to the local development server/i,
+          30
+        );
         expect(foundMessage).toBe(true);
-        
+
         const foundDetails = await waitForOutput(/positronic server/i, 30);
         expect(foundDetails).toBe(true);
       } finally {
@@ -756,7 +804,6 @@ describe('CLI Integration: positronic brain commands', () => {
         await env.stopAndCleanup();
       }
     });
-
 
     it('should display step statuses correctly', async () => {
       const env = await createTestEnv();
@@ -821,7 +868,11 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-brain', '--events']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-brain',
+            '--events',
+          ]);
 
           // Should show events header
           const foundEvents = await waitForOutput(/Events \(\d+ total\)/, 30);
@@ -861,7 +912,11 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-brain', '-e']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-brain',
+            '-e',
+          ]);
 
           // Should show events header
           const foundEvents = await waitForOutput(/Events/, 30);
@@ -940,7 +995,11 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-brain', '--events']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-brain',
+            '--events',
+          ]);
 
           // Should start in events view
           const foundEvents = await waitForOutput(/Events/, 30);
@@ -976,7 +1035,11 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-multi-status', '--events']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-multi-status',
+            '--events',
+          ]);
 
           // Should show brain:start event with [>] symbol
           const foundStart = await waitForOutput(/\[>\].*Brain started/, 30);
@@ -1090,7 +1153,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-state-view']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-state-view',
+          ]);
 
           // Wait for the brain to load
           const foundBrain = await waitForOutput(/State View Brain/, 30);
@@ -1125,7 +1191,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-state-view']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-state-view',
+          ]);
 
           // Wait for the brain to load
           await waitForOutput(/State View Brain/, 30);
@@ -1167,7 +1236,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-state-view']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-state-view',
+          ]);
 
           // Wait for the brain to load
           await waitForOutput(/State View Brain/, 30);
@@ -1202,7 +1274,11 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-state-view', '--events']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-state-view',
+            '--events',
+          ]);
 
           // Wait for actual events to arrive from SSE (not just the "Events" header)
           // The first event is brain:start which shows "Brain started"
@@ -1222,7 +1298,10 @@ describe('CLI Integration: positronic brain commands', () => {
 
           // Should show state view footer (includes paging hint)
           // Use 100 tries (1 second) to handle React render cycle timing
-          const foundStateFooter = await waitForOutput(/j\/k scroll.*b back/, 100);
+          const foundStateFooter = await waitForOutput(
+            /j\/k scroll.*b back/,
+            100
+          );
           expect(foundStateFooter).toBe(true);
 
           instance.unmount();
@@ -1247,7 +1326,11 @@ describe('CLI Integration: positronic brain commands', () => {
         const px = await env.start();
 
         try {
-          const { waitForOutput, instance } = await px(['watch', 'test-state-view', '--events']);
+          const { waitForOutput, instance } = await px([
+            'watch',
+            'test-state-view',
+            '--events',
+          ]);
 
           // Wait for actual events to arrive from SSE (not just the "Events" header)
           await waitForOutput(/Brain started/, 100);
@@ -1268,7 +1351,6 @@ describe('CLI Integration: positronic brain commands', () => {
         }
       });
     });
-
   });
 
   describe('brain list command', () => {
@@ -1278,14 +1360,14 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         const { waitForOutput } = await px(['list']);
-        
+
         // Wait for the empty state message
         const foundEmpty = await waitForOutput(/No brains found/i, 30);
         expect(foundEmpty).toBe(true);
-        
+
         // Verify API call was made
         const calls = env.server.getLogs();
-        const listCall = calls.find(c => c.method === 'getBrains');
+        const listCall = calls.find((c) => c.method === 'getBrains');
         expect(listCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
@@ -1295,7 +1377,7 @@ describe('CLI Integration: positronic brain commands', () => {
     it('should list brains when brains exist', async () => {
       const env = await createTestEnv();
       const { server } = env;
-      
+
       // Add test brains before starting
       server.addBrain({
         filename: 'daily-report',
@@ -1304,7 +1386,7 @@ describe('CLI Integration: positronic brain commands', () => {
         createdAt: Date.now() - 86400000,
         lastModified: Date.now() - 3600000,
       });
-      
+
       server.addBrain({
         filename: 'data-processor',
         title: 'Data Processing Pipeline',
@@ -1312,7 +1394,7 @@ describe('CLI Integration: positronic brain commands', () => {
         createdAt: Date.now() - 172800000,
         lastModified: Date.now() - 7200000,
       });
-      
+
       const px = await env.start();
 
       try {
@@ -1331,7 +1413,7 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API call
         const calls = server.getLogs();
-        const listCall = calls.find(c => c.method === 'getBrains');
+        const listCall = calls.find((c) => c.method === 'getBrains');
         expect(listCall).toBeDefined();
       } finally {
         await env.stopAndCleanup();
@@ -1344,7 +1426,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const { waitForOutput } = await px(['list'], { server: env.server });
 
       try {
-        const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
+        const foundError = await waitForOutput(
+          /Error connecting to the local development server/i,
+          30
+        );
         expect(foundError).toBe(true);
       } finally {
         env.cleanup();
@@ -1370,12 +1455,15 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         const { waitForOutput } = await px(['history', 'test-brain']);
-        const foundMessage = await waitForOutput(/No run history found for brain: test-brain/i, 30);
+        const foundMessage = await waitForOutput(
+          /No run history found for brain: test-brain/i,
+          30
+        );
         expect(foundMessage).toBe(true);
 
         // Verify API call was made
         const calls = env.server.getLogs();
-        const historyCall = calls.find(c => c.method === 'getBrainHistory');
+        const historyCall = calls.find((c) => c.method === 'getBrainHistory');
         expect(historyCall).toBeDefined();
         expect(historyCall?.args[0]).toBe('test-brain');
       } finally {
@@ -1422,22 +1510,25 @@ describe('CLI Integration: positronic brain commands', () => {
 
       try {
         const { waitForOutput } = await px(['history', 'test-brain']);
-        
+
         // Check for header
-        const foundHeader = await waitForOutput(/Recent runs for brain "test-brain"/i, 30);
+        const foundHeader = await waitForOutput(
+          /Recent runs for brain "test-brain"/i,
+          30
+        );
         expect(foundHeader).toBe(true);
-        
+
         // Check for run IDs
         const foundRun1 = await waitForOutput(/run-123/i, 30);
         expect(foundRun1).toBe(true);
-        
+
         const foundRun2 = await waitForOutput(/run-456/i, 30);
         expect(foundRun2).toBe(true);
-        
+
         // Check for statuses
         const foundComplete = await waitForOutput(/COMPLETE/i, 30);
         expect(foundComplete).toBe(true);
-        
+
         const foundError = await waitForOutput(/ERROR/i, 30);
         expect(foundError).toBe(true);
       } finally {
@@ -1473,7 +1564,7 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API was called with correct limit
         const calls = env.server.getLogs();
-        const historyCall = calls.find(c => c.method === 'getBrainHistory');
+        const historyCall = calls.find((c) => c.method === 'getBrainHistory');
         expect(historyCall).toBeDefined();
         expect(historyCall?.args[1]).toBe(20);
       } finally {
@@ -1484,11 +1575,16 @@ describe('CLI Integration: positronic brain commands', () => {
     it('should handle server connection errors', async () => {
       const env = await createTestEnv();
       // Don't start the server to simulate connection error
-      
+
       try {
-        const { waitForOutput } = await px(['history', 'test-brain'], { server: env.server });
-        
-        const foundError = await waitForOutput(/Error connecting to the local development server/i, 30);
+        const { waitForOutput } = await px(['history', 'test-brain'], {
+          server: env.server,
+        });
+
+        const foundError = await waitForOutput(
+          /Error connecting to the local development server/i,
+          30
+        );
         expect(foundError).toBe(true);
       } finally {
         env.cleanup();
@@ -1558,7 +1654,11 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', '--run-id', 'run-completed-123']);
+        const { waitForOutput } = await px([
+          'show',
+          '--run-id',
+          'run-completed-123',
+        ]);
 
         // Check for run ID
         const foundRunId = await waitForOutput(/run-completed-123/, 30);
@@ -1593,7 +1693,8 @@ describe('CLI Integration: positronic brain commands', () => {
         error: {
           name: 'AnthropicError',
           message: 'Rate limit exceeded',
-          stack: 'Error: Rate limit exceeded\n    at processStep (/src/brain.ts:123)\n    at runBrain (/src/runner.ts:45)',
+          stack:
+            'Error: Rate limit exceeded\n    at processStep (/src/brain.ts:123)\n    at runBrain (/src/runner.ts:45)',
         },
         createdAt: Date.now() - 120000,
         startedAt: Date.now() - 120000,
@@ -1603,7 +1704,11 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', '--run-id', 'run-error-456']);
+        const { waitForOutput } = await px([
+          'show',
+          '--run-id',
+          'run-error-456',
+        ]);
 
         // Check for run ID
         const foundRunId = await waitForOutput(/run-error-456/, 30);
@@ -1618,7 +1723,10 @@ describe('CLI Integration: positronic brain commands', () => {
         expect(foundErrorType).toBe(true);
 
         // Check for error message
-        const foundErrorMessage = await waitForOutput(/Rate limit exceeded/, 30);
+        const foundErrorMessage = await waitForOutput(
+          /Rate limit exceeded/,
+          30
+        );
         expect(foundErrorMessage).toBe(true);
 
         // Check for stack trace
@@ -1634,7 +1742,11 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', '--run-id', 'non-existent-run']);
+        const { waitForOutput } = await px([
+          'show',
+          '--run-id',
+          'non-existent-run',
+        ]);
         const foundError = await waitForOutput(/not found/, 30);
         expect(foundError).toBe(true);
       } finally {
@@ -1664,7 +1776,11 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['show', '--run-id', 'run-with-options']);
+        const { waitForOutput } = await px([
+          'show',
+          '--run-id',
+          'run-with-options',
+        ]);
 
         // Check for options section
         const foundOptions = await waitForOutput(/Options/, 30);
@@ -1699,7 +1815,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const { waitForOutput } = await px(['rerun', 'test-brain']);
 
         // Check for success message
-        const foundSuccess = await waitForOutput(/Brain rerun started successfully/i, 30);
+        const foundSuccess = await waitForOutput(
+          /Brain rerun started successfully/i,
+          30
+        );
         expect(foundSuccess).toBe(true);
 
         // Check for new run ID
@@ -1707,16 +1826,22 @@ describe('CLI Integration: positronic brain commands', () => {
         expect(foundRunId).toBe(true);
 
         // Check for descriptive text
-        const foundDescription = await waitForOutput(/Rerunning brain "test-brain"/i, 30);
+        const foundDescription = await waitForOutput(
+          /Rerunning brain "test-brain"/i,
+          30
+        );
         expect(foundDescription).toBe(true);
 
         // Check for watch command suggestion
-        const foundWatchSuggestion = await waitForOutput(/Watch the run with: positronic watch rerun-/i, 30);
+        const foundWatchSuggestion = await waitForOutput(
+          /Watch the run with: positronic watch rerun-/i,
+          30
+        );
         expect(foundWatchSuggestion).toBe(true);
 
         // Verify API call
         const calls = env.server.getLogs();
-        const rerunCall = calls.find(c => c.method === 'rerunBrain');
+        const rerunCall = calls.find((c) => c.method === 'rerunBrain');
         expect(rerunCall).toBeDefined();
         expect(rerunCall?.args[0]).toBe('test-brain');
         expect(rerunCall?.args[1]).toBeUndefined(); // no runId
@@ -1744,7 +1869,10 @@ describe('CLI Integration: positronic brain commands', () => {
         const { waitForOutput } = await px(['rerun', 'test-brain', 'run-123']);
 
         // Check for success message
-        const foundSuccess = await waitForOutput(/Brain rerun started successfully/i, 30);
+        const foundSuccess = await waitForOutput(
+          /Brain rerun started successfully/i,
+          30
+        );
         expect(foundSuccess).toBe(true);
 
         // Check for run details
@@ -1753,7 +1881,7 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API call
         const calls = env.server.getLogs();
-        const rerunCall = calls.find(c => c.method === 'rerunBrain');
+        const rerunCall = calls.find((c) => c.method === 'rerunBrain');
         expect(rerunCall).toBeDefined();
         expect(rerunCall?.args[0]).toBe('test-brain');
         expect(rerunCall?.args[1]).toBe('run-123');
@@ -1788,16 +1916,22 @@ describe('CLI Integration: positronic brain commands', () => {
         ]);
 
         // Check for success message
-        const foundSuccess = await waitForOutput(/Brain rerun started successfully/i, 30);
+        const foundSuccess = await waitForOutput(
+          /Brain rerun started successfully/i,
+          30
+        );
         expect(foundSuccess).toBe(true);
 
         // Check for step range details
-        const foundStepRange = await waitForOutput(/starting at step 3, stopping after step 5/i, 30);
+        const foundStepRange = await waitForOutput(
+          /starting at step 3, stopping after step 5/i,
+          30
+        );
         expect(foundStepRange).toBe(true);
 
         // Verify API call
         const calls = env.server.getLogs();
-        const rerunCall = calls.find(c => c.method === 'rerunBrain');
+        const rerunCall = calls.find((c) => c.method === 'rerunBrain');
         expect(rerunCall).toBeDefined();
         expect(rerunCall?.args[0]).toBe('test-brain');
         expect(rerunCall?.args[1]).toBeUndefined(); // no runId
@@ -1820,7 +1954,10 @@ describe('CLI Integration: positronic brain commands', () => {
         expect(foundErrorTitle).toBe(true);
 
         // Check for error message
-        const foundErrorMessage = await waitForOutput(/No brains found matching 'non-existent-brain'/i, 30);
+        const foundErrorMessage = await waitForOutput(
+          /No brains found matching 'non-existent-brain'/i,
+          30
+        );
         expect(foundErrorMessage).toBe(true);
 
         // Check for helpful details
@@ -1847,18 +1984,28 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['rerun', 'test-brain', 'non-existent-run']);
+        const { waitForOutput } = await px([
+          'rerun',
+          'test-brain',
+          'non-existent-run',
+        ]);
 
         // Check for error title
         const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
         expect(foundErrorTitle).toBe(true);
 
         // Check for error message
-        const foundErrorMessage = await waitForOutput(/Brain run 'non-existent-run' not found/i, 30);
+        const foundErrorMessage = await waitForOutput(
+          /Brain run 'non-existent-run' not found/i,
+          30
+        );
         expect(foundErrorMessage).toBe(true);
 
         // Check for helpful details with runId
-        const foundDetails = await waitForOutput(/positronic brain history test-brain/i, 30);
+        const foundDetails = await waitForOutput(
+          /positronic brain history test-brain/i,
+          30
+        );
         expect(foundDetails).toBe(true);
       } finally {
         await env.stopAndCleanup();
@@ -1870,13 +2017,18 @@ describe('CLI Integration: positronic brain commands', () => {
       // Don't start the server to simulate connection error
 
       try {
-        const { waitForOutput } = await px(['rerun', 'test-brain'], { server: env.server });
+        const { waitForOutput } = await px(['rerun', 'test-brain'], {
+          server: env.server,
+        });
 
         // Check for connection error (now from BrainResolver)
         const foundErrorTitle = await waitForOutput(/Connection Error/i, 30);
         expect(foundErrorTitle).toBe(true);
 
-        const foundConnectionError = await waitForOutput(/Error connecting to the local development server/i, 30);
+        const foundConnectionError = await waitForOutput(
+          /Error connecting to the local development server/i,
+          30
+        );
         expect(foundConnectionError).toBe(true);
       } finally {
         env.cleanup();
@@ -1922,14 +2074,16 @@ describe('CLI Integration: positronic brain commands', () => {
         expect(foundErrorTitle).toBe(true);
 
         // Check for server error
-        const foundServerError = await waitForOutput(/Server returned 500/i, 30);
+        const foundServerError = await waitForOutput(
+          /Server returned 500/i,
+          30
+        );
         expect(foundServerError).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
     });
   });
-
 
   describe('error handling', () => {
     it('should handle missing brain name for run command', async () => {
@@ -1965,7 +2119,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-agent-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-agent-brain',
+        ]);
 
         // Wait for brain to load with agent event
         const foundBrain = await waitForOutput(/Agent Brain/, 30);
@@ -1997,7 +2154,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-agent-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-agent-brain',
+        ]);
 
         // Wait for brain to load
         await waitForOutput(/Agent Brain/, 30);
@@ -2037,7 +2197,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-running-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-running-brain',
+        ]);
 
         // Wait for brain to load
         await waitForOutput(/Running Brain/, 30);
@@ -2054,7 +2217,6 @@ describe('CLI Integration: positronic brain commands', () => {
         await env.stopAndCleanup();
       }
     });
-
   });
 
   describe('watch pause/resume feature', () => {
@@ -2074,7 +2236,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-running-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-running-brain',
+        ]);
 
         // Wait for brain to load
         await waitForOutput(/Running Brain/, 30);
@@ -2088,7 +2253,9 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // Verify API call
         const calls = server.getLogs();
-        const signalCall = calls.find(c => c.method === 'sendSignal' && c.args[1]?.type === 'PAUSE');
+        const signalCall = calls.find(
+          (c) => c.method === 'sendSignal' && c.args[1]?.type === 'PAUSE'
+        );
         expect(signalCall).toBeDefined();
         expect(signalCall?.args[0]).toBe('test-running-brain');
 
@@ -2114,7 +2281,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-running-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-running-brain',
+        ]);
 
         // Wait for brain to load
         await waitForOutput(/Running Brain/, 30);
@@ -2147,7 +2317,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-complete-flow']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-complete-flow',
+        ]);
 
         // Wait for brain to load
         await waitForOutput(/Complete Flow Brain/, 30);
@@ -2158,7 +2331,7 @@ describe('CLI Integration: positronic brain commands', () => {
 
         // The footer should NOT have "p pause" since brain is complete
         // Give time for all SSE events to process
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         const output = instance.lastFrame() || '';
         expect(output).not.toContain('p pause');
 
@@ -2186,7 +2359,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-multi-agent-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-multi-agent-brain',
+        ]);
 
         // Wait for brain to load
         await waitForOutput(/Multi Agent Brain/, 30);
@@ -2227,7 +2403,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-multi-agent-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-multi-agent-brain',
+        ]);
 
         // Wait for brain to load
         await waitForOutput(/Multi Agent Brain/, 30);
@@ -2242,7 +2421,10 @@ describe('CLI Integration: positronic brain commands', () => {
         instance.stdin.write('\r');
 
         // Should navigate to agent chat view - shows agent label and content
-        const foundAgentChat = await waitForOutput(/Research Agent|Researching/, 30);
+        const foundAgentChat = await waitForOutput(
+          /Research Agent|Researching/,
+          30
+        );
         expect(foundAgentChat).toBe(true);
 
         instance.unmount();
@@ -2250,7 +2432,6 @@ describe('CLI Integration: positronic brain commands', () => {
         await env.stopAndCleanup();
       }
     });
-
   });
 
   describe('watch agent chat view', () => {
@@ -2270,7 +2451,10 @@ describe('CLI Integration: positronic brain commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px(['watch', 'test-agent-brain']);
+        const { waitForOutput, instance } = await px([
+          'watch',
+          'test-agent-brain',
+        ]);
 
         // Wait for brain to load with agent
         await waitForOutput(/Agent Brain/, 30);
@@ -2287,6 +2471,5 @@ describe('CLI Integration: positronic brain commands', () => {
         await env.stopAndCleanup();
       }
     });
-
   });
 });

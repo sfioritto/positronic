@@ -13,11 +13,12 @@ This runs in the background — you don't ask the user for permission to journal
 ## The core principle: Why > What
 
 The journal is NOT a changelog. Don't just record "we refactored the auth module." Record:
+
 - **Why** we refactored it (the old design couldn't handle X)
 - **What we learned** along the way (turns out Y doesn't work because of Z)
 - **What we considered** and rejected (we almost did A but realized B)
 
-If you find yourself writing a journal entry that's just "did X, then did Y, then did Z" — stop. That's a git log. Ask yourself: what did we *learn*? Why did we make *these* choices?
+If you find yourself writing a journal entry that's just "did X, then did Y, then did Z" — stop. That's a git log. Ask yourself: what did we _learn_? Why did we make _these_ choices?
 
 ## When you don't know the "why"
 
@@ -35,12 +36,14 @@ All journal pages live in `docs/journal/`. Each effort gets its own file.
 ## When to start a new journal page
 
 Start a new page when:
+
 - The user begins discussing or planning a non-trivial effort
 - Design decisions are being debated or brainstormed
 - There's no active journal page for the current effort
 - The user explicitly starts a new effort
 
 Do NOT journal for:
+
 - Simple questions or explanations unrelated to active development
 - Trivial one-line fixes
 - Reading/exploring code without intent to change it
@@ -75,6 +78,7 @@ Focus on reasoning and insights, not play-by-play of actions taken.
 ## Learnings
 
 Things we discovered that would be valuable to know in the future:
+
 - What surprised us
 - Constraints we discovered
 - Patterns that worked or didn't
@@ -83,6 +87,7 @@ Things we discovered that would be valuable to know in the future:
 ## Dead ends
 
 Approaches that were tried and abandoned. For each:
+
 - What was the approach
 - Why it seemed promising
 - What we learned from trying it (the actual lesson, not just "it didn't work")
@@ -96,6 +101,7 @@ What we did, why this approach won over the alternatives, and what makes it work
 ## When to write
 
 Update the journal at these moments:
+
 - **During design discussion** — capture options considered, tradeoffs debated, and the reasoning behind decisions made
 - **When something is learned** — a new constraint discovered, a surprising behavior found, an assumption proven wrong
 - **After a dead end** — what we tried, why it didn't work, what we learned from it

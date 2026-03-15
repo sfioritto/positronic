@@ -131,7 +131,9 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
         if (buffer) {
           buffer.messages.push({
             role: 'assistant',
-            content: `[Tool Call: ${event.toolName}] ${JSON.stringify(event.input)}`,
+            content: `[Tool Call: ${event.toolName}] ${JSON.stringify(
+              event.input
+            )}`,
           });
         }
       }
@@ -141,7 +143,9 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
         if (buffer) {
           buffer.messages.push({
             role: 'assistant',
-            content: `[Tool Result: ${event.toolName}] ${JSON.stringify(event.result)}`,
+            content: `[Tool Result: ${event.toolName}] ${JSON.stringify(
+              event.result
+            )}`,
           });
         }
       }

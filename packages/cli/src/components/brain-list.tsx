@@ -62,7 +62,8 @@ export const BrainList = () => {
         <Text>No brains found.</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Create a brain with "px brain new &lt;name&gt;" or add .ts files to the brains/ directory
+            Tip: Create a brain with "px brain new &lt;name&gt;" or add .ts
+            files to the brains/ directory
           </Text>
         </Box>
       </Box>
@@ -70,7 +71,9 @@ export const BrainList = () => {
   }
 
   // Sort brains alphabetically by title
-  const sortedBrains = [...data.brains].sort((a, b) => a.title.localeCompare(b.title));
+  const sortedBrains = [...data.brains].sort((a, b) =>
+    a.title.localeCompare(b.title)
+  );
 
   // Define column widths
   const columns = {
@@ -79,7 +82,8 @@ export const BrainList = () => {
   };
 
   // Calculate total width for separator
-  const totalWidth = Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
+  const totalWidth =
+    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -90,9 +94,13 @@ export const BrainList = () => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.title.header, columns.title.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{columns.description.header}</Text>
+          <Text bold color="cyan">
+            {padRight(columns.title.header, columns.title.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {columns.description.header}
+          </Text>
         </Box>
 
         {/* Separator */}
@@ -102,18 +110,33 @@ export const BrainList = () => {
 
         {/* Data rows */}
         {sortedBrains.map((brain) => {
-          const descriptionLines = wrapText(brain.description, columns.description.width);
+          const descriptionLines = wrapText(
+            brain.description,
+            columns.description.width
+          );
           return (
-            <Box key={brain.filename} flexDirection="column" marginBottom={descriptionLines.length > 1 ? 1 : 0}>
+            <Box
+              key={brain.filename}
+              flexDirection="column"
+              marginBottom={descriptionLines.length > 1 ? 1 : 0}
+            >
               <Box>
-                <Text>{padRight(brain.title.length > columns.title.width ? brain.title.substring(0, columns.title.width - 3) + '...' : brain.title, columns.title.width)}</Text>
-                <Text>  </Text>
+                <Text>
+                  {padRight(
+                    brain.title.length > columns.title.width
+                      ? brain.title.substring(0, columns.title.width - 3) +
+                          '...'
+                      : brain.title,
+                    columns.title.width
+                  )}
+                </Text>
+                <Text> </Text>
                 <Text dimColor>{descriptionLines[0]}</Text>
               </Box>
               {descriptionLines.slice(1).map((line, index) => (
                 <Box key={index}>
                   <Text>{' '.repeat(columns.title.width)}</Text>
-                  <Text>  </Text>
+                  <Text> </Text>
                   <Text dimColor>{line}</Text>
                 </Box>
               ))}

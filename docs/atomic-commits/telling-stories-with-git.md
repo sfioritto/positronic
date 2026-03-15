@@ -1,6 +1,6 @@
 # Atomic Commits: Telling Stories with Git
 
-*By Frederick Van Brabant — December 7, 2017*
+_By Frederick Van Brabant — December 7, 2017_
 
 ## Overview
 

@@ -25,7 +25,12 @@ interface ResourceDeleteProps {
   force?: boolean;
 }
 
-export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, force = false }: ResourceDeleteProps) => {
+export const ResourceDelete = ({
+  resourceKey,
+  resourcePath,
+  projectRootPath,
+  force = false,
+}: ResourceDeleteProps) => {
   const [confirmed, setConfirmed] = useState(force); // Auto-confirm if force is true
   const [deleted, setDeleted] = useState(false);
   const [input, setInput] = useState('');
@@ -34,14 +39,18 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, for
   const { exit } = useApp();
 
   const {
-    data: resourcesData, loading: listLoading, error: listError,
+    data: resourcesData,
+    loading: listLoading,
+    error: listError,
   } = useApiGet<ResourcesResponse>('/resources');
   const { execute: deleteResource, loading, error } = useApiDelete('resource');
 
   // Check if the resource is local
   useEffect(() => {
     if (resourcesData) {
-      const resource = resourcesData.resources.find(r => r.key === resourceKey);
+      const resource = resourcesData.resources.find(
+        (r) => r.key === resourceKey
+      );
       if (resource) {
         setIsLocalResource(resource.local);
       } else {
@@ -63,12 +72,14 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, for
           } else {
             exit();
           }
-        } else if (char === '\u0003') { // Ctrl+C
+        } else if (char === '\u0003') {
+          // Ctrl+C
           exit();
-        } else if (char === '\u007F' || char === '\b') { // Backspace
-          setInput(prev => prev.slice(0, -1));
+        } else if (char === '\u007F' || char === '\b') {
+          // Backspace
+          setInput((prev) => prev.slice(0, -1));
         } else {
-          setInput(prev => prev + char);
+          setInput((prev) => prev + char);
         }
       };
 
@@ -85,20 +96,27 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, for
     if (confirmed && !loading && !error && !deleted) {
       // URL encode the key for the API endpoint
       const encodedKey = encodeURIComponent(resourceKey);
-      deleteResource(`/resources/${encodedKey}`)
-        .then(() => {
-          setDeleted(true);
+      deleteResource(`/resources/${encodedKey}`).then(() => {
+        setDeleted(true);
 
-          // Generate types after successful deletion if in local dev mode
-          if (projectRootPath) {
-            generateTypes(projectRootPath)
-              .catch((typeError) => {              // Don't fail the delete if type generation fails
-                console.error('Failed to generate types:', typeError);
-              });
-          }
-        });
+        // Generate types after successful deletion if in local dev mode
+        if (projectRootPath) {
+          generateTypes(projectRootPath).catch((typeError) => {
+            // Don't fail the delete if type generation fails
+            console.error('Failed to generate types:', typeError);
+          });
+        }
+      });
     }
-  }, [confirmed, loading, error, deleted, deleteResource, resourceKey, projectRootPath]);
+  }, [
+    confirmed,
+    loading,
+    error,
+    deleted,
+    deleteResource,
+    resourceKey,
+    projectRootPath,
+  ]);
 
   if (listError) {
     return <ErrorComponent error={listError} />;
@@ -119,10 +137,14 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, for
   if (isLocalResource) {
     return (
       <Box flexDirection="column">
-        <Text color="red" bold>❌ Cannot Delete Local Resource</Text>
+        <Text color="red" bold>
+          ❌ Cannot Delete Local Resource
+        </Text>
         <Box marginTop={1} paddingLeft={2} flexDirection="column">
           <Text>This resource was synced from your local filesystem.</Text>
-          <Text dimColor>To remove it, delete the file locally and run 'px resources sync'.</Text>
+          <Text dimColor>
+            To remove it, delete the file locally and run 'px resources sync'.
+          </Text>
         </Box>
       </Box>
     );
@@ -131,7 +153,9 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, for
   if (!confirmed && !force) {
     return (
       <Box flexDirection="column">
-        <Text bold color="yellow">⚠️  Warning: This will permanently delete the following resource:</Text>
+        <Text bold color="yellow">
+          ⚠️ Warning: This will permanently delete the following resource:
+        </Text>
         <Box marginTop={1} marginBottom={1} paddingLeft={2}>
           <Text>{resourcePath}</Text>
         </Box>
@@ -143,7 +167,7 @@ export const ResourceDelete = ({ resourceKey, resourcePath, projectRootPath, for
   if (loading) {
     return (
       <Box>
-        <Text>🗑️  Deleting {resourcePath}...</Text>
+        <Text>🗑️ Deleting {resourcePath}...</Text>
       </Box>
     );
   }

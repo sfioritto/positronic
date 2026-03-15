@@ -48,15 +48,19 @@ const formatRelativeTime = (timestamp: number): string => {
   }
 };
 
-export const ScheduleRuns = ({ scheduleId, limit, status }: ScheduleRunsProps) => {
+export const ScheduleRuns = ({
+  scheduleId,
+  limit,
+  status,
+}: ScheduleRunsProps) => {
   // Build query params
   const params = new URLSearchParams();
   if (scheduleId) params.set('scheduleId', scheduleId);
   params.set('limit', limit.toString());
-  
+
   const queryString = params.toString();
   const url = `/brains/schedules/runs${queryString ? `?${queryString}` : ''}`;
-  
+
   const { data, loading, error } = useApiGet<ScheduleRunsResponse>(url);
 
   if (error) {
@@ -85,8 +89,8 @@ export const ScheduleRuns = ({ scheduleId, limit, status }: ScheduleRunsProps) =
   }
 
   // Filter by status if provided (client-side filtering since API doesn't support it)
-  const filteredRuns = status 
-    ? data.runs.filter(run => run.status === status)
+  const filteredRuns = status
+    ? data.runs.filter((run) => run.status === status)
     : data.runs;
 
   if (status && filteredRuns.length === 0) {
@@ -100,7 +104,8 @@ export const ScheduleRuns = ({ scheduleId, limit, status }: ScheduleRunsProps) =
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
       <Text bold>
-        Found {filteredRuns.length} scheduled run{filteredRuns.length === 1 ? '' : 's'}
+        Found {filteredRuns.length} scheduled run
+        {filteredRuns.length === 1 ? '' : 's'}
         {scheduleId && ` for schedule ${scheduleId}`}
         {status && ` with status ${status}`}:
       </Text>
@@ -108,15 +113,25 @@ export const ScheduleRuns = ({ scheduleId, limit, status }: ScheduleRunsProps) =
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight('Run ID', 38)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight('Schedule ID', 38)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight('Status', 10)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight('Ran At', 20)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight('When', 12)}</Text>
+          <Text bold color="cyan">
+            {padRight('Run ID', 38)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight('Schedule ID', 38)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight('Status', 10)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight('Ran At', 20)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight('When', 12)}
+          </Text>
         </Box>
 
         {/* Separator */}
@@ -128,15 +143,15 @@ export const ScheduleRuns = ({ scheduleId, limit, status }: ScheduleRunsProps) =
         {filteredRuns.map((run) => (
           <Box key={run.id}>
             <Text>{padRight(run.id, 38)}</Text>
-            <Text>  </Text>
+            <Text> </Text>
             <Text>{padRight(run.scheduleId, 38)}</Text>
-            <Text>  </Text>
+            <Text> </Text>
             <Text color={run.status === 'triggered' ? 'green' : 'red'}>
               {padRight(run.status, 10)}
             </Text>
-            <Text>  </Text>
+            <Text> </Text>
             <Text dimColor>{padRight(formatDate(run.ranAt), 20)}</Text>
-            <Text>  </Text>
+            <Text> </Text>
             <Text dimColor>{padRight(formatRelativeTime(run.ranAt), 12)}</Text>
           </Box>
         ))}

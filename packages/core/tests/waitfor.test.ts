@@ -107,11 +107,16 @@ describe('wait step timeout', () => {
       .wait('Wait', () => testWebhook('id1'));
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
-    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+    const webhookEvent = events.find(
+      (e) => e.type === BRAIN_EVENTS.WEBHOOK
+    ) as any;
     expect(webhookEvent).toBeDefined();
     expect(webhookEvent.timeout).toBeUndefined();
   });
@@ -122,11 +127,16 @@ describe('wait step timeout', () => {
       .wait('Wait', () => testWebhook('id1'), { timeout: '24h' });
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
-    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+    const webhookEvent = events.find(
+      (e) => e.type === BRAIN_EVENTS.WEBHOOK
+    ) as any;
     expect(webhookEvent).toBeDefined();
     expect(webhookEvent.timeout).toBe(24 * 60 * 60 * 1000);
   });
@@ -137,11 +147,16 @@ describe('wait step timeout', () => {
       .wait('Wait', () => testWebhook('id1'), { timeout: 30000 });
 
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
-    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+    const webhookEvent = events.find(
+      (e) => e.type === BRAIN_EVENTS.WEBHOOK
+    ) as any;
     expect(webhookEvent).toBeDefined();
     expect(webhookEvent.timeout).toBe(30000);
   });

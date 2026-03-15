@@ -1,6 +1,14 @@
 import React, { useMemo, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
-import { createMachine, state, transition, reduce, invoke, immediate, guard } from 'robot3';
+import {
+  createMachine,
+  state,
+  transition,
+  reduce,
+  invoke,
+  immediate,
+  guard,
+} from 'robot3';
 import { useMachine } from 'react-robot';
 import { ErrorComponent } from './error.js';
 import { SelectList } from './select-list.js';
@@ -49,13 +57,15 @@ const getConnectionError = (): ErrorInfo => {
     return {
       title: 'Connection Error',
       message: 'Error connecting to the local development server.',
-      details: "Please ensure the server is running ('positronic server' or 'px s').",
+      details:
+        "Please ensure the server is running ('positronic server' or 'px s').",
     };
   }
   return {
     title: 'Connection Error',
     message: 'Error connecting to the remote project server.',
-    details: 'Please check your network connection and verify the project URL is correct.',
+    details:
+      'Please check your network connection and verify the project URL is correct.',
   };
 };
 
@@ -121,7 +131,10 @@ const startRun = async (ctx: BrainRunContext) => {
 
 // Reducers
 const storeBrainSearchResult = reduce(
-  (ctx: BrainRunContext, ev: { data: BrainsResponse }) => ({ ...ctx, brainSearchResult: ev.data })
+  (ctx: BrainRunContext, ev: { data: BrainsResponse }) => ({
+    ...ctx,
+    brainSearchResult: ev.data,
+  })
 );
 
 const applySingleBrainFound = reduce((ctx: BrainRunContext) => ({
@@ -145,26 +158,46 @@ const applyBrainNotFoundError = reduce((ctx: BrainRunContext) => ({
 }));
 
 const setBrainTitleFromSelection = reduce(
-  (ctx: BrainRunContext, ev: { brainTitle: string }) => ({ ...ctx, selectedBrainTitle: ev.brainTitle })
+  (ctx: BrainRunContext, ev: { brainTitle: string }) => ({
+    ...ctx,
+    selectedBrainTitle: ev.brainTitle,
+  })
 );
 
 const storeRunResult = reduce(
-  (ctx: BrainRunContext, ev: { data: { brainRunId: string } }) => ({ ...ctx, runId: ev.data.brainRunId })
+  (ctx: BrainRunContext, ev: { data: { brainRunId: string } }) => ({
+    ...ctx,
+    runId: ev.data.brainRunId,
+  })
 );
 
 const setErrorFromEvent = reduce(
-  (ctx: BrainRunContext, ev: { error: unknown }) => ({ ...ctx, error: handleNetworkError(ev.error) })
+  (ctx: BrainRunContext, ev: { error: unknown }) => ({
+    ...ctx,
+    error: handleNetworkError(ev.error),
+  })
 );
 
 // Guards for routing
-const brainFoundGuard = guard<BrainRunContext, object>((ctx) => ctx.brainSearchResult?.count === 1);
+const brainFoundGuard = guard<BrainRunContext, object>(
+  (ctx) => ctx.brainSearchResult?.count === 1
+);
 
-const brainNotFoundGuard = guard<BrainRunContext, object>((ctx) => ctx.brainSearchResult?.count === 0);
+const brainNotFoundGuard = guard<BrainRunContext, object>(
+  (ctx) => ctx.brainSearchResult?.count === 0
+);
 
-const brainsMultipleGuard = guard<BrainRunContext, object>((ctx) => (ctx.brainSearchResult?.count ?? 0) > 1);
+const brainsMultipleGuard = guard<BrainRunContext, object>(
+  (ctx) => (ctx.brainSearchResult?.count ?? 0) > 1
+);
 
 // State machine definition
-const createBrainRunMachine = (identifier: string, watch: boolean, options: Record<string, string> | undefined, initialState: Record<string, unknown> | undefined) =>
+const createBrainRunMachine = (
+  identifier: string,
+  watch: boolean,
+  options: Record<string, string> | undefined,
+  initialState: Record<string, unknown> | undefined
+) =>
   createMachine(
     'searching',
     {
@@ -179,11 +212,17 @@ const createBrainRunMachine = (identifier: string, watch: boolean, options: Reco
       routeSearch: state(
         immediate('running', brainFoundGuard, applySingleBrainFound),
         immediate('error', brainNotFoundGuard, applyBrainNotFoundError) as any,
-        immediate('disambiguating', brainsMultipleGuard, applyBrainsMultiple) as any
+        immediate(
+          'disambiguating',
+          brainsMultipleGuard,
+          applyBrainsMultiple
+        ) as any
       ),
 
       // User selects from multiple matching brains
-      disambiguating: state(transition('BRAIN_SELECTED', 'running', setBrainTitleFromSelection)),
+      disambiguating: state(
+        transition('BRAIN_SELECTED', 'running', setBrainTitleFromSelection)
+      ),
 
       // Invoke state: start the brain run
       running: invoke(
@@ -219,7 +258,12 @@ const createBrainRunMachine = (identifier: string, watch: boolean, options: Reco
  * 3. Start the brain run
  * 4. Show run ID or Watch component based on watch flag
  */
-export const BrainRun = ({ identifier, watch = false, options, initialState }: BrainRunProps) => {
+export const BrainRun = ({
+  identifier,
+  watch = false,
+  options,
+  initialState,
+}: BrainRunProps) => {
   const machine = useMemo(
     () => createBrainRunMachine(identifier, watch, options, initialState),
     [identifier, watch, options, initialState]
@@ -251,7 +295,11 @@ export const BrainRun = ({ identifier, watch = false, options, initialState }: B
       return (
         <Box flexDirection="column">
           <SelectList
-            items={brains.map((b) => ({ id: b.title, label: b.title, description: b.description }))}
+            items={brains.map((b) => ({
+              id: b.title,
+              label: b.title,
+              description: b.description,
+            }))}
             header={`Multiple brains match '${identifier}':`}
             onSelect={(item) => {
               send({ type: 'BRAIN_SELECTED', brainTitle: item.label });

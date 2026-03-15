@@ -62,7 +62,8 @@ export const UsersList = () => {
     created: { header: 'Created', width: 20 },
   };
 
-  const totalWidth = Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
+  const totalWidth =
+    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -72,9 +73,13 @@ export const UsersList = () => {
 
       <Box marginTop={1} flexDirection="column">
         <Box>
-          <Text bold color="cyan">{padRight(columns.name.header, columns.name.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.created.header, columns.created.width)}</Text>
+          <Text bold color="cyan">
+            {padRight(columns.name.header, columns.name.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.created.header, columns.created.width)}
+          </Text>
         </Box>
 
         <Box>
@@ -83,9 +88,16 @@ export const UsersList = () => {
 
         {sortedUsers.map((user) => (
           <Box key={user.name}>
-            <Text>{padRight(truncate(user.name, columns.name.width), columns.name.width)}</Text>
-            <Text>  </Text>
-            <Text dimColor>{padRight(formatDate(user.createdAt), columns.created.width)}</Text>
+            <Text>
+              {padRight(
+                truncate(user.name, columns.name.width),
+                columns.name.width
+              )}
+            </Text>
+            <Text> </Text>
+            <Text dimColor>
+              {padRight(formatDate(user.createdAt), columns.created.width)}
+            </Text>
           </Box>
         ))}
       </Box>

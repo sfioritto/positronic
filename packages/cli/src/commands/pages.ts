@@ -19,7 +19,10 @@ export class PagesCommand {
     return React.createElement(PagesList, {});
   }
 
-  delete({ slug, force }: ArgumentsCamelCase<PageDeleteArgs>): React.ReactElement {
+  delete({
+    slug,
+    force,
+  }: ArgumentsCamelCase<PageDeleteArgs>): React.ReactElement {
     return React.createElement(PageDelete, {
       slug,
       force,

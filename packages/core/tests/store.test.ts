@@ -17,7 +17,9 @@ const collectEvents = async <T>(
 };
 
 // In-memory store factory for testing — mimics key resolution like a real backend
-const createInMemoryStoreProvider = (): StoreProvider & { data: Map<string, any> } => {
+const createInMemoryStoreProvider = (): StoreProvider & {
+  data: Map<string, any>;
+} => {
   const data = new Map<string, any>();
 
   const factory: StoreProvider & { data: Map<string, any> } = Object.assign(
@@ -25,7 +27,12 @@ const createInMemoryStoreProvider = (): StoreProvider & { data: Map<string, any>
       // Parse per-user keys from schema
       const perUserKeys = new Set<string>();
       for (const [key, value] of Object.entries(schema)) {
-        if (value !== null && typeof value === 'object' && 'perUser' in value && (value as any).perUser === true) {
+        if (
+          value !== null &&
+          typeof value === 'object' &&
+          'perUser' in value &&
+          (value as any).perUser === true
+        ) {
           perUserKeys.add(key);
         }
       }
@@ -35,7 +42,7 @@ const createInMemoryStoreProvider = (): StoreProvider & { data: Map<string, any>
           if (!currentUser) {
             throw new Error(
               `Store key "${key}" is per-user but no currentUser was provided. ` +
-              `Per-user store keys require a currentUser in run params.`
+                `Per-user store keys require a currentUser in run params.`
             );
           }
           return `store/${brainTitle}/user/${currentUser.name}/${key}`;
@@ -44,10 +51,18 @@ const createInMemoryStoreProvider = (): StoreProvider & { data: Map<string, any>
       }
 
       const store: Store<any> = {
-        async get(key: string) { return data.get(resolveKey(key)); },
-        async set(key: string, value: any) { data.set(resolveKey(key), value); },
-        async delete(key: string) { data.delete(resolveKey(key)); },
-        async has(key: string) { return data.has(resolveKey(key)); },
+        async get(key: string) {
+          return data.get(resolveKey(key));
+        },
+        async set(key: string, value: any) {
+          data.set(resolveKey(key), value);
+        },
+        async delete(key: string) {
+          data.delete(resolveKey(key));
+        },
+        async has(key: string) {
+          return data.has(resolveKey(key));
+        },
       };
 
       return store;
@@ -115,7 +130,9 @@ describe('Brain.withStore', () => {
     );
 
     // Verify data was stored at the brain-scoped path
-    expect(storeFactory.data.get('store/test-brain/items')).toEqual(['new-item']);
+    expect(storeFactory.data.get('store/test-brain/items')).toEqual([
+      'new-item',
+    ]);
   });
 
   it('should preserve store through step chain', async () => {
@@ -257,7 +274,9 @@ describe('Brain.withStore', () => {
     // Shared key uses brain-scoped path
     expect(storeFactory.data.get('store/test-brain/sharedCounter')).toBe(1);
     // Per-user key uses user-scoped path
-    expect(storeFactory.data.get('store/test-brain/user/user-42/userPref')).toBe('dark');
+    expect(
+      storeFactory.data.get('store/test-brain/user/user-42/userPref')
+    ).toBe('dark');
   });
 
   it('should isolate store data between different brains', async () => {
@@ -313,11 +332,10 @@ describe('Brain.withStore', () => {
 
     let receivedStore: any;
 
-    const testBrain = myBrain('test-brain')
-      .step('Test', ({ store }) => {
-        receivedStore = store;
-        return { done: true };
-      });
+    const testBrain = myBrain('test-brain').step('Test', ({ store }) => {
+      receivedStore = store;
+      return { done: true };
+    });
 
     await collectEvents(
       testBrain.run({

@@ -4,7 +4,11 @@ import { Cron } from 'croner';
 import Fuse from 'fuse.js';
 import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 import { getManifest } from '../brain-runner-do.js';
-import type { Bindings, CreateBrainRunRequest, CreateBrainRunResponse } from './types.js';
+import type {
+  Bindings,
+  CreateBrainRunRequest,
+  CreateBrainRunResponse,
+} from './types.js';
 
 const brains = new Hono<{ Bindings: Bindings }>();
 
@@ -19,14 +23,19 @@ function scopeUserName(context: Context): string | null {
 }
 
 brains.post('/runs', async (context: Context) => {
-  const requestBody = await context.req.json<CreateBrainRunRequest & { identifier?: string }>();
+  const requestBody = await context.req.json<
+    CreateBrainRunRequest & { identifier?: string }
+  >();
   const { options, initialState } = requestBody;
 
   // Support both identifier and brainTitle for backward compatibility
   const identifier = requestBody.identifier || requestBody.brainTitle;
 
   if (!identifier) {
-    return context.json({ error: 'Missing identifier or brainTitle in request body' }, 400);
+    return context.json(
+      { error: 'Missing identifier or brainTitle in request body' },
+      400
+    );
   }
 
   // Validate that the brain exists before starting it
@@ -43,11 +52,14 @@ brains.post('/runs', async (context: Context) => {
   }
 
   if (resolution.matchType === 'multiple') {
-    return context.json({
-      error: 'Multiple brains match the identifier',
-      matchType: 'multiple',
-      candidates: resolution.candidates
-    }, 409);
+    return context.json(
+      {
+        error: 'Multiple brains match the identifier',
+        matchType: 'multiple',
+        candidates: resolution.candidates,
+      },
+      409
+    );
   }
 
   const brain = resolution.brain!;
@@ -60,14 +72,18 @@ brains.post('/runs', async (context: Context) => {
   // Read auth context for currentUser (every brain run must have an owner)
   const auth = context.get('auth');
   if (!auth?.userName && !auth?.isRoot) {
-    return context.json({ error: 'Authentication required to run a brain' }, 401);
+    return context.json(
+      { error: 'Authentication required to run a brain' },
+      401
+    );
   }
   const currentUser = { name: auth.userName || 'root' };
 
   // Pass options and initialState to the brain runner if provided
-  const initialData = (options || initialState)
-    ? { ...(options && { options }), ...(initialState && { initialState }) }
-    : undefined;
+  const initialData =
+    options || initialState
+      ? { ...(options && { options }), ...(initialState && { initialState }) }
+      : undefined;
   // Get the actual brain title from the resolved brain
   const brainTitle = (brain as any).title || identifier;
   await stub.start(brainTitle, brainRunId, currentUser, initialData);
@@ -86,7 +102,10 @@ brains.post('/runs/rerun', async (context: Context) => {
   const identifier = requestBody.identifier || requestBody.brainTitle;
 
   if (!identifier) {
-    return context.json({ error: 'Missing identifier or brainTitle in request body' }, 400);
+    return context.json(
+      { error: 'Missing identifier or brainTitle in request body' },
+      400
+    );
   }
 
   // Validate that the brain exists
@@ -103,11 +122,14 @@ brains.post('/runs/rerun', async (context: Context) => {
   }
 
   if (resolution.matchType === 'multiple') {
-    return context.json({
-      error: 'Multiple brains match the identifier',
-      matchType: 'multiple',
-      candidates: resolution.candidates
-    }, 409);
+    return context.json(
+      {
+        error: 'Multiple brains match the identifier',
+        matchType: 'multiple',
+        candidates: resolution.candidates,
+      },
+      409
+    );
   }
 
   const brain = resolution.brain!;
@@ -126,7 +148,10 @@ brains.post('/runs/rerun', async (context: Context) => {
   // Read auth context for currentUser (every brain run must have an owner)
   const auth = context.get('auth');
   if (!auth?.userName && !auth?.isRoot) {
-    return context.json({ error: 'Authentication required to run a brain' }, 401);
+    return context.json(
+      { error: 'Authentication required to run a brain' },
+      401
+    );
   }
   const currentUser = { name: auth.userName || 'root' };
 
@@ -213,10 +238,18 @@ brains.delete('/runs/:runId', async (context: Context) => {
 // Signal endpoint - queue KILL, PAUSE, USER_MESSAGE, RESUME, or WEBHOOK_RESPONSE signals
 brains.post('/runs/:runId/signals', async (context: Context) => {
   const runId = context.req.param('runId');
-  const body = await context.req.json<{ type: string; content?: string; response?: Record<string, unknown> }>();
+  const body = await context.req.json<{
+    type: string;
+    content?: string;
+    response?: Record<string, unknown>;
+  }>();
 
   // Validate signal type
-  if (!['KILL', 'PAUSE', 'USER_MESSAGE', 'RESUME', 'WEBHOOK_RESPONSE'].includes(body.type)) {
+  if (
+    !['KILL', 'PAUSE', 'USER_MESSAGE', 'RESUME', 'WEBHOOK_RESPONSE'].includes(
+      body.type
+    )
+  ) {
     return context.json({ error: 'Invalid signal type' }, 400);
   }
 
@@ -233,7 +266,11 @@ brains.post('/runs/:runId/signals', async (context: Context) => {
   // USER_MESSAGE is a data signal that gets queued and processed during agent execution,
   // so it doesn't need state validation - it can always be queued
   if (body.type !== 'USER_MESSAGE') {
-    const validation = isSignalValid(brainMachineDefinition, run.status, body.type);
+    const validation = isSignalValid(
+      brainMachineDefinition,
+      run.status,
+      body.type
+    );
     if (!validation.valid) {
       return context.json({ error: validation.reason }, 409);
     }
@@ -251,10 +288,13 @@ brains.post('/runs/:runId/signals', async (context: Context) => {
     await stub.wakeUp(runId);
   }
 
-  return context.json({
-    success: true,
-    signal: { type: signal.type, queuedAt: signal.queuedAt }
-  }, 202);
+  return context.json(
+    {
+      success: true,
+      signal: { type: signal.type, queuedAt: signal.queuedAt },
+    },
+    202
+  );
 });
 
 // Resume endpoint - resume a paused brain using signal-based approach
@@ -271,9 +311,12 @@ brains.post('/runs/:runId/resume', async (context: Context) => {
   }
 
   if (run.status !== 'paused') {
-    return context.json({
-      error: `Cannot resume brain in '${run.status}' state. Only paused brains can be resumed.`
-    }, 409);
+    return context.json(
+      {
+        error: `Cannot resume brain in '${run.status}' state. Only paused brains can be resumed.`,
+      },
+      409
+    );
   }
 
   // Queue RESUME signal and wake up the brain
@@ -304,11 +347,14 @@ brains.get('/:identifier/history', async (context: Context) => {
   }
 
   if (resolution.matchType === 'multiple') {
-    return context.json({
-      error: 'Multiple brains match the identifier',
-      matchType: 'multiple',
-      candidates: resolution.candidates
-    }, 300);
+    return context.json(
+      {
+        error: 'Multiple brains match the identifier',
+        matchType: 'multiple',
+        candidates: resolution.candidates,
+      },
+      300
+    );
   }
 
   // Get the actual brain title
@@ -339,11 +385,14 @@ brains.get('/:identifier/active-runs', async (context: Context) => {
   }
 
   if (resolution.matchType === 'multiple') {
-    return context.json({
-      error: 'Multiple brains match the identifier',
-      matchType: 'multiple',
-      candidates: resolution.candidates
-    }, 300);
+    return context.json(
+      {
+        error: 'Multiple brains match the identifier',
+        matchType: 'multiple',
+        candidates: resolution.candidates,
+      },
+      300
+    );
   }
 
   // Get the actual brain title
@@ -393,7 +442,7 @@ brains.get('/', async (context: Context) => {
   );
 
   // Filter out any null entries
-  const validBrains = brainList.filter(brain => brain !== null);
+  const validBrains = brainList.filter((brain) => brain !== null);
 
   // If no query, return all brains
   if (!query) {
@@ -406,7 +455,7 @@ brains.get('/', async (context: Context) => {
   // Check for exact match on title or filename first
   const queryLower = query.toLowerCase();
   const exactMatch = validBrains.find(
-    brain =>
+    (brain) =>
       brain.title.toLowerCase() === queryLower ||
       brain.filename.toLowerCase() === queryLower
   );
@@ -454,7 +503,7 @@ brains.get('/', async (context: Context) => {
 
   // Return all matching results, sorted by score (best first)
   return context.json({
-    brains: results.map(r => r.item),
+    brains: results.map((r) => r.item),
     count: results.length,
   });
 });
@@ -471,7 +520,10 @@ brains.post('/schedules', async (context: Context) => {
     const identifier = body.identifier || body.brainTitle;
 
     if (!identifier) {
-      return context.json({ error: 'Missing required field "identifier" or "brainTitle"' }, 400);
+      return context.json(
+        { error: 'Missing required field "identifier" or "brainTitle"' },
+        400
+      );
     }
     if (!cronExpression) {
       return context.json(
@@ -502,11 +554,14 @@ brains.post('/schedules', async (context: Context) => {
     }
 
     if (resolution.matchType === 'multiple') {
-      return context.json({
-        error: 'Multiple brains match the identifier',
-        matchType: 'multiple',
-        candidates: resolution.candidates
-      }, 409);
+      return context.json(
+        {
+          error: 'Multiple brains match the identifier',
+          matchType: 'multiple',
+          candidates: resolution.candidates,
+        },
+        409
+      );
     }
 
     // Get the actual brain title
@@ -520,7 +575,10 @@ brains.post('/schedules', async (context: Context) => {
     // Require authentication — scheduled runs will execute as this user
     const auth = context.get('auth');
     if (!auth?.userName && !auth?.isRoot) {
-      return context.json({ error: 'Authentication required to create a schedule' }, 401);
+      return context.json(
+        { error: 'Authentication required to create a schedule' },
+        401
+      );
     }
     const runAsUserName = auth.userName || 'root';
 
@@ -572,7 +630,11 @@ brains.get('/schedules/runs', async (context: Context) => {
   const scheduleStub = context.env.SCHEDULE_DO.get(scheduleDoId);
 
   const userName = scopeUserName(context);
-  const result = await scheduleStub.getAllRuns(scheduleIdParam, limit, userName);
+  const result = await scheduleStub.getAllRuns(
+    scheduleIdParam,
+    limit,
+    userName
+  );
   return context.json(result);
 });
 
@@ -635,11 +697,14 @@ brains.get('/:identifier', async (context: Context) => {
   }
 
   if (resolution.matchType === 'multiple') {
-    return context.json({
-      error: 'Multiple brains match the identifier',
-      matchType: 'multiple',
-      candidates: resolution.candidates
-    }, 300);
+    return context.json(
+      {
+        error: 'Multiple brains match the identifier',
+        matchType: 'multiple',
+        candidates: resolution.candidates,
+      },
+      300
+    );
   }
 
   const brain = resolution.brain!;

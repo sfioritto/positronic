@@ -1,5 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
-import { parseRateLimitHeaders, getGoogleModelDefaults } from './rate-limit-headers.js';
+import {
+  parseRateLimitHeaders,
+  getGoogleModelDefaults,
+} from './rate-limit-headers.js';
 
 export interface Env {
   IS_TEST?: string;
@@ -62,7 +65,10 @@ export class GovernorDO extends DurableObject<Env> {
     );
   }
 
-  async waitForCapacity(modelId: string, estimatedTokens: number): Promise<void> {
+  async waitForCapacity(
+    modelId: string,
+    estimatedTokens: number
+  ): Promise<void> {
     if (!this.limitsLoaded) {
       const defaults = getGoogleModelDefaults(modelId);
       if (defaults) {

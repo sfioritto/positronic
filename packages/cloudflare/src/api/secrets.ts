@@ -14,7 +14,9 @@ type CloudflareSecretResponse = {
 /**
  * Helper to check if Cloudflare API credentials are configured
  */
-function getSecretsApiConfig(env: Bindings): { accountId: string; scriptName: string; apiToken: string } | null {
+function getSecretsApiConfig(
+  env: Bindings
+): { accountId: string; scriptName: string; apiToken: string } | null {
   const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CF_SCRIPT_NAME } = env;
 
   if (!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !CF_SCRIPT_NAME) {
@@ -42,7 +44,7 @@ async function cloudflareSecretsApi(
   return fetch(url, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${config.apiToken}`,
+      Authorization: `Bearer ${config.apiToken}`,
       'Content-Type': 'application/json',
       ...options.headers,
     },
@@ -64,7 +66,8 @@ secrets.get('/', async (context: Context) => {
   if (!config) {
     return context.json(
       {
-        error: 'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
+        error:
+          'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
       },
       400
     );
@@ -72,10 +75,11 @@ secrets.get('/', async (context: Context) => {
 
   try {
     const response = await cloudflareSecretsApi(config, '');
-    const data = await response.json() as CloudflareSecretResponse;
+    const data = (await response.json()) as CloudflareSecretResponse;
 
     if (!data.success) {
-      const errorMessage = data.errors?.[0]?.message || 'Failed to list secrets';
+      const errorMessage =
+        data.errors?.[0]?.message || 'Failed to list secrets';
       return context.json({ error: errorMessage }, 500);
     }
 
@@ -115,7 +119,8 @@ secrets.post('/', async (context: Context) => {
   if (!config) {
     return context.json(
       {
-        error: 'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
+        error:
+          'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
       },
       400
     );
@@ -152,10 +157,14 @@ secrets.post('/', async (context: Context) => {
       }),
     });
 
-    const data = await response.json() as { success: boolean; errors?: Array<{ message: string }> };
+    const data = (await response.json()) as {
+      success: boolean;
+      errors?: Array<{ message: string }>;
+    };
 
     if (!data.success) {
-      const errorMessage = data.errors?.[0]?.message || 'Failed to create secret';
+      const errorMessage =
+        data.errors?.[0]?.message || 'Failed to create secret';
       return context.json({ error: errorMessage }, 500);
     }
 
@@ -188,7 +197,8 @@ secrets.delete('/:name', async (context: Context) => {
   if (!config) {
     return context.json(
       {
-        error: 'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
+        error:
+          'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
       },
       400
     );
@@ -207,14 +217,22 @@ secrets.delete('/:name', async (context: Context) => {
   }
 
   try {
-    const response = await cloudflareSecretsApi(config, encodeURIComponent(name), {
-      method: 'DELETE',
-    });
+    const response = await cloudflareSecretsApi(
+      config,
+      encodeURIComponent(name),
+      {
+        method: 'DELETE',
+      }
+    );
 
-    const data = await response.json() as { success: boolean; errors?: Array<{ message: string }> };
+    const data = (await response.json()) as {
+      success: boolean;
+      errors?: Array<{ message: string }>;
+    };
 
     if (!data.success) {
-      const errorMessage = data.errors?.[0]?.message || 'Failed to delete secret';
+      const errorMessage =
+        data.errors?.[0]?.message || 'Failed to delete secret';
       return context.json({ error: errorMessage }, 500);
     }
 
@@ -239,7 +257,8 @@ secrets.get('/:name/exists', async (context: Context) => {
   if (!config) {
     return context.json(
       {
-        error: 'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
+        error:
+          'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
       },
       400
     );
@@ -250,10 +269,11 @@ secrets.get('/:name/exists', async (context: Context) => {
   try {
     // List all secrets and check if the name exists
     const response = await cloudflareSecretsApi(config, '');
-    const data = await response.json() as CloudflareSecretResponse;
+    const data = (await response.json()) as CloudflareSecretResponse;
 
     if (!data.success) {
-      const errorMessage = data.errors?.[0]?.message || 'Failed to check secret';
+      const errorMessage =
+        data.errors?.[0]?.message || 'Failed to check secret';
       return context.json({ error: errorMessage }, 500);
     }
 
@@ -280,7 +300,8 @@ secrets.post('/bulk', async (context: Context) => {
   if (!config) {
     return context.json(
       {
-        error: 'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
+        error:
+          'Secrets management not configured. Please set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and CF_SCRIPT_NAME.',
       },
       400
     );
@@ -291,12 +312,15 @@ secrets.post('/bulk', async (context: Context) => {
     const { secrets: secretsArray } = body;
 
     if (!secretsArray || !Array.isArray(secretsArray)) {
-      return context.json({ error: 'Missing required field "secrets" (array)' }, 400);
+      return context.json(
+        { error: 'Missing required field "secrets" (array)' },
+        400
+      );
     }
 
     // First, get existing secrets to determine created vs updated
     const listResponse = await cloudflareSecretsApi(config, '');
-    const listData = await listResponse.json() as CloudflareSecretResponse;
+    const listData = (await listResponse.json()) as CloudflareSecretResponse;
 
     const existingNames = new Set(
       listData.success ? listData.result.map((s) => s.name) : []
@@ -325,7 +349,7 @@ secrets.post('/bulk', async (context: Context) => {
         }),
       });
 
-      const data = await response.json() as { success: boolean };
+      const data = (await response.json()) as { success: boolean };
 
       if (data.success) {
         if (existingNames.has(secret.name)) {

@@ -52,7 +52,9 @@ function parseComponentNode(obj: Record<string, unknown>): ComponentNode {
   const keys = Object.keys(obj);
   if (keys.length !== 1) {
     throw new Error(
-      `Component object must have exactly one key (the component name), got: ${keys.join(', ')}`
+      `Component object must have exactly one key (the component name), got: ${keys.join(
+        ', '
+      )}`
     );
   }
 
@@ -84,9 +86,7 @@ function parseComponentNode(obj: Record<string, unknown>): ComponentNode {
       }
       children = value.map((child) => {
         if (typeof child !== 'object' || child === null) {
-          throw new Error(
-            `Child must be a component object in "${component}"`
-          );
+          throw new Error(`Child must be a component object in "${component}"`);
         }
         return parseComponentNode(child as Record<string, unknown>);
       });
@@ -136,7 +136,9 @@ export function stringifyTemplate(template: Template): string {
       propsObj.children = node.children.map(nodeToObject);
     }
 
-    return { [node.component]: Object.keys(propsObj).length > 0 ? propsObj : null };
+    return {
+      [node.component]: Object.keys(propsObj).length > 0 ? propsObj : null,
+    };
   }
 
   return stringifyYaml(nodeToObject(template.root));

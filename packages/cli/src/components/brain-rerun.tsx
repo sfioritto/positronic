@@ -14,7 +14,12 @@ interface BrainRerunResponse {
   brainRunId: string;
 }
 
-export const BrainRerun = ({ identifier, runId, startsAt, stopsAfter }: BrainRerunProps) => {
+export const BrainRerun = ({
+  identifier,
+  runId,
+  startsAt,
+  stopsAfter,
+}: BrainRerunProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newRunId, setNewRunId] = useState<string | null>(null);
@@ -60,9 +65,12 @@ export const BrainRerun = ({ identifier, runId, startsAt, stopsAfter }: BrainRer
     : `Make sure the brain "${identifier}" exists.\nYou can list available brains with: positronic brain list`;
 
   const runDetails = runId ? ` from run ${runId}` : '';
-  const rangeDetails = startsAt || stopsAfter
-    ? ` (${startsAt ? `starting at step ${startsAt}` : ''}${startsAt && stopsAfter ? ', ' : ''}${stopsAfter ? `stopping after step ${stopsAfter}` : ''})`
-    : '';
+  const rangeDetails =
+    startsAt || stopsAfter
+      ? ` (${startsAt ? `starting at step ${startsAt}` : ''}${
+          startsAt && stopsAfter ? ', ' : ''
+        }${stopsAfter ? `stopping after step ${stopsAfter}` : ''})`
+      : '';
 
   // Maintain consistent Box wrapper to help Ink properly calculate
   // terminal clearing between renders (prevents appending instead of overwriting)
@@ -75,17 +83,20 @@ export const BrainRerun = ({ identifier, runId, startsAt, stopsAfter }: BrainRer
           error={{
             title: 'Brain Rerun Failed',
             message: error,
-            details: errorDetails
+            details: errorDetails,
           }}
         />
       ) : newRunId ? (
         <>
-          <Text bold color="green">✅ Brain rerun started successfully!</Text>
+          <Text bold color="green">
+            ✅ Brain rerun started successfully!
+          </Text>
           <Text>
             New run ID: <Text bold>{newRunId}</Text>
           </Text>
           <Text dimColor>
-            Rerunning brain "{identifier}"{runDetails}{rangeDetails}
+            Rerunning brain "{identifier}"{runDetails}
+            {rangeDetails}
           </Text>
           <Box marginTop={1}>
             <Text dimColor>

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useStdin } from 'ink';
 import { SelectList } from './select-list.js';
-import type { Project, ProjectConfigManager } from '../commands/project-config-manager.js';
+import type {
+  Project,
+  ProjectConfigManager,
+} from '../commands/project-config-manager.js';
 
 interface ProjectSelectProps {
   name?: string;
@@ -18,7 +21,10 @@ const InteractiveProjectSelect = ({
   currentProject: string | null;
   projectConfig: ProjectConfigManager;
 }) => {
-  const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{
+    success: boolean;
+    error?: string;
+  } | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   // If selection was made, show success
@@ -45,7 +51,10 @@ const InteractiveProjectSelect = ({
       items={projects.map((p) => ({
         id: p.name,
         label: p.name,
-        extra: p.name === currentProject ? <Text color="green"> (current)</Text> : undefined,
+        extra:
+          p.name === currentProject ? (
+            <Text color="green"> (current)</Text>
+          ) : undefined,
       }))}
       header="Select a project:"
       initialIndex={currentIndex >= 0 ? currentIndex : 0}
@@ -64,7 +73,10 @@ const InteractiveProjectSelect = ({
 export const ProjectSelect = ({ name, projectConfig }: ProjectSelectProps) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<string | null>(null);
-  const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{
+    success: boolean;
+    error?: string;
+  } | null>(null);
   const [isInteractive] = useState(!name);
   const { isRawModeSupported } = useStdin();
 
@@ -87,7 +99,8 @@ export const ProjectSelect = ({ name, projectConfig }: ProjectSelectProps) => {
         <Text color="red">❌ No projects configured</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Add a project first with "px project add &lt;name&gt; --url &lt;url&gt;"
+            Add a project first with "px project add &lt;name&gt; --url
+            &lt;url&gt;"
           </Text>
         </Box>
       </Box>
@@ -97,7 +110,7 @@ export const ProjectSelect = ({ name, projectConfig }: ProjectSelectProps) => {
   // Direct selection mode - show result
   if (!isInteractive && result) {
     if (result.success) {
-      const selectedProject = projects.find(p => p.name === name);
+      const selectedProject = projects.find((p) => p.name === name);
       return (
         <Box flexDirection="column">
           <Text color="green">✅ Project switched successfully!</Text>
@@ -123,7 +136,7 @@ export const ProjectSelect = ({ name, projectConfig }: ProjectSelectProps) => {
           {projects.length > 0 && (
             <Box marginTop={1} flexDirection="column">
               <Text>Available projects:</Text>
-              {projects.map(p => (
+              {projects.map((p) => (
                 <Box key={p.name} paddingLeft={2}>
                   <Text dimColor>• {p.name}</Text>
                 </Box>
@@ -157,7 +170,8 @@ export const ProjectSelect = ({ name, projectConfig }: ProjectSelectProps) => {
           </Box>
           <Box marginTop={1}>
             <Text dimColor>
-              Interactive mode not available. Use "px project select &lt;name&gt;" to select a project.
+              Interactive mode not available. Use "px project select
+              &lt;name&gt;" to select a project.
             </Text>
           </Box>
         </Box>
@@ -165,11 +179,13 @@ export const ProjectSelect = ({ name, projectConfig }: ProjectSelectProps) => {
     }
 
     // Use the interactive component that has useInput
-    return <InteractiveProjectSelect
-      projects={projects}
-      currentProject={currentProject}
-      projectConfig={projectConfig}
-    />;
+    return (
+      <InteractiveProjectSelect
+        projects={projects}
+        currentProject={currentProject}
+        projectConfig={projectConfig}
+      />
+    );
   }
 
   return <Text>Processing...</Text>;

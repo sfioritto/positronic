@@ -16,7 +16,10 @@ export class MockApiClient implements ApiClient {
   // Track all calls for assertions
   public calls: Array<{ path: string; options?: RequestInit }> = [];
 
-  async fetchUnauthenticated(path: string, options?: RequestInit): Promise<Response> {
+  async fetchUnauthenticated(
+    path: string,
+    options?: RequestInit
+  ): Promise<Response> {
     return this.fetch(path, options);
   }
 

@@ -54,8 +54,18 @@ const test1 = brain('test-1')
 const test2 = brain('test-2')
   .step('Fetch threads', ({ state }) => {
     const threadsById: Record<string, RawThread> = {
-      '1': { id: '1', from: 'alice@test.com', subject: 'Hello', body: 'Hi there' },
-      '2': { id: '2', from: 'bob@test.com', subject: 'Meeting', body: 'Tomorrow at 10' },
+      '1': {
+        id: '1',
+        from: 'alice@test.com',
+        subject: 'Hello',
+        body: 'Hi there',
+      },
+      '2': {
+        id: '2',
+        from: 'bob@test.com',
+        subject: 'Meeting',
+        body: 'Tomorrow at 10',
+      },
     };
     return {
       ...state,
@@ -84,8 +94,18 @@ const test2 = brain('test-2')
 const test3 = brain('test-3')
   .step('Fetch threads', ({ state }) => {
     const threadsById: Record<string, RawThread> = {
-      '1': { id: '1', from: 'alice@test.com', subject: 'Hello', body: 'Hi there' },
-      '2': { id: '2', from: 'bob@test.com', subject: 'Meeting', body: 'Tomorrow at 10' },
+      '1': {
+        id: '1',
+        from: 'alice@test.com',
+        subject: 'Hello',
+        body: 'Hi there',
+      },
+      '2': {
+        id: '2',
+        from: 'bob@test.com',
+        subject: 'Meeting',
+        body: 'Tomorrow at 10',
+      },
     };
     return {
       ...state,

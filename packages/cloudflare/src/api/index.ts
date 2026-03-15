@@ -87,4 +87,9 @@ app.route('/store', store);
 export default app;
 
 // Re-export types for external use
-export type { Bindings, HonoApp, CreateBrainRunRequest, CreateBrainRunResponse } from './types.js';
+export type {
+  Bindings,
+  HonoApp,
+  CreateBrainRunRequest,
+  CreateBrainRunResponse,
+} from './types.js';

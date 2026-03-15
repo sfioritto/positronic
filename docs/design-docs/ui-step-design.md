@@ -41,12 +41,14 @@ const summaryPrompt = prompt({
 ## Step Behaviors
 
 **Prompt step with schema**: Structured output merged into state
+
 ```typescript
 .prompt('Digest', digestPrompt)
 // State: { ..., Digest: { archiveIds: string[], note?: string } }
 ```
 
 **Prompt step without schema**: Text response ephemeral in next step
+
 ```typescript
 .prompt('Summary', summaryPrompt)
 .step('UseSummary', ({ state, response }) => {
@@ -56,6 +58,7 @@ const summaryPrompt = prompt({
 ```
 
 **UI step with schema**: Page with form, webhook available
+
 ```typescript
 .ui('ShowDigest', digestPrompt)
 .step('NotifyAndWait', ({ state, page }) => {
@@ -69,6 +72,7 @@ const summaryPrompt = prompt({
 ```
 
 **UI step without schema**: Display-only page, no form
+
 ```typescript
 .ui('Dashboard', summaryPrompt)
 .step('Notify', ({ state, page }) => {
@@ -82,14 +86,15 @@ const summaryPrompt = prompt({
 
 ## Type Flow
 
-| After | Available in next step | Type |
-|-------|------------------------|------|
-| `.prompt()` with schema | merged into state | `state[name]: z.infer<Schema>` |
-| `.prompt()` without schema | response (ephemeral) | `{ text: string }` |
-| `.ui()` | page (ephemeral) | `{ url: string, webhook: WebhookRegistration<Schema> \| null }` |
-| `waitFor: [webhook]` | response (ephemeral) | `z.infer<WebhookSchema>` |
+| After                      | Available in next step | Type                                                            |
+| -------------------------- | ---------------------- | --------------------------------------------------------------- |
+| `.prompt()` with schema    | merged into state      | `state[name]: z.infer<Schema>`                                  |
+| `.prompt()` without schema | response (ephemeral)   | `{ text: string }`                                              |
+| `.ui()`                    | page (ephemeral)       | `{ url: string, webhook: WebhookRegistration<Schema> \| null }` |
+| `waitFor: [webhook]`       | response (ephemeral)   | `z.infer<WebhookSchema>`                                        |
 
 `page` follows the same pattern as `response` - new type parameter on Brain (`TPage`) that:
+
 1. `.ui()` sets to `Page<Schema>`
 2. Next `.step()` receives as `page` param
 3. That step resets it to `undefined`
@@ -111,8 +116,8 @@ const runner = new BrainRunner({ client, adapters })
   .withResources(resources)
   .withPages(pages)
   .withComponents({
-    ...components,               // Form, Input, TextArea, Checkbox, etc. (bundle attached)
-    EmailCard,                   // Project-wide custom component
+    ...components, // Form, Input, TextArea, Checkbox, etc. (bundle attached)
+    EmailCard, // Project-wide custom component
   });
 
 await runner.run(emailDigestBrain, { initialState });
@@ -121,14 +126,13 @@ await runner.run(emailDigestBrain, { initialState });
 **Per-step override:**
 
 ```typescript
-brain('email-digest')
-  .ui('ShowDigest', digestPrompt, {
-    components: {
-      Input: MyCustomInput,           // Override default for this step
-      EmailCard: EmailCardComponent,  // Use different EmailCard here
-    },
-    maxSteps: 20,                     // Override default max iterations
-  })
+brain('email-digest').ui('ShowDigest', digestPrompt, {
+  components: {
+    Input: MyCustomInput, // Override default for this step
+    EmailCard: EmailCardComponent, // Use different EmailCard here
+  },
+  maxSteps: 20, // Override default max iterations
+});
 ```
 
 **Resolution order**: step components → runner components → default components
@@ -175,7 +179,7 @@ brain('email-digest')
       archiveEmail(id);
     }
     return { ...state, archived: response.archiveIds };
-  })
+  });
 ```
 
 ---
@@ -218,6 +222,7 @@ interface ObjectGenerator {
 ```
 
 **Client implementations:**
+
 - `client-vercel`: Thin wrapper around Vercel AI SDK's `streamText`
 - `client-anthropic`: Implement equivalent using Anthropic API's tool use
 
@@ -227,9 +232,9 @@ interface ObjectGenerator {
 // packages/core/src/ui/types.ts
 interface Placement {
   id: string;
-  component: string;          // Component name, e.g., "Form", "Checkbox"
-  props: Record<string, unknown>;  // Props with binding syntax preserved
-  parentId: string | null;    // Parent placement ID, null for root
+  component: string; // Component name, e.g., "Form", "Checkbox"
+  props: Record<string, unknown>; // Props with binding syntax preserved
+  parentId: string | null; // Parent placement ID, null for root
 }
 ```
 
@@ -241,16 +246,31 @@ Components specify their parent when placed. The LLM receives the parent's ID fr
 // Tool execution returns the placement ID
 execute: (props) => {
   const id = generateId();
-  placements.push({ id, component: name, props, parentId: props.parentId ?? null });
-  return { id, component: name };  // LLM sees this ID and can use it as parentId
-}
+  placements.push({
+    id,
+    component: name,
+    props,
+    parentId: props.parentId ?? null,
+  });
+  return { id, component: name }; // LLM sees this ID and can use it as parentId
+};
 
 // Example placements array (flat, but represents tree via parentId):
 [
-  { id: "form-1", component: "Form", props: {}, parentId: null },
-  { id: "input-1", component: "Input", props: { name: "email", parentId: "form-1" }, parentId: "form-1" },
-  { id: "input-2", component: "Input", props: { name: "name", parentId: "form-1" }, parentId: "form-1" },
-]
+  { id: 'form-1', component: 'Form', props: {}, parentId: null },
+  {
+    id: 'input-1',
+    component: 'Input',
+    props: { name: 'email', parentId: 'form-1' },
+    parentId: 'form-1',
+  },
+  {
+    id: 'input-2',
+    component: 'Input',
+    props: { name: 'name', parentId: 'form-1' },
+    parentId: 'form-1',
+  },
+];
 ```
 
 **Data binding syntax:**
@@ -272,6 +292,7 @@ function resolveProp(value, data) {
 ```
 
 Loop components (like `List`) create local scope for their items:
+
 - `List` with `items: "{{emails}}"` and `as: "email"`
 - Children can reference `{{email.subject}}`, `{{email.id}}`, etc.
 - The bootstrap runtime handles this by passing the loop item as additional context
@@ -285,7 +306,7 @@ export async function generateUI(params: {
   prompt: string;
   components: Record<string, ComponentToolDefinition>;
   schema?: z.ZodSchema;
-  data: Record<string, unknown>;  // For data binding validation
+  data: Record<string, unknown>; // For data binding validation
   maxSteps?: number;
 }): Promise<{
   placements: Placement[];
@@ -295,7 +316,11 @@ export async function generateUI(params: {
 
   const tools = {
     ...componentsToTools(params.components, placements),
-    ValidateForm: createValidateFormTool(params.schema, params.data, placements),
+    ValidateForm: createValidateFormTool(
+      params.schema,
+      params.data,
+      placements
+    ),
   };
 
   await client.streamText({
@@ -305,7 +330,7 @@ export async function generateUI(params: {
     maxSteps: params.maxSteps ?? 10,
   });
 
-  const rootId = placements.find(p => p.parentId === null)?.id;
+  const rootId = placements.find((p) => p.parentId === null)?.id;
   return { placements, rootId };
 }
 ```
@@ -318,7 +343,7 @@ const result = await generateUI({
   prompt: promptText,
   components: resolvedComponents,
   schema: prompt.responseSchema,
-  data: state,  // Brain state for data binding validation
+  data: state, // Brain state for data binding validation
   maxSteps: options.maxSteps ?? 10,
 });
 
@@ -333,6 +358,7 @@ const page = await pagesService.createPage({
 ```
 
 **Loop behavior:**
+
 - Agent calls component tools to build page structure
 - Each tool call adds a Placement to the shared array
 - Agent calls `ValidateForm` to check form matches schema
@@ -368,7 +394,9 @@ const InputTool: ComponentToolDefinition = {
     label: z.string().describe('Label displayed above the input'),
     placeholder: z.string().optional().describe('Placeholder text when empty'),
     required: z.boolean().optional().describe('Whether field is required'),
-    type: z.enum(['text', 'email', 'number', 'password']).optional()
+    type: z
+      .enum(['text', 'email', 'number', 'password'])
+      .optional()
       .describe('Input type, defaults to text'),
   }),
 };
@@ -394,7 +422,11 @@ Components use Tailwind utility classes for styling (Tailwind loaded via CDN at 
 export function Input({ name, label, placeholder, required, type = 'text' }) {
   return (
     <div className="mb-4">
-      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label}
+        </label>
+      )}
       <input
         type={type}
         name={name}
@@ -439,7 +471,12 @@ function componentsToTools(
         parameters: def.parameters,
         execute: async (params) => {
           const id = generateId();
-          placements.push({ id, component: name, props: params, parentId: null });
+          placements.push({
+            id,
+            component: name,
+            props: params,
+            parentId: null,
+          });
           return { id, component: name };
         },
       },
@@ -468,37 +505,51 @@ function componentsToTools(
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{title}}</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
-  <div id="root"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{title}}</title>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body>
+    <div id="root"></div>
 
-  <!-- Pre-bundled components (inlined) -->
-  <script>/* contents of gen-ui-components/dist/components.js */</script>
+    <!-- Pre-bundled components (inlined) -->
+    <script>
+      /* contents of gen-ui-components/dist/components.js */
+    </script>
 
-  <!-- Data injected at generation time -->
-  <script>
-    window.__POSITRONIC_DATA__ = { /* brain state */ };
-    window.__POSITRONIC_TREE__ = [ /* placements array */ ];
-    window.__POSITRONIC_ROOT__ = "placement-id";
-  </script>
+    <!-- Data injected at generation time -->
+    <script>
+      window.__POSITRONIC_DATA__ = {
+        /* brain state */
+      };
+      window.__POSITRONIC_TREE__ = [
+        /* placements array */
+      ];
+      window.__POSITRONIC_ROOT__ = 'placement-id';
+    </script>
 
-  <!-- Bootstrap runtime -->
-  <script>/* runtime that builds and renders React tree */</script>
-</body>
+    <!-- Bootstrap runtime -->
+    <script>
+      /* runtime that builds and renders React tree */
+    </script>
+  </body>
 </html>
 ```
 
 **Bootstrap runtime (inlined in page):**
 
 ```javascript
-(function() {
+(function () {
   const components = window.PositronicComponents;
   const data = window.__POSITRONIC_DATA__;
   const tree = window.__POSITRONIC_TREE__;
@@ -509,14 +560,18 @@ function componentsToTools(
   }
 
   function resolveProp(value, ctx) {
-    if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
+    if (
+      typeof value === 'string' &&
+      value.startsWith('{{') &&
+      value.endsWith('}}')
+    ) {
       return resolveBinding(value.slice(2, -2).trim(), ctx);
     }
     return value;
   }
 
   function buildElement(placementId, ctx) {
-    const placement = tree.find(p => p.id === placementId);
+    const placement = tree.find((p) => p.id === placementId);
     const Component = components[placement.component];
 
     // Resolve props
@@ -526,16 +581,15 @@ function componentsToTools(
     }
 
     // Find children
-    const childIds = tree.filter(p => p.parentId === placementId).map(p => p.id);
-    const children = childIds.map(id => buildElement(id, ctx));
+    const childIds = tree
+      .filter((p) => p.parentId === placementId)
+      .map((p) => p.id);
+    const children = childIds.map((id) => buildElement(id, ctx));
 
     return React.createElement(Component, props, ...children);
   }
 
-  ReactDOM.render(
-    buildElement(rootId, data),
-    document.getElementById('root')
-  );
+  ReactDOM.render(buildElement(rootId, data), document.getElementById('root'));
 })();
 ```
 
@@ -558,17 +612,17 @@ type FormField =
   | z.ZodArray<FormPrimitive>;
 
 type FormSchema = z.ZodObject<{
-  [key: string]: FormField
+  [key: string]: FormField;
 }>;
 ```
 
-| Schema | Component |
-|--------|-----------|
-| `z.string()` | Input / TextArea |
-| `z.number()` | Input (type="number") |
-| `z.boolean()` | Checkbox |
-| `z.enum([...])` | Select / radio buttons |
-| `z.array(z.string())` | MultiTextInput |
+| Schema                   | Component                     |
+| ------------------------ | ----------------------------- |
+| `z.string()`             | Input / TextArea              |
+| `z.number()`             | Input (type="number")         |
+| `z.boolean()`            | Checkbox                      |
+| `z.enum([...])`          | Select / radio buttons        |
+| `z.array(z.string())`    | MultiTextInput                |
 | `z.array(z.enum([...]))` | Multi-select / checkbox group |
 
 Form → JSON is mechanical, no LLM coercion needed.
@@ -610,6 +664,7 @@ The **user's prompt** (from template) describes what the form should collect, in
 **`ValidateForm` tool implementation:**
 
 The tool validates two things:
+
 1. Form fields will produce data matching the expected Zod schema
 2. All data bindings (`{{path}}`) reference valid paths in the provided data
 
@@ -627,7 +682,7 @@ function createValidateFormTool(
       1. Form fields will produce data matching the expected schema
       2. All data bindings reference valid paths in the provided data
       Call this after building your form to verify it's correct.`,
-    parameters: z.object({}),  // No input - reads current placements
+    parameters: z.object({}), // No input - reads current placements
     execute: async () => {
       const errors: ValidationError[] = [];
 
@@ -646,8 +701,8 @@ function createValidateFormTool(
 
       return {
         valid: errors.length === 0,
-        errors: errors.map(e => ({ type: e.type, message: e.message })),
-        extractedFields: extracted.fields.map(f => ({
+        errors: errors.map((e) => ({ type: e.type, message: e.message })),
+        extractedFields: extracted.fields.map((f) => ({
           name: f.name,
           type: f.type,
         })),
@@ -706,7 +761,11 @@ function validateDataBindings(
     for (const [propName, propValue] of Object.entries(placement.props)) {
       if (isBinding(propValue)) {
         const path = extractBindingPath(propValue);
-        const resolved = resolvePathType(path, dataType, getLoopContext(placement));
+        const resolved = resolvePathType(
+          path,
+          dataType,
+          getLoopContext(placement)
+        );
 
         if (resolved === null) {
           errors.push({
@@ -724,6 +783,7 @@ function validateDataBindings(
 ```
 
 **Loop behavior:**
+
 - Agent builds form with component tools
 - Agent calls `ValidateForm`
 - Tool returns errors (missing fields, wrong types, invalid bindings) or OK
@@ -799,16 +859,19 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 ### Phase 1: Client Infrastructure (no breaking changes)
 
 **Step 1**: Add `streamText` to ObjectGenerator interface ✅
+
 - Add `streamText` method to `ObjectGenerator` in core
 - Define types for params and return value (maxSteps, messages, execute functions, usage)
 - Existing code continues to work
 
 **Step 2**: Implement `streamText` in `client-vercel` ✅
+
 - Thin wrapper around Vercel AI SDK's `streamText`
 - Handle `maxSteps` for multi-step (uses `stepCountIs()` internally)
 - Write tests
 
 **Step 3**: Implement `streamText` in `client-anthropic` ✅
+
 - Implement equivalent using Anthropic API's tool use with iteration
 - Match the same interface
 - Write tests
@@ -818,16 +881,19 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 ### Phase 2: Component System (no breaking changes)
 
 **Step 4**: Define `ComponentToolDefinition` interface ✅
+
 - Create interface for tool metadata only (no React dependency)
 - Export from core
 - No runtime impact yet
 
 **Step 5**: Build default components ✅
+
 - Create React components: Form, Input, TextArea, Checkbox, Select, List, Button, Text, Heading, Section, Card
 - Add tool descriptions and parameter schemas as separate `ComponentToolDefinition` objects
 - Export tool definitions from `@positronic/gen-ui-components`
 
 **Step 5b**: Bundle components with esbuild
+
 - Add esbuild as devDependency to `gen-ui-components`
 - Create bundle entry point (`src/bundle.ts`) that exposes React components to `window.PositronicComponents`
 - Configure esbuild: React as external, IIFE format, single output file
@@ -836,6 +902,7 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 - Components should use Tailwind utility classes for styling
 
 **Step 6**: Add `.withComponents()` to BrainRunner ✅
+
 - Additive method on BrainRunner
 - Stores component tool definitions for later use by `.ui()` steps
 - No impact on existing brains
@@ -845,10 +912,12 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 ### Phase 3: Prompt Changes (modifies existing behavior)
 
 **Step 7**: Make `responseSchema` optional in `prompt()` ✅
+
 - Update prompt factory to allow omitting responseSchema
 - Existing prompts with schemas continue to work unchanged
 
 **Step 8**: Schema-less `.prompt()` returns ephemeral response ✅
+
 - When no schema, prompt step returns text wrapped in object
 - Text available as `response: { text: string }` in next step (ephemeral)
 - Add type parameter handling
@@ -858,16 +927,19 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 ### Phase 4: UI Step (builds on everything above)
 
 **Step 9**: Add `TPage` type parameter to Brain ✅
+
 - New type parameter for ephemeral page
 - Pattern matches existing `TResponse` handling
 
 **Step 10**: Implement `generateUI` helper in core ✅
+
 - Uses `client.streamText` internally
 - Converts components to tools via `componentsToTools`
 - Returns `placements` array with component IDs and props
 - Exported from core
 
 **Step 11**: Implement `ValidateForm` tool ✅
+
 - Checks if current component tree satisfies schema
 - Validates data bindings against provided data type
 - Returns `{ valid: boolean, errors: ValidationError[] }`
@@ -875,17 +947,20 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 - Added when schema is provided to generateUI
 
 **Step 11b**: Implement data binding validation
+
 - `inferDataType`: Infer type structure from sample data
 - `validateDataBindings`: Check all `{{path}}` bindings resolve to valid paths
 - Handle loop context (e.g., `{{item.field}}` inside a List)
 - Return detailed errors for invalid bindings
 
 **Step 11c**: Implement form schema extraction
+
 - `extractFormSchema`: Walk placements, find form inputs, extract field info
 - `validateAgainstZod`: Check extracted fields match expected Zod schema
 - Handle fields inside loops (become arrays)
 
 **Step 12**: Implement page template generator
+
 - Create `generatePageHtml` function in core
 - Inputs: placements, rootId, data, component bundle, styles
 - Inlines React from CDN, component bundle, data as JSON, bootstrap runtime
@@ -893,6 +968,7 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 - No React runtime dependency (just string concatenation)
 
 **Step 13**: Add `.ui()` method to Brain
+
 - Runs generateUI with components
 - Calls page template generator
 - Creates page via PagesService (stores HTML)
@@ -904,6 +980,7 @@ Phased approach - each phase is a committable unit that keeps Positronic working
 ### Phase 5: Backend (can parallelize with Phase 4)
 
 **Step 14**: Form submission webhook handler
+
 - Handle POST from generated forms
 - Form data → JSON (mechanical transform)
 - Zod validate against schema

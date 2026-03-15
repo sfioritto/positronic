@@ -5,7 +5,7 @@ type JsonObject = { [key: string]: unknown };
 
 interface StateViewProps {
   state: JsonObject;
-  title: string;  // "Current State" or "State at event #5"
+  title: string; // "Current State" or "State at event #5"
   scrollOffset: number;
   onScrollChange: (offset: number) => void;
   isActive?: boolean;
@@ -56,7 +56,9 @@ export const StateView = ({
     <Box flexDirection="column">
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color="cyan">{title}</Text>
+        <Text bold color="cyan">
+          {title}
+        </Text>
       </Box>
 
       {/* Content */}
@@ -70,7 +72,8 @@ export const StateView = ({
       {totalLines > maxLines && (
         <Box marginTop={1}>
           <Text dimColor>
-            Lines {scrollOffset + 1}-{Math.min(scrollOffset + maxLines, totalLines)} of {totalLines}
+            Lines {scrollOffset + 1}-
+            {Math.min(scrollOffset + maxLines, totalLines)} of {totalLines}
           </Text>
         </Box>
       )}

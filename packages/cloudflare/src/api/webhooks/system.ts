@@ -15,7 +15,10 @@ system.post('/ui-form', async (context: Context) => {
   const identifier = context.req.query('identifier');
 
   if (!identifier) {
-    return context.json({ error: 'Missing required query parameter "identifier"' }, 400);
+    return context.json(
+      { error: 'Missing required query parameter "identifier"' },
+      400
+    );
   }
 
   try {
@@ -24,15 +27,24 @@ system.post('/ui-form', async (context: Context) => {
 
     // System ui-form endpoint always requires a CSRF token
     if (!token) {
-      return context.json({
-        received: false,
-        action: 'ignored',
-        identifier,
-        reason: 'Missing form token',
-      }, 403);
+      return context.json(
+        {
+          received: false,
+          action: 'ignored',
+          identifier,
+          reason: 'Missing form token',
+        },
+        403
+      );
     }
 
-    const result = await queueWebhookAndWakeUp(context, 'ui-form', identifier, response, token);
+    const result = await queueWebhookAndWakeUp(
+      context,
+      'ui-form',
+      identifier,
+      response,
+      token
+    );
 
     // Return 403 if token mismatch
     if (result.action === 'ignored' && result.reason === 'Invalid form token') {
@@ -41,10 +53,13 @@ system.post('/ui-form', async (context: Context) => {
 
     // Return 404 if no brain was waiting
     if (result.action === 'not_found') {
-      return context.json({
-        ...result,
-        message: 'No brain waiting for this form submission',
-      }, 404);
+      return context.json(
+        {
+          ...result,
+          message: 'No brain waiting for this form submission',
+        },
+        404
+      );
     }
 
     return context.json(result);

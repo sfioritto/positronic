@@ -25,7 +25,10 @@ type SetupState =
   | 'success'
   | 'error';
 
-export const ProjectAuthSetup = ({ projectDir, onComplete }: ProjectAuthSetupProps) => {
+export const ProjectAuthSetup = ({
+  projectDir,
+  onComplete,
+}: ProjectAuthSetupProps) => {
   const { exit } = useApp();
   const [state, setState] = useState<SetupState>('checking');
   const [discoveredKeys, setDiscoveredKeys] = useState<DiscoveredKey[]>([]);
@@ -97,7 +100,8 @@ export const ProjectAuthSetup = ({ projectDir, onComplete }: ProjectAuthSetupPro
       if (existsSync(envPath)) {
         // Ensure we start on a new line if the file doesn't end with one
         const existing = readFileSync(envPath, 'utf-8');
-        const prefix = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+        const prefix =
+          existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
         appendFileSync(envPath, prefix + envLine);
       } else {
         writeFileSync(envPath, envLine);
@@ -151,7 +155,9 @@ export const ProjectAuthSetup = ({ projectDir, onComplete }: ProjectAuthSetupPro
     const items: SelectListItem[] = discoveredKeys.map((key) => ({
       id: key.path,
       label: key.path.replace(process.env.HOME || '', '~'),
-      description: `${key.algorithm} - ${key.fingerprint}${key.comment ? ` (${key.comment})` : ''}`,
+      description: `${key.algorithm} - ${key.fingerprint}${
+        key.comment ? ` (${key.comment})` : ''
+      }`,
     }));
 
     const handleSelect = (item: SelectListItem) => {
@@ -197,9 +203,7 @@ export const ProjectAuthSetup = ({ projectDir, onComplete }: ProjectAuthSetupPro
             <Text bold>SSH Key:</Text> {displayPath}
           </Text>
           {generatedKeyPath && (
-            <Text dimColor>
-              (New key generated at {generatedKeyPath})
-            </Text>
+            <Text dimColor>(New key generated at {generatedKeyPath})</Text>
           )}
         </Box>
       </Box>

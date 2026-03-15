@@ -87,7 +87,7 @@ describe('Auth Middleware', () => {
       await waitOnExecutionContext(context);
 
       expect(response.status).toBe(401);
-      const body = await response.json() as { error: string };
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe('Authentication required');
     });
 
@@ -95,7 +95,7 @@ describe('Auth Middleware', () => {
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Authorization': 'Basic dXNlcjpwYXNz',
+          Authorization: 'Basic dXNlcjpwYXNz',
         },
       });
 
@@ -110,17 +110,21 @@ describe('Auth Middleware', () => {
       await waitOnExecutionContext(context);
 
       expect(response.status).toBe(401);
-      const body = await response.json() as { error: string };
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe('Authentication required');
     });
 
     it('should return 401 for expired JWT', async () => {
-      const token = await createTestJwt(TEST_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint', { expired: true });
+      const token = await createTestJwt(
+        TEST_PRIVATE_KEY_PEM,
+        'SHA256:test-fingerprint',
+        { expired: true }
+      );
 
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -135,18 +139,21 @@ describe('Auth Middleware', () => {
       await waitOnExecutionContext(context);
 
       expect(response.status).toBe(401);
-      const body = await response.json() as { error: string };
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe('Invalid or expired token');
     });
 
     it('should return 401 for invalid JWT signature', async () => {
       // Create a token signed with the wrong key
-      const token = await createTestJwt(WRONG_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint');
+      const token = await createTestJwt(
+        WRONG_PRIVATE_KEY_PEM,
+        'SHA256:test-fingerprint'
+      );
 
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -161,17 +168,20 @@ describe('Auth Middleware', () => {
       await waitOnExecutionContext(context);
 
       expect(response.status).toBe(401);
-      const body = await response.json() as { error: string };
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe('Invalid or expired token');
     });
 
     it('should return ROOT_KEY_NOT_CONFIGURED when no root key set', async () => {
-      const token = await createTestJwt(TEST_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint');
+      const token = await createTestJwt(
+        TEST_PRIVATE_KEY_PEM,
+        'SHA256:test-fingerprint'
+      );
 
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -186,18 +196,21 @@ describe('Auth Middleware', () => {
       await waitOnExecutionContext(context);
 
       expect(response.status).toBe(401);
-      const body = await response.json() as { error: string };
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe('ROOT_KEY_NOT_CONFIGURED');
     });
 
     it('should allow valid JWT with matching ROOT_PUBLIC_KEY', async () => {
-      const token = await createTestJwt(TEST_PRIVATE_KEY_PEM, 'SHA256:test-fingerprint');
+      const token = await createTestJwt(
+        TEST_PRIVATE_KEY_PEM,
+        'SHA256:test-fingerprint'
+      );
 
       // Use a protected endpoint (not /status which bypasses auth)
       const request = new Request('http://example.com/brains', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 

@@ -27,7 +27,9 @@ interface BrainWatchByTitleProps {
  * - If multiple: shows the list of run IDs to choose from
  */
 const BrainWatchByTitle = ({ brainTitle }: BrainWatchByTitleProps) => {
-  const [phase, setPhase] = useState<'loading' | 'watching' | 'error' | 'no-runs' | 'multiple-runs'>('loading');
+  const [phase, setPhase] = useState<
+    'loading' | 'watching' | 'error' | 'no-runs' | 'multiple-runs'
+  >('loading');
   const [runId, setRunId] = useState<string | null>(null);
   const [runs, setRuns] = useState<ActiveRunsResponse['runs']>([]);
   const [error, setError] = useState<{
@@ -107,7 +109,9 @@ const BrainWatchByTitle = ({ brainTitle }: BrainWatchByTitleProps) => {
           error={{
             title: 'Multiple Active Runs',
             message: `Found ${runs.length} active runs for brain "${brainTitle}".`,
-            details: `Please specify a specific run ID with --run-id:\n${runs.map((run) => `  positronic watch --run-id ${run.brainRunId}`).join('\n')}`,
+            details: `Please specify a specific run ID with --run-id:\n${runs
+              .map((run) => `  positronic watch --run-id ${run.brainRunId}`)
+              .join('\n')}`,
           }}
         />
       ) : phase === 'watching' && runId ? (
@@ -127,10 +131,14 @@ interface BrainWatchWithResolverProps {
  * Uses BrainResolver to handle fuzzy matching and disambiguation,
  * then finds and watches the brain's active run.
  */
-export const BrainWatchWithResolver = ({ identifier }: BrainWatchWithResolverProps) => {
+export const BrainWatchWithResolver = ({
+  identifier,
+}: BrainWatchWithResolverProps) => {
   return (
     <BrainResolver identifier={identifier}>
-      {(resolvedBrainTitle) => <BrainWatchByTitle brainTitle={resolvedBrainTitle} />}
+      {(resolvedBrainTitle) => (
+        <BrainWatchByTitle brainTitle={resolvedBrainTitle} />
+      )}
     </BrainResolver>
   );
 };

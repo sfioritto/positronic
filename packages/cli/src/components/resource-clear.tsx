@@ -18,16 +18,26 @@ interface ResourcesResponse {
 export const ResourceClear = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [deleted, setDeleted] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<'cancel' | 'delete'>('cancel');
+  const [selectedOption, setSelectedOption] = useState<'cancel' | 'delete'>(
+    'cancel'
+  );
   const { exit } = useApp();
 
-  const { data: resourcesData, loading: listLoading, error: listError } = useApiGet<ResourcesResponse>('/resources');
-  const { execute: deleteResources, loading: deleteLoading, error: deleteError } = useApiDelete('resources');
+  const {
+    data: resourcesData,
+    loading: listLoading,
+    error: listError,
+  } = useApiGet<ResourcesResponse>('/resources');
+  const {
+    execute: deleteResources,
+    loading: deleteLoading,
+    error: deleteError,
+  } = useApiDelete('resources');
 
   useInput((input, key) => {
     if (!confirmed && !deleted && resourcesData && resourcesData.count > 0) {
       if (key.upArrow || key.downArrow) {
-        setSelectedOption(prev => prev === 'cancel' ? 'delete' : 'cancel');
+        setSelectedOption((prev) => (prev === 'cancel' ? 'delete' : 'cancel'));
       } else if (key.return) {
         if (selectedOption === 'delete') {
           setConfirmed(true);
@@ -42,10 +52,9 @@ export const ResourceClear = () => {
 
   useEffect(() => {
     if (confirmed && !deleteLoading && !deleteError && !deleted) {
-      deleteResources('/resources')
-        .then(() => {
-          setDeleted(true);
-        })
+      deleteResources('/resources').then(() => {
+        setDeleted(true);
+      });
     }
   }, [confirmed, deleteLoading, deleteError, deleted, deleteResources]);
 
@@ -55,7 +64,7 @@ export const ResourceClear = () => {
       const timer = setTimeout(() => {
         exit();
       }, 1500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [deleted, exit]);
@@ -87,9 +96,18 @@ export const ResourceClear = () => {
   if (!confirmed) {
     return (
       <Box flexDirection="column">
-        <Text bold color="red">🚨 DANGER: This will permanently delete ALL resources!</Text>
-        <Box marginTop={1} marginBottom={1} paddingLeft={2} flexDirection="column">
-          <Text>This action will delete {resourcesData?.count || 0} resource(s).</Text>
+        <Text bold color="red">
+          🚨 DANGER: This will permanently delete ALL resources!
+        </Text>
+        <Box
+          marginTop={1}
+          marginBottom={1}
+          paddingLeft={2}
+          flexDirection="column"
+        >
+          <Text>
+            This action will delete {resourcesData?.count || 0} resource(s).
+          </Text>
           <Text dimColor>This cannot be undone.</Text>
         </Box>
         <Box marginTop={1} flexDirection="column">
@@ -110,7 +128,7 @@ export const ResourceClear = () => {
   if (deleteLoading) {
     return (
       <Box>
-        <Text>🗑️  Deleting all resources...</Text>
+        <Text>🗑️ Deleting all resources...</Text>
       </Box>
     );
   }

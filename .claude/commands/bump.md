@@ -45,12 +45,13 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
    - Run `git diff --stat [last-tag]..HEAD` to see changed files
    - Run `git diff [last-tag]..HEAD -- '*.md' '*.json' '*.ts' '*.tsx' '*.js'` to see actual code changes
    - Based on the logs and diffs, create a meaningful changelog message that summarizes:
-     * Key features added
-     * Bugs fixed
-     * Dependencies updated
-     * Breaking changes (if any)
-     * Other improvements
+     - Key features added
+     - Bugs fixed
+     - Dependencies updated
+     - Breaking changes (if any)
+     - Other improvements
 5. [ ] Create a changeset file with the custom message:
+
    ```bash
    cat > .changeset/bump-patch.md << 'EOF'
    ---
@@ -67,6 +68,7 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
    [INSERT YOUR CUSTOM CHANGELOG MESSAGE HERE]
    EOF
    ```
+
 6. [ ] Run `npx changeset version` to update versions and dependencies
 7. [ ] Get the new version number from any package.json (e.g., `grep '"version"' packages/core/package.json`)
 8. [ ] Update hardcoded versions in `packages/template-new-project/index.js` (lines 56-58) to match the new version

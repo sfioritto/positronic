@@ -88,15 +88,14 @@ export class JwtAuthProvider {
         let configuredPathForAgent: string | null;
         if (!process.env.POSITRONIC_PRIVATE_KEY && authProjectRootPath) {
           const localKeyPath = readLocalAuth(authProjectRootPath);
-          configuredPathForAgent = localKeyPath || configManager.getPrivateKeyPath();
+          configuredPathForAgent =
+            localKeyPath || configManager.getPrivateKeyPath();
         } else {
           configuredPathForAgent = configManager.getPrivateKeyPath();
         }
         this.encryptedKeyPath = resolvePrivateKeyPath(configuredPathForAgent);
         this.initError =
-          error instanceof Error
-            ? error
-            : new Error('Key is encrypted');
+          error instanceof Error ? error : new Error('Key is encrypted');
       } else {
         this.initError =
           error instanceof Error
@@ -152,7 +151,10 @@ export class JwtAuthProvider {
       throw new Error('Private key not loaded');
     }
 
-    return this.getAlgorithmForKeyType(this.privateKey.type, this.privateKey.curve);
+    return this.getAlgorithmForKeyType(
+      this.privateKey.type,
+      this.privateKey.curve
+    );
   }
 
   /**
@@ -232,7 +234,12 @@ export class JwtAuthProvider {
     }
 
     // If agent fallback succeeded, use agent signing
-    if (this.useAgent && this.agentSigner && this.agentKey && this.fingerprint) {
+    if (
+      this.useAgent &&
+      this.agentSigner &&
+      this.agentKey &&
+      this.fingerprint
+    ) {
       return this.createTokenWithAgent();
     }
 

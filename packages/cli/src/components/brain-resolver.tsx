@@ -44,13 +44,15 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
       return {
         title: 'Connection Error',
         message: 'Error connecting to the local development server.',
-        details: "Please ensure the server is running ('positronic server' or 'px s').",
+        details:
+          "Please ensure the server is running ('positronic server' or 'px s').",
       };
     } else {
       return {
         title: 'Connection Error',
         message: 'Error connecting to the remote project server.',
-        details: 'Please check your network connection and verify the project URL is correct.',
+        details:
+          'Please check your network connection and verify the project URL is correct.',
       };
     }
   }, []);
@@ -79,7 +81,8 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
           setError({
             title: 'Brain Not Found',
             message: `No brains found matching '${identifier}'.`,
-            details: 'Please check that:\n  1. The brain name is spelled correctly\n  2. The brain exists in your project\n  3. The brain has been properly defined and exported\n\nYou can list available brains with: positronic list',
+            details:
+              'Please check that:\n  1. The brain name is spelled correctly\n  2. The brain exists in your project\n  3. The brain has been properly defined and exported\n\nYou can list available brains with: positronic list',
           });
           setPhase('error');
         } else if (data.count === 1) {
@@ -120,7 +123,11 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
   if (phase === 'disambiguating') {
     return (
       <SelectList
-        items={brains.map((b) => ({ id: b.title, label: b.title, description: b.description }))}
+        items={brains.map((b) => ({
+          id: b.title,
+          label: b.title,
+          description: b.description,
+        }))}
         header={`Multiple brains match '${identifier}':`}
         onSelect={(item) => {
           setResolvedTitle(item.label);

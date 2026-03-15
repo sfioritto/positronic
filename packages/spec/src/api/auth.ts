@@ -33,17 +33,23 @@ export const auth = {
 
       // Validate response structure
       if (typeof data.backend !== 'string') {
-        console.error(`Expected backend to be string, got ${typeof data.backend}`);
+        console.error(
+          `Expected backend to be string, got ${typeof data.backend}`
+        );
         return false;
       }
 
       if (typeof data.rootKeyConfigured !== 'boolean') {
-        console.error(`Expected rootKeyConfigured to be boolean, got ${typeof data.rootKeyConfigured}`);
+        console.error(
+          `Expected rootKeyConfigured to be boolean, got ${typeof data.rootKeyConfigured}`
+        );
         return false;
       }
 
       if (typeof data.instructions !== 'string') {
-        console.error(`Expected instructions to be string, got ${typeof data.instructions}`);
+        console.error(
+          `Expected instructions to be string, got ${typeof data.instructions}`
+        );
         return false;
       }
 
@@ -78,7 +84,9 @@ export const auth = {
       }
 
       if (typeof data.isRoot !== 'boolean') {
-        console.error(`Expected isRoot to be boolean, got ${typeof data.isRoot}`);
+        console.error(
+          `Expected isRoot to be boolean, got ${typeof data.isRoot}`
+        );
         return null;
       }
 

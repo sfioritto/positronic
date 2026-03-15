@@ -39,9 +39,7 @@ function parseStoreKey(r2Key: string): {
   const withoutPrefix = r2Key.slice('store/'.length);
 
   // Check for per-user pattern: {brainTitle}/user/{userName}/{key}.json
-  const userMatch = withoutPrefix.match(
-    /^([^/]+)\/user\/([^/]+)\/(.+)\.json$/
-  );
+  const userMatch = withoutPrefix.match(/^([^/]+)\/user\/([^/]+)\/(.+)\.json$/);
   if (userMatch) {
     return {
       brainTitle: userMatch[1],

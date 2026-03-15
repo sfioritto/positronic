@@ -2,7 +2,11 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
-import { syncResources, generateTypes, type SyncProgressCallback } from '../commands/helpers.js';
+import {
+  syncResources,
+  generateTypes,
+  type SyncProgressCallback,
+} from '../commands/helpers.js';
 import { ResourceEntry } from '@positronic/core';
 
 interface SyncStats {
@@ -12,7 +16,13 @@ interface SyncStats {
   totalCount: number;
   deleteCount: number;
   currentFile?: string;
-  currentAction?: 'connecting' | 'uploading' | 'checking' | 'deleting' | 'done' | 'error';
+  currentAction?:
+    | 'connecting'
+    | 'uploading'
+    | 'checking'
+    | 'deleting'
+    | 'done'
+    | 'error';
   errors: Array<{ file: string; message: string }>;
 }
 
@@ -23,7 +33,7 @@ interface ResourceSyncProps {
 
 export const ResourceSync = ({
   localResources,
-  resourcesDir
+  resourcesDir,
 }: ResourceSyncProps) => {
   const [stats, setStats] = useState<SyncStats>({
     uploadCount: 0,
@@ -32,9 +42,13 @@ export const ResourceSync = ({
     totalCount: localResources.length,
     deleteCount: 0,
     errors: [],
-    currentAction: 'connecting'
+    currentAction: 'connecting',
   });
-  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
+  const [error, setError] = useState<{
+    title: string;
+    message: string;
+    details?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!resourcesDir) {
@@ -59,7 +73,11 @@ export const ResourceSync = ({
           });
         };
 
-        const result = await syncResources(projectRootPath, undefined, onProgress);
+        const result = await syncResources(
+          projectRootPath,
+          undefined,
+          onProgress
+        );
 
         // Update final stats with done status
         setStats({
@@ -78,11 +96,12 @@ export const ResourceSync = ({
         setError({
           title: 'Sync Failed',
           message: err.message || 'An unknown error occurred',
-          details: err.code === 'ECONNREFUSED'
-            ? "Please ensure the server is running ('positronic server' or 'px s')"
-            : undefined,
+          details:
+            err.code === 'ECONNREFUSED'
+              ? "Please ensure the server is running ('positronic server' or 'px s')"
+              : undefined,
         });
-        setStats(prev => ({ ...prev, currentAction: 'error' }));
+        setStats((prev) => ({ ...prev, currentAction: 'error' }));
       }
     };
 
@@ -115,32 +134,43 @@ export const ResourceSync = ({
           {currentAction !== 'done' && currentFile && (
             <Box>
               <Text>
-                {currentAction === 'uploading' ? '⬆️  Uploading' :
-                 currentAction === 'deleting' ? '🗑️  Deleting' :
-                 '🔍 Checking'} {currentFile}...
+                {currentAction === 'uploading'
+                  ? '⬆️  Uploading'
+                  : currentAction === 'deleting'
+                  ? '🗑️  Deleting'
+                  : '🔍 Checking'}{' '}
+                {currentFile}...
               </Text>
             </Box>
           )}
 
           {totalCount > 0 && currentAction !== 'done' && (
             <Box marginTop={1}>
-              <Text dimColor>Progress: {processedCount}/{totalCount} files processed</Text>
+              <Text dimColor>
+                Progress: {processedCount}/{totalCount} files processed
+              </Text>
             </Box>
           )}
 
           {totalCount === 0 && currentAction === 'done' && (
             <Box flexDirection="column">
               <Text>📁 No files found in the resources directory.</Text>
-              <Text dimColor>Resources directory has been created and is ready for use.</Text>
+              <Text dimColor>
+                Resources directory has been created and is ready for use.
+              </Text>
             </Box>
           )}
 
           {errors.length > 0 && (
             <Box flexDirection="column" marginTop={1}>
-              <Text color="red" bold>Errors:</Text>
+              <Text color="red" bold>
+                Errors:
+              </Text>
               {errors.map((err, i) => (
                 <Box key={i} paddingLeft={2}>
-                  <Text color="red">❌ {err.file}: {err.message}</Text>
+                  <Text color="red">
+                    ❌ {err.file}: {err.message}
+                  </Text>
                 </Box>
               ))}
             </Box>
@@ -150,13 +180,13 @@ export const ResourceSync = ({
             <Box flexDirection="column" marginTop={1}>
               <Text bold>📊 Sync Summary:</Text>
               <Box paddingLeft={2} flexDirection="column">
-                <Text color="green">  • Uploaded: {uploadCount}</Text>
-                <Text color="blue">  • Skipped (up to date): {skipCount}</Text>
+                <Text color="green"> • Uploaded: {uploadCount}</Text>
+                <Text color="blue"> • Skipped (up to date): {skipCount}</Text>
                 {deleteCount > 0 && (
-                  <Text color="yellow">  • Deleted: {deleteCount}</Text>
+                  <Text color="yellow"> • Deleted: {deleteCount}</Text>
                 )}
                 {errorCount > 0 && (
-                  <Text color="red">  • Errors: {errorCount}</Text>
+                  <Text color="red"> • Errors: {errorCount}</Text>
                 )}
               </Box>
             </Box>

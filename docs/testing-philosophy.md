@@ -34,6 +34,7 @@ Unit Tests & Static
 ### 3. "Write tests. Not too many. Mostly integration."
 
 This quote from Guillermo Rauch (via Kent C. Dodds) captures our approach:
+
 - Write tests to build confidence
 - Don't aim for 100% coverage (diminishing returns after ~70%)
 - Prioritize integration tests that verify component interactions
@@ -49,7 +50,7 @@ Our CLI tests exemplify the integration-first approach:
 it('should create a new schedule', async () => {
   const env = await createTestEnv();
   const px = await env.start();
-  
+
   try {
     const { waitForOutput, instance } = await px([
       'schedule',
@@ -59,12 +60,17 @@ it('should create a new schedule', async () => {
     ]);
 
     // Test user-visible output
-    const foundSuccess = await waitForOutput(/Schedule created successfully/i, 50);
+    const foundSuccess = await waitForOutput(
+      /Schedule created successfully/i,
+      50
+    );
     expect(foundSuccess).toBe(true);
 
     // Verify integration with API
     const methodCalls = env.server.getLogs();
-    const createCall = methodCalls.find((call) => call.method === 'createSchedule');
+    const createCall = methodCalls.find(
+      (call) => call.method === 'createSchedule'
+    );
     expect(createCall).toBeDefined();
   } finally {
     await env.stopAndCleanup();
@@ -73,6 +79,7 @@ it('should create a new schedule', async () => {
 ```
 
 **Why this follows our philosophy:**
+
 - Tests the complete user interaction (running a CLI command)
 - Verifies observable behavior (success message)
 - Checks integration points (API calls)
@@ -90,6 +97,7 @@ const testBrain = brain('test-brain')
 ```
 
 **When to use unit tests:**
+
 - Complex algorithms (JSON patch operations)
 - State management logic
 - Utility functions with edge cases
@@ -127,6 +135,7 @@ server.addSchedule({ ... }); // Pre-populate test data
 ### 3. When to Write Each Type of Test
 
 **Write Integration Tests When:**
+
 - Testing CLI commands
 - Testing API endpoints
 - Testing brain execution flows
@@ -134,12 +143,14 @@ server.addSchedule({ ... }); // Pre-populate test data
 - Testing client-server interactions
 
 **Write Unit Tests When:**
+
 - Testing pure functions with complex logic
 - Testing edge cases in algorithms
 - Testing error handling in utilities
 - Testing data transformations
 
 **Write E2E Tests When:**
+
 - Testing critical user journeys
 - Testing deployment scenarios
 - Testing cross-package integrations
@@ -156,6 +167,7 @@ server.addSchedule({ ... }); // Pre-populate test data
 ### 5. Test Maintenance
 
 Good tests:
+
 - Use descriptive names that explain the use case
 - Are resilient to refactoring
 - Test one concept per test
@@ -176,6 +188,7 @@ npm run build:workspaces       # Ensure TypeScript compiles
 ## Summary
 
 Our testing philosophy emphasizes:
+
 1. **User-focused testing** over implementation details
 2. **Integration tests** as the primary testing strategy
 3. **Pragmatic coverage** over 100% metrics

@@ -208,9 +208,7 @@ export const schedules = {
       const response = await fetch(request);
 
       if (!response.ok) {
-        console.error(
-          `GET /brains/schedules/runs returned ${response.status}`
-        );
+        console.error(`GET /brains/schedules/runs returned ${response.status}`);
         return false;
       }
 
@@ -292,10 +290,7 @@ export const schedules = {
 
       return data.timezone;
     } catch (error) {
-      console.error(
-        `Failed to test GET /brains/schedules/timezone:`,
-        error
-      );
+      console.error(`Failed to test GET /brains/schedules/timezone:`, error);
       return null;
     }
   },
@@ -334,10 +329,7 @@ export const schedules = {
 
       return true;
     } catch (error) {
-      console.error(
-        `Failed to test PUT /brains/schedules/timezone:`,
-        error
-      );
+      console.error(`Failed to test PUT /brains/schedules/timezone:`, error);
       return false;
     }
   },

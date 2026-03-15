@@ -21,7 +21,10 @@ describe('createR2Backend', () => {
     }
   });
 
-  function createStore(schema: Record<string, any> = { key: z.string() }, currentUser?: { name: string }): Store<any> {
+  function createStore(
+    schema: Record<string, any> = { key: z.string() },
+    currentUser?: { name: string }
+  ): Store<any> {
     const factory = createR2Backend(testEnv.TEST_RESOURCES_BUCKET);
     return factory({ schema, brainTitle: 'test-brain', currentUser });
   }
@@ -55,7 +58,12 @@ describe('createR2Backend', () => {
   });
 
   it('should set and get a nested object', async () => {
-    const store = createStore({ data: z.object({ nested: z.object({ key: z.string() }), list: z.array(z.number()) }) });
+    const store = createStore({
+      data: z.object({
+        nested: z.object({ key: z.string() }),
+        list: z.array(z.number()),
+      }),
+    });
     const data = { nested: { key: 'value' }, list: [1, 2, 3] };
     await store.set('data', data);
     const result = await store.get('data');
@@ -93,7 +101,9 @@ describe('createR2Backend', () => {
     await store.set('mykey', 'myvalue');
 
     // Verify the R2 object is at the expected path
-    const obj = await testEnv.TEST_RESOURCES_BUCKET.get('store/test-brain/mykey.json');
+    const obj = await testEnv.TEST_RESOURCES_BUCKET.get(
+      'store/test-brain/mykey.json'
+    );
     expect(obj).not.toBeNull();
     const text = await obj!.text();
     expect(JSON.parse(text)).toBe('myvalue');
@@ -106,7 +116,9 @@ describe('createR2Backend', () => {
     );
     await store.set('pref', 'dark');
 
-    const obj = await testEnv.TEST_RESOURCES_BUCKET.get('store/test-brain/user/user-42/pref.json');
+    const obj = await testEnv.TEST_RESOURCES_BUCKET.get(
+      'store/test-brain/user/user-42/pref.json'
+    );
     expect(obj).not.toBeNull();
     const text = await obj!.text();
     expect(JSON.parse(text)).toBe('dark');
@@ -148,6 +160,8 @@ describe('createR2Backend', () => {
       // no currentUser
     );
 
-    await expect(store.get('pref')).rejects.toThrow(/per-user but no currentUser/);
+    await expect(store.get('pref')).rejects.toThrow(
+      /per-user but no currentUser/
+    );
   });
 });

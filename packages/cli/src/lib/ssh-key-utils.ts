@@ -77,7 +77,10 @@ export function discoverSSHKeys(): DiscoveredKey[] {
 /**
  * Try to load key info from a private/public key pair
  */
-function tryLoadKeyInfo(privateKeyPath: string, publicKeyPath: string): DiscoveredKey | null {
+function tryLoadKeyInfo(
+  privateKeyPath: string,
+  publicKeyPath: string
+): DiscoveredKey | null {
   try {
     // Try to read the public key to get fingerprint and algorithm
     if (existsSync(publicKeyPath)) {
@@ -278,9 +281,12 @@ export function generateSSHKey(
     // -N "": empty passphrase
     // -f: output file path
     // -C: comment (email/identifier)
-    execSync(`ssh-keygen -t ed25519 -N "" -f "${expandedPath}" -C "positronic-key"`, {
-      stdio: 'ignore',
-    });
+    execSync(
+      `ssh-keygen -t ed25519 -N "" -f "${expandedPath}" -C "positronic-key"`,
+      {
+        stdio: 'ignore',
+      }
+    );
 
     return {
       success: true,
@@ -289,7 +295,8 @@ export function generateSSHKey(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to generate SSH key',
+      error:
+        error instanceof Error ? error.message : 'Failed to generate SSH key',
       path: expandedPath,
     };
   }

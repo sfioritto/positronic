@@ -3,7 +3,11 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
-import { syncResources, generateTypes, generateAndWriteSecretTypes } from './helpers.js';
+import {
+  syncResources,
+  generateTypes,
+  generateAndWriteSecretTypes,
+} from './helpers.js';
 import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 
 export class ServerCommand {
@@ -328,8 +332,11 @@ export class ServerCommand {
   }
 
   private async handleKill(argv: ArgumentsCamelCase<any>) {
-    const pidFile = path.join(this.server.projectRootDir, '.positronic-server.pid');
-    
+    const pidFile = path.join(
+      this.server.projectRootDir,
+      '.positronic-server.pid'
+    );
+
     if (!fs.existsSync(pidFile)) {
       console.error(`❌ No default server is running`);
       console.error(`   PID file not found: ${pidFile}`);
@@ -338,7 +345,7 @@ export class ServerCommand {
 
     try {
       const pid = parseInt(fs.readFileSync(pidFile, 'utf8').trim());
-      
+
       if (!this.isProcessRunning(pid)) {
         console.log('⚠️  Server process not found, removing stale PID file');
         fs.unlinkSync(pidFile);
@@ -347,11 +354,11 @@ export class ServerCommand {
 
       // Kill the process
       process.kill(pid, 'SIGTERM');
-      
+
       // Wait a moment to see if the process stops
       let killed = false;
       for (let i = 0; i < 10; i++) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         if (!this.isProcessRunning(pid)) {
           killed = true;
           break;
@@ -372,7 +379,10 @@ export class ServerCommand {
       console.log(`✅ Server stopped (PID: ${pid})`);
       process.exit(0);
     } catch (error) {
-      console.error('❌ Failed to kill server:', error instanceof Error ? error.message : String(error));
+      console.error(
+        '❌ Failed to kill server:',
+        error instanceof Error ? error.message : String(error)
+      );
       process.exit(1);
     }
   }
