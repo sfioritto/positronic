@@ -451,6 +451,25 @@ const errorBrain = reduce<BrainExecutionContext, ErrorPayload>(
   }
 );
 
+const completeInnerBrainError = reduce<BrainExecutionContext, ErrorPayload>(
+  (ctx, { error }) => {
+    const { depth, brainIdStack, executionStack } = ctx;
+
+    if (brainIdStack.length === 0) return ctx;
+
+    const newCtx: BrainExecutionContext = {
+      ...ctx,
+      brainIdStack: brainIdStack.slice(0, -1),
+      executionStack: executionStack.slice(0, -1),
+      depth: depth - 1,
+      error,
+      agentContext: null,
+    };
+
+    return updateDerivedState(newCtx, 'running');
+  }
+);
+
 const cancelBrain = reduce<BrainExecutionContext, object>((ctx) => {
   return updateDerivedState(ctx, 'cancelled');
 });
@@ -851,6 +870,13 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           isOuterBrain,
           errorBrain
         ) as any,
+        // Inner brain error -> stay running (pop the inner brain off the stack)
+        transition(
+          BRAIN_EVENTS.ERROR,
+          'running',
+          isInnerBrain,
+          completeInnerBrainError
+        ) as any,
 
         // Cancelled
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any,
@@ -912,6 +938,13 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           'error',
           isOuterBrain,
           errorBrain
+        ) as any,
+        // Inner brain error -> back to running (pop inner brain, clear agentContext)
+        transition(
+          BRAIN_EVENTS.ERROR,
+          'running',
+          isInnerBrain,
+          completeInnerBrainError
         ) as any,
         transition(BRAIN_EVENTS.CANCELLED, 'cancelled', cancelBrain) as any
       ),
