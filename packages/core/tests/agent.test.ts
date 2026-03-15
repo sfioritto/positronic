@@ -23,7 +23,8 @@ import { createBrainExecutionMachine } from '../src/dsl/brain-state-machine.js';
 
 // Mock ObjectGenerator with generateText support
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-const mockGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+const mockGenerateText =
+  jest.fn<NonNullable<ObjectGenerator['generateText']>>();
 const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 const mockClient: jest.Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
@@ -68,12 +69,17 @@ describe('agent step', () => {
       );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
       // Verify events emitted
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_START)).toBe(true);
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_START)).toBe(
+        true
+      );
       expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION)).toBe(
         true
       );
@@ -106,7 +112,12 @@ describe('agent step', () => {
 
   describe('agent with tool execution', () => {
     it('should execute non-terminal tools and continue agent', async () => {
-      const lookupOrderMock = jest.fn<(input: { orderId: string }) => Promise<{ orderId: string; status: string }>>()
+      const lookupOrderMock = jest
+        .fn<
+          (input: {
+            orderId: string;
+          }) => Promise<{ orderId: string; status: string }>
+        >()
         .mockResolvedValue({ orderId: '123', status: 'shipped' });
 
       // First call: LLM calls lookupOrder tool
@@ -157,14 +168,20 @@ describe('agent step', () => {
       );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
       // Verify tool was executed with correct input (context is the second arg)
       expect(lookupOrderMock).toHaveBeenCalledWith(
         { orderId: '123' },
-        expect.objectContaining({ client: expect.anything(), state: expect.anything() })
+        expect.objectContaining({
+          client: expect.anything(),
+          state: expect.anything(),
+        })
       );
 
       // Verify tool result event was emitted
@@ -173,7 +190,10 @@ describe('agent step', () => {
       ) as AgentToolResultEvent[];
       expect(toolResultEvents.length).toBe(1);
       expect(toolResultEvents[0].toolName).toBe('lookupOrder');
-      expect(toolResultEvents[0].result).toEqual({ orderId: '123', status: 'shipped' });
+      expect(toolResultEvents[0].result).toEqual({
+        orderId: '123',
+        status: 'shipped',
+      });
 
       // Verify two iterations occurred
       const iterationEvents = events.filter(
@@ -208,12 +228,17 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
       // Agent should complete without AGENT_COMPLETE (that's for terminal tools)
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_START)).toBe(true);
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_START)).toBe(
+        true
+      );
       expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION)).toBe(
         true
       );
@@ -235,25 +260,19 @@ describe('agent step', () => {
       mockGenerateText
         .mockResolvedValueOnce({
           text: 'Working...',
-          toolCalls: [
-            { toolCallId: 'call-1', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-1', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 400 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: 'Still working...',
-          toolCalls: [
-            { toolCallId: 'call-2', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-2', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 400 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: 'More work...',
-          toolCalls: [
-            { toolCallId: 'call-3', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-3', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 400 },
           responseMessages: [],
         });
@@ -276,14 +295,17 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
       // Should emit token limit event
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_TOKEN_LIMIT)).toBe(
-        true
-      );
+      expect(
+        events.some((e) => e.type === BRAIN_EVENTS.AGENT_TOKEN_LIMIT)
+      ).toBe(true);
 
       const tokenLimitEvent = events.find(
         (e) => e.type === BRAIN_EVENTS.AGENT_TOKEN_LIMIT
@@ -301,33 +323,25 @@ describe('agent step', () => {
       mockGenerateText
         .mockResolvedValueOnce({
           text: 'Working...',
-          toolCalls: [
-            { toolCallId: 'call-1', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-1', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 50 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: 'Still working...',
-          toolCalls: [
-            { toolCallId: 'call-2', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-2', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 50 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: 'More work...',
-          toolCalls: [
-            { toolCallId: 'call-3', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-3', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 50 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: 'Even more work...',
-          toolCalls: [
-            { toolCallId: 'call-4', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-4', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 50 },
           responseMessages: [],
         });
@@ -350,14 +364,17 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
       // Should emit iteration limit event
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT)).toBe(
-        true
-      );
+      expect(
+        events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
+      ).toBe(true);
 
       const iterationLimitEvent = events.find(
         (e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT
@@ -374,33 +391,41 @@ describe('agent step', () => {
       // Verify default by checking iteration count
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
-        toolCalls: [
-          { toolCallId: 'call-1', toolName: 'done', args: {} },
-        ],
+        toolCalls: [{ toolCallId: 'call-1', toolName: 'done', args: {} }],
         usage: { totalTokens: 50 },
         responseMessages: [],
       });
 
-      const testBrain = brain('test-default-max-iterations').brain('Task', () => ({
-        prompt: 'Do something',
-        tools: {
-          done: {
-            description: 'Done',
-            inputSchema: z.object({}),
-            terminal: true,
+      const testBrain = brain('test-default-max-iterations').brain(
+        'Task',
+        () => ({
+          prompt: 'Do something',
+          tools: {
+            done: {
+              description: 'Done',
+              inputSchema: z.object({}),
+              terminal: true,
+            },
           },
-        },
-        // No maxIterations specified - should default to 100
-      }));
+          // No maxIterations specified - should default to 100
+        })
+      );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
       // Should complete normally (1 iteration < 100 default)
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE)).toBe(true);
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT)).toBe(false);
+      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE)).toBe(
+        true
+      );
+      expect(
+        events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
+      ).toBe(false);
     });
   });
 
@@ -409,17 +434,13 @@ describe('agent step', () => {
       mockGenerateText
         .mockResolvedValueOnce({
           text: undefined,
-          toolCalls: [
-            { toolCallId: 'call-1', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-1', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 100 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: undefined,
-          toolCalls: [
-            { toolCallId: 'call-2', toolName: 'done', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-2', toolName: 'done', args: {} }],
           usage: { totalTokens: 150 },
           responseMessages: [],
         });
@@ -441,7 +462,10 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -494,28 +518,34 @@ describe('agent step', () => {
         responseMessages: [],
       });
 
-      const testBrain = brain('test-waitfor').brain('Handle Escalation', () => ({
-        prompt: 'Handle the request',
-        tools: {
-          escalate: {
-            description: 'Escalate to support',
-            inputSchema: z.object({ summary: z.string() }),
-            execute: async () => {
-              return {
-                waitFor: supportWebhook('ticket-123'),
-              };
+      const testBrain = brain('test-waitfor').brain(
+        'Handle Escalation',
+        () => ({
+          prompt: 'Handle the request',
+          tools: {
+            escalate: {
+              description: 'Escalate to support',
+              inputSchema: z.object({ summary: z.string() }),
+              execute: async () => {
+                return {
+                  waitFor: supportWebhook('ticket-123'),
+                };
+              },
+            },
+            resolve: {
+              description: 'Mark resolved',
+              inputSchema: z.object({ resolution: z.string() }),
+              terminal: true,
             },
           },
-          resolve: {
-            description: 'Mark resolved',
-            inputSchema: z.object({ resolution: z.string() }),
-            terminal: true,
-          },
-        },
-      }));
+        })
+      );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -560,37 +590,50 @@ describe('agent step', () => {
         responseMessages: [],
       });
 
-      const testBrain = brain('test-array-waitfor').brain('Multi-channel Approval', () => ({
-        prompt: 'Request approval via multiple channels',
-        tools: {
-          requestApproval: {
-            description: 'Request approval via Slack and email',
-            inputSchema: z.object({ reason: z.string() }),
-            execute: async () => {
-              return {
-                waitFor: [slackWebhook('slack-thread-1'), emailWebhook('email-msg-1')],
-              };
+      const testBrain = brain('test-array-waitfor').brain(
+        'Multi-channel Approval',
+        () => ({
+          prompt: 'Request approval via multiple channels',
+          tools: {
+            requestApproval: {
+              description: 'Request approval via Slack and email',
+              inputSchema: z.object({ reason: z.string() }),
+              execute: async () => {
+                return {
+                  waitFor: [
+                    slackWebhook('slack-thread-1'),
+                    emailWebhook('email-msg-1'),
+                  ],
+                };
+              },
+            },
+            complete: {
+              description: 'Complete the request',
+              inputSchema: z.object({ result: z.string() }),
+              terminal: true,
             },
           },
-          complete: {
-            description: 'Complete the request',
-            inputSchema: z.object({ result: z.string() }),
-            terminal: true,
-          },
-        },
-      }));
+        })
+      );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
       // Should emit single AGENT_WEBHOOK event (captures tool context)
-      const agentWebhookEvents = events.filter((e) => e.type === BRAIN_EVENTS.AGENT_WEBHOOK);
+      const agentWebhookEvents = events.filter(
+        (e) => e.type === BRAIN_EVENTS.AGENT_WEBHOOK
+      );
       expect(agentWebhookEvents.length).toBe(1);
 
       // Should emit WEBHOOK event with both webhooks
-      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      const webhookEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      ) as any;
       expect(webhookEvent).toBeDefined();
       expect(webhookEvent.waitFor).toHaveLength(2);
       expect(webhookEvent.waitFor[0].slug).toBe('slack-response');
@@ -623,31 +666,39 @@ describe('agent step', () => {
         responseMessages: [],
       });
 
-      const testBrain = brain('test-waitfor-timeout').brain('Handle Timeout', () => ({
-        prompt: 'Handle the request',
-        tools: {
-          escalate: {
-            description: 'Escalate with timeout',
-            inputSchema: z.object({ summary: z.string() }),
-            execute: async () => ({
-              waitFor: supportWebhook('ticket-789'),
-              timeout: 30 * 60 * 1000, // 30 minutes
-            }),
+      const testBrain = brain('test-waitfor-timeout').brain(
+        'Handle Timeout',
+        () => ({
+          prompt: 'Handle the request',
+          tools: {
+            escalate: {
+              description: 'Escalate with timeout',
+              inputSchema: z.object({ summary: z.string() }),
+              execute: async () => ({
+                waitFor: supportWebhook('ticket-789'),
+                timeout: 30 * 60 * 1000, // 30 minutes
+              }),
+            },
+            resolve: {
+              description: 'Mark resolved',
+              inputSchema: z.object({ resolution: z.string() }),
+              terminal: true,
+            },
           },
-          resolve: {
-            description: 'Mark resolved',
-            inputSchema: z.object({ resolution: z.string() }),
-            terminal: true,
-          },
-        },
-      }));
+        })
+      );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
-      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      const webhookEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      ) as any;
       expect(webhookEvent).toBeDefined();
       expect(webhookEvent.timeout).toBe(30 * 60 * 1000);
     });
@@ -676,30 +727,38 @@ describe('agent step', () => {
         responseMessages: [],
       });
 
-      const testBrain = brain('test-waitfor-no-timeout').brain('Handle No Timeout', () => ({
-        prompt: 'Handle the request',
-        tools: {
-          escalate: {
-            description: 'Escalate without timeout',
-            inputSchema: z.object({ summary: z.string() }),
-            execute: async () => ({
-              waitFor: supportWebhook('ticket-no-to'),
-            }),
+      const testBrain = brain('test-waitfor-no-timeout').brain(
+        'Handle No Timeout',
+        () => ({
+          prompt: 'Handle the request',
+          tools: {
+            escalate: {
+              description: 'Escalate without timeout',
+              inputSchema: z.object({ summary: z.string() }),
+              execute: async () => ({
+                waitFor: supportWebhook('ticket-no-to'),
+              }),
+            },
+            resolve: {
+              description: 'Mark resolved',
+              inputSchema: z.object({ resolution: z.string() }),
+              terminal: true,
+            },
           },
-          resolve: {
-            description: 'Mark resolved',
-            inputSchema: z.object({ resolution: z.string() }),
-            terminal: true,
-          },
-        },
-      }));
+        })
+      );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
-      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      const webhookEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      ) as any;
       expect(webhookEvent).toBeDefined();
       expect(webhookEvent.timeout).toBeUndefined();
     });
@@ -720,24 +779,32 @@ describe('agent step', () => {
         responseMessages: [],
       });
 
-      const testBrain = brain('test-default-timeout').brain('Default Timeout', () => ({
-        prompt: 'Wait for user',
-        tools: {
-          waitForWebhook,
-          resolve: {
-            description: 'Mark resolved',
-            inputSchema: z.object({ resolution: z.string() }),
-            terminal: true,
+      const testBrain = brain('test-default-timeout').brain(
+        'Default Timeout',
+        () => ({
+          prompt: 'Wait for user',
+          tools: {
+            waitForWebhook,
+            resolve: {
+              description: 'Mark resolved',
+              inputSchema: z.object({ resolution: z.string() }),
+              terminal: true,
+            },
           },
-        },
-      }));
+        })
+      );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
-      const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK) as any;
+      const webhookEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.WEBHOOK
+      ) as any;
       expect(webhookEvent).toBeDefined();
       expect(webhookEvent.timeout).toBe(60 * 60 * 1000); // 1h default
     });
@@ -815,7 +882,10 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -826,9 +896,9 @@ describe('agent step', () => {
       expect(systemPrompt).toContain('## You Are a Positronic Brain');
       expect(systemPrompt).toContain('You are a helpful assistant.');
       // Default should come first
-      expect(systemPrompt.indexOf('## You Are a Positronic Brain')).toBeLessThan(
-        systemPrompt.indexOf('You are a helpful assistant.')
-      );
+      expect(
+        systemPrompt.indexOf('## You Are a Positronic Brain')
+      ).toBeLessThan(systemPrompt.indexOf('You are a helpful assistant.'));
     });
 
     it('should use default system prompt when none provided', async () => {
@@ -857,7 +927,10 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -898,7 +971,10 @@ describe('agent step', () => {
         }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -955,7 +1031,10 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -986,7 +1065,11 @@ describe('agent step', () => {
         .mockResolvedValueOnce({
           text: 'Thinking...',
           toolCalls: [
-            { toolCallId: 'call-1', toolName: 'doWork', args: { task: 'test' } },
+            {
+              toolCallId: 'call-1',
+              toolName: 'doWork',
+              args: { task: 'test' },
+            },
           ],
           usage: { totalTokens: 100 },
           responseMessages: [
@@ -997,7 +1080,11 @@ describe('agent step', () => {
         .mockResolvedValueOnce({
           text: 'Done!',
           toolCalls: [
-            { toolCallId: 'call-2', toolName: 'done', args: { result: 'completed' } },
+            {
+              toolCallId: 'call-2',
+              toolName: 'done',
+              args: { result: 'completed' },
+            },
           ],
           usage: { totalTokens: 150 },
           responseMessages: [
@@ -1008,12 +1095,18 @@ describe('agent step', () => {
           ],
         });
 
-      const doWorkMock = jest.fn<() => Promise<string>>().mockResolvedValue('work done');
+      const doWorkMock = jest
+        .fn<() => Promise<string>>()
+        .mockResolvedValue('work done');
 
       // Add createToolResultMessage to mock client
       const mockClientWithToolResult = {
         ...mockClient,
-        createToolResultMessage: (toolCallId: string, toolName: string, result: unknown) => ({
+        createToolResultMessage: (
+          toolCallId: string,
+          toolName: string,
+          result: unknown
+        ) => ({
           role: 'tool',
           toolCallId,
           toolName,
@@ -1033,7 +1126,10 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClientWithToolResult, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClientWithToolResult,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1065,9 +1161,7 @@ describe('agent step', () => {
     it('should emit raw response before iteration event', async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
-        toolCalls: [
-          { toolCallId: 'call-1', toolName: 'done', args: {} },
-        ],
+        toolCalls: [{ toolCallId: 'call-1', toolName: 'done', args: {} }],
         usage: { totalTokens: 50 },
         responseMessages: [
           { role: 'user', content: [{ type: 'text', text: 'Do task' }] },
@@ -1080,7 +1174,10 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1126,7 +1223,10 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1186,7 +1286,10 @@ describe('agent step', () => {
       );
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1206,7 +1309,9 @@ describe('agent step', () => {
       const agentWebhookEvent = events[agentWebhookIndex] as AgentWebhookEvent;
       expect(agentWebhookEvent.toolCallId).toBe('call-1');
       expect(agentWebhookEvent.toolName).toBe('escalate');
-      expect(agentWebhookEvent.input).toEqual({ summary: 'Customer needs help' });
+      expect(agentWebhookEvent.input).toEqual({
+        summary: 'Customer needs help',
+      });
     });
 
     it('should not pass webhook response as response parameter to config function on resumption', async () => {
@@ -1289,7 +1394,10 @@ describe('agent step', () => {
 
       // Run until webhook pause
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1306,7 +1414,9 @@ describe('agent step', () => {
       // Use the state machine to reconstruct agent context from events
       const webhookResponse = { ticketId: 'ticket-456', approved: true };
       const machine = createBrainExecutionMachine({
-        events: events as unknown as Array<{ type: string } & Record<string, unknown>>,
+        events: events as unknown as Array<
+          { type: string } & Record<string, unknown>
+        >,
       });
       const agentContext = machine.context.agentContext
         ? { ...machine.context.agentContext, webhookResponse }
@@ -1340,7 +1450,9 @@ describe('agent step', () => {
         });
 
       // Get the brain run ID from the START event
-      const startEvent = events.find((e) => e.type === BRAIN_EVENTS.START) as any;
+      const startEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.START
+      ) as any;
       const brainRunId = startEvent.brainRunId;
 
       // Build resumeContext from the execution stack
@@ -1384,7 +1496,9 @@ describe('agent step', () => {
       }
 
       // Verify brain completed
-      expect(resumeEvents.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+      expect(resumeEvents.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(
+        true
+      );
 
       // Config function should have been called again on resumption
       expect(configFnCalls.length).toBe(2);
@@ -1422,7 +1536,10 @@ describe('agent step', () => {
       });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1477,7 +1594,10 @@ describe('agent step', () => {
         }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1525,7 +1645,10 @@ describe('agent step', () => {
       });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1576,7 +1699,10 @@ describe('agent step', () => {
         });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 
@@ -1621,7 +1747,10 @@ describe('agent step', () => {
       });
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         events.push(event);
       }
 

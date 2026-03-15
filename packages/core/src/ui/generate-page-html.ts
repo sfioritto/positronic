@@ -231,8 +231,12 @@ export function generatePageHtml(options: GeneratePageHtmlOptions): string {
     window.__POSITRONIC_DATA__ = ${safeJsonStringify(data)};
     window.__POSITRONIC_TREE__ = ${safeJsonStringify(placements)};
     window.__POSITRONIC_ROOT__ = ${safeJsonStringify(rootId)};
-    window.__POSITRONIC_FORM_ACTION__ = ${formAction ? safeJsonStringify(formAction) : 'null'};
-    window.__POSITRONIC_FORM_TOKEN__ = ${formToken ? safeJsonStringify(formToken) : 'null'};
+    window.__POSITRONIC_FORM_ACTION__ = ${
+      formAction ? safeJsonStringify(formAction) : 'null'
+    };
+    window.__POSITRONIC_FORM_TOKEN__ = ${
+      formToken ? safeJsonStringify(formToken) : 'null'
+    };
   </script>
 
   <!-- Bootstrap runtime -->

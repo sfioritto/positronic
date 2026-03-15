@@ -10,7 +10,11 @@ interface AuthLogoutProps {
   projectRootPath?: string;
 }
 
-export const AuthLogout = ({ configManager, forProject, projectRootPath }: AuthLogoutProps) => {
+export const AuthLogout = ({
+  configManager,
+  forProject,
+  projectRootPath,
+}: AuthLogoutProps) => {
   const currentProject = configManager.getCurrentProject();
   const isDevMode = !!projectRootPath;
 
@@ -21,7 +25,8 @@ export const AuthLogout = ({ configManager, forProject, projectRootPath }: AuthL
         <Text color="red">Error: No project selected.</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Use "px project select" to select a project first, or omit --project to clear the global default key.
+            Use "px project select" to select a project first, or omit --project
+            to clear the global default key.
           </Text>
         </Box>
       </Box>
@@ -30,12 +35,16 @@ export const AuthLogout = ({ configManager, forProject, projectRootPath }: AuthL
 
   if (forProject && currentProject) {
     // Clear per-project key
-    const projectKeyPath = configManager.getProjectPrivateKeyPath(currentProject.name);
+    const projectKeyPath = configManager.getProjectPrivateKeyPath(
+      currentProject.name
+    );
 
     if (!projectKeyPath) {
       return (
         <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
-          <Text>No SSH key configured for project "{currentProject.name}".</Text>
+          <Text>
+            No SSH key configured for project "{currentProject.name}".
+          </Text>
           <Box marginTop={1}>
             <Text dimColor>Nothing to clear.</Text>
           </Box>
@@ -80,9 +89,7 @@ export const AuthLogout = ({ configManager, forProject, projectRootPath }: AuthL
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
-        <Text color="green">
-          Local project SSH key configuration cleared.
-        </Text>
+        <Text color="green">Local project SSH key configuration cleared.</Text>
         <Box marginTop={1}>
           <Text dimColor>
             Requests will now use the global default key (if configured).
@@ -111,12 +118,11 @@ export const AuthLogout = ({ configManager, forProject, projectRootPath }: AuthL
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
-      <Text color="green">
-        Global SSH key configuration cleared.
-      </Text>
+      <Text color="green">Global SSH key configuration cleared.</Text>
       <Box marginTop={1}>
         <Text dimColor>
-          Requests will now use the default key (~/.ssh/id_rsa) unless POSITRONIC_PRIVATE_KEY is set.
+          Requests will now use the default key (~/.ssh/id_rsa) unless
+          POSITRONIC_PRIVATE_KEY is set.
         </Text>
       </Box>
     </Box>

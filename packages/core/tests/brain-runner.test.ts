@@ -1,7 +1,10 @@
 import { BrainRunner } from '../src/dsl/brain-runner.js';
 import { brain, type SerializedStep } from '../src/dsl/brain.js';
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
-import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
+import {
+  createBrainExecutionMachine,
+  sendEvent,
+} from '../src/dsl/brain-state-machine.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { ObjectGenerator } from '../src/clients/types.js';
 import { Adapter } from '../src/adapters/types.js';
@@ -130,7 +133,9 @@ describe('BrainRunner', () => {
         count: state.count + 1,
       }));
 
-    const result = await runner.run(testBrain, { currentUser: { name: 'test-user' } });
+    const result = await runner.run(testBrain, {
+      currentUser: { name: 'test-user' },
+    });
 
     expect(result.count).toEqual(2);
   });
@@ -184,7 +189,9 @@ describe('BrainRunner', () => {
       }
     );
 
-    await runner.run(resourceConsumingBrain, { currentUser: { name: 'test-user' } });
+    await runner.run(resourceConsumingBrain, {
+      currentUser: { name: 'test-user' },
+    });
 
     expect(mockLoad).toHaveBeenCalledWith('myTextFile', 'text');
     expect(mockLoad).toHaveBeenCalledWith('myBinaryFile', 'binary');
@@ -249,7 +256,9 @@ describe('BrainRunner', () => {
     };
 
     // Configure the new client's response
-    newClient.generateObject.mockResolvedValue({ object: { result: 'from new client' } });
+    newClient.generateObject.mockResolvedValue({
+      object: { result: 'from new client' },
+    });
 
     const runner = new BrainRunner({
       adapters: [],
@@ -274,7 +283,9 @@ describe('BrainRunner', () => {
       }
     );
 
-    const result = await updatedRunner.run(testBrain, { currentUser: { name: 'test-user' } });
+    const result = await updatedRunner.run(testBrain, {
+      currentUser: { name: 'test-user' },
+    });
 
     // Verify new client was used, not the original
     expect(originalClient.generateObject).not.toHaveBeenCalled();
@@ -394,7 +405,7 @@ describe('BrainRunner', () => {
       async (request: Request) => ({
         type: 'webhook' as const,
         identifier: 'test-id',
-        response: { response: 'test' }
+        response: { response: 'test' },
       })
     );
 
@@ -411,7 +422,9 @@ describe('BrainRunner', () => {
         processed: true,
       }));
 
-    const result = await runner.run(testBrain, { currentUser: { name: 'test-user' } });
+    const result = await runner.run(testBrain, {
+      currentUser: { name: 'test-user' },
+    });
 
     // Verify the final state only includes changes up to webhook step
     expect(result).toEqual({ count: 1 });
@@ -428,7 +441,7 @@ describe('BrainRunner', () => {
           {
             slug: 'test-webhook',
             identifier: 'test-id',
-          }
+          },
         ],
       })
     );
@@ -462,7 +475,7 @@ describe('BrainRunner', () => {
       async (request: Request) => ({
         type: 'webhook' as const,
         identifier: 'user-id',
-        response: { userInput: 'test input' }
+        response: { userInput: 'test input' },
       })
     );
 
@@ -474,7 +487,8 @@ describe('BrainRunner', () => {
     const testBrain = brain('Webhook Resume Brain')
       .step('Initial Step', () => ({ count: 1 }))
       .step('Prepare Webhook', ({ state }) => ({
-        ...state, webhookSent: true,
+        ...state,
+        webhookSent: true,
       }))
       .wait('Webhook Step', () => userInputWebhook('user-id'))
       .step('Process Response', ({ state, response }) => ({
@@ -484,11 +498,13 @@ describe('BrainRunner', () => {
       }));
 
     // First run - should stop at webhook
-    const firstRunState = await runner.run(testBrain, { currentUser: { name: 'test-user' } });
+    const firstRunState = await runner.run(testBrain, {
+      currentUser: { name: 'test-user' },
+    });
 
     expect(firstRunState).toEqual({
       count: 1,
-      webhookSent: true
+      webhookSent: true,
     });
 
     // Get the brain run ID from the first run

@@ -8,7 +8,10 @@ interface ProjectRemoveProps {
 }
 
 export const ProjectRemove = ({ name, projectConfig }: ProjectRemoveProps) => {
-  const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{
+    success: boolean;
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
     const removeResult = projectConfig.removeProject(name);
@@ -29,7 +32,8 @@ export const ProjectRemove = ({ name, projectConfig }: ProjectRemoveProps) => {
         {currentProject && (
           <Box marginTop={1} paddingLeft={2}>
             <Text>
-              <Text bold>Current project:</Text> <Text color="cyan">{currentProject}</Text>
+              <Text bold>Current project:</Text>{' '}
+              <Text color="cyan">{currentProject}</Text>
             </Text>
           </Box>
         )}

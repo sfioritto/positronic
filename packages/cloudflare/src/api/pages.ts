@@ -25,7 +25,10 @@ pages.post('/', async (context: Context) => {
       return context.json({ error: 'Missing required field "html"' }, 400);
     }
     if (!brainRunId) {
-      return context.json({ error: 'Missing required field "brainRunId"' }, 400);
+      return context.json(
+        { error: 'Missing required field "brainRunId"' },
+        400
+      );
     }
 
     // Generate slug if not provided
@@ -35,7 +38,10 @@ pages.post('/', async (context: Context) => {
       // Validate slug format (alphanumeric, hyphens, underscores only)
       if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
         return context.json(
-          { error: 'Slug must contain only alphanumeric characters, hyphens, and underscores' },
+          {
+            error:
+              'Slug must contain only alphanumeric characters, hyphens, and underscores',
+          },
           400
         );
       }
@@ -108,7 +114,9 @@ pages.get('/', async (context: Context) => {
         }
 
         const metadata = r2Object.customMetadata || {};
-        const slug = metadata.slug || object.key.replace('pages/', '').replace('.html', '');
+        const slug =
+          metadata.slug ||
+          object.key.replace('pages/', '').replace('.html', '');
 
         // Build the public URL
         const pageUrl = `${origin}/pages/${slug}`;

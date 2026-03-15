@@ -111,9 +111,6 @@ export const BrainTop = ({ brainFilter }: BrainTopProps) => {
   }
 
   return (
-    <BrainTopTable
-      runningBrains={runningBrains}
-      brainFilter={brainFilter}
-    />
+    <BrainTopTable runningBrains={runningBrains} brainFilter={brainFilter} />
   );
 };

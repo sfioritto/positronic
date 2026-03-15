@@ -16,12 +16,21 @@ interface AuthLoginProps {
 
 type LoginState = 'selecting' | 'success' | 'error';
 
-export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath }: AuthLoginProps) => {
+export const AuthLogin = ({
+  configManager,
+  keyPath,
+  forProject,
+  projectRootPath,
+}: AuthLoginProps) => {
   const isDevMode = !!projectRootPath;
   const { exit } = useApp();
-  const [state, setState] = useState<LoginState>(keyPath ? 'success' : 'selecting');
+  const [state, setState] = useState<LoginState>(
+    keyPath ? 'success' : 'selecting'
+  );
   const [error, setError] = useState<string | null>(null);
-  const [selectedPath, setSelectedPath] = useState<string | null>(keyPath || null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(
+    keyPath || null
+  );
 
   const currentProject = configManager.getCurrentProject();
 
@@ -32,7 +41,8 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
         <Text color="red">Error: No project selected.</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Use "px project select" to select a project first, or omit --project to set the global default key.
+            Use "px project select" to select a project first, or omit --project
+            to set the global default key.
           </Text>
         </Box>
       </Box>
@@ -55,7 +65,10 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
 
     // Set the key
     if (forProject && currentProject) {
-      const result = configManager.setProjectPrivateKeyPath(currentProject.name, keyPath);
+      const result = configManager.setProjectPrivateKeyPath(
+        currentProject.name,
+        keyPath
+      );
       if (!result.success) {
         return (
           <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -72,17 +85,16 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
     // Reset request signer to use new key
     resetJwtAuthProvider();
 
-    const scope = forProject && currentProject
-      ? `project "${currentProject.name}"`
-      : isDevMode
+    const scope =
+      forProject && currentProject
+        ? `project "${currentProject.name}"`
+        : isDevMode
         ? 'local project'
         : 'global';
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
-        <Text color="green">
-          SSH key configured successfully.
-        </Text>
+        <Text color="green">SSH key configured successfully.</Text>
         <Box marginTop={1} paddingLeft={2}>
           <Text>
             <Text bold>Path:</Text> {keyPath}
@@ -122,7 +134,9 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
     const items: SelectListItem[] = discoveredKeys.map((key) => ({
       id: key.path,
       label: key.path.replace(process.env.HOME || '', '~'),
-      description: `${key.algorithm} - ${key.fingerprint}${key.comment ? ` (${key.comment})` : ''}`,
+      description: `${key.algorithm} - ${key.fingerprint}${
+        key.comment ? ` (${key.comment})` : ''
+      }`,
     }));
 
     const handleSelect = (item: SelectListItem) => {
@@ -131,7 +145,10 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
       const displayPath = originalPath.replace(process.env.HOME || '', '~');
 
       if (forProject && currentProject) {
-        const result = configManager.setProjectPrivateKeyPath(currentProject.name, displayPath);
+        const result = configManager.setProjectPrivateKeyPath(
+          currentProject.name,
+          displayPath
+        );
         if (!result.success) {
           setError(result.error || 'Unknown error');
           setState('error');
@@ -154,9 +171,10 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
       exit();
     };
 
-    const headerSuffix = forProject && currentProject
-      ? ` for project "${currentProject.name}"`
-      : isDevMode
+    const headerSuffix =
+      forProject && currentProject
+        ? ` for project "${currentProject.name}"`
+        : isDevMode
         ? ' (local project)'
         : ' (global)';
 
@@ -172,17 +190,16 @@ export const AuthLogin = ({ configManager, keyPath, forProject, projectRootPath 
   }
 
   if (state === 'success' && selectedPath) {
-    const scope = forProject && currentProject
-      ? `project "${currentProject.name}"`
-      : isDevMode
+    const scope =
+      forProject && currentProject
+        ? `project "${currentProject.name}"`
+        : isDevMode
         ? 'local project'
         : 'global';
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
-        <Text color="green">
-          SSH key configured successfully.
-        </Text>
+        <Text color="green">SSH key configured successfully.</Text>
         <Box marginTop={1} paddingLeft={2}>
           <Text>
             <Text bold>Path:</Text> {selectedPath}

@@ -172,7 +172,9 @@ function getEventDetailContent(event: BrainEvent): string {
     case BRAIN_EVENTS.START:
       return [
         `Brain: ${event.brainTitle}`,
-        ...(event.brainDescription ? [`Description: ${event.brainDescription}`] : []),
+        ...(event.brainDescription
+          ? [`Description: ${event.brainDescription}`]
+          : []),
         `Run ID: ${event.brainRunId}`,
         '',
         'Options:',
@@ -199,19 +201,32 @@ function getEventDetailContent(event: BrainEvent): string {
       ].join('\n');
 
     case BRAIN_EVENTS.STEP_STATUS:
-      return ['Steps:', ...event.steps.map((s) => `  ${getStatusIcon(s.status)} ${s.title}`)].join('\n');
+      return [
+        'Steps:',
+        ...event.steps.map((s) => `  ${getStatusIcon(s.status)} ${s.title}`),
+      ].join('\n');
 
     case BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE:
-      return [`Step: ${event.stepTitle}`, '', 'Message:', event.content].join('\n');
+      return [`Step: ${event.stepTitle}`, '', 'Message:', event.content].join(
+        '\n'
+      );
 
     case BRAIN_EVENTS.STEP_START:
-      return [`Step: ${event.stepTitle}`, `Step ID: ${event.stepId}`].join('\n');
+      return [`Step: ${event.stepTitle}`, `Step ID: ${event.stepId}`].join(
+        '\n'
+      );
 
     case BRAIN_EVENTS.COMPLETE:
-      return [`Brain: ${event.brainTitle}`, '', 'Brain completed successfully.'].join('\n');
+      return [
+        `Brain: ${event.brainTitle}`,
+        '',
+        'Brain completed successfully.',
+      ].join('\n');
 
     case BRAIN_EVENTS.CANCELLED:
-      return [`Brain: ${event.brainTitle}`, '', 'Brain was cancelled.'].join('\n');
+      return [`Brain: ${event.brainTitle}`, '', 'Brain was cancelled.'].join(
+        '\n'
+      );
 
     case BRAIN_EVENTS.WEBHOOK:
       return [
@@ -222,7 +237,10 @@ function getEventDetailContent(event: BrainEvent): string {
       ].join('\n');
 
     case BRAIN_EVENTS.WEBHOOK_RESPONSE:
-      return ['Webhook Response:', JSON.stringify(event.response, null, 2)].join('\n');
+      return [
+        'Webhook Response:',
+        JSON.stringify(event.response, null, 2),
+      ].join('\n');
 
     case BRAIN_EVENTS.AGENT_WEBHOOK:
       return [
@@ -277,7 +295,12 @@ function getEventDetailContent(event: BrainEvent): string {
   }
 }
 
-export const EventDetail = ({ stored, scrollOffset, onScrollChange, isActive = true }: EventDetailProps) => {
+export const EventDetail = ({
+  stored,
+  scrollOffset,
+  onScrollChange,
+  isActive = true,
+}: EventDetailProps) => {
   const { stdout } = useStdout();
   const terminalHeight = stdout?.rows || 24;
   const maxLines = Math.max(5, terminalHeight - 8);
@@ -324,7 +347,8 @@ export const EventDetail = ({ stored, scrollOffset, onScrollChange, isActive = t
       {totalLines > maxLines && (
         <Box marginTop={1}>
           <Text dimColor>
-            Lines {scrollOffset + 1}-{Math.min(scrollOffset + maxLines, totalLines)} of {totalLines}
+            Lines {scrollOffset + 1}-
+            {Math.min(scrollOffset + maxLines, totalLines)} of {totalLines}
           </Text>
         </Box>
       )}

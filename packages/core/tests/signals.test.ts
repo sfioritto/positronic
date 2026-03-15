@@ -1,7 +1,10 @@
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { createWebhook } from '../src/dsl/webhook.js';
-import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
+import {
+  createBrainExecutionMachine,
+  sendEvent,
+} from '../src/dsl/brain-state-machine.js';
 import type { ResumeContext } from '../src/dsl/definitions/run-params.js';
 import { MockSignalProvider } from './mock-signal-provider.js';
 import { z } from 'zod';
@@ -10,7 +13,8 @@ import type { ObjectGenerator } from '../src/clients/types.js';
 
 // Mock ObjectGenerator with generateText support
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-const mockGenerateText = jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+const mockGenerateText =
+  jest.fn<NonNullable<ObjectGenerator['generateText']>>();
 const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
 const mockClient: jest.Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
@@ -117,7 +121,9 @@ describe('signal handling', () => {
   describe('KILL signal in agent loop', () => {
     it('should terminate agent mid-iteration when KILL signal is received', async () => {
       const lookupMock = jest
-        .fn<(input: { id: string }) => Promise<{ id: string; found: boolean }>>()
+        .fn<
+          (input: { id: string }) => Promise<{ id: string; found: boolean }>
+        >()
         .mockResolvedValue({ id: '123', found: true });
 
       // First LLM call - calls a non-terminal tool to keep the loop going
@@ -206,7 +212,9 @@ describe('signal handling', () => {
   describe('PAUSE signal in agent loop', () => {
     it('should pause agent mid-iteration when PAUSE signal is received', async () => {
       const lookupMock = jest
-        .fn<(input: { id: string }) => Promise<{ id: string; found: boolean }>>()
+        .fn<
+          (input: { id: string }) => Promise<{ id: string; found: boolean }>
+        >()
         .mockResolvedValue({ id: '123', found: true });
 
       // First LLM call - calls a non-terminal tool
@@ -274,7 +282,9 @@ describe('signal handling', () => {
   describe('USER_MESSAGE signal in agent loop', () => {
     it('should inject user message into agent conversation', async () => {
       const lookupMock = jest
-        .fn<(input: { id: string }) => Promise<{ id: string; found: boolean }>>()
+        .fn<
+          (input: { id: string }) => Promise<{ id: string; found: boolean }>
+        >()
         .mockResolvedValue({ id: '123', found: true });
 
       // First LLM call - calls a non-terminal tool to keep loop going
@@ -305,24 +315,21 @@ describe('signal handling', () => {
         responseMessages: [],
       });
 
-      const testBrain = brain('test-agent-message').brain(
-        'Agent Step',
-        () => ({
-          prompt: 'Do something',
-          tools: {
-            lookup: {
-              description: 'Lookup something',
-              inputSchema: z.object({ id: z.string() }),
-              execute: lookupMock,
-            },
-            done: {
-              description: 'Mark as done',
-              inputSchema: z.object({ result: z.string() }),
-              terminal: true,
-            },
+      const testBrain = brain('test-agent-message').brain('Agent Step', () => ({
+        prompt: 'Do something',
+        tools: {
+          lookup: {
+            description: 'Lookup something',
+            inputSchema: z.object({ id: z.string() }),
+            execute: lookupMock,
           },
-        })
-      );
+          done: {
+            description: 'Mark as done',
+            inputSchema: z.object({ result: z.string() }),
+            terminal: true,
+          },
+        },
+      }));
 
       const events: BrainEvent[] = [];
       let iterationCount = 0;
@@ -406,7 +413,9 @@ describe('signal handling', () => {
 
     it('should process PAUSE before USER_MESSAGE when both are queued', async () => {
       const lookupMock = jest
-        .fn<(input: { id: string }) => Promise<{ id: string; found: boolean }>>()
+        .fn<
+          (input: { id: string }) => Promise<{ id: string; found: boolean }>
+        >()
         .mockResolvedValue({ id: '123', found: true });
 
       // First LLM call - calls a non-terminal tool
@@ -577,9 +586,7 @@ describe('signal handling', () => {
           },
         ],
         usage: { totalTokens: 100 },
-        responseMessages: [
-          { role: 'assistant', content: 'Escalating...' },
-        ],
+        responseMessages: [{ role: 'assistant', content: 'Escalating...' }],
       });
 
       const testBrain = brain('test-webhook-message').brain(
@@ -605,20 +612,29 @@ describe('signal handling', () => {
 
       // First run - should stop at webhook
       const firstRunEvents: BrainEvent[] = [];
-      for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
         firstRunEvents.push(event);
       }
 
       // Verify we hit the webhook
-      expect(firstRunEvents.some((e) => e.type === BRAIN_EVENTS.WEBHOOK)).toBe(true);
+      expect(firstRunEvents.some((e) => e.type === BRAIN_EVENTS.WEBHOOK)).toBe(
+        true
+      );
 
       // Build resumeContext from the execution stack
-      const startEvent = firstRunEvents.find((e) => e.type === BRAIN_EVENTS.START) as any;
+      const startEvent = firstRunEvents.find(
+        (e) => e.type === BRAIN_EVENTS.START
+      ) as any;
       const brainRunId = startEvent.brainRunId;
 
       // Use state machine to reconstruct context
       const machine = createBrainExecutionMachine({
-        events: firstRunEvents as unknown as Array<{ type: string } & Record<string, unknown>>,
+        events: firstRunEvents as unknown as Array<
+          { type: string } & Record<string, unknown>
+        >,
       });
       const executionStack = machine.context.executionStack;
 
@@ -696,17 +712,23 @@ describe('signal handling', () => {
         (e) => e.type === BRAIN_EVENTS.AGENT_USER_MESSAGE
       );
       expect(userMessageEvents.length).toBe(1);
-      expect((userMessageEvents[0] as any).content).toBe('Call them banana as a joke!');
+      expect((userMessageEvents[0] as any).content).toBe(
+        'Call them banana as a joke!'
+      );
 
       // Brain should complete successfully
-      expect(resumeEvents.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+      expect(resumeEvents.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(
+        true
+      );
     });
   });
 
   describe('multiple USER_MESSAGE signals', () => {
     it('should process all queued USER_MESSAGE signals in a single iteration', async () => {
       const lookupMock = jest
-        .fn<(input: { id: string }) => Promise<{ id: string; found: boolean }>>()
+        .fn<
+          (input: { id: string }) => Promise<{ id: string; found: boolean }>
+        >()
         .mockResolvedValue({ id: '123', found: true });
 
       // First LLM call - calls a non-terminal tool

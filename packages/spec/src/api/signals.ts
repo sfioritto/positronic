@@ -169,7 +169,10 @@ export const signals = {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'USER_MESSAGE', content: 'test message' }),
+          body: JSON.stringify({
+            type: 'USER_MESSAGE',
+            content: 'test message',
+          }),
         }
       );
 
@@ -351,10 +354,7 @@ export const signals = {
 
       return true;
     } catch (error) {
-      console.error(
-        `Failed to test POST /brains/runs/${runId}/resume:`,
-        error
-      );
+      console.error(`Failed to test POST /brains/runs/${runId}/resume:`, error);
       return false;
     }
   },

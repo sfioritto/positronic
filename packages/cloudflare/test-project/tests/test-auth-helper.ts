@@ -108,7 +108,10 @@ export async function createUserFetch(
   baseFetch: (request: Request) => Promise<Response>,
   rootFetch: (request: Request) => Promise<Response>,
   userName: string
-): Promise<{ fetch: (request: Request) => Promise<Response>; userName: string }> {
+): Promise<{
+  fetch: (request: Request) => Promise<Response>;
+  userName: string;
+}> {
   // 1. Create the user
   const createUserResponse = await rootFetch(
     new Request('http://example.com/users', {

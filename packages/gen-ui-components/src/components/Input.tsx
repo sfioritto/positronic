@@ -24,7 +24,9 @@ const InputComponent = ({
   defaultValue,
 }: InputProps) => (
   <div className="flex flex-col gap-1.5">
-    <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
+    <label htmlFor={name} className="text-sm font-medium text-gray-700">
+      {label}
+    </label>
     <input
       id={name}
       name={name}

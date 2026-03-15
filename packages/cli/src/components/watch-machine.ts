@@ -12,7 +12,8 @@ import { useMachine } from 'react-robot';
 import { apiClient } from '../commands/helpers.js';
 import type { ViewMode } from './watch-keyboard.js';
 
-const { createMachine, state, transition, reduce, invoke, immediate, guard } = robot3;
+const { createMachine, state, transition, reduce, invoke, immediate, guard } =
+  robot3;
 
 // Types
 type JsonObject = { [key: string]: unknown };
@@ -121,12 +122,13 @@ const setPreviousViewForMessage = reduce<WatchContext, GoToMessageInputPayload>(
   })
 );
 
-const setEventsSelectedIndex = reduce<WatchContext, SetEventsSelectedIndexPayload>(
-  (ctx, { index }) => ({
-    ...ctx,
-    eventsSelectedIndex: index,
-  })
-);
+const setEventsSelectedIndex = reduce<
+  WatchContext,
+  SetEventsSelectedIndexPayload
+>((ctx, { index }) => ({
+  ...ctx,
+  eventsSelectedIndex: index,
+}));
 
 const setStateScrollOffset = reduce<WatchContext, SetStateScrollOffsetPayload>(
   (ctx, { offset }) => ({
@@ -135,12 +137,13 @@ const setStateScrollOffset = reduce<WatchContext, SetStateScrollOffsetPayload>(
   })
 );
 
-const setAgentChatScrollOffset = reduce<WatchContext, SetAgentChatScrollOffsetPayload>(
-  (ctx, { offset }) => ({
-    ...ctx,
-    agentChatScrollOffset: offset,
-  })
-);
+const setAgentChatScrollOffset = reduce<
+  WatchContext,
+  SetAgentChatScrollOffsetPayload
+>((ctx, { offset }) => ({
+  ...ctx,
+  agentChatScrollOffset: offset,
+}));
 
 const selectAgentFromPicker = reduce<WatchContext, AgentSelectedPayload>(
   (ctx, { agentId }) => ({
@@ -155,10 +158,12 @@ const markKilled = reduce<WatchContext, object>((ctx) => ({
   isKilled: true,
 }));
 
-const setKillError = reduce<WatchContext, { error: Error }>((ctx, { error }) => ({
-  ...ctx,
-  killError: error,
-}));
+const setKillError = reduce<WatchContext, { error: Error }>(
+  (ctx, { error }) => ({
+    ...ctx,
+    killError: error,
+  })
+);
 
 const setPauseMessage = reduce<WatchContext, object>((ctx) => ({
   ...ctx,
@@ -282,7 +287,11 @@ const createWatchMachine = (runId: string, startWithEvents = false) =>
         transition('GO_TO_EVENTS', 'events') as any,
         transition('GO_TO_STATE', 'state', setStateForStateView) as any,
         transition('GO_TO_AGENTS', 'route-agents', setAgentForChat) as any,
-        transition('GO_TO_MESSAGE_INPUT', 'message-input', setPreviousViewForMessage) as any,
+        transition(
+          'GO_TO_MESSAGE_INPUT',
+          'message-input',
+          setPreviousViewForMessage
+        ) as any,
         transition('INITIATE_KILL', 'confirming-kill') as any,
         transition('PAUSE', 'pausing') as any,
         transition('RESUME', 'resuming') as any
@@ -292,16 +301,28 @@ const createWatchMachine = (runId: string, startWithEvents = false) =>
         transition('GO_TO_PROGRESS', 'progress') as any,
         transition('GO_TO_STATE', 'state', setStateForStateView) as any,
         transition('GO_TO_AGENTS', 'route-agents', setAgentForChat) as any,
-        transition('GO_TO_MESSAGE_INPUT', 'message-input', setPreviousViewForMessage) as any,
+        transition(
+          'GO_TO_MESSAGE_INPUT',
+          'message-input',
+          setPreviousViewForMessage
+        ) as any,
         transition('INITIATE_KILL', 'confirming-kill') as any,
         transition('PAUSE', 'pausing') as any,
         transition('RESUME', 'resuming') as any,
-        transition('SET_EVENTS_SELECTED_INDEX', 'events', setEventsSelectedIndex) as any
+        transition(
+          'SET_EVENTS_SELECTED_INDEX',
+          'events',
+          setEventsSelectedIndex
+        ) as any
       ),
 
       state: state(
         transition('GO_BACK', 'route-back', clearStateSnapshot) as any,
-        transition('SET_STATE_SCROLL_OFFSET', 'state', setStateScrollOffset) as any
+        transition(
+          'SET_STATE_SCROLL_OFFSET',
+          'state',
+          setStateScrollOffset
+        ) as any
       ),
 
       // Routing state to determine where to go back
@@ -323,7 +344,11 @@ const createWatchMachine = (runId: string, startWithEvents = false) =>
 
       'agent-chat': state(
         transition('GO_BACK', 'route-back', clearSelectedAgent) as any,
-        transition('SET_AGENT_CHAT_SCROLL_OFFSET', 'agent-chat', setAgentChatScrollOffset) as any
+        transition(
+          'SET_AGENT_CHAT_SCROLL_OFFSET',
+          'agent-chat',
+          setAgentChatScrollOffset
+        ) as any
       ),
 
       // Message input and sending
@@ -344,7 +369,11 @@ const createWatchMachine = (runId: string, startWithEvents = false) =>
       ),
 
       'message-error': state(
-        transition('CLEAR_FEEDBACK', 'message-input', clearMessageFeedback) as any,
+        transition(
+          'CLEAR_FEEDBACK',
+          'message-input',
+          clearMessageFeedback
+        ) as any,
         transition('GO_BACK', 'route-back', clearMessageText) as any
       ),
 
@@ -383,7 +412,11 @@ const createWatchMachine = (runId: string, startWithEvents = false) =>
       ),
 
       'pause-sent': state(
-        transition('CLEAR_PAUSE_RESUME_MESSAGE', 'progress', clearPauseResumeMessage) as any,
+        transition(
+          'CLEAR_PAUSE_RESUME_MESSAGE',
+          'progress',
+          clearPauseResumeMessage
+        ) as any,
         // Allow navigation while showing message
         transition('GO_TO_EVENTS', 'events', clearPauseResumeMessage) as any,
         transition('GO_TO_STATE', 'state', setStateForStateView) as any,
@@ -398,7 +431,11 @@ const createWatchMachine = (runId: string, startWithEvents = false) =>
       ),
 
       'resume-sent': state(
-        transition('CLEAR_PAUSE_RESUME_MESSAGE', 'progress', clearPauseResumeMessage) as any,
+        transition(
+          'CLEAR_PAUSE_RESUME_MESSAGE',
+          'progress',
+          clearPauseResumeMessage
+        ) as any,
         // Allow navigation while showing message
         transition('GO_TO_EVENTS', 'events', clearPauseResumeMessage) as any,
         transition('GO_TO_STATE', 'state', setStateForStateView) as any,

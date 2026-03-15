@@ -23,7 +23,7 @@ export const ProjectList = ({ projectConfig }: ProjectListProps) => {
   }
 
   // Calculate column widths for table display
-  const maxNameLength = Math.max(...projects.map(p => p.name.length), 4); // min 4 for "Name"
+  const maxNameLength = Math.max(...projects.map((p) => p.name.length), 4); // min 4 for "Name"
   const nameColWidth = Math.min(maxNameLength + 2, 30); // cap at 30
 
   return (
@@ -35,9 +35,13 @@ export const ProjectList = ({ projectConfig }: ProjectListProps) => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight('Name', nameColWidth)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">URL</Text>
+          <Text bold color="cyan">
+            {padRight('Name', nameColWidth)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            URL
+          </Text>
         </Box>
 
         {/* Separator */}
@@ -52,9 +56,12 @@ export const ProjectList = ({ projectConfig }: ProjectListProps) => {
           return (
             <Box key={project.name}>
               <Text color={isCurrent ? 'green' : undefined}>
-                {padRight(truncate(project.name, nameColWidth - 2), nameColWidth)}
+                {padRight(
+                  truncate(project.name, nameColWidth - 2),
+                  nameColWidth
+                )}
               </Text>
-              <Text>  </Text>
+              <Text> </Text>
               <Text dimColor={!isCurrent}>{project.url}</Text>
               {isCurrent && <Text color="green"> ← current</Text>}
             </Box>
@@ -65,7 +72,8 @@ export const ProjectList = ({ projectConfig }: ProjectListProps) => {
       {!current && projects.length > 0 && (
         <Box marginTop={1}>
           <Text dimColor>
-            No project selected. Use "px project select &lt;name&gt;" to select one.
+            No project selected. Use "px project select &lt;name&gt;" to select
+            one.
           </Text>
         </Box>
       )}

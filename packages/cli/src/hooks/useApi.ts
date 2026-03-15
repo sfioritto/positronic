@@ -7,19 +7,22 @@ type ErrorObject = { title: string; message: string; details: string };
 const ROOT_KEY_NOT_CONFIGURED_ERROR: ErrorObject = {
   title: 'Root Key Not Configured',
   message: 'The server does not have a root authentication key configured.',
-  details: "The server does not have a ROOT_PUBLIC_KEY secret configured. Add it in your server configuration.",
+  details:
+    'The server does not have a ROOT_PUBLIC_KEY secret configured. Add it in your server configuration.',
 };
 
 const AUTH_REQUIRED_ERROR: ErrorObject = {
   title: 'Authentication Required',
   message: 'Your request could not be authenticated.',
-  details: "Run 'px login' to configure your SSH key, or check that your key is registered on the server.",
+  details:
+    "Run 'px login' to configure your SSH key, or check that your key is registered on the server.",
 };
 
 const ROOT_ACCESS_REQUIRED_ERROR: ErrorObject = {
   title: 'Root Access Required',
   message: 'This operation requires root access.',
-  details: 'You are authenticated as a regular user. This command can only be run with a root key.',
+  details:
+    'You are authenticated as a regular user. This command can only be run with a root key.',
 };
 
 function getConnectionErrorMessage(): ErrorObject {
@@ -27,13 +30,15 @@ function getConnectionErrorMessage(): ErrorObject {
     return {
       title: 'Connection Error',
       message: 'Error connecting to the local development server.',
-      details: "Please ensure the server is running ('positronic server' or 'px s').",
+      details:
+        "Please ensure the server is running ('positronic server' or 'px s').",
     };
   } else {
     return {
       title: 'Connection Error',
       message: 'Error connecting to the remote project server.',
-      details: 'Please check your network connection and verify the project URL is correct.',
+      details:
+        'Please check your network connection and verify the project URL is correct.',
     };
   }
 }
@@ -52,10 +57,12 @@ async function fetchAuthSetupInstructions(): Promise<AuthSetupResponse | null> {
 /**
  * Check if the error response indicates ROOT_KEY_NOT_CONFIGURED
  */
-async function isRootKeyNotConfiguredError(response: Response): Promise<boolean> {
+async function isRootKeyNotConfiguredError(
+  response: Response
+): Promise<boolean> {
   try {
     const clonedResponse = response.clone();
-    const data = await clonedResponse.json() as { error?: string };
+    const data = (await clonedResponse.json()) as { error?: string };
     return data.error === 'ROOT_KEY_NOT_CONFIGURED';
   } catch {
     return false;
@@ -164,7 +171,11 @@ export function useApiPost<T>(endpoint: string, defaultOptions?: any) {
           body: body != null ? JSON.stringify(body) : undefined,
         });
 
-        if (response.status === 200 || response.status === 201 || response.status === 202) {
+        if (
+          response.status === 200 ||
+          response.status === 201 ||
+          response.status === 202
+        ) {
           const result = (await response.json()) as T;
           setData(result);
           return result;

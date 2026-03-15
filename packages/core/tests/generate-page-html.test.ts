@@ -1,11 +1,19 @@
-import { generatePageHtml, generateFormToken } from '../src/ui/generate-page-html.js';
+import {
+  generatePageHtml,
+  generateFormToken,
+} from '../src/ui/generate-page-html.js';
 import type { Placement } from '../src/ui/types.js';
 
 describe('generatePageHtml', () => {
   it('should generate valid HTML with all required elements', () => {
     const placements: Placement[] = [
       { id: 'form-1', component: 'Form', props: {}, parentId: null },
-      { id: 'input-1', component: 'Input', props: { name: 'email', label: 'Email' }, parentId: 'form-1' },
+      {
+        id: 'input-1',
+        component: 'Input',
+        props: { name: 'email', label: 'Email' },
+        parentId: 'form-1',
+      },
     ];
 
     const html = generatePageHtml({
@@ -21,8 +29,12 @@ describe('generatePageHtml', () => {
     expect(html).toContain('<title>Test Page</title>');
 
     // Check React/ReactDOM CDN
-    expect(html).toContain('https://unpkg.com/react@18/umd/react.production.min.js');
-    expect(html).toContain('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
+    expect(html).toContain(
+      'https://unpkg.com/react@18/umd/react.production.min.js'
+    );
+    expect(html).toContain(
+      'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js'
+    );
 
     // Check Tailwind CDN
     expect(html).toContain('https://cdn.tailwindcss.com');
@@ -134,7 +146,12 @@ describe('generatePageHtml', () => {
   it('should embed formToken as global and hidden input for Form components', () => {
     const placements: Placement[] = [
       { id: 'form-1', component: 'Form', props: {}, parentId: null },
-      { id: 'input-1', component: 'Input', props: { name: 'email' }, parentId: 'form-1' },
+      {
+        id: 'input-1',
+        component: 'Input',
+        props: { name: 'email' },
+        parentId: 'form-1',
+      },
     ];
 
     const token = 'test-csrf-token-123';
@@ -174,7 +191,9 @@ describe('generatePageHtml', () => {
     it('should return a UUID string', () => {
       const token = generateFormToken();
       expect(typeof token).toBe('string');
-      expect(token).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(token).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
     });
 
     it('should return unique tokens', () => {

@@ -62,7 +62,8 @@ const padRight = (text: string, width: number): string => {
 };
 
 export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
-  const { data, loading, error } = useApiGet<SchedulesResponse>('/brains/schedules');
+  const { data, loading, error } =
+    useApiGet<SchedulesResponse>('/brains/schedules');
 
   if (error) {
     return <ErrorComponent error={error} />;
@@ -82,7 +83,8 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
         <Text>No schedules found.</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Create a schedule with "px schedule create &lt;brain-name&gt; &lt;cron-expression&gt;"
+            Tip: Create a schedule with "px schedule create &lt;brain-name&gt;
+            &lt;cron-expression&gt;"
           </Text>
         </Box>
       </Box>
@@ -91,7 +93,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
 
   // Filter schedules if brain filter is provided
   const filteredSchedules = brainFilter
-    ? data.schedules.filter(s => s.brainTitle === brainFilter)
+    ? data.schedules.filter((s) => s.brainTitle === brainFilter)
     : data.schedules;
 
   if (brainFilter && filteredSchedules.length === 0) {
@@ -100,7 +102,8 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
         <Text>No schedules found for brain: {brainFilter}</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Create a schedule with "px schedule create {brainFilter} &lt;cron-expression&gt;"
+            Tip: Create a schedule with "px schedule create {brainFilter}{' '}
+            &lt;cron-expression&gt;"
           </Text>
         </Box>
       </Box>
@@ -108,7 +111,9 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
   }
 
   // Sort schedules by creation date (newest first)
-  const sortedSchedules = [...filteredSchedules].sort((a, b) => b.createdAt - a.createdAt);
+  const sortedSchedules = [...filteredSchedules].sort(
+    (a, b) => b.createdAt - a.createdAt
+  );
 
   // Define column widths
   const columns = {
@@ -123,35 +128,54 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
   };
 
   // Calculate total width for separator
-  const totalWidth = Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
+  const totalWidth =
+    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
       <Text bold>
         {brainFilter
-          ? `Found ${filteredSchedules.length} schedule${filteredSchedules.length === 1 ? '' : 's'} for brain "${brainFilter}"`
-          : `Found ${data.count} schedule${data.count === 1 ? '' : 's'}`
-        }:
+          ? `Found ${filteredSchedules.length} schedule${
+              filteredSchedules.length === 1 ? '' : 's'
+            } for brain "${brainFilter}"`
+          : `Found ${data.count} schedule${data.count === 1 ? '' : 's'}`}
+        :
       </Text>
 
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.brainTitle.header, columns.brainTitle.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.schedule.header, columns.schedule.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.status.header, columns.status.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.runAs.header, columns.runAs.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.timezone.header, columns.timezone.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.nextRun.header, columns.nextRun.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.created.header, columns.created.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.id.header, columns.id.width)}</Text>
+          <Text bold color="cyan">
+            {padRight(columns.brainTitle.header, columns.brainTitle.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.schedule.header, columns.schedule.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.status.header, columns.status.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.runAs.header, columns.runAs.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.timezone.header, columns.timezone.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.nextRun.header, columns.nextRun.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.created.header, columns.created.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.id.header, columns.id.width)}
+          </Text>
         </Box>
 
         {/* Separator */}
@@ -161,33 +185,66 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
 
         {/* Data rows */}
         {sortedSchedules.map((schedule) => {
-          const nextRunDate = schedule.nextRunAt ? new Date(schedule.nextRunAt) : null;
+          const nextRunDate = schedule.nextRunAt
+            ? new Date(schedule.nextRunAt)
+            : null;
           const createdDate = new Date(schedule.createdAt);
           const isOverdue = nextRunDate && nextRunDate.getTime() < Date.now();
 
           return (
             <Box key={schedule.id}>
-              <Text>{padRight(truncate(schedule.brainTitle, columns.brainTitle.width), columns.brainTitle.width)}</Text>
-              <Text>  </Text>
-              <Text>{padRight(truncate(schedule.cronExpression, columns.schedule.width), columns.schedule.width)}</Text>
-              <Text>  </Text>
-              <Text color={schedule.enabled ? 'green' : 'red'}>
-                {padRight(schedule.enabled ? 'Enabled' : 'Disabled', columns.status.width)}
+              <Text>
+                {padRight(
+                  truncate(schedule.brainTitle, columns.brainTitle.width),
+                  columns.brainTitle.width
+                )}
               </Text>
-              <Text>  </Text>
-              <Text dimColor>{padRight(truncate(schedule.runAsUserName, columns.runAs.width), columns.runAs.width)}</Text>
-              <Text>  </Text>
-              <Text dimColor>{padRight(truncate(schedule.timezone || 'UTC', columns.timezone.width), columns.timezone.width)}</Text>
-              <Text>  </Text>
+              <Text> </Text>
+              <Text>
+                {padRight(
+                  truncate(schedule.cronExpression, columns.schedule.width),
+                  columns.schedule.width
+                )}
+              </Text>
+              <Text> </Text>
+              <Text color={schedule.enabled ? 'green' : 'red'}>
+                {padRight(
+                  schedule.enabled ? 'Enabled' : 'Disabled',
+                  columns.status.width
+                )}
+              </Text>
+              <Text> </Text>
+              <Text dimColor>
+                {padRight(
+                  truncate(schedule.runAsUserName, columns.runAs.width),
+                  columns.runAs.width
+                )}
+              </Text>
+              <Text> </Text>
+              <Text dimColor>
+                {padRight(
+                  truncate(schedule.timezone || 'UTC', columns.timezone.width),
+                  columns.timezone.width
+                )}
+              </Text>
+              <Text> </Text>
               <Text color={isOverdue ? 'red' : undefined}>
                 {padRight(
                   nextRunDate ? formatRelativeTime(nextRunDate) : 'N/A',
                   columns.nextRun.width
                 )}
               </Text>
-              <Text>  </Text>
-              <Text dimColor>{padRight(truncate(formatDate(schedule.createdAt), columns.created.width), columns.created.width)}</Text>
-              <Text>  </Text>
+              <Text> </Text>
+              <Text dimColor>
+                {padRight(
+                  truncate(
+                    formatDate(schedule.createdAt),
+                    columns.created.width
+                  ),
+                  columns.created.width
+                )}
+              </Text>
+              <Text> </Text>
               <Text dimColor>{padRight(schedule.id, columns.id.width)}</Text>
             </Box>
           );

@@ -316,10 +316,7 @@ export const resources = {
 
       return true;
     } catch (error) {
-      console.error(
-        `Failed to test DELETE /resources preserves pages:`,
-        error
-      );
+      console.error(`Failed to test DELETE /resources preserves pages:`, error);
       return false;
     }
   },

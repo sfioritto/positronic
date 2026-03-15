@@ -17,7 +17,8 @@ export const ProjectShow = ({ projectConfig }: ProjectShowProps) => {
         {projects.length > 0 ? (
           <Box marginTop={1}>
             <Text dimColor>
-              Use "px project select" to choose from {projects.length} available project{projects.length === 1 ? '' : 's'}.
+              Use "px project select" to choose from {projects.length} available
+              project{projects.length === 1 ? '' : 's'}.
             </Text>
           </Box>
         ) : (
@@ -42,14 +43,17 @@ export const ProjectShow = ({ projectConfig }: ProjectShowProps) => {
           <Text bold>URL:</Text> {currentProject.url}
         </Text>
         <Text>
-          <Text bold>Added:</Text> {new Date(currentProject.addedAt).toLocaleString()}
+          <Text bold>Added:</Text>{' '}
+          {new Date(currentProject.addedAt).toLocaleString()}
         </Text>
       </Box>
 
       {projects.length > 1 && (
         <Box marginTop={1}>
           <Text dimColor>
-            {projects.length - 1} other project{projects.length - 1 === 1 ? '' : 's'} available. Use "px project list" to see all.
+            {projects.length - 1} other project
+            {projects.length - 1 === 1 ? '' : 's'} available. Use "px project
+            list" to see all.
           </Text>
         </Box>
       )}

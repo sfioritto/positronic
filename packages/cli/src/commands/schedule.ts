@@ -60,7 +60,10 @@ export class ScheduleCommand {
     });
   }
 
-  delete({ scheduleId, force }: ArgumentsCamelCase<ScheduleDeleteArgs>): React.ReactElement {
+  delete({
+    scheduleId,
+    force,
+  }: ArgumentsCamelCase<ScheduleDeleteArgs>): React.ReactElement {
     return React.createElement(ScheduleDelete, {
       scheduleId,
       force,

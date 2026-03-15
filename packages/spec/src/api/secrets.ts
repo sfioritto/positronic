@@ -289,7 +289,10 @@ export const secrets = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test POST /secrets ROOT_PUBLIC_KEY rejection:`, error);
+      console.error(
+        `Failed to test POST /secrets ROOT_PUBLIC_KEY rejection:`,
+        error
+      );
       return false;
     }
   },
@@ -325,7 +328,10 @@ export const secrets = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test DELETE /secrets/ROOT_PUBLIC_KEY rejection:`, error);
+      console.error(
+        `Failed to test DELETE /secrets/ROOT_PUBLIC_KEY rejection:`,
+        error
+      );
       return false;
     }
   },
@@ -366,7 +372,10 @@ export const secrets = {
 
       return true;
     } catch (error) {
-      console.error(`Failed to test GET /secrets excludes ROOT_PUBLIC_KEY:`, error);
+      console.error(
+        `Failed to test GET /secrets excludes ROOT_PUBLIC_KEY:`,
+        error
+      );
       return false;
     }
   },

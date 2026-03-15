@@ -1,4 +1,9 @@
-import type { ObjectGenerator, ToolMessage, ResponseMessage, ToolChoice } from '@positronic/core';
+import type {
+  ObjectGenerator,
+  ToolMessage,
+  ResponseMessage,
+  ToolChoice,
+} from '@positronic/core';
 import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from 'llm-polyglot';
 import Anthropic from '@anthropic-ai/sdk';
@@ -12,7 +17,9 @@ config();
 /**
  * Convert our ToolChoice type to Anthropic's tool_choice format.
  */
-function toAnthropicToolChoice(choice: ToolChoice): Anthropic.MessageCreateParams['tool_choice'] {
+function toAnthropicToolChoice(
+  choice: ToolChoice
+): Anthropic.MessageCreateParams['tool_choice'] {
   switch (choice) {
     case 'required':
       return { type: 'any' };
@@ -123,7 +130,13 @@ export class AnthropicClient implements ObjectGenerator {
     usage: { totalTokens: number };
     responseMessages: ResponseMessage[];
   }> {
-    const { system, messages, responseMessages, tools, toolChoice = 'required' } = params;
+    const {
+      system,
+      messages,
+      responseMessages,
+      tools,
+      toolChoice = 'required',
+    } = params;
 
     // Build the messages to send
     let anthropicMessages: Anthropic.MessageParam[];
@@ -157,7 +170,10 @@ export class AnthropicClient implements ObjectGenerator {
           }
 
           if (contentBlocks.length > 0) {
-            anthropicMessages.push({ role: 'assistant', content: contentBlocks });
+            anthropicMessages.push({
+              role: 'assistant',
+              content: contentBlocks,
+            });
           }
         } else if (msg.role === 'tool') {
           anthropicMessages.push({
@@ -179,7 +195,9 @@ export class AnthropicClient implements ObjectGenerator {
       ([name, tool]) => ({
         name,
         description: tool.description,
-        input_schema: zodToJsonSchema(tool.inputSchema) as Anthropic.Tool.InputSchema,
+        input_schema: zodToJsonSchema(
+          tool.inputSchema
+        ) as Anthropic.Tool.InputSchema,
       })
     );
 
@@ -194,7 +212,11 @@ export class AnthropicClient implements ObjectGenerator {
 
     // Extract text and tool calls from response
     let text: string | undefined;
-    const toolCalls: Array<{ toolCallId: string; toolName: string; args: unknown }> = [];
+    const toolCalls: Array<{
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+    }> = [];
 
     for (const block of response.content) {
       if (block.type === 'text') {
@@ -251,14 +273,23 @@ export class AnthropicClient implements ObjectGenerator {
     text?: string;
     usage: { totalTokens: number };
   }> {
-    const { system, prompt, messages = [], tools, maxSteps = 10, toolChoice = 'required' } = params;
+    const {
+      system,
+      prompt,
+      messages = [],
+      tools,
+      maxSteps = 10,
+      toolChoice = 'required',
+    } = params;
 
     // Convert tools to Anthropic format
     const anthropicTools: Anthropic.Tool[] = Object.entries(tools).map(
       ([name, tool]) => ({
         name,
         description: tool.description,
-        input_schema: zodToJsonSchema(tool.inputSchema) as Anthropic.Tool.InputSchema,
+        input_schema: zodToJsonSchema(
+          tool.inputSchema
+        ) as Anthropic.Tool.InputSchema,
       })
     );
 
@@ -305,7 +336,8 @@ export class AnthropicClient implements ObjectGenerator {
 
       // Extract text and tool calls from response
       let stepText: string | undefined;
-      const stepToolCalls: Array<{ id: string; name: string; input: unknown }> = [];
+      const stepToolCalls: Array<{ id: string; name: string; input: unknown }> =
+        [];
 
       for (const block of response.content) {
         if (block.type === 'text') {

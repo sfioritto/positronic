@@ -35,10 +35,12 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
               exit();
             }
             return; // Stop processing after Enter
-          } else if (char === '\u0003') { // Ctrl+C
+          } else if (char === '\u0003') {
+            // Ctrl+C
             exit();
             return;
-          } else if (char === '\u007F' || char === '\b') { // Backspace
+          } else if (char === '\u007F' || char === '\b') {
+            // Backspace
             inputRef.current = inputRef.current.slice(0, -1);
             setInput(inputRef.current);
           } else {
@@ -89,9 +91,11 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
     if (error.details?.includes('409')) {
       return (
         <Box flexDirection="column">
-          <Text color="yellow">⚠️  Brain run is not active</Text>
+          <Text color="yellow">⚠️ Brain run is not active</Text>
           <Box marginTop={1} paddingLeft={2}>
-            <Text>The brain run has already completed or was previously cancelled.</Text>
+            <Text>
+              The brain run has already completed or was previously cancelled.
+            </Text>
           </Box>
         </Box>
       );
@@ -121,10 +125,19 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
   if (!confirmed) {
     return (
       <Box flexDirection="column">
-        <Text bold color="yellow">⚠️  Warning: This will stop the running brain</Text>
-        <Box marginTop={1} marginBottom={1} paddingLeft={2} flexDirection="column">
+        <Text bold color="yellow">
+          ⚠️ Warning: This will stop the running brain
+        </Text>
+        <Box
+          marginTop={1}
+          marginBottom={1}
+          paddingLeft={2}
+          flexDirection="column"
+        >
           <Text>Run ID: {runId}</Text>
-          <Text dimColor>The brain will be cancelled and cannot be resumed.</Text>
+          <Text dimColor>
+            The brain will be cancelled and cannot be resumed.
+          </Text>
         </Box>
         <Text>Type "yes" to confirm: {input}</Text>
       </Box>

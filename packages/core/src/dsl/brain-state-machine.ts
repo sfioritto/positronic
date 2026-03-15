@@ -17,9 +17,9 @@ import type { ResponseMessage } from '../clients/types.js';
  * Forms a tree structure for nested brains.
  */
 export interface ExecutionNode {
-  state: JsonObject;           // State at this brain level
-  stepIndex: number;           // Current step index at this level (0-based)
-  innerNode?: ExecutionNode;   // Child node if mid-inner-brain
+  state: JsonObject; // State at this brain level
+  stepIndex: number; // Current step index at this level (0-based)
+  innerNode?: ExecutionNode; // Child node if mid-inner-brain
 }
 
 export interface BrainStackEntry {
@@ -39,7 +39,7 @@ export interface BrainEntry {
   brainTitle: string;
   brainDescription?: string;
   parentStepId: string | null;
-  parentBrainId: string | null;  // For tree reconstruction
+  parentBrainId: string | null; // For tree reconstruction
   steps: StepInfo[];
   depth: number;
 }
@@ -120,9 +120,9 @@ export interface IterateContext {
 export interface BrainExecutionContext {
   // === Flat storage (source of truth) ===
   // These are the authoritative data structures. O(1) access to current brain.
-  brains: Record<string, BrainEntry>;     // All brains by ID (brainTitle used as key)
-  brainIdStack: string[];                  // Stack of active brain IDs (current = last)
-  executionStack: ExecutionStackEntry[];   // Stack of execution state per nesting level
+  brains: Record<string, BrainEntry>; // All brains by ID (brainTitle used as key)
+  brainIdStack: string[]; // Stack of active brain IDs (current = last)
+  executionStack: ExecutionStackEntry[]; // Stack of execution state per nesting level
 
   // === Core state ===
   depth: number;
@@ -131,8 +131,8 @@ export interface BrainExecutionContext {
   currentStepTitle: string | null;
   error: SerializedError | null;
   pendingWebhooks: WebhookRegistration[] | null;
-  currentState: JsonObject;                // State at outer brain level (depth 1)
-  options: JsonObject;                     // Options passed to the brain run
+  currentState: JsonObject; // State at outer brain level (depth 1)
+  options: JsonObject; // Options passed to the brain run
 
   // Agent context - tracks agent execution state for pause/resume
   // Non-null when we're inside an agent loop (or paused from one)
@@ -183,7 +183,7 @@ export interface StartBrainPayload {
 export interface StartStepPayload {
   stepId: string;
   stepTitle: string;
-  stepIndex?: number;  // 0-based index of the step within the current brain
+  stepIndex?: number; // 0-based index of the step within the current brain
 }
 
 export interface CompleteStepPayload {
@@ -359,7 +359,8 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
     const brainInitialState = initialState ?? currentState;
 
     // === NEW: Update flat structures ===
-    const parentBrainId = brainIdStack.length > 0 ? brainIdStack[brainIdStack.length - 1] : null;
+    const parentBrainId =
+      brainIdStack.length > 0 ? brainIdStack[brainIdStack.length - 1] : null;
     const newBrainEntry: BrainEntry = {
       brainRunId,
       brainTitle,
@@ -372,7 +373,10 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
 
     const newBrains = { ...brains, [brainTitle]: newBrainEntry };
     const newBrainIdStack = [...brainIdStack, brainTitle];
-    const newExecutionStack = [...executionStack, { state: brainInitialState, stepIndex: 0 }];
+    const newExecutionStack = [
+      ...executionStack,
+      { state: brainInitialState, stepIndex: 0 },
+    ];
 
     const newCtx: BrainExecutionContext = {
       ...ctx,
@@ -423,7 +427,10 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
           }
           return step;
         });
-        newBrains = { ...brains, [parentBrainId]: { ...parentBrain, steps: updatedSteps } };
+        newBrains = {
+          ...brains,
+          [parentBrainId]: { ...parentBrain, steps: updatedSteps },
+        };
       }
     }
   }
@@ -437,7 +444,10 @@ const completeBrain = reduce<BrainExecutionContext, object>((ctx) => {
     depth: newDepth,
   };
 
-  return updateDerivedState(newCtx, isOuterBrainComplete ? 'complete' : 'running');
+  return updateDerivedState(
+    newCtx,
+    isOuterBrainComplete ? 'complete' : 'running'
+  );
 });
 
 const errorBrain = reduce<BrainExecutionContext, ErrorPayload>(
@@ -489,9 +499,18 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
     const existingStep = currentBrain.steps.find((s) => s.id === stepId);
     const newSteps = existingStep
       ? currentBrain.steps.map((s) =>
-          s.id === stepId ? { ...s, status: STATUS.RUNNING as StepInfo['status'] } : s
+          s.id === stepId
+            ? { ...s, status: STATUS.RUNNING as StepInfo['status'] }
+            : s
         )
-      : [...currentBrain.steps, { id: stepId, title: stepTitle, status: STATUS.RUNNING as StepInfo['status'] }];
+      : [
+          ...currentBrain.steps,
+          {
+            id: stepId,
+            title: stepTitle,
+            status: STATUS.RUNNING as StepInfo['status'],
+          },
+        ];
 
     const newBrains = {
       ...brains,
@@ -499,9 +518,13 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
     };
 
     // Update stepIndex in execution stack if provided
-    const newExecutionStack = stepIndex !== undefined && executionStack.length > 0
-      ? [...executionStack.slice(0, -1), { ...executionStack[executionStack.length - 1], stepIndex }]
-      : executionStack;
+    const newExecutionStack =
+      stepIndex !== undefined && executionStack.length > 0
+        ? [
+            ...executionStack.slice(0, -1),
+            { ...executionStack[executionStack.length - 1], stepIndex },
+          ]
+        : executionStack;
 
     return {
       ...ctx,
@@ -539,9 +562,19 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     const existingStep = currentBrain.steps.find((s) => s.id === stepId);
     const newSteps = existingStep
       ? currentBrain.steps.map((s) =>
-          s.id === stepId ? { ...s, status: stepStatus as StepInfo['status'], patch } : s
+          s.id === stepId
+            ? { ...s, status: stepStatus as StepInfo['status'], patch }
+            : s
         )
-      : [...currentBrain.steps, { id: stepId, title: stepTitle, status: stepStatus as StepInfo['status'], patch }];
+      : [
+          ...currentBrain.steps,
+          {
+            id: stepId,
+            title: stepTitle,
+            status: stepStatus as StepInfo['status'],
+            patch,
+          },
+        ];
 
     const newBrains = {
       ...brains,
@@ -552,15 +585,19 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     let newExecutionStack = executionStack;
     if (executionStack.length > 0) {
       const topEntry = executionStack[executionStack.length - 1];
-      const newState = patch && !isHalted
-        ? applyPatches(topEntry.state, [patch]) as JsonObject
-        : topEntry.state;
+      const newState =
+        patch && !isHalted
+          ? (applyPatches(topEntry.state, [patch]) as JsonObject)
+          : topEntry.state;
       // Increment stepIndex so resume knows to start from the NEXT step
-      newExecutionStack = [...executionStack.slice(0, -1), {
-        ...topEntry,
-        state: newState,
-        stepIndex: topEntry.stepIndex + 1,
-      }];
+      newExecutionStack = [
+        ...executionStack.slice(0, -1),
+        {
+          ...topEntry,
+          state: newState,
+          stepIndex: topEntry.stepIndex + 1,
+        },
+      ];
     }
 
     // Apply patch to currentState only for top-level brain (for backwards compat)
@@ -658,20 +695,25 @@ const stepStatus = reduce<BrainExecutionContext, StepStatusPayload>(
 const passthrough = () => reduce<BrainExecutionContext, any>((ctx) => ctx);
 
 // Reducer for ITERATE_ITEM_COMPLETE - appends a single item result into iterateContext
-const iterateItemComplete = reduce<BrainExecutionContext, any>((ctx, payload) => {
-  const existing = ctx.iterateContext;
-  const newResults = existing?.accumulatedResults ? [...existing.accumulatedResults] : [];
-  newResults[payload.itemIndex] = payload.result != null ? [payload.item, payload.result] : undefined;
-  return {
-    ...ctx,
-    iterateContext: {
-      accumulatedResults: newResults,
-      processedCount: payload.processedCount,
-      totalItems: payload.totalItems,
-      schemaName: payload.schemaName,
-    },
-  };
-});
+const iterateItemComplete = reduce<BrainExecutionContext, any>(
+  (ctx, payload) => {
+    const existing = ctx.iterateContext;
+    const newResults = existing?.accumulatedResults
+      ? [...existing.accumulatedResults]
+      : [];
+    newResults[payload.itemIndex] =
+      payload.result != null ? [payload.item, payload.result] : undefined;
+    return {
+      ...ctx,
+      iterateContext: {
+        accumulatedResults: newResults,
+        processedCount: payload.processedCount,
+        totalItems: payload.totalItems,
+        schemaName: payload.schemaName,
+      },
+    };
+  }
+);
 
 // Reducer for agent iteration events that tracks tokens per-iteration
 // This ensures tokens are counted even if the agent doesn't complete (e.g., webhook interruption)
@@ -814,22 +856,18 @@ const agentLoopTransitions = [
     'agentLoop',
     agentRawResponseMessage
   ) as any,
-  transition(
-    BRAIN_EVENTS.AGENT_TOOL_CALL,
-    'agentLoop',
-    passthrough()
-  ) as any,
-  transition(
-    BRAIN_EVENTS.AGENT_TOOL_RESULT,
-    'agentLoop',
-    passthrough()
-  ) as any,
+  transition(BRAIN_EVENTS.AGENT_TOOL_CALL, 'agentLoop', passthrough()) as any,
+  transition(BRAIN_EVENTS.AGENT_TOOL_RESULT, 'agentLoop', passthrough()) as any,
   transition(
     BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
     'agentLoop',
     passthrough()
   ) as any,
-  transition(BRAIN_EVENTS.AGENT_USER_MESSAGE, 'agentLoop', agentUserMessage) as any,
+  transition(
+    BRAIN_EVENTS.AGENT_USER_MESSAGE,
+    'agentLoop',
+    agentUserMessage
+  ) as any,
   // AGENT_WEBHOOK records pending tool call but stays in agentLoop
   transition(BRAIN_EVENTS.AGENT_WEBHOOK, 'agentLoop', agentWebhook) as any,
 ];
@@ -839,9 +877,7 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
   createMachine(
     'idle',
     {
-      idle: state(
-        transition(BRAIN_EVENTS.START, 'running', startBrain)
-      ),
+      idle: state(transition(BRAIN_EVENTS.START, 'running', startBrain)),
 
       // Standard step execution state
       running: state(
@@ -900,7 +936,11 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
         transition(BRAIN_EVENTS.STEP_STATUS, 'running', stepStatus) as any,
 
         // Iterate item complete - stays in running, accumulates results
-        transition(BRAIN_EVENTS.ITERATE_ITEM_COMPLETE, 'running', iterateItemComplete) as any,
+        transition(
+          BRAIN_EVENTS.ITERATE_ITEM_COMPLETE,
+          'running',
+          iterateItemComplete
+        ) as any,
 
         // AGENT_START transitions to the agentLoop state
         transition(BRAIN_EVENTS.AGENT_START, 'agentLoop', agentStart) as any
@@ -1066,4 +1106,3 @@ export function sendEvent(
  * The machine is created with default initial context - only the state definitions matter for validation.
  */
 export const brainMachineDefinition = makeBrainMachine(createInitialContext());
-

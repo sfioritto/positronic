@@ -20,7 +20,10 @@ function getGovernorStub(identity: string): GovernorStub | null {
   return governorNamespace.get(governorNamespace.idFromName(identity));
 }
 
-async function computeIdentity(modelId: string, apiKey: string): Promise<string> {
+async function computeIdentity(
+  modelId: string,
+  apiKey: string
+): Promise<string> {
   const data = new TextEncoder().encode(`${modelId}:${apiKey}`);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = new Uint8Array(hashBuffer);
@@ -51,7 +54,10 @@ async function governedCall<T>({
   try {
     await governorStub.waitForCapacity(modelId, estimatedTokens);
   } catch (error) {
-    console.warn('Governor waitForCapacity failed, proceeding without rate limiting:', error);
+    console.warn(
+      'Governor waitForCapacity failed, proceeding without rate limiting:',
+      error
+    );
   }
 
   const result = await call();
@@ -64,9 +70,7 @@ async function governedCall<T>({
   return result;
 }
 
-export function rateGoverned(
-  client: ObjectGenerator,
-): ObjectGenerator {
+export function rateGoverned(client: ObjectGenerator): ObjectGenerator {
   const apiKey = client.apiKey ?? '';
   let cachedIdentity: string | null = null;
 
@@ -109,7 +113,8 @@ export function rateGoverned(
     },
 
     createToolResultMessage: client.createToolResultMessage
-      ? (toolCallId, toolName, result) => client.createToolResultMessage!(toolCallId, toolName, result)
+      ? (toolCallId, toolName, result) =>
+          client.createToolResultMessage!(toolCallId, toolName, result)
       : undefined,
 
     async streamText(params) {

@@ -56,7 +56,7 @@ const formatDuration = (startMs: number, endMs: number): string => {
   const durationMs = endMs - startMs;
   const seconds = Math.floor(durationMs / 1000);
   const minutes = Math.floor(seconds / 60);
-  
+
   if (seconds < 60) {
     return `${seconds}s`;
   } else {
@@ -138,17 +138,29 @@ export const BrainHistory = ({ brainName, limit }: BrainHistoryProps) => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.runId.header, columns.runId.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.status.header, columns.status.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.type.header, columns.type.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.when.header, columns.when.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.duration.header, columns.duration.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.startedAt.header, columns.startedAt.width)}</Text>
+          <Text bold color="cyan">
+            {padRight(columns.runId.header, columns.runId.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.status.header, columns.status.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.type.header, columns.type.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.when.header, columns.when.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.duration.header, columns.duration.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.startedAt.header, columns.startedAt.width)}
+          </Text>
         </Box>
 
         {/* Separator */}
@@ -158,29 +170,46 @@ export const BrainHistory = ({ brainName, limit }: BrainHistoryProps) => {
 
         {/* Data rows */}
         {data.runs.map((run) => {
-          const duration = run.startedAt && run.completedAt 
-            ? formatDuration(run.startedAt, run.completedAt)
-            : run.status === STATUS.RUNNING ? 'Running...' : 'N/A';
+          const duration =
+            run.startedAt && run.completedAt
+              ? formatDuration(run.startedAt, run.completedAt)
+              : run.status === STATUS.RUNNING
+              ? 'Running...'
+              : 'N/A';
 
           return (
             <Box key={run.brainRunId}>
-              <Text>{padRight(truncate(run.brainRunId, columns.runId.width), columns.runId.width)}</Text>
-              <Text>  </Text>
+              <Text>
+                {padRight(
+                  truncate(run.brainRunId, columns.runId.width),
+                  columns.runId.width
+                )}
+              </Text>
+              <Text> </Text>
               <Text color={getStatusColor(run.status)}>
                 {padRight(run.status, columns.status.width)}
               </Text>
-              <Text>  </Text>
+              <Text> </Text>
               <Text>{padRight(run.type || 'N/A', columns.type.width)}</Text>
-              <Text>  </Text>
-              <Text dimColor>{padRight(formatRelativeTime(run.createdAt), columns.when.width)}</Text>
-              <Text>  </Text>
+              <Text> </Text>
+              <Text dimColor>
+                {padRight(
+                  formatRelativeTime(run.createdAt),
+                  columns.when.width
+                )}
+              </Text>
+              <Text> </Text>
               <Text>{padRight(duration, columns.duration.width)}</Text>
-              <Text>  </Text>
-              <Text dimColor>{padRight(run.startedAt ? formatDate(run.startedAt) : 'N/A', columns.startedAt.width)}</Text>
+              <Text> </Text>
+              <Text dimColor>
+                {padRight(
+                  run.startedAt ? formatDate(run.startedAt) : 'N/A',
+                  columns.startedAt.width
+                )}
+              </Text>
             </Box>
           );
         })}
-
       </Box>
     </Box>
   );

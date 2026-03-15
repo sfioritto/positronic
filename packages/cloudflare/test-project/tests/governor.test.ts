@@ -103,11 +103,14 @@ describe('GovernorDO Integration Tests', () => {
     const testEnv = env as TestEnv;
 
     // Create a brain run that uses a prompt step (exercises rateGoverned wrapper)
-    const request = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: 'governor-test-brain' }),
-    });
+    const request = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'governor-test-brain' }),
+      }
+    );
     const context = createExecutionContext();
     const response = await worker.fetch(request, testEnv, context);
     expect(response.status).toBe(201);
@@ -118,7 +121,11 @@ describe('GovernorDO Integration Tests', () => {
     const watchUrl = `http://example.com/brains/runs/${brainRunId}/watch`;
     const watchRequest = await createAuthenticatedRequest(watchUrl);
     const watchContext = createExecutionContext();
-    const watchResponse = await worker.fetch(watchRequest, testEnv, watchContext);
+    const watchResponse = await worker.fetch(
+      watchRequest,
+      testEnv,
+      watchContext
+    );
     expect(watchResponse.status).toBe(200);
     if (!watchResponse.body) throw new Error('Watch response body is null');
 
@@ -126,7 +133,9 @@ describe('GovernorDO Integration Tests', () => {
     await waitOnExecutionContext(watchContext);
 
     // Verify brain completed
-    const completeEvent = allEvents.find((e) => e.type === BRAIN_EVENTS.COMPLETE);
+    const completeEvent = allEvents.find(
+      (e) => e.type === BRAIN_EVENTS.COMPLETE
+    );
     expect(completeEvent).toBeDefined();
   });
 

@@ -3,18 +3,36 @@ import { Text, Box, useStdout, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { EventSource } from 'eventsource';
 import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
-import { BRAIN_EVENTS, STATUS, reconstructBrainTree, createBrainExecutionMachine, sendEvent } from '@positronic/core';
+import {
+  BRAIN_EVENTS,
+  STATUS,
+  reconstructBrainTree,
+  createBrainExecutionMachine,
+  sendEvent,
+} from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useBrainMachine } from '../hooks/useBrainMachine.js';
-import { getApiBaseUrl, isApiLocalDevMode, apiClient } from '../commands/helpers.js';
+import {
+  getApiBaseUrl,
+  isApiLocalDevMode,
+  apiClient,
+} from '../commands/helpers.js';
 import { authenticatedFetch } from '../lib/jwt-auth.js';
 import { ErrorComponent } from './error.js';
-import { EventsView, type StoredEvent, type EventsViewMode } from './events-view.js';
+import {
+  EventsView,
+  type StoredEvent,
+  type EventsViewMode,
+} from './events-view.js';
 import { StateView } from './state-view.js';
 import { AgentChatView } from './agent-chat-view.js';
 import { SelectList } from './select-list.js';
 import { getAgentLoops } from '../utils/agent-utils.js';
-import { handleKeyboardInput, type ViewMode, type WatchKeyboardContext } from './watch-keyboard.js';
+import {
+  handleKeyboardInput,
+  type ViewMode,
+  type WatchKeyboardContext,
+} from './watch-keyboard.js';
 import {
   useWatchMachine,
   machineStateToViewMode,
@@ -37,7 +55,11 @@ const getCurrentStepIndex = (steps: StepInfo[]): number => {
 
   // Find the last completed/halted step
   for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].status === STATUS.COMPLETE || steps[i].status === STATUS.HALTED || steps[i].status === STATUS.ERROR) {
+    if (
+      steps[i].status === STATUS.COMPLETE ||
+      steps[i].status === STATUS.HALTED ||
+      steps[i].status === STATUS.ERROR
+    ) {
       return i;
     }
   }
@@ -46,7 +68,9 @@ const getCurrentStepIndex = (steps: StepInfo[]): number => {
 
 // Count completed steps
 const getCompletedCount = (steps: StepInfo[]): number => {
-  return steps.filter((s) => s.status === STATUS.COMPLETE || s.status === STATUS.HALTED).length;
+  return steps.filter(
+    (s) => s.status === STATUS.COMPLETE || s.status === STATUS.HALTED
+  ).length;
 };
 
 // Get status indicator character
@@ -100,7 +124,10 @@ const ProgressBar = ({ completed, total, width = 20 }: ProgressBarProps) => {
     <Box>
       <Text color="green">{'━'.repeat(filledWidth)}</Text>
       <Text dimColor>{'━'.repeat(emptyWidth)}</Text>
-      <Text dimColor> {completed}/{total} steps</Text>
+      <Text dimColor>
+        {' '}
+        {completed}/{total} steps
+      </Text>
     </Box>
   );
 };
@@ -123,7 +150,8 @@ const StepWindow = ({ steps, indent = 0 }: StepWindowProps) => {
   const currentIndex = getCurrentStepIndex(steps);
   const prevStep = currentIndex > 0 ? steps[currentIndex - 1] : null;
   const currentStep = steps[currentIndex];
-  const nextStep = currentIndex < steps.length - 1 ? steps[currentIndex + 1] : null;
+  const nextStep =
+    currentIndex < steps.length - 1 ? steps[currentIndex + 1] : null;
 
   return (
     <Box flexDirection="column" marginLeft={indent}>
@@ -169,9 +197,7 @@ const BrainSection = ({ brain, isInner = false }: BrainSectionProps) => {
     <Box flexDirection="column" marginLeft={indent}>
       {/* Header */}
       <Box marginBottom={1}>
-        {isInner ? (
-          <Text dimColor>└─ </Text>
-        ) : null}
+        {isInner ? <Text dimColor>└─ </Text> : null}
         <Text bold>{brain.brainTitle}</Text>
       </Box>
 
@@ -202,7 +228,12 @@ interface WatchProps {
   startWithEvents?: boolean;
 }
 
-export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvents = false }: WatchProps) => {
+export const Watch = ({
+  runId,
+  manageScreenBuffer = true,
+  footer,
+  startWithEvents = false,
+}: WatchProps) => {
   const { write } = useStdout();
   const { exit } = useApp();
 
@@ -258,7 +289,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
   const rootBrain = reconstructBrainTree(brains, brainIdStack);
 
   // Additional state for connection and errors (not part of the brain state machine)
-  const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(undefined);
+  const [brainError, setBrainError] = useState<BrainErrorEvent | undefined>(
+    undefined
+  );
   const [connectionError, setConnectionError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -303,7 +336,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         const parsed = JSON.parse(event.data);
 
         // Server sends historical events as an array in the first message
-        const eventList: BrainEvent[] = Array.isArray(parsed) ? parsed : [parsed];
+        const eventList: BrainEvent[] = Array.isArray(parsed)
+          ? parsed
+          : [parsed];
 
         // Add all events in one setEvents call for batch rendering
         setEvents((prev) => {
@@ -452,7 +487,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
         break;
 
       case 'GO_TO_AGENTS': {
-        const fromView = (viewMode === 'events' ? 'events' : 'progress') as PreviousView;
+        const fromView = (
+          viewMode === 'events' ? 'events' : 'progress'
+        ) as PreviousView;
         if (agentLoops.length === 1) {
           // Go directly to chat view for single agent
           sendWatch({
@@ -471,7 +508,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
       }
 
       case 'GO_TO_MESSAGE_INPUT': {
-        const fromView = (viewMode === 'events' ? 'events' : 'progress') as PreviousView;
+        const fromView = (
+          viewMode === 'events' ? 'events' : 'progress'
+        ) as PreviousView;
         sendWatch({ type: 'GO_TO_MESSAGE_INPUT', fromView });
         break;
       }
@@ -492,7 +531,11 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
 
   // Prepare error props using destructuring
   const connectionErrorProps = connectionError
-    ? { title: 'Connection Error', message: connectionError.message, details: connectionError.stack }
+    ? {
+        title: 'Connection Error',
+        message: connectionError.message,
+        details: connectionError.stack,
+      }
     : null;
   const brainErrorProps = brainError
     ? { title: brainError.error.name || 'Brain Error', ...brainError.error }
@@ -527,7 +570,11 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
       }
     } else {
       const msgPart = canSendMessage ? ' | m message' : '';
-      const pauseResumePart = isPaused ? ' | r resume' : (!isComplete ? ' | p pause' : '');
+      const pauseResumePart = isPaused
+        ? ' | r resume'
+        : !isComplete
+        ? ' | p pause'
+        : '';
       return `s state | e events | a agents${pauseResumePart}${msgPart} | x kill | esc quit`;
     }
   };
@@ -544,10 +591,14 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
             state={stateSnapshot}
             title={stateTitle}
             scrollOffset={stateScrollOffset}
-            onScrollChange={(offset) => sendWatch({ type: 'SET_STATE_SCROLL_OFFSET', offset })}
+            onScrollChange={(offset) =>
+              sendWatch({ type: 'SET_STATE_SCROLL_OFFSET', offset })
+            }
             isActive={viewMode === 'state'}
           />
-          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {connectionErrorProps && (
+            <ErrorComponent error={connectionErrorProps} />
+          )}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
       ) : viewMode === 'agent-picker' ? (
@@ -565,12 +616,16 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
             onCancel={() => sendWatch({ type: 'GO_BACK' })}
             footer="j/k select | Enter view | b back"
           />
-          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {connectionErrorProps && (
+            <ErrorComponent error={connectionErrorProps} />
+          )}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
       ) : viewMode === 'agent-chat' && selectedAgentId ? (
         (() => {
-          const selectedAgent = agentLoops.find((a) => a.stepId === selectedAgentId);
+          const selectedAgent = agentLoops.find(
+            (a) => a.stepId === selectedAgentId
+          );
           if (!selectedAgent) {
             return <Text>Agent not found</Text>;
           }
@@ -581,10 +636,14 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
                 agentStartEvent={selectedAgent.startEvent}
                 rawResponseEvents={selectedAgent.rawResponseEvents}
                 scrollOffset={agentChatScrollOffset}
-                onScrollChange={(offset) => sendWatch({ type: 'SET_AGENT_CHAT_SCROLL_OFFSET', offset })}
+                onScrollChange={(offset) =>
+                  sendWatch({ type: 'SET_AGENT_CHAT_SCROLL_OFFSET', offset })
+                }
                 isActive={viewMode === 'agent-chat'}
               />
-              {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+              {connectionErrorProps && (
+                <ErrorComponent error={connectionErrorProps} />
+              )}
               {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
             </>
           );
@@ -598,9 +657,13 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
             onModeChange={setEventsViewMode}
             onViewState={handleViewStateAtEvent}
             selectedIndex={eventsSelectedIndex}
-            onSelectedIndexChange={(index) => sendWatch({ type: 'SET_EVENTS_SELECTED_INDEX', index })}
+            onSelectedIndexChange={(index) =>
+              sendWatch({ type: 'SET_EVENTS_SELECTED_INDEX', index })
+            }
           />
-          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {connectionErrorProps && (
+            <ErrorComponent error={connectionErrorProps} />
+          )}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
       ) : viewMode === 'message-input' ? (
@@ -632,7 +695,9 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
               <Text color="red">Failed to send message</Text>
             </Box>
           )}
-          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {connectionErrorProps && (
+            <ErrorComponent error={connectionErrorProps} />
+          )}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </Box>
       ) : !rootBrain ? (
@@ -652,12 +717,22 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
             </Box>
           )}
           {isKilled && (
-            <Box marginTop={1} borderStyle="round" borderColor="red" paddingX={1}>
+            <Box
+              marginTop={1}
+              borderStyle="round"
+              borderColor="red"
+              paddingX={1}
+            >
               <Text color="red">Brain killed.</Text>
             </Box>
           )}
           {isPaused && !isKilled && (
-            <Box marginTop={1} borderStyle="round" borderColor="cyan" paddingX={1}>
+            <Box
+              marginTop={1}
+              borderStyle="round"
+              borderColor="cyan"
+              paddingX={1}
+            >
               <Text color="cyan">Brain paused. Press 'r' to resume.</Text>
             </Box>
           )}
@@ -677,11 +752,18 @@ export const Watch = ({ runId, manageScreenBuffer = true, footer, startWithEvent
             </Box>
           )}
           {isComplete && !connectionError && !brainError && !isKilled && (
-            <Box marginTop={1} borderStyle="round" borderColor="green" paddingX={1}>
+            <Box
+              marginTop={1}
+              borderStyle="round"
+              borderColor="green"
+              paddingX={1}
+            >
               <Text color="green">Brain completed.</Text>
             </Box>
           )}
-          {connectionErrorProps && <ErrorComponent error={connectionErrorProps} />}
+          {connectionErrorProps && (
+            <ErrorComponent error={connectionErrorProps} />
+          )}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
           {killErrorProps && <ErrorComponent error={killErrorProps} />}
         </>

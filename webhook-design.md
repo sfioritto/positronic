@@ -5,6 +5,7 @@ This document outlines the webhook system design for Positronic, enabling brains
 ## Overview
 
 Webhooks in Positronic allow brains to:
+
 1. Pause execution and wait for external events (e.g., user responses via Slack, SMS, email)
 2. Start new brain runs from incoming webhook requests
 3. Maintain type safety throughout the entire flow
@@ -40,7 +41,7 @@ export const slackWebhook = createWebhook(
         userId: body.user,
         channelId: body.channel,
         threadId: body.thread_ts,
-      }
+      },
     };
   }
 );
@@ -66,7 +67,7 @@ export const slackWebhook = createWebhook(
     if (body.type === 'url_verification') {
       return {
         type: 'verification' as const,
-        challenge: body.challenge
+        challenge: body.challenge,
       };
     }
 
@@ -77,7 +78,7 @@ export const slackWebhook = createWebhook(
       response: {
         message: body.event.text,
         userId: body.event.user,
-      }
+      },
     };
   }
 );
@@ -112,7 +113,7 @@ export default brain('customer-feedback')
       waitFor: [
         slackWebhook(threadId),
         twilioWebhook(state.customer.phoneNumber),
-      ]
+      ],
     };
   })
   .step('ProcessFeedback', async ({ state, response }) => {
@@ -157,7 +158,7 @@ export const githubWebhook = createWebhook(
         prNumber: body.pull_request?.number,
         repository: body.repository.full_name,
         author: body.pull_request?.user.login || body.sender.login,
-      }
+      },
     };
   }
 );
@@ -172,47 +173,46 @@ Loops can support explicit waiting for webhooks via tools:
 #### Explicit Waiting via Tool
 
 ```typescript
-brain('support-agent')
-  .loop('HandleCustomer', {
-    tools: [
-      {
-        name: 'wait_for_response',
-        description: 'Stop and wait for customer response',
-        parameters: z.object({
-          reason: z.string(),
-          identifiers: z.object({
-            slack: z.string().optional(),
-            twilio: z.string().optional(),
-            email: z.string().optional(),
-          })
+brain('support-agent').loop('HandleCustomer', {
+  tools: [
+    {
+      name: 'wait_for_response',
+      description: 'Stop and wait for customer response',
+      parameters: z.object({
+        reason: z.string(),
+        identifiers: z.object({
+          slack: z.string().optional(),
+          twilio: z.string().optional(),
+          email: z.string().optional(),
         }),
-        execute: async ({ reason, identifiers }) => {
-          // Return same format as step returns
-          const waitList: any[] = [];
-          if (identifiers.slack) {
-            waitList.push(slackWebhook(identifiers.slack));
-          }
-          if (identifiers.twilio) {
-            waitList.push(twilioWebhook(identifiers.twilio));
-          }
-          if (identifiers.email) {
-            waitList.push(emailWebhook(identifiers.email));
-          }
-
-          return {
-            state: { waitingReason: reason },
-            waitFor: waitList
-          };
+      }),
+      execute: async ({ reason, identifiers }) => {
+        // Return same format as step returns
+        const waitList: any[] = [];
+        if (identifiers.slack) {
+          waitList.push(slackWebhook(identifiers.slack));
         }
-      }
-    ],
-    prompt: ({ response }) => {
-      if (response) {
-        return `Customer said: "${response.message}"`;
-      }
-      return 'Help the customer...';
+        if (identifiers.twilio) {
+          waitList.push(twilioWebhook(identifiers.twilio));
+        }
+        if (identifiers.email) {
+          waitList.push(emailWebhook(identifiers.email));
+        }
+
+        return {
+          state: { waitingReason: reason },
+          waitFor: waitList,
+        };
+      },
+    },
+  ],
+  prompt: ({ response }) => {
+    if (response) {
+      return `Customer said: "${response.message}"`;
     }
-  });
+    return 'Help the customer...';
+  },
+});
 ```
 
 ### CLI Integration
@@ -235,6 +235,7 @@ Available Webhooks:
 ### Why Factory Functions?
 
 Webhooks use the `createWebhook()` factory function pattern for several reasons:
+
 - **Type Inference**: TypeScript can properly infer the Zod schema type and flow it through to the response type in brain steps
 - **Simplicity**: Single function call creates a complete webhook with handler, schema, and metadata
 - **Functional Style**: Webhooks are immutable values that can be easily composed and reused
@@ -243,6 +244,7 @@ Webhooks use the `createWebhook()` factory function pattern for several reasons:
 ### Why Array Instead of Named Object for `waitFor`?
 
 The `waitFor` field accepts an array rather than a named object:
+
 - **Simplicity**: Just a list of things to wait for, no need to name each one
 - **Flexibility**: Can wait for multiple webhooks of the same type with different identifiers
 - **Extensibility**: Makes it easier to support waiting for non-webhook events in the future (timeouts, scheduled events, etc.)
@@ -251,6 +253,7 @@ The `waitFor` field accepts an array rather than a named object:
 ### Why Enforce Unique Slugs?
 
 Each webhook must have a unique slug for its URL path:
+
 - Ensures predictable 1:1 mapping between URLs and handlers
 - Avoids routing ambiguity - `/webhooks/slack` maps to exactly one handler
 - Matches standard webhook patterns (one endpoint per integration)
@@ -260,6 +263,7 @@ The backend will error at runtime if duplicate slugs are detected.
 ### Why Separate `identifier` and `response`?
 
 This separation allows:
+
 - Service-specific identifiers (thread IDs, phone numbers, PR numbers)
 - Clean mapping between incoming events and waiting brain runs
 - Flexibility for webhooks to handle both resume and cold-start scenarios
@@ -274,12 +278,13 @@ When implemented, a third return type will allow cold-starting brains from webho
 type WebhookHandlerResult<T> =
   | { type: 'verification'; challenge: string }
   | { type: 'webhook'; identifier: string; response: T }
-  | { type: 'start-brain'; brain: string; identifier?: string; response: T } // PLANNED
+  | { type: 'start-brain'; brain: string; identifier?: string; response: T }; // PLANNED
 ```
 
 Real-world webhooks often need to handle both resume and cold-start patterns:
 
 **Example: Slack DM Bot (Planned)**
+
 - `@bot help` in a channel → Start new 'help-request' brain
 - User responds in existing thread → Resume waiting brain
 - Direct message to bot → Start new 'dm-conversation' brain per user
@@ -302,14 +307,18 @@ export const slackWebhook = createWebhook(
       return {
         type: 'start-brain' as const, // PLANNED
         brain: 'help-request',
-        response: { message: event.text, channel: event.channel, user: event.user }
+        response: {
+          message: event.text,
+          channel: event.channel,
+          user: event.user,
+        },
       };
     } else if (event.type === 'message' && event.thread_ts) {
       // Thread reply - resume if brain waiting
       return {
         type: 'webhook' as const,
         identifier: event.thread_ts,
-        response: { message: event.text, user: event.user }
+        response: { message: event.text, user: event.user },
       };
     } else if (event.type === 'message' && event.channel_type === 'im') {
       // DM - resume existing or start new
@@ -317,7 +326,7 @@ export const slackWebhook = createWebhook(
         type: 'start-brain' as const, // PLANNED
         brain: 'dm-conversation',
         identifier: `dm-${event.user}`, // Resume if exists, otherwise start new
-        response: { message: event.text, user: event.user }
+        response: { message: event.text, user: event.user },
       };
     }
   }
@@ -337,6 +346,7 @@ This pattern is common across many services (GitHub PRs, support tickets, chat s
 3. **Handler Processing**: The webhook handler extracts the identifier and builds the typed response
 
 4. **Brain Resume/Start**:
+
    - If `identifier` is returned: Look up brain run ID and resume with response
    - If `brain` is returned (planned): Start new brain run with response as initial state
 
@@ -345,6 +355,7 @@ This pattern is common across many services (GitHub PRs, support tickets, chat s
 ### Loop Implementation Details
 
 Loops will emit their own events similar to steps:
+
 - `LOOP_START` - When loop begins
 - `LOOP_ITERATION` - Each iteration with patches
 - `LOOP_COMPLETE` - When loop exits
@@ -380,16 +391,17 @@ These are interesting ideas that might be useful someday, but aren't current pri
 The concept of persistent webhooks that can inject messages into running loops at any time, without explicitly waiting.
 
 **Example use case:**
+
 ```typescript
 brain('chat-assistant')
-  .withOptionsSchema(z.object({
-    sessionId: z.string(),
-  }))
+  .withOptionsSchema(
+    z.object({
+      sessionId: z.string(),
+    })
+  )
   .loop('Chat', {
     // Always listening, can inject messages anytime
-    persistentWaitFor: ({ options }) => [
-      chatWebhook(options.sessionId)
-    ],
+    persistentWaitFor: ({ options }) => [chatWebhook(options.sessionId)],
 
     tools: [searchWeb, calculate],
 
@@ -401,12 +413,13 @@ brain('chat-assistant')
 
     onMessage: ({ message, state }) => ({
       ...state,
-      history: [...state.history, message]
-    })
+      history: [...state.history, message],
+    }),
   });
 ```
 
 **Implementation approach:**
+
 - Registered when loop starts with a special flag
 - Adapter listens for these continuously
 - Messages delivered via generator's `send()` method
@@ -434,8 +447,10 @@ async *executeLoop() {
 ```
 
 **Additional events needed:**
+
 - `LOOP_MESSAGE` - When persistent webhook delivers a message
 
 The adapter would differentiate by checking the registration type:
+
 - Persistent webhooks → Use `generator.send(message)`
 - Explicit wait webhooks → Resume brain run normally

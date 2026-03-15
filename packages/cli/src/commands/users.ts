@@ -44,11 +44,16 @@ export class UsersCommand {
     return React.createElement(UsersCreate, { name });
   }
 
-  delete({ name, force }: ArgumentsCamelCase<UsersDeleteArgs>): React.ReactElement {
+  delete({
+    name,
+    force,
+  }: ArgumentsCamelCase<UsersDeleteArgs>): React.ReactElement {
     return React.createElement(UsersDelete, { userName: name, force });
   }
 
-  listKeys({ name }: ArgumentsCamelCase<UsersListKeysArgs>): React.ReactElement {
+  listKeys({
+    name,
+  }: ArgumentsCamelCase<UsersListKeysArgs>): React.ReactElement {
     return React.createElement(UsersKeysList, { userName: name });
   }
 

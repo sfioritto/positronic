@@ -1,4 +1,10 @@
-import type { ObjectGenerator, Message, ToolMessage, ResponseMessage, ToolChoice } from '@positronic/core';
+import type {
+  ObjectGenerator,
+  Message,
+  ToolMessage,
+  ResponseMessage,
+  ToolChoice,
+} from '@positronic/core';
 import {
   generateText,
   streamText as vercelStreamText,
@@ -22,7 +28,8 @@ export function createToolResultMessage(
 ): ResponseMessage {
   // Wrap the result in the SDK-expected format
   // The SDK validates output against a discriminated union requiring a `type` field
-  const outputValue = typeof result === 'string' ? result : JSON.stringify(result);
+  const outputValue =
+    typeof result === 'string' ? result : JSON.stringify(result);
 
   return {
     role: 'tool',
@@ -68,7 +75,8 @@ export class VercelClient implements ObjectGenerator {
     usage?: { totalTokens: number };
     responseHeaders?: Record<string, string>;
   }> {
-    const { schema, schemaName, schemaDescription, prompt, messages, system } = params;
+    const { schema, schemaName, schemaDescription, prompt, messages, system } =
+      params;
 
     const coreMessages: Message[] = [];
 
@@ -137,7 +145,13 @@ export class VercelClient implements ObjectGenerator {
     responseMessages: ResponseMessage[];
     responseHeaders?: Record<string, string>;
   }> {
-    const { system, messages, responseMessages, tools, toolChoice = 'required' } = params;
+    const {
+      system,
+      messages,
+      responseMessages,
+      tools,
+      toolChoice = 'required',
+    } = params;
 
     // Build the messages to send to the SDK
     let modelMessages: ModelMessage[];
@@ -154,7 +168,12 @@ export class VercelClient implements ObjectGenerator {
         } else if (msg.role === 'assistant') {
           const contentParts: Array<
             | { type: 'text'; text: string }
-            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+            | {
+                type: 'tool-call';
+                toolCallId: string;
+                toolName: string;
+                input: unknown;
+              }
           > = [];
 
           if (msg.content) {
@@ -254,7 +273,14 @@ export class VercelClient implements ObjectGenerator {
     usage: { totalTokens: number };
     responseHeaders?: Record<string, string>;
   }> {
-    const { system, prompt, messages, tools, maxSteps = 10, toolChoice = 'required' } = params;
+    const {
+      system,
+      prompt,
+      messages,
+      tools,
+      maxSteps = 10,
+      toolChoice = 'required',
+    } = params;
 
     // Build messages array
     const modelMessages: ModelMessage[] = [];
@@ -272,7 +298,12 @@ export class VercelClient implements ObjectGenerator {
           // Build content array for assistant message
           const contentParts: Array<
             | { type: 'text'; text: string }
-            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+            | {
+                type: 'tool-call';
+                toolCallId: string;
+                toolName: string;
+                input: unknown;
+              }
           > = [];
 
           // Add text if present

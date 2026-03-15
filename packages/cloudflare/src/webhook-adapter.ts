@@ -7,7 +7,9 @@ import type { MonitorDO } from './monitor-do.js';
  * with the MonitorDO for brain resumption
  */
 export class WebhookAdapter implements Adapter {
-  constructor(private monitorStub: { registerWebhook: MonitorDO['registerWebhook'] }) {}
+  constructor(
+    private monitorStub: { registerWebhook: MonitorDO['registerWebhook'] }
+  ) {}
 
   async dispatch(event: BrainEvent): Promise<void> {
     // Only handle WEBHOOK events

@@ -50,7 +50,11 @@ export interface PagesService {
    * @param options - Optional settings (persist, ttl)
    * @returns Page metadata including the public URL
    */
-  create(slug: string, html: string, options?: PageCreateOptions): Promise<Page>;
+  create(
+    slug: string,
+    html: string,
+    options?: PageCreateOptions
+  ): Promise<Page>;
 
   /**
    * Get the current HTML content of a page.

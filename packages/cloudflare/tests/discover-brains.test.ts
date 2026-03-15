@@ -103,14 +103,8 @@ describe('discoverBrains', () => {
   });
 
   it('ignores non-.ts files', async () => {
-    await fs.promises.writeFile(
-      path.join(tempDir, 'readme.md'),
-      '# Readme'
-    );
-    await fs.promises.writeFile(
-      path.join(tempDir, 'config.json'),
-      '{}'
-    );
+    await fs.promises.writeFile(path.join(tempDir, 'readme.md'), '# Readme');
+    await fs.promises.writeFile(path.join(tempDir, 'config.json'), '{}');
 
     const brains = await discoverBrains(tempDir);
 

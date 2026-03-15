@@ -15,7 +15,11 @@ interface User {
 export const UsersCreate = ({ name }: UsersCreateProps) => {
   const [data, setData] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
+  const [error, setError] = useState<{
+    title: string;
+    message: string;
+    details?: string;
+  } | null>(null);
 
   useEffect(() => {
     const createUser = async () => {

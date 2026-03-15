@@ -412,10 +412,13 @@ export const pages = {
       formData.append('key', 'spec-test-resource.txt');
       formData.append('local', 'false');
 
-      const createResourceRequest = new Request('http://example.com/resources', {
-        method: 'POST',
-        body: formData,
-      });
+      const createResourceRequest = new Request(
+        'http://example.com/resources',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const createResourceResponse = await fetch(createResourceRequest);
       if (createResourceResponse.status !== 201) {
@@ -510,10 +513,7 @@ export const pages = {
 
       return true;
     } catch (error) {
-      console.error(
-        `Failed to test DELETE /pages preserves resources:`,
-        error
-      );
+      console.error(`Failed to test DELETE /pages preserves resources:`, error);
       return false;
     }
   },

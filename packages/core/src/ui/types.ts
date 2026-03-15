@@ -81,7 +81,11 @@ export function inferDataType(value: unknown): DataType {
  * A validation error from ValidateForm.
  */
 export interface ValidationError {
-  type: 'form-schema-mismatch' | 'invalid-binding' | 'unknown-component' | 'missing-prop';
+  type:
+    | 'form-schema-mismatch'
+    | 'invalid-binding'
+    | 'unknown-component'
+    | 'missing-prop';
   message: string;
   path?: string;
 }
@@ -242,4 +246,3 @@ function isFormPrimitive(schema: z.ZodSchema): schema is FormPrimitive {
     schema instanceof z.ZodEnum
   );
 }
-

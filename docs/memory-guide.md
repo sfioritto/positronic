@@ -5,6 +5,7 @@ This guide covers the memory system in Positronic, which enables brains to store
 ## Overview
 
 The memory system provides:
+
 - **Long-term memory storage** - Persist facts, preferences, and context across brain runs
 - **Semantic search** - Retrieve relevant memories based on natural language queries
 - **Automatic conversation indexing** - Optionally store all conversations for later retrieval
@@ -189,6 +190,7 @@ const adapter = createMem0Adapter({
 ```
 
 Tool calls are formatted as:
+
 ```
 [Tool Call: toolName] {"arg": "value"}
 [Tool Result: toolName] {"result": "value"}
@@ -210,7 +212,7 @@ const myBrain = brain('my-brain')
     });
 
     return {
-      context: memories.map(m => m.content).join('\n'),
+      context: memories.map((m) => m.content).join('\n'),
     };
   });
 ```
@@ -224,14 +226,19 @@ const myBrain = brain('my-brain')
     // Fetch memories to include in system prompt
     const prefs = await memory.search('user preferences');
 
-    const context = prefs.length > 0
-      ? `\n\nUser preferences:\n${prefs.map(p => `- ${p.content}`).join('\n')}`
-      : '';
+    const context =
+      prefs.length > 0
+        ? `\n\nUser preferences:\n${prefs
+            .map((p) => `- ${p.content}`)
+            .join('\n')}`
+        : '';
 
     return {
       system: `You are helpful.${context}`,
       prompt: 'Help the user with their request',
-      tools: { /* ... */ },
+      tools: {
+        /* ... */
+      },
     };
   });
 ```
@@ -282,7 +289,13 @@ const myBrain = brain('my-brain')
       }
     );
 
-    return { system, prompt: userMessage, tools: { /* ... */ } };
+    return {
+      system,
+      prompt: userMessage,
+      tools: {
+        /* ... */
+      },
+    };
   });
 ```
 
@@ -312,8 +325,8 @@ Automatically set to the brain/step title. Memories are isolated per agent:
 
 ```typescript
 // These brains have separate memory spaces
-brain('support-agent').withMemory(memory)  // agentId = 'support-agent'
-brain('sales-agent').withMemory(memory)    // agentId = 'sales-agent'
+brain('support-agent').withMemory(memory); // agentId = 'support-agent'
+brain('sales-agent').withMemory(memory); // agentId = 'sales-agent'
 ```
 
 ### userId
@@ -326,8 +339,8 @@ await memory.search('preferences');
 await memory.add(messages);
 
 // In tools — the agent just passes the fact/query, userId is automatic
-rememberFact({ fact: 'Prefers dark mode' })
-recallMemories({ query: 'preferences' })
+rememberFact({ fact: 'Prefers dark mode' });
+recallMemories({ query: 'preferences' });
 ```
 
 ## Complete Example
@@ -356,9 +369,11 @@ const memoryTools = createMem0Tools();
 // Define brain
 const assistant = brain('personal-assistant')
   .withMemory(provider)
-  .withOptionsSchema(z.object({
-    message: z.string(),
-  }))
+  .withOptionsSchema(
+    z.object({
+      message: z.string(),
+    })
+  )
   .brain('Respond', async ({ memory, options }) => {
     // Build system prompt with memory context (userId auto-scoped from currentUser)
     const system = await createMemorySystemPrompt(
@@ -404,14 +419,17 @@ const result = await runner.run(assistant, {
 You can implement your own memory provider by implementing the `MemoryProvider` interface:
 
 ```typescript
-import type { MemoryProvider, Memory, MemoryScope, MemoryMessage } from '@positronic/core';
+import type {
+  MemoryProvider,
+  Memory,
+  MemoryScope,
+  MemoryMessage,
+} from '@positronic/core';
 
 const customProvider: MemoryProvider = {
   async search(query, scope, options) {
     // Your search implementation
-    return [
-      { id: '1', content: 'Memory content', score: 0.95 },
-    ];
+    return [{ id: '1', content: 'Memory content', score: 0.95 }];
   },
 
   async add(messages, scope, options) {
@@ -420,7 +438,6 @@ const customProvider: MemoryProvider = {
 };
 
 // Use like any provider
-const myBrain = brain('my-brain')
-  .withMemory(customProvider)
-  // ...
+const myBrain = brain('my-brain').withMemory(customProvider);
+// ...
 ```

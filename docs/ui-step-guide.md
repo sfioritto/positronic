@@ -5,6 +5,7 @@ This guide explains how to use the `.ui()` method to generate dynamic user inter
 ## Overview
 
 The UI step allows brains to generate React-based user interfaces dynamically using AI. When a brain reaches a UI step, it generates a page and provides a `page` object to the next step. The brain author is responsible for:
+
 1. Notifying users about the page (via Slack, email, etc.)
 2. Using `waitFor` to pause until the form is submitted
 3. Processing the form data in the step after `waitFor`
@@ -43,8 +44,8 @@ const feedbackBrain = brain('Collect Feedback')
   .step('Process Feedback', ({ state, response }) => ({
     ...state,
     feedbackReceived: true,
-    rating: response.rating,       // typed as number
-    comments: response.comments,   // typed as string
+    rating: response.rating, // typed as number
+    comments: response.comments, // typed as string
   }));
 ```
 
@@ -55,6 +56,7 @@ const feedbackBrain = brain('Collect Feedback')
 2. **Page Creation**: The components are rendered to an HTML page and stored. A webhook is automatically configured for form submissions. A CSRF token is generated and embedded as a hidden form field to protect against unauthorized submissions.
 
 3. **Page Object**: The next step receives a `page` object with:
+
    - `url`: Where users can access the form
    - `webhook`: A pre-configured webhook for form submissions
 
@@ -174,8 +176,8 @@ After a `.ui()` step, the next step receives a `page` parameter:
 
 ```typescript
 interface GeneratedPage<TSchema> {
-  url: string;                        // URL to the generated page
-  webhook: WebhookRegistration<TSchema>;  // Pre-configured form webhook
+  url: string; // URL to the generated page
+  webhook: WebhookRegistration<TSchema>; // Pre-configured form webhook
 }
 ```
 
@@ -375,6 +377,7 @@ Data bindings are resolved when the page is rendered.
 ### Separation of Concerns
 
 The `.ui()` step only generates the page. You control:
+
 - **How** users are notified (Slack, email, SMS, push notification, etc.)
 - **When** to pause for submission (`waitFor`)
 - **What** to do with the form data

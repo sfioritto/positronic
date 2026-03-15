@@ -5,7 +5,10 @@
  * - name[] syntax for explicit arrays
  * - Multiple values with same key (converted to array)
  */
-export function parseFormData(formData: FormData): { data: Record<string, unknown>; token: string | null } {
+export function parseFormData(formData: FormData): {
+  data: Record<string, unknown>;
+  token: string | null;
+} {
   const result: Record<string, unknown> = {};
   let token: string | null = null;
 

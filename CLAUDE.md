@@ -74,6 +74,7 @@ The project uses npm workspaces with the following packages:
 The project template (`packages/template-new-project/template/.positronic/`) is what `px project new` uses to scaffold new projects. It has its own `wrangler.jsonc` and `src/index.ts` that are **separate from** the cloudflare test-project's versions. There are no tests that verify the template produces a working project, so you must keep it in sync manually.
 
 **When adding a new Durable Object**, update all three places:
+
 1. `packages/cloudflare/test-project/wrangler.jsonc` — migration + binding
 2. `packages/cloudflare/test-project/src/index.ts` — import + export
 3. `packages/template-new-project/template/.positronic/wrangler.jsonc` — migration + binding (both top-level AND the `env.production` section)
@@ -82,6 +83,7 @@ The project template (`packages/template-new-project/template/.positronic/`) is 
 **When adding a new API endpoint or binding**, check whether the template's `wrangler.jsonc` and `index.ts` need updates. The test-project and template must stay in sync — if one has it, the other should too.
 
 **When adding a new brain event type** (`BRAIN_EVENTS` in `packages/core/src/dsl/constants.ts`), update all three places:
+
 1. `packages/cli/src/components/events-view.tsx` — `formatEvent()` switch statement (list view symbol, text, color)
 2. `packages/cli/src/components/event-detail.tsx` — `getEventSymbol()` (detail view symbol/color) AND `getEventDetailContent()` (detail view content)
 3. `packages/core/src/dsl/definitions/events.ts` — TypeScript interface and add to the `BrainEvent` union type

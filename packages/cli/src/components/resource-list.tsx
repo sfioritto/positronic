@@ -80,16 +80,19 @@ export const ResourceList = () => {
 
       {truncated && (
         <Box marginTop={1}>
-          <Text color="yellow">⚠️  Results truncated. More resources exist than shown.</Text>
+          <Text color="yellow">
+            ⚠️ Results truncated. More resources exist than shown.
+          </Text>
         </Box>
       )}
 
       {/* Legend for resource types */}
-      {resources.some(r => !r.local) && (
+      {resources.some((r) => !r.local) && (
         <Box marginTop={1} flexDirection="column">
           <Text color="gray">─────</Text>
           <Text color="blueBright">
-            <Text color="blueBright">↗</Text> = uploaded resource (not in local filesystem)
+            <Text color="blueBright">↗</Text> = uploaded resource (not in local
+            filesystem)
           </Text>
         </Box>
       )}
@@ -104,7 +107,12 @@ interface TreeViewProps {
   depth?: number;
 }
 
-const TreeView = ({ node, prefix = '', isLast = true, depth = 0 }: TreeViewProps) => {
+const TreeView = ({
+  node,
+  prefix = '',
+  isLast = true,
+  depth = 0,
+}: TreeViewProps) => {
   const children = Array.from(node.children.entries()).sort(([a], [b]) => {
     // Sort directories first, then alphabetically
     const aIsDir = node.children.get(a)!.type === 'directory';
@@ -120,7 +128,11 @@ const TreeView = ({ node, prefix = '', isLast = true, depth = 0 }: TreeViewProps
       <Box flexDirection="column">
         {children.map(([name, child], index) => (
           <React.Fragment key={name}>
-            {index > 0 && <Box><Text> </Text></Box>}
+            {index > 0 && (
+              <Box>
+                <Text> </Text>
+              </Box>
+            )}
             <TreeView
               node={child}
               prefix=""
@@ -143,14 +155,20 @@ const TreeView = ({ node, prefix = '', isLast = true, depth = 0 }: TreeViewProps
   return (
     <Box flexDirection="column">
       <Box>
-        {!isTopLevel && <Text dimColor>{prefix}{connector}</Text>}
-        <Text
-          color={isRemote ? 'blueBright' : undefined}
-        >
+        {!isTopLevel && (
+          <Text dimColor>
+            {prefix}
+            {connector}
+          </Text>
+        )}
+        <Text color={isRemote ? 'blueBright' : undefined}>
           {node.name}
           {node.resource && (
             <>
-              <Text color={isRemote ? 'blueBright' : 'gray'}> ({formatSize(node.resource.size)})</Text>
+              <Text color={isRemote ? 'blueBright' : 'gray'}>
+                {' '}
+                ({formatSize(node.resource.size)})
+              </Text>
               {isRemote && <Text color="blueBright"> ↗</Text>}
             </>
           )}
@@ -172,6 +190,7 @@ const TreeView = ({ node, prefix = '', isLast = true, depth = 0 }: TreeViewProps
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }

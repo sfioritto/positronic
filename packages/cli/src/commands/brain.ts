@@ -58,7 +58,10 @@ export class BrainCommand {
     return React.createElement(BrainResolver, {
       identifier: brain,
       children: (resolvedBrainTitle: string) =>
-        React.createElement(BrainHistory, { brainName: resolvedBrainTitle, limit }),
+        React.createElement(BrainHistory, {
+          brainName: resolvedBrainTitle,
+          limit,
+        }),
     });
   }
 
@@ -74,7 +77,10 @@ export class BrainCommand {
 
     // If brain identifier is provided, show brain info
     if (brain) {
-      return React.createElement(BrainShow, { identifier: brain, showSteps: steps || false });
+      return React.createElement(BrainShow, {
+        identifier: brain,
+        showSteps: steps || false,
+      });
     }
 
     // Neither provided - show error
@@ -82,7 +88,8 @@ export class BrainCommand {
       error: {
         title: 'Missing Argument',
         message: 'You must provide either a brain identifier or a run ID.',
-        details: 'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
+        details:
+          'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
       },
     });
   }
@@ -105,7 +112,12 @@ export class BrainCommand {
     });
   }
 
-  run({ brain, watch, options, initialState }: ArgumentsCamelCase<BrainRunArgs>): React.ReactElement {
+  run({
+    brain,
+    watch,
+    options,
+    initialState,
+  }: ArgumentsCamelCase<BrainRunArgs>): React.ReactElement {
     return React.createElement(BrainRun, {
       identifier: brain,
       watch,
@@ -118,7 +130,10 @@ export class BrainCommand {
     identifier,
     events,
   }: ArgumentsCamelCase<BrainWatchArgs>): React.ReactElement {
-    return React.createElement(WatchResolver, { identifier, startWithEvents: events });
+    return React.createElement(WatchResolver, {
+      identifier,
+      startWithEvents: events,
+    });
   }
 
   kill({

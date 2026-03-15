@@ -11,7 +11,9 @@ const LinkPropsSchema = z.object({
   external: z
     .boolean()
     .optional()
-    .describe('If true, opens in new tab and adds security attributes (noopener, noreferrer)'),
+    .describe(
+      'If true, opens in new tab and adds security attributes (noopener, noreferrer)'
+    ),
 });
 
 export type LinkProps = z.infer<typeof LinkPropsSchema>;

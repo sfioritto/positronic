@@ -1,6 +1,6 @@
 # Literate Atomic Commits
 
-*Source: iamjonas.me*
+_Source: iamjonas.me_
 
 The article explores the intersection of literate programming and atomic commits as a practice for writing better code and clearer commit messages.
 

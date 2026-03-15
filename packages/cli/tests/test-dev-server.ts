@@ -11,7 +11,9 @@ import { STATUS } from '@positronic/core';
  * so properly-sent requests may arrive as objects or strings.
  */
 function parseRequestBody(requestBody: nock.Body): any {
-  return typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+  return typeof requestBody === 'string'
+    ? JSON.parse(requestBody)
+    : requestBody;
 }
 
 interface MockResource {
@@ -327,8 +329,7 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /brains/runs
     nockInstance.post('/brains/runs').reply((uri, requestBody) => {
-      const body =
-        parseRequestBody(requestBody);
+      const body = parseRequestBody(requestBody);
 
       // Support both identifier and brainTitle for backward compatibility
       const identifier = body.identifier || body.brainTitle;
@@ -350,14 +351,17 @@ export class TestDevServer implements PositronicDevServer {
         brainRunId = 'test-multi-status';
       }
 
-      this.logCall('createBrainRun', [identifier, body.options, body.initialState]);
+      this.logCall('createBrainRun', [
+        identifier,
+        body.options,
+        body.initialState,
+      ]);
       return [201, { brainRunId }];
     });
 
     // POST /brains/runs/rerun
     nockInstance.post('/brains/runs/rerun').reply((uri, requestBody) => {
-      const body =
-        parseRequestBody(requestBody);
+      const body = parseRequestBody(requestBody);
 
       // Support both identifier and brainTitle for backward compatibility
       const identifier = body.identifier || body.brainTitle;
@@ -422,24 +426,29 @@ export class TestDevServer implements PositronicDevServer {
     });
 
     // POST /brains/runs/:runId/signals
-    nockInstance.post(/^\/brains\/runs\/(.+)\/signals$/).reply((uri, requestBody) => {
-      const match = uri.match(/^\/brains\/runs\/(.+)\/signals$/);
-      if (match) {
-        const runId = decodeURIComponent(match[1]);
-        const body = parseRequestBody(requestBody);
+    nockInstance
+      .post(/^\/brains\/runs\/(.+)\/signals$/)
+      .reply((uri, requestBody) => {
+        const match = uri.match(/^\/brains\/runs\/(.+)\/signals$/);
+        if (match) {
+          const runId = decodeURIComponent(match[1]);
+          const body = parseRequestBody(requestBody);
 
-        this.logCall('sendSignal', [runId, body]);
+          this.logCall('sendSignal', [runId, body]);
 
-        return [202, {
-          success: true,
-          signal: {
-            type: body.type,
-            queuedAt: new Date().toISOString(),
-          },
-        }];
-      }
-      return [404, { error: 'Invalid brain run ID' }];
-    });
+          return [
+            202,
+            {
+              success: true,
+              signal: {
+                type: body.type,
+                queuedAt: new Date().toISOString(),
+              },
+            },
+          ];
+        }
+        return [404, { error: 'Invalid brain run ID' }];
+      });
 
     // GET /brains/runs/:runId (get single run details)
     // Must be before the watch endpoint to avoid conflicts
@@ -449,7 +458,7 @@ export class TestDevServer implements PositronicDevServer {
         const runId = decodeURIComponent(match[1]);
         this.logCall('getRun', [runId]);
 
-        const run = this.brainRuns.find(r => r.brainRunId === runId);
+        const run = this.brainRuns.find((r) => r.brainRunId === runId);
         if (!run) {
           return [404, { error: `Brain run '${runId}' not found` }];
         }
@@ -792,8 +801,16 @@ export class TestDevServer implements PositronicDevServer {
                 brainRunId: runId,
                 options: {},
                 steps: [
-                  { id: 'agent-step-1', title: 'Research Agent', status: 'complete' },
-                  { id: 'agent-step-2', title: 'Analysis Agent', status: 'running' },
+                  {
+                    id: 'agent-step-1',
+                    title: 'Research Agent',
+                    status: 'complete',
+                  },
+                  {
+                    id: 'agent-step-2',
+                    title: 'Analysis Agent',
+                    status: 'running',
+                  },
                 ],
               },
               {
@@ -858,7 +875,11 @@ export class TestDevServer implements PositronicDevServer {
                 brainRunId: runId,
                 options: {},
                 steps: [
-                  { id: 'step-1', title: 'Long Running Step', status: 'running' },
+                  {
+                    id: 'step-1',
+                    title: 'Long Running Step',
+                    status: 'running',
+                  },
                   { id: 'step-2', title: 'Pending Step', status: 'pending' },
                 ],
               },
@@ -909,93 +930,109 @@ export class TestDevServer implements PositronicDevServer {
     // Note: Must be defined BEFORE the catch-all /brains/:identifier routes
     // Store reference to this for the callback
     const self = this;
-    nockInstance
-      .get('/brains/watch')
-      .reply(
-        200,
-        function () {
-          self.logCall('watchAllBrains', []);
-          const data = { runningBrains: self.runningBrainsForWatch };
-          return `data: ${JSON.stringify(data)}\n\n`;
-        },
-        {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
-        }
-      );
+    nockInstance.get('/brains/watch').reply(
+      200,
+      function () {
+        self.logCall('watchAllBrains', []);
+        const data = { runningBrains: self.runningBrainsForWatch };
+        return `data: ${JSON.stringify(data)}\n\n`;
+      },
+      {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      }
+    );
 
     // GET /brains (with optional query filtering using fuse.js)
-    nockInstance.get('/brains').query(true).reply((uri) => {
-      const url = new URL(uri, 'http://example.com');
-      const query = url.searchParams.get('q')?.trim();
+    nockInstance
+      .get('/brains')
+      .query(true)
+      .reply((uri) => {
+        const url = new URL(uri, 'http://example.com');
+        const query = url.searchParams.get('q')?.trim();
 
-      const allBrains = Array.from(this.brains.values());
+        const allBrains = Array.from(this.brains.values());
 
-      this.logCall('getBrains', [query || null]);
+        this.logCall('getBrains', [query || null]);
 
-      // If no query, return all brains
-      if (!query) {
-        return [200, {
-          brains: allBrains,
-          count: allBrains.length,
-        }];
-      }
+        // If no query, return all brains
+        if (!query) {
+          return [
+            200,
+            {
+              brains: allBrains,
+              count: allBrains.length,
+            },
+          ];
+        }
 
-      // Check for exact match on title or filename first
-      const queryLower = query.toLowerCase();
-      const exactMatch = allBrains.find(
-        brain =>
-          brain.title.toLowerCase() === queryLower ||
-          brain.filename.toLowerCase() === queryLower
-      );
+        // Check for exact match on title or filename first
+        const queryLower = query.toLowerCase();
+        const exactMatch = allBrains.find(
+          (brain) =>
+            brain.title.toLowerCase() === queryLower ||
+            brain.filename.toLowerCase() === queryLower
+        );
 
-      if (exactMatch) {
-        return [200, {
-          brains: [exactMatch],
-          count: 1,
-        }];
-      }
+        if (exactMatch) {
+          return [
+            200,
+            {
+              brains: [exactMatch],
+              count: 1,
+            },
+          ];
+        }
 
-      // Use fuse.js for fuzzy matching with weighted keys
-      const fuse = new Fuse(allBrains, {
-        keys: [
-          { name: 'title', weight: 2 },
-          { name: 'filename', weight: 2 },
-          { name: 'description', weight: 0.5 },
-        ],
-        includeScore: true,
-        threshold: 0.4,
-        ignoreLocation: true,
+        // Use fuse.js for fuzzy matching with weighted keys
+        const fuse = new Fuse(allBrains, {
+          keys: [
+            { name: 'title', weight: 2 },
+            { name: 'filename', weight: 2 },
+            { name: 'description', weight: 0.5 },
+          ],
+          includeScore: true,
+          threshold: 0.4,
+          ignoreLocation: true,
+        });
+
+        const results = fuse.search(query);
+
+        // If no results, return empty
+        if (results.length === 0) {
+          return [
+            200,
+            {
+              brains: [],
+              count: 0,
+            },
+          ];
+        }
+
+        // If top result is significantly better than others, return just that one
+        if (
+          results.length === 1 ||
+          (results.length > 1 && results[1].score! - results[0].score! > 0.2)
+        ) {
+          return [
+            200,
+            {
+              brains: [results[0].item],
+              count: 1,
+            },
+          ];
+        }
+
+        // Return all matching results
+        return [
+          200,
+          {
+            brains: results.map((r) => r.item),
+            count: results.length,
+          },
+        ];
       });
-
-      const results = fuse.search(query);
-
-      // If no results, return empty
-      if (results.length === 0) {
-        return [200, {
-          brains: [],
-          count: 0,
-        }];
-      }
-
-      // If top result is significantly better than others, return just that one
-      if (
-        results.length === 1 ||
-        (results.length > 1 && results[1].score! - results[0].score! > 0.2)
-      ) {
-        return [200, {
-          brains: [results[0].item],
-          count: 1,
-        }];
-      }
-
-      // Return all matching results
-      return [200, {
-        brains: results.map(r => r.item),
-        count: results.length,
-      }];
-    });
 
     // GET /brains/schedules
     nockInstance.get('/brains/schedules').reply(200, () => {
@@ -1013,15 +1050,16 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /brains/schedules
     nockInstance.post('/brains/schedules').reply(201, (uri, requestBody) => {
-      const body =
-        parseRequestBody(requestBody);
+      const body = parseRequestBody(requestBody);
 
       // Support both identifier and brainTitle for backward compatibility
       const brainTitle = body.brainTitle || body.identifier;
       const timezone = body.timezone || this.projectTimezone || 'UTC';
 
       const scheduleId = `schedule-${Date.now()}`;
-      const schedule: MockSchedule & { initialState?: Record<string, unknown> } = {
+      const schedule: MockSchedule & {
+        initialState?: Record<string, unknown>;
+      } = {
         id: scheduleId,
         brainTitle: brainTitle,
         cronExpression: body.cronExpression,
@@ -1079,8 +1117,7 @@ export class TestDevServer implements PositronicDevServer {
 
     // PUT /brains/schedules/timezone
     nockInstance.put('/brains/schedules/timezone').reply((uri, requestBody) => {
-      const body =
-        parseRequestBody(requestBody);
+      const body = parseRequestBody(requestBody);
 
       if (!body.timezone) {
         return [400, { error: 'Missing required field "timezone"' }];
@@ -1132,8 +1169,7 @@ export class TestDevServer implements PositronicDevServer {
         // Filter runs by brain title (exact match on resolved title)
         const runs = this.brainRuns
           .filter(
-            (run) =>
-              run.brainTitle.toLowerCase() === identifier.toLowerCase()
+            (run) => run.brainTitle.toLowerCase() === identifier.toLowerCase()
           )
           .sort((a, b) => b.createdAt - a.createdAt)
           .slice(0, limit);
@@ -1185,8 +1221,7 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /secrets
     nockInstance.post('/secrets').reply(201, (uri, requestBody) => {
-      const body =
-        parseRequestBody(requestBody);
+      const body = parseRequestBody(requestBody);
 
       const now = new Date().toISOString();
       const secret: MockSecret = {
@@ -1257,8 +1292,7 @@ export class TestDevServer implements PositronicDevServer {
 
     // POST /secrets/bulk
     nockInstance.post('/secrets/bulk').reply(201, (uri, requestBody) => {
-      const body =
-        parseRequestBody(requestBody);
+      const body = parseRequestBody(requestBody);
 
       let created = 0;
       let updated = 0;
@@ -1395,8 +1429,7 @@ export class TestDevServer implements PositronicDevServer {
       const match = uri.match(/^\/users\/([^/]+)\/keys$/);
       if (match) {
         const name = decodeURIComponent(match[1]);
-        const body =
-          parseRequestBody(requestBody);
+        const body = parseRequestBody(requestBody);
 
         // Check if user exists
         const user = this.users.get(name);
@@ -1437,7 +1470,9 @@ export class TestDevServer implements PositronicDevServer {
           return [404, { error: `User '${name}' not found` }];
         }
 
-        const keys = Array.from(this.userKeys.values()).filter(k => k.userName === name);
+        const keys = Array.from(this.userKeys.values()).filter(
+          (k) => k.userName === name
+        );
         return [200, { keys, count: keys.length }];
       }
       return [404, 'Not Found'];
@@ -1479,7 +1514,8 @@ export class TestDevServer implements PositronicDevServer {
         this.logCall('getSharedValue', [brainTitle, key]);
 
         const entry = this.storeEntries.find(
-          (e) => e.brainTitle === brainTitle && e.key === key && e.scope === 'shared'
+          (e) =>
+            e.brainTitle === brainTitle && e.key === key && e.scope === 'shared'
         );
 
         if (!entry) {
@@ -1500,14 +1536,18 @@ export class TestDevServer implements PositronicDevServer {
         this.logCall('getUserValue', [brainTitle, key]);
 
         const entry = this.storeEntries.find(
-          (e) => e.brainTitle === brainTitle && e.key === key && e.scope === 'user'
+          (e) =>
+            e.brainTitle === brainTitle && e.key === key && e.scope === 'user'
         );
 
         if (!entry) {
           return [404, { error: `Key '${key}' not found` }];
         }
 
-        return [200, { key, value: entry.value, scope: 'user', userName: entry.userName }];
+        return [
+          200,
+          { key, value: entry.value, scope: 'user', userName: entry.userName },
+        ];
       }
       return [404, 'Not Found'];
     });
@@ -1521,7 +1561,12 @@ export class TestDevServer implements PositronicDevServer {
         this.logCall('deleteSharedKey', [brainTitle, key]);
 
         this.storeEntries = this.storeEntries.filter(
-          (e) => !(e.brainTitle === brainTitle && e.key === key && e.scope === 'shared')
+          (e) =>
+            !(
+              e.brainTitle === brainTitle &&
+              e.key === key &&
+              e.scope === 'shared'
+            )
         );
 
         return [204, ''];
@@ -1538,7 +1583,12 @@ export class TestDevServer implements PositronicDevServer {
         this.logCall('deleteUserKey', [brainTitle, key]);
 
         this.storeEntries = this.storeEntries.filter(
-          (e) => !(e.brainTitle === brainTitle && e.key === key && e.scope === 'user')
+          (e) =>
+            !(
+              e.brainTitle === brainTitle &&
+              e.key === key &&
+              e.scope === 'user'
+            )
         );
 
         return [204, ''];
@@ -1737,7 +1787,9 @@ export class TestDevServer implements PositronicDevServer {
   }
 
   getUserKeys(userName: string): MockUserKey[] {
-    return Array.from(this.userKeys.values()).filter(k => k.userName === userName);
+    return Array.from(this.userKeys.values()).filter(
+      (k) => k.userName === userName
+    );
   }
 
   // Store helper methods

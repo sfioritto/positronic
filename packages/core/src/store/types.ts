@@ -21,7 +21,11 @@ export type StoreSchema = Record<string, z.ZodType | PerUserField<any>>;
  * PerUserField<T> extracts z.infer<T>, plain ZodType extracts z.infer.
  */
 export type InferStoreTypes<T extends StoreSchema> = {
-  [K in keyof T]: T[K] extends PerUserField<infer V> ? z.infer<V> : T[K] extends z.ZodType ? z.infer<T[K]> : never;
+  [K in keyof T]: T[K] extends PerUserField<infer V>
+    ? z.infer<V>
+    : T[K] extends z.ZodType
+    ? z.infer<T[K]>
+    : never;
 };
 
 /**
@@ -54,5 +58,5 @@ export type StoreProvider = (config: {
 export type StoreContext<TStore> = [TStore] extends [never]
   ? {}
   : TStore extends Record<string, JsonValue | undefined>
-    ? { store: Store<TStore> }
-    : {};
+  ? { store: Store<TStore> }
+  : {};

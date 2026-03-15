@@ -7,8 +7,12 @@ interface ResourceTypesProps {
   projectRootDir: string;
 }
 
-export const ResourceTypes: React.FC<ResourceTypesProps> = ({ projectRootDir }) => {
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+export const ResourceTypes: React.FC<ResourceTypesProps> = ({
+  projectRootDir,
+}) => {
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
+    'loading'
+  );
   const [typesFilePath, setTypesFilePath] = useState<string>('');
   const [error, setError] = useState<Error | null>(null);
 

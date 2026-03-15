@@ -25,7 +25,9 @@ export interface CliOptions {
 }
 
 // Helper function to parse key=value options
-function parseKeyValueOptions(opts: string[] | undefined): Record<string, string> | undefined {
+function parseKeyValueOptions(
+  opts: string[] | undefined
+): Record<string, string> | undefined {
   if (!opts || opts.length === 0) return undefined;
 
   const parsed: Record<string, string> = {};
@@ -34,7 +36,9 @@ function parseKeyValueOptions(opts: string[] | undefined): Record<string, string
     const value = valueParts.join('=');
 
     if (!key || !value) {
-      throw new Error(`Invalid option format: "${opt}". Options must be in key=value format.`);
+      throw new Error(
+        `Invalid option format: "${opt}". Options must be in key=value format.`
+      );
     }
 
     parsed[key] = value;
@@ -43,7 +47,9 @@ function parseKeyValueOptions(opts: string[] | undefined): Record<string, string
 }
 
 // Helper function to parse key=value state values with type coercion
-function parseStateValues(opts: string[] | undefined): Record<string, unknown> | undefined {
+function parseStateValues(
+  opts: string[] | undefined
+): Record<string, unknown> | undefined {
   if (!opts || opts.length === 0) return undefined;
 
   const parsed: Record<string, unknown> = {};
@@ -52,7 +58,9 @@ function parseStateValues(opts: string[] | undefined): Record<string, unknown> |
     const raw = valueParts.join('=');
 
     if (!key || raw === undefined || raw === '') {
-      throw new Error(`Invalid state format: "${opt}". State values must be in key=value format.`);
+      throw new Error(
+        `Invalid state format: "${opt}". State values must be in key=value format.`
+      );
     }
 
     // Type coercion
@@ -366,12 +374,17 @@ export function buildCli(options: CliOptions) {
         })
         .check((argv) => {
           if (!argv.brain && !argv.runId) {
-            throw new Error('You must provide either a brain identifier or a --run-id.');
+            throw new Error(
+              'You must provide either a brain identifier or a --run-id.'
+            );
           }
           return true;
         })
         .example('$0 show my-brain', 'Show info about my-brain')
-        .example('$0 show my-brain --steps', 'Show my-brain with step structure')
+        .example(
+          '$0 show my-brain --steps',
+          'Show my-brain with step structure'
+        )
         .example('$0 show --run-id abc123', 'Show details for a specific run');
     },
     (argv) => {
@@ -449,14 +462,15 @@ export function buildCli(options: CliOptions) {
           type: 'array',
           alias: 'o',
           string: true,
-          coerce: parseKeyValueOptions
+          coerce: parseKeyValueOptions,
         })
         .option('state', {
-          describe: 'Initial state values (key=value format, with type coercion)',
+          describe:
+            'Initial state values (key=value format, with type coercion)',
           type: 'array',
           alias: 's',
           string: true,
-          coerce: parseStateValues
+          coerce: parseStateValues,
         })
         .option('state-json', {
           describe: 'Initial state as a JSON string',
@@ -464,7 +478,9 @@ export function buildCli(options: CliOptions) {
         })
         .check((argv) => {
           if (argv.state && argv.stateJson) {
-            throw new Error('Cannot use both --state/-s and --state-json at the same time.');
+            throw new Error(
+              'Cannot use both --state/-s and --state-json at the same time.'
+            );
           }
           return true;
         })
@@ -526,14 +542,8 @@ export function buildCli(options: CliOptions) {
           '$0 watch my-brain',
           "Watch the latest run of the brain named 'my-brain'"
         )
-        .example(
-          '$0 watch abc123def',
-          'Watch a specific brain run by its ID'
-        )
-        .example(
-          '$0 watch my-brain --events',
-          'Watch with events log view'
-        );
+        .example('$0 watch abc123def', 'Watch a specific brain run by its ID')
+        .example('$0 watch my-brain --events', 'Watch with events log view');
     },
     (argv) => {
       const element = brainCommand.watch(argv);
@@ -587,8 +597,14 @@ export function buildCli(options: CliOptions) {
               type: 'number',
               default: 10,
             })
-            .example('$0 brain history my-brain', 'List recent runs for my-brain')
-            .example('$0 brain history my-brain --limit=20', 'List more recent runs');
+            .example(
+              '$0 brain history my-brain',
+              'List recent runs for my-brain'
+            )
+            .example(
+              '$0 brain history my-brain --limit=20',
+              'List more recent runs'
+            );
         },
         (argv) => {
           const element = brainCommand.history(argv);
@@ -616,13 +632,21 @@ export function buildCli(options: CliOptions) {
             })
             .check((argv) => {
               if (!argv.brain && !argv.runId) {
-                throw new Error('You must provide either a brain identifier or a --run-id.');
+                throw new Error(
+                  'You must provide either a brain identifier or a --run-id.'
+                );
               }
               return true;
             })
             .example('$0 brain show my-brain', 'Show info about my-brain')
-            .example('$0 brain show my-brain --steps', 'Show my-brain with step structure')
-            .example('$0 brain show --run-id abc123', 'Show details for a specific run');
+            .example(
+              '$0 brain show my-brain --steps',
+              'Show my-brain with step structure'
+            )
+            .example(
+              '$0 brain show --run-id abc123',
+              'Show details for a specific run'
+            );
         },
         (argv) => {
           const element = brainCommand.show(argv as any);
@@ -658,8 +682,14 @@ export function buildCli(options: CliOptions) {
               '$0 brain rerun my-brain',
               'Rerun the most recent execution of my-brain'
             )
-            .example('$0 brain rerun my-brain abc123', 'Rerun a specific brain run')
-            .example('$0 brain rerun my-brain --starts-at=3', 'Rerun from step 3')
+            .example(
+              '$0 brain rerun my-brain abc123',
+              'Rerun a specific brain run'
+            )
+            .example(
+              '$0 brain rerun my-brain --starts-at=3',
+              'Rerun from step 3'
+            )
             .example(
               '$0 brain rerun my-brain --stops-after=5',
               'Rerun and stop after step 5'
@@ -695,14 +725,15 @@ export function buildCli(options: CliOptions) {
               type: 'array',
               alias: 'o',
               string: true,
-              coerce: parseKeyValueOptions
+              coerce: parseKeyValueOptions,
             })
             .option('state', {
-              describe: 'Initial state values (key=value format, with type coercion)',
+              describe:
+                'Initial state values (key=value format, with type coercion)',
               type: 'array',
               alias: 's',
               string: true,
-              coerce: parseStateValues
+              coerce: parseStateValues,
             })
             .option('state-json', {
               describe: 'Initial state as a JSON string',
@@ -710,13 +741,18 @@ export function buildCli(options: CliOptions) {
             })
             .check((argv) => {
               if (argv.state && argv.stateJson) {
-                throw new Error('Cannot use both --state/-s and --state-json at the same time.');
+                throw new Error(
+                  'Cannot use both --state/-s and --state-json at the same time.'
+                );
               }
               return true;
             })
             .example('$0 brain run my-brain', 'Run a brain by filename')
             .example('$0 brain run "Email Digest"', 'Run a brain by title')
-            .example('$0 brain run email', 'Fuzzy search for brains matching "email"')
+            .example(
+              '$0 brain run email',
+              'Fuzzy search for brains matching "email"'
+            )
             .example(
               '$0 brain run my-brain --watch',
               'Run a brain and watch its execution'
@@ -820,7 +856,10 @@ export function buildCli(options: CliOptions) {
               type: 'string',
             })
             .example('$0 brain top', 'View all running brains')
-            .example('$0 brain top my-brain', 'View running brains matching "my-brain"');
+            .example(
+              '$0 brain top my-brain',
+              'View running brains matching "my-brain"'
+            );
         },
         (argv) => {
           const element = brainCommand.top(argv);
@@ -834,7 +873,6 @@ export function buildCli(options: CliOptions) {
 
     return yargsBrain;
   });
-
 
   // --- Resource Management Commands ---
   cli = cli.command(
@@ -1066,10 +1104,7 @@ export function buildCli(options: CliOptions) {
 
       yargsSchedule
         .command(
-          [
-            'create <brain> <cron-expression>',
-            'c <brain> <cron-expression>',
-          ],
+          ['create <brain> <cron-expression>', 'c <brain> <cron-expression>'],
           'Create a new schedule for a brain\n',
           (yargsCreate) => {
             return yargsCreate
@@ -1085,18 +1120,20 @@ export function buildCli(options: CliOptions) {
                 demandOption: true,
               })
               .option('options', {
-                describe: 'Options to pass to the brain on each run (key=value format)',
+                describe:
+                  'Options to pass to the brain on each run (key=value format)',
                 type: 'array',
                 alias: 'o',
                 string: true,
-                coerce: parseKeyValueOptions
+                coerce: parseKeyValueOptions,
               })
               .option('state', {
-                describe: 'Initial state values for each run (key=value format, with type coercion)',
+                describe:
+                  'Initial state values for each run (key=value format, with type coercion)',
                 type: 'array',
                 alias: 's',
                 string: true,
-                coerce: parseStateValues
+                coerce: parseStateValues,
               })
               .option('state-json', {
                 describe: 'Initial state as a JSON string',
@@ -1104,7 +1141,9 @@ export function buildCli(options: CliOptions) {
               })
               .check((argv) => {
                 if (argv.state && argv.stateJson) {
-                  throw new Error('Cannot use both --state/-s and --state-json at the same time.');
+                  throw new Error(
+                    'Cannot use both --state/-s and --state-json at the same time.'
+                  );
                 }
                 return true;
               })
@@ -1139,13 +1178,18 @@ export function buildCli(options: CliOptions) {
               try {
                 initialState = JSON.parse(argv.stateJson as string);
               } catch {
-                console.error(`Invalid JSON for --state-json: ${argv.stateJson}`);
+                console.error(
+                  `Invalid JSON for --state-json: ${argv.stateJson}`
+                );
                 process.exit(1);
               }
             } else if (argv.state) {
               initialState = argv.state as Record<string, unknown>;
             }
-            const element = scheduleCommand.create({ ...argv, initialState } as any);
+            const element = scheduleCommand.create({
+              ...argv,
+              initialState,
+            } as any);
             render(element);
           }
         )
@@ -1159,10 +1203,7 @@ export function buildCli(options: CliOptions) {
                   'IANA timezone (e.g., "America/Chicago", "Europe/London")',
                 type: 'string',
               })
-              .example(
-                '$0 schedule timezone',
-                'Show current project timezone'
-              )
+              .example('$0 schedule timezone', 'Show current project timezone')
               .example(
                 '$0 schedule timezone America/Chicago',
                 'Set timezone to Central'
@@ -1220,15 +1261,10 @@ export function buildCli(options: CliOptions) {
     'Manage pages created by brains\n',
     (yargsPages) => {
       yargsPages
-        .command(
-          'list',
-          'List all pages\n',
-          {},
-          (argv) => {
-            const element = pagesCommand.list(argv);
-            render(element);
-          }
-        )
+        .command('list', 'List all pages\n', {}, (argv) => {
+          const element = pagesCommand.list(argv);
+          render(element);
+        })
         .command(
           'delete <slug>',
           'Delete a page by slug\n',
@@ -1268,15 +1304,10 @@ export function buildCli(options: CliOptions) {
     'Manage secrets for your brains\n',
     (yargsSecret) => {
       yargsSecret
-        .command(
-          'list',
-          'List all secrets\n',
-          {},
-          () => {
-            const element = secretCommand.list();
-            render(element);
-          }
-        )
+        .command('list', 'List all secrets\n', {}, () => {
+          const element = secretCommand.list();
+          render(element);
+        })
         .command(
           'create <name>',
           'Create a new secret\n',
@@ -1315,10 +1346,7 @@ export function buildCli(options: CliOptions) {
                 type: 'string',
                 demandOption: true,
               })
-              .example(
-                '$0 secret delete ANTHROPIC_API_KEY',
-                'Delete a secret'
-              );
+              .example('$0 secret delete ANTHROPIC_API_KEY', 'Delete a secret');
           },
           (argv) => {
             const element = secretCommand.delete(argv);
@@ -1331,7 +1359,8 @@ export function buildCli(options: CliOptions) {
           (yargsBulk) => {
             return yargsBulk
               .positional('file', {
-                describe: 'Path to the .env file (defaults to .env in project root)',
+                describe:
+                  'Path to the .env file (defaults to .env in project root)',
                 type: 'string',
               })
               .example(
@@ -1360,15 +1389,10 @@ export function buildCli(options: CliOptions) {
     'Manage users and SSH keys for authentication\n',
     (yargsUsers) => {
       yargsUsers
-        .command(
-          'list',
-          'List all users\n',
-          {},
-          () => {
-            const element = usersCommand.list();
-            render(element);
-          }
-        )
+        .command('list', 'List all users\n', {}, () => {
+          const element = usersCommand.list();
+          render(element);
+        })
         .command(
           'create <name>',
           'Create a new user\n',
@@ -1501,17 +1525,17 @@ export function buildCli(options: CliOptions) {
                 alias: 'f',
                 default: false,
               })
-              .example(
-                '$0 users remove-key admin SHA256:...',
-                'Remove a key'
-              );
+              .example('$0 users remove-key admin SHA256:...', 'Remove a key');
           },
           (argv) => {
             const element = usersCommand.removeKey(argv as any);
             render(element);
           }
         )
-        .demandCommand(1, 'You need to specify a users command (list, create, delete, list-keys, add-key, remove-key)');
+        .demandCommand(
+          1,
+          'You need to specify a users command (list, create, delete, list-keys, add-key, remove-key)'
+        );
 
       return yargsUsers;
     }
@@ -1548,14 +1572,8 @@ export function buildCli(options: CliOptions) {
           default: false,
         })
         .example('$0 login', 'Interactive key selection')
-        .example(
-          '$0 login --path ~/.ssh/id_ed25519',
-          'Set key directly'
-        )
-        .example(
-          '$0 login --project',
-          'Set key for current project'
-        );
+        .example('$0 login --path ~/.ssh/id_ed25519', 'Set key directly')
+        .example('$0 login --project', 'Set key for current project');
     },
     (argv) => {
       const element = authCommand.login(argv as any);
@@ -1574,10 +1592,7 @@ export function buildCli(options: CliOptions) {
           default: false,
         })
         .example('$0 logout', 'Clear global key configuration')
-        .example(
-          '$0 logout --project',
-          'Clear project-specific key'
-        );
+        .example('$0 logout --project', 'Clear project-specific key');
     },
     (argv) => {
       const element = authCommand.logout(argv as any);

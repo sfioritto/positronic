@@ -42,26 +42,29 @@ export function createWebhook<TSchema extends z.ZodSchema>(
   handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>
 ): WebhookFunction<TSchema> {
   // Create the registration function
-  const webhookFn = (identifier: string, token?: string): WebhookRegistration<TSchema> => ({
+  const webhookFn = (
+    identifier: string,
+    token?: string
+  ): WebhookRegistration<TSchema> => ({
     slug,
     identifier,
     schema,
     token,
   });
-  
+
   // Attach properties to the function
   webhookFn.handler = handler;
   webhookFn.slug = slug;
   webhookFn.schema = schema;
-  
+
   return webhookFn as WebhookFunction<TSchema>;
 }
 
 // Helper to extract schema type from a webhook registration
-type ExtractSchema<T> = T extends { schema: infer S } 
-  ? S extends z.ZodSchema 
-    ? z.infer<S> 
-    : never 
+type ExtractSchema<T> = T extends { schema: infer S }
+  ? S extends z.ZodSchema
+    ? z.infer<S>
+    : never
   : never;
 
 // Helper to normalize a single WebhookRegistration into a tuple for ExtractWebhookResponses

@@ -6,7 +6,9 @@ const ContainerPropsSchema = z.object({
   direction: z
     .enum(['row', 'column'])
     .optional()
-    .describe('Layout direction - row (horizontal) or column (vertical, default)'),
+    .describe(
+      'Layout direction - row (horizontal) or column (vertical, default)'
+    ),
   gap: z
     .enum(['none', 'small', 'medium', 'large'])
     .optional()
@@ -46,7 +48,9 @@ const ContainerComponent = ({
   gap = 'medium',
   padding = 'none',
 }: ContainerProps) => (
-  <div className={`flex ${directionClasses[direction]} ${gapClasses[gap]} ${paddingClasses[padding]}`}>
+  <div
+    className={`flex ${directionClasses[direction]} ${gapClasses[gap]} ${paddingClasses[padding]}`}
+  >
     {children}
   </div>
 );

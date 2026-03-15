@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
-import { uploadFileWithPresignedUrl, generateTypes } from '../commands/helpers.js';
+import {
+  uploadFileWithPresignedUrl,
+  generateTypes,
+} from '../commands/helpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -17,11 +20,19 @@ interface UploadProgress {
   percentage: number;
 }
 
-export const ResourceUpload = ({ filePath, customKey, projectRootPath }: ResourceUploadProps) => {
+export const ResourceUpload = ({
+  filePath,
+  customKey,
+  projectRootPath,
+}: ResourceUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [complete, setComplete] = useState(false);
-  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
+  const [error, setError] = useState<{
+    title: string;
+    message: string;
+    details?: string;
+  } | null>(null);
   const [resourceKey, setResourceKey] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -69,7 +80,7 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath }: Resourc
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
 
-            // Use presigned URL upload with progress callback
+      // Use presigned URL upload with progress callback
       await uploadFileWithPresignedUrl(
         filePath,
         key,
@@ -106,15 +117,17 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath }: Resourc
         setError({
           title: 'R2 Configuration Required',
           message: 'Large file uploads require R2 configuration.',
-          details: 'Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, and R2_BUCKET_NAME in your .env file.',
+          details:
+            'Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, and R2_BUCKET_NAME in your .env file.',
         });
       } else {
         setError({
           title: 'Upload Failed',
           message: err.message || 'An unknown error occurred',
-          details: err.code === 'ECONNREFUSED'
-            ? "Please ensure the server is running ('positronic server' or 'px s')"
-            : undefined,
+          details:
+            err.code === 'ECONNREFUSED'
+              ? "Please ensure the server is running ('positronic server' or 'px s')"
+              : undefined,
         });
       }
     } finally {
@@ -139,7 +152,7 @@ export const ResourceUpload = ({ filePath, customKey, projectRootPath }: Resourc
   if (uploading && progress) {
     return (
       <Box flexDirection="column">
-        <Text>⬆️  Uploading {path.basename(filePath)}...</Text>
+        <Text>⬆️ Uploading {path.basename(filePath)}...</Text>
         <Box marginTop={1}>
           <Text dimColor>Size: {formatSize(progress.total)}</Text>
         </Box>
@@ -177,6 +190,7 @@ const ProgressBar = ({ percentage }: ProgressBarProps) => {
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }

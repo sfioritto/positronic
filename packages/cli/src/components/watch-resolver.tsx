@@ -1,6 +1,14 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { createMachine, state, transition, reduce, invoke, immediate, guard } from 'robot3';
+import {
+  createMachine,
+  state,
+  transition,
+  reduce,
+  invoke,
+  immediate,
+  guard,
+} from 'robot3';
 import { useMachine } from 'react-robot';
 import { Watch } from './watch.js';
 import { ErrorComponent } from './error.js';
@@ -59,13 +67,15 @@ const getConnectionError = () => {
     return {
       title: 'Connection Error',
       message: 'Error connecting to the local development server.',
-      details: "Please ensure the server is running ('positronic server' or 'px s').",
+      details:
+        "Please ensure the server is running ('positronic server' or 'px s').",
     };
   }
   return {
     title: 'Connection Error',
     message: 'Error connecting to the remote project server.',
-    details: 'Please check your network connection and verify the project URL is correct.',
+    details:
+      'Please check your network connection and verify the project URL is correct.',
   };
 };
 
@@ -115,7 +125,9 @@ const searchRun = async (ctx: ResolverContext) => {
 };
 
 const fetchActiveRuns = async (ctx: ResolverContext) => {
-  const apiPath = `/brains/${encodeURIComponent(ctx.resolvedBrainTitle!)}/active-runs`;
+  const apiPath = `/brains/${encodeURIComponent(
+    ctx.resolvedBrainTitle!
+  )}/active-runs`;
   const response = await apiClient.fetch(apiPath, { method: 'GET' });
 
   if (response.status === 200) {
@@ -145,7 +157,10 @@ const handleNetworkError = (err: unknown): ErrorInfo => {
 
 // Reducers
 const storeBrainSearchResult = reduce(
-  (ctx: ResolverContext, ev: { data: BrainsResponse }) => ({ ...ctx, brainSearchResult: ev.data })
+  (ctx: ResolverContext, ev: { data: BrainsResponse }) => ({
+    ...ctx,
+    brainSearchResult: ev.data,
+  })
 );
 
 const storeRunAndResolve = reduce(
@@ -157,31 +172,44 @@ const storeRunAndResolve = reduce(
 );
 
 const storeActiveRunsResult = reduce(
-  (ctx: ResolverContext, ev: { data: ActiveRunsResponse['runs'] }) => ({ ...ctx, activeRunsResult: ev.data })
+  (ctx: ResolverContext, ev: { data: ActiveRunsResponse['runs'] }) => ({
+    ...ctx,
+    activeRunsResult: ev.data,
+  })
 );
 
 const setErrorFromEvent = reduce(
-  (ctx: ResolverContext, ev: { error: unknown }) => ({ ...ctx, error: handleNetworkError(ev.error) })
+  (ctx: ResolverContext, ev: { error: unknown }) => ({
+    ...ctx,
+    error: handleNetworkError(ev.error),
+  })
 );
 
-const applyBrainFound = reduce(
-  (ctx: ResolverContext) => ({ ...ctx, resolvedBrainTitle: ctx.brainSearchResult!.brains[0].title })
-);
+const applyBrainFound = reduce((ctx: ResolverContext) => ({
+  ...ctx,
+  resolvedBrainTitle: ctx.brainSearchResult!.brains[0].title,
+}));
 
-const applyBrainsMultiple = reduce(
-  (ctx: ResolverContext) => ({ ...ctx, brains: ctx.brainSearchResult!.brains })
-);
+const applyBrainsMultiple = reduce((ctx: ResolverContext) => ({
+  ...ctx,
+  brains: ctx.brainSearchResult!.brains,
+}));
 
-const applyActiveRunFound = reduce(
-  (ctx: ResolverContext) => ({ ...ctx, resolvedRunId: ctx.activeRunsResult![0].brainRunId })
-);
+const applyActiveRunFound = reduce((ctx: ResolverContext) => ({
+  ...ctx,
+  resolvedRunId: ctx.activeRunsResult![0].brainRunId,
+}));
 
-const applyMultipleActiveRuns = reduce(
-  (ctx: ResolverContext) => ({ ...ctx, activeRuns: ctx.activeRunsResult! })
-);
+const applyMultipleActiveRuns = reduce((ctx: ResolverContext) => ({
+  ...ctx,
+  activeRuns: ctx.activeRunsResult!,
+}));
 
 const setBrainTitleFromSelection = reduce(
-  (ctx: ResolverContext, ev: { brainTitle: string }) => ({ ...ctx, resolvedBrainTitle: ev.brainTitle })
+  (ctx: ResolverContext, ev: { brainTitle: string }) => ({
+    ...ctx,
+    resolvedBrainTitle: ev.brainTitle,
+  })
 );
 
 // Guards for routing
@@ -225,7 +253,11 @@ const createResolverMachine = (identifier: string) =>
       routeBrainSearch: state(
         immediate('fetchingActiveRuns', brainFoundGuard, applyBrainFound),
         immediate('searchingRun', brainNotFoundGuard) as any,
-        immediate('disambiguating', brainsMultipleGuard, applyBrainsMultiple) as any
+        immediate(
+          'disambiguating',
+          brainsMultipleGuard,
+          applyBrainsMultiple
+        ) as any
       ),
 
       // Invoke state: search for run by ID
@@ -237,7 +269,11 @@ const createResolverMachine = (identifier: string) =>
 
       // User selects from multiple matching brains
       disambiguating: state(
-        transition('BRAIN_SELECTED', 'fetchingActiveRuns', setBrainTitleFromSelection)
+        transition(
+          'BRAIN_SELECTED',
+          'fetchingActiveRuns',
+          setBrainTitleFromSelection
+        )
       ),
 
       // Invoke state: fetch active runs for the brain
@@ -251,7 +287,11 @@ const createResolverMachine = (identifier: string) =>
       routeActiveRuns: state(
         immediate('resolved', activeRunFoundGuard, applyActiveRunFound),
         immediate('noActiveRuns', noActiveRunsGuard) as any,
-        immediate('multipleActiveRuns', multipleActiveRunsGuard, applyMultipleActiveRuns) as any
+        immediate(
+          'multipleActiveRuns',
+          multipleActiveRunsGuard,
+          applyMultipleActiveRuns
+        ) as any
       ),
 
       // Terminal states
@@ -287,18 +327,19 @@ interface WatchResolverProps {
  * 2. If no brain matches, try as a run ID
  * 3. If neither works, show an error
  */
-export const WatchResolver = ({ identifier, startWithEvents }: WatchResolverProps) => {
-  const machine = useMemo(() => createResolverMachine(identifier), [identifier]);
+export const WatchResolver = ({
+  identifier,
+  startWithEvents,
+}: WatchResolverProps) => {
+  const machine = useMemo(
+    () => createResolverMachine(identifier),
+    [identifier]
+  );
   const [current, send] = useMachine(machine);
 
   const currentState = current.name;
-  const {
-    brains,
-    resolvedBrainTitle,
-    resolvedRunId,
-    activeRuns,
-    error,
-  } = current.context;
+  const { brains, resolvedBrainTitle, resolvedRunId, activeRuns, error } =
+    current.context;
 
   // Render based on state
   switch (currentState) {
@@ -340,7 +381,11 @@ export const WatchResolver = ({ identifier, startWithEvents }: WatchResolverProp
     case 'disambiguating':
       return (
         <SelectList
-          items={brains.map((b) => ({ id: b.title, label: b.title, description: b.description }))}
+          items={brains.map((b) => ({
+            id: b.title,
+            label: b.title,
+            description: b.description,
+          }))}
           header={`Multiple brains match '${identifier}':`}
           onSelect={(item) => {
             send({ type: 'BRAIN_SELECTED', brainTitle: item.label });
@@ -365,7 +410,9 @@ export const WatchResolver = ({ identifier, startWithEvents }: WatchResolverProp
           error={{
             title: 'Multiple Active Runs',
             message: `Found ${activeRuns.length} active runs for brain "${resolvedBrainTitle}".`,
-            details: `Please specify a specific run ID:\n${activeRuns.map(({ brainRunId }) => `  positronic watch ${brainRunId}`).join('\n')}`,
+            details: `Please specify a specific run ID:\n${activeRuns
+              .map(({ brainRunId }) => `  positronic watch ${brainRunId}`)
+              .join('\n')}`,
           }}
         />
       );
@@ -374,7 +421,9 @@ export const WatchResolver = ({ identifier, startWithEvents }: WatchResolverProp
       return error ? <ErrorComponent error={error} /> : null;
 
     case 'resolved':
-      return resolvedRunId ? <Watch runId={resolvedRunId} startWithEvents={startWithEvents} /> : null;
+      return resolvedRunId ? (
+        <Watch runId={resolvedRunId} startWithEvents={startWithEvents} />
+      ) : null;
 
     default:
       return null;

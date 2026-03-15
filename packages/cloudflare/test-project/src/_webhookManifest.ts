@@ -7,7 +7,7 @@ import webhook_loop_escalation from '../webhooks/loop-escalation.js';
 
 export const webhookManifest: Record<string, any> = {
   'test-webhook': webhook_test_webhook,
-  'notification': webhook_notification,
+  notification: webhook_notification,
   'inner-webhook': webhook_inner_webhook,
   'loop-escalation': webhook_loop_escalation,
 };

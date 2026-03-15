@@ -29,7 +29,10 @@ interface SchedulesResponse {
 }
 
 // Component to display a labeled field
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
+  label,
+  children,
+}) => (
   <Box>
     <Box width={14}>
       <Text dimColor>{label}:</Text>
@@ -74,13 +77,14 @@ interface BrainInfoProps {
 }
 
 const BrainInfo = ({ brainTitle, showSteps }: BrainInfoProps) => {
-  const { data: brain, loading: brainLoading, error: brainError } = useApiGet<BrainStructure>(
-    `/brains/${encodeURIComponent(brainTitle)}`
-  );
+  const {
+    data: brain,
+    loading: brainLoading,
+    error: brainError,
+  } = useApiGet<BrainStructure>(`/brains/${encodeURIComponent(brainTitle)}`);
 
-  const { data: schedulesData, loading: schedulesLoading } = useApiGet<SchedulesResponse>(
-    '/brains/schedules'
-  );
+  const { data: schedulesData, loading: schedulesLoading } =
+    useApiGet<SchedulesResponse>('/brains/schedules');
 
   if (brainLoading || schedulesLoading) {
     return (
@@ -103,9 +107,8 @@ const BrainInfo = ({ brainTitle, showSteps }: BrainInfoProps) => {
   }
 
   // Filter schedules for this brain
-  const brainSchedules = schedulesData?.schedules.filter(
-    (s) => s.brainTitle === brainTitle
-  ) || [];
+  const brainSchedules =
+    schedulesData?.schedules.filter((s) => s.brainTitle === brainTitle) || [];
 
   return (
     <Box flexDirection="column" gap={1}>

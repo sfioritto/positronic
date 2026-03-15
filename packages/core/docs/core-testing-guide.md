@@ -20,7 +20,7 @@ for await (const event of brain.run({ client: mockClient })) {
 }
 
 // Now make assertions
-expect(events.map(e => e.type)).toContain(BRAIN_EVENTS.COMPLETE);
+expect(events.map((e) => e.type)).toContain(BRAIN_EVENTS.COMPLETE);
 
 // WRONG: Don't try to assert while iterating
 for await (const event of brain.run()) {
@@ -35,7 +35,10 @@ for await (const event of brain.run()) {
 **Solution**: Replay events through the brain execution state machine:
 
 ```typescript
-import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
+import {
+  createBrainExecutionMachine,
+  sendEvent,
+} from '../src/dsl/brain-state-machine.js';
 
 // Helper defined at the top of brain.test.ts
 function finalStateFromEvents(events: BrainEvent<any>[]): any {
@@ -48,7 +51,10 @@ function finalStateFromEvents(events: BrainEvent<any>[]): any {
 
 // Usage
 const events = [];
-for await (const event of brain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+for await (const event of brain.run({
+  client: mockClient,
+  currentUser: { name: 'test-user' },
+})) {
   events.push(event);
 }
 const finalState = finalStateFromEvents(events);
@@ -128,12 +134,12 @@ for await (const event of errorBrain.run()) {
 }
 
 // Find the error event
-const errorEvent = events.find(e => e.type === BRAIN_EVENTS.ERROR);
+const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
 expect(errorEvent).toBeDefined();
 expect(errorEvent?.error.message).toBe('Step failed');
 
 // Brain still completes!
-expect(events.some(e => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
 ```
 
 ### 6. Type Inference Testing
@@ -191,7 +197,7 @@ for await (const event of brain.run()) {
 
 // CORRECT: Collect all events first
 const events = await collectAllEvents(brain.run());
-const foundComplete = events.some(e => e.type === BRAIN_EVENTS.COMPLETE);
+const foundComplete = events.some((e) => e.type === BRAIN_EVENTS.COMPLETE);
 ```
 
 ### Pitfall 3: Not Handling Async Steps
@@ -215,19 +221,19 @@ const brain = brain('test').step('Async', async ({ client }) => {
 
 ```typescript
 // WRONG: Expecting only main events
-expect(events.map(e => e.type)).toEqual([
+expect(events.map((e) => e.type)).toEqual([
   BRAIN_EVENTS.START,
-  BRAIN_EVENTS.COMPLETE
+  BRAIN_EVENTS.COMPLETE,
 ]);
 
 // CORRECT: Include all events in sequence
-expect(events.map(e => e.type)).toEqual([
+expect(events.map((e) => e.type)).toEqual([
   BRAIN_EVENTS.START,
-  BRAIN_EVENTS.STEP_STATUS,    // Don't forget status events!
+  BRAIN_EVENTS.STEP_STATUS, // Don't forget status events!
   BRAIN_EVENTS.STEP_START,
   BRAIN_EVENTS.STEP_COMPLETE,
   BRAIN_EVENTS.STEP_STATUS,
-  BRAIN_EVENTS.COMPLETE
+  BRAIN_EVENTS.COMPLETE,
 ]);
 ```
 
@@ -235,7 +241,10 @@ expect(events.map(e => e.type)).toEqual([
 
 ```typescript
 import { brain, BRAIN_EVENTS } from '@positronic/core';
-import { createBrainExecutionMachine, sendEvent } from '../src/dsl/brain-state-machine.js';
+import {
+  createBrainExecutionMachine,
+  sendEvent,
+} from '../src/dsl/brain-state-machine.js';
 import type { BrainEvent } from '../src/dsl/brain.js';
 import type { ObjectGenerator, ResourceLoader } from '@positronic/core';
 
@@ -264,15 +273,17 @@ describe('my brain feature', () => {
     mockGenerateObject.mockResolvedValue({ result: 'test' });
 
     // Define brain
-    const testBrain = brain('test')
-      .step('Process', async ({ client }) => {
-        const res = await client.generateObject({ prompt: 'test' });
-        return { processed: res.result };
-      });
+    const testBrain = brain('test').step('Process', async ({ client }) => {
+      const res = await client.generateObject({ prompt: 'test' });
+      return { processed: res.result };
+    });
 
     // Collect all events
     const events = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -281,7 +292,7 @@ describe('my brain feature', () => {
     expect(finalState).toEqual({ processed: 'test' });
 
     // Verify completion
-    expect(events.some(e => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
   });
 });
 ```

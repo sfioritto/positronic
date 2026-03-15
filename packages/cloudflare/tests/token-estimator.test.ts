@@ -1,5 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
-import { estimateTokens, estimateRequestTokens } from '../src/token-estimator.js';
+import {
+  estimateTokens,
+  estimateRequestTokens,
+} from '../src/token-estimator.js';
 
 describe('token-estimator', () => {
   describe('estimateTokens', () => {
@@ -14,7 +17,9 @@ describe('token-estimator', () => {
 
     it('returns more tokens for longer text', () => {
       const short = estimateTokens('hello');
-      const long = estimateTokens('hello world, this is a longer sentence with many more words');
+      const long = estimateTokens(
+        'hello world, this is a longer sentence with many more words'
+      );
       expect(long).toBeGreaterThan(short);
     });
   });

@@ -68,19 +68,22 @@ const getStatusColor = (status: string): string => {
 };
 
 // Component to display a labeled field
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
+  label,
+  children,
+}) => (
   <Box>
     <Box width={14}>
       <Text dimColor>{label}:</Text>
     </Box>
-    <Box flexGrow={1}>
-      {children}
-    </Box>
+    <Box flexGrow={1}>{children}</Box>
   </Box>
 );
 
 export const RunShow = ({ runId }: RunShowProps) => {
-  const { data, loading, error } = useApiGet<BrainRun>(`/brains/runs/${encodeURIComponent(runId)}`);
+  const { data, loading, error } = useApiGet<BrainRun>(
+    `/brains/runs/${encodeURIComponent(runId)}`
+  );
 
   if (loading) {
     return (
@@ -102,11 +105,12 @@ export const RunShow = ({ runId }: RunShowProps) => {
     );
   }
 
-  const duration = data.startedAt && data.completedAt
-    ? formatDuration(data.startedAt, data.completedAt)
-    : data.status === STATUS.RUNNING
-    ? 'Running...'
-    : 'N/A';
+  const duration =
+    data.startedAt && data.completedAt
+      ? formatDuration(data.startedAt, data.completedAt)
+      : data.status === STATUS.RUNNING
+      ? 'Running...'
+      : 'N/A';
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -170,8 +174,15 @@ export const RunShow = ({ runId }: RunShowProps) => {
       {/* Error details if status is error */}
       {data.status === STATUS.ERROR && data.error && (
         <Box flexDirection="column" marginTop={1}>
-          <Box borderStyle="round" borderColor="red" flexDirection="column" paddingX={1}>
-            <Text bold color="red">Error Details</Text>
+          <Box
+            borderStyle="round"
+            borderColor="red"
+            flexDirection="column"
+            paddingX={1}
+          >
+            <Text bold color="red">
+              Error Details
+            </Text>
             <Box marginTop={1} flexDirection="column">
               <Field label="Type">
                 <Text color="red">{data.error.name}</Text>
@@ -182,7 +193,9 @@ export const RunShow = ({ runId }: RunShowProps) => {
             </Box>
             {data.error.stack && (
               <Box marginTop={1} flexDirection="column">
-                <Text bold dimColor>Stack Trace:</Text>
+                <Text bold dimColor>
+                  Stack Trace:
+                </Text>
                 <Box marginLeft={2}>
                   <Text dimColor>{data.error.stack}</Text>
                 </Box>

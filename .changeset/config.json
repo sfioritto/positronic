@@ -10,7 +10,7 @@
       "@positronic/cli",
       "@positronic/cloudflare",
       "@positronic/shell",
-      "@positronic/client-anthropic", 
+      "@positronic/client-anthropic",
       "@positronic/client-vercel",
       "@positronic/template-new-project"
     ]

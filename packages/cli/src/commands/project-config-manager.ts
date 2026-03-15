@@ -169,7 +169,9 @@ export class ProjectConfigManager {
 
     // Priority 2: Project-specific key
     if (config.currentProject) {
-      const project = config.projects.find((p) => p.name === config.currentProject);
+      const project = config.projects.find(
+        (p) => p.name === config.currentProject
+      );
       if (project?.privateKeyPath) {
         return project.privateKeyPath;
       }
@@ -187,7 +189,10 @@ export class ProjectConfigManager {
   /**
    * Set the global default private key path
    */
-  setDefaultPrivateKeyPath(keyPath: string): { success: boolean; error?: string } {
+  setDefaultPrivateKeyPath(keyPath: string): {
+    success: boolean;
+    error?: string;
+  } {
     const config = this.read();
     config.defaultPrivateKeyPath = keyPath;
     this.write(config);
@@ -197,7 +202,10 @@ export class ProjectConfigManager {
   /**
    * Set the private key path for a specific project
    */
-  setProjectPrivateKeyPath(projectName: string, keyPath: string): { success: boolean; error?: string } {
+  setProjectPrivateKeyPath(
+    projectName: string,
+    keyPath: string
+  ): { success: boolean; error?: string } {
     const config = this.read();
     const project = config.projects.find((p) => p.name === projectName);
 
@@ -222,7 +230,10 @@ export class ProjectConfigManager {
   /**
    * Clear the private key path for a specific project
    */
-  clearProjectPrivateKeyPath(projectName: string): { success: boolean; error?: string } {
+  clearProjectPrivateKeyPath(projectName: string): {
+    success: boolean;
+    error?: string;
+  } {
     const config = this.read();
     const project = config.projects.find((p) => p.name === projectName);
 

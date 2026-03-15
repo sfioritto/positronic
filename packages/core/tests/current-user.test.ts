@@ -28,11 +28,13 @@ describe('currentUser', () => {
     const mockClient = createMockClient();
     let receivedUser: CurrentUser | undefined;
 
-    const testBrain = brain('test-brain')
-      .step('Check User', ({ currentUser }) => {
+    const testBrain = brain('test-brain').step(
+      'Check User',
+      ({ currentUser }) => {
         receivedUser = currentUser;
         return { done: true };
-      });
+      }
+    );
 
     const events = await collectEvents(
       testBrain.run({
@@ -49,8 +51,7 @@ describe('currentUser', () => {
   it('should appear in the START event payload', async () => {
     const mockClient = createMockClient();
 
-    const testBrain = brain('test-brain')
-      .step('Noop', () => ({ done: true }));
+    const testBrain = brain('test-brain').step('Noop', () => ({ done: true }));
 
     const events = await collectEvents(
       testBrain.run({
@@ -86,45 +87,46 @@ describe('currentUser', () => {
     });
 
     // After checkUser is called, the next iteration returns the done tool
-    (mockClient.generateText as any).mockResolvedValueOnce({
-      text: '',
-      toolCalls: [
-        {
-          toolName: 'checkUser',
-          toolCallId: 'call-1',
-          args: { input: 'test' },
-        },
-      ],
-      responseMessages: [{ role: 'assistant', content: 'test' }],
-      usage: { totalTokens: 10 },
-    }).mockResolvedValueOnce({
-      text: '',
-      toolCalls: [
-        {
-          toolName: 'done',
-          toolCallId: 'call-2',
-          args: { result: 'completed' },
-        },
-      ],
-      responseMessages: [{ role: 'assistant', content: 'done' }],
-      usage: { totalTokens: 5 },
-    });
+    (mockClient.generateText as any)
+      .mockResolvedValueOnce({
+        text: '',
+        toolCalls: [
+          {
+            toolName: 'checkUser',
+            toolCallId: 'call-1',
+            args: { input: 'test' },
+          },
+        ],
+        responseMessages: [{ role: 'assistant', content: 'test' }],
+        usage: { totalTokens: 10 },
+      })
+      .mockResolvedValueOnce({
+        text: '',
+        toolCalls: [
+          {
+            toolName: 'done',
+            toolCallId: 'call-2',
+            args: { result: 'completed' },
+          },
+        ],
+        responseMessages: [{ role: 'assistant', content: 'done' }],
+        usage: { totalTokens: 5 },
+      });
 
-    const testBrain = brain('test-brain')
-      .brain('Agent Step', {
-        system: 'You are a test agent',
-        prompt: 'Check the user',
-        tools: {
-          checkUser: {
-            description: 'Check who the current user is',
-            inputSchema: z.object({ input: z.string() }),
-            execute: async (input: any, context: StepContext) => {
-              toolReceivedUser = context.currentUser;
-              return 'checked';
-            },
+    const testBrain = brain('test-brain').brain('Agent Step', {
+      system: 'You are a test agent',
+      prompt: 'Check the user',
+      tools: {
+        checkUser: {
+          description: 'Check who the current user is',
+          inputSchema: z.object({ input: z.string() }),
+          execute: async (input: any, context: StepContext) => {
+            toolReceivedUser = context.currentUser;
+            return 'checked';
           },
         },
-      });
+      },
+    });
 
     await collectEvents(
       testBrain.run({

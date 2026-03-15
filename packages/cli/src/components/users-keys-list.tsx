@@ -39,8 +39,14 @@ const padRight = (text: string, width: number): string => {
 };
 
 export const UsersKeysList = ({ userName }: UsersKeysListProps) => {
-  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userName}`);
-  const { data, loading, error } = useApiGet<KeysResponse>(`/users/${userName}/keys`);
+  const {
+    data: user,
+    loading: loadingUser,
+    error: userError,
+  } = useApiGet<User>(`/users/${userName}`);
+  const { data, loading, error } = useApiGet<KeysResponse>(
+    `/users/${userName}/keys`
+  );
 
   if (userError) {
     return <ErrorComponent error={userError} />;
@@ -72,7 +78,8 @@ export const UsersKeysList = ({ userName }: UsersKeysListProps) => {
         <Text>No keys found for user "{user.name}".</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Add a key with "px users add-key {userName} ~/.ssh/id_ed25519.pub"
+            Tip: Add a key with "px users add-key {userName}{' '}
+            ~/.ssh/id_ed25519.pub"
           </Text>
         </Box>
       </Box>
@@ -87,21 +94,29 @@ export const UsersKeysList = ({ userName }: UsersKeysListProps) => {
     added: { header: 'Added', width: 20 },
   };
 
-  const totalWidth = Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
+  const totalWidth =
+    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
       <Text bold>
-        Keys for user "{user.name}" ({data.count} key{data.count === 1 ? '' : 's'}):
+        Keys for user "{user.name}" ({data.count} key
+        {data.count === 1 ? '' : 's'}):
       </Text>
 
       <Box marginTop={1} flexDirection="column">
         <Box>
-          <Text bold color="cyan">{padRight(columns.fingerprint.header, columns.fingerprint.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.label.header, columns.label.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.added.header, columns.added.width)}</Text>
+          <Text bold color="cyan">
+            {padRight(columns.fingerprint.header, columns.fingerprint.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.label.header, columns.label.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.added.header, columns.added.width)}
+          </Text>
         </Box>
 
         <Box>
@@ -110,11 +125,23 @@ export const UsersKeysList = ({ userName }: UsersKeysListProps) => {
 
         {sortedKeys.map((key) => (
           <Box key={key.fingerprint}>
-            <Text>{padRight(truncate(key.fingerprint, columns.fingerprint.width), columns.fingerprint.width)}</Text>
-            <Text>  </Text>
-            <Text>{padRight(truncate(key.label || '-', columns.label.width), columns.label.width)}</Text>
-            <Text>  </Text>
-            <Text dimColor>{padRight(formatDate(key.addedAt), columns.added.width)}</Text>
+            <Text>
+              {padRight(
+                truncate(key.fingerprint, columns.fingerprint.width),
+                columns.fingerprint.width
+              )}
+            </Text>
+            <Text> </Text>
+            <Text>
+              {padRight(
+                truncate(key.label || '-', columns.label.width),
+                columns.label.width
+              )}
+            </Text>
+            <Text> </Text>
+            <Text dimColor>
+              {padRight(formatDate(key.addedAt), columns.added.width)}
+            </Text>
           </Box>
         ))}
       </Box>

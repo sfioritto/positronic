@@ -3,6 +3,7 @@
 ## Goal
 
 Simplify how UI components and bundles work:
+
 - Components are just React component definitions
 - Bundle is built by the project (not shipped with package)
 - Page references bundle via script src (not inlined)
@@ -13,11 +14,13 @@ Simplify how UI components and bundles work:
 ### 1. Move components from Runner to Brain
 
 **brain.ts:**
+
 - Add `.withComponents(components)` method to Brain DSL
 - Components stored on brain, passed through to BrainEventStream
 - Remove components from BaseRunParams
 
 **brain-runner.ts:**
+
 - Remove `.withComponents()` method
 - Remove components/componentBundle from options
 - Runner no longer knows about components at all
@@ -25,36 +28,43 @@ Simplify how UI components and bundles work:
 ### 2. Remove componentBundle infrastructure
 
 **brain.ts:**
+
 - Remove `componentBundle` from BaseRunParams
 - Remove `componentBundle` field from BrainEventStream
 - Remove componentBundle validation in executeUIStep
 
 **ui/types.ts:**
+
 - Remove `BUNDLE_KEY` Symbol
 - Remove `ComponentRegistry` type
 - Remove `createComponentRegistry()` function
 - Remove `getComponentBundle()` function
 
 **core/index.ts:**
+
 - Remove exports for BUNDLE_KEY, createComponentRegistry, getComponentBundle, ComponentRegistry
 
 ### 3. Update page generation to use script src
 
 **ui/generate-page-html.ts:**
+
 - Remove `componentBundle` parameter
 - Change from inlining bundle to: `<script src="/bundle/components.js"></script>`
 
 **brain.ts (executeUIStep):**
+
 - Remove componentBundle from generatePageHtml call
 
 ### 4. Simplify gen-ui-components package
 
 **gen-ui-components/src/index.ts:**
+
 - Remove `createComponentRegistry` usage
 - Just export components directly as a plain object
 - Remove componentBundle import
 
 **gen-ui-components:**
+
 - Remove `generated-bundle.ts` and generation script
 - Remove esbuild config (bundling moves to generated projects)
 - Update package.json build scripts
@@ -62,6 +72,7 @@ Simplify how UI components and bundles work:
 ### 5. Update generated project template
 
 **template-new-project:**
+
 - Add `components/index.ts` that re-exports from @positronic/gen-ui-components
 - Add esbuild.config.mjs for bundling components
 - Add build script to package.json
@@ -70,6 +81,7 @@ Simplify how UI components and bundles work:
 ### 6. Dev server builds and serves bundle
 
 **cli (dev server):**
+
 - On startup, build bundle from `components/index.ts` using esbuild
 - Watch `components/` directory for changes, rebuild on change
 - Serve bundle at `/bundle/components.js`

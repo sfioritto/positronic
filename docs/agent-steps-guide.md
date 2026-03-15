@@ -5,6 +5,7 @@ This guide covers the agent step functionality in Positronic brains - a powerful
 ## Overview
 
 Agent steps allow you to define LLM agents directly within your brain workflow. An agent:
+
 - Has a system prompt and initial user prompt
 - Can use tools to perform actions
 - Can suspend execution to wait for external events (webhooks)
@@ -34,11 +35,10 @@ Now all brains in your project have type-safe access to services:
 import { brain } from '../brain.js';
 
 // Builder pattern - services available in steps
-export default brain('my-workflow')
-  .step('Notify', ({ slack }) => {
-    slack.postMessage('#alerts', 'Workflow started');
-    return { notified: true };
-  });
+export default brain('my-workflow').step('Notify', ({ slack }) => {
+  slack.postMessage('#alerts', 'Workflow started');
+  return { notified: true };
+});
 
 // Direct agent creation - services available in config function
 export default brain('my-agent', ({ slack, env }) => ({
@@ -135,11 +135,13 @@ const dynamicAgent = brain('dynamic-helper', ({ tools }) => ({
 ### When to Use Direct Agent Creation
 
 Use `brain('name', config)` when:
+
 - Your brain is a single agent with no other steps
 - You want a concise way to define a standalone agent
 - The agent doesn't need initialization steps before running
 
 Use the builder pattern `brain('name').step(...).brain(...)` when:
+
 - You need multiple steps before or after the agent
 - You need to set up state before the agent runs
 - You have multiple agents in sequence
@@ -155,8 +157,9 @@ Run another brain as a sub-workflow:
 ```typescript
 import { brain } from '@positronic/core';
 
-const innerBrain = brain('process-item')
-  .step('Process', ({ state }) => ({ processed: true }));
+const innerBrain = brain('process-item').step('Process', ({ state }) => ({
+  processed: true,
+}));
 
 const outerBrain = brain('orchestrator')
   .step('Init', () => ({ items: ['a', 'b', 'c'] }))
@@ -261,7 +264,9 @@ interface AgentTool<TInput extends z.ZodSchema> {
   inputSchema: TInput;
 
   /** Execute function. Can return a result or { waitFor: webhook } to suspend */
-  execute?: (input: z.infer<TInput>) =>
+  execute?: (
+    input: z.infer<TInput>
+  ) =>
     | unknown
     | Promise<unknown>
     | AgentToolWaitFor
@@ -417,16 +422,16 @@ When the agent calls `generateUI`, execution suspends until the user submits the
 
 Agent steps emit events during execution for monitoring and debugging:
 
-| Event | Description |
-|-------|-------------|
-| `AGENT_START` | Agent execution begins |
-| `AGENT_ITERATION` | New iteration of the agent loop |
-| `AGENT_TOOL_CALL` | Agent is calling a tool |
-| `AGENT_TOOL_RESULT` | Tool execution completed |
-| `AGENT_ASSISTANT_MESSAGE` | LLM generated a message |
-| `AGENT_WEBHOOK` | Agent suspended waiting for webhook |
-| `AGENT_COMPLETE` | Agent finished (terminal tool called) |
-| `AGENT_TOKEN_LIMIT` | Agent stopped due to token limit |
+| Event                     | Description                           |
+| ------------------------- | ------------------------------------- |
+| `AGENT_START`             | Agent execution begins                |
+| `AGENT_ITERATION`         | New iteration of the agent loop       |
+| `AGENT_TOOL_CALL`         | Agent is calling a tool               |
+| `AGENT_TOOL_RESULT`       | Tool execution completed              |
+| `AGENT_ASSISTANT_MESSAGE` | LLM generated a message               |
+| `AGENT_WEBHOOK`           | Agent suspended waiting for webhook   |
+| `AGENT_COMPLETE`          | Agent finished (terminal tool called) |
+| `AGENT_TOKEN_LIMIT`       | Agent stopped due to token limit      |
 
 ### Listening to Events
 
@@ -458,7 +463,9 @@ The `ExtractTerminalInput` helper type extracts the result type from terminal to
 import type { AgentTool, ExtractTerminalInput } from '@positronic/core';
 
 const myTools = {
-  search: { /* ... */ } as AgentTool,
+  search: {
+    /* ... */
+  } as AgentTool,
   submit: {
     description: 'Submit result',
     inputSchema: z.object({
@@ -514,9 +521,11 @@ const approvalWebhook = createWebhook(
 
 // Define the brain
 const supportAgent = brain('support-agent')
-  .withOptionsSchema(z.object({
-    maxIterations: z.number().default(10),
-  }))
+  .withOptionsSchema(
+    z.object({
+      maxIterations: z.number().default(10),
+    })
+  )
   .withTools(defaultTools)
   .step('Initialize', () => ({
     ticketId: 'TICKET-123',

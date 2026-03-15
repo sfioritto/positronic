@@ -496,7 +496,10 @@ describe('CLI Integration: project commands', () => {
       // Wait for success text from the UI component
       // Note: caz runs `npm install --production` in the template directory when loading it,
       // which can take 5-10+ seconds when tests run concurrently. Using 1500 retries (15s).
-      const isReady = await waitForOutput(/project created successfully/i, 1500);
+      const isReady = await waitForOutput(
+        /project created successfully/i,
+        1500
+      );
       expect(isReady).toBe(true);
 
       // Validate CLI output contains the project name

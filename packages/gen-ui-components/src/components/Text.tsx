@@ -6,7 +6,9 @@ const TextPropsSchema = z.object({
   variant: z
     .enum(['body', 'small', 'muted'])
     .optional()
-    .describe('Text style - body (normal), small (smaller), muted (less prominent)'),
+    .describe(
+      'Text style - body (normal), small (smaller), muted (less prominent)'
+    ),
 });
 
 export type TextProps = z.infer<typeof TextPropsSchema>;

@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv, AgentTool, AgentConfig, AgentOutputSchema } from '../types.js';
+import type {
+  State,
+  JsonObject,
+  RuntimeEnv,
+  AgentTool,
+  AgentConfig,
+  AgentOutputSchema,
+} from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
@@ -55,7 +62,10 @@ export type StepBlock<
   isUIStep?: boolean;
   /** Configuration for UI generation steps */
   uiConfig?: {
-    template: (state: TStateIn, resources: Resources) => string | Promise<string>;
+    template: (
+      state: TStateIn,
+      resources: Resources
+    ) => string | Promise<string>;
     responseSchema?: z.ZodObject<any>;
   };
   /** Per-step client override for prompt steps */
@@ -131,7 +141,10 @@ export type AgentBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
+  TTools extends Record<string, AgentTool<any>> = Record<
+    string,
+    AgentTool<any>
+  >,
   TOutputSchema extends AgentOutputSchema | undefined = undefined
 > = {
   type: 'agent';
@@ -146,7 +159,9 @@ export type AgentBlock<
       pages?: PagesService;
       env: RuntimeEnv;
     } & TServices
-  ) => AgentConfig<TTools, TOutputSchema> | Promise<AgentConfig<TTools, TOutputSchema>>;
+  ) =>
+    | AgentConfig<TTools, TOutputSchema>
+    | Promise<AgentConfig<TTools, TOutputSchema>>;
   iterateConfig?: {
     over: (state: any) => any[];
     outputKey: string;
@@ -155,10 +170,7 @@ export type AgentBlock<
   };
 };
 
-export type GuardBlock<
-  TStateIn,
-  TOptions extends JsonObject = JsonObject,
-> = {
+export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
   type: 'guard';
   title: string;
   predicate: (params: { state: TStateIn; options: TOptions }) => boolean;
@@ -172,14 +184,7 @@ export type Block<
   TResponseIn extends JsonObject | undefined = undefined,
   TPageIn extends GeneratedPage | undefined = undefined
 > =
-  | StepBlock<
-      TStateIn,
-      TStateOut,
-      TOptions,
-      TServices,
-      TResponseIn,
-      TPageIn
-    >
+  | StepBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn, TPageIn>
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
   | AgentBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>
   | GuardBlock<TStateIn, TOptions>

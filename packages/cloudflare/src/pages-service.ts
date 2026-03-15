@@ -1,4 +1,9 @@
-import type { PagesService, Page, PageCreateOptions, RuntimeEnv } from '@positronic/core';
+import type {
+  PagesService,
+  Page,
+  PageCreateOptions,
+  RuntimeEnv,
+} from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
 import type { MonitorDO } from './monitor-do.js';
 
@@ -148,7 +153,8 @@ export function createPagesService(
         brainRunId: existingMetadata.brainRunId || '',
         persist: existingMetadata.persist === 'true',
         ...(existingMetadata.ttl && { ttl: Number(existingMetadata.ttl) }),
-        createdAt: existingMetadata.createdAt || existingObject.uploaded.toISOString(),
+        createdAt:
+          existingMetadata.createdAt || existingObject.uploaded.toISOString(),
       };
     },
   };

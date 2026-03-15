@@ -41,7 +41,9 @@ bundle.get('/components.js', async (context: Context) => {
   } catch (error) {
     console.error('Error serving bundle:', error);
     return new Response(
-      `// Error loading bundle: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      `// Error loading bundle: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
       {
         status: 500,
         headers: {

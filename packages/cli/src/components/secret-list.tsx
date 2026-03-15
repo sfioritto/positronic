@@ -52,7 +52,8 @@ export const SecretList = () => {
         <Text>No secrets found.</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Create a secret with "px secret create &lt;name&gt; --value=&lt;value&gt;"
+            Tip: Create a secret with "px secret create &lt;name&gt;
+            --value=&lt;value&gt;"
           </Text>
         </Box>
       </Box>
@@ -66,10 +67,13 @@ export const SecretList = () => {
   };
 
   // Calculate total width for separator
-  const totalWidth = Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
+  const totalWidth =
+    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
 
   // Sort secrets by name
-  const sortedSecrets = [...data.secrets].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedSecrets = [...data.secrets].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -80,9 +84,13 @@ export const SecretList = () => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.name.header, columns.name.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.updatedAt.header, columns.updatedAt.width)}</Text>
+          <Text bold color="cyan">
+            {padRight(columns.name.header, columns.name.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.updatedAt.header, columns.updatedAt.width)}
+          </Text>
         </Box>
 
         {/* Separator */}
@@ -93,9 +101,16 @@ export const SecretList = () => {
         {/* Data rows */}
         {sortedSecrets.map((secret) => (
           <Box key={secret.name}>
-            <Text>{padRight(truncate(secret.name, columns.name.width), columns.name.width)}</Text>
-            <Text>  </Text>
-            <Text dimColor>{padRight(formatDate(secret.updatedAt), columns.updatedAt.width)}</Text>
+            <Text>
+              {padRight(
+                truncate(secret.name, columns.name.width),
+                columns.name.width
+              )}
+            </Text>
+            <Text> </Text>
+            <Text dimColor>
+              {padRight(formatDate(secret.updatedAt), columns.updatedAt.width)}
+            </Text>
           </Box>
         ))}
       </Box>

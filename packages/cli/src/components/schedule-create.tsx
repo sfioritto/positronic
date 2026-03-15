@@ -20,20 +20,33 @@ interface CreateScheduleResponse {
   nextRunAt?: number;
 }
 
-export const ScheduleCreate = ({ identifier, cronExpression, options, initialState }: ScheduleCreateProps) => {
+export const ScheduleCreate = ({
+  identifier,
+  cronExpression,
+  options,
+  initialState,
+}: ScheduleCreateProps) => {
   const [created, setCreated] = useState(false);
   const [schedule, setSchedule] = useState<CreateScheduleResponse | null>(null);
 
-  const { execute, loading, error } = useApiPost<CreateScheduleResponse>('/brains/schedules', {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const { execute, loading, error } = useApiPost<CreateScheduleResponse>(
+    '/brains/schedules',
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 
   useEffect(() => {
     const createSchedule = async () => {
       try {
-        const result = await execute({ identifier, cronExpression, options, ...(initialState && { initialState }) });
+        const result = await execute({
+          identifier,
+          cronExpression,
+          options,
+          ...(initialState && { initialState }),
+        });
         setSchedule(result);
         setCreated(true);
       } catch (err) {
@@ -74,18 +87,20 @@ export const ScheduleCreate = ({ identifier, cronExpression, options, initialSta
             <Text bold>Timezone:</Text> {schedule.timezone}
           </Text>
           <Text>
-            <Text bold>Status:</Text> {schedule.enabled ? 'Enabled' : 'Disabled'}
+            <Text bold>Status:</Text>{' '}
+            {schedule.enabled ? 'Enabled' : 'Disabled'}
           </Text>
           {options && Object.keys(options).length > 0 && (
             <Text>
               <Text bold>Options:</Text>{' '}
-              {Object.entries(options).map(([k, v]) => `${k}=${v}`).join(', ')}
+              {Object.entries(options)
+                .map(([k, v]) => `${k}=${v}`)
+                .join(', ')}
             </Text>
           )}
           {initialState && Object.keys(initialState).length > 0 && (
             <Text>
-              <Text bold>Initial State:</Text>{' '}
-              {JSON.stringify(initialState)}
+              <Text bold>Initial State:</Text> {JSON.stringify(initialState)}
             </Text>
           )}
           {schedule.nextRunAt && (
@@ -100,9 +115,7 @@ export const ScheduleCreate = ({ identifier, cronExpression, options, initialSta
           )}
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>
-            Tip: Use "px schedule -l" to view all schedules
-          </Text>
+          <Text dimColor>Tip: Use "px schedule -l" to view all schedules</Text>
         </Box>
       </Box>
     );

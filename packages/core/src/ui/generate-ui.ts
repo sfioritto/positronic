@@ -356,7 +356,11 @@ ${componentDocs}
 4. The root must be a single component (usually Form or Container)
 5. Use \`children:\` array for nested components
 6. Do NOT use markdown formatting in content strings - no **bold**, *italic*, or [links](url). These are React components, not markdown. URLs should be included as plain text.
-${hasSchema ? '7. After generating the YAML, call validate_template to verify it matches the expected schema' : ''}`;
+${
+  hasSchema
+    ? '7. After generating the YAML, call validate_template to verify it matches the expected schema'
+    : ''
+}`;
 }
 
 /**
@@ -435,10 +439,16 @@ export async function generateUI(params: {
   system?: string;
   maxSteps?: number;
 }): Promise<GenerateUIResult> {
-  const { client, prompt, components, schema, data = {}, maxSteps = 10 } = params;
+  const {
+    client,
+    prompt,
+    components,
+    schema,
+    data = {},
+    maxSteps = 10,
+  } = params;
 
-  const systemPrompt =
-    params.system ?? buildSystemPrompt(components, !!schema);
+  const systemPrompt = params.system ?? buildSystemPrompt(components, !!schema);
   const userPrompt = buildUserPrompt(prompt, data, schema);
 
   // Create the validate_template tool

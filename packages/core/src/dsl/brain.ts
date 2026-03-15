@@ -35,7 +35,11 @@ export type {
 } from './definitions/steps.js';
 
 // Definitions - Blocks
-export type { StepAction, GuardBlock, WaitBlock } from './definitions/blocks.js';
+export type {
+  StepAction,
+  GuardBlock,
+  WaitBlock,
+} from './definitions/blocks.js';
 
 // Definitions - Brain types
 export type { GeneratedPage, BrainConfig } from './definitions/brain-types.js';

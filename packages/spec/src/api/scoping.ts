@@ -26,9 +26,11 @@ async function runBrainAndWait(
       return null;
     }
 
-    await readSseUntil(watchResponse.body, (event) =>
-      event.type === BRAIN_EVENTS.COMPLETE ||
-      event.type === BRAIN_EVENTS.ERROR
+    await readSseUntil(
+      watchResponse.body,
+      (event) =>
+        event.type === BRAIN_EVENTS.COMPLETE ||
+        event.type === BRAIN_EVENTS.ERROR
     );
 
     return brainRunId;
@@ -97,7 +99,9 @@ export const scoping = {
       // userA's history has the run
       const historyA = await userA.fetch(
         new Request(
-          `http://example.com/brains/${encodeURIComponent(brainIdentifier)}/history?limit=50`
+          `http://example.com/brains/${encodeURIComponent(
+            brainIdentifier
+          )}/history?limit=50`
         )
       );
       if (historyA.status !== 200) {
@@ -117,7 +121,9 @@ export const scoping = {
       // userB's history is empty for this brain
       const historyB = await userB.fetch(
         new Request(
-          `http://example.com/brains/${encodeURIComponent(brainIdentifier)}/history?limit=50`
+          `http://example.com/brains/${encodeURIComponent(
+            brainIdentifier
+          )}/history?limit=50`
         )
       );
       if (historyB.status !== 200) {
@@ -160,13 +166,18 @@ export const scoping = {
       const userB = await fetchFactory('scoping-bob-active');
 
       // Start a delayed brain as userA (will be running for a while)
-      const brainRunId = await startBrainRun(userA.fetch, delayedBrainIdentifier);
+      const brainRunId = await startBrainRun(
+        userA.fetch,
+        delayedBrainIdentifier
+      );
       if (!brainRunId) return false;
 
       // userB checks active runs — should be empty
       const responseB = await userB.fetch(
         new Request(
-          `http://example.com/brains/${encodeURIComponent(delayedBrainIdentifier)}/active-runs`
+          `http://example.com/brains/${encodeURIComponent(
+            delayedBrainIdentifier
+          )}/active-runs`
         )
       );
       if (responseB.status !== 200) {
@@ -188,7 +199,9 @@ export const scoping = {
       // userA checks active runs — should have the run
       const responseA = await userA.fetch(
         new Request(
-          `http://example.com/brains/${encodeURIComponent(delayedBrainIdentifier)}/active-runs`
+          `http://example.com/brains/${encodeURIComponent(
+            delayedBrainIdentifier
+          )}/active-runs`
         )
       );
       if (responseA.status !== 200) {
@@ -201,9 +214,7 @@ export const scoping = {
         runs: Array<{ brainRunId: string }>;
       };
       if (activeA.runs.length === 0) {
-        console.error(
-          'userA should see at least 1 active run but sees 0'
-        );
+        console.error('userA should see at least 1 active run but sees 0');
         return false;
       }
 
@@ -292,7 +303,7 @@ export const scoping = {
         schedules: Array<{ id: string }>;
       };
       if (!listA.schedules.some((s) => s.id === schedule.id)) {
-        console.error("userA should see their own schedule in list");
+        console.error('userA should see their own schedule in list');
         return false;
       }
 

@@ -31,13 +31,20 @@ describe('Wait Timeout Tests', () => {
     const testEnv = env as TestEnv;
 
     // Step 1: Start the timeout-webhook-brain
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: 'timeout-webhook-brain' }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'timeout-webhook-brain' }),
+      }
+    );
     const createCtx = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createCtx);
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createCtx
+    );
     expect(createResponse.status).toBe(201);
     const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
     await waitOnExecutionContext(createCtx);
@@ -71,7 +78,11 @@ describe('Wait Timeout Tests', () => {
     // Step 4: Watch again — should see CANCELLED event
     const resumeWatchRequest = await createAuthenticatedRequest(watchUrl);
     const resumeWatchCtx = createExecutionContext();
-    const resumeWatchResponse = await worker.fetch(resumeWatchRequest, testEnv, resumeWatchCtx);
+    const resumeWatchResponse = await worker.fetch(
+      resumeWatchRequest,
+      testEnv,
+      resumeWatchCtx
+    );
 
     const { found: foundCancelled } = await readUntilEvent(
       resumeWatchResponse.body!,
@@ -94,13 +105,20 @@ describe('Wait Timeout Tests', () => {
     const webhookIdentifier = 'timeout-test-123';
 
     // Step 1: Start the timeout-webhook-brain
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: 'timeout-webhook-brain' }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'timeout-webhook-brain' }),
+      }
+    );
     const createCtx = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createCtx);
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createCtx
+    );
     expect(createResponse.status).toBe(201);
     const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
     await waitOnExecutionContext(createCtx);
@@ -129,9 +147,16 @@ describe('Wait Timeout Tests', () => {
       }
     );
     const webhookCtx = createExecutionContext();
-    const webhookResponse = await worker.fetch(webhookRequest, testEnv, webhookCtx);
+    const webhookResponse = await worker.fetch(
+      webhookRequest,
+      testEnv,
+      webhookCtx
+    );
     expect(webhookResponse.status).toBe(200);
-    const webhookResult = await webhookResponse.json<{ received: boolean; action: string }>();
+    const webhookResult = await webhookResponse.json<{
+      received: boolean;
+      action: string;
+    }>();
     expect(webhookResult.received).toBe(true);
     expect(webhookResult.action).toBe('resumed');
     await waitOnExecutionContext(webhookCtx);
@@ -139,7 +164,11 @@ describe('Wait Timeout Tests', () => {
     // Step 4: Watch again — should see COMPLETE event
     const resumeWatchRequest = await createAuthenticatedRequest(watchUrl);
     const resumeWatchCtx = createExecutionContext();
-    const resumeWatchResponse = await worker.fetch(resumeWatchRequest, testEnv, resumeWatchCtx);
+    const resumeWatchResponse = await worker.fetch(
+      resumeWatchRequest,
+      testEnv,
+      resumeWatchCtx
+    );
 
     const { events: resumeEvents, found: foundComplete } = await readUntilEvent(
       resumeWatchResponse.body!,
@@ -149,7 +178,9 @@ describe('Wait Timeout Tests', () => {
     await waitOnExecutionContext(resumeWatchCtx);
 
     // Verify completion status
-    const completeEvent = resumeEvents.find((e) => e.type === BRAIN_EVENTS.COMPLETE);
+    const completeEvent = resumeEvents.find(
+      (e) => e.type === BRAIN_EVENTS.COMPLETE
+    );
     expect(completeEvent?.status).toBe(STATUS.COMPLETE);
 
     // Step 5: Verify MonitorDO shows complete
@@ -165,13 +196,20 @@ describe('Wait Timeout Tests', () => {
     const testEnv = env as TestEnv;
 
     // Step 1: Start the timeout-webhook-brain
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: 'timeout-webhook-brain' }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'timeout-webhook-brain' }),
+      }
+    );
     const createCtx = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createCtx);
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createCtx
+    );
     expect(createResponse.status).toBe(201);
     const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
     await waitOnExecutionContext(createCtx);
@@ -201,7 +239,11 @@ describe('Wait Timeout Tests', () => {
       `http://example.com/brains/runs/${brainRunId}`
     );
     const getRunCtx = createExecutionContext();
-    const getRunResponse = await worker.fetch(getRunRequest, testEnv, getRunCtx);
+    const getRunResponse = await worker.fetch(
+      getRunRequest,
+      testEnv,
+      getRunCtx
+    );
     await waitOnExecutionContext(getRunCtx);
     expect(getRunResponse.ok).toBe(true);
 
@@ -228,13 +270,20 @@ describe('Wait Timeout Tests', () => {
     const testEnv = env as TestEnv;
 
     // Step 1: Start the multi-wait-brain
-    const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brainTitle: 'multi-wait-brain' }),
-    });
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'multi-wait-brain' }),
+      }
+    );
     const createCtx = createExecutionContext();
-    const createResponse = await worker.fetch(createRequest, testEnv, createCtx);
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createCtx
+    );
     expect(createResponse.status).toBe(201);
     const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
     await waitOnExecutionContext(createCtx);
@@ -263,9 +312,16 @@ describe('Wait Timeout Tests', () => {
       }
     );
     const webhook1Ctx = createExecutionContext();
-    const webhook1Response = await worker.fetch(webhook1Request, testEnv, webhook1Ctx);
+    const webhook1Response = await worker.fetch(
+      webhook1Request,
+      testEnv,
+      webhook1Ctx
+    );
     expect(webhook1Response.status).toBe(200);
-    const webhook1Result = await webhook1Response.json<{ received: boolean; action: string }>();
+    const webhook1Result = await webhook1Response.json<{
+      received: boolean;
+      action: string;
+    }>();
     expect(webhook1Result.received).toBe(true);
     expect(webhook1Result.action).toBe('resumed');
     await waitOnExecutionContext(webhook1Ctx);
@@ -273,7 +329,11 @@ describe('Wait Timeout Tests', () => {
     // Step 4: Watch until second WEBHOOK event
     const watch2Request = await createAuthenticatedRequest(watchUrl);
     const watch2Ctx = createExecutionContext();
-    const watch2Response = await worker.fetch(watch2Request, testEnv, watch2Ctx);
+    const watch2Response = await worker.fetch(
+      watch2Request,
+      testEnv,
+      watch2Ctx
+    );
 
     const { found: foundSecondWebhook } = await readUntilEvent(
       watch2Response.body!,
@@ -292,7 +352,11 @@ describe('Wait Timeout Tests', () => {
     // Step 6: Watch again — should see CANCELLED event
     const watch3Request = await createAuthenticatedRequest(watchUrl);
     const watch3Ctx = createExecutionContext();
-    const watch3Response = await worker.fetch(watch3Request, testEnv, watch3Ctx);
+    const watch3Response = await worker.fetch(
+      watch3Request,
+      testEnv,
+      watch3Ctx
+    );
 
     const { found: foundCancelled } = await readUntilEvent(
       watch3Response.body!,

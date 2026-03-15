@@ -92,18 +92,23 @@ describe('Brain API Error Handling', () => {
       const testEnv = env as TestEnv;
       const brainName = 'basic-brain';
 
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
         testEnv,
         createContext
       );
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       await waitOnExecutionContext(createContext);
 
       const historyRequest = await createAuthenticatedRequest(
@@ -132,18 +137,23 @@ describe('Brain API Error Handling', () => {
 
       setMockError(createAnthropicTooManyTokensError());
 
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
         testEnv,
         createContext
       );
-      const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+      const { brainRunId } = await createResponse.json<{
+        brainRunId: string;
+      }>();
       await waitOnExecutionContext(createContext);
 
       const historyRequest = await createAuthenticatedRequest(
@@ -190,11 +200,14 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -298,11 +311,14 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -354,11 +370,14 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -405,11 +424,14 @@ describe('Brain API Error Handling', () => {
       setMockError(createAnthropicTooManyTokensError());
 
       // Create the brain run
-      const createRequest = await createAuthenticatedRequest('http://example.com/brains/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brainTitle: brainName }),
-      });
+      const createRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brainTitle: brainName }),
+        }
+      );
       const createContext = createExecutionContext();
       const createResponse = await worker.fetch(
         createRequest,
@@ -439,7 +461,9 @@ describe('Brain API Error Handling', () => {
       await waitOnExecutionContext(watchContext);
 
       // Connect to watch endpoint for running brains
-      const runningBrainsRequest = await createAuthenticatedRequest('http://example.com/brains/watch');
+      const runningBrainsRequest = await createAuthenticatedRequest(
+        'http://example.com/brains/watch'
+      );
       const runningBrainsContext = createExecutionContext();
       const runningBrainsResponse = await worker.fetch(
         runningBrainsRequest,

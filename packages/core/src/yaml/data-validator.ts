@@ -137,7 +137,11 @@ export function validateDataBindings(
       const asProp = node.props.as;
 
       if (itemsProp?.type === 'binding') {
-        const itemsType = resolvePathType(itemsProp.path, dataType, loopContext);
+        const itemsType = resolvePathType(
+          itemsProp.path,
+          dataType,
+          loopContext
+        );
 
         if (itemsType && itemsType.kind === 'array') {
           // Create new loop context with the loop variable
@@ -198,7 +202,11 @@ export function resolvePathValue(
   if (loopDataContext.has(firstSegment)) {
     current = loopDataContext.get(firstSegment);
     for (const segment of segments.slice(1)) {
-      if (current === null || current === undefined || typeof current !== 'object') {
+      if (
+        current === null ||
+        current === undefined ||
+        typeof current !== 'object'
+      ) {
         return undefined;
       }
       current = (current as Record<string, unknown>)[segment];
@@ -209,7 +217,11 @@ export function resolvePathValue(
   // Otherwise resolve against root data
   current = rootData;
   for (const segment of segments) {
-    if (current === null || current === undefined || typeof current !== 'object') {
+    if (
+      current === null ||
+      current === undefined ||
+      typeof current !== 'object'
+    ) {
       return undefined;
     }
     current = (current as Record<string, unknown>)[segment];
@@ -287,7 +299,11 @@ export function resolveBindings(
       const asProp = node.props.as;
 
       if (itemsProp?.type === 'binding') {
-        const itemsValue = resolvePathValue(itemsProp.path, data, loopDataContext);
+        const itemsValue = resolvePathValue(
+          itemsProp.path,
+          data,
+          loopDataContext
+        );
 
         if (Array.isArray(itemsValue)) {
           const varName =

@@ -18,7 +18,9 @@ import type { FormSchema } from './types.js';
  * Check if a value is a binding expression like "{{path}}".
  */
 export function isBinding(value: unknown): value is string {
-  return typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}');
+  return (
+    typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')
+  );
 }
 
 /**
@@ -37,7 +39,10 @@ export function extractBindingPath(binding: string): string {
  * Components that create loop contexts.
  * Children of these components can reference the loop variable.
  */
-const LOOP_COMPONENTS: Record<string, { itemsProp: string; asProp: string; defaultAs: string }> = {
+const LOOP_COMPONENTS: Record<
+  string,
+  { itemsProp: string; asProp: string; defaultAs: string }
+> = {
   List: { itemsProp: 'items', asProp: 'as', defaultAs: 'item' },
 };
 
@@ -103,7 +108,7 @@ function getLoopContext(
 
   let current: Placement | undefined = placement;
   while (current && current.parentId) {
-    const parent = placements.find(p => p.id === current!.parentId);
+    const parent = placements.find((p) => p.id === current!.parentId);
     if (!parent) break;
 
     const loopConfig = LOOP_COMPONENTS[parent.component];
@@ -135,7 +140,7 @@ function getLoopContext(
 function isInsideLoop(placement: Placement, placements: Placement[]): boolean {
   let current: Placement | undefined = placement;
   while (current && current.parentId) {
-    const parent = placements.find(p => p.id === current!.parentId);
+    const parent = placements.find((p) => p.id === current!.parentId);
     if (!parent) break;
 
     if (LOOP_COMPONENTS[parent.component]) {
@@ -190,7 +195,10 @@ export function validateDataBindings(
  * Components that contribute form fields.
  * Maps component name -> how to extract field info.
  */
-const FORM_COMPONENTS: Record<string, { nameProp: string; fieldType: ExtractedFormField['type'] }> = {
+const FORM_COMPONENTS: Record<
+  string,
+  { nameProp: string; fieldType: ExtractedFormField['type'] }
+> = {
   Input: { nameProp: 'name', fieldType: 'string' },
   TextArea: { nameProp: 'name', fieldType: 'string' },
   Checkbox: { nameProp: 'name', fieldType: 'boolean' }, // Note: overridden to 'string' if value prop is set
@@ -203,7 +211,9 @@ const FORM_COMPONENTS: Record<string, { nameProp: string; fieldType: ExtractedFo
  * Extract form schema from placements.
  * Finds all form input components and extracts their field info.
  */
-export function extractFormSchema(placements: Placement[]): ExtractedFormSchema {
+export function extractFormSchema(
+  placements: Placement[]
+): ExtractedFormSchema {
   const fields: ExtractedFormField[] = [];
 
   for (const placement of placements) {
@@ -216,7 +226,10 @@ export function extractFormSchema(placements: Placement[]): ExtractedFormSchema 
         let fieldType = formComponent.fieldType;
 
         // Special handling for Checkbox: if it has a value prop, it returns that string value
-        if (placement.component === 'Checkbox' && placement.props.value !== undefined) {
+        if (
+          placement.component === 'Checkbox' &&
+          placement.props.value !== undefined
+        ) {
           fieldType = 'string';
         }
 
@@ -228,7 +241,7 @@ export function extractFormSchema(placements: Placement[]): ExtractedFormSchema 
         }
 
         // Check if we already have this field (e.g., multiple checkboxes with same name)
-        const existing = fields.find(f => f.name === nameProp);
+        const existing = fields.find((f) => f.name === nameProp);
         if (existing) {
           // Multiple fields with same name = array
           if (!existing.type.endsWith('[]')) {
@@ -263,7 +276,7 @@ export function validateAgainstZod(
   // Check each schema field has a matching form field
   for (const [fieldName, fieldSchema] of Object.entries(shape)) {
     const isOptional = fieldSchema instanceof z.ZodOptional;
-    const extractedField = extracted.fields.find(f => f.name === fieldName);
+    const extractedField = extracted.fields.find((f) => f.name === fieldName);
 
     if (!isOptional && !extractedField) {
       errors.push({
@@ -295,7 +308,11 @@ export function createValidateFormTool(
 2. All data bindings (like {{email.subject}}) reference valid paths in the provided data
 Call this after building your form to verify it's correct.`,
     inputSchema: z.object({}),
-    execute: (): { valid: boolean; errors: Array<{ type: string; message: string }>; extractedFields: Array<{ name: string; type: string }> } => {
+    execute: (): {
+      valid: boolean;
+      errors: Array<{ type: string; message: string }>;
+      extractedFields: Array<{ name: string; type: string }>;
+    } => {
       const errors: ValidationError[] = [];
 
       // 1. Extract form schema from placements
@@ -313,8 +330,11 @@ Call this after building your form to verify it's correct.`,
 
       return {
         valid: errors.length === 0,
-        errors: errors.map(e => ({ type: e.type, message: e.message })),
-        extractedFields: extracted.fields.map(f => ({ name: f.name, type: f.type })),
+        errors: errors.map((e) => ({ type: e.type, message: e.message })),
+        extractedFields: extracted.fields.map((f) => ({
+          name: f.name,
+          type: f.type,
+        })),
       };
     },
   };

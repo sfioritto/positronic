@@ -119,7 +119,9 @@ export function inferTypeWithExamples(value: unknown, indent = 0): string {
       typeof firstElement === 'number' ||
       typeof firstElement === 'boolean'
     ) {
-      return `Array<${inferTypeDescription(firstElement)}> // ${value.length} items, e.g., ${formatExample(firstElement)}`;
+      return `Array<${inferTypeDescription(firstElement)}> // ${
+        value.length
+      } items, e.g., ${formatExample(firstElement)}`;
     }
 
     // For object arrays, show the structure

@@ -20,8 +20,12 @@ function collectEvents(events: BrainEvent[]): {
   stepStatuses: BrainEvent[];
   finalState: object;
 } {
-  const stepCompletes = events.filter((e) => e.type === BRAIN_EVENTS.STEP_COMPLETE);
-  const stepStatuses = events.filter((e) => e.type === BRAIN_EVENTS.STEP_STATUS);
+  const stepCompletes = events.filter(
+    (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
+  );
+  const stepStatuses = events.filter(
+    (e) => e.type === BRAIN_EVENTS.STEP_STATUS
+  );
   let state = {};
   for (const event of stepCompletes) {
     if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
@@ -44,12 +48,19 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
     const { finalState } = collectEvents(events);
-    expect(finalState).toEqual({ important: true, processed: true, done: true });
+    expect(finalState).toEqual({
+      important: true,
+      processed: true,
+      done: true,
+    });
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
   });
 
@@ -61,7 +72,10 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -69,10 +83,18 @@ describe('guard', () => {
 
     // Should have: Init complete, Guard complete, Process halted, Done halted
     expect(stepCompletes).toHaveLength(4);
-    expect(stepCompletes[0]).toEqual(expect.objectContaining({ stepTitle: 'Init' }));
-    expect(stepCompletes[1]).toEqual(expect.objectContaining({ stepTitle: 'Guard' }));
-    expect(stepCompletes[2]).toEqual(expect.objectContaining({ stepTitle: 'Process', halted: true, patch: [] }));
-    expect(stepCompletes[3]).toEqual(expect.objectContaining({ stepTitle: 'Done', halted: true, patch: [] }));
+    expect(stepCompletes[0]).toEqual(
+      expect.objectContaining({ stepTitle: 'Init' })
+    );
+    expect(stepCompletes[1]).toEqual(
+      expect.objectContaining({ stepTitle: 'Guard' })
+    );
+    expect(stepCompletes[2]).toEqual(
+      expect.objectContaining({ stepTitle: 'Process', halted: true, patch: [] })
+    );
+    expect(stepCompletes[3]).toEqual(
+      expect.objectContaining({ stepTitle: 'Done', halted: true, patch: [] })
+    );
 
     // State should only have what Init produced (guard doesn't modify, remaining halted)
     expect(finalState).toEqual({ important: false });
@@ -85,7 +107,10 @@ describe('guard', () => {
       .guard(({ state }) => state.value > 0);
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -103,7 +128,10 @@ describe('guard', () => {
       .step('After B', ({ state }) => ({ ...state, passedB: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -121,7 +149,10 @@ describe('guard', () => {
       .step('After B', ({ state }) => ({ ...state, passedB: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -129,9 +160,15 @@ describe('guard', () => {
 
     // Init complete, Check A complete, After A halted, Check B halted, After B halted
     expect(stepCompletes).toHaveLength(5);
-    expect(stepCompletes[2]).toEqual(expect.objectContaining({ stepTitle: 'After A', halted: true }));
-    expect(stepCompletes[3]).toEqual(expect.objectContaining({ stepTitle: 'Check B', halted: true }));
-    expect(stepCompletes[4]).toEqual(expect.objectContaining({ stepTitle: 'After B', halted: true }));
+    expect(stepCompletes[2]).toEqual(
+      expect.objectContaining({ stepTitle: 'After A', halted: true })
+    );
+    expect(stepCompletes[3]).toEqual(
+      expect.objectContaining({ stepTitle: 'Check B', halted: true })
+    );
+    expect(stepCompletes[4]).toEqual(
+      expect.objectContaining({ stepTitle: 'After B', halted: true })
+    );
 
     expect(finalState).toEqual({ a: false, b: true });
   });
@@ -144,7 +181,10 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -159,7 +199,10 @@ describe('guard', () => {
       .step('Never runs', ({ state }) => ({ ...state, modified: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -174,7 +217,10 @@ describe('guard', () => {
       .step('Done', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -182,18 +228,18 @@ describe('guard', () => {
 
     expect(types).toEqual([
       BRAIN_EVENTS.START,
-      BRAIN_EVENTS.STEP_STATUS,      // initial
-      BRAIN_EVENTS.STEP_START,        // Init
+      BRAIN_EVENTS.STEP_STATUS, // initial
+      BRAIN_EVENTS.STEP_START, // Init
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_COMPLETE,     // Init
+      BRAIN_EVENTS.STEP_COMPLETE, // Init
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_START,        // Check flag (guard)
+      BRAIN_EVENTS.STEP_START, // Check flag (guard)
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_COMPLETE,     // Check flag (guard pass — empty patch)
+      BRAIN_EVENTS.STEP_COMPLETE, // Check flag (guard pass — empty patch)
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_START,        // Done
+      BRAIN_EVENTS.STEP_START, // Done
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_COMPLETE,     // Done
+      BRAIN_EVENTS.STEP_COMPLETE, // Done
       BRAIN_EVENTS.STEP_STATUS,
       BRAIN_EVENTS.COMPLETE,
     ]);
@@ -207,7 +253,10 @@ describe('guard', () => {
       .step('B', ({ state }) => ({ ...state, b: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
@@ -215,18 +264,18 @@ describe('guard', () => {
 
     expect(types).toEqual([
       BRAIN_EVENTS.START,
-      BRAIN_EVENTS.STEP_STATUS,      // initial
-      BRAIN_EVENTS.STEP_START,        // Init
+      BRAIN_EVENTS.STEP_STATUS, // initial
+      BRAIN_EVENTS.STEP_START, // Init
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_COMPLETE,     // Init
+      BRAIN_EVENTS.STEP_COMPLETE, // Init
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_START,        // Check flag (guard)
+      BRAIN_EVENTS.STEP_START, // Check flag (guard)
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_COMPLETE,     // Check flag (guard)
+      BRAIN_EVENTS.STEP_COMPLETE, // Check flag (guard)
       BRAIN_EVENTS.STEP_STATUS,
-      BRAIN_EVENTS.STEP_COMPLETE,     // A (skipped)
-      BRAIN_EVENTS.STEP_COMPLETE,     // B (skipped)
-      BRAIN_EVENTS.STEP_STATUS,       // final status showing all skipped
+      BRAIN_EVENTS.STEP_COMPLETE, // A (skipped)
+      BRAIN_EVENTS.STEP_COMPLETE, // B (skipped)
+      BRAIN_EVENTS.STEP_STATUS, // final status showing all skipped
       BRAIN_EVENTS.COMPLETE,
     ]);
   });
@@ -239,12 +288,17 @@ describe('guard', () => {
       .step('B', ({ state }) => ({ ...state, b: true }));
 
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
       events.push(event);
     }
 
     // Find the last STEP_STATUS event
-    const stepStatusEvents = events.filter((e) => e.type === BRAIN_EVENTS.STEP_STATUS);
+    const stepStatusEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.STEP_STATUS
+    );
     const lastStatus = stepStatusEvents[stepStatusEvents.length - 1];
 
     expect(lastStatus.type).toBe(BRAIN_EVENTS.STEP_STATUS);
@@ -321,7 +375,9 @@ describe('guard', () => {
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
 
     // No new step completions, brain just completes
-    const stepCompletes = events.filter((e) => e.type === BRAIN_EVENTS.STEP_COMPLETE);
+    const stepCompletes = events.filter(
+      (e) => e.type === BRAIN_EVENTS.STEP_COMPLETE
+    );
     expect(stepCompletes).toHaveLength(0);
   });
 
@@ -365,12 +421,19 @@ describe('guard', () => {
     const testBrain = brain('guard-options')
       .withOptionsSchema(z.object({ threshold: z.number() }))
       .step('Init', () => ({ value: 5 }))
-      .guard(({ state, options }) => state.value > options.threshold, 'Threshold check')
+      .guard(
+        ({ state, options }) => state.value > options.threshold,
+        'Threshold check'
+      )
       .step('Process', ({ state }) => ({ ...state, processed: true }));
 
     // Guard should fail (5 is not > 10)
     const events: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' }, options: { threshold: 10 } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      options: { threshold: 10 },
+    })) {
       events.push(event);
     }
 
@@ -379,7 +442,11 @@ describe('guard', () => {
 
     // Guard should pass (5 > 3)
     const events2: BrainEvent[] = [];
-    for await (const event of testBrain.run({ client: mockClient, currentUser: { name: 'test-user' }, options: { threshold: 3 } })) {
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      options: { threshold: 3 },
+    })) {
       events2.push(event);
     }
 

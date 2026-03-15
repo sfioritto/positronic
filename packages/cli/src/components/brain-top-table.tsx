@@ -193,7 +193,10 @@ export const BrainTopTable = ({
                 )}
               </Text>
               <Text> </Text>
-              <Text dimColor={!isSelected} color={isSelected ? 'cyan' : undefined}>
+              <Text
+                dimColor={!isSelected}
+                color={isSelected ? 'cyan' : undefined}
+              >
                 {padRight(brain.brainRunId, columns.runId.width)}
               </Text>
               <Text> </Text>
@@ -201,7 +204,10 @@ export const BrainTopTable = ({
                 {padRight(brain.status, columns.status.width)}
               </Text>
               <Text> </Text>
-              <Text dimColor={!isSelected} color={isSelected ? 'cyan' : undefined}>
+              <Text
+                dimColor={!isSelected}
+                color={isSelected ? 'cyan' : undefined}
+              >
                 {padRight(started, columns.started.width)}
               </Text>
               <Text> </Text>

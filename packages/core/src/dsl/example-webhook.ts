@@ -10,14 +10,14 @@ export const slackWebhook = createWebhook(
     threadId: z.string(),
   }),
   async (request) => {
-    const body = await request.json() as any;
+    const body = (await request.json()) as any;
     return {
       type: 'webhook' as const,
       identifier: body.thread_ts,
       response: {
         message: body.text,
         threadId: body.thread_ts,
-      }
+      },
     };
   }
 );
@@ -30,7 +30,7 @@ export const emailWebhook = createWebhook(
     from: z.string(),
   }),
   async (request) => {
-    const body = await request.json() as any;
+    const body = (await request.json()) as any;
     return {
       type: 'webhook' as const,
       identifier: body.messageId,
@@ -38,7 +38,7 @@ export const emailWebhook = createWebhook(
         subject: body.subject,
         body: body.body,
         from: body.from,
-      }
+      },
     };
   }
 );
@@ -47,7 +47,11 @@ const myBrain = brain('My Brain')
   .step('My Step', ({ state }) => {
     return { cool: 'thing', ...state };
   })
-  .wait('Wait for response', () => [slackWebhook('thread-123'), emailWebhook('email-456')], { timeout: '24h' })
+  .wait(
+    'Wait for response',
+    () => [slackWebhook('thread-123'), emailWebhook('email-456')],
+    { timeout: '24h' }
+  )
   .step('My Step 2', ({ state, response }) => {
     if (response) {
       if ('threadId' in response) {

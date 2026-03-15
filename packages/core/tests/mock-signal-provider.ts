@@ -15,7 +15,13 @@ export class MockSignalProvider implements SignalProvider {
     this.signals.push(signal);
     // Sort by priority: KILL (1) > PAUSE (2) > WEBHOOK_RESPONSE (3) > RESUME (4) > USER_MESSAGE (5)
     this.signals.sort((a, b) => {
-      const priority: Record<string, number> = { KILL: 1, PAUSE: 2, WEBHOOK_RESPONSE: 3, RESUME: 4, USER_MESSAGE: 5 };
+      const priority: Record<string, number> = {
+        KILL: 1,
+        PAUSE: 2,
+        WEBHOOK_RESPONSE: 3,
+        RESUME: 4,
+        USER_MESSAGE: 5,
+      };
       return priority[a.type] - priority[b.type];
     });
   }
@@ -24,14 +30,18 @@ export class MockSignalProvider implements SignalProvider {
    * Get pending signals, consuming them in the process.
    * @param filter - 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
    */
-  async getSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): Promise<BrainSignal[]> {
+  async getSignals(
+    filter: 'CONTROL' | 'WEBHOOK' | 'ALL'
+  ): Promise<BrainSignal[]> {
     let result: BrainSignal[];
     if (filter === 'ALL') {
       result = [...this.signals];
     } else if (filter === 'WEBHOOK') {
       result = this.signals.filter((s) => s.type === 'WEBHOOK_RESPONSE');
     } else {
-      result = this.signals.filter((s) => s.type === 'KILL' || s.type === 'PAUSE');
+      result = this.signals.filter(
+        (s) => s.type === 'KILL' || s.type === 'PAUSE'
+      );
     }
 
     // Consume signals (delete after returning)

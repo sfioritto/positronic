@@ -12,11 +12,15 @@ interface ErrorComponentProps {
 export const ErrorComponent = ({ error }: ErrorComponentProps) => {
   return (
     <Box flexDirection="column">
-      <Text color="red" bold>❌ {error.title}</Text>
+      <Text color="red" bold>
+        ❌ {error.title}
+      </Text>
       <Box paddingLeft={2} flexDirection="column">
         <Text color="red">{error.message}</Text>
         {error.details && (
-          <Text color="red" dimColor>{error.details}</Text>
+          <Text color="red" dimColor>
+            {error.details}
+          </Text>
         )}
       </Box>
     </Box>

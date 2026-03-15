@@ -64,7 +64,9 @@ export type JsonPatch = {
  * Supports single webhook or array of webhooks (first response wins).
  */
 export interface AgentToolWaitFor {
-  waitFor: WebhookRegistration<z.ZodSchema> | WebhookRegistration<z.ZodSchema>[];
+  waitFor:
+    | WebhookRegistration<z.ZodSchema>
+    | WebhookRegistration<z.ZodSchema>[];
   timeout?: number;
 }
 
@@ -155,7 +157,10 @@ export interface AgentOutputSchema<
  * Configuration for an agent step.
  */
 export interface AgentConfig<
-  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>,
+  TTools extends Record<string, AgentTool<any>> = Record<
+    string,
+    AgentTool<any>
+  >,
   TOutputSchema extends AgentOutputSchema | undefined = undefined
 > {
   /** System prompt for the LLM */
@@ -199,14 +204,18 @@ export interface AgentMessage {
  * Helper type to extract the terminal tool's input type from a tools object.
  * Used for typing the result that gets merged into state.
  */
-export type ExtractTerminalInput<TTools extends Record<string, AgentTool<any>>> = {
-  [K in keyof TTools]: TTools[K] extends { terminal: true; inputSchema: infer S }
+export type ExtractTerminalInput<
+  TTools extends Record<string, AgentTool<any>>
+> = {
+  [K in keyof TTools]: TTools[K] extends {
+    terminal: true;
+    inputSchema: infer S;
+  }
     ? S extends z.ZodSchema
       ? z.infer<S>
       : never
     : never;
 }[keyof TTools];
-
 
 // Signal types for brain interruption
 
@@ -214,7 +223,12 @@ export type ExtractTerminalInput<TTools extends Record<string, AgentTool<any>>> 
  * Signal types that can be sent to a running brain.
  * Signals are processed in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
  */
-export type SignalType = 'KILL' | 'PAUSE' | 'USER_MESSAGE' | 'RESUME' | 'WEBHOOK_RESPONSE';
+export type SignalType =
+  | 'KILL'
+  | 'PAUSE'
+  | 'USER_MESSAGE'
+  | 'RESUME'
+  | 'WEBHOOK_RESPONSE';
 
 /**
  * A signal that can be injected into a running brain's execution.

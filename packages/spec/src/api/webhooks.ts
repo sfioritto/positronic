@@ -204,7 +204,9 @@ export const webhooks = {
       }
 
       const request = new Request(
-        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
+        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
+          identifier
+        )}`,
         {
           method: 'POST',
           headers: {
@@ -320,7 +322,9 @@ export const webhooks = {
       params.append('name', 'Test User');
 
       const request = new Request(
-        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
+        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
+          identifier
+        )}`,
         {
           method: 'POST',
           headers: {
@@ -346,16 +350,12 @@ export const webhooks = {
       };
 
       if (data.received !== false) {
-        console.error(
-          `Expected received to be false, got ${data.received}`
-        );
+        console.error(`Expected received to be false, got ${data.received}`);
         return false;
       }
 
       if (data.action !== 'ignored') {
-        console.error(
-          `Expected action to be 'ignored', got '${data.action}'`
-        );
+        console.error(`Expected action to be 'ignored', got '${data.action}'`);
         return false;
       }
 
@@ -395,7 +395,9 @@ export const webhooks = {
       }
 
       const request = new Request(
-        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(identifier)}`,
+        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
+          identifier
+        )}`,
         {
           method: 'POST',
           headers: {

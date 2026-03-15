@@ -32,36 +32,51 @@ export function createTool<T extends z.ZodSchema>(config: {
   execute?: (
     input: z.infer<T>,
     context: StepContext
-  ) => unknown | Promise<unknown> | AgentToolWaitFor | Promise<AgentToolWaitFor>;
+  ) =>
+    | unknown
+    | Promise<unknown>
+    | AgentToolWaitFor
+    | Promise<AgentToolWaitFor>;
   terminal?: boolean;
 }): AgentTool<T> {
   return config;
 }
 
 const generateUIInputSchema = z.object({
-  prompt: z.string().describe(
-    'Natural language instructions describing the UI to generate. ' +
-    'Include: (1) the purpose of the page, (2) what information to display from the data parameter, ' +
-    '(3) what input fields are needed if collecting data, (4) labels and placeholders for fields, ' +
-    '(5) any specific layout preferences. Example: "Create a form to collect user feedback with ' +
-    'fields for rating (1-5 scale), comments (text area), and email. Show the product name at the top."'
-  ),
-  hasForm: z.boolean().optional().describe(
-    'Whether to include a form that can be submitted. Defaults to true. ' +
-    'Set to true when: collecting user input, approval workflows, any interactive data entry. ' +
-    'Set to false when: displaying read-only information, confirmation pages, dashboards. ' +
-    'When true, the tool returns webhook info that must be used with waitForWebhook to receive the submission.'
-  ),
-  persist: z.boolean().optional().describe(
-    'Whether to keep the page after the brain run completes. Defaults to false. ' +
-    'Set to false (default): Page is automatically cleaned up when the brain run finishes. Use for one-time forms, approvals, or temporary displays. ' +
-    'Set to true: Page survives brain completion and remains accessible. Use for shared dashboards, permanent reference pages, or pages that need to outlive the workflow.'
-  ),
-  data: z.record(z.unknown()).optional().describe(
-    'Structured data for template bindings ({{path.to.value}} syntax). ' +
-    'Pass the objects/arrays you want to display. The UI generator infers the shape ' +
-    'and creates bindings to render all items. Example: { articles: [...], user: { name: "..." } }'
-  ),
+  prompt: z
+    .string()
+    .describe(
+      'Natural language instructions describing the UI to generate. ' +
+        'Include: (1) the purpose of the page, (2) what information to display from the data parameter, ' +
+        '(3) what input fields are needed if collecting data, (4) labels and placeholders for fields, ' +
+        '(5) any specific layout preferences. Example: "Create a form to collect user feedback with ' +
+        'fields for rating (1-5 scale), comments (text area), and email. Show the product name at the top."'
+    ),
+  hasForm: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether to include a form that can be submitted. Defaults to true. ' +
+        'Set to true when: collecting user input, approval workflows, any interactive data entry. ' +
+        'Set to false when: displaying read-only information, confirmation pages, dashboards. ' +
+        'When true, the tool returns webhook info that must be used with waitForWebhook to receive the submission.'
+    ),
+  persist: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether to keep the page after the brain run completes. Defaults to false. ' +
+        'Set to false (default): Page is automatically cleaned up when the brain run finishes. Use for one-time forms, approvals, or temporary displays. ' +
+        'Set to true: Page survives brain completion and remains accessible. Use for shared dashboards, permanent reference pages, or pages that need to outlive the workflow.'
+    ),
+  data: z
+    .record(z.unknown())
+    .optional()
+    .describe(
+      'Structured data for template bindings ({{path.to.value}} syntax). ' +
+        'Pass the objects/arrays you want to display. The UI generator infers the shape ' +
+        'and creates bindings to render all items. Example: { articles: [...], user: { name: "..." } }'
+    ),
 });
 
 /**
@@ -93,14 +108,21 @@ RETURNS: { url: string, webhook: { slug: string, identifier: string, token: stri
 
 IMPORTANT: Users have no way to discover the page URL on their own. After generating a page, you must tell them the URL using whatever communication tools are available.`,
   inputSchema: generateUIInputSchema,
-  async execute(input, context): Promise<{ url: string; webhook: { slug: string; identifier: string; token: string } | null }> {
-    const { components, pages, client, state, env, brainRunId, stepId } = context;
+  async execute(
+    input,
+    context
+  ): Promise<{
+    url: string;
+    webhook: { slug: string; identifier: string; token: string } | null;
+  }> {
+    const { components, pages, client, state, env, brainRunId, stepId } =
+      context;
     const hasForm = input.hasForm ?? true;
 
     if (!components || Object.keys(components).length === 0) {
       throw new Error(
         'generateUI requires components to be configured. ' +
-        'Use createBrain({ components }) or brain.withComponents() to register UI components.'
+          'Use createBrain({ components }) or brain.withComponents() to register UI components.'
       );
     }
 
@@ -117,25 +139,33 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       if (placementCount === 0) {
         throw new Error(
           `UI generation failed - no components were generated. ` +
-          `The LLM may not have understood the prompt. Try being more specific.`
+            `The LLM may not have understood the prompt. Try being more specific.`
         );
       } else {
         throw new Error(
           `UI generation failed - no root component found. ` +
-          `${placementCount} component(s) were placed but all have a parentId.`
+            `${placementCount} component(s) were placed but all have a parentId.`
         );
       }
     }
 
     // Create webhook info only if hasForm is true
-    let webhookInfo: { slug: string; identifier: string; token: string } | null = null;
+    let webhookInfo: {
+      slug: string;
+      identifier: string;
+      token: string;
+    } | null = null;
     let formAction: string | undefined;
     let formToken: string | undefined;
 
     if (hasForm) {
       const webhookIdentifier = `${brainRunId}-${stepId}-generateui-${Date.now()}`;
       formToken = crypto.randomUUID();
-      formAction = `${env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}`;
+      formAction = `${
+        env.origin
+      }/webhooks/system/ui-form?identifier=${encodeURIComponent(
+        webhookIdentifier
+      )}`;
       webhookInfo = {
         slug: 'ui-form',
         identifier: webhookIdentifier,
@@ -165,26 +195,36 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 };
 
 const waitForWebhookInputSchema = z.object({
-  slug: z.string().describe(
-    'The webhook slug that identifies the type of webhook. ' +
-    'For generateUI forms, this is always "ui-form". ' +
-    'Use the exact slug value returned by the tool that created the webhook.'
-  ),
-  identifier: z.string().describe(
-    'The unique identifier for this specific webhook instance. ' +
-    'This is returned by generateUI in webhook.identifier. ' +
-    'Each generateUI call creates a unique identifier - use the one from the specific page you want to wait for.'
-  ),
-  token: z.string().optional().describe(
-    'The CSRF token for form submission validation. ' +
-    'This is returned by generateUI in webhook.token. ' +
-    'Pass it through to ensure only submissions from the actual page are accepted.'
-  ),
-  timeout: z.string().optional().describe(
-    'How long to wait before timing out. Defaults to "1h". ' +
-    'Accepts durations like "30m", "1h", "24h", "7d". ' +
-    'If the timeout elapses without a response, the brain is cancelled.'
-  ),
+  slug: z
+    .string()
+    .describe(
+      'The webhook slug that identifies the type of webhook. ' +
+        'For generateUI forms, this is always "ui-form". ' +
+        'Use the exact slug value returned by the tool that created the webhook.'
+    ),
+  identifier: z
+    .string()
+    .describe(
+      'The unique identifier for this specific webhook instance. ' +
+        'This is returned by generateUI in webhook.identifier. ' +
+        'Each generateUI call creates a unique identifier - use the one from the specific page you want to wait for.'
+    ),
+  token: z
+    .string()
+    .optional()
+    .describe(
+      'The CSRF token for form submission validation. ' +
+        'This is returned by generateUI in webhook.token. ' +
+        'Pass it through to ensure only submissions from the actual page are accepted.'
+    ),
+  timeout: z
+    .string()
+    .optional()
+    .describe(
+      'How long to wait before timing out. Defaults to "1h". ' +
+        'Accepts durations like "30m", "1h", "24h", "7d". ' +
+        'If the timeout elapses without a response, the brain is cancelled.'
+    ),
 });
 
 /**
@@ -267,10 +307,18 @@ export const consoleLog = createTool({
   description: `Write a debug log message to the server console. For internal debugging only - users do not see these messages. Use 'print' to communicate with users.`,
   inputSchema: z.object({
     message: z.string().describe('The debug message to log'),
-    level: z.enum(['info', 'warn', 'error']).optional().describe('Log level: info (default), warn, or error'),
+    level: z
+      .enum(['info', 'warn', 'error'])
+      .optional()
+      .describe('Log level: info (default), warn, or error'),
   }),
   execute: ({ message, level = 'info' }) => {
-    const logFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+    const logFn =
+      level === 'error'
+        ? console.error
+        : level === 'warn'
+        ? console.warn
+        : console.log;
     logFn(`[Debug] ${message}`);
     return { logged: true };
   },
@@ -281,11 +329,13 @@ export const consoleLog = createTool({
  * Used internally by the framework.
  */
 export const defaultDoneSchema = z.object({
-  result: z.string().describe(
-    'A clear summary of what was accomplished. ' +
-    'Include: key outcomes, any important values or findings, and confirmation that the task is complete. ' +
-    'Be specific but concise. Example: "Successfully processed 15 orders totaling $1,234.56. All items shipped."'
-  ),
+  result: z
+    .string()
+    .describe(
+      'A clear summary of what was accomplished. ' +
+        'Include: key outcomes, any important values or findings, and confirmation that the task is complete. ' +
+        'Be specific but concise. Example: "Successfully processed 15 orders totaling $1,234.56. All items shipped."'
+    ),
 });
 
 /**

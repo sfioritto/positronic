@@ -15,9 +15,9 @@ describe('Brain withOptionsSchema', () => {
   };
 
   // Helper to collect all events
-  async function collectAllEvents<T extends Record<string, any> = Record<string, any>>(
-    generator: AsyncGenerator<BrainEvent<T>>
-  ): Promise<BrainEvent<T>[]> {
+  async function collectAllEvents<
+    T extends Record<string, any> = Record<string, any>
+  >(generator: AsyncGenerator<BrainEvent<T>>): Promise<BrainEvent<T>[]> {
     const events: BrainEvent<T>[] = [];
     for await (const event of generator) {
       events.push(event);
@@ -46,7 +46,9 @@ describe('Brain withOptionsSchema', () => {
         })
       );
 
-      const completeEvent = events.find(e => e.type === BRAIN_EVENTS.COMPLETE);
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
       expect(completeEvent).toBeDefined();
     });
 
@@ -91,7 +93,9 @@ describe('Brain withOptionsSchema', () => {
         })
       );
 
-      const completeEvent = events.find(e => e.type === BRAIN_EVENTS.COMPLETE);
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
       expect(completeEvent).toBeDefined();
       // TODO: verify state has default values once implementation is complete
     });
@@ -109,14 +113,16 @@ describe('Brain withOptionsSchema', () => {
             options: { some: 'options' },
           })
         );
-      }).rejects.toThrow("Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.");
+      }).rejects.toThrow(
+        "Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options."
+      );
     });
 
     it('should throw error for invalid options when schema is defined', async () => {
       const schema = z.object({
         required: z.string(),
       });
-      
+
       const myBrain = brain('test')
         .withOptionsSchema(schema)
         .step('Process', ({ state }) => state);
@@ -143,7 +149,9 @@ describe('Brain withOptionsSchema', () => {
         })
       );
 
-      const completeEvent = events.find(e => e.type === BRAIN_EVENTS.COMPLETE);
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
       expect(completeEvent).toBeDefined();
     });
   });
@@ -151,7 +159,7 @@ describe('Brain withOptionsSchema', () => {
   describe('Fluent API and type inference', () => {
     it('should maintain fluent API pattern', () => {
       const schema = z.object({ flag: z.boolean() });
-      
+
       const myBrain = brain('test')
         .withOptionsSchema(schema)
         .step('Step1', ({ options }) => ({ enabled: options.flag }))
@@ -209,7 +217,9 @@ describe('Brain withOptionsSchema', () => {
         })
       );
 
-      const completeEvent = events.find(e => e.type === BRAIN_EVENTS.COMPLETE);
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
       expect(completeEvent).toBeDefined();
     });
 
@@ -236,7 +246,9 @@ describe('Brain withOptionsSchema', () => {
         })
       );
 
-      const completeEvent = events.find(e => e.type === BRAIN_EVENTS.COMPLETE);
+      const completeEvent = events.find(
+        (e) => e.type === BRAIN_EVENTS.COMPLETE
+      );
       expect(completeEvent).toBeDefined();
     });
   });
@@ -249,9 +261,12 @@ describe('Brain withOptionsSchema', () => {
         count: number;
       };
 
-      const myBrain = brain<MyOptions>('test').step('Process', ({ options }) => ({
-        message: `${options.name} has count ${options.count}`,
-      }));
+      const myBrain = brain<MyOptions>('test').step(
+        'Process',
+        ({ options }) => ({
+          message: `${options.name} has count ${options.count}`,
+        })
+      );
 
       await expect(async () => {
         await collectAllEvents(
@@ -261,7 +276,9 @@ describe('Brain withOptionsSchema', () => {
             options: { name: 'Test', count: 42 },
           })
         );
-      }).rejects.toThrow("Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.");
+      }).rejects.toThrow(
+        "Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options."
+      );
     });
   });
 });

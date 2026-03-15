@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiPost, useApiGet } from '../hooks/useApi.js';
-import { convertSSHPubKeyToJWK, convertSSHPubKeyStringToJWK } from '../lib/ssh-key-utils.js';
+import {
+  convertSSHPubKeyToJWK,
+  convertSSHPubKeyStringToJWK,
+} from '../lib/ssh-key-utils.js';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -26,33 +29,50 @@ interface User {
   createdAt: number;
 }
 
-export const UsersKeysAdd = ({ userName, pubkeyPath, paste, label }: UsersKeysAddProps) => {
-  const { data: user, loading: loadingUser, error: userError } = useApiGet<User>(`/users/${userName}`);
-  const { data, loading, error, execute } = useApiPost<UserKey>(`/users/${userName}/keys`);
+export const UsersKeysAdd = ({
+  userName,
+  pubkeyPath,
+  paste,
+  label,
+}: UsersKeysAddProps) => {
+  const {
+    data: user,
+    loading: loadingUser,
+    error: userError,
+  } = useApiGet<User>(`/users/${userName}`);
+  const { data, loading, error, execute } = useApiPost<UserKey>(
+    `/users/${userName}/keys`
+  );
   const [added, setAdded] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [keyInfo, setKeyInfo] = useState<{ fingerprint: string; algorithm: string } | null>(null);
+  const [keyInfo, setKeyInfo] = useState<{
+    fingerprint: string;
+    algorithm: string;
+  } | null>(null);
   const [pasteMode, setPasteMode] = useState(paste && !pubkeyPath);
   const [pastedKey, setPastedKey] = useState('');
   const [pasteSubmitted, setPasteSubmitted] = useState(false);
 
-  useInput((input, key) => {
-    if (!pasteMode || pasteSubmitted) return;
+  useInput(
+    (input, key) => {
+      if (!pasteMode || pasteSubmitted) return;
 
-    if (key.return) {
-      setPasteSubmitted(true);
-      return;
-    }
+      if (key.return) {
+        setPasteSubmitted(true);
+        return;
+      }
 
-    if (key.backspace || key.delete) {
-      setPastedKey((prev) => prev.slice(0, -1));
-      return;
-    }
+      if (key.backspace || key.delete) {
+        setPastedKey((prev) => prev.slice(0, -1));
+        return;
+      }
 
-    if (input) {
-      setPastedKey((prev) => prev + input);
-    }
-  }, { isActive: pasteMode && !pasteSubmitted });
+      if (input) {
+        setPastedKey((prev) => prev + input);
+      }
+    },
+    { isActive: pasteMode && !pasteSubmitted }
+  );
 
   useEffect(() => {
     if (!user || added || parseError) return;
@@ -60,7 +80,9 @@ export const UsersKeysAdd = ({ userName, pubkeyPath, paste, label }: UsersKeysAd
 
     if (pasteMode && pasteSubmitted && pastedKey) {
       try {
-        const { jwk, fingerprint, algorithm } = convertSSHPubKeyStringToJWK(pastedKey.trim());
+        const { jwk, fingerprint, algorithm } = convertSSHPubKeyStringToJWK(
+          pastedKey.trim()
+        );
         setKeyInfo({ fingerprint, algorithm });
         execute({ jwk, fingerprint, label: label || '' })
           .then(() => setAdded(true))
@@ -83,7 +105,8 @@ export const UsersKeysAdd = ({ userName, pubkeyPath, paste, label }: UsersKeysAd
       }
 
       try {
-        const { jwk, fingerprint, algorithm } = convertSSHPubKeyToJWK(resolvedPath);
+        const { jwk, fingerprint, algorithm } =
+          convertSSHPubKeyToJWK(resolvedPath);
         setKeyInfo({ fingerprint, algorithm });
         execute({ jwk, fingerprint, label: label || '' })
           .then(() => setAdded(true))
@@ -92,7 +115,17 @@ export const UsersKeysAdd = ({ userName, pubkeyPath, paste, label }: UsersKeysAd
         setParseError(err.message || 'Failed to parse SSH public key');
       }
     }
-  }, [user, added, pubkeyPath, label, execute, parseError, pasteMode, pasteSubmitted, pastedKey]);
+  }, [
+    user,
+    added,
+    pubkeyPath,
+    label,
+    execute,
+    parseError,
+    pasteMode,
+    pasteSubmitted,
+    pastedKey,
+  ]);
 
   if (userError) {
     return <ErrorComponent error={userError} />;
@@ -104,7 +137,8 @@ export const UsersKeysAdd = ({ userName, pubkeyPath, paste, label }: UsersKeysAd
         <Text color="red">Error parsing public key: {parseError}</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Make sure the file is a valid SSH public key (e.g., id_rsa.pub, id_ed25519.pub)
+            Make sure the file is a valid SSH public key (e.g., id_rsa.pub,
+            id_ed25519.pub)
           </Text>
         </Box>
       </Box>
@@ -134,7 +168,9 @@ export const UsersKeysAdd = ({ userName, pubkeyPath, paste, label }: UsersKeysAd
   if (pasteMode && !pasteSubmitted) {
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
-        <Text>Paste your SSH public key and press <Text bold>Enter</Text>:</Text>
+        <Text>
+          Paste your SSH public key and press <Text bold>Enter</Text>:
+        </Text>
         <Box marginTop={1}>
           <Text>{pastedKey || '...'}</Text>
         </Box>

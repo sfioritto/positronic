@@ -7,13 +7,18 @@ const SelectPropsSchema = z.object({
   options: z
     .array(
       z.object({
-        value: z.string().describe('The value submitted when this option is selected'),
+        value: z
+          .string()
+          .describe('The value submitted when this option is selected'),
         label: z.string().describe('The text displayed for this option'),
       })
     )
     .describe('List of options to choose from'),
   required: z.boolean().optional().describe('Whether a selection is required'),
-  defaultValue: z.string().optional().describe('Value of the initially selected option'),
+  defaultValue: z
+    .string()
+    .optional()
+    .describe('Value of the initially selected option'),
 });
 
 export type SelectProps = z.infer<typeof SelectPropsSchema>;
@@ -26,8 +31,16 @@ const SelectComponent = ({
   defaultValue,
 }: SelectProps) => (
   <div className="flex flex-col gap-1.5">
-    <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
-    <select id={name} name={name} required={required} defaultValue={defaultValue} className="px-3 py-2 border border-gray-300 rounded-md text-base w-full bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+    <label htmlFor={name} className="text-sm font-medium text-gray-700">
+      {label}
+    </label>
+    <select
+      id={name}
+      name={name}
+      required={required}
+      defaultValue={defaultValue}
+      className="px-3 py-2 border border-gray-300 rounded-md text-base w-full bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+    >
       <option value="">Select...</option>
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>

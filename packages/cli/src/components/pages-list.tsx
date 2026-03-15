@@ -85,7 +85,8 @@ export const PagesList = () => {
   };
 
   // Calculate total width for separator
-  const totalWidth = Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
+  const totalWidth =
+    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -96,15 +97,25 @@ export const PagesList = () => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
-          <Text bold color="cyan">{padRight(columns.slug.header, columns.slug.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.persist.header, columns.persist.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.size.header, columns.size.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.brainRunId.header, columns.brainRunId.width)}</Text>
-          <Text>  </Text>
-          <Text bold color="cyan">{padRight(columns.created.header, columns.created.width)}</Text>
+          <Text bold color="cyan">
+            {padRight(columns.slug.header, columns.slug.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.persist.header, columns.persist.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.size.header, columns.size.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.brainRunId.header, columns.brainRunId.width)}
+          </Text>
+          <Text> </Text>
+          <Text bold color="cyan">
+            {padRight(columns.created.header, columns.created.width)}
+          </Text>
         </Box>
 
         {/* Separator */}
@@ -115,24 +126,37 @@ export const PagesList = () => {
         {/* Data rows */}
         {sortedPages.map((page) => (
           <Box key={page.slug}>
-            <Text>{padRight(truncate(page.slug, columns.slug.width), columns.slug.width)}</Text>
-            <Text>  </Text>
+            <Text>
+              {padRight(
+                truncate(page.slug, columns.slug.width),
+                columns.slug.width
+              )}
+            </Text>
+            <Text> </Text>
             <Text color={page.persist ? 'green' : 'yellow'}>
               {padRight(page.persist ? 'Yes' : 'No', columns.persist.width)}
             </Text>
-            <Text>  </Text>
+            <Text> </Text>
             <Text>{padRight(formatSize(page.size), columns.size.width)}</Text>
-            <Text>  </Text>
-            <Text dimColor>{padRight(truncate(page.brainRunId, columns.brainRunId.width), columns.brainRunId.width)}</Text>
-            <Text>  </Text>
-            <Text dimColor>{padRight(formatDate(page.createdAt), columns.created.width)}</Text>
+            <Text> </Text>
+            <Text dimColor>
+              {padRight(
+                truncate(page.brainRunId, columns.brainRunId.width),
+                columns.brainRunId.width
+              )}
+            </Text>
+            <Text> </Text>
+            <Text dimColor>
+              {padRight(formatDate(page.createdAt), columns.created.width)}
+            </Text>
           </Box>
         ))}
       </Box>
 
       <Box marginTop={1}>
         <Text dimColor>
-          Tip: View a page URL by visiting your deployment at /pages/&lt;slug&gt;
+          Tip: View a page URL by visiting your deployment at
+          /pages/&lt;slug&gt;
         </Text>
       </Box>
     </Box>

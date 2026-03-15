@@ -1,15 +1,29 @@
 import { jest } from '@jest/globals';
-import { formatMemories, createMemorySystemPrompt, getMemoryContext } from '../src/helpers.js';
-import type { Memory, ScopedMemory, MemorySearchOptions, MemoryAddOptions, MemoryMessage } from '@positronic/core';
+import {
+  formatMemories,
+  createMemorySystemPrompt,
+  getMemoryContext,
+} from '../src/helpers.js';
+import type {
+  Memory,
+  ScopedMemory,
+  MemorySearchOptions,
+  MemoryAddOptions,
+  MemoryMessage,
+} from '@positronic/core';
 
 // Create a mock ScopedMemory for testing
 function createMockScopedMemory(searchResult: Memory[] = []): ScopedMemory {
   return {
     search: jest.fn(
-      async (query: string, options?: MemorySearchOptions): Promise<Memory[]> => searchResult
+      async (query: string, options?: MemorySearchOptions): Promise<Memory[]> =>
+        searchResult
     ),
     add: jest.fn(
-      async (messages: MemoryMessage[], options?: MemoryAddOptions): Promise<void> => {}
+      async (
+        messages: MemoryMessage[],
+        options?: MemoryAddOptions
+      ): Promise<void> => {}
     ),
   };
 }
@@ -25,8 +39,8 @@ describe('formatMemories', () => {
     const result = formatMemories(testMemories);
     expect(result).toBe(
       '1. User prefers dark mode\n' +
-      '2. User likes TypeScript\n' +
-      '3. User works on web apps'
+        '2. User likes TypeScript\n' +
+        '3. User works on web apps'
     );
   });
 
@@ -36,9 +50,9 @@ describe('formatMemories', () => {
     });
     expect(result).toBe(
       'User preferences:\n' +
-      '1. User prefers dark mode\n' +
-      '2. User likes TypeScript\n' +
-      '3. User works on web apps'
+        '1. User prefers dark mode\n' +
+        '2. User likes TypeScript\n' +
+        '3. User works on web apps'
     );
   });
 
@@ -46,8 +60,8 @@ describe('formatMemories', () => {
     const result = formatMemories(testMemories, { includeScores: true });
     expect(result).toBe(
       '1. User prefers dark mode (0.95)\n' +
-      '2. User likes TypeScript (0.85)\n' +
-      '3. User works on web apps'
+        '2. User likes TypeScript (0.85)\n' +
+        '3. User works on web apps'
     );
   });
 
@@ -85,8 +99,8 @@ describe('createMemorySystemPrompt', () => {
     });
     expect(result).toBe(
       'You are a helpful assistant.\n\n' +
-      'Relevant context from previous interactions:\n' +
-      '1. User prefers concise responses'
+        'Relevant context from previous interactions:\n' +
+        '1. User prefers concise responses'
     );
   });
 
@@ -116,21 +130,16 @@ describe('createMemorySystemPrompt', () => {
     );
 
     expect(result).toBe(
-      'Base prompt\n\n' +
-      'Known facts:\n' +
-      '1. User likes dark mode'
+      'Base prompt\n\n' + 'Known facts:\n' + '1. User likes dark mode'
     );
   });
 
   it('should pass limit to search', async () => {
     const mockScopedMemory = createMockScopedMemory([]);
 
-    await createMemorySystemPrompt(
-      mockScopedMemory,
-      'Base',
-      'query',
-      { limit: 5 }
-    );
+    await createMemorySystemPrompt(mockScopedMemory, 'Base', 'query', {
+      limit: 5,
+    });
 
     expect(mockScopedMemory.search).toHaveBeenCalledWith('query', {
       limit: 5,
@@ -149,8 +158,7 @@ describe('getMemoryContext', () => {
     const result = await getMemoryContext(mockScopedMemory, 'user context');
 
     expect(result).toBe(
-      '1. User prefers TypeScript\n' +
-      '2. User works on React apps'
+      '1. User prefers TypeScript\n' + '2. User works on React apps'
     );
   });
 
