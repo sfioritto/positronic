@@ -65,6 +65,17 @@ Added an optional `mapOutput` callback to all three iterate variants (prompt, br
 
 **Agent iterate type mismatch** — the overload types say the result parameter in `mapOutput` is `z.infer<TSchema>`, but at runtime the agent stores results as the full agent state (which nests the output under `outputSchema.name`, e.g., `{ result: { processed: true } }`). This is a pre-existing mismatch in how agent iterate types the tuple's second element. The test uses `any` cast to access the runtime shape. Not worth fixing now since it would be a breaking type change to the existing tuple type too.
 
+### Phase 4: Fix Inner Brain ERROR → Execution Stack Imbalance
+
+Phase 2 point #4 noted the state machine depth mismatch when an inner brain errors — the ERROR event was suppressed in `executeIterateBrain` so the state machine never learned the inner brain was done, leaving an orphaned entry on `brainIdStack` and `executionStack`. On Cloudflare PAUSE/resume, this causes an infinite loop because the execution stack is out of sync.
+
+A previous attempt (reverted) tried to fix this in the event stream by emitting synthetic AGENT_COMPLETE + COMPLETE events in the catch block. That required the event stream to shadow the state machine's internal state (`agentRunning`, `innerBrainStarted`). Wrong layer.
+
+**The fix:** let the ERROR event flow through to the state machine, and teach the state machine to handle it. Added a `completeInnerBrainError` reducer that pops `brainIdStack`/`executionStack`, decrements depth, and clears `agentContext` — then returns to `'running'`. Added guarded transitions for inner brain ERROR in both `running` and `agentLoop` states. Removed the 3-line suppression block in `event-stream.ts`.
+
+The reducer is much simpler than `completeBrain` — it doesn't need the `innerSteps` attachment logic since nothing reads that field for errored brains.
+
 ## Dead ends
 
 - **Manual patch application in tests** — initially tried to reconstruct state by collecting all STEP_COMPLETE patches and applying them. Inner brain patches are relative to inner state, not outer state, causing OPERATION_PATH_UNRESOLVABLE errors. The state machine handles this correctly by tracking depth.
+- **Synthetic events in the event stream** — the reverted approach emitted fake AGENT_COMPLETE + COMPLETE events from the catch block in `executeIterateBrain`. This required tracking `agentRunning` and `innerBrainStarted` flags — effectively shadowing the state machine's state inside the event stream. Fragile, wrong layer. The state machine should own its own transitions.
