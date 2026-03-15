@@ -1332,11 +1332,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               `Remove .wait() from the inner brain or process items outside of iterate.`
             );
           }
-          // Don't forward inner brain ERROR events when we have an error handler —
-          // the outer brain will continue and the error event would confuse the state machine
-          if (event.type === BRAIN_EVENTS.ERROR && iterateConfig.error) {
-            continue;
-          }
           yield event; // Forward all inner events
           if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
             patches.push(event.patch);
