@@ -3,7 +3,7 @@ import type { BrainEvent } from '@positronic/core';
 
 /**
  * Parse an SSE data field from a raw text chunk.
- * Returns the parsed JSON object, or null if parsing fails.
+ * Returns the parsed JSON value (object or array), or null if parsing fails.
  */
 export function parseSseEvent(text: string): any | null {
   const lines = text.trim().split('\n');
@@ -18,6 +18,15 @@ export function parseSseEvent(text: string): any | null {
     }
   }
   return null;
+}
+
+/**
+ * Normalize a parsed SSE value into an array of events.
+ * The server may send a single event object or an array of historical events.
+ */
+function normalizeEvents(parsed: any): BrainEvent[] {
+  if (parsed == null) return [];
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
 /**
@@ -38,8 +47,8 @@ export async function readSseStream(
     const { value, done } = await reader.read();
     if (done) {
       if (buffer.trim().length > 0) {
-        const event = parseSseEvent(buffer);
-        if (event) {
+        const parsed = parseSseEvent(buffer);
+        for (const event of normalizeEvents(parsed)) {
           events.push(event);
           sendEvent(machine, event);
         }
@@ -54,8 +63,8 @@ export async function readSseStream(
       const message = buffer.substring(0, eventEndIndex);
       buffer = buffer.substring(eventEndIndex + 2);
       if (message.startsWith('data:')) {
-        const event = parseSseEvent(message);
-        if (event) {
+        const parsed = parseSseEvent(message);
+        for (const event of normalizeEvents(parsed)) {
           events.push(event);
           sendEvent(machine, event);
 
@@ -95,8 +104,8 @@ export async function readSseStreamIncludingErrors(
     const { value, done } = await reader.read();
     if (done) {
       if (buffer.trim().length > 0) {
-        const event = parseSseEvent(buffer);
-        if (event) {
+        const parsed = parseSseEvent(buffer);
+        for (const event of normalizeEvents(parsed)) {
           events.push(event);
         }
       }
@@ -107,12 +116,13 @@ export async function readSseStreamIncludingErrors(
     buffer += decodedChunk;
 
     let eventEndIndex;
+    let shouldReturn = false;
     while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
       const message = buffer.substring(0, eventEndIndex);
       buffer = buffer.substring(eventEndIndex + 2);
       if (message.startsWith('data:')) {
-        const event = parseSseEvent(message);
-        if (event) {
+        const parsed = parseSseEvent(message);
+        for (const event of normalizeEvents(parsed)) {
           events.push(event);
 
           if (
@@ -135,6 +145,7 @@ export async function readSseStreamIncludingErrors(
         }
       }
     }
+    if (shouldReturn) return events;
   }
   return events;
 }
@@ -165,14 +176,15 @@ export async function readUntilEvent(
         buffer = buffer.substring(eventEndIndex + 2);
 
         if (message.startsWith('data:')) {
-          const event = parseSseEvent(message);
-          if (event) {
+          const parsed = parseSseEvent(message);
+          for (const event of normalizeEvents(parsed)) {
             events.push(event);
             if (event.type === targetType) {
               found = true;
               break;
             }
           }
+          if (found) break;
         }
       }
     }
