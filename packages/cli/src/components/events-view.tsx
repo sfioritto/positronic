@@ -184,6 +184,18 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `Brain resumed: "${event.brainTitle}"`,
         color: 'green',
       };
+    case BRAIN_EVENTS.ITERATE_ITEM_COMPLETE:
+      return {
+        symbol: '[i]',
+        text: `Item ${event.processedCount}/${event.totalItems} complete: "${event.stepTitle}"`,
+        color: 'green',
+      };
+    case BRAIN_EVENTS.AGENT_USER_MESSAGE:
+      return {
+        symbol: '[U]',
+        text: `User message: "${truncate(event.content, 50)}"`,
+        color: 'cyan',
+      };
     default:
       return {
         symbol: '[?]',
