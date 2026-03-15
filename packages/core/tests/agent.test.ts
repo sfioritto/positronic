@@ -1769,5 +1769,124 @@ describe('agent step', () => {
         welcome: { userName: 'Alice', greeting: 'Welcome!' },
       });
     });
+
+    it('should throw when agent output does not match outputSchema', async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: undefined,
+        toolCalls: [
+          {
+            toolCallId: 'call-1',
+            toolName: 'done',
+            args: { wrongField: 'not what the schema expects' },
+          },
+        ],
+        usage: { totalTokens: 100 },
+        responseMessages: [],
+      });
+
+      const testBrain = brain('test-output-schema-validation').brain(
+        'Process',
+        {
+          prompt: 'Analyze data',
+          outputSchema: {
+            schema: z.object({
+              summary: z.string(),
+              score: z.number(),
+            }),
+            name: 'analysis' as const,
+          },
+        }
+      );
+
+      const events: BrainEvent[] = [];
+      try {
+        for await (const event of testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })) {
+          events.push(event);
+        }
+      } catch (error) {
+        // Error is expected to be re-thrown after ERROR event is emitted
+      }
+
+      const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent as any).error.message).toMatch(
+        /does not match outputSchema 'analysis'/
+      );
+    });
+
+    it('should throw when agent hits iteration limit with outputSchema', async () => {
+      // LLM never calls done — just keeps calling a non-terminal tool
+      mockGenerateText
+        .mockResolvedValueOnce({
+          text: undefined,
+          toolCalls: [
+            { toolCallId: 'call-1', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 50 },
+          responseMessages: [],
+        })
+        .mockResolvedValueOnce({
+          text: undefined,
+          toolCalls: [
+            { toolCallId: 'call-2', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 50 },
+          responseMessages: [],
+        })
+        .mockResolvedValueOnce({
+          text: undefined,
+          toolCalls: [
+            { toolCallId: 'call-3', toolName: 'doWork', args: {} },
+          ],
+          usage: { totalTokens: 50 },
+          responseMessages: [],
+        });
+
+      const testBrain = brain('test-iteration-limit-output').brain(
+        'Long Task',
+        {
+          prompt: 'Process data',
+          tools: {
+            doWork: {
+              description: 'Do some work',
+              inputSchema: z.object({}),
+              execute: async () => 'ok',
+            },
+          },
+          outputSchema: {
+            schema: z.object({ result: z.string() }),
+            name: 'output' as const,
+          },
+          maxIterations: 2,
+        }
+      );
+
+      const events: BrainEvent[] = [];
+      try {
+        for await (const event of testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })) {
+          events.push(event);
+        }
+      } catch (error) {
+        // Error is expected to be re-thrown after ERROR event is emitted
+      }
+
+      // Should still emit the iteration limit event
+      expect(
+        events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION_LIMIT)
+      ).toBe(true);
+
+      // Should also emit an error because outputSchema was required
+      const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent as any).error.message).toMatch(
+        /hit iteration limit.*without producing required 'output' output/
+      );
+    });
   });
 });

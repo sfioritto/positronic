@@ -937,6 +937,11 @@ Provide a clear, concise summary of the outcome in the 'result' field.`,
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
+        if (config.outputSchema) {
+          throw new Error(
+            `Agent hit iteration limit (${maxIterations}) without producing required '${config.outputSchema.name}' output`
+          );
+        }
         return;
       }
 
@@ -1048,6 +1053,11 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
+        if (config.outputSchema) {
+          throw new Error(
+            `Agent hit token limit (${config.maxTokens}) without producing required '${config.outputSchema.name}' output`
+          );
+        }
         return;
       }
 
@@ -1116,10 +1126,16 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           // Merge terminal result into state
           // Only namespace under outputSchema.name when 'done' tool is called with outputSchema
           if (config.outputSchema && toolCall.toolName === 'done') {
+            const parsed = config.outputSchema.schema.safeParse(toolCall.args);
+            if (!parsed.success) {
+              throw new Error(
+                `Agent output does not match outputSchema '${config.outputSchema.name}': ${parsed.error.message}`
+              );
+            }
             // Namespace result under outputSchema.name
             this.currentState = {
               ...this.currentState,
-              [config.outputSchema.name]: toolCall.args,
+              [config.outputSchema.name]: parsed.data,
             };
           } else {
             // Default behavior: spread into state root (for other terminal tools)
