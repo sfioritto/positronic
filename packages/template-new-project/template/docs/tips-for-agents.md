@@ -454,6 +454,86 @@ export const brain = createBrain({
 
 This keeps your service implementations separate from your brain logic and makes them easier to test and maintain.
 
+## Rate Limiting with bottleneck
+
+Most external APIs have rate limits. The `utils/bottleneck.ts` utility creates a simple rate limiter you can wrap around any async call.
+
+### Basic Usage
+
+```typescript
+import { bottleneck } from '../utils/bottleneck.js';
+
+// Create a limiter — exactly one rate unit is required
+const limit = bottleneck({ rpm: 60 }); // 60 requests per minute
+
+// Wrap any async call with the limiter
+const result = await limit(() => api.fetchData(id));
+```
+
+### Config Options
+
+Pass exactly one of these (TypeScript enforces this):
+
+- `rps` — requests per second
+- `rpm` — requests per minute
+- `rph` — requests per hour
+- `rpd` — requests per day
+
+```typescript
+const fast = bottleneck({ rps: 10 });   // 10 per second
+const slow = bottleneck({ rpd: 1000 }); // 1000 per day
+```
+
+### Wrapping a Service
+
+Create one limiter per API and wrap all calls through it:
+
+```typescript
+// services/github.ts
+import { bottleneck } from '../utils/bottleneck.js';
+
+const limit = bottleneck({ rps: 10 });
+
+async function getRepo(owner: string, repo: string) {
+  return limit(() =>
+    fetch('https://api.github.com/repos/' + owner + '/' + repo)
+      .then(r => r.json())
+  );
+}
+
+async function listIssues(owner: string, repo: string) {
+  return limit(() =>
+    fetch('https://api.github.com/repos/' + owner + '/' + repo + '/issues')
+      .then(r => r.json())
+  );
+}
+
+export default { getRepo, listIssues };
+```
+
+### Using with Iterate
+
+When iterating over items, wrap the API call inside the step callback:
+
+```typescript
+import { bottleneck } from '../utils/bottleneck.js';
+
+const limit = bottleneck({ rpm: 60 });
+
+brain('process-items')
+  .step('Init', ({ state }) => ({ items: state.items }))
+  .step('Fetch details', async ({ state }) => {
+    const details = await Promise.all(
+      state.items.map(item => limit(() => api.getDetail(item.id)))
+    );
+    return { ...state, details };
+  });
+```
+
+### When Creating Services
+
+When building a new service that wraps an external API, research the API's rate limits and add a bottleneck upfront. It's much easier to add rate limiting from the start than to debug 429 errors later.
+
 ## Brain Options Usage
 
 When creating brains that need runtime configuration, use the options schema pattern:
