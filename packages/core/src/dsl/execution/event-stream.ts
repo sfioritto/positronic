@@ -458,6 +458,25 @@ export class BrainEventStream<
     }
   }
 
+  private buildStepContext(step: Step) {
+    return {
+      state: this.currentState,
+      options: this.options ?? ({} as TOptions),
+      client: this.client,
+      resources: this.resources,
+      response: this.currentResponse,
+      page: this.currentPage,
+      pages: this.pages,
+      env: this.env,
+      memory: this.scopedMemory,
+      store: this.store,
+      currentUser: this.currentUser,
+      brainRunId: this.brainRunId,
+      stepId: step.id,
+      ...this.services,
+    };
+  }
+
   private async *executeStep(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as Block<any, any, TOptions, TServices, any, any>;
 
@@ -1329,7 +1348,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         ? this.governor(rawClient)
         : rawClient
       : this.client;
-    const items = iterateConfig.over(this.currentState);
+    const items = await iterateConfig.over(this.buildStepContext(step));
     const totalItems = items.length;
 
     // Resume support: pick up from where we left off
@@ -1441,7 +1460,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const block = step.block as BrainBlock<any, any, any, TOptions, TServices>;
     const iterateConfig = block.iterateConfig!;
     const prevState = this.currentState;
-    const items = iterateConfig.over(this.currentState);
+    const items = await iterateConfig.over(this.buildStepContext(step));
     const totalItems = items.length;
 
     // Resume support
@@ -1585,7 +1604,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     >;
     const iterateConfig = block.iterateConfig!;
     const prevState = this.currentState;
-    const items = iterateConfig.over(this.currentState);
+    const items = await iterateConfig.over(this.buildStepContext(step));
     const totalItems = items.length;
 
     // Resume support

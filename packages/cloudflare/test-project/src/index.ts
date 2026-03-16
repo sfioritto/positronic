@@ -438,7 +438,7 @@ const iterateWebhookBrain = brain({
       },
     },
     {
-      over: (state) => state.items,
+      over: ({ state }) => state.items,
     }
   )
   .step('Prepare webhook wait', ({ state }) => ({
@@ -519,7 +519,7 @@ const iterateBrainTestBrain = brain({
     items: [1, 2, 3, 4, 5, 6, 7],
   }))
   .brain('Process items', iterateTestInnerBrain, {
-    over: (state) => state.items,
+    over: ({ state }) => state.items,
     initialState: (item) => ({ value: item, doubled: 0 }),
     outputKey: 'results' as const,
   });
@@ -554,8 +554,12 @@ const iterateOptionsTestBrain = brain({
     items: [1, 2, 3],
   }))
   .brain('Process items', iterateOptionsInnerBrain, {
-    over: (state) => state.items,
-    initialState: (item, state) => ({
+    over: ({ state }: { state: { multiplier: number; items: number[] } }) =>
+      state.items,
+    initialState: (
+      item: number,
+      state: { multiplier: number; items: number[] }
+    ) => ({
       value: item,
       multiplier: state.multiplier,
       result: 0,

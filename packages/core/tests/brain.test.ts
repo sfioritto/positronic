@@ -2299,7 +2299,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.emails,
+            over: ({ state }) => state.emails,
           }
         );
 
@@ -2351,7 +2351,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -2389,7 +2389,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -2428,7 +2428,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -2508,7 +2508,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
             error: (item, err) => ({ status: 'failed' }),
           }
         );
@@ -2558,7 +2558,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -2597,7 +2597,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -2668,7 +2668,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
             error: () => null, // Skip failed items
           }
         )
@@ -2770,7 +2770,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -2822,7 +2822,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -2865,7 +2865,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
             error: (item, err) => ({ status: 'failed' }),
           }
         );
@@ -2911,7 +2911,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
             error: (item, err) => null, // Return null to skip
           }
         );
@@ -2957,7 +2957,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
             error: () => ({ done: false }),
           }
         );
@@ -3005,7 +3005,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.myItems,
+            over: ({ state }) => state.myItems,
           }
         )
         .step('Use Results', ({ state }) => {
@@ -3055,7 +3055,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         )
         .step('Aggregate', ({ state }) => {
@@ -3104,7 +3104,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -3144,7 +3144,7 @@ describe('prompt with over (iterate)', () => {
             },
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -3189,7 +3189,7 @@ describe('prompt with over (iterate)', () => {
             client: customClient,
           },
           {
-            over: (state) => state.items,
+            over: ({ state }) => state.items,
           }
         );
 
@@ -3345,7 +3345,7 @@ describe('prompt with over (iterate)', () => {
           },
         },
         {
-          over: (state) => state.emails,
+          over: ({ state }) => state.emails,
           mapOutput: (result) => result.category,
         }
       );
@@ -3386,7 +3386,7 @@ describe('prompt with over (iterate)', () => {
           },
         },
         {
-          over: (state) => state.items,
+          over: ({ state }) => state.items,
           error: () => null,
           mapOutput: (result) => result.category,
         }
@@ -3434,7 +3434,7 @@ describe('.brain() with over — nested brain iterate', () => {
         items: [{ n: 3 }, { n: 5 }, { n: 7 }],
       }))
       .brain('Process Items', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item, state) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
@@ -3459,7 +3459,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
@@ -3506,7 +3506,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
@@ -3550,7 +3550,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
         error: (item, err) => ({ value: -1 }),
@@ -3587,7 +3587,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
         error: () => null,
@@ -3638,7 +3638,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
@@ -3694,7 +3694,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
@@ -3732,7 +3732,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }] }))
       .brain('Iterate', innerBrain as any, {
-        over: (state: any) => state.items,
+        over: ({ state }: any) => state.items,
         initialState: (item: any) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
@@ -3763,7 +3763,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
       });
@@ -3825,7 +3825,7 @@ describe('.brain() with over — nested brain iterate', () => {
         items: [{ n: 3 }, { n: 5 }, { n: 7 }],
       }))
       .brain('Process Items', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'doubled' as const,
         mapOutput: (result) => result.value,
@@ -3948,7 +3948,7 @@ describe('.brain() with over — nested brain iterate', () => {
     const outerBrain = brain('StackOuter')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
         outputKey: 'results' as const,
         error: (item, err) => ({ value: -1 }),
@@ -4000,7 +4000,7 @@ describe('.brain() with over — nested brain iterate', () => {
         items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
       }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ url: item.url }),
         outputKey: 'results' as const,
         error: (item, err) => null,
@@ -4047,7 +4047,7 @@ describe('.brain() with over — nested brain iterate', () => {
         items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
       }))
       .brain('Iterate', innerBrain, {
-        over: (state) => state.items,
+        over: ({ state }) => state.items,
         initialState: (item) => ({ url: item.url }),
         outputKey: 'results' as const,
         error: (item, err) => null,
@@ -4130,7 +4130,7 @@ describe('.brain() with over — agent config iterate', () => {
           },
         }),
         {
-          over: (state) => state.items,
+          over: ({ state }) => state.items,
           outputKey: 'results' as const,
         }
       );
@@ -4192,7 +4192,7 @@ describe('.brain() with over — agent config iterate', () => {
           },
         }),
         {
-          over: (state) => state.items,
+          over: ({ state }) => state.items,
           outputKey: 'results' as const,
         }
       );
@@ -4241,7 +4241,7 @@ describe('.brain() with over — agent config iterate', () => {
           prompt: `Process ${item.id}`,
         }),
         {
-          over: (state) => state.items,
+          over: ({ state }) => state.items,
           outputKey: 'results' as const,
           error: (item, err) => ({ status: 'failed', id: item.id }),
         }
@@ -4301,7 +4301,7 @@ describe('.brain() with over — agent config iterate', () => {
           prompt: `Process ${item.id}`,
         }),
         {
-          over: (state) => state.items,
+          over: ({ state }) => state.items,
           outputKey: 'results' as const,
         }
       );
@@ -4355,7 +4355,7 @@ describe('.brain() with over — agent config iterate', () => {
           },
         }),
         {
-          over: (state) => state.items,
+          over: ({ state }) => state.items,
           outputKey: 'indices' as const,
           // At runtime, the agent result is the full agent state: { result: { processed, index } }
           // The type says z.infer<TSchema>, so we cast to any to access the runtime shape
