@@ -111,6 +111,7 @@ export interface AgentContext {
  * Accumulates per-item results so the iteration can resume from where it left off.
  */
 export interface IterateContext {
+  stepId: string;
   accumulatedResults: ([any, any] | undefined)[];
   processedCount: number;
   totalItems: number;
@@ -609,13 +610,18 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       newStepCount = topLevelStepCount + 1;
     }
 
+    // Only clear iterateContext when the iterate step itself completes,
+    // not when inner brain steps complete during iteration
+    const newIterateContext =
+      ctx.iterateContext?.stepId === stepId ? null : ctx.iterateContext;
+
     return {
       ...ctx,
       brains: newBrains,
       executionStack: newExecutionStack,
       currentState: newState,
       topLevelStepCount: newStepCount,
-      iterateContext: null,
+      iterateContext: newIterateContext,
     };
   }
 );
@@ -706,6 +712,7 @@ const iterateItemComplete = reduce<BrainExecutionContext, any>(
     return {
       ...ctx,
       iterateContext: {
+        stepId: payload.stepId,
         accumulatedResults: newResults,
         processedCount: payload.processedCount,
         totalItems: payload.totalItems,

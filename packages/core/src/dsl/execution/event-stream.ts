@@ -1323,10 +1323,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Resume support: pick up from where we left off
     const iterateProgress = this.resumeContext?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
-    const results: ([any, any] | undefined)[] =
-      iterateProgress?.accumulatedResults
-        ? [...iterateProgress.accumulatedResults]
-        : new Array(totalItems);
+    // Use a Map for results accumulation during iteration.
+    const resultsMap = new Map<number, [any, any]>();
+    if (iterateProgress?.accumulatedResults) {
+      for (let k = 0; k < iterateProgress.accumulatedResults.length; k++) {
+        const r = iterateProgress.accumulatedResults[k];
+        if (r != null) resultsMap.set(k, r);
+      }
+    }
 
     // Clear resumeContext after consuming iterateProgress
     if (iterateProgress) {
@@ -1361,7 +1365,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       }
 
       const item = items[i];
-      let result: any;
+      let result: [any, any] | undefined;
 
       try {
         const promptText = await iterateConfig.template(item, this.resources);
@@ -1381,7 +1385,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         }
       }
 
-      results[i] = result;
+      if (result != null) {
+        resultsMap.set(i, result);
+      }
 
       // Yield one event per item
       yield {
@@ -1400,7 +1406,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     // All items done - update state and complete step
-    const finalResults = results.filter((r): r is [any, any] => r != null);
+    const finalResults = [...resultsMap.values()];
     const outputResults = iterateConfig.mapOutput
       ? finalResults.map(([item, result]) =>
           iterateConfig.mapOutput!(result, item)
@@ -1429,10 +1435,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Resume support
     const iterateProgress = this.resumeContext?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
-    const results: ([any, any] | undefined)[] =
-      iterateProgress?.accumulatedResults
-        ? [...iterateProgress.accumulatedResults]
-        : new Array(totalItems);
+    // Use a Map for results accumulation during iteration.
+    const resultsMap = new Map<number, [any, any]>();
+    if (iterateProgress?.accumulatedResults) {
+      for (let k = 0; k < iterateProgress.accumulatedResults.length; k++) {
+        const r = iterateProgress.accumulatedResults[k];
+        if (r != null) resultsMap.set(k, r);
+      }
+    }
 
     if (iterateProgress) {
       this.resumeContext = undefined;
@@ -1513,7 +1523,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         }
       }
 
-      results[i] = result;
+      if (result != null) {
+        resultsMap.set(i, result);
+      }
 
       yield {
         type: BRAIN_EVENTS.ITERATE_ITEM_COMPLETE,
@@ -1530,7 +1542,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       };
     }
 
-    const finalResults = results.filter((r): r is [any, any] => r != null);
+    const finalResults = [...resultsMap.values()];
     const outputResults = iterateConfig.mapOutput
       ? finalResults.map(([item, result]) =>
           iterateConfig.mapOutput!(result, item)
@@ -1567,10 +1579,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Resume support
     const iterateProgress = this.resumeContext?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
-    const results: ([any, any] | undefined)[] =
-      iterateProgress?.accumulatedResults
-        ? [...iterateProgress.accumulatedResults]
-        : new Array(totalItems);
+    // Use a Map for results accumulation during iteration.
+    const resultsMap = new Map<number, [any, any]>();
+    if (iterateProgress?.accumulatedResults) {
+      for (let k = 0; k < iterateProgress.accumulatedResults.length; k++) {
+        const r = iterateProgress.accumulatedResults[k];
+        if (r != null) resultsMap.set(k, r);
+      }
+    }
 
     if (iterateProgress) {
       this.resumeContext = undefined;
@@ -1642,7 +1658,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         }
       }
 
-      results[i] = result;
+      if (result != null) {
+        resultsMap.set(i, result);
+      }
 
       yield {
         type: BRAIN_EVENTS.ITERATE_ITEM_COMPLETE,
@@ -1659,7 +1677,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       };
     }
 
-    const finalResults = results.filter((r): r is [any, any] => r != null);
+    const finalResults = [...resultsMap.values()];
     const outputResults = iterateConfig.mapOutput
       ? finalResults.map(([item, result]) =>
           iterateConfig.mapOutput!(result, item)
