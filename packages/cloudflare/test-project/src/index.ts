@@ -500,6 +500,30 @@ const governorTestBrain = brain({
   },
 });
 
+// Inner brain for iterate testing - just doubles a number
+const iterateTestInnerBrain = brain<{}, { value: number; doubled: number }>({
+  title: 'iterate-test-inner',
+  description: 'Inner brain for iterate brain testing',
+}).step('Double value', ({ state }) => ({
+  ...state,
+  doubled: state.value * 2,
+}));
+
+// Outer brain that iterates over 7 items using .brain() iterate
+const iterateBrainTestBrain = brain({
+  title: 'iterate-brain-test',
+  description: 'Tests .brain() iterate with multiple items',
+})
+  .step('Init items', ({ state }) => ({
+    ...state,
+    items: [1, 2, 3, 4, 5, 6, 7],
+  }))
+  .brain('Process items', iterateTestInnerBrain, {
+    over: (state) => state.items,
+    initialState: (item) => ({ value: item, doubled: 0 }),
+    outputKey: 'results' as const,
+  });
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -605,6 +629,11 @@ const brainManifest = {
     filename: 'governor-test-brain',
     path: 'brains/governor-test-brain.ts',
     brain: governorTestBrain,
+  },
+  'iterate-brain-test': {
+    filename: 'iterate-brain-test',
+    path: 'brains/iterate-brain-test.ts',
+    brain: iterateBrainTestBrain,
   },
 };
 
