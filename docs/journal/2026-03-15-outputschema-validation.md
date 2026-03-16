@@ -39,7 +39,7 @@ The user's inner brain was typed as `brain<any, ...>`. With `any` as the state t
 
 - `yield*` delegation from a sub-generator propagates throws through the entire chain — the try/catch in the outer generator (`next()`) catches errors thrown inside `executeAgent()` even though there are two layers of `yield*` in between.
 - The catch handler in `next()` yields ERROR events and then **re-throws** — so tests need a try/catch around the `for await` loop to collect all events before the re-throw kills iteration.
-- The iteration/token limit paths (`AGENT_ITERATION_LIMIT`, `AGENT_TOKEN_LIMIT`) were "silent exits" — they yielded an event and returned without any state update. For brains without `outputSchema` this is fine (state just doesn't change). For brains *with* `outputSchema`, this meant the output key was never set, leading to undefined access crashes downstream.
+- The iteration/token limit paths (`AGENT_ITERATION_LIMIT`, `AGENT_TOKEN_LIMIT`) were "silent exits" — they yielded an event and returned without any state update. For brains without `outputSchema` this is fine (state just doesn't change). For brains _with_ `outputSchema`, this meant the output key was never set, leading to undefined access crashes downstream.
 
 ## Dead ends
 
