@@ -115,7 +115,7 @@ const test3 = brain('test-3')
   .prompt('Categorize', categorizePrompt, {
     // This is where the issue manifests:
     // If state is JsonObject, we'd need to cast state.threadsById
-    over: (state) => Object.values(state.threadsById),
+    over: ({ state }) => Object.values(state.threadsById),
   });
 
 // Test 4: Single prompt followed by batch prompt
@@ -158,7 +158,7 @@ const test5 = brain('test-5')
     items: ['a', 'b', 'c'],
   }))
   .prompt('Process items', itemPrompt, {
-    over: (state) => state.items,
+    over: ({ state }) => state.items,
   })
   .step('After batch prompt', ({ state }) => {
     // state.results should be [string, { result: string }][]
@@ -183,7 +183,7 @@ const test6 = brain('test-6')
     ] as RawThread[],
   }))
   .prompt('First categorize', categorizePrompt, {
-    over: (state) => state.threads,
+    over: ({ state }) => state.threads,
   })
   .step('After first prompt', ({ state }) => {
     // state.categoryResult should be the batch results
@@ -195,7 +195,7 @@ const test6 = brain('test-6')
   })
   .prompt('Second categorize', categorizePrompt, {
     // Should still have access to threads
-    over: (state) => state.threads,
+    over: ({ state }) => state.threads,
   });
 
 // Export to prevent unused variable warnings

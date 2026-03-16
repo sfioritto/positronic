@@ -1099,7 +1099,7 @@ brain('Item Processor')
       name: 'summaries' as const
     }
   }, {
-    over: (state) => state.items,
+    over: ({ state }) => state.items,
     error: (item, error) => ({ summary: 'Failed to summarize' })
   })
   .step('Process Results', ({ state }) => ({
@@ -1130,7 +1130,7 @@ brain('Process All Items')
     items: [{ value: 1 }, { value: 2 }, { value: 3 }]
   }))
   .brain('Process Each', processBrain, {
-    over: (state) => state.items,
+    over: ({ state }) => state.items,
     initialState: (item) => ({ value: item.value }),
     outputKey: 'results' as const,
     error: (item, error) => ({ value: item.value, failed: true }),
@@ -1162,7 +1162,7 @@ brain('Research Topics')
       name: 'research' as const,
     },
   }), {
-    over: (state) => state.topics,
+    over: ({ state }) => state.topics,
     outputKey: 'results' as const,
   })
   .step('Use Results', ({ state }) => ({
@@ -1175,7 +1175,7 @@ brain('Research Topics')
 
 All iterate variants share these options:
 
-- `over: (state) => T[]` - Function returning the array to iterate over
+- `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, services, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, services, or any other context field. Can be async.
 - `error: (item, error) => Result | null` - Fallback when an item fails. Return `null` to skip the item entirely.
 - `mapOutput: (result, item) => Mapped` - Optional transform applied to each result. When provided, the output array contains mapped values instead of `[item, result]` tuples.
 
@@ -1186,6 +1186,31 @@ Brain and agent iterate also require:
 Brain iterate additionally requires:
 
 - `initialState: (item, outerState) => State` - Function to create the inner brain's initial state from each item
+
+#### Accessing options and services in `over`
+
+Since `over` receives the full step context, you can use options or services to determine which items to iterate over:
+
+```typescript
+brain('Dynamic Processor')
+  .withOptionsSchema(z.object({ category: z.string() }))
+  .step('Load items', () => ({
+    items: [
+      { id: 1, category: 'a' },
+      { id: 2, category: 'b' },
+      { id: 3, category: 'a' },
+    ]
+  }))
+  .prompt('Process', {
+    template: (item) => `Process item <%= '${item.id}' %>`,
+    outputSchema: {
+      schema: z.object({ result: z.string() }),
+      name: 'results' as const,
+    },
+  }, {
+    over: ({ state, options }) => state.items.filter(i => i.category === options.category),
+  })
+```
 
 ### Result Format
 
@@ -1214,7 +1239,7 @@ brain('Item Processor')
       name: 'summaries' as const
     }
   }, {
-    over: (state) => state.items,
+    over: ({ state }) => state.items,
     mapOutput: (result) => result.summary,
   })
   .step('Use Summaries', ({ state }) => ({
@@ -1232,7 +1257,7 @@ brain('Process All Items')
     items: [{ value: 1 }, { value: 2 }, { value: 3 }]
   }))
   .brain('Process Each', processBrain, {
-    over: (state) => state.items,
+    over: ({ state }) => state.items,
     initialState: (item) => ({ value: item.value }),
     outputKey: 'totals' as const,
     mapOutput: (result) => result.result,
@@ -1262,7 +1287,7 @@ brain('Research Topics')
       name: 'research' as const,
     },
   }), {
-    over: (state) => state.topics,
+    over: ({ state }) => state.topics,
     outputKey: 'summaries' as const,
     mapOutput: (agentState) => agentState.research.summary,
   })

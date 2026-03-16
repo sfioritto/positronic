@@ -481,7 +481,11 @@ export class Brain<
     title: string,
     innerBrain: Brain<TOptions, TInnerState, TServices>,
     iterateConfig: {
-      over: (state: TState) => TItem[];
+      over: (
+        context: StepContext<TState, TOptions> &
+          TServices &
+          StoreContext<TStore>
+      ) => TItem[] | Promise<TItem[]>;
       initialState: (item: TItem, outerState: TState) => State;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => TInnerState | null;
@@ -515,7 +519,11 @@ export class Brain<
       | AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
       | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>,
     iterateConfig: {
-      over: (state: TState) => TItem[];
+      over: (
+        context: StepContext<TState, TOptions> &
+          TServices &
+          StoreContext<TStore>
+      ) => TItem[] | Promise<TItem[]>;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
       mapOutput?: (result: z.infer<TSchema>, item: TItem) => TMapped;
@@ -545,7 +553,11 @@ export class Brain<
         }
     ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>,
     iterateConfig: {
-      over: (state: TState) => TItem[];
+      over: (
+        context: StepContext<TState, TOptions> &
+          TServices &
+          StoreContext<TStore>
+      ) => TItem[] | Promise<TItem[]>;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => any | null;
       mapOutput?: (result: any, item: TItem) => TMapped;
@@ -567,7 +579,7 @@ export class Brain<
         ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
     actionOrIterateConfig?:
       | ((params: any) => any)
-      | { over: (state: any) => any[]; [key: string]: any },
+      | { over: (context: any) => any[] | Promise<any[]>; [key: string]: any },
     initialState?: State | ((state: TState) => State)
   ): any {
     // Detect iterate config: 3rd arg is an object with `over` property
@@ -586,7 +598,7 @@ export class Brain<
       if (isIterateConfig) {
         // Case 1b: Nested brain with iterate
         const iterateConfig = actionOrIterateConfig as {
-          over: (state: any) => any[];
+          over: (context: any) => any[] | Promise<any[]>;
           initialState: (item: any, outerState: any) => State;
           outputKey: string;
           error?: (item: any, error: Error) => any | null;
@@ -622,7 +634,7 @@ export class Brain<
     if (isIterateConfig) {
       // Agent config with iterate — configFn receives (item, params)
       const iterateConfig = actionOrIterateConfig as {
-        over: (state: any) => any[];
+        over: (context: any) => any[] | Promise<any[]>;
         outputKey: string;
         error?: (item: any, error: Error) => any | null;
         mapOutput?: (result: any, item: any) => any;
@@ -721,7 +733,11 @@ export class Brain<
       client?: ObjectGenerator;
     },
     iterateConfig: {
-      over: (state: TState) => TItem[];
+      over: (
+        context: StepContext<TState, TOptions> &
+          TServices &
+          StoreContext<TStore>
+      ) => TItem[] | Promise<TItem[]>;
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
       mapOutput?: (result: z.infer<TSchema>, item: TItem) => TMapped;
     }
@@ -751,7 +767,7 @@ export class Brain<
       client?: ObjectGenerator;
     },
     iterateConfig?: {
-      over: (state: any) => any[];
+      over: (context: any) => any[] | Promise<any[]>;
       error?: (item: any, error: Error) => any | null;
       mapOutput?: (result: any, item: any) => any;
     }

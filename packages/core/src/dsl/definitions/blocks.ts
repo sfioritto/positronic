@@ -72,7 +72,7 @@ export type StepBlock<
   client?: ObjectGenerator;
   /** Configuration for iterate prompt execution (prompt with `over`) */
   iterateConfig?: {
-    over: (state: any) => any[];
+    over: (context: any) => any[] | Promise<any[]>;
     error?: (item: any, error: Error) => any | null;
     template: (item: any, resources: Resources) => string | Promise<string>;
     schema: z.ZodObject<any>;
@@ -127,7 +127,7 @@ export type BrainBlock<
     services: TServices
   ) => TNewState;
   iterateConfig?: {
-    over: (state: any) => any[];
+    over: (context: any) => any[] | Promise<any[]>;
     initialState: (item: any, outerState: any) => State;
     outputKey: string;
     error?: (item: any, error: Error) => any | null;
@@ -163,7 +163,7 @@ export type AgentBlock<
     | AgentConfig<TTools, TOutputSchema>
     | Promise<AgentConfig<TTools, TOutputSchema>>;
   iterateConfig?: {
-    over: (state: any) => any[];
+    over: (context: any) => any[] | Promise<any[]>;
     outputKey: string;
     error?: (item: any, error: Error) => any | null;
     mapOutput?: (result: any, item: any) => any;

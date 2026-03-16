@@ -274,7 +274,7 @@ When iterating over items with `.prompt()`, `.brain()`, or agent iterate, use `m
 ```typescript
 // ❌ DON'T DO THIS — tuple destructuring in the next step
 .prompt('Categorize', { ... }, {
-    over: (state) => state.emails,
+    over: ({ state }) => state.emails,
   })
   .step('Extract', ({ state }) => ({
     ...state,
@@ -283,7 +283,7 @@ When iterating over items with `.prompt()`, `.brain()`, or agent iterate, use `m
 
 // ✅ DO THIS — mapOutput eliminates the next step entirely
 .prompt('Categorize', { ... }, {
-    over: (state) => state.emails,
+    over: ({ state }) => state.emails,
     mapOutput: (result) => result.category,
   })
 ```
