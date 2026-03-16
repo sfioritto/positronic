@@ -99,8 +99,9 @@ export function rateGoverned(client: ObjectGenerator): ObjectGenerator {
       const governorStub = getGovernorStub(identity);
       const estimated = estimateRequestTokens({
         prompt: params.prompt,
-        messages: params.messages as Array<{ content: string }> | undefined,
+        messages: params.messages,
         system: params.system,
+        schema: params.schema,
       });
 
       return governedCall({
@@ -122,8 +123,9 @@ export function rateGoverned(client: ObjectGenerator): ObjectGenerator {
       const governorStub = getGovernorStub(identity);
       const estimated = estimateRequestTokens({
         prompt: params.prompt,
-        messages: params.messages as Array<{ content: string }> | undefined,
+        messages: params.messages,
         system: params.system,
+        tools: params.tools,
       });
 
       return governedCall({
@@ -141,8 +143,9 @@ export function rateGoverned(client: ObjectGenerator): ObjectGenerator {
       const identity = await getIdentity();
       const governorStub = getGovernorStub(identity);
       const estimated = estimateRequestTokens({
-        messages: params.messages as Array<{ content: string }> | undefined,
+        messages: params.messages,
         system: params.system,
+        tools: params.tools,
       });
 
       return governedCall({

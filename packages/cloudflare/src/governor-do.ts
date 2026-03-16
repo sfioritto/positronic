@@ -80,6 +80,9 @@ export class GovernorDO extends DurableObject<Env> {
     }
 
     if (!this.limitsLoaded) {
+      console.warn(
+        `Governor: no rate limits known for model '${modelId}', requests will not be throttled`
+      );
       return;
     }
 
