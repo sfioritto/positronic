@@ -84,6 +84,7 @@ export class BrainEventStream<
   private guards: Map<number, GuardBlock<any, any>> = new Map();
   private waits: Map<number, WaitBlock<any, any, any, any>> = new Map();
   private stopped = false;
+  private optionsSchema?: z.ZodSchema<any>;
 
   constructor(
     params: (InitialRunParams<TOptions> | ResumeRunParams<TOptions>) & {
@@ -96,6 +97,7 @@ export class BrainEventStream<
       extraTools?: Record<string, AgentTool<any>>;
       memoryProvider?: MemoryProvider;
       store?: Store<any>;
+      optionsSchema?: z.ZodSchema<any>;
     }
   ) {
     const {
@@ -142,6 +144,7 @@ export class BrainEventStream<
     this.signalProvider = signalProvider;
     this.memoryProvider = memoryProvider;
     this.store = store;
+    this.optionsSchema = params.optionsSchema;
 
     // Create scoped memory if provider is configured
     if (memoryProvider) {
@@ -241,6 +244,15 @@ export class BrainEventStream<
           options,
           brainRunId,
         };
+
+        // Validate options after START so errors are visible in watch/history
+        if (this.optionsSchema) {
+          this.options = this.optionsSchema.parse(this.options) as TOptions;
+        } else if (this.options && Object.keys(this.options).length > 0) {
+          throw new Error(
+            `Brain '${brainTitle}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`
+          );
+        }
       } else {
         // Resuming - check for WEBHOOK_RESPONSE signal or fall back to resumeContext
         let webhookResponse: JsonObject | undefined;

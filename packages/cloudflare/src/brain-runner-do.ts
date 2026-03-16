@@ -734,6 +734,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const brainTitle = (startEvent as any).brainTitle;
     const initialState = (startEvent as any).initialState || {};
+    const options = (startEvent as any).options || {};
 
     // Read run owner from durable storage (set once in start(), not from events)
     const ownerId = this.getRunOwner();
@@ -874,6 +875,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
         currentUser,
         machine,
         brainRunId: originalBrainRunId,
+        options,
         signal: this.abortController.signal,
       })
       .catch((err: any) => {

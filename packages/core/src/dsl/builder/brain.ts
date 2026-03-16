@@ -947,23 +947,6 @@ export class Brain<
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const { title, description, blocks } = this;
 
-    // Validate options if schema is defined
-    let validatedOptions: TOptions;
-    if (this.optionsSchema) {
-      // Just call parse - Zod handles defaults automatically
-      validatedOptions = this.optionsSchema.parse(
-        params.options || {}
-      ) as TOptions;
-    } else {
-      // If no schema is defined but options are provided, throw error
-      if (params.options && Object.keys(params.options).length > 0) {
-        throw new Error(
-          `Brain '${this.title}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`
-        );
-      }
-      validatedOptions = {} as TOptions;
-    }
-
     // Build store if withStore() was called and a store provider is given
     const store =
       this.storeSchema && params.storeProvider
@@ -979,7 +962,8 @@ export class Brain<
       description,
       blocks,
       ...params,
-      options: validatedOptions,
+      options: (params.options || {}) as TOptions,
+      optionsSchema: this.optionsSchema,
       services: this.services,
       components: this.components,
       defaultTools: this.defaultTools,

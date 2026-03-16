@@ -524,6 +524,49 @@ const iterateBrainTestBrain = brain({
     outputKey: 'results' as const,
   });
 
+// Inner brain for iterate-with-options testing - multiplies value by multiplier from initial state
+const iterateOptionsInnerBrain = brain<
+  {},
+  { value: number; multiplier: number; result: number }
+>({
+  title: 'iterate-options-inner',
+  description: 'Inner brain that multiplies value by multiplier',
+})
+  .withOptionsSchema(z.object({}).passthrough())
+  .step('Multiply', ({ state }) => ({
+    ...state,
+    result: state.value * state.multiplier,
+  }));
+
+// Outer brain with options schema + iterate - options must survive resume
+const iterateOptionsTestBrain = brain({
+  title: 'iterate-options-test',
+  description: 'Tests that options survive DO resume during iterate',
+})
+  .withOptionsSchema(
+    z.object({
+      multiplier: z.number(),
+    })
+  )
+  .step('Init items', ({ state, options }) => ({
+    ...state,
+    multiplier: options.multiplier,
+    items: [1, 2, 3],
+  }))
+  .brain('Process items', iterateOptionsInnerBrain, {
+    over: (state) => state.items,
+    initialState: (item, state) => ({
+      value: item,
+      multiplier: state.multiplier,
+      result: 0,
+    }),
+    outputKey: 'results' as const,
+  })
+  .step('Verify options', ({ state, options }) => ({
+    ...state,
+    finalMultiplier: options.multiplier,
+  }));
+
 const brainManifest = {
   'basic-brain': {
     filename: 'basic-brain',
@@ -634,6 +677,11 @@ const brainManifest = {
     filename: 'iterate-brain-test',
     path: 'brains/iterate-brain-test.ts',
     brain: iterateBrainTestBrain,
+  },
+  'iterate-options-test': {
+    filename: 'iterate-options-test',
+    path: 'brains/iterate-options-test.ts',
+    brain: iterateOptionsTestBrain,
   },
 };
 
