@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+import { z } from 'zod';
 import {
   estimateTokens,
   estimateRequestTokens,
@@ -45,6 +46,83 @@ describe('token-estimator', () => {
           { content: 'What is AI?' },
           { content: 'AI stands for artificial intelligence.' },
         ],
+      });
+      expect(count).toBeGreaterThan(0);
+    });
+
+    it('includes tool definitions in token count', () => {
+      const withoutTools = estimateRequestTokens({
+        prompt: 'hello',
+      });
+      const withTools = estimateRequestTokens({
+        prompt: 'hello',
+        tools: {
+          get_weather: {
+            description: 'Get the current weather for a location',
+            inputSchema: z.object({
+              city: z.string().describe('The city name'),
+              unit: z.enum(['celsius', 'fahrenheit']).optional(),
+            }),
+          },
+          search: {
+            description: 'Search for information on the web',
+            inputSchema: z.object({
+              query: z.string().describe('The search query'),
+              maxResults: z.number().optional(),
+            }),
+          },
+        },
+      });
+      expect(withTools).toBeGreaterThan(withoutTools);
+    });
+
+    it('includes output schema in token count', () => {
+      const withoutSchema = estimateRequestTokens({
+        prompt: 'hello',
+      });
+      const withSchema = estimateRequestTokens({
+        prompt: 'hello',
+        schema: z.object({
+          summary: z.string(),
+          sentiment: z.enum(['positive', 'negative', 'neutral']),
+          keywords: z.array(z.string()),
+        }),
+      });
+      expect(withSchema).toBeGreaterThan(withoutSchema);
+    });
+
+    it('includes toolCalls from messages in token count', () => {
+      const withoutToolCalls = estimateRequestTokens({
+        messages: [{ content: 'What is the weather?' }],
+      });
+      const withToolCalls = estimateRequestTokens({
+        messages: [
+          { content: 'What is the weather?' },
+          {
+            content: '',
+            toolCalls: [
+              {
+                toolCallId: 'call_abc123',
+                toolName: 'get_weather',
+                args: { city: 'San Francisco', unit: 'celsius' },
+              },
+            ],
+          },
+          {
+            content: '72 degrees and sunny',
+            toolCallId: 'call_abc123',
+            toolName: 'get_weather',
+          },
+        ],
+      });
+      expect(withToolCalls).toBeGreaterThan(withoutToolCalls);
+    });
+
+    it('works without tools or schema (backward compatibility)', () => {
+      const count = estimateRequestTokens({
+        system: 'You are helpful',
+        prompt: 'hello',
+        messages: [{ content: 'Hi there' }],
       });
       expect(count).toBeGreaterThan(0);
     });
