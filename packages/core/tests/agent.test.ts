@@ -1822,25 +1822,19 @@ describe('agent step', () => {
       mockGenerateText
         .mockResolvedValueOnce({
           text: undefined,
-          toolCalls: [
-            { toolCallId: 'call-1', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-1', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 50 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: undefined,
-          toolCalls: [
-            { toolCallId: 'call-2', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-2', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 50 },
           responseMessages: [],
         })
         .mockResolvedValueOnce({
           text: undefined,
-          toolCalls: [
-            { toolCallId: 'call-3', toolName: 'doWork', args: {} },
-          ],
+          toolCalls: [{ toolCallId: 'call-3', toolName: 'doWork', args: {} }],
           usage: { totalTokens: 50 },
           responseMessages: [],
         });
