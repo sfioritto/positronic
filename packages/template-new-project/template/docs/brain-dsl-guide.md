@@ -1104,8 +1104,8 @@ brain('Item Processor')
   })
   .step('Process Results', ({ state }) => ({
     ...state,
-    // summaries is [item, response][] - array of tuples
-    processedSummaries: state.summaries.map(([item, response]) => ({
+    // summaries is an IterateResult — use .values, .items, .entries, .filter(), .map()
+    processedSummaries: state.summaries.map((item, response) => ({
       id: item.id,
       summary: response.summary
     }))
@@ -1137,8 +1137,8 @@ brain('Process All Items')
   })
   .step('Use Results', ({ state }) => ({
     ...state,
-    // results is [item, innerState][] - array of tuples
-    totals: state.results.map(([item, result]) => result.result),
+    // results is an IterateResult — use .values to get just the results
+    totals: state.results.values.map(result => result.result),
   }));
 ```
 
@@ -1167,7 +1167,8 @@ brain('Research Topics')
   })
   .step('Use Results', ({ state }) => ({
     ...state,
-    summaries: state.results.map(([topic, result]) => result.summary),
+    // results is an IterateResult — use .values to get just the results
+    summaries: state.results.values.map(result => result.summary),
   }));
 ```
 
@@ -1177,7 +1178,6 @@ All iterate variants share these options:
 
 - `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, services, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, services, or any other context field. Can be async.
 - `error: (item, error) => Result | null` - Fallback when an item fails. Return `null` to skip the item entirely.
-- `mapOutput: (result, item) => Mapped` - Optional transform applied to each result. When provided, the output array contains mapped values instead of `[item, result]` tuples.
 
 Brain and agent iterate also require:
 
@@ -1214,99 +1214,17 @@ brain('Dynamic Processor')
 
 ### Result Format
 
-By default, results are stored as `[item, result][]` tuples, preserving the relationship between each input item and its output. For prompts, the key comes from `outputSchema.name`. For brain and agent iterate, it comes from `outputKey`.
+By default, results are stored as an `IterateResult` — a collection that wraps `[item, result]` pairs and provides a richer API than raw tuples:
 
-When `mapOutput` is provided, results are stored as `Mapped[]` — the return type of your `mapOutput` function — instead of tuples.
+- **`.items`** — array of all input items
+- **`.values`** — array of all results
+- **`.entries`** — array of `[item, result]` tuples
+- **`.length`** — number of results
+- **`.filter((item, result) => boolean)`** — returns a new `IterateResult` with only matching pairs
+- **`.map((item, result) => value)`** — maps over both item and result, returns a plain array
+- **`for...of`** — iterates as `[item, result]` tuples (backward compatible with destructuring)
 
-### Transforming Results with `mapOutput`
-
-When the next step only needs to extract one field from the result, use `mapOutput` to do it inline:
-
-**Prompt iterate with `mapOutput`:**
-
-```typescript
-brain('Item Processor')
-  .step('Initialize', () => ({
-    items: [
-      { id: 1, title: 'First item' },
-      { id: 2, title: 'Second item' },
-    ]
-  }))
-  .prompt('Summarize Items', {
-    template: (item) => `Summarize this item: <%= '${item.title}' %>`,
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'summaries' as const
-    }
-  }, {
-    over: ({ state }) => state.items,
-    mapOutput: (result) => result.summary,
-  })
-  .step('Use Summaries', ({ state }) => ({
-    ...state,
-    // summaries is string[] — no tuple destructuring needed
-    allSummaries: state.summaries.join('\n'),
-  }));
-```
-
-**Brain iterate with `mapOutput`:**
-
-```typescript
-brain('Process All Items')
-  .step('Initialize', () => ({
-    items: [{ value: 1 }, { value: 2 }, { value: 3 }]
-  }))
-  .brain('Process Each', processBrain, {
-    over: ({ state }) => state.items,
-    initialState: (item) => ({ value: item.value }),
-    outputKey: 'totals' as const,
-    mapOutput: (result) => result.result,
-  })
-  .step('Use Results', ({ state }) => ({
-    ...state,
-    // totals is number[] — no tuple destructuring needed
-    sum: state.totals.reduce((a, b) => a + b, 0),
-  }));
-```
-
-**Agent iterate with `mapOutput`:**
-
-```typescript
-brain('Research Topics')
-  .step('Initialize', () => ({
-    topics: [{ name: 'AI' }, { name: 'Robotics' }]
-  }))
-  .brain('Research Each', (item, { state, tools }) => ({
-    system: 'You are a research assistant.',
-    prompt: `Research this topic: <%= '${item.name}' %>`,
-    tools: {
-      search: tools.search,
-    },
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'research' as const,
-    },
-  }), {
-    over: ({ state }) => state.topics,
-    outputKey: 'summaries' as const,
-    mapOutput: (agentState) => agentState.research.summary,
-  })
-  .step('Use Results', ({ state }) => ({
-    ...state,
-    // summaries is string[] — no tuple destructuring needed
-    report: state.summaries.join('\n\n'),
-  }));
-```
-
-Without `mapOutput`, you'd need to destructure tuples in the next step:
-
-```typescript
-// Without mapOutput — tuple destructuring required
-.step('Use Results', ({ state }) => ({
-  ...state,
-  summaries: state.results.map(([topic, result]) => result.summary),
-}))
-```
+For prompts, the key comes from `outputSchema.name`. For brain and agent iterate, it comes from `outputKey`.
 
 ## Agent Steps
 

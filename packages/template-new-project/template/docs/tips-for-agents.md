@@ -265,32 +265,38 @@ The smell to watch for: if you're reading a brain and can't quickly answer "what
   })
 ```
 
-## Iterate `mapOutput`
+## Iterate Results
 
-When iterating over items with `.prompt()`, `.brain()`, or agent iterate, use `mapOutput` to transform results inline instead of destructuring tuples in the next step.
-
-**Always use `mapOutput`** when the next step just destructures the tuple to extract one field — that's exactly what `mapOutput` is for:
+Iterate steps produce an `IterateResult` — use its properties and methods to access results cleanly:
 
 ```typescript
-// ❌ DON'T DO THIS — tuple destructuring in the next step
-.prompt('Categorize', { ... }, {
-    over: ({ state }) => state.emails,
-  })
-  .step('Extract', ({ state }) => ({
-    ...state,
-    categories: state.categories.map(([_, result]) => result.category),
-  }))
+// Access just the results
+state.results.values.map(r => r.summary)
 
-// ✅ DO THIS — mapOutput eliminates the next step entirely
-.prompt('Categorize', { ... }, {
-    over: ({ state }) => state.emails,
-    mapOutput: (result) => result.category,
-  })
+// Access just the input items
+state.results.items
+
+// Filter by both item and result
+state.results.filter((item, r) => r.isImportant).items
+
+// Map over both item and result
+state.results.map((item, r) => ({ id: item.id, summary: r.summary }))
+
+// Tuple destructuring still works (backward compatible)
+for (const [item, result] of state.results) { ... }
 ```
 
-**Don't use `mapOutput`** when the next step needs both the input item and the result — the tuple is the right shape already.
+Use `.values` for simple extraction, `.filter()` for correlated filtering, and `.map()` when you need both item and result:
 
-**Name the `outputKey` after the mapped value.** If mapping to `result.analysis`, use `outputKey: 'analyses' as const`, not `outputKey: 'processedItems' as const`.
+```typescript
+.step('Process', ({ state }) => ({
+    ...state,
+    important: state.results.filter((item, r) => r.score > 0.8).items,
+    summaries: state.results.values.map(r => r.summary),
+  }))
+```
+
+**Name the `outputKey` after the content.** If results contain analyses, use `outputKey: 'analyses' as const`, not `outputKey: 'processedItems' as const`.
 
 ## Brain DSL Type Inference
 

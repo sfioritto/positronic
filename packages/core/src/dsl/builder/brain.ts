@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
+import type { IterateResult } from '../iterate-result.js';
 import type {
   State,
   JsonObject,
@@ -472,11 +473,8 @@ export class Brain<
     TItem,
     TInnerState extends State,
     TOutputKey extends string & { readonly brand?: unique symbol },
-    TMapped = never,
     TNewState extends State = TState & {
-      [K in TOutputKey]: [TMapped] extends [never]
-        ? [TItem, TInnerState][]
-        : TMapped[];
+      [K in TOutputKey]: IterateResult<TItem, TInnerState>;
     }
   >(
     title: string,
@@ -490,7 +488,6 @@ export class Brain<
       initialState: (item: TItem, outerState: TState) => State;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => TInnerState | null;
-      mapOutput?: (result: TInnerState, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -501,11 +498,8 @@ export class Brain<
     TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TOutputKey extends string & { readonly brand?: unique symbol },
-    TMapped = never,
     TNewState extends State = TState & {
-      [K in TOutputKey]: [TMapped] extends [never]
-        ? [TItem, z.infer<TSchema>][]
-        : TMapped[];
+      [K in TOutputKey]: IterateResult<TItem, z.infer<TSchema>>;
     }
   >(
     title: string,
@@ -527,7 +521,6 @@ export class Brain<
       ) => TItem[] | Promise<TItem[]>;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
-      mapOutput?: (result: z.infer<TSchema>, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -539,9 +532,8 @@ export class Brain<
       AgentTool<any>
     >,
     TOutputKey extends string = string,
-    TMapped = never,
     TNewState extends State = TState & {
-      [K in TOutputKey]: [TMapped] extends [never] ? [TItem, any][] : TMapped[];
+      [K in TOutputKey]: IterateResult<TItem, any>;
     }
   >(
     title: string,
@@ -561,7 +553,6 @@ export class Brain<
       ) => TItem[] | Promise<TItem[]>;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItem, error: Error) => any | null;
-      mapOutput?: (result: any, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -603,7 +594,6 @@ export class Brain<
           initialState: (item: any, outerState: any) => State;
           outputKey: string;
           error?: (item: any, error: Error) => any | null;
-          mapOutput?: (result: any, item: any) => any;
         };
         const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
           type: 'brain',
@@ -638,7 +628,6 @@ export class Brain<
         over: (context: any) => any[] | Promise<any[]>;
         outputKey: string;
         error?: (item: any, error: Error) => any | null;
-        mapOutput?: (result: any, item: any) => any;
       };
       const configFn = innerBrainOrConfig as (
         item: any,
@@ -717,11 +706,8 @@ export class Brain<
     TItem,
     TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
-    TMapped = never,
     TNewState extends State = TState & {
-      [K in TResponseKey]: [TMapped] extends [never]
-        ? [TItem, z.infer<TSchema>][]
-        : TMapped[];
+      [K in TResponseKey]: IterateResult<TItem, z.infer<TSchema>>;
     }
   >(
     title: string,
@@ -740,7 +726,6 @@ export class Brain<
           StoreContext<TStore>
       ) => TItem[] | Promise<TItem[]>;
       error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
-      mapOutput?: (result: z.infer<TSchema>, item: TItem) => TMapped;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -770,7 +755,6 @@ export class Brain<
     iterateConfig?: {
       over: (context: any) => any[] | Promise<any[]>;
       error?: (item: any, error: Error) => any | null;
-      mapOutput?: (result: any, item: any) => any;
     }
   ): any {
     // Schema-less prompt - returns text response for next step
@@ -826,7 +810,6 @@ export class Brain<
           schema: outputSchema.schema,
           schemaName: outputSchema.name,
           client: config.client,
-          mapOutput: iterateConfig.mapOutput,
         },
       };
       this.blocks.push(promptBlock);
