@@ -39,6 +39,7 @@ export interface BrainEntry {
   brainRunId: string;
   brainTitle: string;
   brainDescription?: string;
+  options?: JsonObject;
   parentStepId: string | null;
   parentBrainId: string | null; // For tree reconstruction
   steps: StepInfo[];
@@ -62,6 +63,7 @@ export interface RunningBrain {
   brainRunId: string;
   brainTitle: string;
   brainDescription?: string;
+  options?: JsonObject;
   parentStepId: string | null;
   steps: StepInfo[];
   innerBrain: RunningBrain | null;
@@ -184,6 +186,7 @@ export interface StartBrainPayload {
   brainRunId: string;
   brainTitle: string;
   brainDescription?: string;
+  options?: JsonObject;
   initialState?: JsonObject;
 }
 
@@ -241,6 +244,7 @@ export function reconstructBrainTree(
       brainRunId: entry.brainRunId,
       brainTitle: entry.brainTitle,
       brainDescription: entry.brainDescription,
+      options: entry.options,
       parentStepId: entry.parentStepId,
       steps: entry.steps,
       innerBrain,
@@ -353,7 +357,10 @@ const updateDerivedState = (
 // ============================================================================
 
 const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
-  (ctx, { brainRunId, brainTitle, brainDescription, initialState }) => {
+  (
+    ctx,
+    { brainRunId, brainTitle, brainDescription, options, initialState }
+  ) => {
     const {
       currentStepId,
       depth,
@@ -374,6 +381,7 @@ const startBrain = reduce<BrainExecutionContext, StartBrainPayload>(
       brainRunId,
       brainTitle,
       brainDescription,
+      options,
       parentStepId: currentStepId,
       parentBrainId,
       steps: [],
