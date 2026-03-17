@@ -136,7 +136,7 @@ interface BrainInfoProps {
   showSteps: boolean;
 }
 
-const BrainInfo = ({ brainTitle, showSteps }: BrainInfoProps) => {
+export const BrainInfo = ({ brainTitle, showSteps }: BrainInfoProps) => {
   const {
     data: brain,
     loading: brainLoading,
