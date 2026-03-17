@@ -1,7 +1,8 @@
-import React from 'react';
-import { Text, Box } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { Text, Box, useInput, useApp, useStdout } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
+import { BrainInfo } from './brain-show.js';
 
 interface Brain {
   filename: string;
@@ -41,8 +42,55 @@ const wrapText = (text: string, maxWidth: number): string[] => {
   return lines.length > 0 ? lines : [''];
 };
 
+type Mode = 'list' | 'detail';
+
 export const BrainList = () => {
+  const { exit } = useApp();
+  const { write } = useStdout();
   const { data, loading, error } = useApiGet<BrainsResponse>('/brains');
+
+  const [mode, setMode] = useState<Mode>('list');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Enter alternate screen buffer on mount, exit on unmount
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    write('\x1B[?1049h\x1B[2J\x1B[H');
+
+    return () => {
+      write('\x1B[?1049l');
+    };
+  }, [write]);
+
+  // Sort brains alphabetically by title
+  const sortedBrains = data
+    ? [...data.brains].sort((a, b) => a.title.localeCompare(b.title))
+    : [];
+
+  useInput((input, key) => {
+    if (mode === 'list') {
+      if ((key.upArrow || input === 'k') && sortedBrains.length > 0) {
+        setSelectedIndex(
+          (prev) => (prev - 1 + sortedBrains.length) % sortedBrains.length
+        );
+      } else if ((key.downArrow || input === 'j') && sortedBrains.length > 0) {
+        setSelectedIndex((prev) => (prev + 1) % sortedBrains.length);
+      } else if (key.return && sortedBrains.length > 0) {
+        setMode('detail');
+      } else if (input === 'q' || key.escape) {
+        exit();
+      }
+    } else if (mode === 'detail') {
+      if (key.escape) {
+        setMode('list');
+      } else if (input === 'q') {
+        exit();
+      }
+    }
+  });
 
   if (error) {
     return <ErrorComponent error={error} />;
@@ -70,20 +118,31 @@ export const BrainList = () => {
     );
   }
 
-  // Sort brains alphabetically by title
-  const sortedBrains = [...data.brains].sort((a, b) =>
-    a.title.localeCompare(b.title)
-  );
+  // Detail mode - show BrainInfo for the selected brain
+  const selectedBrain = sortedBrains[selectedIndex];
+  if (mode === 'detail' && selectedBrain) {
+    return (
+      <Box flexDirection="column">
+        <BrainInfo brainTitle={selectedBrain.title} showSteps={true} />
+        <Box marginTop={1}>
+          <Text dimColor>esc back | q quit</Text>
+        </Box>
+      </Box>
+    );
+  }
 
   // Define column widths
+  const indicatorWidth = 2;
   const columns = {
     title: { header: 'Brain', width: 25 },
     description: { header: 'Description', width: 70 },
   };
 
-  // Calculate total width for separator
+  // Calculate total width for separator (including indicator column)
   const totalWidth =
-    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) - 2;
+    indicatorWidth +
+    Object.values(columns).reduce((sum, col) => sum + col.width + 2, 0) -
+    2;
 
   return (
     <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -94,6 +153,7 @@ export const BrainList = () => {
       <Box marginTop={1} flexDirection="column">
         {/* Header row */}
         <Box>
+          <Text>{' '.repeat(indicatorWidth)}</Text>
           <Text bold color="cyan">
             {padRight(columns.title.header, columns.title.width)}
           </Text>
@@ -109,19 +169,19 @@ export const BrainList = () => {
         </Box>
 
         {/* Data rows */}
-        {sortedBrains.map((brain) => {
+        {sortedBrains.map((brain, index) => {
+          const isSelected = index === selectedIndex;
           const descriptionLines = wrapText(
             brain.description,
             columns.description.width
           );
           return (
-            <Box
-              key={brain.filename}
-              flexDirection="column"
-              marginBottom={descriptionLines.length > 1 ? 1 : 0}
-            >
+            <Box key={brain.filename} flexDirection="column" marginBottom={1}>
               <Box>
-                <Text>
+                <Text color={isSelected ? 'cyan' : undefined}>
+                  {isSelected ? '> ' : '  '}
+                </Text>
+                <Text bold={isSelected} color={isSelected ? 'cyan' : undefined}>
                   {padRight(
                     brain.title.length > columns.title.width
                       ? brain.title.substring(0, columns.title.width - 3) +
@@ -133,8 +193,9 @@ export const BrainList = () => {
                 <Text> </Text>
                 <Text dimColor>{descriptionLines[0]}</Text>
               </Box>
-              {descriptionLines.slice(1).map((line, index) => (
-                <Box key={index}>
+              {descriptionLines.slice(1).map((line, lineIndex) => (
+                <Box key={lineIndex}>
+                  <Text>{' '.repeat(indicatorWidth)}</Text>
                   <Text>{' '.repeat(columns.title.width)}</Text>
                   <Text> </Text>
                   <Text dimColor>{line}</Text>
@@ -143,6 +204,11 @@ export const BrainList = () => {
             </Box>
           );
         })}
+      </Box>
+
+      {/* Footer */}
+      <Box marginTop={1}>
+        <Text dimColor>j/k or up/down select | Enter show | esc/q quit</Text>
       </Box>
     </Box>
   );
