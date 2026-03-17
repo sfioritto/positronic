@@ -21,6 +21,7 @@ import type { Resources } from '../../resources/resources.js';
 import type {
   WebhookRegistration,
   SerializedWebhookRegistration,
+  SerializedPageContext,
 } from '../webhook.js';
 import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
@@ -188,6 +189,17 @@ export class BrainEventStream<
         this.currentResponse = resumeContext.webhookResponse;
       }
       // Agent webhook response is handled via agentContext (checked in executeAgent)
+
+      // Restore page context if available (from a preceding UI step)
+      if (resumeContext.currentPage) {
+        this.currentPage = {
+          url: resumeContext.currentPage.url,
+          webhook: {
+            ...resumeContext.currentPage.webhook,
+            schema: z.record(z.unknown()), // fallback schema for deserialized webhook
+          },
+        };
+      }
     } else {
       // Fresh start: use initialState or empty object
       this.currentState = clone(initialParams.initialState ?? {}) as TState;
@@ -1820,7 +1832,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     // State doesn't change from UI step - it just sets up the page
     // The next step will receive the page object and can use waitFor
-    yield* this.completeStep(step, prevState);
+    yield* this.completeStep(step, prevState, {
+      url: page.url,
+      webhook: {
+        slug: webhook.slug,
+        identifier: webhook.identifier,
+        token: webhook.token,
+      },
+    });
   }
 
   private async *executeWait(
@@ -1986,7 +2005,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
   private *completeStep(
     step: Step,
-    prevState: TState
+    prevState: TState,
+    pageContext?: SerializedPageContext
   ): Generator<BrainEvent<TOptions>> {
     step.withStatus(STATUS.COMPLETE);
 
@@ -2000,6 +2020,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       stepTitle: step.block.title,
       stepId: step.id,
       patch,
+      ...(pageContext && { pageContext }),
       options: this.options ?? ({} as TOptions),
       brainRunId: this.brainRunId,
     };

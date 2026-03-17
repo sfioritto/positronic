@@ -6,6 +6,7 @@ const { createMachine, state, transition, reduce, guard, interpret } = robot3;
 import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { JsonPatch, JsonObject } from './types.js';
+import type { SerializedPageContext } from './webhook.js';
 import type { ResponseMessage } from '../clients/types.js';
 
 // ============================================================================
@@ -143,6 +144,11 @@ export interface BrainExecutionContext {
   // Non-null when we're inside an iterate step (or paused from one)
   iterateContext: IterateContext | null;
 
+  // Page context - tracks the current page reference from a UI step
+  // Set when a UI step completes (via pageContext on STEP_COMPLETE event)
+  // Cleared when the next non-UI step completes
+  currentPage: SerializedPageContext | null;
+
   // Derived state (updated by reducers)
   // The authoritative status (depth-aware) - use this instead of checking event.status
   status: (typeof STATUS)[keyof typeof STATUS];
@@ -192,6 +198,7 @@ export interface CompleteStepPayload {
   stepTitle: string;
   patch?: JsonPatch;
   halted?: boolean;
+  pageContext?: SerializedPageContext;
 }
 
 export interface WebhookPayload {
@@ -273,6 +280,7 @@ const createInitialContext = (
   options: opts?.options ?? {},
   agentContext: null,
   iterateContext: null,
+  currentPage: null,
   status: STATUS.PENDING,
   isTopLevel: false,
   isRunning: false,
@@ -538,7 +546,7 @@ const startStep = reduce<BrainExecutionContext, StartStepPayload>(
 );
 
 const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
-  (ctx, { stepId, stepTitle, patch, halted }) => {
+  (ctx, { stepId, stepTitle, patch, halted, pageContext }) => {
     const {
       brains,
       brainIdStack,
@@ -615,6 +623,10 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     const newIterateContext =
       ctx.iterateContext?.stepId === stepId ? null : ctx.iterateContext;
 
+    // Track page context: set when UI step completes (has pageContext),
+    // clear when the next step completes (page is ephemeral)
+    const newCurrentPage = pageContext ?? null;
+
     return {
       ...ctx,
       brains: newBrains,
@@ -622,6 +634,7 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       currentState: newState,
       topLevelStepCount: newStepCount,
       iterateContext: newIterateContext,
+      currentPage: newCurrentPage,
     };
   }
 );

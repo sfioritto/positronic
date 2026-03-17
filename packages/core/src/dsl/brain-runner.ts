@@ -7,6 +7,7 @@ import {
   type AgentContext,
   type IterateContext,
 } from './brain-state-machine.js';
+import type { SerializedPageContext } from './webhook.js';
 import type { Adapter } from '../adapters/types.js';
 import {
   DEFAULT_ENV,
@@ -36,7 +37,8 @@ import type { StoreProvider } from '../store/types.js';
 function executionStackToResumeContext(
   stack: ExecutionStackEntry[],
   agentContext: AgentContext | null,
-  iterateContext: IterateContext | null
+  iterateContext: IterateContext | null,
+  currentPage: SerializedPageContext | null
 ): ResumeContext {
   if (stack.length === 0) {
     throw new Error('Cannot convert empty execution stack to ResumeContext');
@@ -47,12 +49,13 @@ function executionStackToResumeContext(
   for (let i = stack.length - 1; i >= 0; i--) {
     const entry = stack[i];
     if (i === stack.length - 1) {
-      // Deepest level - add agent context and iterate progress (webhook response comes from signals now)
+      // Deepest level - add agent context, iterate progress, and page context
       context = {
         stepIndex: entry.stepIndex,
         state: entry.state,
         agentContext: agentContext ?? undefined,
         iterateProgress: iterateContext ?? undefined,
+        currentPage: currentPage ?? undefined,
       };
     } else {
       // Outer level - wrap inner context
@@ -219,11 +222,13 @@ export class BrainRunner {
 
     // Build ResumeContext from machine's execution stack
     // Webhook response comes from signals during execution, not from resume parameters
-    const { executionStack, agentContext, iterateContext } = machine.context;
+    const { executionStack, agentContext, iterateContext, currentPage } =
+      machine.context;
     const resumeContext = executionStackToResumeContext(
       executionStack,
       agentContext,
-      iterateContext
+      iterateContext,
+      currentPage
     );
 
     return this.execute(brain, {
