@@ -14,7 +14,7 @@ interface CreateSecretResponse {
   updatedAt: string;
 }
 
-export const SecretCreate = ({ name, value }: SecretCreateProps) => {
+export const SecretsCreate = ({ name, value }: SecretCreateProps) => {
   const [created, setCreated] = useState(false);
   const [secret, setSecret] = useState<CreateSecretResponse | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export const SecretCreate = ({ name, value }: SecretCreateProps) => {
         <Text color="red">{validationError}</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Example: px secret create {name} --value=my-secret-value
+            Example: px secrets create {name} --value=my-secret-value
           </Text>
         </Box>
       </Box>
@@ -82,7 +82,7 @@ export const SecretCreate = ({ name, value }: SecretCreateProps) => {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Tip: Use "px secret list" to view all secrets</Text>
+          <Text dimColor>Tip: Use "px secrets list" to view all secrets</Text>
         </Box>
       </Box>
     );
