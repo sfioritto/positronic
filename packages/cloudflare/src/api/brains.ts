@@ -131,7 +131,7 @@ brains.post('/runs/rerun', async (context: Context) => {
   }
 
   return context.json(
-    { brainRunId: runId, brainTitle: existingRun.brain_title },
+    { brainRunId: runId, brainTitle: existingRun.brainTitle },
     200
   );
 });
