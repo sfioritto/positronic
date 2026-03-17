@@ -54,6 +54,7 @@ export class Brain<
   TPage extends GeneratedPage | undefined = undefined,
   TStore extends Record<string, JsonValue> = never
 > {
+  declare readonly __optionsType: TOptions;
   private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
