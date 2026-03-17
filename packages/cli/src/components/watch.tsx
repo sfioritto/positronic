@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Text, Box, useStdout, useInput, useApp } from 'ink';
+import { Text, Box, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { EventSource } from 'eventsource';
 import type { BrainEvent, BrainErrorEvent } from '@positronic/core';
@@ -33,6 +33,7 @@ import {
   type ViewMode,
   type WatchKeyboardContext,
 } from './watch-keyboard.js';
+import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 import {
   useWatchMachine,
   machineStateToViewMode,
@@ -245,7 +246,6 @@ export const Watch = ({
   footer,
   startWithEvents = false,
 }: WatchProps) => {
-  const { write } = useStdout();
   const { exit } = useApp();
 
   // UI navigation state machine - handles view transitions and related context
@@ -309,21 +309,7 @@ export const Watch = ({
   // Track paused status from brain state machine
   const isPaused = current.context.status === STATUS.PAUSED;
 
-  // Enter alternate screen buffer on mount, exit on unmount
-  // Skip in test environment or when parent manages screen buffer
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'test' || !manageScreenBuffer) {
-      return;
-    }
-
-    // Enter alternate screen buffer and clear
-    write('\x1B[?1049h\x1B[2J\x1B[H');
-
-    return () => {
-      // Exit alternate screen buffer
-      write('\x1B[?1049l');
-    };
-  }, [write, manageScreenBuffer]);
+  useAlternateScreen(manageScreenBuffer);
 
   useEffect(() => {
     const baseUrl = getApiBaseUrl();

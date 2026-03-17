@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Text, Box, useStdout } from 'ink';
+import { Text, Box } from 'ink';
 import { EventSource } from 'eventsource';
 import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
 import { BrainTopTable, type RunningBrain } from './brain-top-table.js';
+import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 
 interface BrainWatchEvent {
   runningBrains: RunningBrain[];
@@ -14,7 +15,6 @@ interface BrainTopProps {
 }
 
 export const BrainTop = ({ brainFilter }: BrainTopProps) => {
-  const { write } = useStdout();
   const [runningBrains, setRunningBrains] = useState<RunningBrain[]>([]);
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -22,21 +22,7 @@ export const BrainTop = ({ brainFilter }: BrainTopProps) => {
   const eventSourceRef = useRef<EventSource | null>(null);
   const hasReceivedDataRef = useRef(false);
 
-  // Enter alternate screen buffer on mount, exit on unmount
-  // Skip in test environment to avoid interfering with test output capture
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-
-    // Enter alternate screen buffer and clear
-    write('\x1B[?1049h\x1B[2J\x1B[H');
-
-    return () => {
-      // Exit alternate screen buffer
-      write('\x1B[?1049l');
-    };
-  }, [write]);
+  useAlternateScreen();
 
   // Update tick every second to refresh duration display
   useEffect(() => {

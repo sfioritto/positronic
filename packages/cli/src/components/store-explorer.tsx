@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Text, Box, useStdout, useInput, useApp } from 'ink';
+import { Text, Box, useInput, useApp } from 'ink';
 import { apiClient } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
 import { StateView } from './state-view.js';
+import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 
 type Mode = 'brains' | 'keys' | 'value';
 
@@ -41,7 +42,6 @@ type InputKey = {
 };
 
 export const StoreExplorer = () => {
-  const { write } = useStdout();
   const { exit } = useApp();
 
   // Navigation state
@@ -77,18 +77,7 @@ export const StoreExplorer = () => {
     () => {}
   );
 
-  // Enter alternate screen buffer on mount, exit on unmount
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-
-    write('\x1B[?1049h\x1B[2J\x1B[H');
-
-    return () => {
-      write('\x1B[?1049l');
-    };
-  }, [write]);
+  useAlternateScreen();
 
   // Fetch brains list
   useEffect(() => {

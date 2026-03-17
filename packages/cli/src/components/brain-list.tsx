@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Text, Box, useInput, useApp, useStdout } from 'ink';
+import React, { useState } from 'react';
+import { Text, Box, useInput, useApp } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
 import { BrainInfo } from './brain-show.js';
+import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 
 interface Brain {
   filename: string;
@@ -46,24 +47,12 @@ type Mode = 'list' | 'detail';
 
 export const BrainList = () => {
   const { exit } = useApp();
-  const { write } = useStdout();
   const { data, loading, error } = useApiGet<BrainsResponse>('/brains');
 
   const [mode, setMode] = useState<Mode>('list');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Enter alternate screen buffer on mount, exit on unmount
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-
-    write('\x1B[?1049h\x1B[2J\x1B[H');
-
-    return () => {
-      write('\x1B[?1049l');
-    };
-  }, [write]);
+  useAlternateScreen();
 
   // Sort brains alphabetically by title
   const sortedBrains = data
