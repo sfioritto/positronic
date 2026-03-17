@@ -32,6 +32,28 @@ export class EventLoader {
   }
 
   /**
+   * Load all events with their SQL row IDs, for truncation operations.
+   */
+  async loadAllEventsWithIds(): Promise<
+    Array<{ eventId: number; event: BrainEvent }>
+  > {
+    const rows = this.sql
+      .exec<EventRow>(
+        `SELECT event_id, event_type, serialized_event, r2_key
+         FROM brain_events
+         ORDER BY event_id ASC`
+      )
+      .toArray();
+
+    const events = await this.hydrateEvents(rows);
+
+    return rows.map((row, i) => ({
+      eventId: row.event_id,
+      event: events[i],
+    }));
+  }
+
+  /**
    * Load a single event by type, optionally ordering to get first/last.
    * Returns null if no event of the given type exists.
    */

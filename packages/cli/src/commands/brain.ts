@@ -23,10 +23,8 @@ interface BrainShowArgs {
   steps?: boolean;
 }
 interface BrainRerunArgs {
-  brain: string;
-  runId?: string;
-  startsAt?: number;
-  stopsAfter?: number;
+  runId: string;
+  startsAt: number;
 }
 interface BrainRunArgs {
   brain: string;
@@ -95,20 +93,12 @@ export class BrainCommand {
   }
 
   rerun({
-    brain,
     runId,
     startsAt,
-    stopsAfter,
   }: ArgumentsCamelCase<BrainRerunArgs>): React.ReactElement {
-    return React.createElement(BrainResolver, {
-      identifier: brain,
-      children: (resolvedBrainTitle: string) =>
-        React.createElement(BrainRerun, {
-          identifier: resolvedBrainTitle,
-          runId,
-          startsAt,
-          stopsAfter,
-        }),
+    return React.createElement(BrainRerun, {
+      runId,
+      startsAt,
     });
   }
 

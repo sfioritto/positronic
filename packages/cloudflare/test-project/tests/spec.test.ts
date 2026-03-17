@@ -177,6 +177,39 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
+    it('passes POST /brains/runs/rerun test (destructive rerun)', async () => {
+      const fetch = createFetch();
+
+      // Helper to poll until brain reaches a terminal state
+      const waitForCompletion = async (runId: string) => {
+        for (let i = 0; i < 50; i++) {
+          const response = await fetch(
+            new Request(`http://example.com/brains/runs/${runId}`)
+          );
+          const data = (await response.json()) as { status: string };
+          if (data.status === 'complete' || data.status === 'error') {
+            return true;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return false;
+      };
+
+      // First create and run a brain to completion
+      const brainRunId = await brains.run(fetch, 'basic-brain');
+      expect(brainRunId).toBeTruthy();
+      expect(await waitForCompletion(brainRunId!)).toBe(true);
+
+      // Rerun from step 2
+      const rerunId = await brains.rerun(fetch, brainRunId!, 2);
+      expect(rerunId).toBeTruthy();
+      expect(rerunId).toBe(brainRunId);
+
+      // Wait for the rerun to complete so the DO's async work doesn't
+      // outlive the test (causes isolated storage errors in vitest)
+      expect(await waitForCompletion(brainRunId!)).toBe(true);
+    });
+
     it('passes inner brain COMPLETE does not affect outer brain status test', async () => {
       const result = await brains.innerBrainCompleteDoesNotAffectOuterStatus(
         createFetch(),

@@ -926,34 +926,28 @@ export const brains = {
   },
 
   /**
-   * Test POST /brains/runs/rerun - Rerun an existing brain run
+   * Test POST /brains/runs/rerun - Destructive rerun of an existing brain run.
+   * Requires runId and startsAt. Returns the same runId on success.
    */
   async rerun(
     fetch: Fetch,
-    identifier: string,
-    runId?: string,
-    startsAt?: number,
-    stopsAfter?: number
+    runId: string,
+    startsAt: number
   ): Promise<string | null> {
     try {
-      const body: any = { identifier };
-      if (runId) body.runId = runId;
-      if (startsAt !== undefined) body.startsAt = startsAt;
-      if (stopsAfter !== undefined) body.stopsAfter = stopsAfter;
-
       const request = new Request('http://example.com/brains/runs/rerun', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ runId, startsAt }),
       });
 
       const response = await fetch(request);
 
-      if (response.status !== 201) {
+      if (response.status !== 200) {
         console.error(
-          `POST /brains/runs/rerun returned ${response.status}, expected 201`
+          `POST /brains/runs/rerun returned ${response.status}, expected 200`
         );
         return null;
       }
@@ -963,6 +957,14 @@ export const brains = {
       if (!data.brainRunId || typeof data.brainRunId !== 'string') {
         console.error(
           `Expected brainRunId to be string, got ${typeof data.brainRunId}`
+        );
+        return null;
+      }
+
+      // Destructive rerun returns the same run ID
+      if (data.brainRunId !== runId) {
+        console.error(
+          `Expected brainRunId to be '${runId}', got '${data.brainRunId}'`
         );
         return null;
       }

@@ -540,6 +540,89 @@ export class BrainRunnerDO extends DurableObject<Env> {
     return { success: true, message: 'Brain run cancelled' };
   }
 
+  /**
+   * Destructive rerun: truncate event history to just before step N,
+   * then resume from there using the existing wakeUp() machinery.
+   * startsAt is 1-indexed: --starts-at 3 keeps steps 1-2, re-executes from step 3.
+   */
+  async rerun(startsAt: number) {
+    if (this.abortController) {
+      throw new Error('Cannot rerun while brain is actively running');
+    }
+
+    const eventLoader = new EventLoader(this.sql, this.env.RESOURCES_BUCKET);
+    const eventsWithIds = await eventLoader.loadAllEventsWithIds();
+
+    if (eventsWithIds.length === 0) {
+      throw new Error('No events found for this brain run');
+    }
+
+    // Find the START event to get initialState
+    const startEntry = eventsWithIds.find(
+      (e) => e.event.type === BRAIN_EVENTS.START
+    );
+    if (!startEntry) {
+      throw new Error('No START event found');
+    }
+
+    const initialState = (startEntry.event as any).initialState || {};
+
+    // Replay events through a state machine and count top-level STEP_COMPLETE events
+    const machine = createBrainExecutionMachine({ initialState });
+    const stepsToKeep = startsAt - 1;
+    let topLevelStepCount = 0;
+    let cutoffEventId = startEntry.eventId; // Default: keep only START
+
+    for (const { eventId, event } of eventsWithIds) {
+      sendEvent(machine, event);
+
+      if (
+        event.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        machine.context.isTopLevel
+      ) {
+        topLevelStepCount++;
+        if (topLevelStepCount === stepsToKeep) {
+          cutoffEventId = eventId;
+          break;
+        }
+      }
+    }
+
+    // If startsAt is 1, cutoff stays at the START event's ID
+
+    // Find R2 keys that need to be deleted (overflow events beyond the cutoff)
+    const r2Rows = this.sql
+      .exec<{ r2_key: string }>(
+        `SELECT r2_key FROM brain_events WHERE event_id > ? AND r2_key IS NOT NULL`,
+        cutoffEventId
+      )
+      .toArray();
+
+    // Delete R2 objects
+    if (r2Rows.length > 0) {
+      await Promise.all(
+        r2Rows.map((row) => this.env.RESOURCES_BUCKET.delete(row.r2_key))
+      );
+    }
+
+    // Truncate events beyond cutoff
+    this.sql.exec(`DELETE FROM brain_events WHERE event_id > ?`, cutoffEventId);
+
+    // Clear signals and wait timeouts
+    // Use DROP + recreate pattern since tables may not exist if the brain
+    // never used signals/wait (e.g. basic-brain with no wait steps)
+    this.sql.exec(`DROP TABLE IF EXISTS brain_signals`);
+    this.sql.exec(`DROP TABLE IF EXISTS wait_timeout`);
+    this.signalsTableInitialized = false;
+    this.waitTimeoutTableInitialized = false;
+
+    // Cancel any pending alarm
+    await this.ctx.storage.deleteAlarm();
+
+    // Resume from the truncation point
+    await this.wakeUp(this.brainRunId);
+  }
+
   async alarm() {
     const timeout = this.getWaitTimeout();
     if (timeout && Date.now() >= timeout.timeoutAt) {

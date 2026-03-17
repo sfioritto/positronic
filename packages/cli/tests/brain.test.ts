@@ -1796,123 +1796,16 @@ describe('CLI Integration: positronic brain commands', () => {
   });
 
   describe('brain rerun command', () => {
-    it('should successfully rerun a brain without specific run ID', async () => {
+    it('should successfully rerun a brain from a specific step', async () => {
       const env = await createTestEnv();
-      const { server } = env;
-
-      // Add brain to mock server for fuzzy search resolution
-      server.addBrain({
-        filename: 'test-brain',
-        title: 'test-brain',
-        description: 'A test brain for testing',
-        createdAt: Date.now(),
-        lastModified: Date.now(),
-      });
-
-      const px = await env.start();
-
-      try {
-        const { waitForOutput } = await px(['rerun', 'test-brain']);
-
-        // Check for success message
-        const foundSuccess = await waitForOutput(
-          /Brain rerun started successfully/i,
-          30
-        );
-        expect(foundSuccess).toBe(true);
-
-        // Check for new run ID
-        const foundRunId = await waitForOutput(/New run ID:.*rerun-/i, 30);
-        expect(foundRunId).toBe(true);
-
-        // Check for descriptive text
-        const foundDescription = await waitForOutput(
-          /Rerunning brain "test-brain"/i,
-          30
-        );
-        expect(foundDescription).toBe(true);
-
-        // Check for watch command suggestion
-        const foundWatchSuggestion = await waitForOutput(
-          /Watch the run with: positronic watch rerun-/i,
-          30
-        );
-        expect(foundWatchSuggestion).toBe(true);
-
-        // Verify API call
-        const calls = env.server.getLogs();
-        const rerunCall = calls.find((c) => c.method === 'rerunBrain');
-        expect(rerunCall).toBeDefined();
-        expect(rerunCall?.args[0]).toBe('test-brain');
-        expect(rerunCall?.args[1]).toBeUndefined(); // no runId
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
-    it('should successfully rerun a brain with specific run ID', async () => {
-      const env = await createTestEnv();
-      const { server } = env;
-
-      // Add brain to mock server for fuzzy search resolution
-      server.addBrain({
-        filename: 'test-brain',
-        title: 'test-brain',
-        description: 'A test brain for testing',
-        createdAt: Date.now(),
-        lastModified: Date.now(),
-      });
-
-      const px = await env.start();
-
-      try {
-        const { waitForOutput } = await px(['rerun', 'test-brain', 'run-123']);
-
-        // Check for success message
-        const foundSuccess = await waitForOutput(
-          /Brain rerun started successfully/i,
-          30
-        );
-        expect(foundSuccess).toBe(true);
-
-        // Check for run details
-        const foundRunDetails = await waitForOutput(/from run run-123/i, 30);
-        expect(foundRunDetails).toBe(true);
-
-        // Verify API call
-        const calls = env.server.getLogs();
-        const rerunCall = calls.find((c) => c.method === 'rerunBrain');
-        expect(rerunCall).toBeDefined();
-        expect(rerunCall?.args[0]).toBe('test-brain');
-        expect(rerunCall?.args[1]).toBe('run-123');
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
-    it('should successfully rerun a brain with step range options', async () => {
-      const env = await createTestEnv();
-      const { server } = env;
-
-      // Add brain to mock server for fuzzy search resolution
-      server.addBrain({
-        filename: 'test-brain',
-        title: 'test-brain',
-        description: 'A test brain for testing',
-        createdAt: Date.now(),
-        lastModified: Date.now(),
-      });
-
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px([
           'rerun',
-          'test-brain',
+          'run-123',
           '--starts-at',
           '3',
-          '--stops-after',
-          '5',
         ]);
 
         // Check for success message
@@ -1922,47 +1815,27 @@ describe('CLI Integration: positronic brain commands', () => {
         );
         expect(foundSuccess).toBe(true);
 
-        // Check for step range details
-        const foundStepRange = await waitForOutput(
-          /starting at step 3, stopping after step 5/i,
+        // Check for brain title returned from server
+        const foundBrainTitle = await waitForOutput(/test-brain/i, 30);
+        expect(foundBrainTitle).toBe(true);
+
+        // Check for step info
+        const foundStepInfo = await waitForOutput(/from step 3/i, 30);
+        expect(foundStepInfo).toBe(true);
+
+        // Check for watch command suggestion using same run ID
+        const foundWatchSuggestion = await waitForOutput(
+          /Watch the run with: positronic watch run-123/i,
           30
         );
-        expect(foundStepRange).toBe(true);
+        expect(foundWatchSuggestion).toBe(true);
 
         // Verify API call
         const calls = env.server.getLogs();
         const rerunCall = calls.find((c) => c.method === 'rerunBrain');
         expect(rerunCall).toBeDefined();
-        expect(rerunCall?.args[0]).toBe('test-brain');
-        expect(rerunCall?.args[1]).toBeUndefined(); // no runId
-        expect(rerunCall?.args[2]).toBe(3); // startsAt
-        expect(rerunCall?.args[3]).toBe(5); // stopsAfter
-      } finally {
-        await env.stopAndCleanup();
-      }
-    });
-
-    it('should handle brain not found error', async () => {
-      const env = await createTestEnv();
-      const px = await env.start();
-
-      try {
-        const { waitForOutput } = await px(['rerun', 'non-existent-brain']);
-
-        // Check for error title (now from BrainResolver)
-        const foundErrorTitle = await waitForOutput(/Brain Not Found/i, 30);
-        expect(foundErrorTitle).toBe(true);
-
-        // Check for error message
-        const foundErrorMessage = await waitForOutput(
-          /No brains found matching 'non-existent-brain'/i,
-          30
-        );
-        expect(foundErrorMessage).toBe(true);
-
-        // Check for helpful details
-        const foundDetails = await waitForOutput(/positronic list/i, 30);
-        expect(foundDetails).toBe(true);
+        expect(rerunCall?.args[0]).toBe('run-123');
+        expect(rerunCall?.args[1]).toBe(3);
       } finally {
         await env.stopAndCleanup();
       }
@@ -1970,24 +1843,14 @@ describe('CLI Integration: positronic brain commands', () => {
 
     it('should handle run ID not found error', async () => {
       const env = await createTestEnv();
-      const { server } = env;
-
-      // Add brain to mock server for fuzzy search resolution
-      server.addBrain({
-        filename: 'test-brain',
-        title: 'test-brain',
-        description: 'A test brain for testing',
-        createdAt: Date.now(),
-        lastModified: Date.now(),
-      });
-
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px([
           'rerun',
-          'test-brain',
           'non-existent-run',
+          '--starts-at',
+          '2',
         ]);
 
         // Check for error title
@@ -2000,13 +1863,6 @@ describe('CLI Integration: positronic brain commands', () => {
           30
         );
         expect(foundErrorMessage).toBe(true);
-
-        // Check for helpful details with runId
-        const foundDetails = await waitForOutput(
-          /positronic brain history test-brain/i,
-          30
-        );
-        expect(foundDetails).toBe(true);
       } finally {
         await env.stopAndCleanup();
       }
@@ -2017,16 +1873,19 @@ describe('CLI Integration: positronic brain commands', () => {
       // Don't start the server to simulate connection error
 
       try {
-        const { waitForOutput } = await px(['rerun', 'test-brain'], {
-          server: env.server,
-        });
+        const { waitForOutput } = await px(
+          ['rerun', 'run-123', '--starts-at', '2'],
+          {
+            server: env.server,
+          }
+        );
 
-        // Check for connection error (now from BrainResolver)
-        const foundErrorTitle = await waitForOutput(/Connection Error/i, 30);
+        // Check for connection error
+        const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
         expect(foundErrorTitle).toBe(true);
 
         const foundConnectionError = await waitForOutput(
-          /Error connecting to the local development server/i,
+          /Connection error/i,
           30
         );
         expect(foundConnectionError).toBe(true);
@@ -2035,39 +1894,52 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
+    it('should reject when run-id is missing', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        await expect(px(['rerun', '--starts-at', '3'])).rejects.toThrow(
+          'Not enough non-option arguments: got 0, need at least 1'
+        );
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should reject when --starts-at is missing', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        await expect(px(['rerun', 'run-123'])).rejects.toThrow(
+          'Missing required argument: starts-at'
+        );
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
     it('should handle API server errors', async () => {
       const env = await createTestEnv();
-      const { server } = env;
-
-      // Add brain to mock server for fuzzy search resolution
-      server.addBrain({
-        filename: 'test-brain',
-        title: 'test-brain',
-        description: 'A test brain for testing',
-        createdAt: Date.now(),
-        lastModified: Date.now(),
-      });
-
       const px = await env.start();
 
       try {
         // Clear all existing nock interceptors to avoid conflicts
         nock.cleanAll();
 
-        // Mock the brain search to return the brain, and rerun to return 500
+        // Mock rerun to return 500
         const port = env.server.port;
-        nock(`http://localhost:${port}`)
-          .get(/^\/brains\?q=/)
-          .reply(200, {
-            brains: [{ title: 'test-brain', description: 'A test brain' }],
-            count: 1,
-          });
-
         nock(`http://localhost:${port}`)
           .post('/brains/runs/rerun')
           .reply(500, 'Internal Server Error');
 
-        const { waitForOutput } = await px(['rerun', 'test-brain']);
+        const { waitForOutput } = await px([
+          'rerun',
+          'run-123',
+          '--starts-at',
+          '2',
+        ]);
 
         // Check for error title
         const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
