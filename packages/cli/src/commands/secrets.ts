@@ -1,9 +1,9 @@
 import type { ArgumentsCamelCase } from 'yargs';
 import React from 'react';
-import { SecretCreate } from '../components/secret-create.js';
-import { SecretList } from '../components/secret-list.js';
-import { SecretDelete } from '../components/secret-delete.js';
-import { SecretBulk } from '../components/secret-bulk.js';
+import { SecretsCreate } from '../components/secrets-create.js';
+import { SecretsList } from '../components/secrets-list.js';
+import { SecretsDelete } from '../components/secrets-delete.js';
+import { SecretsBulk } from '../components/secrets-bulk.js';
 
 interface SecretCreateArgs {
   name: string;
@@ -18,26 +18,26 @@ interface SecretBulkArgs {
   file?: string;
 }
 
-export class SecretCommand {
+export class SecretsCommand {
   list(): React.ReactElement {
-    return React.createElement(SecretList);
+    return React.createElement(SecretsList);
   }
 
   create({
     name,
     value,
   }: ArgumentsCamelCase<SecretCreateArgs>): React.ReactElement {
-    return React.createElement(SecretCreate, {
+    return React.createElement(SecretsCreate, {
       name,
       value,
     });
   }
 
   delete({ name }: ArgumentsCamelCase<SecretDeleteArgs>): React.ReactElement {
-    return React.createElement(SecretDelete, { name });
+    return React.createElement(SecretsDelete, { name });
   }
 
   bulk({ file }: ArgumentsCamelCase<SecretBulkArgs>): React.ReactElement {
-    return React.createElement(SecretBulk, { file });
+    return React.createElement(SecretsBulk, { file });
   }
 }

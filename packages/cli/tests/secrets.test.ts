@@ -3,15 +3,15 @@ import { createTestEnv } from './test-utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-describe('secret commands', () => {
-  describe('secret create', () => {
+describe('secrets commands', () => {
+  describe('secrets create', () => {
     it('should create a secret via API', async () => {
       const env = await createTestEnv();
       const px = await env.start();
 
       try {
         const { waitForOutput } = await px([
-          'secret',
+          'secrets',
           'create',
           'TEST_SECRET',
           '--value=test-value',
@@ -33,7 +33,7 @@ describe('secret commands', () => {
     });
   });
 
-  describe('secret list', () => {
+  describe('secrets list', () => {
     it('should list secrets from API', async () => {
       const env = await createTestEnv();
 
@@ -44,7 +44,7 @@ describe('secret commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['secret', 'list']);
+        const { waitForOutput } = await px(['secrets', 'list']);
 
         const foundSecrets = await waitForOutput(/Found 2 secrets/i, 30);
         expect(foundSecrets).toBe(true);
@@ -63,7 +63,7 @@ describe('secret commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['secret', 'list']);
+        const { waitForOutput } = await px(['secrets', 'list']);
 
         const foundEmpty = await waitForOutput(/No secrets found/i, 30);
         expect(foundEmpty).toBe(true);
@@ -73,7 +73,7 @@ describe('secret commands', () => {
     });
   });
 
-  describe('secret delete', () => {
+  describe('secrets delete', () => {
     it('should delete a secret via API', async () => {
       const env = await createTestEnv();
 
@@ -83,7 +83,11 @@ describe('secret commands', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['secret', 'delete', 'TEST_SECRET']);
+        const { waitForOutput } = await px([
+          'secrets',
+          'delete',
+          'TEST_SECRET',
+        ]);
 
         const foundSuccess = await waitForOutput(
           /Secret deleted successfully/i,
@@ -101,7 +105,7 @@ describe('secret commands', () => {
     });
   });
 
-  describe('secret bulk', () => {
+  describe('secrets bulk', () => {
     it('should bulk upload secrets from .env file', async () => {
       const env = await createTestEnv();
 
@@ -116,7 +120,7 @@ TEST_REDIS_URL=redis://localhost:6379`;
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['secret', 'bulk']);
+        const { waitForOutput } = await px(['secrets', 'bulk']);
 
         const foundSuccess = await waitForOutput(
           /Secrets uploaded successfully/i,
@@ -154,7 +158,7 @@ API_TOKEN=token123`;
 
       try {
         const { waitForOutput } = await px([
-          'secret',
+          'secrets',
           'bulk',
           '.env.production',
         ]);
@@ -189,7 +193,7 @@ KEY3=value3`;
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['secret', 'bulk']);
+        const { waitForOutput } = await px(['secrets', 'bulk']);
 
         const foundSuccess = await waitForOutput(
           /Secrets uploaded successfully/i,
@@ -212,7 +216,7 @@ KEY3=value3`;
 
       try {
         const { waitForOutput } = await px([
-          'secret',
+          'secrets',
           'bulk',
           'nonexistent.env',
         ]);
@@ -235,7 +239,7 @@ KEY3=value3`;
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['secret', 'bulk']);
+        const { waitForOutput } = await px(['secrets', 'bulk']);
 
         const foundError = await waitForOutput(/No secrets found/i, 30);
         expect(foundError).toBe(true);
@@ -259,7 +263,7 @@ EXISTING_KEY=updated-value`;
       const px = await env.start();
 
       try {
-        const { waitForOutput } = await px(['secret', 'bulk']);
+        const { waitForOutput } = await px(['secrets', 'bulk']);
 
         const foundSuccess = await waitForOutput(
           /Secrets uploaded successfully/i,

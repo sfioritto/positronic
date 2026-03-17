@@ -31,7 +31,7 @@ const formatDate = (dateStr: string): string => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 };
 
-export const SecretList = () => {
+export const SecretsList = () => {
   const { data, loading, error } = useApiGet<SecretsResponse>('/secrets');
 
   if (error) {
@@ -52,7 +52,7 @@ export const SecretList = () => {
         <Text>No secrets found.</Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Tip: Create a secret with "px secret create &lt;name&gt;
+            Tip: Create a secret with "px secrets create &lt;name&gt;
             --value=&lt;value&gt;"
           </Text>
         </Box>

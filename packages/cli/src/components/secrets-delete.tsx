@@ -7,7 +7,7 @@ interface SecretDeleteProps {
   name: string;
 }
 
-export const SecretDelete = ({ name }: SecretDeleteProps) => {
+export const SecretsDelete = ({ name }: SecretDeleteProps) => {
   const [deleted, setDeleted] = useState(false);
 
   const { execute, loading, error } = useApiDelete('secret');

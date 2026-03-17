@@ -16,7 +16,7 @@ interface BulkSecretsResponse {
   updated: number;
 }
 
-export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
+export const SecretsBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
   const [result, setResult] = useState<BulkSecretsResponse | null>(null);
@@ -117,7 +117,7 @@ export const SecretBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Tip: Use "px secret list" to view all secrets</Text>
+          <Text dimColor>Tip: Use "px secrets list" to view all secrets</Text>
         </Box>
       </Box>
     );

@@ -6,7 +6,7 @@ import { ServerCommand } from './commands/server.js';
 import { BrainCommand } from './commands/brain.js';
 import { ResourcesCommand } from './commands/resources.js';
 import { ScheduleCommand } from './commands/schedule.js';
-import { SecretCommand } from './commands/secret.js';
+import { SecretsCommand } from './commands/secrets.js';
 import { PagesCommand } from './commands/pages.js';
 import { UsersCommand } from './commands/users.js';
 import { AuthCommand } from './commands/auth.js';
@@ -105,7 +105,7 @@ export function buildCli(options: CliOptions) {
   const projectCommand = new ProjectCommand();
   const brainCommand = new BrainCommand();
   const scheduleCommand = new ScheduleCommand();
-  const secretCommand = new SecretCommand();
+  const secretsCommand = new SecretsCommand();
   const pagesCommand = new PagesCommand();
   const usersCommand = new UsersCommand();
 
@@ -1251,14 +1251,14 @@ export function buildCli(options: CliOptions) {
     }
   );
 
-  // --- Secret Management Commands ---
+  // --- Secrets Management Commands ---
   cli = cli.command(
-    'secret',
+    'secrets',
     'Manage secrets for your brains\n',
     (yargsSecret) => {
       yargsSecret
         .command('list', 'List all secrets\n', {}, () => {
-          const element = secretCommand.list();
+          const element = secretsCommand.list();
           render(element);
         })
         .command(
@@ -1276,16 +1276,16 @@ export function buildCli(options: CliOptions) {
                 type: 'string',
               })
               .example(
-                '$0 secret create ANTHROPIC_API_KEY',
+                '$0 secrets create ANTHROPIC_API_KEY',
                 'Create a secret with secure input'
               )
               .example(
-                '$0 secret create DATABASE_URL --value "postgres://..."',
+                '$0 secrets create DATABASE_URL --value "postgres://..."',
                 'Create a secret with direct value (not recommended)'
               );
           },
           (argv) => {
-            const element = secretCommand.create(argv);
+            const element = secretsCommand.create(argv);
             render(element);
           }
         )
@@ -1299,10 +1299,13 @@ export function buildCli(options: CliOptions) {
                 type: 'string',
                 demandOption: true,
               })
-              .example('$0 secret delete ANTHROPIC_API_KEY', 'Delete a secret');
+              .example(
+                '$0 secrets delete ANTHROPIC_API_KEY',
+                'Delete a secret'
+              );
           },
           (argv) => {
-            const element = secretCommand.delete(argv);
+            const element = secretsCommand.delete(argv);
             render(element);
           }
         )
@@ -1317,16 +1320,16 @@ export function buildCli(options: CliOptions) {
                 type: 'string',
               })
               .example(
-                '$0 secret bulk',
+                '$0 secrets bulk',
                 'Upload secrets from .env file in project root'
               )
               .example(
-                '$0 secret bulk .env.production',
+                '$0 secrets bulk .env.production',
                 'Upload secrets from a specific .env file'
               );
           },
           (argv) => {
-            const element = secretCommand.bulk(argv);
+            const element = secretsCommand.bulk(argv);
             render(element);
           }
         )
