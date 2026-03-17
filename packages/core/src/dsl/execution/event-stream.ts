@@ -17,6 +17,7 @@ import type {
 } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
+import { IterateResult } from '../iterate-result.js';
 import type { Resources } from '../../resources/resources.js';
 import type {
   WebhookRegistration,
@@ -1449,15 +1450,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     // All items done - update state and complete step
-    const finalResults = [...resultsMap.values()];
-    const outputResults = iterateConfig.mapOutput
-      ? finalResults.map(([item, result]) =>
-          iterateConfig.mapOutput!(result, item)
-        )
-      : finalResults;
+    const finalResults = new IterateResult([...resultsMap.values()]);
     this.currentState = {
       ...this.currentState,
-      [iterateConfig.schemaName]: outputResults,
+      [iterateConfig.schemaName]: finalResults,
     };
     yield* this.completeStep(step, prevState);
   }
@@ -1586,11 +1582,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     const finalResults = [...resultsMap.values()];
-    const outputResults = iterateConfig.mapOutput
-      ? finalResults.map(([item, result]) =>
-          iterateConfig.mapOutput!(result, item)
-        )
-      : finalResults;
+    const outputResults = new IterateResult(finalResults);
     this.currentState = {
       ...this.currentState,
       [iterateConfig.outputKey]: outputResults,
@@ -1720,15 +1712,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       };
     }
 
-    const finalResults = [...resultsMap.values()];
-    const outputResults = iterateConfig.mapOutput
-      ? finalResults.map(([item, result]) =>
-          iterateConfig.mapOutput!(result, item)
-        )
-      : finalResults;
+    const finalResults = new IterateResult([...resultsMap.values()]);
     this.currentState = {
       ...this.currentState,
-      [iterateConfig.outputKey]: outputResults,
+      [iterateConfig.outputKey]: finalResults,
     };
     yield* this.completeStep(step, prevState);
   }

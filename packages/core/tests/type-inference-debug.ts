@@ -161,13 +161,12 @@ const test5 = brain('test-5')
     over: ({ state }) => state.items,
   })
   .step('After batch prompt', ({ state }) => {
-    // state.results should be [string, { result: string }][]
+    // state.results is an IterateResult<string, { result: string }>
     const results = state.results;
 
-    // Access first tuple
-    const [firstItem, firstResult] = results[0];
-    const itemValue: string = firstItem;
-    const resultValue: string = firstResult.result;
+    // Access first item and result via IterateResult API
+    const firstItem: string = results.items[0];
+    const firstResult: string = results.values[0].result;
 
     return {
       ...state,
