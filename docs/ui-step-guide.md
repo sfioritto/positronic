@@ -23,7 +23,7 @@ const feedbackBrain = brain('Collect Feedback')
   }))
   // Generate the form
   .ui('Create Feedback Form', {
-    template: (state) => `
+    template: ({ state }) => `
       Create a feedback form for ${state.userName}.
       Include fields for rating (1-5) and comments.
     `,
@@ -90,7 +90,7 @@ const supportTicketBrain = brain('Support Ticket')
 
   // Generate the ticket form
   .ui('Create Ticket Form', {
-    template: (state) => `
+    template: ({ state }) => `
       Create a support ticket form with:
       - A heading "Submit Support Ticket"
       - Subject line input (required)
@@ -159,7 +159,7 @@ export default supportTicketBrain;
 
 ```typescript
 .ui(title: string, config: {
-  template: (state: TState, resources: Resources) => string | Promise<string>;
+  template: (context: { state: TState; options: TOptions; resources: Resources }) => string | Promise<string>;
   responseSchema?: z.ZodObject<any>;
 })
 ```
@@ -187,7 +187,7 @@ interface GeneratedPage<TSchema> {
 
 ```typescript
 .ui('User Profile Form', {
-  template: (state) => `
+  template: ({ state }) => `
     Create a user profile form with:
     - A header showing "Edit Profile"
     - Name field (required)
@@ -211,7 +211,7 @@ The template can reference state values that will be resolved at render time usi
 
 ```typescript
 .ui('Order Review', {
-  template: (state) => `
+  template: ({ state }) => `
     Create an order review form showing:
     - List of items from {{cart.items}}
     - Total price: {{cart.total}}
@@ -228,7 +228,7 @@ The template can reference state values that will be resolved at render time usi
 
 ```typescript
 .ui('Survey Form', {
-  template: async (state, resources) => {
+  template: async ({ state, resources }) => {
     const surveyTemplate = await resources.prompts.surveyTemplate.loadText();
     return surveyTemplate
       .replace('{{userName}}', state.userName)
@@ -308,7 +308,7 @@ brain('User Onboarding')
 
   // Step 2: Preferences
   .ui('Preferences Form', {
-    template: (state) => `
+    template: ({ state }) => `
       Create a preferences form for ${state.userData.firstName}:
       - Newsletter subscription (checkbox)
       - Contact method (select: email, phone, sms)

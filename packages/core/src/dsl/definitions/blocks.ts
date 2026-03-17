@@ -13,6 +13,25 @@ import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
 import type { WebhookRegistration } from '../webhook.js';
 
+// Context passed to template callbacks (prompt, ui)
+export interface TemplateContext<TState, TOptions extends JsonObject> {
+  state: TState;
+  options: TOptions;
+  resources: Resources;
+}
+
+// Context passed to iterate template callbacks (prompt with over)
+export interface IterateTemplateContext<
+  TItem,
+  TState,
+  TOptions extends JsonObject
+> {
+  item: TItem;
+  state: TState;
+  options: TOptions;
+  resources: Resources;
+}
+
 // Shared interface for step action functions
 export type StepAction<
   TStateIn,
@@ -63,8 +82,7 @@ export type StepBlock<
   /** Configuration for UI generation steps */
   uiConfig?: {
     template: (
-      state: TStateIn,
-      resources: Resources
+      context: TemplateContext<TStateIn, TOptions>
     ) => string | Promise<string>;
     responseSchema?: z.ZodObject<any>;
   };
@@ -74,7 +92,9 @@ export type StepBlock<
   iterateConfig?: {
     over: (context: any) => any[] | Promise<any[]>;
     error?: (item: any, error: Error) => any | null;
-    template: (item: any, resources: Resources) => string | Promise<string>;
+    template: (
+      context: IterateTemplateContext<any, any, any>
+    ) => string | Promise<string>;
     schema: z.ZodObject<any>;
     schemaName: string;
     client?: ObjectGenerator;

@@ -1412,7 +1412,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       let result: [any, any] | undefined;
 
       try {
-        const promptText = await iterateConfig.template(item, this.resources);
+        const promptText = await iterateConfig.template({
+          item,
+          state: this.currentState,
+          options: this.options ?? ({} as TOptions),
+          resources: this.resources,
+        });
         const response = await client.generateObject({
           schema: iterateConfig.schema,
           schemaName: iterateConfig.schemaName,
@@ -1748,7 +1753,11 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const uiConfig = stepBlock.uiConfig!;
 
     // Get the prompt from template (with heartbeat for long-running template functions)
-    const prompt = await uiConfig.template(this.currentState, this.resources);
+    const prompt = await uiConfig.template({
+      state: this.currentState,
+      options: this.options ?? ({} as TOptions),
+      resources: this.resources,
+    });
 
     const uiResult = await generateUI({
       client: this.client,

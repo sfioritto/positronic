@@ -19,8 +19,8 @@ interface RawThread {
 
 // Simulating a categorization prompt
 const categorizePrompt = {
-  template: (thread: RawThread) =>
-    `Categorize this email:\nFrom: ${thread.from}\nSubject: ${thread.subject}`,
+  template: ({ item }: { item: RawThread }) =>
+    `Categorize this email:\nFrom: ${item.from}\nSubject: ${item.subject}`,
   outputSchema: {
     schema: z.object({
       category: z.string(),
@@ -120,7 +120,8 @@ const test3 = brain('test-3')
 
 // Test 4: Single prompt followed by batch prompt
 const singlePrompt = {
-  template: (state: { count: number }) => `Count is ${state.count}`,
+  template: ({ state }: { state: { count: number } }) =>
+    `Count is ${state.count}`,
   outputSchema: {
     schema: z.object({ summary: z.string() }),
     name: 'summary' as const,
@@ -146,7 +147,7 @@ const test4 = brain('test-4')
 
 // Test 5: Batch prompt followed by step
 const itemPrompt = {
-  template: (item: string) => `Process: ${item}`,
+  template: ({ item }: { item: string }) => `Process: ${item}`,
   outputSchema: {
     schema: z.object({ result: z.string() }),
     name: 'results' as const,
