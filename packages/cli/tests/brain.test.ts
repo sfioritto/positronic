@@ -1435,6 +1435,55 @@ describe('CLI Integration: positronic brain commands', () => {
         env.cleanup();
       }
     });
+
+    it('should navigate into detail view and back with Enter and Escape', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      // filename must match title since BrainInfo fetches /brains/:title
+      // and mock server looks up by filename
+      server.addBrain({
+        filename: 'daily-report',
+        title: 'daily-report',
+        description: 'Generates daily reports from various data sources',
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput, instance } = await px(['list']);
+
+        // Wait for the list to render with footer
+        const foundFooter = await waitForOutput(
+          /j\/k or up\/down select \| Enter show \| esc\/q quit/,
+          30
+        );
+        expect(foundFooter).toBe(true);
+
+        // Press Enter to drill into detail view
+        instance.stdin.write('\r');
+
+        // Should show detail view with brain info
+        const foundDetail = await waitForOutput(/Brain:/, 30);
+        expect(foundDetail).toBe(true);
+
+        // Should show the detail footer
+        const foundDetailFooter = await waitForOutput(/esc back \| q quit/, 30);
+        expect(foundDetailFooter).toBe(true);
+
+        // Press Escape to go back to list
+        instance.stdin.write('\x1B');
+
+        // Should show the list footer again
+        const foundListFooter = await waitForOutput(
+          /j\/k or up\/down select \| Enter show \| esc\/q quit/,
+          30
+        );
+        expect(foundListFooter).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
   });
 
   describe('brain history command', () => {
