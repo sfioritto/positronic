@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Text, Box, useStdout, useInput, useApp } from 'ink';
+import { Text, Box, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import {
   getApiBaseUrl,
@@ -12,6 +12,7 @@ import { useApiDelete } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { BrainTopTable, type RunningBrain } from './brain-top-table.js';
 import { Watch } from './watch.js';
+import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 
 interface BrainWatchEvent {
   runningBrains: RunningBrain[];
@@ -24,7 +25,6 @@ interface TopNavigatorProps {
 type Mode = 'list' | 'detail';
 
 export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
-  const { write } = useStdout();
   const { exit } = useApp();
 
   // Navigation state
@@ -60,21 +60,7 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
       )
     : runningBrains;
 
-  // Enter alternate screen buffer on mount, exit on unmount
-  // Skip in test environment to avoid interfering with test output capture
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-
-    // Enter alternate screen buffer and clear
-    write('\x1B[?1049h\x1B[2J\x1B[H');
-
-    return () => {
-      // Exit alternate screen buffer
-      write('\x1B[?1049l');
-    };
-  }, [write]);
+  useAlternateScreen();
 
   // Update tick every second to refresh duration display (in list mode)
   useEffect(() => {
