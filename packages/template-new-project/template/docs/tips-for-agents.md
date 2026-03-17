@@ -298,6 +298,44 @@ Use `.values` for simple extraction, `.filter()` for correlated filtering, and `
 
 **Name the `outputKey` after the content.** If results contain analyses, use `outputKey: 'analyses' as const`, not `outputKey: 'processedItems' as const`.
 
+### Naming convention for filter/map parameters
+
+`IterateResult.filter()` and `.map()` take two parameters: the input item and the AI result. **Name them after what they represent**, not generic names like `item` and `r`:
+
+```typescript
+// ❌ DON'T DO THIS - generic parameter names
+state.validations.filter((item, r) => r.matches)
+state.transcripts.filter((t) => t.hasTranscript)  // WRONG: single param is the item, not the result
+
+// ✅ DO THIS - descriptive names that reflect the data
+state.validations.filter((crawledResult, validation) => validation.matches)
+state.transcripts.filter((match, extraction) => extraction.hasTranscript)
+```
+
+The first parameter is always the input item (what you passed to `over`), and the second is the AI's output (what the `outputSchema` describes). A single-parameter callback only receives the item — if you need the AI result, you must use both parameters.
+
+### Nested brain state mapping
+
+When a `.brain()` step runs an inner brain and maps its state into the outer brain, **destructure to select the fields you need** instead of casting:
+
+```typescript
+// ❌ DON'T DO THIS - casting to force the type
+.brain(
+    'Search and validate',
+    searchAndValidate,
+    ({ brainState }) => brainState as { matches: Match[] },
+  )
+
+// ✅ DO THIS - destructure to select and let inference work
+.brain(
+    'Search and validate',
+    searchAndValidate,
+    ({ brainState: { matches } }) => ({ matches }),
+  )
+```
+
+The inner brain's state type is fully inferred from its definition. Destructuring picks the fields you want and TypeScript infers the outer state correctly — no casts needed. If the inner brain exports an interface for its output shape, import it for use in downstream steps (like prompt templates).
+
 ## Brain DSL Type Inference
 
 The Brain DSL has very strong type inference capabilities. **Important**: You should NOT explicitly specify types on the state object as it flows through steps. The types are automatically inferred from the previous step.

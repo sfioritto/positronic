@@ -470,11 +470,11 @@ export class Brain<
 
   // Overload 6: Nested brain with iterate
   brain<
-    TItem,
+    TItems extends any[],
     TInnerState extends State,
     TOutputKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItem, TInnerState>;
+      [K in TOutputKey]: IterateResult<TItems[number], TInnerState>;
     }
   >(
     title: string,
@@ -484,27 +484,27 @@ export class Brain<
         context: StepContext<TState, TOptions> &
           TServices &
           StoreContext<TStore>
-      ) => TItem[] | Promise<TItem[]>;
-      initialState: (item: TItem, outerState: TState) => State;
+      ) => TItems | Promise<TItems>;
+      initialState: (item: TItems[number], outerState: TState) => State;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
-      error?: (item: TItem, error: Error) => TInnerState | null;
+      error?: (item: TItems[number], error: Error) => TInnerState | null;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 7: Agent config function with iterate, WITH outputSchema
   brain<
-    TItem,
+    TItems extends any[],
     TTools extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TOutputKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItem, z.infer<TSchema>>;
+      [K in TOutputKey]: IterateResult<TItems[number], z.infer<TSchema>>;
     }
   >(
     title: string,
     configFn: (
-      item: TItem,
+      item: TItems[number],
       params: StepContext<TState, TOptions, TResponse, TPage> &
         TServices &
         StoreContext<TStore> & {
@@ -518,27 +518,27 @@ export class Brain<
         context: StepContext<TState, TOptions> &
           TServices &
           StoreContext<TStore>
-      ) => TItem[] | Promise<TItem[]>;
+      ) => TItems | Promise<TItems>;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
-      error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
+      error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
   // Overload 8: Agent config function with iterate, no outputSchema
   brain<
-    TItem,
+    TItems extends any[],
     TTools extends Record<string, AgentTool<any>> = Record<
       string,
       AgentTool<any>
     >,
     TOutputKey extends string = string,
     TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItem, any>;
+      [K in TOutputKey]: IterateResult<TItems[number], any>;
     }
   >(
     title: string,
     configFn: (
-      item: TItem,
+      item: TItems[number],
       params: StepContext<TState, TOptions, TResponse, TPage> &
         TServices &
         StoreContext<TStore> & {
@@ -550,9 +550,9 @@ export class Brain<
         context: StepContext<TState, TOptions> &
           TServices &
           StoreContext<TStore>
-      ) => TItem[] | Promise<TItem[]>;
+      ) => TItems | Promise<TItems>;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
-      error?: (item: TItem, error: Error) => any | null;
+      error?: (item: TItems[number], error: Error) => any | null;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
@@ -703,16 +703,19 @@ export class Brain<
 
   // Overload 2: Iterate execution - runs prompt for each item in array
   prompt<
-    TItem,
+    TItems extends any[],
     TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & {
-      [K in TResponseKey]: IterateResult<TItem, z.infer<TSchema>>;
+      [K in TResponseKey]: IterateResult<TItems[number], z.infer<TSchema>>;
     }
   >(
     title: string,
     config: {
-      template: (item: TItem, resources: Resources) => string | Promise<string>;
+      template: (
+        item: TItems[number],
+        resources: Resources
+      ) => string | Promise<string>;
       outputSchema: {
         schema: TSchema;
         name: TResponseKey & (string extends TResponseKey ? never : unknown);
@@ -724,8 +727,8 @@ export class Brain<
         context: StepContext<TState, TOptions> &
           TServices &
           StoreContext<TStore>
-      ) => TItem[] | Promise<TItem[]>;
-      error?: (item: TItem, error: Error) => z.infer<TSchema> | null;
+      ) => TItems | Promise<TItems>;
+      error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
