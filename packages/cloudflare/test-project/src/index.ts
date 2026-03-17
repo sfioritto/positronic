@@ -532,7 +532,7 @@ const iterateOptionsInnerBrain = brain<
   title: 'iterate-options-inner',
   description: 'Inner brain that multiplies value by multiplier',
 })
-  .withOptionsSchema(z.object({}).passthrough())
+  .withOptionsSchema(z.object({ multiplier: z.number() }))
   .step('Multiply', ({ state }) => ({
     ...state,
     result: state.value * state.multiplier,
