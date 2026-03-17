@@ -77,8 +77,10 @@ const StepTree = ({ steps, depth = 0 }: StepTreeProps) => {
 // Component for rendering options
 const OptionsSection = ({
   options,
+  brainTitle,
 }: {
   options: NonNullable<BrainStructure['options']>;
+  brainTitle: string;
 }) => {
   const { properties, required } = options;
 
@@ -86,29 +88,45 @@ const OptionsSection = ({
     return null;
   }
 
+  const entries = Object.entries(properties);
   const requiredSet = new Set(required || []);
 
+  const flags = entries
+    .map(([name, prop]) => `-o ${name}=<${prop.type || 'any'}>`)
+    .join(' ');
+
   return (
-    <Box flexDirection="column">
-      <Text bold>Options:</Text>
-      <Box marginLeft={2} flexDirection="column">
-        {Object.entries(properties).map(([name, prop]) => {
-          const isRequired = requiredSet.has(name);
-          return (
-            <Box key={name}>
-              <Text>
-                {name}
-                <Text dimColor>
-                  {' '}
-                  {prop.type || 'any'}
-                  {isRequired ? ', required' : ''}
+    <>
+      <Box flexDirection="column">
+        <Text bold>Options:</Text>
+        <Box marginLeft={2} flexDirection="column">
+          {entries.map(([name, prop]) => {
+            const isRequired = requiredSet.has(name);
+            return (
+              <Box key={name}>
+                <Text>
+                  {name}
+                  <Text dimColor>
+                    {' '}
+                    {prop.type || 'any'}
+                    {isRequired ? ', required' : ''}
+                  </Text>
                 </Text>
-              </Text>
-            </Box>
-          );
-        })}
+              </Box>
+            );
+          })}
+        </Box>
       </Box>
-    </Box>
+
+      <Box flexDirection="column">
+        <Text bold>Example:</Text>
+        <Box marginLeft={2}>
+          <Text dimColor>
+            px run {brainTitle} {flags}
+          </Text>
+        </Box>
+      </Box>
+    </>
   );
 };
 
@@ -167,7 +185,9 @@ const BrainInfo = ({ brainTitle, showSteps }: BrainInfoProps) => {
       </Box>
 
       {/* Options */}
-      {brain.options && <OptionsSection options={brain.options} />}
+      {brain.options && (
+        <OptionsSection options={brain.options} brainTitle={brain.title} />
+      )}
 
       {/* Steps (only if --steps flag) */}
       {showSteps && brain.steps.length > 0 && (
