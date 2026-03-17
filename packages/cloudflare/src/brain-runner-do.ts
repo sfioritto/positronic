@@ -133,8 +133,8 @@ class IterateItemAdapter implements Adapter {
       // After the last item the brain continues to subsequent steps naturally.
       // A spurious alarm after the last item would call wakeUp() while the
       // brain is still running, corrupting execution state.
-      const { processedCount, totalItems } = event as any;
-      if (processedCount < totalItems) {
+      const { processedCount, totalItems, canRelease } = event as any;
+      if (canRelease && processedCount < totalItems) {
         await this.doQueueSignal({ type: 'PAUSE' });
         await this.doSetAlarm(Date.now());
       }

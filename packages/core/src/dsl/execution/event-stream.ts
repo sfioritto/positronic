@@ -1446,6 +1446,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         schemaName: iterateConfig.schemaName,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
+        canRelease: !!this.signalProvider,
       };
     }
 
@@ -1578,6 +1579,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         schemaName: iterateConfig.outputKey,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
+        canRelease: !!this.signalProvider,
       };
     }
 
@@ -1709,6 +1711,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         schemaName: iterateConfig.outputKey,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
+        canRelease: !!this.signalProvider,
       };
     }
 
