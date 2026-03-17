@@ -1,6 +1,6 @@
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
-import { State } from '../src/dsl/types.js';
+import { State, JsonObject } from '../src/dsl/types.js';
 import {
   brain,
   type BrainEvent,
@@ -1584,7 +1584,7 @@ describe('nested brains', () => {
     );
 
     // Inner brain with a webhook wait
-    const innerBrain = brain<{ data: string }, { count: number }>('Inner Brain')
+    const innerBrain = brain<JsonObject, { count: number }>('Inner Brain')
       .step('Inner step 1', ({ state }) => ({ count: state.count + 1 }))
       .step('Prepare wait', ({ state }) => ({
         ...state,

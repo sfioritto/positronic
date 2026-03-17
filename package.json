@@ -15,7 +15,7 @@
     "clean:workspaces": "npm run clean --workspaces && rm -rf node_modules",
     "build:workspaces": "npm run build --workspaces",
     "build:watch": "nodemon --exec 'npm run build:workspaces || /usr/local/bin/terminal-notifier -title \"Positronic Build\" -message \"Build failed\"'",
-    "typecheck": "tsc --noEmit && (cd packages/cloudflare/test-project && npm run typecheck)",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/core/tsconfig.check.json && (cd packages/cloudflare/test-project && npm run typecheck)",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "changeset publish --no-git-tag"
