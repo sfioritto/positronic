@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Cron } from 'croner';
 import Fuse from 'fuse.js';
 import { isSignalValid, brainMachineDefinition } from '@positronic/core';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { getManifest } from '../brain-runner-do.js';
 import type {
   Bindings,
@@ -674,6 +675,9 @@ brains.get('/:identifier', async (context: Context) => {
     title: structure.title,
     description: structure.description || `${structure.title} brain`,
     steps: structure.steps,
+    ...(brain.optionsSchema && {
+      options: zodToJsonSchema(brain.optionsSchema),
+    }),
   });
 });
 

@@ -59,7 +59,7 @@ export class Brain<
   private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
   public type: 'brain' = 'brain';
   private services: TServices = {} as TServices;
-  private optionsSchema?: z.ZodSchema<any>;
+  public optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool<any>>;
   private extraTools?: Record<string, AgentTool<any>>;

@@ -170,6 +170,18 @@ describe('Brain withOptionsSchema', () => {
       expect(myBrain.title).toBe('test');
     });
 
+    it('should preserve optionsSchema through the builder chain', () => {
+      const schema = z.object({ flag: z.boolean() });
+
+      const myBrain = brain('test')
+        .withOptionsSchema(schema)
+        .step('Step1', ({ options }) => ({ enabled: options.flag }))
+        .step('Step2', ({ state }) => ({ ...state, processed: true }))
+        .step('Step3', ({ state }) => ({ ...state, finalized: true }));
+
+      expect(myBrain.optionsSchema).toBe(schema);
+    });
+
     it('should work with withServices', () => {
       const schema = z.object({ apiKey: z.string() });
       const services = { logger: console };

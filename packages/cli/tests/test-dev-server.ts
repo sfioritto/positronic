@@ -132,6 +132,7 @@ interface MockBrain {
       steps: any[];
     };
   }>;
+  options?: Record<string, any>;
 }
 
 interface MockBrainRun {
@@ -1188,6 +1189,7 @@ export class TestDevServer implements PositronicDevServer {
           title: brain.title,
           description: brain.description || `${brain.title} brain`,
           steps: brain.steps || [],
+          ...(brain.options && { options: brain.options }),
         },
       ];
     });

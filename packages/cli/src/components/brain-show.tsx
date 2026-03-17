@@ -15,6 +15,10 @@ interface BrainStructure {
   title: string;
   description?: string;
   steps: BrainStep[];
+  options?: {
+    properties?: Record<string, { type?: string }>;
+    required?: string[];
+  };
 }
 
 interface Schedule {
@@ -66,6 +70,44 @@ const StepTree = ({ steps, depth = 0 }: StepTreeProps) => {
           )}
         </Box>
       ))}
+    </Box>
+  );
+};
+
+// Component for rendering options
+const OptionsSection = ({
+  options,
+}: {
+  options: NonNullable<BrainStructure['options']>;
+}) => {
+  const { properties, required } = options;
+
+  if (!properties || Object.keys(properties).length === 0) {
+    return null;
+  }
+
+  const requiredSet = new Set(required || []);
+
+  return (
+    <Box flexDirection="column">
+      <Text bold>Options:</Text>
+      <Box marginLeft={2} flexDirection="column">
+        {Object.entries(properties).map(([name, prop]) => {
+          const isRequired = requiredSet.has(name);
+          return (
+            <Box key={name}>
+              <Text>
+                {name}
+                <Text dimColor>
+                  {' '}
+                  {prop.type || 'any'}
+                  {isRequired ? ', required' : ''}
+                </Text>
+              </Text>
+            </Box>
+          );
+        })}
+      </Box>
     </Box>
   );
 };
@@ -123,6 +165,9 @@ const BrainInfo = ({ brainTitle, showSteps }: BrainInfoProps) => {
           </Field>
         )}
       </Box>
+
+      {/* Options */}
+      {brain.options && <OptionsSection options={brain.options} />}
 
       {/* Steps (only if --steps flag) */}
       {showSteps && brain.steps.length > 0 && (

@@ -1795,6 +1795,47 @@ describe('CLI Integration: positronic brain commands', () => {
     });
   });
 
+  describe('show command (brain info with options)', () => {
+    it('should display options when brain has options schema', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      server.addBrain({
+        filename: 'options-brain',
+        title: 'options-brain',
+        description: 'A brain with options',
+        options: {
+          type: 'object',
+          properties: {
+            environment: { type: 'string' },
+            debug: { type: 'boolean' },
+          },
+          required: ['environment'],
+        },
+      });
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px(['show', 'options-brain']);
+
+        const foundOptions = await waitForOutput(/Options:/, 30);
+        expect(foundOptions).toBe(true);
+
+        const foundEnv = await waitForOutput(/environment/, 30);
+        expect(foundEnv).toBe(true);
+
+        const foundDebug = await waitForOutput(/debug/, 30);
+        expect(foundDebug).toBe(true);
+
+        const foundRequired = await waitForOutput(/required/, 30);
+        expect(foundRequired).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+  });
+
   describe('brain rerun command', () => {
     it('should successfully rerun a brain from a specific step', async () => {
       const env = await createTestEnv();
