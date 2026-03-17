@@ -9,6 +9,7 @@ import type {
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { AgentContext } from '../brain-state-machine.js';
+import type { SerializedPageContext } from '../webhook.js';
 import type { StoreProvider } from '../../store/types.js';
 
 /**
@@ -28,6 +29,7 @@ export interface ResumeContext {
     totalItems: number;
     schemaName: string;
   };
+  currentPage?: SerializedPageContext;
 }
 
 export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {

@@ -15,6 +15,12 @@ export type SerializedWebhookRegistration = {
   token?: string;
 };
 
+// Serializable page reference (URL + webhook metadata) for persisting across resume
+export type SerializedPageContext = {
+  url: string;
+  webhook: SerializedWebhookRegistration;
+};
+
 // Type for the webhook handler return value (discriminated union)
 export type WebhookHandlerResult<TSchema extends z.ZodSchema = z.ZodSchema> =
   | {

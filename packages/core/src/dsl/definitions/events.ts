@@ -1,7 +1,10 @@
 import type { BRAIN_EVENTS, STATUS } from '../constants.js';
 import type { JsonObject, JsonPatch, CurrentUser } from '../types.js';
 import type { SerializedStepStatus } from './steps.js';
-import type { SerializedWebhookRegistration } from '../webhook.js';
+import type {
+  SerializedWebhookRegistration,
+  SerializedPageContext,
+} from '../webhook.js';
 import type { ResponseMessage } from '../../clients/types.js';
 
 export type SerializedError = {
@@ -88,6 +91,7 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
   stepId: string;
   patch: JsonPatch;
   halted?: boolean;
+  pageContext?: SerializedPageContext;
 }
 
 // Webhook Event
