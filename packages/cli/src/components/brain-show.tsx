@@ -57,7 +57,9 @@ const StepTree = ({ steps, depth = 0 }: StepTreeProps) => {
       {steps.map((step, index) => (
         <Box key={index} flexDirection="column">
           <Box marginLeft={1}>
-            <Text color="gray">○ {step.title}</Text>
+            <Text color="gray">
+              {index + 1}. {step.title}
+            </Text>
             {step.type === 'loop' && <Text dimColor> (loop)</Text>}
           </Box>
           {step.innerBrain && (

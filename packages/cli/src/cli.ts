@@ -395,7 +395,7 @@ export function buildCli(options: CliOptions) {
 
   // --- Rerun Brain Command ---
   cli = cli.command(
-    'rerun <run-id>',
+    ['rerun <run-id>', 'rr <run-id>'],
     'Rerun an existing brain run from a specific step\n',
     (yargsRerun) => {
       return yargsRerun
@@ -632,7 +632,7 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'rerun <run-id>',
+        ['rerun <run-id>', 'rr <run-id>'],
         'Rerun an existing brain run from a specific step\n',
         (yargsRerun) => {
           return yargsRerun
