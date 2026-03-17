@@ -1,5 +1,24 @@
 # @positronic/cli
 
+## 0.0.76
+
+### Patch Changes
+
+- - **Iterate overhaul**: Renamed batch/chunk to iterate/item, added `brain-each` for iterate support with `.brain()` steps, added `IterateResult` collection class, gave iterate `over` the full step context with async support, and added `mapOutput` option to all iterate patterns
+  - **Destructive rerun**: Implemented truncate-and-resume rerun on the same Durable Object
+  - **Brain options**: Display brain options in `px show` and watch progress view, enforce matching options types in nested `.brain()` composition, added `TOptions`/`TState` type parameters to `createBrain`
+  - **CLI improvements**: Extract `useAlternateScreen` hook, fullscreen brain list with consistent row spacing, rename `px secret` to `px secrets`, add `initialState` CLI flags (`-s/--state-json`) to run and schedule create, batch historical SSE events as array to eliminate per-event re-renders
+  - **Runtime validation**: Validate `outputSchema` output at runtime with Zod safeParse
+  - **Bug fixes**: Fix iterate brain silently dropping results during DO event replay, fix inner brain ERROR events in state machine, fix options lost on DO resume, fix rerun returning empty brainTitle, persist page context in brain events
+  - **Tools**: Added `withExtraTools()` for additive tool configuration
+  - **Store**: Allow optional Zod fields in store schemas, make store non-optional when `withStore()` is used
+  - **Governor**: Improved token estimation for tools and schemas
+  - **Template**: Added bottleneck rate-limiting utility, updated docs for iterate and brain-each
+- Updated dependencies
+  - @positronic/core@0.0.76
+  - @positronic/spec@0.0.76
+  - @positronic/template-new-project@0.0.76
+
 ## 0.0.75
 
 ### Patch Changes
