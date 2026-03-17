@@ -174,6 +174,46 @@ const outerBrain = brain('orchestrator')
   );
 ```
 
+### Options Flow in Nested Brains
+
+When using `.brain()` to compose a sub-brain, the parent brain's options are automatically passed through to the sub-brain at runtime. This means:
+
+1. **Sub-brains receive the parent's options** — no need to pass them explicitly. The runner calls `innerBrain.run()` with the parent's options object.
+2. **Options persist after the sub-brain completes** — subsequent steps (`.guard()`, `.prompt()`, `.step()`, etc.) still have access to `options` in their context.
+3. **No re-validation** — the sub-brain's `withOptionsSchema` only validates when the brain is run directly as a top-level brain. When invoked as a nested step, the parent's options object is passed through as-is without re-validation.
+
+```typescript
+import { brain } from '@positronic/core';
+import { z } from 'zod';
+
+const innerBrain = brain('search')
+  .withOptionsSchema(
+    z.object({
+      query: z.string(),
+      limit: z.number().default(10),
+    })
+  )
+  .step('Search', ({ options }) => {
+    // options.query and options.limit are available here
+    return { results: [] };
+  });
+
+const outerBrain = brain('orchestrator')
+  .withOptionsSchema(
+    z.object({
+      query: z.string(),
+      limit: z.number().default(10),
+    })
+  )
+  .brain('Run Search', innerBrain, ({ brainState }) => brainState)
+  .step('Process', ({ state, options }) => {
+    // options still available after the nested brain completes
+    return { ...state, query: options.query };
+  });
+```
+
+TypeScript enforces that the sub-brain's `TOptions` type is structurally compatible with the parent's. If the schemas produce different types, you'll get a type error at the `.brain()` call site.
+
 ### Form 2: Inline Agent with Config Object
 
 Create an agent with a static configuration:
