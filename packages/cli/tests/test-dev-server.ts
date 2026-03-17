@@ -359,44 +359,19 @@ export class TestDevServer implements PositronicDevServer {
       return [201, { brainRunId }];
     });
 
-    // POST /brains/runs/rerun
+    // POST /brains/runs/rerun (destructive rerun)
     nockInstance.post('/brains/runs/rerun').reply((uri, requestBody) => {
       const body = parseRequestBody(requestBody);
 
-      // Support both identifier and brainTitle for backward compatibility
-      const identifier = body.identifier || body.brainTitle;
+      this.logCall('rerunBrain', [body.runId, body.startsAt]);
 
-      // Check if brain exists
-      if (identifier === 'non-existent-brain') {
-        this.logCall('rerunBrain', [
-          identifier,
-          body.runId,
-          body.startsAt,
-          body.stopsAfter,
-        ]);
-        return [404, { error: `Brain '${identifier}' not found` }];
-      }
-
-      // Check if run ID exists (if provided)
+      // Check if run ID exists
       if (body.runId === 'non-existent-run') {
-        this.logCall('rerunBrain', [
-          body.brainTitle,
-          body.runId,
-          body.startsAt,
-          body.stopsAfter,
-        ]);
         return [404, { error: `Brain run '${body.runId}' not found` }];
       }
 
-      const newBrainRunId = `rerun-${Date.now()}`;
-
-      this.logCall('rerunBrain', [
-        identifier,
-        body.runId,
-        body.startsAt,
-        body.stopsAfter,
-      ]);
-      return [201, { brainRunId: newBrainRunId }];
+      // Destructive rerun returns the same run ID plus the brain title
+      return [200, { brainRunId: body.runId, brainTitle: 'test-brain' }];
     });
 
     // DELETE /brains/runs/:runId

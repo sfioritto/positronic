@@ -96,86 +96,44 @@ brains.post('/runs', async (context: Context) => {
 
 brains.post('/runs/rerun', async (context: Context) => {
   const requestBody = await context.req.json<any>();
-  const { runId, startsAt, stopsAfter } = requestBody;
+  const { runId, startsAt } = requestBody;
 
-  // Support both identifier and brainTitle for backward compatibility
-  const identifier = requestBody.identifier || requestBody.brainTitle;
+  if (!runId) {
+    return context.json({ error: 'Missing runId in request body' }, 400);
+  }
 
-  if (!identifier) {
+  if (startsAt === undefined || typeof startsAt !== 'number' || startsAt < 1) {
     return context.json(
-      { error: 'Missing identifier or brainTitle in request body' },
+      { error: 'Missing or invalid startsAt in request body (must be >= 1)' },
       400
     );
   }
 
-  // Validate that the brain exists
-  const manifest = getManifest();
-  if (!manifest) {
-    return context.json({ error: 'Manifest not initialized' }, 500);
+  // Validate the run exists and the user owns it
+  const userName = scopeUserName(context);
+  const monitorId = context.env.MONITOR_DO.idFromName('singleton');
+  const monitorStub = context.env.MONITOR_DO.get(monitorId);
+  const existingRun = await monitorStub.getRun(runId, userName);
+
+  if (!existingRun) {
+    return context.json({ error: `Brain run '${runId}' not found` }, 404);
   }
 
-  // Resolve the identifier to find the brain
-  const resolution = manifest.resolve(identifier);
-
-  if (resolution.matchType === 'none') {
-    return context.json({ error: `Brain '${identifier}' not found` }, 404);
-  }
-
-  if (resolution.matchType === 'multiple') {
-    return context.json(
-      {
-        error: 'Multiple brains match the identifier',
-        matchType: 'multiple',
-        candidates: resolution.candidates,
-      },
-      409
-    );
-  }
-
-  const brain = resolution.brain!;
-
-  // If runId is provided, validate it exists
-  if (runId) {
-    const monitorId = context.env.MONITOR_DO.idFromName('singleton');
-    const monitorStub = context.env.MONITOR_DO.get(monitorId);
-    const existingRun = await monitorStub.getLastEvent(runId);
-
-    if (!existingRun) {
-      return context.json({ error: `Brain run '${runId}' not found` }, 404);
-    }
-  }
-
-  // Read auth context for currentUser (every brain run must have an owner)
-  const auth = context.get('auth');
-  if (!auth?.userName && !auth?.isRoot) {
-    return context.json(
-      { error: 'Authentication required to run a brain' },
-      401
-    );
-  }
-  const currentUser = { name: auth.userName || 'root' };
-
-  // Create a new brain run with rerun parameters
-  const newBrainRunId = uuidv4();
+  // Get the existing DO and call rerun
   const namespace = context.env.BRAIN_RUNNER_DO;
-  const doId = namespace.idFromName(newBrainRunId);
+  const doId = namespace.idFromName(runId);
   const stub = namespace.get(doId);
 
-  // Start the brain with rerun options
-  const rerunOptions = {
-    ...(runId && { originalRunId: runId }),
-    ...(startsAt !== undefined && { startsAt }),
-    ...(stopsAfter !== undefined && { stopsAfter }),
-  };
+  try {
+    await stub.rerun(startsAt);
+  } catch (error: any) {
+    return context.json({ error: error.message || 'Rerun failed' }, 500);
+  }
 
-  // Get the actual brain title from the resolved brain
-  const brainTitle = (brain as any).title || identifier;
-  await stub.start(brainTitle, newBrainRunId, currentUser, rerunOptions);
-
-  const response: CreateBrainRunResponse = {
-    brainRunId: newBrainRunId,
-  };
-  return context.json(response, 201);
+  return context.json(
+    { brainRunId: runId, brainTitle: existingRun.brain_title },
+    200
+  );
 });
 
 brains.get('/runs/:runId/watch', async (context: Context) => {

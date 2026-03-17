@@ -395,44 +395,22 @@ export function buildCli(options: CliOptions) {
 
   // --- Rerun Brain Command ---
   cli = cli.command(
-    'rerun <brain> [run-id]',
-    'Rerun an existing brain run\n',
+    'rerun <run-id>',
+    'Rerun an existing brain run from a specific step\n',
     (yargsRerun) => {
       return yargsRerun
-        .positional('brain', {
-          describe: 'Brain identifier (title, filename, or search term)',
+        .positional('run-id', {
+          describe: 'ID of the brain run to rerun',
           type: 'string',
           demandOption: true,
         })
-        .positional('run-id', {
-          describe:
-            'ID of the brain run to rerun (defaults to the most recent run)',
-          type: 'string',
-        })
         .option('starts-at', {
-          describe: 'Step number to start execution from',
+          describe: 'Step number to start execution from (1-indexed)',
           type: 'number',
+          demandOption: true,
         })
         .alias('starts-at', 's')
-        .option('stops-after', {
-          describe: 'Step number to stop execution after',
-          type: 'number',
-        })
-        .alias('stops-after', 'e')
-        .example(
-          '$0 rerun my-brain',
-          'Rerun the most recent execution of my-brain'
-        )
-        .example('$0 rerun my-brain abc123', 'Rerun a specific brain run')
-        .example('$0 rerun my-brain --starts-at=3', 'Rerun from step 3')
-        .example(
-          '$0 rerun my-brain --stops-after=5',
-          'Rerun and stop after step 5'
-        )
-        .example(
-          '$0 rerun my-brain --starts-at=3 --stops-after=5',
-          'Rerun steps 3 through 5'
-        );
+        .example('$0 rerun abc123 --starts-at=3', 'Rerun from step 3');
     },
     (argv) => {
       const element = brainCommand.rerun(argv);
@@ -654,49 +632,24 @@ export function buildCli(options: CliOptions) {
         }
       )
       .command(
-        'rerun <brain> [run-id]',
-        'Rerun an existing brain run\n',
+        'rerun <run-id>',
+        'Rerun an existing brain run from a specific step\n',
         (yargsRerun) => {
           return yargsRerun
-            .positional('brain', {
-              describe: 'Brain identifier (title, filename, or search term)',
+            .positional('run-id', {
+              describe: 'ID of the brain run to rerun',
               type: 'string',
               demandOption: true,
             })
-            .positional('run-id', {
-              describe:
-                'ID of the brain run to rerun (defaults to the most recent run)',
-              type: 'string',
-            })
             .option('starts-at', {
-              describe: 'Step number to start execution from',
+              describe: 'Step number to start execution from (1-indexed)',
               type: 'number',
+              demandOption: true,
             })
             .alias('starts-at', 's')
-            .option('stops-after', {
-              describe: 'Step number to stop execution after',
-              type: 'number',
-            })
-            .alias('stops-after', 'e')
             .example(
-              '$0 brain rerun my-brain',
-              'Rerun the most recent execution of my-brain'
-            )
-            .example(
-              '$0 brain rerun my-brain abc123',
-              'Rerun a specific brain run'
-            )
-            .example(
-              '$0 brain rerun my-brain --starts-at=3',
+              '$0 brain rerun abc123 --starts-at=3',
               'Rerun from step 3'
-            )
-            .example(
-              '$0 brain rerun my-brain --stops-after=5',
-              'Rerun and stop after step 5'
-            )
-            .example(
-              '$0 brain rerun my-brain --starts-at=3 --stops-after=5',
-              'Rerun steps 3 through 5'
             );
         },
         (argv) => {
