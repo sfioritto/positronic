@@ -1,7 +1,6 @@
 ---
 name: code-review
-description: Review current diffs for opportunities to dramatically simplify and reduce code changes.
-disable-model-invocation: true
+description: Review current diffs for opportunities to dramatically simplify and reduce code changes. Activates automatically after completing all tasks from a plan implementation.
 ---
 
 # Code Review
