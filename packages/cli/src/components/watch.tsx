@@ -201,6 +201,17 @@ const BrainSection = ({ brain, isInner = false }: BrainSectionProps) => {
         <Text bold>{brain.brainTitle}</Text>
       </Box>
 
+      {/* Options (only for root brain, when non-empty) */}
+      {!isInner && brain.options && Object.keys(brain.options).length > 0 && (
+        <Box marginBottom={1} marginLeft={1} flexDirection="column">
+          {Object.entries(brain.options).map(([key, value]) => (
+            <Text key={key}>
+              <Text dimColor>{key}:</Text> {String(value)}
+            </Text>
+          ))}
+        </Box>
+      )}
+
       {/* Step window */}
       <StepWindow steps={brain.steps} indent={1} />
 
