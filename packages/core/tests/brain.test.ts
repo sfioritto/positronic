@@ -2285,15 +2285,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Categorize',
           {
-            template: ({
-              item: email,
-            }: {
-              item: {
-                id: string;
-                subject: string;
-                body: string;
-              };
-            }) => {
+            template: ({ item: email }) => {
               templateCalls.push(email.id);
               return `Categorize: ${email.subject} - ${email.body}`;
             },
@@ -2348,7 +2340,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Analyze',
           {
-            template: ({ item }: { item: { text: string } }) => item.text,
+            template: ({ item }) => item.text,
             outputSchema: {
               schema: z.object({ sentiment: z.string() }),
               name: 'sentimentResults' as const,
@@ -2386,7 +2378,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: string } }) => item.id,
+            template: ({ item }) => item.id,
             outputSchema: {
               schema: z.object({ order: z.number() }),
               name: 'results' as const,
@@ -2425,7 +2417,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Categorize',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ category: z.string() }),
               name: 'categories' as const,
@@ -2505,7 +2497,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ status: z.string() }),
               name: 'results' as const,
@@ -2555,7 +2547,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
@@ -2594,7 +2586,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
@@ -2665,7 +2657,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
@@ -2767,7 +2759,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
@@ -2819,7 +2811,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
@@ -2862,7 +2854,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ status: z.string() }),
               name: 'results' as const,
@@ -2908,7 +2900,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ status: z.string() }),
               name: 'results' as const,
@@ -2954,7 +2946,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
@@ -2997,7 +2989,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Label',
           {
-            template: ({ item }: { item: { name: string; value: number } }) => {
+            template: ({ item }) => {
               // TypeScript should know item has name and value
               const nameUppercase = item.name.toUpperCase();
               const doubledValue = item.value * 2;
@@ -3048,7 +3040,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Score',
           {
-            template: ({ item }: { item: { text: string } }) => item.text,
+            template: ({ item }) => item.text,
             outputSchema: {
               schema: z.object({ score: z.number() }),
               name: 'scores' as const,
@@ -3093,7 +3085,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ done: z.boolean() }),
               name: 'results' as const,
@@ -3130,7 +3122,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: async ({ item }: { item: { id: number } }) => {
+            template: async ({ item }) => {
               await new Promise((resolve) => setTimeout(resolve, 10));
               return `Async item ${item.id}`;
             },
@@ -3177,7 +3169,7 @@ describe('prompt with over (iterate)', () => {
         .prompt(
           'Process',
           {
-            template: ({ item }: { item: { id: number } }) => `Item ${item.id}`,
+            template: ({ item }) => `Item ${item.id}`,
             outputSchema: {
               schema: z.object({ custom: z.boolean() }),
               name: 'results' as const,
@@ -4440,11 +4432,7 @@ describe('IterateResult', () => {
       .prompt(
         'Summarize',
         {
-          template: ({
-            item,
-          }: {
-            item: { name: string; important: boolean };
-          }) => `Summarize ${item.name}`,
+          template: ({ item }) => `Summarize ${item.name}`,
           outputSchema: {
             schema: z.object({ summary: z.string() }),
             name: 'results' as const,

@@ -431,7 +431,7 @@ const iterateWebhookBrain = brain({
   .prompt(
     'Process items',
     {
-      template: ({ item }: { item: string }) => `Process: ${item}`,
+      template: ({ item }) => `Process: ${item}`,
       outputSchema: {
         schema: z.object({ result: z.string() }),
         name: 'iterateResults' as const,
