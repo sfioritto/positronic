@@ -231,6 +231,7 @@ export interface IterateItemCompleteEvent<
   processedCount: number;
   totalItems: number;
   schemaName: string;
+  canRelease: boolean;
 }
 
 // Union type of all possible events
