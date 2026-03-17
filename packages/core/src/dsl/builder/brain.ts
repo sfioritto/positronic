@@ -10,7 +10,7 @@ import type {
   AgentOutputSchema,
   StepContext,
 } from '../types.js';
-import type { Resources } from '../../resources/resources.js';
+
 import type {
   WebhookRegistration,
   ExtractWebhookResponses,
@@ -37,6 +37,8 @@ import type {
   AgentBlock,
   GuardBlock,
   WaitBlock,
+  TemplateContext,
+  IterateTemplateContext,
 } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type {
@@ -690,8 +692,7 @@ export class Brain<
     title: string,
     config: {
       template: (
-        state: TState,
-        resources: Resources
+        context: TemplateContext<TState, TOptions>
       ) => string | Promise<string>;
       outputSchema: {
         schema: TSchema;
@@ -713,8 +714,7 @@ export class Brain<
     title: string,
     config: {
       template: (
-        item: TItems[number],
-        resources: Resources
+        context: IterateTemplateContext<TItems[number], TState, TOptions>
       ) => string | Promise<string>;
       outputSchema: {
         schema: TSchema;
@@ -737,8 +737,7 @@ export class Brain<
     title: string,
     config: {
       template: (
-        state: TState,
-        resources: Resources
+        context: TemplateContext<TState, TOptions>
       ) => string | Promise<string>;
       client?: ObjectGenerator;
     }
@@ -748,7 +747,7 @@ export class Brain<
   prompt(
     title: string,
     config: {
-      template: (input: any, resources: Resources) => string | Promise<string>;
+      template: (context: any) => string | Promise<string>;
       outputSchema?: {
         schema: z.ZodObject<any>;
         name: string;
@@ -774,8 +773,8 @@ export class Brain<
         type: 'step',
         title,
         client: config.client,
-        action: async ({ state, client, resources }) => {
-          const prompt = await config.template(state, resources);
+        action: async ({ state, options, client, resources }) => {
+          const prompt = await config.template({ state, options, resources });
           const result = await client.generateObject({
             schema: textSchema,
             schemaName: 'TextResponse',
@@ -830,9 +829,9 @@ export class Brain<
         type: 'step',
         title,
         client: config.client,
-        action: async ({ state, client, resources }) => {
+        action: async ({ state, options, client, resources }) => {
           const { schema, name: schemaName } = outputSchema;
-          const prompt = await config.template(state, resources);
+          const prompt = await config.template({ state, options, resources });
           const result = await client.generateObject({
             schema,
             schemaName,
@@ -871,7 +870,7 @@ export class Brain<
    * brain('feedback-form')
    *   .step('Initialize', () => ({ userName: 'John' }))
    *   .ui('Create Form', {
-   *     template: (state) => `Create a feedback form for ${state.userName}`,
+   *     template: ({ state }) => `Create a feedback form for ${state.userName}`,
    *     responseSchema: z.object({
    *       rating: z.number().min(1).max(5),
    *       comments: z.string(),
@@ -894,8 +893,7 @@ export class Brain<
     title: string,
     config: {
       template: (
-        state: TState,
-        resources: Resources
+        context: TemplateContext<TState, TOptions>
       ) => string | Promise<string>;
       responseSchema?: TSchema;
     }
@@ -919,10 +917,7 @@ export class Brain<
       title,
       isUIStep: true,
       uiConfig: {
-        template: config.template as (
-          state: any,
-          resources: Resources
-        ) => string | Promise<string>,
+        template: config.template as (context: any) => string | Promise<string>,
         responseSchema: config.responseSchema,
       },
       action: async (params) => {

@@ -31,11 +31,11 @@ This also applies to variable declarations and function parameters:
 ```typescript
 // ❌ DON'T DO THIS
 const names: string[] = options.notify.split(',');
-template: (state: any) => { ... }
+template: ({ state }: any) => { ... }
 
 // ✅ DO THIS
 const names = options.notify.split(',');
-template: (state) => { ... }
+template: ({ state }) => { ... }
 ```
 
 If you genuinely need a cast to fix a type error, prefer the narrowest cast possible and add it only after seeing the error.
@@ -199,10 +199,10 @@ The same applies to prompt templates:
 
 ```typescript
 // ❌ DON'T DO THIS
-template: (state) => `Hello <%= '${state.user.name}' %>, your order <%= '${state.order.id}' %> is ready.`,
+template: ({ state }) => `Hello <%= '${state.user.name}' %>, your order <%= '${state.order.id}' %> is ready.`,
 
 // ✅ DO THIS
-template: ({ user, order }) => `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.`,
+template: ({ state: { user, order } }) => `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.`,
 ```
 
 When you still need `state` (e.g. for `...state` in the return value), destructure in the function body instead:
@@ -431,7 +431,7 @@ brain('feedback-collector')
   }))
   // Generate the form
   .ui('Collect Feedback', {
-    template: (state) => <%= '\`' %>
+    template: ({ state }) => <%= '\`' %>
       Create a feedback form for <%= '${state.userName}' %>:
       - Rating (1-5)
       - Comments textarea
@@ -777,7 +777,7 @@ export default feedbackBrain;
 // Step 3: Run and check logs, see it doesn't analyze yet
 // Step 4: Add sentiment analysis step
   .prompt('Analyze sentiment', {
-    template: ({ feedback }) =>
+    template: ({ state: { feedback } }) =>
       <%= '\`Analyze the sentiment of this feedback: "${feedback}"\`' %>,
     outputSchema: {
       schema: z.object({
@@ -791,7 +791,7 @@ export default feedbackBrain;
 // Step 5: Run again, check logs, test still fails (no response)
 // Step 6: Add response generation
   .prompt('Generate response', {
-    template: ({ sentimentAnalysis, feedback }) =>
+    template: ({ state: { sentimentAnalysis, feedback } }) =>
       <%= '\`Generate a brief response to this ${sentimentAnalysis.sentiment} feedback: "${feedback}"\`' %>,
     outputSchema: {
       schema: z.object({

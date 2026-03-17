@@ -81,7 +81,7 @@ brain('AI Education Assistant')
     context: 'We are creating an educational example',
   }))
   .prompt('Generate explanation', {
-    template: ({ topic, context }) =>
+    template: ({ state: { topic, context } }) =>
       `<%= '${context}' %>. Please provide a brief, beginner-friendly explanation of <%= '${topic}' %>.`,
     outputSchema: {
       schema: z.object({
@@ -104,7 +104,7 @@ brain('AI Education Assistant')
   .prompt(
     'Generate follow-up questions',
     {
-      template: ({ formattedOutput }) =>
+      template: ({ state: { formattedOutput } }) =>
         `Based on this explanation about <%= '${formattedOutput.topic}' %>: "<%= '${formattedOutput.explanation}' %>"
         
         Generate 3 thoughtful follow-up questions that a student might ask.`,
@@ -147,7 +147,7 @@ const smartModel = createAnthropicClient({ model: 'claude-sonnet-4-5-20250929' }
 
 brain('Multi-Model Brain')
   .prompt('Quick summary', {
-    template: ({ document }) => `Summarize this briefly: <%= '${document}' %>`,
+    template: ({ state: { document } }) => `Summarize this briefly: <%= '${document}' %>`,
     outputSchema: {
       schema: z.object({ summary: z.string() }),
       name: 'quickSummary' as const,
@@ -155,7 +155,7 @@ brain('Multi-Model Brain')
     client: fastModel,  // Use a fast, cheap model for summarization
   })
   .prompt('Deep analysis', {
-    template: ({ quickSummary }) =>
+    template: ({ state: { quickSummary } }) =>
       `Analyze the implications of this summary: <%= '${quickSummary.summary}' %>`,
     outputSchema: {
       schema: z.object({
@@ -419,7 +419,7 @@ Services are destructured alongside other parameters in:
 2. **Prompt Reduce Functions**:
 ```typescript
 .prompt('Generate', {
-  template: (state) => 'Generate something',
+  template: ({ state }) => 'Generate something',
   outputSchema: { schema, name: 'result' as const }
 }, async ({ state, response, logger, database }) => {
   logger.info('Saving AI response');
@@ -477,7 +477,7 @@ const analysisBrain = brain('Data Analysis')
     return { ...state, data };
   })
   .prompt('Analyze Data', {
-    template: ({ data }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
+    template: ({ state: { data } }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
     outputSchema: {
       schema: z.object({
         insights: z.array(z.string()),
@@ -630,7 +630,7 @@ const brainWithComponents = brain('Custom UI Brain')
     }
   })
   .ui('Dashboard', {
-    template: (state) => `
+    template: ({ state }) => `
       Create a dashboard using CustomCard components to display:
       - User name: <%= '${state.userName}' %>
       - Account status: <%= '${state.status}' %>
@@ -931,7 +931,7 @@ Resources are also available in prompt templates:
 
 ```typescript
 brain('Template Example').prompt('Generate Content', {
-  template: async (state, resources) => {
+  template: async ({ state, resources }) => {
     const template = await resources.prompts.customerSupport.load();
     return template.replace('{{issue}}', state.issue);
   },
@@ -1025,7 +1025,7 @@ interface FilterPromptState {
 
 // Export the prompt configuration
 export const aiFilterPrompt = {
-  template: async (state: FilterPromptState, resources: Resources) => {
+  template: async ({ state, resources }: { state: FilterPromptState, resources: Resources }) => {
     // Load a prompt template from resources
     const template = await resources.prompts.hnFilter.load();
 
@@ -1093,7 +1093,7 @@ brain('Item Processor')
     ]
   }))
   .prompt('Summarize Items', {
-    template: (item) => `Summarize this item: <%= '${item.title}' %>`,
+    template: ({ item }) => `Summarize this item: <%= '${item.title}' %>`,
     outputSchema: {
       schema: z.object({ summary: z.string() }),
       name: 'summaries' as const
@@ -1202,7 +1202,7 @@ brain('Dynamic Processor')
     ]
   }))
   .prompt('Process', {
-    template: (item) => `Process item <%= '${item.id}' %>`,
+    template: ({ item }) => `Process item <%= '${item.id}' %>`,
     outputSchema: {
       schema: z.object({ result: z.string() }),
       name: 'results' as const,
@@ -1534,7 +1534,7 @@ brain('Feedback Collector')
   }))
   // Generate the form
   .ui('Collect Feedback', {
-    template: (state) => `
+    template: ({ state }) => `
       Create a feedback form for <%= '${state.userName}' %>.
       Include fields for rating (1-5) and comments.
     `,
@@ -1580,7 +1580,7 @@ Be specific about layout and content:
 
 ```typescript
 .ui('Contact Form', {
-  template: (state) => `
+  template: ({ state }) => `
     Create a contact form with:
     - Header: "Get in Touch"
     - Name field (required)
@@ -1604,7 +1604,7 @@ Use `{{path}}` syntax to bind props to runtime data:
 
 ```typescript
 .ui('Order Summary', {
-  template: (state) => `
+  template: ({ state }) => `
     Create an order summary showing:
     - List of items from {{cart.items}}
     - Total: {{cart.total}}
@@ -1651,7 +1651,7 @@ brain('User Onboarding')
 
   // Step 2: Preferences
   .ui('Preferences', {
-    template: (state) => `
+    template: ({ state }) => `
       Create preferences form for <%= '${state.userData.firstName}' %>:
       - Newsletter subscription checkbox
       - Contact preference (email/phone/sms)
@@ -1708,7 +1708,7 @@ const completeBrain = brain({
     return { startTime: Date.now() };
   })
   .prompt('Generate Plan', {
-    template: async (state, resources) => {
+    template: async ({ state, resources }) => {
       // Load a template from resources
       const template = await resources.templates.projectPlan.load();
       return template.replace('{{context}}', 'software project');
