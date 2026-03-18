@@ -7,7 +7,6 @@ import {
   type BrainErrorEvent,
   type SerializedStep,
   type SerializedStepStatus,
-  type ResumeContext,
 } from '../src/dsl/brain.js';
 import { createBrain } from '../src/dsl/create-brain.js';
 import { z } from 'zod';
@@ -1068,9 +1067,9 @@ describe('brain resumption', () => {
     for await (const event of threeStepBrain.run({
       client: mockClient as ObjectGenerator,
       currentUser: { name: 'test-user' },
-      resumeContext: {
-        stepIndex: 1, // Resume from step index 1 (Step 2)
+      resume: {
         state: stateAfterStep1,
+        stepIndex: 1, // Resume from step index 1 (Step 2)
       },
       brainRunId: 'test-run-id',
     })) {
@@ -1618,18 +1617,9 @@ describe('nested brains', () => {
     );
     expect(outerCompleteEvent).toBeUndefined();
 
-    // Build resumeContext from events using the new tree structure
+    // Build resume params from events using flat structure
     // Outer brain: at step 1 (the inner brain step), state after step 0
     // Inner brain: at step 3 (Process webhook), state after steps 0, 1, and 2
-    const resumeContext: ResumeContext = {
-      stepIndex: 1, // Outer brain is at step 1 (Run inner brain)
-      state: { prefix: 'outer-' }, // State after outer step 1
-      innerResumeContext: {
-        stepIndex: 3, // Inner brain resumes at step 3 (Process webhook)
-        state: { count: 1, waiting: true }, // State after inner steps 0, 1, and 2
-        webhookResponse: { data: 'hello from webhook!' },
-      },
-    };
 
     // Resume with webhook response
     const resumeEvents: BrainEvent<any>[] = [];
@@ -1637,7 +1627,14 @@ describe('nested brains', () => {
       client: mockClient,
       currentUser: { name: 'test-user' },
       brainRunId: 'test-run-id',
-      resumeContext,
+      resume: {
+        state: { prefix: 'outer-' }, // State after outer step 1
+        stepIndex: 1, // Outer brain is at step 1 (Run inner brain)
+        innerStack: [
+          { state: { count: 1, waiting: true }, stepIndex: 3 }, // Inner brain resumes at step 3
+        ],
+        webhookResponse: { data: 'hello from webhook!' },
+      },
     })) {
       resumeEvents.push(event);
     }
@@ -2690,27 +2687,25 @@ describe('.map()', () => {
         outputKey: 'results' as const,
       });
 
-    const resumeContext: ResumeContext = {
-      stepIndex: 1,
-      state: { items: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }] },
-      iterateProgress: {
-        accumulatedResults: [
-          [{ n: 1 }, { value: 2 }],
-          [{ n: 2 }, { value: 4 }],
-          undefined,
-          undefined,
-        ],
-        processedCount: 2,
-        totalItems: 4,
-        schemaName: 'results',
-      },
-    };
-
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      resumeContext,
+      resume: {
+        state: { items: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }] },
+        stepIndex: 1,
+        iterateProgress: {
+          accumulatedResults: [
+            [{ n: 1 }, { value: 2 }],
+            [{ n: 2 }, { value: 4 }],
+            undefined,
+            undefined,
+          ],
+          processedCount: 2,
+          totalItems: 4,
+          schemaName: 'results',
+        },
+      },
       brainRunId: 'test-resume',
     })) {
       events.push(event);

@@ -7,9 +7,9 @@ export type { Adapter } from './adapters/types.js';
 export type {
   BrainEvent,
   SerializedStep,
+  ResumeParams,
   InitialRunParams,
   ResumeRunParams,
-  ResumeContext,
   BrainStartEvent,
   BrainCompleteEvent,
   BrainErrorEvent,
@@ -156,4 +156,3 @@ export type {
   IterateContext,
   ExecutionNode,
 } from './dsl/brain-state-machine.js';
-export type { AgentResumeContext } from './dsl/agent-messages.js';

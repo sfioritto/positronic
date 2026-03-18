@@ -44,9 +44,9 @@ import type {
 } from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
 import type {
+  ResumeParams,
   InitialRunParams,
   ResumeRunParams,
-  ResumeContext,
 } from '../definitions/run-params.js';
 
 import { Step } from '../builder/step.js';
@@ -73,7 +73,7 @@ export class BrainEventStream<
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
   private currentPage: GeneratedPage | undefined = undefined;
-  private resumeContext?: ResumeContext;
+  private resume?: ResumeParams;
   private components?: Record<string, UIComponent<any>>;
   private defaultTools?: Record<string, AgentTool<any>>;
   private extraTools?: Record<string, AgentTool<any>>;
@@ -132,7 +132,7 @@ export class BrainEventStream<
     // Check if this is a resume run or fresh start
     const resumeParams = params as ResumeRunParams<TOptions>;
     const initialParams = params as InitialRunParams<TOptions>;
-    const resumeContext = resumeParams.resumeContext;
+    const resume = resumeParams.resume;
 
     this.title = title;
     this.description = description;
@@ -142,7 +142,7 @@ export class BrainEventStream<
     this.resources = resources;
     this.pages = pages;
     this.env = env ?? DEFAULT_ENV;
-    this.resumeContext = resumeContext;
+    this.resume = resume;
     this.components = components;
     this.defaultTools = defaultTools;
     this.extraTools = extraTools;
@@ -174,33 +174,29 @@ export class BrainEventStream<
       this.steps.push(new Step(block));
     }
 
-    if (resumeContext) {
-      // Resume: use state and stepIndex directly from resumeContext
-      this.currentState = clone(resumeContext.state) as TState;
-      this.currentStepIndex = resumeContext.stepIndex;
+    if (resume) {
+      // Resume: use state and stepIndex from resume params
+      this.currentState = clone(resume.state) as TState;
+      this.currentStepIndex = resume.stepIndex;
 
       // Mark steps before stepIndex as complete (they won't be re-executed)
-      for (let i = 0; i < resumeContext.stepIndex; i++) {
+      for (let i = 0; i < resume.stepIndex; i++) {
         this.steps[i].withStatus(STATUS.COMPLETE);
       }
 
-      // For inner brains (no signalProvider), check resumeContext for webhookResponse
+      // For inner brains (no signalProvider), check for webhookResponse
       // The outer brain will have set this from the signal
-      if (
-        !signalProvider &&
-        resumeContext.webhookResponse &&
-        !resumeContext.agentContext
-      ) {
-        this.currentResponse = resumeContext.webhookResponse;
+      if (!signalProvider && resume.webhookResponse && !resume.agentContext) {
+        this.currentResponse = resume.webhookResponse;
       }
       // Agent webhook response is handled via agentContext (checked in executeAgent)
 
       // Restore page context if available (from a preceding UI step)
-      if (resumeContext.currentPage) {
+      if (resume.currentPage) {
         this.currentPage = {
-          url: resumeContext.currentPage.url,
+          url: resume.currentPage.url,
           webhook: {
-            ...resumeContext.currentPage.webhook,
+            ...resume.currentPage.webhook,
             schema: z.record(z.unknown()), // fallback schema for deserialized webhook
           },
         };
@@ -213,17 +209,6 @@ export class BrainEventStream<
 
     // Use provided ID if available, otherwise generate one
     this.brainRunId = providedBrainRunId ?? uuidv4();
-  }
-
-  /**
-   * Find webhookResponse anywhere in the resumeContext tree (for nested brain resumes)
-   */
-  private findWebhookResponseInResumeContext(
-    context: ResumeContext | undefined
-  ): JsonObject | undefined {
-    if (!context) return undefined;
-    if (context.webhookResponse) return context.webhookResponse;
-    return this.findWebhookResponseInResumeContext(context.innerResumeContext);
   }
 
   async *next(): AsyncGenerator<BrainEvent<TOptions>> {
@@ -239,7 +224,7 @@ export class BrainEventStream<
     try {
       // Only emit START event for fresh runs, not resumes
       // Resumed brains already have a historical START event
-      if (!this.resumeContext) {
+      if (!this.resume) {
         yield {
           type: BRAIN_EVENTS.START,
           status: STATUS.RUNNING,
@@ -271,7 +256,7 @@ export class BrainEventStream<
           );
         }
       } else {
-        // Resuming - check for WEBHOOK_RESPONSE signal or fall back to resumeContext
+        // Resuming - check for WEBHOOK_RESPONSE signal or fall back to stored webhook response
         let webhookResponse: JsonObject | undefined;
 
         if (this.signalProvider) {
@@ -288,24 +273,14 @@ export class BrainEventStream<
             // Set currentResponse for step consumption (non-agent webhooks)
             this.currentResponse = webhookResponse;
 
-            // Set webhookResponse at the deepest level of the resumeContext tree
-            // This is needed for:
-            // 1. Agent webhook resumes (via resumeContext.webhookResponse)
-            // 2. Nested brain resumes (inner brain accesses via innerResumeContext)
-            if (this.resumeContext) {
-              let deepest = this.resumeContext;
-              while (deepest.innerResumeContext) {
-                deepest = deepest.innerResumeContext;
-              }
-              deepest.webhookResponse = webhookResponse;
+            // Store for propagation to inner brains and agent context
+            if (this.resume) {
+              this.resume = { ...this.resume, webhookResponse };
             }
           }
         } else {
-          // Inner brain (no signalProvider): check resumeContext for webhookResponse
-          // The outer brain will have set this from the signal
-          webhookResponse = this.findWebhookResponseInResumeContext(
-            this.resumeContext
-          );
+          // Inner brain (no signalProvider): check for webhookResponse passed from outer brain
+          webhookResponse = this.resume?.webhookResponse;
         }
 
         if (webhookResponse) {
@@ -537,20 +512,28 @@ export class BrainEventStream<
           : brainBlock.initialState
         : {};
 
-      // Check if we're resuming and if there's an inner resume context
-      const innerResumeContext = this.resumeContext?.innerResumeContext;
+      // Check if we're resuming an inner brain
+      const innerStack = this.resume?.innerStack;
+      const hasInnerResume = innerStack && innerStack.length > 0;
+      const innerEntry = hasInnerResume ? innerStack[0] : undefined;
+      const remainingStack = hasInnerResume ? innerStack.slice(1) : undefined;
 
       // Run inner brain and yield all its events
       // Pass brainRunId so inner brain shares outer brain's run ID
       let patches: any[] = [];
 
       let innerBrainPaused = false;
-      const innerRun = innerResumeContext
+      const innerRun = hasInnerResume
         ? brainBlock.innerBrain.run({
             resources: this.resources,
             client: this.client,
             currentUser: this.currentUser,
-            resumeContext: innerResumeContext,
+            resume: {
+              ...this.resume,
+              state: innerEntry!.state,
+              stepIndex: innerEntry!.stepIndex,
+              innerStack: remainingStack?.length ? remainingStack : undefined,
+            },
             options: this.options ?? ({} as TOptions),
             pages: this.pages,
             env: this.env,
@@ -573,11 +556,17 @@ export class BrainEventStream<
             storeProvider: this.storeProvider,
           });
 
+      // Context has been forwarded to the inner brain — clear so outer
+      // brain's later steps (e.g. an agent at step N+1) don't consume them.
+      if (hasInnerResume) {
+        this.resume = undefined;
+      }
+
       // Track nesting depth so we only collect patches from the direct
       // child brain (depth 1) and ignore patches from deeper nested brains
       // (e.g. inner brains run by .map() or nested .brain() steps).
       // Resumed brains skip their START event, so start at depth 1.
-      let innerDepth = innerResumeContext ? 1 : 0;
+      let innerDepth = hasInnerResume ? 1 : 0;
 
       for await (const event of innerRun) {
         yield event; // Forward all inner brain events
@@ -612,7 +601,7 @@ export class BrainEventStream<
 
       // Apply collected patches to get final inner state
       // When resuming, use the resumed state as base; otherwise use initialState
-      const baseState = innerResumeContext?.state ?? initialState;
+      const baseState = innerEntry?.state ?? initialState;
       const innerState = applyPatches(baseState, patches);
 
       // Get previous state before action
@@ -765,8 +754,8 @@ The schema for this result is: ${name}`,
     let initialMessages: ToolMessage[];
 
     // Check if we're resuming from a previous agent execution
-    const agentContext = this.resumeContext?.agentContext;
-    const webhookResponse = this.resumeContext?.webhookResponse;
+    const agentContext = this.resume?.agentContext;
+    const webhookResponse = this.resume?.webhookResponse;
 
     // Use preserved stepId from agentContext when resuming, or step.id for fresh start
     // This ensures all events for the same agent use the same stepId across resumes
@@ -854,8 +843,8 @@ The schema for this result is: ${name}`,
         // No events to emit for pause resume - we just continue the conversation
       }
 
-      // Clear the resume context so it's only used once
-      this.resumeContext = undefined;
+      // Clear resume so it's only used once
+      this.resume = undefined;
     } else {
       // Use "Begin." as default prompt if not provided
       const prompt = config.prompt ?? 'Begin.';
@@ -1329,7 +1318,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const totalItems = items.length;
 
     // Resume support
-    const iterateProgress = this.resumeContext?.iterateProgress;
+    const iterateProgress = this.resume?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
     const resultsMap = new Map<number, [any, any]>();
     if (iterateProgress?.accumulatedResults) {
@@ -1340,7 +1329,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     if (iterateProgress) {
-      this.resumeContext = undefined;
+      this.resume = undefined;
     }
 
     for (let i = startIndex; i < totalItems; i++) {

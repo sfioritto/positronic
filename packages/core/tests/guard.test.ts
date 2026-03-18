@@ -1,10 +1,6 @@
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
-import {
-  brain,
-  type BrainEvent,
-  type ResumeContext,
-} from '../src/dsl/brain.js';
+import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { jest } from '@jest/globals';
 import { ObjectGenerator } from '../src/clients/types.js';
 
@@ -320,16 +316,11 @@ describe('guard', () => {
     // Simulate resuming after guard already passed (stepIndex = 2: Init + Guard done)
     const resumeState = { value: 10 };
 
-    const resumeContext: ResumeContext = {
-      state: resumeState,
-      stepIndex: 2, // Past Init(0) and Guard(1)
-    };
-
     const events: BrainEvent[] = [];
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      resumeContext,
+      resume: { state: resumeState, stepIndex: 2 }, // Past Init(0) and Guard(1)
       brainRunId: 'test-run-id',
     })) {
       events.push(event);
@@ -357,16 +348,11 @@ describe('guard', () => {
     // stepIndex = 3 means all steps are past
     const resumeState = { value: 0 };
 
-    const resumeContext: ResumeContext = {
-      state: resumeState,
-      stepIndex: 3, // Past Init(0), Guard(1), After(2) — all done
-    };
-
     const events: BrainEvent[] = [];
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      resumeContext,
+      resume: { state: resumeState, stepIndex: 3 }, // Past Init(0), Guard(1), After(2) — all done
       brainRunId: 'test-run-id',
     })) {
       events.push(event);

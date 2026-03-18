@@ -12,7 +12,6 @@ import {
   type AgentIterationLimitEvent,
   type AgentWebhookEvent,
   type WebhookResponseEvent,
-  type ResumeContext,
 } from '../src/dsl/brain.js';
 import type { AgentRawResponseMessageEvent } from '../src/dsl/definitions/events.js';
 import { z } from 'zod';
@@ -1464,41 +1463,24 @@ describe('agent step', () => {
       ) as any;
       const brainRunId = startEvent.brainRunId;
 
-      // Build resumeContext from the execution stack
+      // Build resume params from execution stack
       const executionStack = machine.context.executionStack;
-
-      // Helper to convert executionStack to ResumeContext (adds webhookResponse and agentContext at deepest level)
-      function toResumeContext(stack: typeof executionStack): ResumeContext {
-        let context: ResumeContext | undefined;
-        for (let i = stack.length - 1; i >= 0; i--) {
-          const entry = stack[i];
-          if (i === stack.length - 1) {
-            // Deepest level gets the webhook response and agent context
-            context = {
-              stepIndex: entry.stepIndex,
-              state: entry.state,
-              webhookResponse,
-              agentContext: agentContext ?? undefined,
-            };
-          } else {
-            context = {
-              stepIndex: entry.stepIndex,
-              state: entry.state,
-              innerResumeContext: context,
-            };
-          }
-        }
-        return context!;
-      }
-
-      const resumeContext = toResumeContext(executionStack);
+      const topEntry = executionStack[0];
+      const innerStack =
+        executionStack.length > 1 ? executionStack.slice(1) : undefined;
 
       // Resume the brain with the webhook response
       const resumeEvents: BrainEvent[] = [];
       for await (const event of resumedBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        resumeContext,
+        resume: {
+          state: topEntry.state,
+          stepIndex: topEntry.stepIndex,
+          innerStack,
+          agentContext: agentContext ?? undefined,
+          webhookResponse,
+        },
         brainRunId,
       })) {
         resumeEvents.push(event);
