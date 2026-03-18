@@ -417,6 +417,18 @@ const largeStateWebhookBrain = brain({
     largeData: 'cleared',
   }));
 
+// Inner brain for iterate-webhook testing — wraps a prompt call
+const iterateItemBrain = brain<{}, { item: string; result: string }>({
+  title: 'iterate-item-brain',
+  description: 'Processes a single iterate item',
+}).prompt('Process item', {
+  template: ({ state }) => `Process: ${state.item}`,
+  outputSchema: {
+    schema: z.object({ result: z.string() }),
+    name: 'result' as const,
+  },
+});
+
 // Brain that does iterate processing followed by a webhook wait.
 // Tests that alarm-based DO restart (for iterate item processing) preserves the brainRunId
 // so that MonitorDO can correctly track state and validate webhook responses.
@@ -428,19 +440,12 @@ const iterateWebhookBrain = brain({
     ...state,
     items: ['item-a', 'item-b', 'item-c'],
   }))
-  .prompt(
-    'Process items',
-    {
-      template: ({ item }) => `Process: ${item}`,
-      outputSchema: {
-        schema: z.object({ result: z.string() }),
-        name: 'iterateResults' as const,
-      },
-    },
-    {
-      over: ({ state }) => state.items,
-    }
-  )
+  .map('Process items', {
+    run: iterateItemBrain,
+    over: ({ state }) => state.items,
+    initialState: (item) => ({ item, result: '' }),
+    outputKey: 'iterateResults' as const,
+  })
   .step('Prepare webhook wait', ({ state }) => ({
     ...state,
     waiting: true,
@@ -509,16 +514,17 @@ const iterateTestInnerBrain = brain<{}, { value: number; doubled: number }>({
   doubled: state.value * 2,
 }));
 
-// Outer brain that iterates over 7 items using .brain() iterate
+// Outer brain that iterates over 7 items using .map()
 const iterateBrainTestBrain = brain({
   title: 'iterate-brain-test',
-  description: 'Tests .brain() iterate with multiple items',
+  description: 'Tests .map() with multiple items',
 })
   .step('Init items', ({ state }) => ({
     ...state,
     items: [1, 2, 3, 4, 5, 6, 7],
   }))
-  .brain('Process items', iterateTestInnerBrain, {
+  .map('Process items', {
+    run: iterateTestInnerBrain,
     over: ({ state }) => state.items,
     initialState: (item) => ({ value: item, doubled: 0 }),
     outputKey: 'results' as const,
@@ -553,7 +559,8 @@ const iterateOptionsTestBrain = brain({
     multiplier: options.multiplier,
     items: [1, 2, 3],
   }))
-  .brain('Process items', iterateOptionsInnerBrain, {
+  .map('Process items', {
+    run: iterateOptionsInnerBrain,
     over: ({ state }: { state: { multiplier: number; items: number[] } }) =>
       state.items,
     initialState: (

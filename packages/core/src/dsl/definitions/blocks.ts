@@ -20,18 +20,6 @@ export interface TemplateContext<TState, TOptions extends JsonObject> {
   resources: Resources;
 }
 
-// Context passed to iterate template callbacks (prompt with over)
-export interface IterateTemplateContext<
-  TItem,
-  TState,
-  TOptions extends JsonObject
-> {
-  item: TItem;
-  state: TState;
-  options: TOptions;
-  resources: Resources;
-}
-
 // Shared interface for step action functions
 export type StepAction<
   TStateIn,
@@ -88,17 +76,6 @@ export type StepBlock<
   };
   /** Per-step client override for prompt steps */
   client?: ObjectGenerator;
-  /** Configuration for iterate prompt execution (prompt with `over`) */
-  iterateConfig?: {
-    over: (context: any) => any[] | Promise<any[]>;
-    error?: (item: any, error: Error) => any | null;
-    template: (
-      context: IterateTemplateContext<any, any, any>
-    ) => string | Promise<string>;
-    schema: z.ZodObject<any>;
-    schemaName: string;
-    client?: ObjectGenerator;
-  };
 };
 
 export type WaitBlock<
@@ -145,12 +122,6 @@ export type BrainBlock<
     innerState: TInnerState,
     services: TServices
   ) => TNewState;
-  iterateConfig?: {
-    over: (context: any) => any[] | Promise<any[]>;
-    initialState: (item: any, outerState: any) => State;
-    outputKey: string;
-    error?: (item: any, error: Error) => any | null;
-  };
 };
 
 export type AgentBlock<
@@ -180,17 +151,23 @@ export type AgentBlock<
   ) =>
     | AgentConfig<TTools, TOutputSchema>
     | Promise<AgentConfig<TTools, TOutputSchema>>;
-  iterateConfig?: {
-    over: (context: any) => any[] | Promise<any[]>;
-    outputKey: string;
-    error?: (item: any, error: Error) => any | null;
-  };
 };
 
 export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
   type: 'guard';
   title: string;
   predicate: (params: { state: TStateIn; options: TOptions }) => boolean;
+};
+
+// MapBlock: runs an inner brain once per item from the `over` list
+export type MapBlock = {
+  type: 'map';
+  title: string;
+  innerBrain: any;
+  over: (context: any) => any[] | Promise<any[]>;
+  initialState: (item: any, outerState: any) => State;
+  outputKey: string;
+  error?: (item: any, error: Error) => any | null;
 };
 
 export type Block<
@@ -205,4 +182,5 @@ export type Block<
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
   | AgentBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>
   | GuardBlock<TStateIn, TOptions>
-  | WaitBlock<TStateIn, TOptions, TServices, TPageIn>;
+  | WaitBlock<TStateIn, TOptions, TServices, TPageIn>
+  | MapBlock;
