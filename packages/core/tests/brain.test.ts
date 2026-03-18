@@ -271,7 +271,7 @@ describe('brain creation', () => {
         return { count: 1 };
       })
       .wait('Webhook step', () => testWebhook('test-id'))
-      .step('Third step', ({ state }) => ({
+      .handle('Third step', ({ state }) => ({
         ...state,
         processed: true,
       }));
@@ -1591,7 +1591,7 @@ describe('nested brains', () => {
         waiting: true,
       }))
       .wait('Wait for webhook', () => testWebhook('test-id'))
-      .step('Process webhook', ({ state, response }) => ({
+      .handle('Process webhook', ({ state, response }) => ({
         ...state,
         webhookData: response?.data || 'no-data',
         processed: true,
@@ -2702,7 +2702,8 @@ describe('.map()', () => {
         identifier: 'test-id',
         schema: z.object({ data: z.string() }),
         token: 'token',
-      }));
+      }))
+      .handle('After webhook', ({ state }) => state);
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }] }))

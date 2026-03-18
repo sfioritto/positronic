@@ -52,7 +52,7 @@ const myBrain = brain('My Brain')
     () => [slackWebhook('thread-123'), emailWebhook('email-456')],
     { timeout: '24h' }
   )
-  .step('My Step 2', ({ state, response }) => {
+  .handle('My Step 2', ({ state, response }) => {
     if (response) {
       if ('threadId' in response) {
         // Handle Slack webhook response

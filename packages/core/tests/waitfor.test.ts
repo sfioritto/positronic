@@ -53,7 +53,7 @@ describe('webhook type inference', () => {
         };
       })
       .wait('Wait for webhooks', () => [webhook1('id1'), webhook2('id2')])
-      .step('Step 2', ({ state, response }) => {
+      .handle('Step 2', ({ state, response }) => {
         // Type inference test: response should be a union of both webhook response types
         if (response) {
           if ('field1' in response) {
@@ -104,7 +104,8 @@ describe('wait step timeout', () => {
   it('should emit WEBHOOK event without timeout when no timeout specified', async () => {
     const testBrain = brain('no-timeout brain')
       .step('Init', () => ({ ready: true }))
-      .wait('Wait', () => testWebhook('id1'));
+      .wait('Wait', () => testWebhook('id1'))
+      .handle('Done', ({ state }) => state);
 
     const events = [];
     for await (const event of testBrain.run({
@@ -124,7 +125,8 @@ describe('wait step timeout', () => {
   it('should emit WEBHOOK event with timeout in ms when timeout string specified', async () => {
     const testBrain = brain('timeout-string brain')
       .step('Init', () => ({ ready: true }))
-      .wait('Wait', () => testWebhook('id1'), { timeout: '24h' });
+      .wait('Wait', () => testWebhook('id1'), { timeout: '24h' })
+      .handle('Done', ({ state }) => state);
 
     const events = [];
     for await (const event of testBrain.run({
@@ -144,7 +146,8 @@ describe('wait step timeout', () => {
   it('should emit WEBHOOK event with timeout in ms when timeout number specified', async () => {
     const testBrain = brain('timeout-number brain')
       .step('Init', () => ({ ready: true }))
-      .wait('Wait', () => testWebhook('id1'), { timeout: 30000 });
+      .wait('Wait', () => testWebhook('id1'), { timeout: 30000 })
+      .handle('Done', ({ state }) => state);
 
     const events = [];
     for await (const event of testBrain.run({

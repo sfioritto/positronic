@@ -1,4 +1,4 @@
-export { Brain, brain } from './dsl/brain.js';
+export { Brain, brain, Continuation } from './dsl/brain.js';
 export { BrainRunner } from './dsl/brain-runner.js';
 export { createBrain } from './dsl/create-brain.js';
 export type { CreateBrainConfig } from './dsl/create-brain.js';
@@ -102,7 +102,6 @@ export type {
   StoreProvider,
   PerUserField,
   InferStoreTypes,
-  StoreContext,
 } from './store/types.js';
 
 // Memory types and utilities

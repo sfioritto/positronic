@@ -2,6 +2,7 @@
 
 // Builder
 export { Brain, brain } from './builder/brain.js';
+export { Continuation } from './builder/continuation.js';
 
 // Definitions - Events
 export type {

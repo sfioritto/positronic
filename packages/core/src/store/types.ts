@@ -49,14 +49,3 @@ export type StoreProvider = (config: {
   brainTitle: string;
   currentUser?: CurrentUser;
 }) => Store<any>;
-
-/**
- * Conditional type that adds `store` to step params only when withStore() is used.
- * When TStore is `never` (default), this resolves to `{}` — no store in params.
- * When TStore is a record type, this adds `{ store: Store<TStore> }`.
- */
-export type StoreContext<TStore> = [TStore] extends [never]
-  ? {}
-  : TStore extends Record<string, JsonValue | undefined>
-  ? { store: Store<TStore> }
-  : {};

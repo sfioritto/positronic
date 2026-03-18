@@ -417,7 +417,7 @@ describe('BrainRunner', () => {
     const testBrain = brain('Webhook Test Brain')
       .step('First Step', () => ({ count: 1 }))
       .wait('Webhook Step', () => testWebhook('test-id'))
-      .step('Third Step', ({ state }) => ({
+      .handle('Third Step', ({ state }) => ({
         ...state,
         processed: true,
       }));
@@ -491,7 +491,7 @@ describe('BrainRunner', () => {
         webhookSent: true,
       }))
       .wait('Webhook Step', () => userInputWebhook('user-id'))
-      .step('Process Response', ({ state, response }) => ({
+      .handle('Process Response', ({ state, response }) => ({
         ...state,
         userResponse: response?.userInput || 'no response',
         processed: true,
