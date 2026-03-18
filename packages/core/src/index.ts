@@ -90,7 +90,6 @@ export type {
 export {
   createTool,
   defaultTools,
-  defaultDoneSchema,
   generateUI,
   waitForWebhook,
   print,
