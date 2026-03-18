@@ -20,6 +20,11 @@ const memoryTools = {
   recallMemories: recallMemories as unknown as AgentTool<ZodType>,
 };
 
+const dummyOutputSchema = {
+  schema: z.object({ result: z.string() }),
+  name: 'agentResult' as const,
+} as const;
+
 // Mock ObjectGenerator with generateText support
 const mockGenerateText =
   jest.fn<NonNullable<ObjectGenerator['generateText']>>();
@@ -61,7 +66,7 @@ describe('Memory Tools Integration', () => {
             {
               toolCallId: 'call-2',
               toolName: 'done',
-              args: { message: 'Done' },
+              args: { result: 'Done' },
             },
           ],
           usage: { totalTokens: 50 },
@@ -72,13 +77,9 @@ describe('Memory Tools Integration', () => {
         .withMemory(provider)
         .brain('Remember', () => ({
           prompt: 'Remember that the user prefers dark mode',
+          outputSchema: dummyOutputSchema,
           tools: {
             ...memoryTools,
-            done: {
-              description: 'Complete the task',
-              inputSchema: z.object({ message: z.string() }),
-              terminal: true,
-            },
           },
         }));
 
@@ -124,7 +125,7 @@ describe('Memory Tools Integration', () => {
             {
               toolCallId: 'call-2',
               toolName: 'done',
-              args: {},
+              args: { result: 'Done' },
             },
           ],
           usage: { totalTokens: 50 },
@@ -135,13 +136,9 @@ describe('Memory Tools Integration', () => {
         .withMemory(provider)
         .brain('Remember User Pref', () => ({
           prompt: 'Store user preference',
+          outputSchema: dummyOutputSchema,
           tools: {
             ...memoryTools,
-            done: {
-              description: 'Done',
-              inputSchema: z.object({}),
-              terminal: true,
-            },
           },
         }));
 
@@ -177,7 +174,7 @@ describe('Memory Tools Integration', () => {
             {
               toolCallId: 'call-2',
               toolName: 'done',
-              args: {},
+              args: { result: 'Done' },
             },
           ],
           usage: { totalTokens: 50 },
@@ -187,13 +184,9 @@ describe('Memory Tools Integration', () => {
       // Brain WITHOUT memory provider
       const testBrain = brain('test-no-memory').brain('Remember', () => ({
         prompt: 'Try to remember something',
+        outputSchema: dummyOutputSchema,
         tools: {
           ...memoryTools,
-          done: {
-            description: 'Done',
-            inputSchema: z.object({}),
-            terminal: true,
-          },
         },
       }));
 
@@ -248,7 +241,7 @@ describe('Memory Tools Integration', () => {
             {
               toolCallId: 'call-2',
               toolName: 'done',
-              args: { summary: 'User prefers dark mode and TypeScript' },
+              args: { result: 'User prefers dark mode and TypeScript' },
             },
           ],
           usage: { totalTokens: 50 },
@@ -259,13 +252,9 @@ describe('Memory Tools Integration', () => {
         .withMemory(provider)
         .brain('Recall Preferences', () => ({
           prompt: 'What are the user preferences?',
+          outputSchema: dummyOutputSchema,
           tools: {
             ...memoryTools,
-            done: {
-              description: 'Summarize findings',
-              inputSchema: z.object({ summary: z.string() }),
-              terminal: true,
-            },
           },
         }));
 
@@ -320,7 +309,7 @@ describe('Memory Tools Integration', () => {
             {
               toolCallId: 'call-2',
               toolName: 'done',
-              args: {},
+              args: { result: 'Done' },
             },
           ],
           usage: { totalTokens: 50 },
@@ -330,13 +319,9 @@ describe('Memory Tools Integration', () => {
       // Brain WITHOUT memory provider
       const testBrain = brain('test-no-memory-recall').brain('Recall', () => ({
         prompt: 'Try to recall memories',
+        outputSchema: dummyOutputSchema,
         tools: {
           ...memoryTools,
-          done: {
-            description: 'Done',
-            inputSchema: z.object({}),
-            terminal: true,
-          },
         },
       }));
 
@@ -387,7 +372,7 @@ describe('Mem0 Adapter Integration', () => {
         {
           toolCallId: 'call-1',
           toolName: 'done',
-          args: { message: 'Task completed' },
+          args: { result: 'Task completed' },
         },
       ],
       usage: { totalTokens: 100 },
@@ -396,13 +381,8 @@ describe('Mem0 Adapter Integration', () => {
 
     const testBrain = brain('test-adapter').brain('Help User', () => ({
       prompt: 'Hello, can you help me?',
-      tools: {
-        done: {
-          description: 'Complete the task',
-          inputSchema: z.object({ message: z.string() }),
-          terminal: true,
-        },
-      },
+      outputSchema: dummyOutputSchema,
+      tools: {},
     }));
 
     const runner = new BrainRunner({
@@ -432,13 +412,8 @@ describe('Mem0 Adapter Integration', () => {
 
     const testBrain = brain('test-error').brain('Will Fail', () => ({
       prompt: 'This will fail',
-      tools: {
-        done: {
-          description: 'Done',
-          inputSchema: z.object({}),
-          terminal: true,
-        },
-      },
+      outputSchema: dummyOutputSchema,
+      tools: {},
     }));
 
     const runner = new BrainRunner({
@@ -481,7 +456,7 @@ describe('Mem0 Adapter Integration', () => {
           {
             toolCallId: 'call-2',
             toolName: 'done',
-            args: {},
+            args: { result: 'Done' },
           },
         ],
         usage: { totalTokens: 50 },
@@ -490,16 +465,12 @@ describe('Mem0 Adapter Integration', () => {
 
     const testBrain = brain('test-toolcalls').brain('Process', () => ({
       prompt: 'Help me',
+      outputSchema: dummyOutputSchema,
       tools: {
         lookup: {
           description: 'Look something up',
           inputSchema: z.object({ query: z.string() }),
           execute: async () => ({ result: 'found' }),
-        },
-        done: {
-          description: 'Done',
-          inputSchema: z.object({}),
-          terminal: true,
         },
       },
     }));
@@ -545,7 +516,7 @@ describe('Mem0 Adapter Integration', () => {
           {
             toolCallId: 'call-2',
             toolName: 'done',
-            args: {},
+            args: { result: 'Done' },
           },
         ],
         usage: { totalTokens: 50 },
@@ -554,16 +525,12 @@ describe('Mem0 Adapter Integration', () => {
 
     const testBrain = brain('test-no-toolcalls').brain('Process', () => ({
       prompt: 'Help me',
+      outputSchema: dummyOutputSchema,
       tools: {
         lookup: {
           description: 'Look something up',
           inputSchema: z.object({ query: z.string() }),
           execute: async () => ({ result: 'found' }),
-        },
-        done: {
-          description: 'Done',
-          inputSchema: z.object({}),
-          terminal: true,
         },
       },
     }));

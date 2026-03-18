@@ -149,15 +149,10 @@ const outerInnerWebhookBrain = brain({
   description: 'Outer brain containing inner brain with webhook',
 })
   .step('Outer step 1', () => ({ prefix: 'outer-' }))
-  .brain(
-    'Run inner brain',
-    innerWebhookBrain,
-    ({ state, brainState }) => ({
-      ...state,
-      innerResult: brainState,
-    }),
-    () => ({ count: 0 })
-  )
+  .brain('Run inner brain', innerWebhookBrain, {
+    outputKey: 'innerResult' as const,
+    initialState: { count: 0 },
+  })
   .step('Outer step 2', ({ state }) => ({
     ...state,
     done: true,
@@ -176,12 +171,9 @@ const outerWebhookAfterInner = brain({
   description: 'Outer brain with webhook after inner brain completes',
 })
   .step('Outer step 1', () => ({ started: true }))
-  .brain(
-    'Run inner brain',
-    simpleInnerBrain,
-    ({ state, brainState }) => ({ ...state, innerResult: brainState }),
-    () => ({})
-  )
+  .brain('Run inner brain', simpleInnerBrain, {
+    outputKey: 'innerResult' as const,
+  })
   .step('Prepare webhook wait', ({ state }) => ({
     ...state,
     waitingForWebhook: true,
@@ -343,6 +335,10 @@ const agentWebhookBrain = brain({
       terminal: true,
     },
   },
+  outputSchema: {
+    schema: z.object({ result: z.string() }),
+    name: 'agentResult' as const,
+  },
 }));
 
 // Brain with an agent step that will trigger an API error (simulates "too many tokens")
@@ -361,6 +357,10 @@ const agentErrorBrain = brain({
       }),
       terminal: true,
     },
+  },
+  outputSchema: {
+    schema: z.object({ result: z.string() }),
+    name: 'agentResult' as const,
   },
 }));
 

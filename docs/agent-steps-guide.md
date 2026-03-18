@@ -50,11 +50,10 @@ export default brain('my-agent', ({ slack, env }) => ({
       inputSchema: z.object({ message: z.string() }),
       execute: ({ message }) => slack.postMessage('#general', message),
     },
-    done: {
-      description: 'Complete the task',
-      inputSchema: z.object({ result: z.string() }),
-      terminal: true,
-    },
+  },
+  outputSchema: {
+    schema: z.object({ result: z.string() }),
+    name: 'agentResult' as const,
   },
 }));
 ```
@@ -82,14 +81,13 @@ const myAgent = brain('math-helper', {
       }),
       execute: ({ expression }) => eval(expression),
     },
-    submitAnswer: {
-      description: 'Submit the final answer',
-      inputSchema: z.object({
-        answer: z.number(),
-        explanation: z.string(),
-      }),
-      terminal: true,
-    },
+  },
+  outputSchema: {
+    schema: z.object({
+      answer: z.number(),
+      explanation: z.string(),
+    }),
+    name: 'mathResult' as const,
   },
 });
 ```
@@ -102,6 +100,7 @@ brain('math-helper')
     system: '...',
     prompt: '...',
     tools: { ... },
+    outputSchema: { ... },
   })
 ```
 
@@ -123,11 +122,10 @@ const dynamicAgent = brain('dynamic-helper', ({ tools }) => ({
       inputSchema: z.object({ input: z.string() }),
       execute: ({ input }) => `Processed: ${input}`,
     },
-    done: {
-      description: 'Complete the task',
-      inputSchema: z.object({ result: z.string() }),
-      terminal: true,
-    },
+  },
+  outputSchema: {
+    schema: z.object({ result: z.string() }),
+    name: 'helperResult' as const,
   },
 }));
 ```
@@ -150,7 +148,7 @@ Use the builder pattern `brain('name').step(...).brain(...)` when:
 
 The `.brain()` method has three overloaded forms for different use cases:
 
-### Form 1: Nested Brain (Existing Behavior)
+### Form 1: Nested Brain
 
 Run another brain as a sub-workflow:
 
@@ -163,16 +161,13 @@ const innerBrain = brain('process-item').step('Process', ({ state }) => ({
 
 const outerBrain = brain('orchestrator')
   .step('Init', () => ({ items: ['a', 'b', 'c'] }))
-  .brain(
-    'Run Inner',
-    innerBrain,
-    ({ state, brainState }) => ({
-      ...state,
-      result: brainState.processed,
-    }),
-    (state) => ({ item: state.items[0] }) // Initial state for inner brain
-  );
+  .brain('Run Inner', innerBrain, {
+    outputKey: 'result' as const,
+    initialState: ({ state }) => ({ item: state.items[0] }),
+  });
 ```
+
+The `outputKey` stores the entire inner brain's final state under that key in the outer state. `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
 
 ### Options Flow in Nested Brains
 
@@ -205,9 +200,12 @@ const outerBrain = brain('orchestrator')
       limit: z.number().default(10),
     })
   )
-  .brain('Run Search', innerBrain, ({ brainState }) => brainState)
+  .brain('Run Search', innerBrain, {
+    outputKey: 'searchResult' as const,
+  })
   .step('Process', ({ state, options }) => {
     // options still available after the nested brain completes
+    // state.searchResult contains the inner brain's final state
     return { ...state, query: options.query };
   });
 ```
@@ -216,7 +214,7 @@ TypeScript enforces that the sub-brain's `TOptions` type is structurally compati
 
 ### Form 2: Inline Agent with Config Object
 
-Create an agent with a static configuration:
+Create an agent with a static configuration. Agent `.brain()` calls require `outputSchema`:
 
 ```typescript
 import { brain } from '@positronic/core';
@@ -236,20 +234,20 @@ const myBrain = brain('simple-agent')
         }),
         execute: ({ a, b }) => a + b,
       },
-      submitAnswer: {
-        description: 'Submit the final answer',
-        inputSchema: z.object({
-          answer: z.number(),
-        }),
-        terminal: true,
-      },
+    },
+    outputSchema: {
+      schema: z.object({
+        answer: z.number(),
+        explanation: z.string(),
+      }),
+      name: 'mathAnswer' as const,
     },
   });
 ```
 
 ### Form 3: Inline Agent with Config Function
 
-Create an agent with dynamic configuration based on state:
+Create an agent with dynamic configuration based on state. Agent `.brain()` calls require `outputSchema`:
 
 ```typescript
 import { brain } from '@positronic/core';
@@ -267,6 +265,12 @@ const myBrain = brain('dynamic-agent')
         inputSchema: z.object({ input: z.string() }),
         execute: ({ input }) => `Processed: ${input}`,
       },
+    },
+    outputSchema: {
+      schema: z.object({
+        summary: z.string(),
+      }),
+      name: 'processingResult' as const,
     },
   }));
 ```
@@ -389,6 +393,7 @@ Configure default tools that are available to all agent steps:
 
 ```typescript
 import { brain, defaultTools } from '@positronic/core';
+import { z } from 'zod';
 
 const myBrain = brain('with-defaults')
   .withTools(defaultTools)
@@ -396,6 +401,10 @@ const myBrain = brain('with-defaults')
     system: 'You are helpful.',
     prompt: 'Help the user.',
     tools, // Uses defaultTools
+    outputSchema: {
+      schema: z.object({ result: z.string() }),
+      name: 'agentResult' as const,
+    },
   }));
 ```
 
@@ -414,6 +423,10 @@ Add custom tools while keeping defaults:
       inputSchema: z.object({ data: z.string() }),
       execute: ({ data }) => processData(data),
     },
+  },
+  outputSchema: {
+    schema: z.object({ result: z.string() }),
+    name: 'taskResult' as const,
   },
 }))
 ```
@@ -436,6 +449,10 @@ Replace a default tool with a custom implementation:
       },
     },
   },
+  outputSchema: {
+    schema: z.object({ uiGenerated: z.boolean() }),
+    name: 'uiResult' as const,
+  },
 }))
 ```
 
@@ -445,6 +462,7 @@ The `generateUI` tool allows agents to create interactive UI and wait for user r
 
 ```typescript
 import { brain, defaultTools } from '@positronic/core';
+import { z } from 'zod';
 
 const uiBrain = brain('interactive')
   .withTools(defaultTools)
@@ -453,6 +471,10 @@ const uiBrain = brain('interactive')
     system: 'You can generate forms to collect user input.',
     prompt: 'Ask the user for their preferences.',
     tools, // includes generateUI
+    outputSchema: {
+      schema: z.object({ preferences: z.record(z.string()) }),
+      name: 'userPreferences' as const,
+    },
   }));
 ```
 
@@ -616,20 +638,18 @@ any sensitive actions, request approval first.`,
           return { success: true };
         },
       },
-
-      resolveTicket: {
-        description: 'Mark the ticket as resolved',
-        inputSchema: z.object({
-          resolution: z.string(),
-          followUpRequired: z.boolean(),
-        }),
-        terminal: true,
-      },
+    },
+    outputSchema: {
+      schema: z.object({
+        resolution: z.string(),
+        followUpRequired: z.boolean(),
+      }),
+      name: 'ticketResolution' as const,
     },
     maxTokens: 50000,
   }))
   .step('Log Resolution', ({ state }) => {
-    console.log('Ticket resolved:', state);
+    console.log('Ticket resolved:', state.ticketResolution);
     return state;
   });
 

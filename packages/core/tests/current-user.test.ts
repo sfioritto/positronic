@@ -23,6 +23,11 @@ const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
   streamText: jest.fn<ObjectGenerator['streamText']>(),
 });
 
+const dummyOutputSchema = {
+  schema: z.object({ result: z.string() }),
+  name: 'agentResult' as const,
+} as const;
+
 describe('currentUser', () => {
   it('should be available in step context when provided via run params', async () => {
     const mockClient = createMockClient();
@@ -116,6 +121,7 @@ describe('currentUser', () => {
     const testBrain = brain('test-brain').brain('Agent Step', {
       system: 'You are a test agent',
       prompt: 'Check the user',
+      outputSchema: dummyOutputSchema,
       tools: {
         checkUser: {
           description: 'Check who the current user is',

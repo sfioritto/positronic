@@ -66,6 +66,11 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   streamText: mockStreamText,
 };
 
+const dummyOutputSchema = {
+  schema: z.object({ result: z.string() }),
+  name: 'agentResult' as const,
+} as const;
+
 // Mock Resources for testing
 const mockResourceLoad = jest.fn(
   async (
@@ -641,7 +646,7 @@ describe('brain creation', () => {
       const outerBrain = brain('Outer Resource Brain').brain(
         'Run Inner',
         innerBrain,
-        ({ state, brainState }) => ({ ...state, ...brainState })
+        { outputKey: 'innerResult' as const }
       );
 
       const run = outerBrain.run({
@@ -733,16 +738,10 @@ describe('error handling', () => {
     // Create outer brain that uses the failing inner brain
     const outerBrain = brain('Outer Brain')
       .step('First step', () => ({ step: 'first' }))
-      .brain(
-        'Run inner brain',
-        innerBrain,
-        ({ state, brainState }) => ({
-          ...state,
-          step: 'second',
-          innerResult: brainState.value,
-        }),
-        () => ({ value: 5 })
-      );
+      .brain('Run inner brain', innerBrain, {
+        outputKey: 'innerResult' as const,
+        initialState: { value: 5 },
+      });
 
     const events: BrainEvent<any>[] = [];
     let error: Error | undefined;
@@ -1106,15 +1105,10 @@ describe('nested brains', () => {
     // Create outer brain that uses the inner brain
     const outerBrain = brain('Outer Brain')
       .step('Set prefix', () => ({ prefix: 'test-' }))
-      .brain(
-        'Run inner brain',
-        innerBrain,
-        ({ state, brainState }) => ({
-          ...state,
-          innerResult: brainState.value,
-        }),
-        () => ({ value: 5 })
-      );
+      .brain('Run inner brain', innerBrain, {
+        outputKey: 'innerResult' as const,
+        initialState: { value: 5 },
+      });
 
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
@@ -1259,7 +1253,7 @@ describe('nested brains', () => {
 
     expect(outerState).toEqual({
       prefix: 'test-',
-      innerResult: 10,
+      innerResult: { inner: true, value: 10 },
     });
   });
 
@@ -1274,16 +1268,10 @@ describe('nested brains', () => {
     // Create outer brain that uses the failing inner brain
     const outerBrain = brain('Outer Brain')
       .step('First step', () => ({ step: 'first' }))
-      .brain(
-        'Run inner brain',
-        innerBrain,
-        ({ state, brainState }) => ({
-          ...state,
-          step: 'second',
-          innerResult: brainState.value,
-        }),
-        () => ({ value: 5 })
-      );
+      .brain('Run inner brain', innerBrain, {
+        outputKey: 'innerResult' as const,
+        initialState: { value: 5 },
+      });
 
     const events: BrainEvent<any>[] = [];
     let error: Error | undefined;
@@ -1448,15 +1436,10 @@ describe('nested brains', () => {
       .step('Set initial', () => ({
         value: 5,
       }))
-      .brain(
-        'Run inner brain',
-        innerBrain,
-        ({ state, brainState }) => ({
-          ...state,
-          result: brainState.value,
-        }),
-        (state) => ({ value: state.value })
-      );
+      .brain('Run inner brain', innerBrain, {
+        outputKey: 'result' as const,
+        initialState: ({ state }) => ({ value: state.value }),
+      });
 
     // Run brain and collect step status events
     let finalStepStatus;
@@ -1513,7 +1496,7 @@ describe('nested brains', () => {
           .sort();
         return {};
       })
-      .brain('Run Inner', innerBrain, ({ state }) => state);
+      .brain('Run Inner', innerBrain, { outputKey: 'inner' as const });
 
     // Create mock pages service
     const mockPages = {
@@ -1545,15 +1528,10 @@ describe('nested brains', () => {
 
     const outerBrain = brain('Outer Brain')
       .step('Outer step', () => ({ prefix: 'test-' }))
-      .brain(
-        'Run inner brain',
-        innerBrain,
-        ({ state, brainState }) => ({
-          ...state,
-          innerResult: brainState.value,
-        }),
-        () => ({ value: 5 })
-      );
+      .brain('Run inner brain', innerBrain, {
+        outputKey: 'innerResult' as const,
+        initialState: { value: 5 },
+      });
 
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
@@ -1600,15 +1578,10 @@ describe('nested brains', () => {
     // Outer brain containing the inner brain
     const outerBrain = brain('Outer Brain')
       .step('Outer step 1', () => ({ prefix: 'outer-' }))
-      .brain(
-        'Run inner brain',
-        innerBrain,
-        ({ state, brainState }) => ({
-          ...state,
-          innerResult: brainState,
-        }),
-        () => ({ count: 0 })
-      )
+      .brain('Run inner brain', innerBrain, {
+        outputKey: 'innerResult' as const,
+        initialState: { count: 0 },
+      })
       .step('Outer step 2', ({ state }) => ({
         ...state,
         done: true,
@@ -1847,12 +1820,9 @@ describe('services support', () => {
     const parentBrain = brain('Parent Brain')
       .withServices({ api: 'parent-api-url' })
       .step('Init', () => ({ started: true }))
-      .brain(
-        'Run child',
-        childBrain as any,
-        ({ state, brainState }) => ({ ...state, ...brainState }),
-        () => ({})
-      );
+      .brain('Run child', childBrain as any, {
+        outputKey: 'child' as const,
+      });
 
     for await (const _ of parentBrain.run({
       client: mockClient,
@@ -1876,12 +1846,9 @@ describe('services support', () => {
     const parentBrain = brain('Override Parent')
       .withServices({ api: 'parent-api-url' })
       .step('Init', () => ({ started: true }))
-      .brain(
-        'Run child',
-        childBrain,
-        ({ state, brainState }) => ({ ...state, ...brainState }),
-        () => ({})
-      );
+      .brain('Run child', childBrain, {
+        outputKey: 'child' as const,
+      });
 
     for await (const _ of parentBrain.run({
       client: mockClient,
@@ -1907,12 +1874,9 @@ describe('services support', () => {
     const parentBrain = brain('Provides Services Parent')
       .withServices({ logger: testLogger })
       .step('Init', () => ({ started: true }))
-      .brain(
-        'Run child',
-        childBrain as any,
-        ({ state, brainState }) => ({ ...state, ...brainState }),
-        () => ({})
-      );
+      .brain('Run child', childBrain as any, {
+        outputKey: 'child' as const,
+      });
 
     for await (const _ of parentBrain.run({
       client: mockClient,
@@ -1945,12 +1909,9 @@ describe('services support', () => {
 
     const parentBrain = brain('Store Parent')
       .step('Init', () => ({ started: true }))
-      .brain(
-        'Run child',
-        childBrain as any,
-        ({ state, brainState }) => ({ ...state, ...brainState }),
-        () => ({})
-      );
+      .brain('Run child', childBrain as any, {
+        outputKey: 'child' as const,
+      });
 
     for await (const _ of parentBrain.run({
       client: mockClient,
@@ -1984,19 +1945,13 @@ describe('type inference', () => {
         initialFeatures: options.features,
         value: 42,
       }))
-      .brain(
-        'Nested brain',
-        innerBrain,
-        ({ state, brainState }) => ({
-          ...state,
-          processedValue: brainState.processedValue,
-          totalFeatures: brainState.featureCount,
-        }),
-        () => ({
+      .brain('Nested brain', innerBrain, {
+        outputKey: 'nested' as const,
+        initialState: {
           processedValue: 0,
           featureCount: 0,
-        })
-      )
+        },
+      })
       .step('Final step', ({ state }) => ({
         ...state,
         completed: true as const,
@@ -2006,8 +1961,10 @@ describe('type inference', () => {
     type ExpectedState = {
       initialFeatures: string[];
       value: number;
-      processedValue: number;
-      totalFeatures: number;
+      nested: {
+        processedValue: number;
+        featureCount: number;
+      };
       completed: true;
     };
 
@@ -2075,61 +2032,46 @@ describe('type inference', () => {
     expect(finalState).toEqual({
       initialFeatures: ['fast', 'secure'],
       value: 42,
-      processedValue: 100,
-      totalFeatures: 2,
+      nested: {
+        processedValue: 100,
+        featureCount: 2,
+      },
       completed: true,
     });
   });
 
-  it('should correctly infer brain reducer state types', async () => {
+  it('should correctly infer brain outputKey state types', async () => {
     // Create an inner brain with a specific state shape
     const innerBrain = brain('Inner State Test').step('Inner step', () => ({
       innerValue: 42,
       metadata: { processed: true as const },
     }));
 
-    // Create outer brain to test reducer type inference
+    // Create outer brain to test outputKey type inference
     const outerBrain = brain('Outer State Test')
       .step('First step', () => ({
         outerValue: 100,
         status: 'ready',
       }))
-      .brain(
-        'Nested brain',
-        innerBrain,
-        ({ state, brainState }) => {
-          // Type assertion for outer state
-          type ExpectedOuterState = {
-            outerValue: number;
-            status: string;
-          };
-          type ActualOuterState = typeof state;
-          type OuterStateTest = AssertEquals<
-            ActualOuterState,
-            ExpectedOuterState
-          >;
-          const _outerAssert: OuterStateTest = true;
-
-          // Type assertion for inner brain state
-          type ExpectedInnerState = {
+      .brain('Nested brain', innerBrain, {
+        outputKey: 'innerResult' as const,
+      })
+      .step('Verify types', ({ state }) => {
+        // Type assertion for merged state with outputKey
+        type ExpectedState = {
+          outerValue: number;
+          status: string;
+          innerResult: {
             innerValue: number;
             metadata: { processed: true };
           };
-          type ActualInnerState = typeof brainState;
-          type InnerStateTest = AssertEquals<
-            ActualInnerState,
-            ExpectedInnerState
-          >;
-          const _innerAssert: InnerStateTest = true;
+        };
+        type ActualState = typeof state;
+        type StateTest = AssertEquals<ActualState, ExpectedState>;
+        const _stateAssert: StateTest = true;
 
-          return {
-            ...state,
-            innerResult: brainState.innerValue,
-            processed: brainState.metadata.processed,
-          };
-        },
-        () => ({} as { innerValue: number; metadata: { processed: boolean } })
-      );
+        return state;
+      });
 
     // Run the brain to verify runtime behavior
     const events = [];
@@ -2144,8 +2086,10 @@ describe('type inference', () => {
     expect(finalState).toEqual({
       outerValue: 100,
       status: 'ready',
-      innerResult: 42,
-      processed: true,
+      innerResult: {
+        innerValue: 42,
+        metadata: { processed: true },
+      },
     });
   });
 
@@ -2284,9 +2228,9 @@ describe('brain structure', () => {
       description: 'An outer brain',
     })
       .step('Outer step 1', ({ state }) => ({ ...state, outer1: true }))
-      .brain('Run inner brain', innerBrain, ({ brainState }) => ({
-        result: brainState,
-      }))
+      .brain('Run inner brain', innerBrain, {
+        outputKey: 'result' as const,
+      })
       .step('Outer step 2', ({ state }) => ({ ...state, outer2: true }));
 
     const structure = outerBrain.structure;
@@ -2912,6 +2856,7 @@ describe('.map()', () => {
             prompt: `Crawl ${state.url}`,
             tools,
             maxIterations: 2,
+            outputSchema: dummyOutputSchema,
           })
         );
       },
@@ -2938,6 +2883,7 @@ describe('.map()', () => {
             prompt: `Crawl ${state.url}`,
             tools,
             maxIterations: 2,
+            outputSchema: dummyOutputSchema,
           }))
           .step('Verify', ({ state }) => state);
       },
@@ -3149,20 +3095,16 @@ describe('.map()', () => {
         ),
       }));
 
-    const outerBrain = brain('MapOuter').brain(
-      'Run inner',
-      innerBrain,
-      ({ brainState }) => ({
-        total: brainState.total,
-      })
-    );
+    const outerBrain = brain('MapOuter').brain('Run inner', innerBrain, {
+      outputKey: 'inner' as const,
+    });
 
     const { finalState } = await runWithStateMachine(outerBrain, {
       client: mockClient,
       currentUser: { name: 'test-user' },
     });
 
-    expect(finalState.total).toBe(12);
+    expect(finalState.inner.total).toBe(12);
   });
 });
 
@@ -3206,6 +3148,7 @@ describe('withTools vs withExtraTools semantics', () => {
       .brain('agent', ({ tools }) => ({
         prompt: 'Do something',
         tools,
+        outputSchema: dummyOutputSchema,
       }));
 
     const events: BrainEvent<any>[] = [];
@@ -3249,6 +3192,7 @@ describe('withTools vs withExtraTools semantics', () => {
       .brain('agent', ({ tools }) => ({
         prompt: 'Do something',
         tools,
+        outputSchema: dummyOutputSchema,
       }));
 
     const events: BrainEvent<any>[] = [];
@@ -3305,6 +3249,7 @@ describe('withTools vs withExtraTools semantics', () => {
           defaultTool: overrideTool, // override the default
           stepOnlyTool, // add step-specific tool
         },
+        outputSchema: dummyOutputSchema,
       }));
 
     const events: BrainEvent<any>[] = [];
@@ -3356,6 +3301,7 @@ describe('withTools vs withExtraTools semantics', () => {
       .brain('agent', ({ tools }) => ({
         prompt: 'Do something',
         tools,
+        outputSchema: dummyOutputSchema,
       }));
 
     const events: BrainEvent<any>[] = [];
