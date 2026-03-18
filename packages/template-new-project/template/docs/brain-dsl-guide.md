@@ -204,9 +204,8 @@ brain('email-checker')
   })
   .guard(({ state }) => state.emails.some(e => e.important))
   // everything below only runs if guard passes
-  .ui('Review emails', { ... })
-  .step('Notify and wait', ...)
-  .step('Handle response', ...);
+  .ui('Review emails', { ..., responseSchema: ... })
+  .handle('Handle response', ...);
 ```
 
 Key points:
@@ -237,11 +236,11 @@ Each step receives these parameters:
 - `client` - AI client for generating structured objects
 - `resources` - Loaded resources (files, documents, etc.)
 - `options` - Runtime options passed to the brain
-- `response` - Webhook response data (available after `.wait()` completes)
-- `page` - Generated page object (available after `.ui()` step)
 - `pages` - Pages service for HTML page management
 - `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
 - Custom services (if configured with `.withServices()` or `createBrain()`)
+
+> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()` or `.ui()` with `responseSchema`. It is not a general step parameter — see [UI Steps](#ui-steps) and [Webhooks](#webhooks) for details.
 
 ## Configuration Methods
 
@@ -1077,44 +1076,9 @@ Extract prompts to separate files when:
 
 ## Iterating Over Items
 
-When you need to run the same prompt, brain, or agent over multiple items, use the `over` option.
+When you need to run the same operation over multiple items, use `.map()`. All iteration goes through `.map()` — to iterate a prompt or agent, wrap it in a brain first.
 
-### Prompt Iterate
-
-Run the same prompt once per item in a list:
-
-```typescript
-brain('Item Processor')
-  .step('Initialize', () => ({
-    items: [
-      { id: 1, title: 'First item' },
-      { id: 2, title: 'Second item' },
-      { id: 3, title: 'Third item' }
-    ]
-  }))
-  .prompt('Summarize Items', {
-    template: ({ item }) => `Summarize this item: <%= '${item.title}' %>`,
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'summaries' as const
-    }
-  }, {
-    over: ({ state }) => state.items,
-    error: (item, error) => ({ summary: 'Failed to summarize' })
-  })
-  .step('Process Results', ({ state }) => ({
-    ...state,
-    // summaries is an IterateResult — use .values, .items, .entries, .filter(), .map()
-    processedSummaries: state.summaries.map((item, response) => ({
-      id: item.id,
-      summary: response.summary
-    }))
-  }));
-```
-
-Prompt iterate also supports per-step `client` overrides (see Prompt Steps above), so you can use a different model for processing.
-
-### Brain Iterate
+### Basic `.map()` with a Brain
 
 Run a nested brain once per item:
 
@@ -1129,11 +1093,12 @@ brain('Process All Items')
   .step('Initialize', () => ({
     items: [{ value: 1 }, { value: 2 }, { value: 3 }]
   }))
-  .brain('Process Each', processBrain, {
+  .map('Process Each', {
+    run: processBrain,
     over: ({ state }) => state.items,
-    initialState: (item) => ({ value: item.value }),
+    initialState: (item) => ({ value: item.value, result: 0 }),
     outputKey: 'results' as const,
-    error: (item, error) => ({ value: item.value, failed: true }),
+    error: (item, error) => ({ value: item.value, result: 0 }),
   })
   .step('Use Results', ({ state }) => ({
     ...state,
@@ -1142,56 +1107,97 @@ brain('Process All Items')
   }));
 ```
 
-### Agent Iterate
+### Iterating a Prompt
 
-Run an agent config once per item. The `configFn` receives the item as its first argument:
+To iterate a prompt over items, wrap it in a small brain and use `.map()`:
 
 ```typescript
-brain('Research Topics')
-  .step('Initialize', () => ({
-    topics: [{ name: 'AI' }, { name: 'Robotics' }]
-  }))
-  .brain('Research Each', (item, { state, tools }) => ({
-    system: 'You are a research assistant.',
-    prompt: `Research this topic: <%= '${item.name}' %>`,
-    tools: {
-      search: tools.search,
+const summarizeBrain = brain('Summarize Single')
+  .prompt('Summarize', {
+    template: ({ state }) => `Summarize this item: <%= '${state.title}' %>`,
+    outputSchema: {
+      schema: z.object({ summary: z.string() }),
+      name: 'result' as const,
     },
+  });
+
+brain('Item Processor')
+  .step('Initialize', () => ({
+    items: [
+      { id: 1, title: 'First item' },
+      { id: 2, title: 'Second item' },
+      { id: 3, title: 'Third item' },
+    ]
+  }))
+  .map('Summarize Items', {
+    run: summarizeBrain,
+    over: ({ state }) => state.items,
+    initialState: (item) => ({ title: item.title }),
+    outputKey: 'summaries' as const,
+    error: (item, error) => ({ result: { summary: 'Failed to summarize' } }),
+  })
+  .step('Process Results', ({ state }) => ({
+    ...state,
+    processedSummaries: state.summaries.map((item, result) => ({
+      id: item.id,
+      summary: result.result.summary,
+    })),
+  }));
+```
+
+### Iterating an Agent
+
+To iterate an agent over items, wrap it in a brain and use `.map()`:
+
+```typescript
+const researchBrain = brain('Research Single')
+  .brain('Research', ({ state, tools }) => ({
+    system: 'You are a research assistant.',
+    prompt: `Research this topic: <%= '${state.name}' %>`,
+    tools: { search: tools.search },
     outputSchema: {
       schema: z.object({ summary: z.string() }),
       name: 'research' as const,
     },
-  }), {
+  }));
+
+brain('Research Topics')
+  .step('Initialize', () => ({
+    topics: [{ name: 'AI' }, { name: 'Robotics' }]
+  }))
+  .map('Research Each', {
+    run: researchBrain,
     over: ({ state }) => state.topics,
+    initialState: (topic) => ({ name: topic.name }),
     outputKey: 'results' as const,
   })
   .step('Use Results', ({ state }) => ({
     ...state,
-    // results is an IterateResult — use .values to get just the results
-    summaries: state.results.values.map(result => result.summary),
+    summaries: state.results.values.map(result => result.research.summary),
   }));
 ```
 
-### Iterate Options
+### `.map()` Options
 
-All iterate variants share these options:
+All `.map()` calls take a config object with these fields:
 
+- `run: Brain` - The inner brain to execute for each item
 - `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, services, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, services, or any other context field. Can be async.
-- `error: (item, error) => Result | null` - Fallback when an item fails. Return `null` to skip the item entirely.
-
-Brain and agent iterate also require:
-
-- `outputKey: string` - Key under which results are stored in state (use `as const` for type inference)
-
-Brain iterate additionally requires:
-
 - `initialState: (item, outerState) => State` - Function to create the inner brain's initial state from each item
+- `outputKey: string` - Key under which results are stored in state (use `as const` for type inference)
+- `error: (item, error) => Result | null` - Optional fallback when an item fails. Return `null` to skip the item entirely.
 
 #### Accessing options and services in `over`
 
 Since `over` receives the full step context, you can use options or services to determine which items to iterate over:
 
 ```typescript
+const processItemBrain = brain('Process Single')
+  .step('Process', ({ state }) => ({
+    ...state,
+    result: `Processed item <%= '${state.id}' %>`,
+  }));
+
 brain('Dynamic Processor')
   .withOptionsSchema(z.object({ category: z.string() }))
   .step('Load items', () => ({
@@ -1201,14 +1207,11 @@ brain('Dynamic Processor')
       { id: 3, category: 'a' },
     ]
   }))
-  .prompt('Process', {
-    template: ({ item }) => `Process item <%= '${item.id}' %>`,
-    outputSchema: {
-      schema: z.object({ result: z.string() }),
-      name: 'results' as const,
-    },
-  }, {
+  .map('Process', {
+    run: processItemBrain,
     over: ({ state, options }) => state.items.filter(i => i.category === options.category),
+    initialState: (item) => ({ id: item.id, result: '' }),
+    outputKey: 'results' as const,
   })
 ```
 
@@ -1322,17 +1325,18 @@ brain('Support Ticket Handler')
       },
     },
   })
-  .step('Process Result', ({ state, response }) => ({
+  .step('Process Result', ({ state }) => ({
     ...state,
-    // response contains the webhook data (e.g., { approved: true, reviewerNote: '...' })
-    approved: response?.approved,
-    reviewerNote: response?.reviewerNote,
+    // The webhook response is fed back to the agent as a tool result.
+    // The agent processes it and finishes (e.g., via a terminal tool).
+    // This step only sees the final state after the agent completes.
+    handled: true,
   }));
 ```
 
 Key points about tool `waitFor`:
 - Return `{ waitFor: webhook(...) }` to pause the agent and wait for an external event
-- The webhook response is available in the next step via the `response` parameter
+- The webhook response is fed back to the agent as a tool result — the agent continues its loop with this data
 - You can wait for multiple webhooks (first response wins): `{ waitFor: [webhook1(...), webhook2(...)] }`
 - The `execute` function receives a `context` parameter with access to `state`, `options`, `env`, etc.
 - Use this pattern for approvals, external API callbacks, or any human-in-the-loop workflow
@@ -1467,7 +1471,7 @@ brain('Archive Workflow')
     return { ...state, formToken };
   })
   .wait('Wait for submission', ({ state }) => archiveWebhook(state.sessionId, state.formToken), { timeout: '24h' })
-  .step('Process', ({ state, response }) => ({
+  .handle('Process', ({ state, response }) => ({
     ...state,
     name: response.name,
   }));
@@ -1503,7 +1507,7 @@ brain('Custom Form')
     };
   })
   .wait('Wait for form', ({ state }) => state.webhook)
-  .step('Process', ({ state, response }) => ({
+  .handle('Process', ({ state, response }) => ({
     ...state,
     name: response.name,
   }));
@@ -1520,7 +1524,7 @@ Without a token, the server will reject the form submission.
 
 ## UI Steps
 
-UI steps allow brains to generate dynamic user interfaces using AI. The `.ui()` step generates a page and provides a `page` object to the next step. You then notify users and use `.wait()` to pause until the form is submitted.
+UI steps allow brains to generate dynamic user interfaces using AI. When `responseSchema` is provided, `.ui()` generates a page, auto-suspends the brain, and returns a `Continuation`. Use `.handle()` to process the form response. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
 
 ### Basic UI Step
 
@@ -1532,7 +1536,7 @@ brain('Feedback Collector')
     ...state,
     userName: 'John Doe',
   }))
-  // Generate the form
+  // Generate the form, notify users, auto-suspend, then handle response
   .ui('Collect Feedback', {
     template: ({ state }) => `
       Create a feedback form for <%= '${state.userName}' %>.
@@ -1542,16 +1546,12 @@ brain('Feedback Collector')
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
+    notify: async ({ page, slack }) => {
+      await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
+    },
   })
-  // Notify user
-  .step('Notify', async ({ state, page, slack }) => {
-    await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
-    return state;
-  })
-  // Wait for form submission (timeout after 24 hours, brain is cancelled if no response)
-  .wait('Wait for submission', ({ page }) => page.webhook, { timeout: '24h' })
-  // Process the form data (comes through response, not page)
-  .step('Process Feedback', ({ state, response }) => ({
+  // .handle() receives the form response
+  .handle('Process Feedback', ({ state, response }) => ({
     ...state,
     feedbackReceived: true,
     rating: response.rating,     // typed from responseSchema
@@ -1563,14 +1563,13 @@ brain('Feedback Collector')
 
 1. **Template**: The `template` function generates a prompt describing the desired UI
 2. **AI Generation**: The AI creates a component tree based on the prompt
-3. **Page Object**: Next step receives `page` with `url` and `webhook`
-4. **Notification**: You notify users however you want (Slack, email, etc.)
-5. **Wait**: Use `.wait('title', ({ page }) => page.webhook)` to pause until form submission
-6. **Form Data**: Step after `.wait()` receives form data via `response`
+3. **Notify**: The optional `notify` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
+4. **Auto-Suspend**: The brain automatically suspends and waits for the form submission
+5. **Handle**: `.handle()` receives the form data via `response`, typed according to `responseSchema`
 
 ### The `page` Object
 
-After a `.ui()` step, the next step receives:
+The `page` object is available inside the `notify` callback:
 - `page.url` - URL where users can access the form
 - `page.webhook` - Pre-configured webhook for form submissions
 
@@ -1638,13 +1637,11 @@ brain('User Onboarding')
       lastName: z.string(),
       dob: z.string(),
     }),
+    notify: async ({ page, notify }) => {
+      await notify(`Step 1: <%= '${page.url}' %>`);
+    },
   })
-  .step('Notify Personal', async ({ state, page, notify }) => {
-    await notify(`Step 1: <%= '${page.url}' %>`);
-    return state;
-  })
-  .wait('Wait for Personal', ({ page }) => page.webhook)
-  .step('Save Personal', ({ state, response }) => ({
+  .handle('Save Personal', ({ state, response }) => ({
     ...state,
     userData: { ...state.userData, ...response },
   }))
@@ -1661,13 +1658,11 @@ brain('User Onboarding')
       newsletter: z.boolean(),
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
+    notify: async ({ page, notify }) => {
+      await notify(`Step 2: <%= '${page.url}' %>`);
+    },
   })
-  .step('Notify Preferences', async ({ state, page, notify }) => {
-    await notify(`Step 2: <%= '${page.url}' %>`);
-    return state;
-  })
-  .wait('Wait for Preferences', ({ page }) => page.webhook)
-  .step('Complete', ({ state, response }) => ({
+  .handle('Complete', ({ state, response }) => ({
     ...state,
     userData: { ...state.userData, preferences: response },
     onboardingComplete: true,

@@ -415,11 +415,7 @@ Most generated brains should not have try-catch blocks. Only use them when the e
 
 ## UI Steps for Form Generation
 
-When you need to collect user input, use the `.ui()` method. The pattern is:
-1. `.ui()` generates the page
-2. Next step gets `page.url` and `page.webhook`
-3. Notify users, then use `.wait()` with `page.webhook`
-4. Step after `.wait()` gets form data in `response`
+When you need to collect user input, use the `.ui()` method with `responseSchema`. The brain auto-suspends after generating the page. Use the `notify` callback for side effects, and `.handle()` to process the form response.
 
 ```typescript
 import { z } from 'zod';
@@ -429,7 +425,7 @@ brain('feedback-collector')
     ...state,
     userName: 'John',
   }))
-  // Generate the form
+  // Generate the form, notify, auto-suspend
   .ui('Collect Feedback', {
     template: ({ state }) => <%= '\`' %>
       Create a feedback form for <%= '${state.userName}' %>:
@@ -441,16 +437,12 @@ brain('feedback-collector')
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
+    notify: async ({ page, slack }) => {
+      await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
+    },
   })
-  // Notify users
-  .step('Notify', async ({ state, page, slack }) => {
-    await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
-    return state;
-  })
-  // Wait for form submission
-  .wait('Wait for submission', ({ page }) => page.webhook)
-  // Form data comes through response (not page)
-  .step('Process', ({ state, response }) => ({
+  // .handle() receives the form response
+  .handle('Process', ({ state, response }) => ({
     ...state,
     rating: response.rating,     // Typed from responseSchema
     comments: response.comments,
@@ -458,10 +450,11 @@ brain('feedback-collector')
 ```
 
 Key points:
+- `page` is available inside the `notify` callback, not in a separate step
 - `page.url` - where to send users
-- `page.webhook` - use with `.wait()` to pause for submission
-- `response` - form data arrives here (in step after `.wait()`)
-- You control how users are notified (Slack, email, etc.)
+- The brain auto-suspends after `.ui()` with `responseSchema`
+- `.handle()` receives the form data via `response`
+- You control how users are notified (Slack, email, etc.) inside `notify`
 
 See `/docs/brain-dsl-guide.md` for more UI step examples.
 
