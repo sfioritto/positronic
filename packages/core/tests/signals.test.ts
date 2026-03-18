@@ -5,7 +5,6 @@ import {
   createBrainExecutionMachine,
   sendEvent,
 } from '../src/dsl/brain-state-machine.js';
-import type { ResumeContext } from '../src/dsl/definitions/run-params.js';
 import { MockSignalProvider } from './mock-signal-provider.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
@@ -634,7 +633,7 @@ describe('signal handling', () => {
         true
       );
 
-      // Build resumeContext from the execution stack
+      // Build flat resume params from the execution stack
       const startEvent = firstRunEvents.find(
         (e) => e.type === BRAIN_EVENTS.START
       ) as any;
@@ -648,35 +647,13 @@ describe('signal handling', () => {
       });
       const executionStack = machine.context.executionStack;
 
-      // Build resume context with agent context from the state machine
+      // Build resume params with agent context from the state machine
       const webhookResponse = { response: 'Support said to do X' };
-      const agentContext = machine.context.agentContext
-        ? { ...machine.context.agentContext, webhookResponse }
-        : null;
+      const agentContext = machine.context.agentContext ?? undefined;
 
-      function toResumeContext(stack: typeof executionStack): ResumeContext {
-        let context: ResumeContext | undefined;
-        for (let i = stack.length - 1; i >= 0; i--) {
-          const entry = stack[i];
-          if (i === stack.length - 1) {
-            context = {
-              stepIndex: entry.stepIndex,
-              state: entry.state,
-              webhookResponse,
-              agentContext: agentContext ?? undefined,
-            };
-          } else {
-            context = {
-              stepIndex: entry.stepIndex,
-              state: entry.state,
-              innerResumeContext: context,
-            };
-          }
-        }
-        return context!;
-      }
-
-      const resumeContext = toResumeContext(executionStack);
+      const topEntry = executionStack[0];
+      const innerStack =
+        executionStack.length > 1 ? executionStack.slice(1) : undefined;
 
       // Set up mock for the resumed agent loop
       // Second call after resumption with user message: should process message and call terminal tool
@@ -710,7 +687,13 @@ describe('signal handling', () => {
       for await (const event of testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        resumeContext,
+        resume: {
+          state: topEntry.state,
+          stepIndex: topEntry.stepIndex,
+          innerStack,
+          agentContext,
+          webhookResponse,
+        },
         brainRunId,
         signalProvider: resumeSignalProvider,
       })) {

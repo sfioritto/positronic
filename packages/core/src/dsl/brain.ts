@@ -47,9 +47,9 @@ export type { GeneratedPage, BrainConfig } from './definitions/brain-types.js';
 
 // Definitions - Run params
 export type {
+  ResumeParams,
   InitialRunParams,
   ResumeRunParams,
-  ResumeContext,
 } from './definitions/run-params.js';
 
 // Execution - Constants

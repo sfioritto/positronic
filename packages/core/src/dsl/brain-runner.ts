@@ -3,18 +3,9 @@ import {
   createBrainExecutionMachine,
   sendEvent,
   type BrainStateMachine,
-  type ExecutionStackEntry,
-  type AgentContext,
-  type IterateContext,
 } from './brain-state-machine.js';
-import type { SerializedPageContext } from './webhook.js';
 import type { Adapter } from '../adapters/types.js';
-import {
-  DEFAULT_ENV,
-  type Brain,
-  type BrainEvent,
-  type ResumeContext,
-} from './brain.js';
+import { DEFAULT_ENV, type Brain, type BrainEvent } from './brain.js';
 import type {
   State,
   JsonObject,
@@ -27,48 +18,7 @@ import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
 import type { BrainCancelledEvent } from './definitions/events.js';
 import type { StoreProvider } from '../store/types.js';
-
-/**
- * Convert execution stack to ResumeContext tree.
- * Adds agent context to the deepest level.
- * Webhook response is no longer passed here - it comes from signals during execution.
- * This is internal to BrainRunner - external consumers don't need to know about ResumeContext.
- */
-function executionStackToResumeContext(
-  stack: ExecutionStackEntry[],
-  agentContext: AgentContext | null,
-  iterateContext: IterateContext | null,
-  currentPage: SerializedPageContext | null
-): ResumeContext {
-  if (stack.length === 0) {
-    throw new Error('Cannot convert empty execution stack to ResumeContext');
-  }
-
-  // Build from bottom of stack up (deepest to root)
-  let context: ResumeContext | undefined;
-  for (let i = stack.length - 1; i >= 0; i--) {
-    const entry = stack[i];
-    if (i === stack.length - 1) {
-      // Deepest level - add agent context, iterate progress, and page context
-      context = {
-        stepIndex: entry.stepIndex,
-        state: entry.state,
-        agentContext: agentContext ?? undefined,
-        iterateProgress: iterateContext ?? undefined,
-        currentPage: currentPage ?? undefined,
-      };
-    } else {
-      // Outer level - wrap inner context
-      context = {
-        stepIndex: entry.stepIndex,
-        state: entry.state,
-        innerResumeContext: context,
-      };
-    }
-  }
-
-  return context!;
-}
+import type { ResumeParams } from './definitions/run-params.js';
 
 /**
  * Create a CANCELLED event for when the brain is aborted via signal.
@@ -197,7 +147,7 @@ export class BrainRunner {
   /**
    * Resume a brain from a previous execution point.
    * The machine should have historical events already replayed to reconstruct execution state.
-   * The BrainRunner will derive the ResumeContext from the machine's execution stack.
+   * The BrainRunner builds a ResumeParams from the machine's execution stack.
    * Webhook response data comes from signals, not as a parameter.
    */
   async resume<TOptions extends JsonObject = {}, TState extends State = {}>(
@@ -220,26 +170,33 @@ export class BrainRunner {
       currentUser,
     } = options;
 
-    // Build ResumeContext from machine's execution stack
-    // Webhook response comes from signals during execution, not from resume parameters
     const { executionStack, agentContext, iterateContext, currentPage } =
       machine.context;
-    const resumeContext = executionStackToResumeContext(
-      executionStack,
-      agentContext,
-      iterateContext,
-      currentPage
-    );
+
+    if (executionStack.length === 0) {
+      throw new Error('Cannot resume from empty execution stack');
+    }
+
+    const topEntry = executionStack[0];
+    const innerStack =
+      executionStack.length > 1 ? executionStack.slice(1) : undefined;
 
     return this.execute(brain, {
-      resumeContext,
+      resume: {
+        state: topEntry.state,
+        stepIndex: topEntry.stepIndex,
+        innerStack,
+        agentContext: agentContext ?? undefined,
+        iterateProgress: iterateContext ?? undefined,
+        currentPage: currentPage ?? undefined,
+      },
       machine,
       options: brainOptions,
       brainRunId,
       endAfter,
       signal,
       currentUser,
-      initialStepCount: resumeContext.stepIndex,
+      initialStepCount: topEntry.stepIndex,
     });
   }
 
@@ -253,7 +210,7 @@ export class BrainRunner {
     brain: Brain<TOptions, TState, any>,
     params: {
       initialState?: TState;
-      resumeContext?: ResumeContext;
+      resume?: ResumeParams;
       machine?: BrainStateMachine;
       options?: TOptions;
       brainRunId?: string;
@@ -277,7 +234,7 @@ export class BrainRunner {
     const resolvedEnv = env ?? DEFAULT_ENV;
     const {
       initialState,
-      resumeContext,
+      resume,
       machine: providedMachine,
       options,
       brainRunId,
@@ -292,12 +249,12 @@ export class BrainRunner {
     const machine =
       providedMachine ??
       createBrainExecutionMachine({
-        initialState: resumeContext?.state ?? initialState ?? {},
+        initialState: resume?.state ?? initialState ?? {},
       });
 
-    const brainRun = resumeContext
+    const brainRun = resume
       ? brain.run({
-          resumeContext,
+          resume,
           brainRunId: brainRunId!,
           options,
           client,
