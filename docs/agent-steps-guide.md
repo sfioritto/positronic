@@ -169,13 +169,9 @@ const outerBrain = brain('orchestrator')
 
 The `outputKey` stores the entire inner brain's final state under that key in the outer state. `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
 
-### Options Flow in Nested Brains
+### Options in Nested Brains
 
-When using `.brain()` to compose a sub-brain, the parent brain's options are automatically passed through to the sub-brain at runtime. This means:
-
-1. **Sub-brains receive the parent's options** — no need to pass them explicitly. The runner calls `innerBrain.run()` with the parent's options object.
-2. **Options persist after the sub-brain completes** — subsequent steps (`.guard()`, `.prompt()`, `.step()`, etc.) still have access to `options` in their context.
-3. **No re-validation** — the sub-brain's `withOptionsSchema` only validates when the brain is run directly as a top-level brain. When invoked as a nested step, the parent's options object is passed through as-is without re-validation.
+Inner brains define their own options schema independently from the parent. You pass options explicitly via the `options` field in the config — the same pattern as `initialState`. Options are **not** automatically propagated from parent to child.
 
 ```typescript
 import { brain } from '@positronic/core';
@@ -189,28 +185,45 @@ const innerBrain = brain('search')
     })
   )
   .step('Search', ({ options }) => {
-    // options.query and options.limit are available here
+    // options.query and options.limit come from the parent's `options` config
     return { results: [] };
   });
 
 const outerBrain = brain('orchestrator')
-  .withOptionsSchema(
-    z.object({
-      query: z.string(),
-      limit: z.number().default(10),
-    })
-  )
+  .withOptionsSchema(z.object({ searchQuery: z.string() }))
   .brain('Run Search', innerBrain, {
     outputKey: 'searchResult' as const,
+    options: ({ options }) => ({ query: options.searchQuery, limit: 5 }),
   })
   .step('Process', ({ state, options }) => {
-    // options still available after the nested brain completes
-    // state.searchResult contains the inner brain's final state
-    return { ...state, query: options.query };
+    // outer options still available after the nested brain completes
+    return { ...state, query: options.searchQuery };
   });
 ```
 
-TypeScript enforces that the sub-brain's `TOptions` type is structurally compatible with the parent's. If the schemas produce different types, you'll get a type error at the `.brain()` call site.
+The `options` field can be a static object or a function receiving the outer brain's `{ state, options, ...services }` context. If omitted, the inner brain receives `{}` as its options.
+
+The same pattern applies to `.map()` in brain mode:
+
+```typescript
+const itemProcessor = brain('process-item')
+  .withOptionsSchema(z.object({ multiplier: z.number() }))
+  .step('Multiply', ({ state, options }) => ({
+    ...state,
+    result: state.value * options.multiplier,
+  }));
+
+const outerBrain = brain('batch')
+  .withOptionsSchema(z.object({ multiplier: z.number() }))
+  .step('Init', () => ({ items: [1, 2, 3] }))
+  .map('Process', {
+    run: itemProcessor,
+    over: ({ state }) => state.items,
+    initialState: (item) => ({ value: item, result: 0 }),
+    options: ({ options }) => ({ multiplier: options.multiplier }),
+    outputKey: 'results' as const,
+  });
+```
 
 ### Form 2: Inline Agent with Config Object
 

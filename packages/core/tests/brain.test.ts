@@ -1948,6 +1948,7 @@ describe('type inference', () => {
           processedValue: 0,
           featureCount: 0,
         },
+        options: ({ options }) => options,
       })
       .step('Final step', ({ state }) => ({
         ...state,
@@ -2088,6 +2089,61 @@ describe('type inference', () => {
         metadata: { processed: true },
       },
     });
+  });
+
+  it('should pass independent options to inner brain', async () => {
+    // Inner brain has its own options schema, different from the parent
+    const innerBrain = brain('Independent Options Inner')
+      .withOptionsSchema(z.object({ multiplier: z.number() }))
+      .step('Multiply', ({ state, options }) => ({
+        result: (state as any).value * options.multiplier,
+      }));
+
+    // Outer brain has a completely different options schema
+    const outerBrain = brain('Independent Options Outer')
+      .withOptionsSchema(z.object({ label: z.string() }))
+      .step('Init', ({ options }) => ({
+        value: 10,
+        label: options.label,
+      }))
+      .brain('Compute', innerBrain, {
+        outputKey: 'computed' as const,
+        initialState: ({ state }) => ({ value: state.value }),
+        options: { multiplier: 3 },
+      })
+      .step('Final', ({ state }) => ({
+        ...state,
+        done: true,
+      }));
+
+    const events = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      options: { label: 'test' },
+    })) {
+      events.push(event);
+    }
+    const finalState = finalStateFromEvents(events);
+
+    expect(finalState).toEqual({
+      value: 10,
+      label: 'test',
+      computed: { result: 30 },
+      done: true,
+    });
+
+    // Verify inner brain received its own options, not the parent's
+    const innerStartEvent = events.find(
+      (e: any) =>
+        e.type === BRAIN_EVENTS.START &&
+        e.brainTitle === 'Independent Options Inner'
+    );
+    expect(innerStartEvent).toEqual(
+      expect.objectContaining({
+        options: { multiplier: 3 },
+      })
+    );
   });
 
   it('should correctly infer step action state types', async () => {

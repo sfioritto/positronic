@@ -123,6 +123,11 @@ export type BrainBlock<
     | ((
         context: { state: TOuterState; options: TOptions } & TServices
       ) => State);
+  options?:
+    | JsonObject
+    | ((
+        context: { state: TOuterState; options: TOptions } & TServices
+      ) => JsonObject);
 };
 
 export type AgentBlock<
@@ -170,6 +175,7 @@ export type MapBlock = {
   // Brain mode
   innerBrain?: any;
   initialState?: (item: any, outerState: any) => State;
+  options?: any | ((context: any) => any);
   // Prompt mode
   template?: (context: any) => string | Promise<string>;
   outputSchema?: {
