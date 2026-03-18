@@ -1,5 +1,16 @@
 # @positronic/spec
 
+## 0.0.77
+
+### Patch Changes
+
+- - Fix iterate PAUSE leak: added canRelease flag to prevent inner brain iterate steps from leaking PAUSE events to the outer brain
+  - Fix TItem type inference regression in all iterate overloads
+  - Unify all template callbacks to context object pattern (breaking: positional params replaced with destructured context object)
+  - Add `rr` alias for rerun command and numbered steps in brain show output
+  - Add core test files to typecheck configuration
+  - Update template documentation for brain DSL guide and agent tips
+
 ## 0.0.76
 
 ### Patch Changes
