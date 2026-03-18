@@ -1076,7 +1076,7 @@ Extract prompts to separate files when:
 
 ## Iterating Over Items
 
-When you need to run the same operation over multiple items, use `.map()`. All iteration goes through `.map()` — to iterate a prompt or agent, wrap it in a brain first.
+When you need to run the same operation over multiple items, use `.map()`. You can iterate a prompt directly, or iterate a brain for more complex per-item logic.
 
 ### Basic `.map()` with a Brain
 
@@ -1109,18 +1109,9 @@ brain('Process All Items')
 
 ### Iterating a Prompt
 
-To iterate a prompt over items, wrap it in a small brain and use `.map()`:
+Use `.map()` with `template` and `outputSchema` to run a prompt per item:
 
 ```typescript
-const summarizeBrain = brain('Summarize Single')
-  .prompt('Summarize', {
-    template: ({ state }) => `Summarize this item: <%= '${state.title}' %>`,
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'result' as const,
-    },
-  });
-
 brain('Item Processor')
   .step('Initialize', () => ({
     items: [
@@ -1130,20 +1121,25 @@ brain('Item Processor')
     ]
   }))
   .map('Summarize Items', {
-    run: summarizeBrain,
+    template: ({ item }) => `Summarize this item: <%= '${item.title}' %>`,
+    outputSchema: {
+      schema: z.object({ summary: z.string() }),
+      name: 'summary',
+    },
     over: ({ state }) => state.items,
-    initialState: (item) => ({ title: item.title }),
     outputKey: 'summaries' as const,
-    error: (item, error) => ({ result: { summary: 'Failed to summarize' } }),
+    error: () => ({ summary: 'Failed to summarize' }),
   })
   .step('Process Results', ({ state }) => ({
     ...state,
     processedSummaries: state.summaries.map((item, result) => ({
       id: item.id,
-      summary: result.result.summary,
+      summary: result.summary,
     })),
   }));
 ```
+
+The template receives `{ item, state, options, resources }` where `item` is the current iteration item. The result per item is `z.infer` of the `outputSchema.schema`. You can also pass `client` to use a different LLM client for the prompt.
 
 ### Iterating an Agent
 
@@ -1179,13 +1175,24 @@ brain('Research Topics')
 
 ### `.map()` Options
 
-All `.map()` calls take a config object with these fields:
+`.map()` has two modes: **brain mode** (run an inner brain per item) and **prompt mode** (run a prompt per item).
 
-- `run: Brain` - The inner brain to execute for each item
+**Common options** (both modes):
+
 - `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, services, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, services, or any other context field. Can be async.
-- `initialState: (item, outerState) => State` - Function to create the inner brain's initial state from each item
 - `outputKey: string` - Key under which results are stored in state (use `as const` for type inference)
 - `error: (item, error) => Result | null` - Optional fallback when an item fails. Return `null` to skip the item entirely.
+
+**Brain mode** (use `run`):
+
+- `run: Brain` - The inner brain to execute for each item
+- `initialState: (item, outerState) => State` - Function to create the inner brain's initial state from each item
+
+**Prompt mode** (use `template` + `outputSchema`):
+
+- `template: (context) => string` - Prompt template function. Receives `{ item, state, options, resources }` where `item` is the current iteration item.
+- `outputSchema: { schema, name }` - Zod schema for the LLM output and a name for the schema.
+- `client?: ObjectGenerator` - Optional per-step LLM client override.
 
 #### Accessing options and services in `over`
 
@@ -1227,7 +1234,7 @@ By default, results are stored as an `IterateResult` — a collection that wraps
 - **`.map((item, result) => value)`** — maps over both item and result, returns a plain array
 - **`for...of`** — iterates as `[item, result]` tuples (backward compatible with destructuring)
 
-For prompts, the key comes from `outputSchema.name`. For brain and agent iterate, it comes from `outputKey`.
+The key always comes from `outputKey`. The `outputSchema.name` in prompt mode is only used as the schema name for the LLM call.
 
 ## Agent Steps
 

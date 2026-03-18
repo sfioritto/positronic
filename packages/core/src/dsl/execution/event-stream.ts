@@ -1381,43 +1381,65 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       let result: [any, any] | undefined;
 
       try {
-        const initialState = block.initialState(item, this.currentState);
+        if (block.template) {
+          // Prompt mode: call generateObject directly per item
+          const prompt = await block.template({
+            item,
+            state: this.currentState,
+            options: this.options,
+            resources: this.resources,
+          });
+          const client = block.client
+            ? this.governor
+              ? this.governor(block.client)
+              : block.client
+            : this.client;
+          const response = await client.generateObject({
+            schema: block.outputSchema!.schema,
+            schemaName: block.outputSchema!.name,
+            prompt,
+          });
+          result = [item, response.object];
+        } else {
+          // Brain mode: run inner brain per item
+          const initialState = block.initialState!(item, this.currentState);
 
-        const innerRun = block.innerBrain.run({
-          resources: this.resources,
-          client: this.client,
-          currentUser: this.currentUser,
-          initialState,
-          options: this.options ?? ({} as TOptions),
-          pages: this.pages,
-          env: this.env,
-          brainRunId: this.brainRunId,
-          governor: this.governor,
-          services: this.services as Record<string, any>,
-          storeProvider: this.storeProvider,
-        });
+          const innerRun = block.innerBrain.run({
+            resources: this.resources,
+            client: this.client,
+            currentUser: this.currentUser,
+            initialState,
+            options: this.options ?? ({} as TOptions),
+            pages: this.pages,
+            env: this.env,
+            brainRunId: this.brainRunId,
+            governor: this.governor,
+            services: this.services as Record<string, any>,
+            storeProvider: this.storeProvider,
+          });
 
-        let patches: any[] = [];
-        for await (const event of innerRun) {
-          // Throw on WEBHOOK — not supported in map
-          if (event.type === BRAIN_EVENTS.WEBHOOK) {
-            throw new Error(
-              `Webhook/wait inside .map() is not supported. ` +
-                `Step "${block.title}" item ${i} triggered a webhook. ` +
-                `Remove .wait() from the inner brain or process items outside of .map().`
-            );
+          let patches: any[] = [];
+          for await (const event of innerRun) {
+            // Throw on WEBHOOK — not supported in map
+            if (event.type === BRAIN_EVENTS.WEBHOOK) {
+              throw new Error(
+                `Webhook/wait inside .map() is not supported. ` +
+                  `Step "${block.title}" item ${i} triggered a webhook. ` +
+                  `Remove .wait() from the inner brain or process items outside of .map().`
+              );
+            }
+            yield event; // Forward all inner events
+            if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+              patches.push(event.patch);
+            }
+            if (event.type === BRAIN_EVENTS.COMPLETE) {
+              break;
+            }
           }
-          yield event; // Forward all inner events
-          if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
-            patches.push(event.patch);
-          }
-          if (event.type === BRAIN_EVENTS.COMPLETE) {
-            break;
-          }
+
+          const innerState = applyPatches(initialState, patches);
+          result = [item, innerState];
         }
-
-        const innerState = applyPatches(initialState, patches);
-        result = [item, innerState];
       } catch (error) {
         if (block.error) {
           const fallback = block.error(item, error as Error);
