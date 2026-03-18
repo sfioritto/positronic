@@ -35,6 +35,7 @@ export type {
   Secrets,
   AgentTool,
   AgentConfig,
+  AgentConfigWithOutput,
   AgentOutputSchema,
   AgentMessage,
   AgentToolWaitFor,

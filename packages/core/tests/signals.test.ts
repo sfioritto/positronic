@@ -22,6 +22,11 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   streamText: mockStreamText,
 };
 
+const dummyOutputSchema = {
+  schema: z.object({ result: z.string() }),
+  name: 'agentResult' as const,
+} as const;
+
 describe('signal handling', () => {
   let signalProvider: MockSignalProvider;
 
@@ -156,6 +161,7 @@ describe('signal handling', () => {
 
       const testBrain = brain('test-agent-kill').brain('Agent Step', () => ({
         prompt: 'Do something',
+        outputSchema: dummyOutputSchema,
         tools: {
           lookup: {
             description: 'Lookup something',
@@ -233,6 +239,7 @@ describe('signal handling', () => {
 
       const testBrain = brain('test-agent-pause').brain('Agent Step', () => ({
         prompt: 'Do something',
+        outputSchema: dummyOutputSchema,
         tools: {
           lookup: {
             description: 'Lookup something',
@@ -317,6 +324,7 @@ describe('signal handling', () => {
 
       const testBrain = brain('test-agent-message').brain('Agent Step', () => ({
         prompt: 'Do something',
+        outputSchema: dummyOutputSchema,
         tools: {
           lookup: {
             description: 'Lookup something',
@@ -434,6 +442,7 @@ describe('signal handling', () => {
 
       const testBrain = brain('test-priority-2').brain('Agent Step', () => ({
         prompt: 'Do something',
+        outputSchema: dummyOutputSchema,
         tools: {
           lookup: {
             description: 'Lookup something',
@@ -593,6 +602,7 @@ describe('signal handling', () => {
         'Handle Request',
         () => ({
           prompt: 'Handle the request',
+          outputSchema: dummyOutputSchema,
           tools: {
             escalate: {
               description: 'Escalate to support',
@@ -761,6 +771,7 @@ describe('signal handling', () => {
 
       const testBrain = brain('test-multi-message').brain('Agent Step', () => ({
         prompt: 'Do something',
+        outputSchema: dummyOutputSchema,
         tools: {
           lookup: {
             description: 'Lookup something',

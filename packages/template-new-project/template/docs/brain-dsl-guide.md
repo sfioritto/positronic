@@ -181,16 +181,13 @@ const subBrain = brain('Sub Process').step('Transform', ({ state }) => ({
 
 const mainBrain = brain('Main Process')
   .step('Prepare', () => ({ value: 10 }))
-  .brain(
-    'Run Sub Process',
-    subBrain,
-    ({ state, brainState }) => ({
-      ...state,
-      processed: brainState.result,
-    }),
-    (state) => ({ input: state.value }) // Initial state for sub-brain
-  );
+  .brain('Run Sub Process', subBrain, {
+    outputKey: 'processed' as const,
+    initialState: ({ state }) => ({ input: state.value }),
+  });
 ```
+
+The `outputKey` stores the entire inner brain's final state under that key in the outer state (e.g., `state.processed` will be `{ result: 20 }`). `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
 
 ## Guard Clauses
 
@@ -427,11 +424,10 @@ Services are destructured alongside other parameters in:
 })
 ```
 
-3. **Nested Brain Reducers**:
+3. **Nested Brain Config**:
 ```typescript
-.brain('Run Sub-Brain', subBrain, ({ state, brainState, logger }) => {
-  logger.info('Sub-brain completed');
-  return { ...state, subResult: brainState };
+.brain('Run Sub-Brain', subBrain, {
+  outputKey: 'subResult' as const,
 })
 ```
 
@@ -586,8 +582,12 @@ const brainWithTools = brain('Tool Brain')
   })
   .brain('Data Agent', {
     system: 'You can fetch and save data.',
-    prompt: 'Fetch user data and save the summary.'
+    prompt: 'Fetch user data and save the summary.',
     // Tools defined with withTools() are automatically available
+    outputSchema: {
+      schema: z.object({ summary: z.string() }),
+      name: 'dataSummary' as const,
+    },
   });
 ```
 
@@ -1238,7 +1238,7 @@ The key always comes from `outputKey`. The `outputSchema.name` in prompt mode is
 
 ## Agent Steps
 
-For complex AI workflows that require tool use, use the `.brain()` method with an agent configuration:
+For complex AI workflows that require tool use, use the `.brain()` method with an agent configuration. Agent `.brain()` calls require `outputSchema`:
 
 ```typescript
 brain('Research Assistant')
@@ -1270,11 +1270,18 @@ brain('Research Assistant')
         }
       }
     },
+    outputSchema: {
+      schema: z.object({
+        findings: z.array(z.string()),
+        summary: z.string(),
+      }),
+      name: 'research' as const,
+    },
     maxTokens: 10000,
   })
-  .step('Format Results', ({ state, brainState }) => ({
+  .step('Format Results', ({ state }) => ({
     ...state,
-    researchResults: brainState.response
+    researchResults: state.research.summary,
   }));
 ```
 
@@ -1283,7 +1290,7 @@ brain('Research Assistant')
 - `system: string` - System prompt for the agent
 - `prompt: string | ((state) => string)` - User prompt (can be a function)
 - `tools: Record<string, ToolDefinition>` - Tools available to the agent
-- `outputSchema: { schema, name }` - Structured output schema (see below)
+- `outputSchema: { schema, name }` - **Required.** Structured output schema that generates a terminal `done` tool (see below)
 - `maxTokens: number` - Maximum tokens for the agent response
 - `maxIterations: number` - Maximum agent loop iterations (default: 100)
 
@@ -1323,19 +1330,18 @@ brain('Support Ticket Handler')
           };
         },
       },
-      resolveTicket: {
-        description: 'Mark the ticket as resolved',
-        inputSchema: z.object({
-          resolution: z.string().describe('How the ticket was resolved'),
-        }),
-        terminal: true,
-      },
+    },
+    outputSchema: {
+      schema: z.object({
+        resolution: z.string().describe('How the ticket was resolved'),
+      }),
+      name: 'ticketResult' as const,
     },
   })
   .step('Process Result', ({ state }) => ({
     ...state,
     // The webhook response is fed back to the agent as a tool result.
-    // The agent processes it and finishes (e.g., via a terminal tool).
+    // The agent processes it and finishes (via the auto-generated done tool from outputSchema).
     // This step only sees the final state after the agent completes.
     handled: true,
   }));

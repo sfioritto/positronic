@@ -151,6 +151,18 @@ export interface AgentOutputSchema<
 }
 
 /**
+ * AgentConfig with outputSchema required (not optional).
+ * Used in overload signatures to enforce that outputSchema must be provided.
+ */
+export type AgentConfigWithOutput<
+  TTools extends Record<string, AgentTool<any>>,
+  TSchema extends z.ZodObject<any>,
+  TName extends string
+> = AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> & {
+  outputSchema: AgentOutputSchema<TSchema, TName>;
+};
+
+/**
  * Configuration for an agent step.
  */
 export interface AgentConfig<

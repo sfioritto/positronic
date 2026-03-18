@@ -39,11 +39,10 @@ const myBrain = brain('assistant')
     prompt: 'The user said: I prefer dark mode',
     tools: {
       ...memoryTools,
-      done: {
-        description: 'Complete the task',
-        inputSchema: z.object({ result: z.string() }),
-        terminal: true,
-      },
+    },
+    outputSchema: {
+      schema: z.object({ result: z.string() }),
+      name: 'helpResult' as const,
     },
   }));
 ```
@@ -136,11 +135,10 @@ Use recallMemories before responding to check for relevant context.`,
     prompt: userMessage,
     tools: {
       ...memoryTools,
-      done: {
-        description: 'Send final response',
-        inputSchema: z.object({ response: z.string() }),
-        terminal: true,
-      },
+    },
+    outputSchema: {
+      schema: z.object({ response: z.string() }),
+      name: 'chatResult' as const,
     },
   }));
 ```
@@ -239,6 +237,10 @@ const myBrain = brain('my-brain')
       tools: {
         /* ... */
       },
+      outputSchema: {
+        schema: z.object({ result: z.string() }),
+        name: 'processResult' as const,
+      },
     };
   });
 ```
@@ -294,6 +296,10 @@ const myBrain = brain('my-brain')
       prompt: userMessage,
       tools: {
         /* ... */
+      },
+      outputSchema: {
+        schema: z.object({ reply: z.string() }),
+        name: 'chatReply' as const,
       },
     };
   });
@@ -391,11 +397,10 @@ When you need context, use recallMemories to search your memory.`,
       prompt: options.message,
       tools: {
         ...memoryTools,
-        done: {
-          description: 'Send the final response to the user',
-          inputSchema: z.object({ response: z.string() }),
-          terminal: true,
-        },
+      },
+      outputSchema: {
+        schema: z.object({ response: z.string() }),
+        name: 'assistantResponse' as const,
       },
     };
   });

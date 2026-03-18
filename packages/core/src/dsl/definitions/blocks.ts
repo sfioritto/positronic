@@ -117,12 +117,12 @@ export type BrainBlock<
   type: 'brain';
   title: string;
   innerBrain: TInnerBrain;
-  initialState: State | ((outerState: TOuterState) => State);
-  action: (
-    outerState: TOuterState,
-    innerState: TInnerState,
-    services: TServices
-  ) => TNewState;
+  outputKey: string;
+  initialState?:
+    | State
+    | ((
+        context: { state: TOuterState; options: TOptions } & TServices
+      ) => State);
 };
 
 export type AgentBlock<

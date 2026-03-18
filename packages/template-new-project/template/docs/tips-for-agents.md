@@ -316,25 +316,15 @@ The first parameter is always the input item (what you passed to `over`), and th
 
 ### Nested brain state mapping
 
-When a `.brain()` step runs an inner brain and maps its state into the outer brain, **destructure to select the fields you need** instead of casting:
+When a `.brain()` step runs an inner brain, use `outputKey` to store the inner brain's final state under a key in the outer state:
 
 ```typescript
-// ❌ DON'T DO THIS - casting to force the type
-.brain(
-    'Search and validate',
-    searchAndValidate,
-    ({ brainState }) => brainState as { matches: Match[] },
-  )
-
-// ✅ DO THIS - destructure to select and let inference work
-.brain(
-    'Search and validate',
-    searchAndValidate,
-    ({ brainState: { matches } }) => ({ matches }),
-  )
+.brain('Search and validate', searchAndValidate, {
+  outputKey: 'searchResults' as const,
+})
 ```
 
-The inner brain's state type is fully inferred from its definition. Destructuring picks the fields you want and TypeScript infers the outer state correctly — no casts needed. If the inner brain exports an interface for its output shape, import it for use in downstream steps (like prompt templates).
+The entire inner brain's final state is stored under the `outputKey`. Use `as const` on the key for proper type inference. The inner brain's state type is fully inferred from its definition, so subsequent steps can access the nested state with full type safety (e.g., `state.searchResults.matches`).
 
 ## Brain DSL Type Inference
 

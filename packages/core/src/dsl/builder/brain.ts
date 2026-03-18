@@ -6,6 +6,7 @@ import type {
   JsonObject,
   AgentTool,
   AgentConfig,
+  AgentConfigWithOutput,
   AgentOutputSchema,
   StepContext,
 } from '../types.js';
@@ -384,19 +385,23 @@ export class Brain<
     return this.nextBrain<TState>();
   }
 
-  // Overload 1: Nested brain
-  brain<TInnerState extends State, TNewState extends State>(
+  // Overload 1: Nested brain with outputKey
+  brain<
+    TInnerState extends State,
+    TOutputKey extends string & { readonly brand?: unique symbol },
+    TNewState extends State = TState & { [K in TOutputKey]: TInnerState }
+  >(
     title: string,
     innerBrain: Brain<TOptions, TInnerState, TServices>,
-    action: (params: {
-      state: TState;
-      brainState: TInnerState;
-      services: TServices;
-    }) => TNewState,
-    initialState?: State | ((state: TState) => State)
+    config: {
+      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      initialState?:
+        | State
+        | ((context: StepContext<TState, TOptions> & TServices) => State);
+    }
   ): Brain<TOptions, TNewState, TServices>;
 
-  // Overload 2: Agent config object WITH outputSchema
+  // Overload 2: Agent config object WITH outputSchema (required)
   brain<
     TTools extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
@@ -404,10 +409,10 @@ export class Brain<
     TNewState extends State = TState & { [K in TName]: z.infer<TSchema> }
   >(
     title: string,
-    config: AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
+    config: AgentConfigWithOutput<TTools, TSchema, TName>
   ): Brain<TOptions, TNewState, TServices>;
 
-  // Overload 3: Agent config function WITH outputSchema
+  // Overload 3: Agent config function WITH outputSchema (required)
   brain<
     TTools extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
@@ -422,38 +427,8 @@ export class Brain<
           tools: Record<string, AgentTool<any>>;
         }
     ) =>
-      | AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
-      | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>
-  ): Brain<TOptions, TNewState, TServices>;
-
-  // Overload 4: Agent config object (no outputSchema)
-  brain<
-    TTools extends Record<string, AgentTool<any>> = Record<
-      string,
-      AgentTool<any>
-    >,
-    TNewState extends State = TState
-  >(
-    title: string,
-    config: AgentConfig<TTools>
-  ): Brain<TOptions, TNewState, TServices>;
-
-  // Overload 5: Agent config function (no outputSchema)
-  brain<
-    TTools extends Record<string, AgentTool<any>> = Record<
-      string,
-      AgentTool<any>
-    >,
-    TNewState extends State = TState
-  >(
-    title: string,
-    configFn: (
-      params: StepContext<TState, TOptions> &
-        TServices & {
-          /** Default tools available for agent steps */
-          tools: Record<string, AgentTool<any>>;
-        }
-    ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
+      | AgentConfigWithOutput<TTools, TSchema, TName>
+      | Promise<AgentConfigWithOutput<TTools, TSchema, TName>>
   ): Brain<TOptions, TNewState, TServices>;
 
   // Implementation
@@ -465,8 +440,7 @@ export class Brain<
       | ((
           params: any
         ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
-    actionOrConfig?: (params: any) => any,
-    initialState?: State | ((state: TState) => State)
+    configOrUndefined?: { outputKey: string; initialState?: any }
   ): any {
     // Case 1: Nested brain instance
     if (
@@ -475,14 +449,16 @@ export class Brain<
       'type' in innerBrainOrConfig &&
       innerBrainOrConfig.type === 'brain'
     ) {
-      const action = actionOrConfig as (params: any) => any;
+      const config = configOrUndefined as {
+        outputKey: string;
+        initialState?: any;
+      };
       const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
         type: 'brain',
         title,
         innerBrain: innerBrainOrConfig,
-        initialState: initialState || (() => ({} as State)),
-        action: (outerState, innerState, services) =>
-          action!({ state: outerState, brainState: innerState, services }),
+        outputKey: config.outputKey,
+        initialState: config.initialState,
       };
       this.blocks.push(nestedBlock);
       return this.nextBrain<any>();
@@ -945,7 +921,7 @@ export function brain<
   description?: string;
 }): Brain<TOptions, TState, TServices>;
 
-// Overload 3: Direct agent with config object WITH outputSchema
+// Overload 3: Direct agent with config object WITH outputSchema (required)
 export function brain<
   TTools extends Record<string, AgentTool<any>>,
   TName extends string & { readonly brand?: unique symbol },
@@ -953,10 +929,10 @@ export function brain<
   TNewState extends State = { [K in TName]: z.infer<TSchema> }
 >(
   title: string,
-  config: AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
+  config: AgentConfigWithOutput<TTools, TSchema, TName>
 ): Brain<JsonObject, TNewState, object>;
 
-// Overload 4: Direct agent with config function WITH outputSchema
+// Overload 4: Direct agent with config function WITH outputSchema (required)
 export function brain<
   TTools extends Record<string, AgentTool<any>>,
   TName extends string & { readonly brand?: unique symbol },
@@ -969,37 +945,9 @@ export function brain<
       tools: Record<string, AgentTool<any>>;
     }
   ) =>
-    | AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
-    | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>
+    | AgentConfigWithOutput<TTools, TSchema, TName>
+    | Promise<AgentConfigWithOutput<TTools, TSchema, TName>>
 ): Brain<JsonObject, TNewState, object>;
-
-// Overload 5: Direct agent with config object (no outputSchema)
-export function brain<
-  TTools extends Record<string, AgentTool<any>> = Record<
-    string,
-    AgentTool<any>
-  >,
-  TState extends State = object
->(
-  title: string,
-  config: AgentConfig<TTools>
-): Brain<JsonObject, TState, object>;
-
-// Overload 6: Direct agent with config function (no outputSchema)
-export function brain<
-  TTools extends Record<string, AgentTool<any>> = Record<
-    string,
-    AgentTool<any>
-  >,
-  TState extends State = object
->(
-  title: string,
-  configFn: (
-    params: StepContext<object, JsonObject> & {
-      tools: Record<string, AgentTool<any>>;
-    }
-  ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
-): Brain<JsonObject, TState, object>;
 
 // Implementation
 export function brain(

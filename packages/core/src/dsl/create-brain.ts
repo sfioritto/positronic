@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { brain as coreBrain, Brain } from './builder/brain.js';
 import type {
   AgentConfig,
+  AgentConfigWithOutput,
   AgentTool,
   AgentOutputSchema,
   StepContext,
@@ -112,10 +113,7 @@ export function createBrain<
       tools: TTools extends {} ? Record<string, AgentTool<any>> : TTools;
     };
 
-  // Return type for the brain function
-  type BrainReturn = Brain<{}, object, AllServices>;
-
-  // Overload 1: Direct agent with config object WITH outputSchema
+  // Overload 1: Direct agent with config object WITH outputSchema (required)
   function brain<
     T extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
@@ -123,10 +121,10 @@ export function createBrain<
     TNewState extends State = { [K in TName]: z.infer<TSchema> }
   >(
     title: string,
-    config: AgentConfig<T, AgentOutputSchema<TSchema, TName>>
+    config: AgentConfigWithOutput<T, TSchema, TName>
   ): Brain<{}, TNewState, AllServices>;
 
-  // Overload 2: Direct agent with config function WITH outputSchema
+  // Overload 2: Direct agent with config function WITH outputSchema (required)
   function brain<
     T extends Record<string, AgentTool<any>>,
     TName extends string & { readonly brand?: unique symbol },
@@ -137,29 +135,17 @@ export function createBrain<
     configFn: (
       params: AgentParams
     ) =>
-      | AgentConfig<T, AgentOutputSchema<TSchema, TName>>
-      | Promise<AgentConfig<T, AgentOutputSchema<TSchema, TName>>>
+      | AgentConfigWithOutput<T, TSchema, TName>
+      | Promise<AgentConfigWithOutput<T, TSchema, TName>>
   ): Brain<{}, TNewState, AllServices>;
 
-  // Overload 3: Direct agent with config function (no outputSchema)
-  function brain<T extends Record<string, AgentTool<any>>>(
-    title: string,
-    configFn: (params: AgentParams) => AgentConfig<T> | Promise<AgentConfig<T>>
-  ): BrainReturn;
-
-  // Overload 4: Direct agent with config object (no outputSchema)
-  function brain<T extends Record<string, AgentTool<any>>>(
-    title: string,
-    config: AgentConfig<T>
-  ): BrainReturn;
-
-  // Overload 5: Builder pattern with title string
+  // Overload 3: Builder pattern with title string
   function brain<
     TOptions extends JsonObject = {},
     TState extends State = object
   >(title: string): Brain<TOptions, TState, AllServices>;
 
-  // Overload 6: Builder pattern with config object
+  // Overload 4: Builder pattern with config object
   function brain<
     TOptions extends JsonObject = {},
     TState extends State = object

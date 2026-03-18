@@ -51,7 +51,6 @@ import type {
 
 import { Step } from '../builder/step.js';
 import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT } from './constants.js';
-import { defaultDoneSchema } from '../../tools/index.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -528,10 +527,15 @@ export class BrainEventStream<
         TOptions,
         TServices
       >;
-      const initialState =
-        typeof brainBlock.initialState === 'function'
-          ? brainBlock.initialState(this.currentState)
-          : brainBlock.initialState;
+      const initialState = brainBlock.initialState
+        ? typeof brainBlock.initialState === 'function'
+          ? brainBlock.initialState({
+              state: this.currentState,
+              options: this.options,
+              ...this.services,
+            })
+          : brainBlock.initialState
+        : {};
 
       // Check if we're resuming and if there's an inner resume context
       const innerResumeContext = this.resumeContext?.innerResumeContext;
@@ -614,12 +618,11 @@ export class BrainEventStream<
       // Get previous state before action
       const prevState = this.currentState;
 
-      // Update state with inner brain results
-      this.currentState = await brainBlock.action(
-        this.currentState,
-        innerState,
-        this.services
-      );
+      // Update state with inner brain results using outputKey
+      this.currentState = {
+        ...this.currentState,
+        [brainBlock.outputKey]: innerState,
+      };
       yield* this.completeStep(step, prevState);
     } else if (block.type === 'agent') {
       const prevState = this.currentState;
@@ -728,12 +731,10 @@ export class BrainEventStream<
       ...(config.tools ?? {}),
     };
 
-    // Always generate a 'done' terminal tool for every agent
-    // If outputSchema is provided, use that schema; otherwise use defaultDoneSchema
-    if (config.outputSchema) {
-      const { schema, name } = config.outputSchema;
-      mergedTools['done'] = {
-        description: `Signal that the task is complete and provide the final ${name} result.
+    // Generate a 'done' terminal tool for every agent using the required outputSchema
+    const { schema, name } = config.outputSchema;
+    mergedTools['done'] = {
+      description: `Signal that the task is complete and provide the final ${name} result.
 
 PURPOSE: End agent execution and return structured output to the calling system.
 
@@ -754,36 +755,9 @@ DO NOT CALL IF:
 - The task is not yet complete
 
 The schema for this result is: ${name}`,
-        inputSchema: schema,
-        terminal: true,
-      };
-    } else {
-      mergedTools['done'] = {
-        description: `Signal that the task is complete and provide a summary of what was accomplished.
-
-PURPOSE: End agent execution and return a result string to the calling system.
-
-BEHAVIOR:
-- This is a TERMINAL tool - calling it immediately ends the agent
-- No further tools will execute after this
-- No further iterations will occur
-- The result string you provide becomes the agent's final output
-
-WHEN TO CALL:
-- When you have completed the assigned task
-- When you have gathered all required information
-- When you have the final answer ready to report
-
-DO NOT CALL IF:
-- You still need to gather more information
-- You are waiting for user input (use waitForWebhook instead)
-- The task is not yet complete
-
-Provide a clear, concise summary of the outcome in the 'result' field.`,
-        inputSchema: defaultDoneSchema,
-        terminal: true,
-      };
-    }
+      inputSchema: schema,
+      terminal: true,
+    };
 
     // Track conversation using SDK-native messages (preserves providerOptions like thoughtSignature)
     let responseMessages: ResponseMessage[] | undefined;
@@ -1175,8 +1149,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           };
 
           // Merge terminal result into state
-          // Only namespace under outputSchema.name when 'done' tool is called with outputSchema
-          if (config.outputSchema && toolCall.toolName === 'done') {
+          // Namespace under outputSchema.name when 'done' tool is called
+          if (toolCall.toolName === 'done') {
             const parsed = config.outputSchema.schema.safeParse(toolCall.args);
             if (!parsed.success) {
               throw new Error(

@@ -32,6 +32,11 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   streamText: mockStreamText,
 };
 
+const dummyOutputSchema = {
+  schema: z.object({ result: z.string() }),
+  name: 'agentResult' as const,
+} as const;
+
 describe('agent step', () => {
   beforeEach(() => {
     mockGenerateObject.mockReset();
@@ -65,6 +70,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -164,6 +170,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -225,6 +232,7 @@ describe('agent step', () => {
             terminal: true,
           },
         },
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -292,14 +300,19 @@ describe('agent step', () => {
           },
         },
         maxTokens: 1000, // Limit at 1000 tokens
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-      })) {
-        events.push(event);
+      try {
+        for await (const event of testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })) {
+          events.push(event);
+        }
+      } catch (error) {
+        // Error is expected because outputSchema requires output but token limit was hit
       }
 
       // Should emit token limit event
@@ -312,8 +325,9 @@ describe('agent step', () => {
       ) as AgentTokenLimitEvent;
       expect(tokenLimitEvent.totalTokens).toBeGreaterThanOrEqual(1000);
 
-      // Agent should still complete
-      expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+      // Should also emit an error because outputSchema was required
+      const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
+      expect(errorEvent).toBeDefined();
     });
   });
 
@@ -361,14 +375,19 @@ describe('agent step', () => {
           },
         },
         maxIterations: 3, // Limit at 3 iterations
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-      })) {
-        events.push(event);
+      try {
+        for await (const event of testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })) {
+          events.push(event);
+        }
+      } catch (error) {
+        // Error is expected because outputSchema requires output but iteration limit was hit
       }
 
       // Should emit iteration limit event
@@ -383,15 +402,18 @@ describe('agent step', () => {
       expect(iterationLimitEvent.maxIterations).toBe(3);
       expect(iterationLimitEvent.totalTokens).toBe(150); // 3 iterations * 50 tokens
 
-      // Agent should still complete
-      expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+      // Should also emit an error because outputSchema was required
+      const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
+      expect(errorEvent).toBeDefined();
     });
 
     it('should use default maxIterations of 100', async () => {
       // Verify default by checking iteration count
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
-        toolCalls: [{ toolCallId: 'call-1', toolName: 'done', args: {} }],
+        toolCalls: [
+          { toolCallId: 'call-1', toolName: 'done', args: { result: 'ok' } },
+        ],
         usage: { totalTokens: 50 },
         responseMessages: [],
       });
@@ -400,13 +422,7 @@ describe('agent step', () => {
         'Task',
         () => ({
           prompt: 'Do something',
-          tools: {
-            done: {
-              description: 'Done',
-              inputSchema: z.object({}),
-              terminal: true,
-            },
-          },
+          outputSchema: dummyOutputSchema,
           // No maxIterations specified - should default to 100
         })
       );
@@ -440,7 +456,9 @@ describe('agent step', () => {
         })
         .mockResolvedValueOnce({
           text: undefined,
-          toolCalls: [{ toolCallId: 'call-2', toolName: 'done', args: {} }],
+          toolCalls: [
+            { toolCallId: 'call-2', toolName: 'done', args: { result: 'ok' } },
+          ],
           usage: { totalTokens: 150 },
           responseMessages: [],
         });
@@ -453,12 +471,8 @@ describe('agent step', () => {
             inputSchema: z.object({}),
             execute: async () => 'done',
           },
-          done: {
-            description: 'Done',
-            inputSchema: z.object({}),
-            terminal: true,
-          },
         },
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -538,6 +552,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -613,6 +628,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -685,6 +701,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -745,6 +762,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -791,6 +809,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -829,6 +848,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -862,7 +882,7 @@ describe('agent step', () => {
           {
             toolCallId: 'call-1',
             toolName: 'done',
-            args: {},
+            args: { result: 'ok' },
           },
         ],
         usage: { totalTokens: 50 },
@@ -872,13 +892,7 @@ describe('agent step', () => {
       const testBrain = brain('test-system').brain('With System', () => ({
         system: 'You are a helpful assistant.',
         prompt: 'Help the user',
-        tools: {
-          done: {
-            description: 'Done',
-            inputSchema: z.object({}),
-            terminal: true,
-          },
-        },
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -908,7 +922,7 @@ describe('agent step', () => {
           {
             toolCallId: 'call-1',
             toolName: 'done',
-            args: {},
+            args: { result: 'ok' },
           },
         ],
         usage: { totalTokens: 50 },
@@ -917,13 +931,7 @@ describe('agent step', () => {
 
       const testBrain = brain('test-default-system').brain('No System', () => ({
         prompt: 'Do something',
-        tools: {
-          done: {
-            description: 'Done',
-            inputSchema: z.object({}),
-            terminal: true,
-          },
-        },
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -968,6 +976,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         }));
 
       const events: BrainEvent[] = [];
@@ -1021,13 +1030,7 @@ describe('agent step', () => {
 
       const testBrain = brain('test-event-order').brain('Task', () => ({
         prompt: 'Do task',
-        tools: {
-          done: {
-            description: 'Done',
-            inputSchema: z.object({ result: z.string() }),
-            terminal: true,
-          },
-        },
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -1123,6 +1126,7 @@ describe('agent step', () => {
             execute: doWorkMock,
           },
         },
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -1161,7 +1165,9 @@ describe('agent step', () => {
     it('should emit raw response before iteration event', async () => {
       mockGenerateText.mockResolvedValueOnce({
         text: undefined,
-        toolCalls: [{ toolCallId: 'call-1', toolName: 'done', args: {} }],
+        toolCalls: [
+          { toolCallId: 'call-1', toolName: 'done', args: { result: 'ok' } },
+        ],
         usage: { totalTokens: 50 },
         responseMessages: [
           { role: 'user', content: [{ type: 'text', text: 'Do task' }] },
@@ -1171,6 +1177,7 @@ describe('agent step', () => {
 
       const testBrain = brain('test-event-order-raw').brain('Task', () => ({
         prompt: 'Do task',
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -1220,6 +1227,7 @@ describe('agent step', () => {
             terminal: true,
           },
         },
+        outputSchema: dummyOutputSchema,
       }));
 
       const events: BrainEvent[] = [];
@@ -1282,6 +1290,7 @@ describe('agent step', () => {
               terminal: true,
             },
           },
+          outputSchema: dummyOutputSchema,
         })
       );
 
@@ -1388,6 +1397,7 @@ describe('agent step', () => {
                 terminal: true,
               },
             },
+            outputSchema: dummyOutputSchema,
           };
         });
 
@@ -1444,6 +1454,7 @@ describe('agent step', () => {
                 terminal: true,
               },
             },
+            outputSchema: dummyOutputSchema,
           };
         });
 
