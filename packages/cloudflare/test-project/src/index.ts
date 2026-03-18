@@ -530,18 +530,15 @@ const iterateBrainTestBrain = brain({
     outputKey: 'results' as const,
   });
 
-// Inner brain for iterate-with-options testing - multiplies value by multiplier from initial state
-const iterateOptionsInnerBrain = brain<
-  {},
-  { value: number; multiplier: number; result: number }
->({
+// Inner brain for iterate-with-options testing - multiplies value by multiplier from options
+const iterateOptionsInnerBrain = brain<{}, { value: number; result: number }>({
   title: 'iterate-options-inner',
-  description: 'Inner brain that multiplies value by multiplier',
+  description: 'Inner brain that multiplies value by multiplier from options',
 })
   .withOptionsSchema(z.object({ multiplier: z.number() }))
-  .step('Multiply', ({ state }) => ({
+  .step('Multiply', ({ state, options }) => ({
     ...state,
-    result: state.value * state.multiplier,
+    result: state.value * options.multiplier,
   }));
 
 // Outer brain with options schema + iterate - options must survive resume
@@ -563,14 +560,11 @@ const iterateOptionsTestBrain = brain({
     run: iterateOptionsInnerBrain,
     over: ({ state }: { state: { multiplier: number; items: number[] } }) =>
       state.items,
-    initialState: (
-      item: number,
-      state: { multiplier: number; items: number[] }
-    ) => ({
+    initialState: (item: number) => ({
       value: item,
-      multiplier: state.multiplier,
       result: 0,
     }),
+    options: ({ options }) => ({ multiplier: options.multiplier }),
     outputKey: 'results' as const,
   })
   .step('Verify options', ({ state, options }) => ({

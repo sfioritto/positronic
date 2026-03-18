@@ -512,6 +512,16 @@ export class BrainEventStream<
           : brainBlock.initialState
         : {};
 
+      const innerOptions = brainBlock.options
+        ? typeof brainBlock.options === 'function'
+          ? brainBlock.options({
+              state: this.currentState,
+              options: this.options,
+              ...this.services,
+            })
+          : brainBlock.options
+        : {};
+
       // Check if we're resuming an inner brain
       const innerStack = this.resume?.innerStack;
       const hasInnerResume = innerStack && innerStack.length > 0;
@@ -534,7 +544,7 @@ export class BrainEventStream<
               stepIndex: innerEntry!.stepIndex,
               innerStack: remainingStack?.length ? remainingStack : undefined,
             },
-            options: this.options ?? ({} as TOptions),
+            options: innerOptions,
             pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
@@ -547,7 +557,7 @@ export class BrainEventStream<
             client: this.client,
             currentUser: this.currentUser,
             initialState,
-            options: this.options ?? ({} as TOptions),
+            options: innerOptions,
             pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
@@ -1389,12 +1399,22 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           // Brain mode: run inner brain per item
           const initialState = block.initialState!(item, this.currentState);
 
+          const mapInnerOptions = block.options
+            ? typeof block.options === 'function'
+              ? block.options({
+                  state: this.currentState,
+                  options: this.options,
+                  ...this.services,
+                })
+              : block.options
+            : {};
+
           const innerRun = block.innerBrain.run({
             resources: this.resources,
             client: this.client,
             currentUser: this.currentUser,
             initialState,
-            options: this.options ?? ({} as TOptions),
+            options: mapInnerOptions,
             pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,

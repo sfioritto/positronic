@@ -387,17 +387,23 @@ export class Brain<
 
   // Overload 1: Nested brain with outputKey
   brain<
+    TInnerOptions extends JsonObject,
     TInnerState extends State,
     TOutputKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & { [K in TOutputKey]: TInnerState }
   >(
     title: string,
-    innerBrain: Brain<TOptions, TInnerState, TServices>,
+    innerBrain: Brain<TInnerOptions, TInnerState, any>,
     config: {
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       initialState?:
         | State
         | ((context: StepContext<TState, TOptions> & TServices) => State);
+      options?:
+        | TInnerOptions
+        | ((
+            context: StepContext<TState, TOptions> & TServices
+          ) => TInnerOptions);
     }
   ): Brain<TOptions, TNewState, TServices>;
 
@@ -440,7 +446,7 @@ export class Brain<
       | ((
           params: any
         ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
-    configOrUndefined?: { outputKey: string; initialState?: any }
+    configOrUndefined?: { outputKey: string; initialState?: any; options?: any }
   ): any {
     // Case 1: Nested brain instance
     if (
@@ -452,6 +458,7 @@ export class Brain<
       const config = configOrUndefined as {
         outputKey: string;
         initialState?: any;
+        options?: any;
       };
       const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
         type: 'brain',
@@ -459,6 +466,7 @@ export class Brain<
         innerBrain: innerBrainOrConfig,
         outputKey: config.outputKey,
         initialState: config.initialState,
+        options: config.options,
       };
       this.blocks.push(nestedBlock);
       return this.nextBrain<any>();
@@ -590,6 +598,7 @@ export class Brain<
   // Overload 1: Brain mode — run an inner brain per item
   map<
     TItems extends any[],
+    TInnerOptions extends JsonObject,
     TInnerState extends State,
     TOutputKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & {
@@ -598,13 +607,18 @@ export class Brain<
   >(
     title: string,
     config: {
-      run: Brain<TOptions, TInnerState, TServices>;
+      run: Brain<TInnerOptions, TInnerState, any>;
       over: (
         context: StepContext<TState, TOptions> & TServices
       ) => TItems | Promise<TItems>;
       initialState: (item: TItems[number], outerState: TState) => State;
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItems[number], error: Error) => TInnerState | null;
+      options?:
+        | TInnerOptions
+        | ((
+            context: StepContext<TState, TOptions> & TServices
+          ) => TInnerOptions);
     }
   ): Brain<TOptions, TNewState, TServices>;
 
@@ -652,6 +666,7 @@ export class Brain<
       initialState?: (item: any, outerState: any) => State;
       outputKey: string;
       error?: (item: any, error: Error) => any | null;
+      options?: any;
     }
   ): Brain<TOptions, any, TServices> {
     const mapBlock: MapBlock = {
@@ -665,6 +680,7 @@ export class Brain<
       template: config.template,
       outputSchema: config.outputSchema,
       client: config.client,
+      options: config.options,
     };
     this.blocks.push(mapBlock);
     return this.nextBrain<any>();
