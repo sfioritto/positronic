@@ -3123,6 +3123,47 @@ describe('.map()', () => {
       { result: 'from custom client' },
     ]);
   });
+
+  it('should work in brain mode when the parent brain runs as a child via .brain()', async () => {
+    const processBrain = brain<{}, { value: number }>('MapChild').step(
+      'Double',
+      ({ state }) => ({ value: state.value * 2 })
+    );
+
+    const innerBrain = brain('MapParent')
+      .step('Init', () => ({
+        items: [{ value: 1 }, { value: 2 }, { value: 3 }],
+      }))
+      .map('Process items', {
+        run: processBrain,
+        over: ({ state }) => state.items,
+        initialState: (item) => item,
+        outputKey: 'results' as const,
+        error: () => null,
+      })
+      .step('Summarize', ({ state }) => ({
+        ...state,
+        total: state.results.values.reduce(
+          (sum: number, r: any) => sum + r.value,
+          0
+        ),
+      }));
+
+    const outerBrain = brain('MapOuter').brain(
+      'Run inner',
+      innerBrain,
+      ({ brainState }) => ({
+        total: brainState.total,
+      })
+    );
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    expect(finalState.total).toBe(12);
+  });
 });
 
 describe('withTools vs withExtraTools semantics', () => {

@@ -569,18 +569,34 @@ export class BrainEventStream<
             storeProvider: this.storeProvider,
           });
 
+      // Track nesting depth so we only collect patches from the direct
+      // child brain (depth 1) and ignore patches from deeper nested brains
+      // (e.g. inner brains run by .map() or nested .brain() steps).
+      // Resumed brains skip their START event, so start at depth 1.
+      let innerDepth = innerResumeContext ? 1 : 0;
+
       for await (const event of innerRun) {
         yield event; // Forward all inner brain events
-        if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        if (event.type === BRAIN_EVENTS.START) {
+          innerDepth++;
+        }
+        if (event.type === BRAIN_EVENTS.STEP_COMPLETE && innerDepth === 1) {
           patches.push(event.patch);
         }
         // If inner brain yielded a WEBHOOK event, it's pausing
         if (event.type === BRAIN_EVENTS.WEBHOOK) {
           innerBrainPaused = true;
         }
-        // If inner brain completed, break immediately to prevent hanging
         if (event.type === BRAIN_EVENTS.COMPLETE) {
-          break;
+          innerDepth--;
+          if (innerDepth === 0) {
+            break;
+          }
+        }
+        // Errored brains emit ERROR instead of COMPLETE, so decrement depth
+        // to keep tracking accurate when errors are caught (e.g. by .map() error handlers)
+        if (event.type === BRAIN_EVENTS.ERROR) {
+          innerDepth--;
         }
       }
 
