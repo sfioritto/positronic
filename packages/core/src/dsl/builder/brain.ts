@@ -37,8 +37,8 @@ import type {
   AgentBlock,
   GuardBlock,
   WaitBlock,
+  MapBlock,
   TemplateContext,
-  IterateTemplateContext,
 } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
 import type {
@@ -94,6 +94,12 @@ export class Brain<
           return {
             type: 'wait' as const,
             title: block.title,
+          };
+        } else if (block.type === 'map') {
+          return {
+            type: 'map' as const,
+            title: block.title,
+            innerBrain: (block as MapBlock).innerBrain.structure,
           };
         } else {
           // block.type === 'brain'
@@ -470,94 +476,6 @@ export class Brain<
     ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
-  // Overload 6: Nested brain with iterate
-  brain<
-    TItems extends any[],
-    TInnerState extends State,
-    TOutputKey extends string & { readonly brand?: unique symbol },
-    TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItems[number], TInnerState>;
-    }
-  >(
-    title: string,
-    innerBrain: Brain<TOptions, TInnerState, TServices>,
-    iterateConfig: {
-      over: (
-        context: StepContext<TState, TOptions> &
-          TServices &
-          StoreContext<TStore>
-      ) => TItems | Promise<TItems>;
-      initialState: (item: TItems[number], outerState: TState) => State;
-      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
-      error?: (item: TItems[number], error: Error) => TInnerState | null;
-    }
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
-
-  // Overload 7: Agent config function with iterate, WITH outputSchema
-  brain<
-    TItems extends any[],
-    TTools extends Record<string, AgentTool<any>>,
-    TName extends string & { readonly brand?: unique symbol },
-    TSchema extends z.ZodObject<any>,
-    TOutputKey extends string & { readonly brand?: unique symbol },
-    TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItems[number], z.infer<TSchema>>;
-    }
-  >(
-    title: string,
-    configFn: (
-      item: TItems[number],
-      params: StepContext<TState, TOptions, TResponse, TPage> &
-        TServices &
-        StoreContext<TStore> & {
-          tools: Record<string, AgentTool<any>>;
-        }
-    ) =>
-      | AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>
-      | Promise<AgentConfig<TTools, AgentOutputSchema<TSchema, TName>>>,
-    iterateConfig: {
-      over: (
-        context: StepContext<TState, TOptions> &
-          TServices &
-          StoreContext<TStore>
-      ) => TItems | Promise<TItems>;
-      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
-      error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
-    }
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
-
-  // Overload 8: Agent config function with iterate, no outputSchema
-  brain<
-    TItems extends any[],
-    TTools extends Record<string, AgentTool<any>> = Record<
-      string,
-      AgentTool<any>
-    >,
-    TOutputKey extends string = string,
-    TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItems[number], any>;
-    }
-  >(
-    title: string,
-    configFn: (
-      item: TItems[number],
-      params: StepContext<TState, TOptions, TResponse, TPage> &
-        TServices &
-        StoreContext<TStore> & {
-          tools: Record<string, AgentTool<any>>;
-        }
-    ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>,
-    iterateConfig: {
-      over: (
-        context: StepContext<TState, TOptions> &
-          TServices &
-          StoreContext<TStore>
-      ) => TItems | Promise<TItems>;
-      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
-      error?: (item: TItems[number], error: Error) => any | null;
-    }
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
-
   // Implementation
   brain(
     title: string,
@@ -566,22 +484,10 @@ export class Brain<
       | AgentConfig<any, any>
       | ((
           params: any
-        ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
-      | ((
-          item: any,
-          params: any
         ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
-    actionOrIterateConfig?:
-      | ((params: any) => any)
-      | { over: (context: any) => any[] | Promise<any[]>; [key: string]: any },
+    actionOrConfig?: (params: any) => any,
     initialState?: State | ((state: TState) => State)
   ): any {
-    // Detect iterate config: 3rd arg is an object with `over` property
-    const isIterateConfig =
-      actionOrIterateConfig &&
-      typeof actionOrIterateConfig === 'object' &&
-      'over' in actionOrIterateConfig;
-
     // Case 1: Nested brain instance
     if (
       innerBrainOrConfig &&
@@ -589,28 +495,7 @@ export class Brain<
       'type' in innerBrainOrConfig &&
       innerBrainOrConfig.type === 'brain'
     ) {
-      if (isIterateConfig) {
-        // Case 1b: Nested brain with iterate
-        const iterateConfig = actionOrIterateConfig as {
-          over: (context: any) => any[] | Promise<any[]>;
-          initialState: (item: any, outerState: any) => State;
-          outputKey: string;
-          error?: (item: any, error: Error) => any | null;
-        };
-        const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
-          type: 'brain',
-          title,
-          innerBrain: innerBrainOrConfig,
-          initialState: () => ({} as State), // placeholder — iterate uses iterateConfig.initialState per item
-          action: () => ({}), // placeholder — iterate accumulates results under outputKey
-          iterateConfig,
-        };
-        this.blocks.push(nestedBlock);
-        return this.nextBrain<any>();
-      }
-
-      // Case 1a: Single nested brain (existing behavior)
-      const action = actionOrIterateConfig as (params: any) => any;
+      const action = actionOrConfig as (params: any) => any;
       const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
         type: 'brain',
         title,
@@ -624,35 +509,6 @@ export class Brain<
     }
 
     // Case 2 & 3: Agent config (object or function)
-    if (isIterateConfig) {
-      // Agent config with iterate — configFn receives (item, params)
-      const iterateConfig = actionOrIterateConfig as {
-        over: (context: any) => any[] | Promise<any[]>;
-        outputKey: string;
-        error?: (item: any, error: Error) => any | null;
-      };
-      const configFn = innerBrainOrConfig as (
-        item: any,
-        params: any
-      ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>;
-      const agentBlock: AgentBlock<
-        TState,
-        any,
-        TOptions,
-        TServices,
-        TResponse,
-        any,
-        any
-      > = {
-        type: 'agent',
-        title,
-        configFn: configFn as any, // stored as the item-receiving configFn
-        iterateConfig,
-      };
-      this.blocks.push(agentBlock);
-      return this.nextBrain<any, TResponse, undefined>();
-    }
-
     const configFn =
       typeof innerBrainOrConfig === 'function'
         ? innerBrainOrConfig
@@ -702,37 +558,7 @@ export class Brain<
     }
   ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
 
-  // Overload 2: Iterate execution - runs prompt for each item in array
-  prompt<
-    TItems extends any[],
-    TResponseKey extends string & { readonly brand?: unique symbol },
-    TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & {
-      [K in TResponseKey]: IterateResult<TItems[number], z.infer<TSchema>>;
-    }
-  >(
-    title: string,
-    config: {
-      template: (
-        context: IterateTemplateContext<TItems[number], TState, TOptions>
-      ) => string | Promise<string>;
-      outputSchema: {
-        schema: TSchema;
-        name: TResponseKey & (string extends TResponseKey ? never : unknown);
-      };
-      client?: ObjectGenerator;
-    },
-    iterateConfig: {
-      over: (
-        context: StepContext<TState, TOptions> &
-          TServices &
-          StoreContext<TStore>
-      ) => TItems | Promise<TItems>;
-      error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
-    }
-  ): Brain<TOptions, TNewState, TServices, TResponse, undefined, TStore>;
-
-  // Overload 3: Schema-less prompt - returns text response for next step
+  // Overload 2: Schema-less prompt - returns text response for next step
   prompt(
     title: string,
     config: {
@@ -753,10 +579,6 @@ export class Brain<
         name: string;
       };
       client?: ObjectGenerator;
-    },
-    iterateConfig?: {
-      over: (context: any) => any[] | Promise<any[]>;
-      error?: (item: any, error: Error) => any | null;
     }
   ): any {
     // Schema-less prompt - returns text response for next step
@@ -792,60 +614,68 @@ export class Brain<
     // At this point, outputSchema is guaranteed to exist (schema-less case returned early)
     const outputSchema = config.outputSchema!;
 
-    if (iterateConfig) {
-      // Iterate mode - store config on block for event-stream to execute with per-item events
-      const promptBlock: StepBlock<
-        TState,
-        any,
-        TOptions,
-        TServices,
-        TResponse,
-        TPage
-      > = {
-        type: 'step',
-        title,
-        action: async ({ state }) => state,
-        iterateConfig: {
-          over: iterateConfig.over,
-          error: iterateConfig.error,
-          template: config.template,
-          schema: outputSchema.schema,
-          schemaName: outputSchema.name,
-          client: config.client,
-        },
-      };
-      this.blocks.push(promptBlock);
-      return this.nextBrain<any>();
-    } else {
-      // Single mode - run prompt once with current state
-      const promptBlock: StepBlock<
-        TState,
-        any,
-        TOptions,
-        TServices,
-        TResponse,
-        TPage
-      > = {
-        type: 'step',
-        title,
-        client: config.client,
-        action: async ({ state, options, client, resources }) => {
-          const { schema, name: schemaName } = outputSchema;
-          const prompt = await config.template({ state, options, resources });
-          const result = await client.generateObject({
-            schema,
-            schemaName,
-            prompt,
-          });
-          return {
-            ...state,
-            [outputSchema.name]: result.object,
-          };
-        },
-      };
-      this.blocks.push(promptBlock);
-      return this.nextBrain<any>();
+    // Single mode - run prompt once with current state
+    const promptBlock: StepBlock<
+      TState,
+      any,
+      TOptions,
+      TServices,
+      TResponse,
+      TPage
+    > = {
+      type: 'step',
+      title,
+      client: config.client,
+      action: async ({ state, options, client, resources }) => {
+        const { schema, name: schemaName } = outputSchema;
+        const prompt = await config.template({ state, options, resources });
+        const result = await client.generateObject({
+          schema,
+          schemaName,
+          prompt,
+        });
+        return {
+          ...state,
+          [outputSchema.name]: result.object,
+        };
+      },
+    };
+    this.blocks.push(promptBlock);
+    return this.nextBrain<any>();
+  }
+
+  map<
+    TItems extends any[],
+    TInnerState extends State,
+    TOutputKey extends string & { readonly brand?: unique symbol },
+    TNewState extends State = TState & {
+      [K in TOutputKey]: IterateResult<TItems[number], TInnerState>;
     }
+  >(
+    title: string,
+    config: {
+      run: Brain<TOptions, TInnerState, TServices>;
+      over: (
+        context: StepContext<TState, TOptions> &
+          TServices &
+          StoreContext<TStore>
+      ) => TItems | Promise<TItems>;
+      initialState: (item: TItems[number], outerState: TState) => State;
+      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      error?: (item: TItems[number], error: Error) => TInnerState | null;
+    }
+  ): Brain<TOptions, TNewState, TServices, undefined, undefined, TStore> {
+    const mapBlock: MapBlock = {
+      type: 'map',
+      title,
+      innerBrain: config.run,
+      over: config.over,
+      initialState: config.initialState,
+      outputKey: config.outputKey,
+      error: config.error,
+    };
+    this.blocks.push(mapBlock);
+    return this.nextBrain<TNewState>();
   }
 
   /**

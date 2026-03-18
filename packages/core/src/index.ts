@@ -44,10 +44,7 @@ export type {
   BrainSignal,
   SignalProvider,
 } from './dsl/types.js';
-export type {
-  TemplateContext,
-  IterateTemplateContext,
-} from './dsl/definitions/blocks.js';
+export type { TemplateContext } from './dsl/definitions/blocks.js';
 export { applyPatches } from './dsl/json-patch.js';
 export { IterateResult } from './dsl/iterate-result.js';
 export { parseDuration } from './dsl/duration.js';

@@ -1775,9 +1775,11 @@ describe('Hono API Tests', () => {
       const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
       expect(webhookEvent).toBeDefined();
 
-      // Should NOT have completed yet
+      // Should NOT have completed yet (inner brain completes are expected from .map())
       const prematureComplete = events.find(
-        (e) => e.type === BRAIN_EVENTS.COMPLETE
+        (e) =>
+          e.type === BRAIN_EVENTS.COMPLETE &&
+          (e as BrainCompleteEvent).brainTitle === 'iterate-webhook-brain'
       );
       expect(prematureComplete).toBeUndefined();
 
