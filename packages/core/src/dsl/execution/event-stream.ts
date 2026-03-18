@@ -951,12 +951,11 @@ The schema for this result is: ${name}`,
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
-        if (config.outputSchema) {
-          throw new Error(
-            `Agent hit iteration limit (${maxIterations}) without producing required '${config.outputSchema.name}' output`
-          );
-        }
-        return;
+        throw new Error(
+          `Agent hit iteration limit (${maxIterations}) without producing required '${
+            config.outputSchema?.name ?? 'done'
+          }' output`
+        );
       }
 
       // Check if client supports generateText
@@ -1018,7 +1017,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         messages: initialMessages,
         responseMessages,
         tools: toolsForClient,
-        toolChoice: config.toolChoice,
+        toolChoice: config.toolChoice ?? 'required',
       });
 
       // Update responseMessages for next iteration (preserves providerOptions)
@@ -1067,12 +1066,13 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           options: this.options ?? ({} as TOptions),
           brainRunId: this.brainRunId,
         };
-        if (config.outputSchema) {
-          throw new Error(
-            `Agent hit token limit (${config.maxTokens}) without producing required '${config.outputSchema.name}' output`
-          );
-        }
-        return;
+        throw new Error(
+          `Agent hit token limit (${
+            config.maxTokens
+          }) without producing required '${
+            config.outputSchema?.name ?? 'done'
+          }' output`
+        );
       }
 
       // Handle assistant text response (emit event and log)
@@ -1090,9 +1090,15 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         };
       }
 
-      // If no tool calls, agent is done
+      // If no tool calls, something went wrong — with toolChoice 'required',
+      // the LLM should always produce tool calls. If it didn't, the agent
+      // exited without calling the 'done' tool to produce required output.
       if (!response.toolCalls || response.toolCalls.length === 0) {
-        return;
+        throw new Error(
+          `Agent exited without calling the 'done' tool. The LLM returned no tool calls despite toolChoice being 'required'. This is unexpected — the agent must call '${
+            config.outputSchema?.name ?? 'done'
+          }' to produce its output.`
+        );
       }
 
       // Track pending webhook if any tool returns waitFor

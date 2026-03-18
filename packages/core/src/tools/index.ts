@@ -325,29 +325,14 @@ export const consoleLog = createTool({
 });
 
 /**
- * Default schema for the auto-generated 'done' tool when no outputSchema is provided.
- * Used internally by the framework.
- */
-export const defaultDoneSchema = z.object({
-  result: z
-    .string()
-    .describe(
-      'A clear summary of what was accomplished. ' +
-        'Include: key outcomes, any important values or findings, and confirmation that the task is complete. ' +
-        'Be specific but concise. Example: "Successfully processed 15 orders totaling $1,234.56. All items shipped."'
-    ),
-});
-
-/**
  * Default tools bundle.
  *
  * Use with createBrain's defaultTools option or .withTools() to include
  * standard tools in your brain. Tools can be extended or overridden in
  * individual agent steps.
  *
- * Note: A 'done' terminal tool is automatically generated for every agent.
- * If you provide an outputSchema, 'done' will use that schema. Otherwise,
- * it uses a default schema expecting { result: string }.
+ * Note: A 'done' terminal tool is automatically generated for every agent
+ * using the required outputSchema.
  *
  * @example
  * ```typescript

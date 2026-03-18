@@ -213,8 +213,9 @@ describe('agent step', () => {
   });
 
   describe('agent ends when no tool calls', () => {
-    it('should complete agent when LLM returns no tool calls', async () => {
-      // LLM returns text but no tool calls
+    it('should throw error when LLM returns no tool calls', async () => {
+      // LLM returns text but no tool calls — this shouldn't happen with
+      // toolChoice 'required', but if it does, it's an error
       mockGenerateText.mockResolvedValueOnce({
         text: 'I have completed the task.',
         toolCalls: undefined,
@@ -235,28 +236,22 @@ describe('agent step', () => {
       }));
 
       const events: BrainEvent[] = [];
-      for await (const event of testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-      })) {
-        events.push(event);
+      try {
+        for await (const event of testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })) {
+          events.push(event);
+        }
+      } catch (error) {
+        // Error is expected because agent exited without calling 'done'
       }
 
-      // Agent should complete without AGENT_COMPLETE (that's for terminal tools)
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_START)).toBe(
-        true
-      );
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_ITERATION)).toBe(
-        true
-      );
-      expect(
-        events.some((e) => e.type === BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE)
-      ).toBe(true);
-      expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
-
-      // No AGENT_COMPLETE since no terminal tool was called
-      expect(events.some((e) => e.type === BRAIN_EVENTS.AGENT_COMPLETE)).toBe(
-        false
+      // Should have errored because agent exited without calling 'done'
+      const errorEvent = events.find((e) => e.type === BRAIN_EVENTS.ERROR);
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent as any).error.message).toMatch(
+        /Agent exited without calling the 'done' tool/
       );
     });
   });
