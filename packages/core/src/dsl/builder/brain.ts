@@ -86,10 +86,13 @@ export class Brain<
             title: block.title,
           };
         } else if (block.type === 'map') {
+          const mapBlock = block as MapBlock;
           return {
             type: 'map' as const,
             title: block.title,
-            innerBrain: (block as MapBlock).innerBrain.structure,
+            ...(mapBlock.innerBrain
+              ? { innerBrain: mapBlock.innerBrain.structure }
+              : {}),
           };
         } else {
           // block.type === 'brain'
