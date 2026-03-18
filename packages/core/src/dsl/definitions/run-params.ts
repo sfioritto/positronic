@@ -42,6 +42,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   governor?: (client: ObjectGenerator) => ObjectGenerator;
   storeProvider?: StoreProvider;
   currentUser: CurrentUser;
+  services?: Record<string, any>;
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>

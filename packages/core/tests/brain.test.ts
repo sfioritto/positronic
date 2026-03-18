@@ -1832,6 +1832,135 @@ describe('services support', () => {
     // Verify the state was updated
     expect(finalState).toEqual({ serviceUsed: true });
   });
+
+  it('should propagate services from parent to child brain', async () => {
+    let childReceivedApi: string | undefined;
+
+    const childBrain = brain('Child Brain').step(
+      'Use parent service',
+      (params: any) => {
+        childReceivedApi = params.api;
+        return { childDone: true };
+      }
+    );
+
+    const parentBrain = brain('Parent Brain')
+      .withServices({ api: 'parent-api-url' })
+      .step('Init', () => ({ started: true }))
+      .brain(
+        'Run child',
+        childBrain as any,
+        ({ state, brainState }) => ({ ...state, ...brainState }),
+        () => ({})
+      );
+
+    for await (const _ of parentBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
+    }
+
+    expect(childReceivedApi).toBe('parent-api-url');
+  });
+
+  it('should allow child services to override parent services', async () => {
+    let childReceivedApi: string | undefined;
+
+    const childBrain = brain('Override Child')
+      .withServices({ api: 'child-api-url' })
+      .step('Use service', (params: any) => {
+        childReceivedApi = params.api;
+        return { childDone: true };
+      });
+
+    const parentBrain = brain('Override Parent')
+      .withServices({ api: 'parent-api-url' })
+      .step('Init', () => ({ started: true }))
+      .brain(
+        'Run child',
+        childBrain,
+        ({ state, brainState }) => ({ ...state, ...brainState }),
+        () => ({})
+      );
+
+    for await (const _ of parentBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
+    }
+
+    // Child's own withServices() should win over parent's
+    expect(childReceivedApi).toBe('child-api-url');
+  });
+
+  it('should make parent services available to child without withServices', async () => {
+    let childReceivedLogger: any;
+
+    const childBrain = brain('No Services Child').step(
+      'Check for service',
+      (params: any) => {
+        childReceivedLogger = params.logger;
+        return { checked: true };
+      }
+    );
+
+    const parentBrain = brain('Provides Services Parent')
+      .withServices({ logger: testLogger })
+      .step('Init', () => ({ started: true }))
+      .brain(
+        'Run child',
+        childBrain as any,
+        ({ state, brainState }) => ({ ...state, ...brainState }),
+        () => ({})
+      );
+
+    for await (const _ of parentBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
+    }
+
+    expect(childReceivedLogger).toBe(testLogger);
+  });
+
+  it('should propagate storeProvider to nested brains', async () => {
+    const storeData = new Map<string, any>();
+    const mockStoreProvider = (config: any) => ({
+      get: async (key: string) => storeData.get(`${config.brainTitle}:${key}`),
+      set: async (key: string, value: any) => {
+        storeData.set(`${config.brainTitle}:${key}`, value);
+      },
+      delete: async (key: string) => {
+        storeData.delete(`${config.brainTitle}:${key}`);
+      },
+      has: async (key: string) => storeData.has(`${config.brainTitle}:${key}`),
+    });
+
+    const childBrain = brain('Store Child')
+      .withStore({ counter: z.number() })
+      .step('Write store', async ({ store }) => {
+        await store!.set('counter', 42);
+        return { stored: true };
+      });
+
+    const parentBrain = brain('Store Parent')
+      .step('Init', () => ({ started: true }))
+      .brain(
+        'Run child',
+        childBrain as any,
+        ({ state, brainState }) => ({ ...state, ...brainState }),
+        () => ({})
+      );
+
+    for await (const _ of parentBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      storeProvider: mockStoreProvider,
+    })) {
+    }
+
+    expect(storeData.get('Store Child:counter')).toBe(42);
+  });
 });
 
 describe('type inference', () => {

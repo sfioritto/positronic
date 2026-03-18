@@ -962,7 +962,7 @@ export class Brain<
       ...params,
       options: (params.options || {}) as TOptions,
       optionsSchema: this.optionsSchema,
-      services: this.services,
+      services: { ...(params.services || {}), ...this.services } as TServices,
       components: this.components,
       defaultTools: this.defaultTools,
       extraTools: this.extraTools,
