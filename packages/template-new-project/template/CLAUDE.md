@@ -113,7 +113,7 @@ export default brain('approval-workflow')
     ...state, status: 'pending',
   }))
   .wait('Wait for approval', ({ state }) => approvalWebhook(state.requestId), { timeout: '24h' })
-  .step('Process approval', ({ state, response }) => ({
+  .handle('Process approval', ({ state, response }) => ({
     ...state,
     status: response.approved ? 'approved' : 'rejected',
     reviewerNote: response.reviewerNote,

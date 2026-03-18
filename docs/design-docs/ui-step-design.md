@@ -93,6 +93,8 @@ const summaryPrompt = prompt({
 | `.ui()`                    | page (ephemeral)       | `{ url: string, webhook: WebhookRegistration<Schema> \| null }` |
 | `waitFor: [webhook]`       | response (ephemeral)   | `z.infer<WebhookSchema>`                                        |
 
+> **Historical note**: This design doc predates the continuation pattern refactor. `TPage` and `TResponse` type parameters were removed from Brain in March 2026. Operations producing ephemeral data (`.wait()`, `.ui()` with `responseSchema`, schema-less `.prompt()`) now return a `Continuation` whose `.handle()` method accesses the data. The `page` object is now available via a `notify` callback in `.ui()` config rather than as a step parameter.
+
 `page` follows the same pattern as `response` - new type parameter on Brain (`TPage`) that:
 
 1. `.ui()` sets to `Page<Schema>`
