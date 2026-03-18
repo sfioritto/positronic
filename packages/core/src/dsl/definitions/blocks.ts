@@ -160,15 +160,23 @@ export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
   predicate: (params: { state: TStateIn; options: TOptions }) => boolean;
 };
 
-// MapBlock: runs an inner brain once per item from the `over` list
+// MapBlock: runs an inner brain or prompt once per item from the `over` list
 export type MapBlock = {
   type: 'map';
   title: string;
-  innerBrain: any;
   over: (context: any) => any[] | Promise<any[]>;
-  initialState: (item: any, outerState: any) => State;
   outputKey: string;
   error?: (item: any, error: Error) => any | null;
+  // Brain mode
+  innerBrain?: any;
+  initialState?: (item: any, outerState: any) => State;
+  // Prompt mode
+  template?: (context: any) => string | Promise<string>;
+  outputSchema?: {
+    schema: z.ZodObject<any>;
+    name: string;
+  };
+  client?: ObjectGenerator;
 };
 
 export type Block<

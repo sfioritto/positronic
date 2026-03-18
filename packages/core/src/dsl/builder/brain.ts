@@ -608,6 +608,7 @@ export class Brain<
     return this.nextBrain<any>();
   }
 
+  // Overload 1: Brain mode — run an inner brain per item
   map<
     TItems extends any[],
     TInnerState extends State,
@@ -626,7 +627,54 @@ export class Brain<
       outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
       error?: (item: TItems[number], error: Error) => TInnerState | null;
     }
-  ): Brain<TOptions, TNewState, TServices> {
+  ): Brain<TOptions, TNewState, TServices>;
+
+  // Overload 2: Prompt mode — run a prompt per item
+  map<
+    TItems extends any[],
+    TSchema extends z.ZodObject<any>,
+    TOutputKey extends string & { readonly brand?: unique symbol },
+    TNewState extends State = TState & {
+      [K in TOutputKey]: IterateResult<TItems[number], z.infer<TSchema>>;
+    }
+  >(
+    title: string,
+    config: {
+      template: (
+        context: TemplateContext<TState, TOptions> & {
+          item: NoInfer<TItems[number]>;
+        }
+      ) => string | Promise<string>;
+      outputSchema: {
+        schema: TSchema;
+        name: string;
+      };
+      client?: ObjectGenerator;
+      over: (
+        context: StepContext<TState, TOptions> & TServices
+      ) => TItems | Promise<TItems>;
+      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
+    }
+  ): Brain<TOptions, TNewState, TServices>;
+
+  // Implementation
+  map(
+    title: string,
+    config: {
+      run?: any;
+      template?: (context: any) => string | Promise<string>;
+      outputSchema?: {
+        schema: z.ZodObject<any>;
+        name: string;
+      };
+      client?: ObjectGenerator;
+      over: (context: any) => any[] | Promise<any[]>;
+      initialState?: (item: any, outerState: any) => State;
+      outputKey: string;
+      error?: (item: any, error: Error) => any | null;
+    }
+  ): Brain<TOptions, any, TServices> {
     const mapBlock: MapBlock = {
       type: 'map',
       title,
@@ -635,9 +683,12 @@ export class Brain<
       initialState: config.initialState,
       outputKey: config.outputKey,
       error: config.error,
+      template: config.template,
+      outputSchema: config.outputSchema,
+      client: config.client,
     };
     this.blocks.push(mapBlock);
-    return this.nextBrain<TNewState>();
+    return this.nextBrain<any>();
   }
 
   /**

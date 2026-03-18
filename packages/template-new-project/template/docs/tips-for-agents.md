@@ -366,6 +366,34 @@ brain('example')
 
 The type inference flows through the entire chain, making the code cleaner and more maintainable.
 
+### Brains that receive initial state from outside
+
+If a brain receives its initial state from the outside — via `.map()`, `.brain()`, or `run({ initialState })` — declare the state type in the generic parameters:
+
+```typescript
+// This brain is used inside .map() — it receives thread data as initial state
+const categorizeBrain = brain<{}, RawThread>('categorize-thread')
+  .prompt('Categorize', {
+    template: ({ state }) => `Categorize: <%= '${state.subject}' %>`,
+    outputSchema: {
+      schema: z.object({ category: z.string() }),
+      name: 'category' as const,
+    },
+  });
+
+// The parent brain maps over threads
+brain('email-digest')
+  .step('Fetch', async () => ({ threads: await fetchThreads() }))
+  .map('Categorize', {
+    run: categorizeBrain,
+    over: ({ state }) => state.threads,
+    initialState: (thread) => thread,
+    outputKey: 'categorized' as const,
+  });
+```
+
+Without the generic, `TState` defaults to `object` and steps can't see any properties. The generic tells TypeScript "this brain starts with this shape." If the brain builds its own state from nothing (first step returns the initial shape), skip the generic — inference handles it.
+
 ## Error Handling in Brains
 
 **Important**: Do NOT catch errors in brain steps unless error handling is specifically part of the brain's workflow logic. The brain runner handles all errors automatically.

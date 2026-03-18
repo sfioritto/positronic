@@ -2981,6 +2981,148 @@ describe('.map()', () => {
       expect(sm.context.iterateContext!.totalItems).toBe(3);
     }
   );
+
+  it('should run prompt per item in prompt mode', async () => {
+    mockGenerateObject
+      .mockResolvedValueOnce({
+        object: { category: 'work', priority: 'high' },
+      })
+      .mockResolvedValueOnce({
+        object: { category: 'personal', priority: 'low' },
+      });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        emails: [
+          { subject: 'Meeting tomorrow', from: 'boss@work.com' },
+          { subject: 'Weekend plans', from: 'friend@home.com' },
+        ],
+      }))
+      .map('Categorize', {
+        template: ({ item }: { item: { subject: string; from: string } }) =>
+          `Categorize: ${item.subject} from ${item.from}`,
+        outputSchema: {
+          schema: z.object({
+            category: z.string(),
+            priority: z.enum(['high', 'medium', 'low']),
+          }),
+          name: 'categorization',
+        },
+        over: ({ state }) => state.emails,
+        outputKey: 'categories' as const,
+      });
+
+    const { finalState, events } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Results are IterateResult tuples
+    expect(finalState.categories).toHaveLength(2);
+    expect(finalState.categories[0]).toEqual([
+      { subject: 'Meeting tomorrow', from: 'boss@work.com' },
+      { category: 'work', priority: 'high' },
+    ]);
+    expect(finalState.categories[1]).toEqual([
+      { subject: 'Weekend plans', from: 'friend@home.com' },
+      { category: 'personal', priority: 'low' },
+    ]);
+
+    // Should emit ITERATE_ITEM_COMPLETE for each item
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    );
+    expect(itemEvents).toHaveLength(2);
+
+    // No inner brain events (no START/COMPLETE from inner brain)
+    const innerBrainStarts = events.filter(
+      (e) => e.type === BRAIN_EVENTS.START && (e as any).brainTitle !== 'Outer'
+    );
+    expect(innerBrainStarts).toHaveLength(0);
+
+    // generateObject called twice
+    expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle errors in prompt mode with error callback', async () => {
+    mockGenerateObject
+      .mockResolvedValueOnce({
+        object: { summary: 'Good result' },
+      })
+      .mockRejectedValueOnce(new Error('LLM error'))
+      .mockResolvedValueOnce({
+        object: { summary: 'Another result' },
+      });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: ['a', 'b', 'c'],
+      }))
+      .map('Summarize', {
+        template: ({ item }: { item: string }) => `Summarize: ${item}`,
+        outputSchema: {
+          schema: z.object({ summary: z.string() }),
+          name: 'summary',
+        },
+        over: ({ state }) => state.items,
+        outputKey: 'summaries' as const,
+        error: () => ({ summary: 'fallback' }),
+      });
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    expect(finalState.summaries).toHaveLength(3);
+    expect(finalState.summaries[0]).toEqual(['a', { summary: 'Good result' }]);
+    expect(finalState.summaries[1]).toEqual(['b', { summary: 'fallback' }]);
+    expect(finalState.summaries[2]).toEqual([
+      'c',
+      { summary: 'Another result' },
+    ]);
+  });
+
+  it('should use per-step client override in prompt mode', async () => {
+    const customMockGenerateObject =
+      jest.fn<ObjectGenerator['generateObject']>();
+    const customClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: customMockGenerateObject,
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
+    };
+
+    customMockGenerateObject.mockResolvedValue({
+      object: { result: 'from custom client' },
+    });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ n: 1 }],
+      }))
+      .map('Process', {
+        template: ({ item }: { item: { n: number } }) => `Process: ${item.n}`,
+        outputSchema: {
+          schema: z.object({ result: z.string() }),
+          name: 'result',
+        },
+        client: customClient,
+        over: ({ state }) => state.items,
+        outputKey: 'results' as const,
+      });
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Custom client was used, not the default one
+    expect(customMockGenerateObject).toHaveBeenCalledTimes(1);
+    expect(mockGenerateObject).not.toHaveBeenCalled();
+    expect(finalState.results[0]).toEqual([
+      { n: 1 },
+      { result: 'from custom client' },
+    ]);
+  });
 });
 
 describe('withTools vs withExtraTools semantics', () => {

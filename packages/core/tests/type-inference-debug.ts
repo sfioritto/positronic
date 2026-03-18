@@ -17,19 +17,6 @@ interface RawThread {
   body: string;
 }
 
-// Simulating a categorization prompt
-const categorizePrompt = {
-  template: ({ item }: { item: RawThread }) =>
-    `Categorize this email:\nFrom: ${item.from}\nSubject: ${item.subject}`,
-  outputSchema: {
-    schema: z.object({
-      category: z.string(),
-      priority: z.enum(['high', 'medium', 'low']),
-    }),
-    name: 'categoryResult' as const,
-  },
-};
-
 // Test 1: Simple step → step chain
 // This should properly infer state types
 const test1 = brain('test-1')
@@ -90,7 +77,7 @@ const test2 = brain('test-2')
     };
   });
 
-// Test 3: Step → batch prompt chain (the problematic pattern)
+// Test 3: Step → .map() with prompt (flat config)
 const test3 = brain('test-3')
   .step('Fetch threads', ({ state }) => {
     const threadsById: Record<string, RawThread> = {
@@ -112,13 +99,21 @@ const test3 = brain('test-3')
       threadsById,
     };
   })
-  .prompt('Categorize', categorizePrompt, {
-    // This is where the issue manifests:
-    // If state is JsonObject, we'd need to cast state.threadsById
+  .map('Categorize', {
+    template: ({ item }: { item: RawThread }) =>
+      `Categorize this email:\nFrom: ${item.from}\nSubject: ${item.subject}`,
+    outputSchema: {
+      schema: z.object({
+        category: z.string(),
+        priority: z.enum(['high', 'medium', 'low']),
+      }),
+      name: 'categoryResult',
+    },
     over: ({ state }) => Object.values(state.threadsById),
+    outputKey: 'categoryResult' as const,
   });
 
-// Test 4: Single prompt followed by batch prompt
+// Test 4: Single prompt followed by step
 const singlePrompt = {
   template: ({ state }: { state: { count: number } }) =>
     `Count is ${state.count}`,
@@ -145,21 +140,19 @@ const test4 = brain('test-4')
     };
   });
 
-// Test 5: Batch prompt followed by step
-const itemPrompt = {
-  template: ({ item }: { item: string }) => `Process: ${item}`,
-  outputSchema: {
-    schema: z.object({ result: z.string() }),
-    name: 'results' as const,
-  },
-};
-
+// Test 5: .map() with prompt followed by step
 const test5 = brain('test-5')
   .step('Initialize', () => ({
     items: ['a', 'b', 'c'],
   }))
-  .prompt('Process items', itemPrompt, {
+  .map('Process items', {
+    template: ({ item }: { item: string }) => `Process: ${item}`,
+    outputSchema: {
+      schema: z.object({ result: z.string() }),
+      name: 'results',
+    },
     over: ({ state }) => state.items,
+    outputKey: 'results' as const,
   })
   .step('After batch prompt', ({ state }) => {
     // state.results is an IterateResult<string, { result: string }>
@@ -175,27 +168,45 @@ const test5 = brain('test-5')
     };
   });
 
-// Test 6: Multiple prompts in sequence
+// Test 6: Multiple .map() prompts in sequence
 const test6 = brain('test-6')
   .step('Initialize', () => ({
     threads: [
       { id: '1', from: 'alice@test.com', subject: 'Hello', body: 'Hi' },
     ] as RawThread[],
   }))
-  .prompt('First categorize', categorizePrompt, {
+  .map('First categorize', {
+    template: ({ item }: { item: RawThread }) => `Categorize: ${item.subject}`,
+    outputSchema: {
+      schema: z.object({
+        category: z.string(),
+        priority: z.enum(['high', 'medium', 'low']),
+      }),
+      name: 'categoryResult',
+    },
     over: ({ state }) => state.threads,
+    outputKey: 'firstCategories' as const,
   })
   .step('After first prompt', ({ state }) => {
-    // state.categoryResult should be the batch results
-    const categories = state.categoryResult;
+    // state.firstCategories should be the batch results
+    const categories = state.firstCategories;
     return {
       ...state,
       categorizedCount: categories.length,
     };
   })
-  .prompt('Second categorize', categorizePrompt, {
-    // Should still have access to threads
+  .map('Second categorize', {
+    template: ({ item }: { item: RawThread }) =>
+      `Re-categorize: ${item.subject}`,
+    outputSchema: {
+      schema: z.object({
+        category: z.string(),
+        priority: z.enum(['high', 'medium', 'low']),
+      }),
+      name: 'categoryResult',
+    },
     over: ({ state }) => state.threads,
+    outputKey: 'secondCategories' as const,
   });
 
 // Export to prevent unused variable warnings
