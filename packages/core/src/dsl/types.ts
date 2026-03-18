@@ -74,15 +74,14 @@ export interface AgentToolWaitFor {
  * Context passed to step actions, agent config functions, and tool execute functions.
  * This is the same context available throughout brain execution.
  *
- * Generic parameters allow type-safe access to state, options, response, and page.
+ * Generic parameters allow type-safe access to state and options.
  * For tools (which are defined statically), use the non-generic defaults.
+ *
+ * Ephemeral data like `response` (from webhooks/prompts) and `page` (from UI steps)
+ * is only available inside continuation `.handle()` callbacks and `.ui()` `notify` callbacks,
+ * where it's injected via intersection types.
  */
-export interface StepContext<
-  TState = object,
-  TOptions = JsonObject,
-  TResponse = JsonObject | undefined,
-  TPage = import('./definitions/brain-types.js').GeneratedPage | undefined
-> {
+export interface StepContext<TState = object, TOptions = JsonObject> {
   /** Current brain state */
   state: TState;
   /** Brain options */
@@ -91,10 +90,6 @@ export interface StepContext<
   client: import('../clients/types.js').ObjectGenerator;
   /** Resource loader for accessing brain resources */
   resources: import('../resources/resources.js').Resources;
-  /** Webhook response data (when resuming after a webhook) */
-  response: TResponse;
-  /** Generated page from a previous UI step */
-  page: TPage;
   /** Page service for creating UI pages */
   pages: import('./pages.js').PagesService;
   /** Runtime environment (origin, secrets) */
@@ -105,10 +100,12 @@ export interface StepContext<
   brainRunId: string;
   /** Current step ID (for creating unique webhook identifiers) */
   stepId: string;
-  /** Scoped memory for storing and retrieving long-term memories */
-  memory?: import('../memory/types.js').ScopedMemory;
   /** The authenticated user running this brain */
   currentUser: CurrentUser;
+  /** Scoped memory — present at runtime when a memory provider is configured. Use withMemory() for non-optional typing in step callbacks. */
+  memory?: import('../memory/types.js').ScopedMemory;
+  /** Typed key-value store — present at runtime when a store schema is configured. Use withStore() for non-optional typing in step callbacks. */
+  store?: import('../store/types.js').Store<any>;
 }
 
 /**

@@ -1556,8 +1556,15 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       webhook,
     };
 
+    // Call notify callback if provided (side effects like Slack messages)
+    if (uiConfig.notify) {
+      await uiConfig.notify({
+        ...this.buildStepContext(step),
+        page: this.currentPage,
+      });
+    }
+
     // State doesn't change from UI step - it just sets up the page
-    // The next step will receive the page object and can use waitFor
     yield* this.completeStep(step, prevState, {
       url: page.url,
       webhook: {
@@ -1566,6 +1573,24 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         token: webhook.token,
       },
     });
+
+    // If responseSchema is present, the UI step natively suspends
+    // by yielding a WEBHOOK event (no separate .wait() block needed)
+    if (uiConfig.responseSchema) {
+      yield {
+        type: BRAIN_EVENTS.WEBHOOK,
+        waitFor: [
+          {
+            slug: webhook.slug,
+            identifier: webhook.identifier,
+            token: webhook.token,
+          },
+        ],
+        options: this.options,
+        brainRunId: this.brainRunId,
+      };
+      this.currentPage = undefined;
+    }
   }
 
   private async *executeWait(

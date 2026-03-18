@@ -73,6 +73,7 @@ export type StepBlock<
       context: TemplateContext<TStateIn, TOptions>
     ) => string | Promise<string>;
     responseSchema?: z.ZodObject<any>;
+    notify?: (context: any) => void | Promise<void>;
   };
   /** Per-step client override for prompt steps */
   client?: ObjectGenerator;

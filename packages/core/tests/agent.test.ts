@@ -1319,7 +1319,7 @@ describe('agent step', () => {
       // response (not the webhook response) when resuming from a webhook.
       // The webhook response should only be available via the messages array.
 
-      const configFnCalls: Array<{ response: any }> = [];
+      const configFnCalls: Array<{ state: any }> = [];
 
       const supportWebhook = createWebhook(
         'support-response',
@@ -1369,9 +1369,8 @@ describe('agent step', () => {
 
       const testBrain = brain('test-config-response')
         .step('Init', () => ({ previousStepData: 'from-init-step' }))
-        .brain('Handle Request', ({ state, response }) => {
-          // Capture what response is each time config function is called
-          configFnCalls.push({ response });
+        .brain('Handle Request', ({ state }) => {
+          configFnCalls.push({ state });
 
           return {
             prompt: 'Handle the request',
@@ -1406,9 +1405,9 @@ describe('agent step', () => {
 
       // Config function should have been called once (initial start)
       expect(configFnCalls.length).toBe(1);
-      // On initial start, response should be undefined (no previous response from Init step
-      // because the step just sets state, doesn't return a "response" in the generateObject sense)
-      expect(configFnCalls[0].response).toBeUndefined();
+      expect(configFnCalls[0].state).toEqual({
+        previousStepData: 'from-init-step',
+      });
 
       // Now resume from webhook with a webhook response
       // Use the state machine to reconstruct agent context from events
@@ -1426,9 +1425,8 @@ describe('agent step', () => {
       // Create a new brain instance to resume
       const resumedBrain = brain('test-config-response')
         .step('Init', () => ({ previousStepData: 'from-init-step' }))
-        .brain('Handle Request', ({ state, response }) => {
-          // Capture what response is on resumption
-          configFnCalls.push({ response });
+        .brain('Handle Request', ({ state }) => {
+          configFnCalls.push({ state });
 
           return {
             prompt: 'Handle the request',
@@ -1503,12 +1501,10 @@ describe('agent step', () => {
       // Config function should have been called again on resumption
       expect(configFnCalls.length).toBe(2);
 
-      // THE KEY ASSERTION: On resumption, response should NOT be the webhook data
-      // It should be undefined (same as on initial start), because the config function
-      // is for setting up the agent, not for processing webhook responses.
-      // Webhook responses flow through the messages array, not the response parameter.
-      expect(configFnCalls[1].response).toBeUndefined();
-      expect(configFnCalls[1].response).not.toEqual(webhookResponse);
+      // On resumption, the config function still receives the same state
+      expect(configFnCalls[1].state).toEqual({
+        previousStepData: 'from-init-step',
+      });
     });
   });
 

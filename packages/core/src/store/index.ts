@@ -3,5 +3,4 @@ export type {
   StoreProvider,
   PerUserField,
   InferStoreTypes,
-  StoreContext,
 } from './types.js';

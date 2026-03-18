@@ -118,7 +118,7 @@ const webhookBrain = brain({
     waiting: true,
   }))
   .wait('Wait for webhook', () => testWebhook('test-thread-123'))
-  .step('Process response', ({ state, response }) => ({
+  .handle('Process response', ({ state, response }) => ({
     ...state,
     waiting: false,
     receivedMessage: response.message,
@@ -136,7 +136,7 @@ const innerWebhookBrain = brain<{ data: string }, { count: number }>({
     waiting: true,
   }))
   .wait('Wait for inner webhook', () => innerWebhook('inner-test-id'))
-  .step('Process inner webhook', ({ state, response }) => ({
+  .handle('Process inner webhook', ({ state, response }) => ({
     ...state,
     waiting: false,
     webhookData: response?.data || 'no-data',
@@ -187,7 +187,7 @@ const outerWebhookAfterInner = brain({
     waitingForWebhook: true,
   }))
   .wait('Wait for webhook', () => testWebhook('outer-status-test'))
-  .step('After webhook', ({ state }) => ({ ...state, complete: true }));
+  .handle('After webhook', ({ state }) => ({ ...state, complete: true }));
 
 // Brain that uses the pages service
 const pagesBrain = brain({
@@ -308,7 +308,7 @@ const pageWebhookBrain = brain({
     waiting: true,
   }))
   .wait('Wait for webhook', () => testWebhook('page-webhook-test'))
-  .step('After webhook', ({ state, response }) => ({
+  .handle('After webhook', ({ state, response }) => ({
     ...state,
     waiting: false,
     webhookResponse: response,
@@ -408,7 +408,7 @@ const largeStateWebhookBrain = brain({
     waiting: true,
   }))
   .wait('Wait for webhook', () => testWebhook('large-state-test'))
-  .step('After webhook', ({ state, response }) => ({
+  .handle('After webhook', ({ state, response }) => ({
     ...state,
     waiting: false,
     webhookReceived: true,
@@ -451,7 +451,7 @@ const iterateWebhookBrain = brain({
     waiting: true,
   }))
   .wait('Wait for webhook', () => testWebhook('iterate-webhook-test'))
-  .step('Process webhook response', ({ state, response }) => ({
+  .handle('Process webhook response', ({ state, response }) => ({
     ...state,
     waiting: false,
     webhookMessage: response.message,
@@ -469,7 +469,7 @@ const timeoutWebhookBrain = brain({
   .wait('Wait for webhook', () => testWebhook('timeout-test-123'), {
     timeout: '1h',
   })
-  .step('Process response', ({ state, response }) => ({
+  .handle('Process response', ({ state, response }) => ({
     ...state,
     waiting: false,
     receivedMessage: response.message,
@@ -482,13 +482,13 @@ const multiWaitBrain = brain({
 })
   .step('Init', ({ state }) => ({ ...state, step: 1 }))
   .wait('Wait 1', () => testWebhook('multi-wait-1'), { timeout: '1h' })
-  .step('After wait 1', ({ state, response }) => ({
+  .handle('After wait 1', ({ state, response }) => ({
     ...state,
     step: 2,
     msg1: response.message,
   }))
   .wait('Wait 2', () => testWebhook('multi-wait-2'), { timeout: '2h' })
-  .step('After wait 2', ({ state, response }) => ({
+  .handle('After wait 2', ({ state, response }) => ({
     ...state,
     step: 3,
     msg2: response.message,

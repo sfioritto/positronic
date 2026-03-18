@@ -9,12 +9,8 @@ import type {
   JsonObject,
 } from './types.js';
 import type { UIComponent } from '../ui/types.js';
-import type { MemoryProvider } from '../memory/types.js';
-import type {
-  StoreSchema,
-  InferStoreTypes,
-  StoreContext,
-} from '../store/types.js';
+import type { MemoryProvider, ScopedMemory } from '../memory/types.js';
+import type { StoreSchema, InferStoreTypes, Store } from '../store/types.js';
 
 /**
  * Configuration for creating a project-level brain function.
@@ -23,7 +19,8 @@ export interface CreateBrainConfig<
   TServices extends object = {},
   TComponents extends Record<string, UIComponent<any>> = {},
   TTools extends Record<string, AgentTool<any>> = {},
-  TStoreSchema extends StoreSchema | undefined = undefined
+  TStoreSchema extends StoreSchema | undefined = undefined,
+  TMemory extends MemoryProvider | undefined = undefined
 > {
   /** Services available to all brains (e.g., slack, gmail, database clients) */
   services?: TServices;
@@ -32,7 +29,7 @@ export interface CreateBrainConfig<
   /** Default tools available to all agent steps */
   defaultTools?: TTools;
   /** Memory provider for long-term memory storage */
-  memory?: MemoryProvider;
+  memory?: TMemory;
   /** Store field definitions for typed key-value storage */
   store?: TStoreSchema;
 }
@@ -83,31 +80,40 @@ export function createBrain<
   TServices extends object = {},
   TComponents extends Record<string, UIComponent<any>> = {},
   TTools extends Record<string, AgentTool<any>> = {},
-  TStoreSchema extends StoreSchema | undefined = undefined
->(config: CreateBrainConfig<TServices, TComponents, TTools, TStoreSchema>) {
+  TStoreSchema extends StoreSchema | undefined = undefined,
+  TMemory extends MemoryProvider | undefined = undefined
+>(
+  config: CreateBrainConfig<
+    TServices,
+    TComponents,
+    TTools,
+    TStoreSchema,
+    TMemory
+  >
+) {
   const { services, components, defaultTools, memory, store } = config;
 
-  // Derive the store type from the schema
-  type InferredStore = TStoreSchema extends StoreSchema
-    ? InferStoreTypes<TStoreSchema>
-    : never;
+  // Derive the store service type from the schema
+  type StoreService = TStoreSchema extends StoreSchema
+    ? { store: Store<InferStoreTypes<TStoreSchema>> }
+    : {};
+
+  // Derive the memory service type from the provider
+  type MemoryService = TMemory extends MemoryProvider
+    ? { memory: ScopedMemory }
+    : {};
+
+  // Combined services type
+  type AllServices = TServices & StoreService & MemoryService;
 
   // The params available in agent config functions - uses StepContext for consistency
-  type AgentParams = StepContext<object, {}, undefined, undefined> &
-    TServices &
-    StoreContext<InferredStore> & {
+  type AgentParams = StepContext<object, {}> &
+    AllServices & {
       tools: TTools extends {} ? Record<string, AgentTool<any>> : TTools;
     };
 
   // Return type for the brain function
-  type BrainReturn = Brain<
-    {},
-    object,
-    TServices,
-    undefined,
-    undefined,
-    InferredStore
-  >;
+  type BrainReturn = Brain<{}, object, AllServices>;
 
   // Overload 1: Direct agent with config object WITH outputSchema
   function brain<
@@ -118,7 +124,7 @@ export function createBrain<
   >(
     title: string,
     config: AgentConfig<T, AgentOutputSchema<TSchema, TName>>
-  ): Brain<{}, TNewState, TServices, undefined, undefined, InferredStore>;
+  ): Brain<{}, TNewState, AllServices>;
 
   // Overload 2: Direct agent with config function WITH outputSchema
   function brain<
@@ -133,7 +139,7 @@ export function createBrain<
     ) =>
       | AgentConfig<T, AgentOutputSchema<TSchema, TName>>
       | Promise<AgentConfig<T, AgentOutputSchema<TSchema, TName>>>
-  ): Brain<{}, TNewState, TServices, undefined, undefined, InferredStore>;
+  ): Brain<{}, TNewState, AllServices>;
 
   // Overload 3: Direct agent with config function (no outputSchema)
   function brain<T extends Record<string, AgentTool<any>>>(
@@ -151,9 +157,7 @@ export function createBrain<
   function brain<
     TOptions extends JsonObject = {},
     TState extends State = object
-  >(
-    title: string
-  ): Brain<TOptions, TState, TServices, undefined, undefined, InferredStore>;
+  >(title: string): Brain<TOptions, TState, AllServices>;
 
   // Overload 6: Builder pattern with config object
   function brain<
@@ -162,7 +166,7 @@ export function createBrain<
   >(config: {
     title: string;
     description?: string;
-  }): Brain<TOptions, TState, TServices, undefined, undefined, InferredStore>;
+  }): Brain<TOptions, TState, AllServices>;
 
   // Implementation
   function brain(
