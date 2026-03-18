@@ -30,7 +30,7 @@ import { generateUI } from '../../ui/generate-ui.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
 import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
-import type { Store } from '../../store/types.js';
+import type { Store, StoreProvider } from '../../store/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type {
@@ -81,6 +81,7 @@ export class BrainEventStream<
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
   private store?: Store<any>;
+  private storeProvider?: StoreProvider;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private currentUser: CurrentUser;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
@@ -99,6 +100,7 @@ export class BrainEventStream<
       extraTools?: Record<string, AgentTool<any>>;
       memoryProvider?: MemoryProvider;
       store?: Store<any>;
+      storeProvider?: StoreProvider;
       optionsSchema?: z.ZodSchema<any>;
     }
   ) {
@@ -119,6 +121,7 @@ export class BrainEventStream<
       signalProvider,
       memoryProvider,
       store,
+      storeProvider,
       currentUser,
     } = params;
 
@@ -146,6 +149,7 @@ export class BrainEventStream<
     this.signalProvider = signalProvider;
     this.memoryProvider = memoryProvider;
     this.store = store;
+    this.storeProvider = storeProvider;
     this.optionsSchema = params.optionsSchema;
 
     // Create scoped memory if provider is configured
@@ -552,6 +556,8 @@ export class BrainEventStream<
             env: this.env,
             brainRunId: this.brainRunId,
             governor: this.governor,
+            services: this.services as Record<string, any>,
+            storeProvider: this.storeProvider,
           })
         : brainBlock.innerBrain.run({
             resources: this.resources,
@@ -563,6 +569,8 @@ export class BrainEventStream<
             env: this.env,
             brainRunId: this.brainRunId,
             governor: this.governor,
+            services: this.services as Record<string, any>,
+            storeProvider: this.storeProvider,
           });
 
       for await (const event of innerRun) {
@@ -1536,6 +1544,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           env: this.env,
           brainRunId: this.brainRunId,
           governor: this.governor,
+          services: this.services as Record<string, any>,
+          storeProvider: this.storeProvider,
         });
 
         let patches: any[] = [];
