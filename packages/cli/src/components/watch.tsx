@@ -34,18 +34,7 @@ import {
   type WatchKeyboardContext,
 } from './watch-keyboard.js';
 import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
-import {
-  useWatchMachine,
-  machineStateToViewMode,
-  isConfirmingKill,
-  isKillingState,
-  isKilledState,
-  isPausingState,
-  isResumingState,
-  isSendingMessageState,
-  type WatchContext,
-  type PreviousView,
-} from './watch-machine.js';
+import { useWatchReducer, type PreviousView } from './watch-machine.js';
 
 type JsonObject = { [key: string]: unknown };
 
@@ -248,14 +237,11 @@ export const Watch = ({
 }: WatchProps) => {
   const { exit } = useApp();
 
-  // UI navigation state machine - handles view transitions and related context
-  const [watchState, sendWatch] = useWatchMachine(runId, startWithEvents);
+  // UI navigation state — handles view transitions, async operations, and related context
+  const [watchState, sendWatch] = useWatchReducer(runId, startWithEvents);
 
-  // Derive viewMode from machine state
-  const viewMode = machineStateToViewMode(watchState.name);
-
-  // Read navigation and async operation state from machine context
   const {
+    viewMode,
     previousView: previousViewMode,
     stateSnapshot,
     stateTitle,
@@ -263,19 +249,21 @@ export const Watch = ({
     selectedAgentId,
     agentChatScrollOffset,
     eventsSelectedIndex,
+    killStatus,
     killError,
-    isKilled,
+    pauseResumeStatus,
     pauseResumeMessage,
     messageText,
+    messageStatus,
     messageFeedback: messageSentFeedback,
-  } = watchState.context;
+  } = watchState;
 
-  // Derive async operation flags from machine state
-  const confirmingKill = isConfirmingKill(watchState.name);
-  const isKilling = isKillingState(watchState.name);
-  const isPausing = isPausingState(watchState.name);
-  const isResuming = isResumingState(watchState.name);
-  const isSendingMessage = isSendingMessageState(watchState.name);
+  const confirmingKill = killStatus === 'confirming';
+  const isKilling = killStatus === 'killing';
+  const isKilled = killStatus === 'killed';
+  const isPausing = pauseResumeStatus === 'pausing';
+  const isResuming = pauseResumeStatus === 'resuming';
+  const isSendingMessage = messageStatus === 'sending';
 
   // Events array (large, not navigation state)
   const [events, setEvents] = useState<StoredEvent[]>([]);
