@@ -165,7 +165,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         env.origin
       }/webhooks/system/ui-form?identifier=${encodeURIComponent(
         webhookIdentifier
-      )}`;
+      )}&token=${encodeURIComponent(formToken)}`;
       webhookInfo = {
         slug: 'ui-form',
         identifier: webhookIdentifier,
@@ -180,7 +180,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       data: (input.data ?? {}) as Record<string, unknown>,
       title: hasForm ? 'Generated Form' : 'Generated Page',
       formAction,
-      formToken,
     });
 
     // Create the page

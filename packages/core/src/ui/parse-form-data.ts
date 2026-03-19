@@ -1,24 +1,13 @@
 /**
  * Parse form data into a plain object, handling array fields.
- * Extracts and strips the __positronic_token CSRF field.
  * Supports:
  * - name[] syntax for explicit arrays
  * - Multiple values with same key (converted to array)
  */
-export function parseFormData(formData: FormData): {
-  data: Record<string, unknown>;
-  token: string | null;
-} {
+export function parseFormData(formData: FormData): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  let token: string | null = null;
 
   for (const [key, value] of formData.entries()) {
-    // Extract CSRF token and exclude from response data
-    if (key === '__positronic_token') {
-      token = value as string;
-      continue;
-    }
-
     // Handle array fields (e.g., name[] for multi-select)
     if (key.endsWith('[]')) {
       const baseKey = key.slice(0, -2);
@@ -37,5 +26,5 @@ export function parseFormData(formData: FormData): {
     }
   }
 
-  return { data: result, token };
+  return result;
 }

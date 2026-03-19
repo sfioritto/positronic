@@ -37,10 +37,6 @@ webhooks.post('/:slug', async (context: Context) => {
   }
 
   try {
-    // Clone the request so we can extract the CSRF token separately
-    // without consuming the body that the user's handler needs
-    const clonedReq = context.req.raw.clone();
-
     // Call the webhook handler to process the incoming request
     const handlerResult = await webhook.handler(context.req.raw);
 
@@ -49,20 +45,8 @@ webhooks.post('/:slug', async (context: Context) => {
       return context.json({ challenge: handlerResult.challenge });
     }
 
-    // Extract CSRF token from form submissions
-    let submittedToken: string | null = null;
-    const contentType = clonedReq.headers.get('content-type') || '';
-    if (
-      contentType.includes('form-urlencoded') ||
-      contentType.includes('form-data')
-    ) {
-      try {
-        const formData = await clonedReq.formData();
-        submittedToken = formData.get('__positronic_token') as string | null;
-      } catch {
-        // Not parseable as form data, skip token extraction
-      }
-    }
+    // CSRF token is passed as a query parameter (if present)
+    const submittedToken = context.req.query('token') || null;
 
     // Normal webhook processing - queue signal and wake up brain
     const result = await queueWebhookAndWakeUp(
