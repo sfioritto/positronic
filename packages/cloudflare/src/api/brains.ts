@@ -1,10 +1,9 @@
 import { Hono, type Context } from 'hono';
-import { v4 as uuidv4 } from 'uuid';
 import { Cron } from 'croner';
 import Fuse from 'fuse.js';
 import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { getManifest } from '../brain-runner-do.js';
+import { getManifest, startBrainRun } from '../brain-runner-do.js';
 import type {
   Bindings,
   CreateBrainRunRequest,
@@ -80,11 +79,6 @@ brains.post('/runs', async (context: Context) => {
   if (!('brain' in result)) return result;
   const { brain } = result;
 
-  const brainRunId = uuidv4();
-  const namespace = context.env.BRAIN_RUNNER_DO;
-  const doId = namespace.idFromName(brainRunId);
-  const stub = namespace.get(doId);
-
   // Read auth context for currentUser (every brain run must have an owner)
   const auth = context.get('auth');
   if (!auth?.userName && !auth?.isRoot) {
@@ -100,7 +94,12 @@ brains.post('/runs', async (context: Context) => {
     options || initialState
       ? { ...(options && { options }), ...(initialState && { initialState }) }
       : undefined;
-  await stub.start(result.brainTitle, brainRunId, currentUser, initialData);
+  const brainRunId = await startBrainRun(
+    context.env.BRAIN_RUNNER_DO,
+    result.brainTitle,
+    currentUser,
+    initialData
+  );
 
   const response: CreateBrainRunResponse = {
     brainRunId,

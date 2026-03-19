@@ -21,6 +21,12 @@ export type SerializedPageContext = {
   webhook: SerializedWebhookRegistration;
 };
 
+// Configuration for webhooks that trigger new brain runs
+export interface WebhookTriggerConfig {
+  brain: string;
+  runAs: string;
+}
+
 // Type for the webhook handler return value (discriminated union)
 export type WebhookHandlerResult<TSchema extends z.ZodSchema = z.ZodSchema> =
   | {
@@ -31,6 +37,13 @@ export type WebhookHandlerResult<TSchema extends z.ZodSchema = z.ZodSchema> =
       type: 'webhook';
       identifier: string;
       response: z.infer<TSchema>;
+    }
+  | {
+      type: 'trigger';
+      response: z.infer<TSchema>;
+    }
+  | {
+      type: 'ignore';
     };
 
 // Type for the webhook function with handler attached
@@ -39,13 +52,15 @@ export interface WebhookFunction<TSchema extends z.ZodSchema = z.ZodSchema> {
   handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>;
   slug: string;
   schema: TSchema;
+  triggers?: WebhookTriggerConfig;
 }
 
 // Factory function to create webhooks
 export function createWebhook<TSchema extends z.ZodSchema>(
   slug: string,
   schema: TSchema,
-  handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>
+  handler: (request: Request) => Promise<WebhookHandlerResult<TSchema>>,
+  triggers?: WebhookTriggerConfig
 ): WebhookFunction<TSchema> {
   // Create the registration function
   const webhookFn = (
@@ -62,6 +77,9 @@ export function createWebhook<TSchema extends z.ZodSchema>(
   webhookFn.handler = handler;
   webhookFn.slug = slug;
   webhookFn.schema = schema;
+  if (triggers) {
+    webhookFn.triggers = triggers;
+  }
 
   return webhookFn as WebhookFunction<TSchema>;
 }

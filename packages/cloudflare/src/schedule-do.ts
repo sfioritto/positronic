@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { v4 as uuidv4 } from 'uuid';
 import { Cron } from 'croner';
 import { BRAIN_EVENTS, type BrainEvent } from '@positronic/core';
+import { startBrainRun } from './brain-runner-do.js';
 import type { BrainRunnerDO } from './brain-runner-do.js';
 
 export interface Env {
@@ -406,24 +407,19 @@ export class ScheduleDO extends DurableObject<Env> {
     options?: Record<string, string>,
     initialState?: Record<string, unknown>
   ): Promise<string> {
-    const brainRunId = uuidv4();
-    const namespace = this.env.BRAIN_RUNNER_DO;
-    const doId = namespace.idFromName(brainRunId);
-    const stub = namespace.get(doId);
-    console.log(
-      `[ScheduleDO] Triggering brain run ${brainTitle} with id ${brainRunId} as user ${runAsUserName}`
-    );
     const initialData = {
       ...(options && { options }),
       ...(initialState && { initialState }),
     };
-    await stub.start(
+    const brainRunId = await startBrainRun(
+      this.env.BRAIN_RUNNER_DO,
       brainTitle,
-      brainRunId,
       { name: runAsUserName },
       Object.keys(initialData).length > 0 ? initialData : undefined
     );
-
+    console.log(
+      `[ScheduleDO] Triggered brain run ${brainTitle} with id ${brainRunId} as user ${runAsUserName}`
+    );
     return brainRunId;
   }
 

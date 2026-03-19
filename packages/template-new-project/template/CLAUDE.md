@@ -66,7 +66,7 @@ Resources are files that brains can access during execution. They're stored in t
 
 ## Webhooks
 
-Webhooks allow brains to pause execution and wait for external events (like form submissions, API callbacks, or user approvals). Webhooks are auto-discovered from the `/webhooks` directory.
+Webhooks allow brains to pause execution and wait for external events, or to start new brain runs from incoming requests (like GitHub events or Slack messages). Webhooks are auto-discovered from the `/webhooks` directory.
 
 ### Creating a Webhook
 
@@ -131,6 +131,40 @@ If your brain generates a custom HTML page with a form that submits to a webhook
 3. Pass the token when creating the webhook registration: `myWebhook(identifier, token)`
 
 The `.ui()` step handles this automatically. See `/docs/brain-dsl-guide.md` for full examples.
+
+### Starting Brain Runs from Webhooks
+
+Webhooks can also trigger new brain runs by adding a `triggers` config and returning `{ type: 'trigger' }` from the handler:
+
+```typescript
+// webhooks/github-pr.ts
+import { createWebhook } from '@positronic/core';
+import { z } from 'zod';
+
+const githubPR = createWebhook(
+  'github-pr',
+  z.object({ prNumber: z.number(), title: z.string() }),
+  async (request: Request) => {
+    const body = await request.json();
+    if (body.action !== 'opened') return { type: 'ignore' };
+    return {
+      type: 'trigger',
+      response: { prNumber: body.pull_request.number, title: body.pull_request.title },
+    };
+  },
+  { brain: 'code-review', runAs: 'github-webhook' }
+);
+
+export default githubPR;
+```
+
+The handler return type determines the behavior:
+- `{ type: 'trigger', response }` — starts a new brain run with `response` as `initialState`
+- `{ type: 'webhook', identifier, response }` — resumes a waiting brain
+- `{ type: 'ignore' }` — acknowledges receipt, takes no action
+- `{ type: 'verification', challenge }` — handles webhook verification challenges
+
+The `triggers` config requires `brain` (brain title to start) and `runAs` (user identity for the run). Only webhooks with explicit `triggers` config can start brains — the handler validates the incoming request first.
 
 ### How Auto-Discovery Works
 
