@@ -193,13 +193,15 @@ export class BrainEventStream<
 
       // Restore page context if available (from a preceding UI step)
       if (resume.currentPage) {
-        this.currentPage = {
-          url: resume.currentPage.url,
-          webhook: {
-            ...resume.currentPage.webhook,
-            schema: z.record(z.unknown()), // fallback schema for deserialized webhook
-          },
-        };
+        this.currentPage = resume.currentPage.webhook
+          ? {
+              url: resume.currentPage.url,
+              webhook: {
+                ...resume.currentPage.webhook,
+                schema: z.record(z.unknown()),
+              },
+            }
+          : { url: resume.currentPage.url };
       }
     } else {
       // Fresh start: use initialState or empty object
@@ -1450,6 +1452,18 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     stepBlock: StepBlock<any, any, TOptions, TServices, any, any>
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const prevState = this.currentState;
+    const uiConfig = stepBlock.uiConfig!;
+
+    // Resume path: form response already available, merge onto state and complete
+    if (this.currentResponse && uiConfig.outputSchema) {
+      this.currentState = {
+        ...this.currentState,
+        [uiConfig.outputSchema.name]: this.currentResponse,
+      };
+      this.currentResponse = undefined;
+      yield* this.completeStep(step, prevState);
+      return;
+    }
 
     // Validate required configuration
     if (!this.components) {
@@ -1463,9 +1477,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       );
     }
 
-    const uiConfig = stepBlock.uiConfig!;
-
-    // Get the prompt from template (with heartbeat for long-running template functions)
+    // Get the prompt from the template callback
     const prompt = await uiConfig.template({
       state: this.currentState,
       options: this.options ?? ({} as TOptions),
@@ -1476,7 +1488,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       client: this.client,
       prompt,
       components: this.components,
-      schema: uiConfig.responseSchema,
+      schema: uiConfig.outputSchema?.schema,
       data: this.currentState as Record<string, unknown>,
     });
 
@@ -1502,66 +1514,43 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       }
     }
 
-    // Create unique identifier for this form submission webhook
-    const webhookIdentifier = `${this.brainRunId}-${step.id}`;
+    if (uiConfig.outputSchema) {
+      // Form UI: create webhook, CSRF token, suspend for submission
+      const webhookIdentifier = `${this.brainRunId}-${step.id}`;
+      const formToken = crypto.randomUUID();
+      const formAction = `${
+        this.env.origin
+      }/webhooks/system/ui-form?identifier=${encodeURIComponent(
+        webhookIdentifier
+      )}&token=${encodeURIComponent(formToken)}`;
 
-    // Generate CSRF token for form submission validation
-    const formToken = crypto.randomUUID();
-
-    // Construct form action URL for the webhook (includes CSRF token as query param)
-    const formAction = `${
-      this.env.origin
-    }/webhooks/system/ui-form?identifier=${encodeURIComponent(
-      webhookIdentifier
-    )}&token=${encodeURIComponent(formToken)}`;
-
-    // Generate HTML page
-    const html = generatePageHtml({
-      placements: uiResult.placements,
-      rootId: uiResult.rootId,
-      data: this.currentState as Record<string, unknown>,
-      title: stepBlock.title,
-      formAction,
-    });
-
-    const page = await this.pages.create(html);
-
-    // Create webhook registration for form submissions
-    // Uses a built-in 'ui-form' webhook slug that the backend knows how to handle
-    const webhook: WebhookRegistration = {
-      slug: 'ui-form',
-      identifier: webhookIdentifier,
-      schema: uiConfig.responseSchema ?? z.record(z.unknown()),
-      token: formToken,
-    };
-
-    // Set currentPage for the next step to access
-    this.currentPage = {
-      url: page.url,
-      webhook,
-    };
-
-    // Call notify callback if provided (side effects like Slack messages)
-    if (uiConfig.notify) {
-      await uiConfig.notify({
-        ...this.buildStepContext(step),
-        page: this.currentPage,
+      const html = generatePageHtml({
+        placements: uiResult.placements,
+        rootId: uiResult.rootId,
+        data: this.currentState as Record<string, unknown>,
+        title: stepBlock.title,
+        formAction,
       });
-    }
 
-    // State doesn't change from UI step - it just sets up the page
-    yield* this.completeStep(step, prevState, {
-      url: page.url,
-      webhook: {
-        slug: webhook.slug,
-        identifier: webhook.identifier,
-        token: webhook.token,
-      },
-    });
+      const page = await this.pages.create(html);
 
-    // If responseSchema is present, the UI step natively suspends
-    // by yielding a WEBHOOK event (no separate .wait() block needed)
-    if (uiConfig.responseSchema) {
+      const webhook: WebhookRegistration = {
+        slug: 'ui-form',
+        identifier: webhookIdentifier,
+        schema: uiConfig.outputSchema.schema,
+        token: formToken,
+      };
+
+      this.currentPage = { url: page.url, webhook };
+
+      if (uiConfig.notify) {
+        await uiConfig.notify({
+          ...this.buildStepContext(step),
+          page: this.currentPage,
+        });
+      }
+
+      // Suspend — step completes on resume (see resume path above)
       yield {
         type: BRAIN_EVENTS.WEBHOOK,
         waitFor: [
@@ -1575,6 +1564,25 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         brainRunId: this.brainRunId,
       };
       this.currentPage = undefined;
+    } else {
+      // Read-only UI: no form, no webhook
+      const html = generatePageHtml({
+        placements: uiResult.placements,
+        rootId: uiResult.rootId,
+        data: this.currentState as Record<string, unknown>,
+        title: stepBlock.title,
+      });
+
+      const page = await this.pages.create(html);
+
+      if (uiConfig.notify) {
+        await uiConfig.notify({
+          ...this.buildStepContext(step),
+          page: { url: page.url },
+        });
+      }
+
+      yield* this.completeStep(step, prevState, { url: page.url });
     }
   }
 

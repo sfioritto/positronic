@@ -13,7 +13,7 @@ import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
 import type { WebhookRegistration } from '../webhook.js';
 
-// Context passed to template callbacks (prompt, ui)
+// Context passed to template callbacks (prompt, ui, map)
 export interface TemplateContext<TState, TOptions extends JsonObject> {
   state: TState;
   options: TOptions;
@@ -72,7 +72,7 @@ export type StepBlock<
     template: (
       context: TemplateContext<TStateIn, TOptions>
     ) => string | Promise<string>;
-    responseSchema?: z.ZodObject<any>;
+    outputSchema?: { schema: z.ZodObject<any>; name: string };
     notify?: (context: any) => void | Promise<void>;
   };
   /** Per-step client override for prompt steps */

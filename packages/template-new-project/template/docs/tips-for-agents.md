@@ -433,7 +433,7 @@ Most generated brains should not have try-catch blocks. Only use them when the e
 
 ## UI Steps for Form Generation
 
-When you need to collect user input, use the `.ui()` method with `responseSchema`. The brain auto-suspends after generating the page. Use the `notify` callback for side effects, and `.handle()` to process the form response.
+When you need to collect user input, use the `.ui()` method with `outputSchema`. The brain auto-suspends after generating the page, then auto-merges the form response onto state under `outputSchema.name`. Use the `notify` callback for side effects.
 
 ```typescript
 import { z } from 'zod';
@@ -443,7 +443,7 @@ brain('feedback-collector')
     ...state,
     userName: 'John',
   }))
-  // Generate the form, notify, auto-suspend
+  // Generate the form, notify, auto-suspend, auto-merge response
   .ui('Collect Feedback', {
     template: ({ state }) => <%= '\`' %>
       Create a feedback form for <%= '${state.userName}' %>:
@@ -451,27 +451,30 @@ brain('feedback-collector')
       - Comments textarea
       - Submit button
     <%= '\`' %>,
-    responseSchema: z.object({
-      rating: z.number().min(1).max(5),
-      comments: z.string(),
-    }),
+    outputSchema: {
+      schema: z.object({
+        rating: z.number().min(1).max(5),
+        comments: z.string(),
+      }),
+      name: 'feedback' as const,
+    },
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
     },
   })
-  // .handle() receives the form response
-  .handle('Process', ({ state, response }) => ({
+  // No .handle() needed — form data auto-merges onto state.feedback
+  .step('Process', ({ state }) => ({
     ...state,
-    rating: response.rating,     // Typed from responseSchema
-    comments: response.comments,
+    // state.feedback.rating and state.feedback.comments are typed
+    processed: true,
   }));
 ```
 
 Key points:
 - `page` is available inside the `notify` callback, not in a separate step
 - `page.url` - where to send users
-- The brain auto-suspends after `.ui()` with `responseSchema`
-- `.handle()` receives the form data via `response`
+- The brain auto-suspends after `.ui()` with `outputSchema`
+- Form data auto-merges onto state under `outputSchema.name`
 - You control how users are notified (Slack, email, etc.) inside `notify`
 
 See `/docs/brain-dsl-guide.md` for more UI step examples.

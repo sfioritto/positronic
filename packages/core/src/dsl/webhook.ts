@@ -15,10 +15,10 @@ export type SerializedWebhookRegistration = {
   token?: string;
 };
 
-// Serializable page reference (URL + webhook metadata) for persisting across resume
+// Serializable page reference (URL + optional webhook metadata) for persisting across resume
 export type SerializedPageContext = {
   url: string;
-  webhook: SerializedWebhookRegistration;
+  webhook?: SerializedWebhookRegistration;
 };
 
 // Configuration for webhooks that trigger new brain runs

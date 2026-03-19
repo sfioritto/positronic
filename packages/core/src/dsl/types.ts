@@ -77,8 +77,8 @@ export interface AgentToolWaitFor {
  * Generic parameters allow type-safe access to state and options.
  * For tools (which are defined statically), use the non-generic defaults.
  *
- * Ephemeral data like `response` (from webhooks/prompts) and `page` (from UI steps)
- * is only available inside continuation `.handle()` callbacks and `.ui()` `notify` callbacks,
+ * Ephemeral data like `response` (from webhooks) and `page` (from UI steps)
+ * is only available inside `.handle()` callbacks after `.wait()` and `.ui()` `notify` callbacks,
  * where it's injected via intersection types.
  */
 export interface StepContext<TState = object, TOptions = JsonObject> {

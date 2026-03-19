@@ -517,7 +517,11 @@ export class Brain<
           title,
           client: config.client,
           action: async ({ state, options, client, resources }) => {
-            const prompt = await config.template({ state, options, resources });
+            const prompt = await config.template({
+              state,
+              options,
+              resources,
+            });
             const result = await client.generateObject({
               schema: textSchema,
               schemaName: 'TextResponse',
@@ -652,11 +656,11 @@ export class Brain<
   /**
    * Add a UI generation step that creates an interactive page.
    *
-   * When `responseSchema` is provided, the brain automatically suspends after
-   * generating the page (waiting for the form submission). Returns a `Continuation`
-   * that must be `.handle()`d to process the form response.
+   * When `outputSchema` is provided, the brain automatically suspends after
+   * generating the page (waiting for the form submission) and auto-merges
+   * the form response onto state under `outputSchema.name`.
    *
-   * When no `responseSchema` is provided, the step generates a read-only page
+   * When no `outputSchema` is provided, the step generates a read-only page
    * and returns the `Brain` directly for continued chaining.
    *
    * Use the optional `notify` callback for side effects (sending Slack messages, etc.)
@@ -664,24 +668,23 @@ export class Brain<
    *
    * @example
    * ```typescript
-   * // UI with form submission (returns Continuation)
+   * // UI with form submission (auto-merges response onto state)
    * brain('feedback-form')
    *   .step('Initialize', () => ({ userName: 'John' }))
    *   .ui('Create Form', {
    *     template: ({ state }) => `Create a feedback form for ${state.userName}`,
-   *     responseSchema: z.object({
-   *       rating: z.number().min(1).max(5),
-   *       comments: z.string(),
-   *     }),
+   *     outputSchema: {
+   *       schema: z.object({
+   *         rating: z.number().min(1).max(5),
+   *         comments: z.string(),
+   *       }),
+   *       name: 'feedback' as const,
+   *     },
    *     notify: async ({ page, slack }) => {
    *       await slack.post('#general', `Please fill out: ${page.url}`);
    *     },
    *   })
-   *   .handle('Process Feedback', ({ state, response }) => ({
-   *     ...state,
-   *     rating: response.rating,
-   *     comments: response.comments,
-   *   }))
+   *   // No .handle() needed — form data auto-merges onto state.feedback
    *
    * // Read-only UI (returns Brain directly)
    * brain('report')
@@ -691,14 +694,23 @@ export class Brain<
    *   .step('Next', ({ state }) => state)
    * ```
    */
-  // Overload 1: With responseSchema - returns Continuation
-  ui<TSchema extends z.ZodObject<any>>(
+  // Overload 1: With outputSchema - auto-merges response onto state
+  ui<
+    TResponseKey extends string & { readonly brand?: unique symbol },
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & {
+      [K in TResponseKey]: z.infer<TSchema>;
+    }
+  >(
     title: string,
     config: {
       template: (
         context: TemplateContext<TState, TOptions>
       ) => string | Promise<string>;
-      responseSchema: TSchema;
+      outputSchema: {
+        schema: TSchema;
+        name: TResponseKey & (string extends TResponseKey ? never : unknown);
+      };
       notify?: (
         context: { page: GeneratedPage<TSchema> } & StepContext<
           TState,
@@ -707,9 +719,9 @@ export class Brain<
           TServices
       ) => void | Promise<void>;
     }
-  ): Continuation<TOptions, TState, TServices, z.infer<TSchema>>;
+  ): Brain<TOptions, TNewState, TServices>;
 
-  // Overload 2: Without responseSchema - returns Brain
+  // Overload 2: Without outputSchema - returns Brain
   ui(
     title: string,
     config: {
@@ -728,7 +740,7 @@ export class Brain<
     title: string,
     config: {
       template: (context: any) => string | Promise<string>;
-      responseSchema?: z.ZodObject<any>;
+      outputSchema?: { schema: z.ZodObject<any>; name: string };
       notify?: (context: any) => void | Promise<void>;
     }
   ): any {
@@ -738,7 +750,7 @@ export class Brain<
       isUIStep: true,
       uiConfig: {
         template: config.template as (context: any) => string | Promise<string>,
-        responseSchema: config.responseSchema,
+        outputSchema: config.outputSchema,
         notify: config.notify,
       },
       action: async (params) => {
@@ -753,10 +765,8 @@ export class Brain<
     };
     this.blocks.push(uiBlock);
 
-    if (config.responseSchema) {
-      return this.continuationCallbacks<
-        z.infer<typeof config.responseSchema>
-      >();
+    if (config.outputSchema) {
+      return this.nextBrain<any>();
     }
 
     return this.nextBrain<TState>();
