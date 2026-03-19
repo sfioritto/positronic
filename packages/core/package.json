@@ -17,6 +17,10 @@
     ".": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/src/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/types/jsx-runtime.d.ts",
+      "import": "./dist/src/jsx-runtime.js"
     }
   },
   "scripts": {

@@ -51,6 +51,7 @@ import type {
 
 import { Step } from '../builder/step.js';
 import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT } from './constants.js';
+import { resolveTemplate } from '../../template/render.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -1334,12 +1335,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       try {
         if (block.template) {
           // Prompt mode: call generateObject directly per item
-          const prompt = await block.template({
-            item,
-            state: this.currentState,
-            options: this.options,
-            resources: this.resources,
-          });
+          const prompt = await resolveTemplate(
+            block.template({
+              item,
+              state: this.currentState,
+              options: this.options,
+              resources: this.resources,
+            })
+          );
           const client = block.client
             ? this.governor
               ? this.governor(block.client)
@@ -1472,11 +1475,13 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     // Get the prompt from the template callback
-    const prompt = await uiConfig.template({
-      state: this.currentState,
-      options: this.options ?? ({} as TOptions),
-      resources: this.resources,
-    });
+    const prompt = await resolveTemplate(
+      uiConfig.template({
+        state: this.currentState,
+        options: this.options ?? ({} as TOptions),
+        resources: this.resources,
+      })
+    );
 
     const uiResult = await generateUI({
       client: this.client,
