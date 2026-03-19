@@ -473,15 +473,6 @@ export class ScheduleDO extends DurableObject<Env> {
     );
   }
 
-  private isValidCronExpression(expression: string): boolean {
-    try {
-      new Cron(expression);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
   private calculateNextRunTime(
     cronExpression: string,
     afterTime: number,
