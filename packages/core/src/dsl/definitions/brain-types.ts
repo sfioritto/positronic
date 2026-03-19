@@ -3,25 +3,22 @@ import type { WebhookRegistration } from '../webhook.js';
 
 /**
  * Page object available after a .ui() step.
- * Contains URL to the page and a pre-configured webhook for form submissions.
+ * Contains URL and, for form UIs, a pre-configured webhook for submissions.
  *
  * Usage:
  * ```typescript
- * .ui('Create Form', { template: ..., responseSchema: z.object({ name: z.string() }) })
- * .step('Notify', async ({ page, slack }) => {
- *   await slack.post(`Fill out the form: ${page.url}`);
- *   return { state, waitFor: [page.webhook] };
+ * .ui('Create Form', {
+ *   template: ({ state }) => `Create a form for ${state.user}`,
+ *   outputSchema: { schema: z.object({ name: z.string() }), name: 'form' as const },
  * })
- * .step('Process', ({ response }) => {
- *   // response.name is typed from responseSchema
- * })
+ * // form data auto-merges onto state.form
  * ```
  */
 export type GeneratedPage<TSchema extends z.ZodSchema = z.ZodSchema> = {
   /** URL where the generated page can be accessed */
   url: string;
-  /** Pre-configured webhook for form submissions, typed based on responseSchema */
-  webhook: WebhookRegistration<TSchema>;
+  /** Pre-configured webhook for form submissions (present when outputSchema is provided) */
+  webhook?: WebhookRegistration<TSchema>;
 };
 
 /**

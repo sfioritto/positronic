@@ -4,7 +4,7 @@ This guide explains how to use the `.ui()` method to generate dynamic user inter
 
 ## Overview
 
-The UI step allows brains to generate React-based user interfaces dynamically using AI. When `.ui()` is called with a `responseSchema`, the brain generates a page, runs an optional `notify` callback (for side effects like Slack messages), then auto-suspends until the form is submitted. Use `.handle()` to process the form response.
+The UI step allows brains to generate React-based user interfaces dynamically using AI. When `.ui()` is called with an `outputSchema`, the brain generates a page, runs an optional `notify` callback (for side effects like Slack messages), then auto-suspends until the form is submitted. The form response is auto-merged onto state under `outputSchema.name`.
 
 ## Basic Usage
 
@@ -17,40 +17,42 @@ const feedbackBrain = brain('Collect Feedback')
     ...state,
     userName: 'John Doe',
   }))
-  // Generate the form, notify, auto-suspend
+  // Generate the form, notify, auto-suspend, auto-merge response
   .ui('Create Feedback Form', {
     template: ({ state }) => `
       Create a feedback form for ${state.userName}.
       Include fields for rating (1-5) and comments.
     `,
-    responseSchema: z.object({
-      rating: z.number().min(1).max(5),
-      comments: z.string(),
-    }),
+    outputSchema: {
+      schema: z.object({
+        rating: z.number().min(1).max(5),
+        comments: z.string(),
+      }),
+      name: 'feedback' as const,
+    },
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Please fill out: ${page.url}`);
     },
   })
-  // .handle() receives the form response
-  .handle('Process Feedback', ({ state, response }) => ({
+  // No .handle() needed — form data auto-merges onto state.feedback
+  .step('Process Feedback', ({ state }) => ({
     ...state,
     feedbackReceived: true,
-    rating: response.rating, // typed as number
-    comments: response.comments, // typed as string
+    // state.feedback.rating and state.feedback.comments are typed
   }));
 ```
 
 ## How It Works
 
-1. **UI Generation**: The `.ui()` step calls an AI agent to generate UI components based on your template prompt.
+1. **UI Generation**: The `.ui()` step calls an AI agent to generate UI components based on your prompt.
 
 2. **Page Creation**: The components are rendered to an HTML page and stored. A webhook is automatically configured for form submissions. A CSRF token is generated and embedded as a hidden form field to protect against unauthorized submissions.
 
 3. **Notify**: The optional `notify` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users however you want (Slack, email, SMS, etc.).
 
-4. **Auto-Suspend**: When `responseSchema` is provided, the brain automatically suspends and waits for the form to be submitted.
+4. **Auto-Suspend**: When `outputSchema` is provided, the brain automatically suspends and waits for the form to be submitted.
 
-5. **Handle**: `.handle()` receives the submitted form data via `response`, typed according to your `responseSchema`.
+5. **Auto-Merge**: The form data is automatically merged onto state under `outputSchema.name`.
 
 ## Complete Example
 
@@ -74,7 +76,7 @@ const supportTicketBrain = brain('Support Ticket')
     defaultEmail: 'user@example.com',
   }))
 
-  // Generate the ticket form, notify, auto-suspend
+  // Generate the ticket form, notify, auto-suspend, auto-merge
   .ui('Create Ticket Form', {
     template: ({ state }) => `
       Create a support ticket form with:
@@ -85,7 +87,10 @@ const supportTicketBrain = brain('Support Ticket')
       - Contact email, pre-filled with "${state.defaultEmail}"
       - Submit button labeled "Create Ticket"
     `,
-    responseSchema: ticketSchema,
+    outputSchema: {
+      schema: ticketSchema,
+      name: 'ticketData' as const,
+    },
     notify: async ({ page, state, email }) => {
       await email.send({
         to: state.defaultEmail,
@@ -95,28 +100,20 @@ const supportTicketBrain = brain('Support Ticket')
     },
   })
 
-  // Process the submitted form data
-  .handle('Process Ticket', ({ state, response }) => {
-    // response is fully typed based on ticketSchema:
-    // - response.subject: string
-    // - response.priority: 'low' | 'medium' | 'high'
-    // - response.description: string
-    // - response.contactEmail: string
-
-    return {
-      ...state,
-      notificationSent: true,
-      ticket: {
-        id: state.ticketId,
-        subject: response.subject,
-        priority: response.priority,
-        description: response.description,
-        contactEmail: response.contactEmail,
-        createdAt: new Date().toISOString(),
-        status: 'open',
-      },
-    };
-  })
+  // Form data is on state.ticketData — build the ticket
+  .step('Process Ticket', ({ state }) => ({
+    ...state,
+    notificationSent: true,
+    ticket: {
+      id: state.ticketId,
+      subject: state.ticketData.subject,
+      priority: state.ticketData.priority,
+      description: state.ticketData.description,
+      contactEmail: state.ticketData.contactEmail,
+      createdAt: new Date().toISOString(),
+      status: 'open',
+    },
+  }))
 
   // Send confirmation
   .step('Send Confirmation', async ({ state, email }) => {
@@ -137,14 +134,14 @@ export default supportTicketBrain;
 ### Signature
 
 ```typescript
-// With responseSchema — returns Continuation, must use .handle()
+// With outputSchema — auto-merges response onto state, returns Brain
 .ui(title: string, config: {
   template: (context: { state: TState; options: TOptions; resources: Resources }) => string | Promise<string>;
-  responseSchema: z.ZodObject<any>;
+  outputSchema: { schema: z.ZodObject<any>; name: TResponseKey };
   notify?: (context: { page: GeneratedPage } & StepContext & Services) => void | Promise<void>;
-}): Continuation
+}): Brain
 
-// Without responseSchema — returns Brain, continue chaining with .step()
+// Without outputSchema — returns Brain, continue chaining with .step()
 .ui(title: string, config: {
   template: (context: { state: TState; options: TOptions; resources: Resources }) => string | Promise<string>;
   notify?: (context: { page: GeneratedPage } & StepContext & Services) => void | Promise<void>;
@@ -155,7 +152,7 @@ export default supportTicketBrain;
 
 - **`title`**: A descriptive name for this UI step (shown in logs and events)
 - **`config.template`**: A function that generates the prompt for the AI to create the UI
-- **`config.responseSchema`**: A Zod schema defining the expected form submission data. When provided, the brain auto-suspends and returns a `Continuation`.
+- **`config.outputSchema`**: An object with `schema` (Zod schema defining expected form data) and `name` (key under which the response is merged onto state). When provided, the brain auto-suspends.
 - **`config.notify`**: Optional callback for side effects (Slack, email, etc.) that need the `page` object
 
 ### The `page` Object
@@ -185,11 +182,14 @@ interface GeneratedPage<TSchema> {
 
     Use a clean, single-column layout with proper spacing.
   `,
-  responseSchema: z.object({
-    name: z.string(),
-    email: z.string().email(),
-    bio: z.string().optional(),
-  }),
+  outputSchema: {
+    schema: z.object({
+      name: z.string(),
+      email: z.string().email(),
+      bio: z.string().optional(),
+    }),
+    name: 'profile' as const,
+  },
 })
 ```
 
@@ -206,9 +206,12 @@ The template can reference state values that will be resolved at render time usi
     - Shipping address input
     - Confirm order button
   `,
-  responseSchema: z.object({
-    shippingAddress: z.string(),
-  }),
+  outputSchema: {
+    schema: z.object({
+      shippingAddress: z.string(),
+    }),
+    name: 'orderConfirmation' as const,
+  },
 })
 ```
 
@@ -222,18 +225,21 @@ The template can reference state values that will be resolved at render time usi
       .replace('{{userName}}', state.userName)
       .replace('{{questions}}', JSON.stringify(state.questions));
   },
-  responseSchema: z.object({
-    answers: z.array(z.string()),
-  }),
+  outputSchema: {
+    schema: z.object({
+      answers: z.array(z.string()),
+    }),
+    name: 'surveyAnswers' as const,
+  },
 })
 ```
 
-## Response Schema
+## Output Schema
 
-The `responseSchema` defines what data the form collects. This provides:
+The `outputSchema` defines what data the form collects. This provides:
 
 1. **Validation**: The AI-generated form is validated to ensure it has inputs for all required fields
-2. **Type Safety**: The `response` parameter in `.handle()` is typed according to the schema
+2. **Type Safety**: The response is auto-merged onto state under `outputSchema.name` with full type inference
 
 ### Schema Examples
 
@@ -278,41 +284,43 @@ brain('User Onboarding')
       - Date of birth (required)
       - Next button
     `,
-    responseSchema: z.object({
-      firstName: z.string(),
-      lastName: z.string(),
-      dateOfBirth: z.string(),
-    }),
+    outputSchema: {
+      schema: z.object({
+        firstName: z.string(),
+        lastName: z.string(),
+        dateOfBirth: z.string(),
+      }),
+      name: 'personalInfo' as const,
+    },
     notify: async ({ page, notify }) => {
       await notify(`Complete step 1: ${page.url}`);
     },
   })
-  .handle('Save Personal Info', ({ state, response }) => ({
-    ...state,
-    step: 2,
-    userData: { ...state.userData, ...response },
-  }))
+  // No .handle() needed — auto-merges onto state.personalInfo
 
   // Step 2: Preferences
   .ui('Preferences Form', {
     template: ({ state }) => `
-      Create a preferences form for ${state.userData.firstName}:
+      Create a preferences form for ${state.personalInfo.firstName}:
       - Newsletter subscription (checkbox)
       - Contact method (select: email, phone, sms)
       - Complete button
     `,
-    responseSchema: z.object({
-      newsletter: z.boolean(),
-      contactMethod: z.enum(['email', 'phone', 'sms']),
-    }),
+    outputSchema: {
+      schema: z.object({
+        newsletter: z.boolean(),
+        contactMethod: z.enum(['email', 'phone', 'sms']),
+      }),
+      name: 'preferences' as const,
+    },
     notify: async ({ page, notify }) => {
       await notify(`Complete step 2: ${page.url}`);
     },
   })
-  .handle('Complete Onboarding', ({ state, response }) => ({
+  // No .handle() needed — auto-merges onto state.preferences
+  .step('Complete Onboarding', ({ state }) => ({
     ...state,
     step: 'complete',
-    userData: { ...state.userData, preferences: response },
     onboardingComplete: true,
   }));
 ```
@@ -353,18 +361,18 @@ Data bindings are resolved when the page is rendered.
 - Contains `url` and `webhook`
 - Use `page.url` to notify users where to go
 
-### The `response` Parameter
+### Auto-Merge Behavior
 
-- Available inside `.handle()` after `.ui()` with `responseSchema`
-- Contains the submitted form data
-- Typed according to `responseSchema`
+- When `outputSchema` is provided, form data auto-merges onto state under `outputSchema.name`
+- The merged data is fully typed based on the schema
+- No `.handle()` step is needed
 
 ### Separation of Concerns
 
 The `.ui()` step generates the page and auto-suspends. You control:
 
 - **How** users are notified (Slack, email, SMS, push notification, etc.) via the `notify` callback
-- **What** to do with the form data in `.handle()`
+- **What** to do with the auto-merged form data in subsequent steps
 
 This gives you flexibility to integrate with any notification system your brain uses.
 
@@ -384,8 +392,8 @@ See the Brain DSL Guide's "Custom Pages with Forms" section for full examples.
 
 ## Tips
 
-1. **Be Descriptive**: The more detail in your template, the better the generated UI
-2. **Always Provide Schema**: The `responseSchema` ensures type safety and validation
+1. **Be Descriptive**: The more detail in your prompt, the better the generated UI
+2. **Always Provide Schema**: The `outputSchema` ensures type safety and validation
 3. **Use `notify`**: Put notification logic in the `notify` callback, not in a separate step
 4. **Test Incrementally**: Test each UI step independently before combining
 5. **Use Meaningful Titles**: Step titles appear in logs and help with debugging

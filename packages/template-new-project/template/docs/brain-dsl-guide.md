@@ -106,7 +106,7 @@ brain('AI Education Assistant')
     {
       template: ({ state: { formattedOutput } }) =>
         `Based on this explanation about <%= '${formattedOutput.topic}' %>: "<%= '${formattedOutput.explanation}' %>"
-        
+
         Generate 3 thoughtful follow-up questions that a student might ask.`,
       outputSchema: {
         schema: z.object({
@@ -201,8 +201,8 @@ brain('email-checker')
   })
   .guard(({ state }) => state.emails.some(e => e.important))
   // everything below only runs if guard passes
-  .ui('Review emails', { ..., responseSchema: ... })
-  .handle('Handle response', ...);
+  .ui('Review emails', { ..., outputSchema: { schema: ..., name: 'review' as const } })
+  // form data auto-merges onto state.review
 ```
 
 Key points:
@@ -237,7 +237,7 @@ Each step receives these parameters:
 - `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
 - Custom services (if configured with `.withServices()` or `createBrain()`)
 
-> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()` or `.ui()` with `responseSchema`. It is not a general step parameter — see [UI Steps](#ui-steps) and [Webhooks](#webhooks) for details.
+> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.ui()` with `outputSchema`, the response is auto-merged onto state. See [UI Steps](#ui-steps) and [Webhooks](#webhooks) for details.
 
 ## Configuration Methods
 
@@ -635,9 +635,12 @@ const brainWithComponents = brain('Custom UI Brain')
       - Account status: <%= '${state.status}' %>
       Use DataTable to show recent activity.
     `,
-    responseSchema: z.object({
-      acknowledged: z.boolean()
-    })
+    outputSchema: {
+      schema: z.object({
+        acknowledged: z.boolean()
+      }),
+      name: 'acknowledgement' as const,
+    },
   });
 ```
 
@@ -1190,7 +1193,7 @@ brain('Research Topics')
 
 **Prompt mode** (use `template` + `outputSchema`):
 
-- `template: (context) => string` - Prompt template function. Receives `{ item, state, options, resources }` where `item` is the current iteration item.
+- `template: (context) => string` - Template function. Receives `{ item, state, options, resources }` where `item` is the current iteration item.
 - `outputSchema: { schema, name }` - Zod schema for the LLM output and a name for the schema.
 - `client?: ObjectGenerator` - Optional per-step LLM client override.
 
@@ -1537,7 +1540,7 @@ Without a token, the server will reject the form submission.
 
 ## UI Steps
 
-UI steps allow brains to generate dynamic user interfaces using AI. When `responseSchema` is provided, `.ui()` generates a page, auto-suspends the brain, and returns a `Continuation`. Use `.handle()` to process the form response. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
+UI steps allow brains to generate dynamic user interfaces using AI. When `outputSchema` is provided, `.ui()` generates a page, auto-suspends the brain, and auto-merges the form response onto state under `outputSchema.name`. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
 
 ### Basic UI Step
 
@@ -1549,26 +1552,28 @@ brain('Feedback Collector')
     ...state,
     userName: 'John Doe',
   }))
-  // Generate the form, notify users, auto-suspend, then handle response
+  // Generate the form, notify users, auto-suspend, auto-merge response
   .ui('Collect Feedback', {
     template: ({ state }) => `
       Create a feedback form for <%= '${state.userName}' %>.
       Include fields for rating (1-5) and comments.
     `,
-    responseSchema: z.object({
-      rating: z.number().min(1).max(5),
-      comments: z.string(),
-    }),
+    outputSchema: {
+      schema: z.object({
+        rating: z.number().min(1).max(5),
+        comments: z.string(),
+      }),
+      name: 'feedback' as const,
+    },
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
     },
   })
-  // .handle() receives the form response
-  .handle('Process Feedback', ({ state, response }) => ({
+  // No .handle() needed — form data auto-merges onto state.feedback
+  .step('Process Feedback', ({ state }) => ({
     ...state,
     feedbackReceived: true,
-    rating: response.rating,     // typed from responseSchema
-    comments: response.comments,
+    // state.feedback.rating and state.feedback.comments are typed
   }));
 ```
 
@@ -1578,7 +1583,7 @@ brain('Feedback Collector')
 2. **AI Generation**: The AI creates a component tree based on the prompt
 3. **Notify**: The optional `notify` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
 4. **Auto-Suspend**: The brain automatically suspends and waits for the form submission
-5. **Handle**: `.handle()` receives the form data via `response`, typed according to `responseSchema`
+5. **Auto-Merge**: The form data is automatically merged onto state under `outputSchema.name`
 
 ### The `page` Object
 
@@ -1602,11 +1607,14 @@ Be specific about layout and content:
 
     Use a clean, centered single-column layout.
   `,
-  responseSchema: z.object({
-    name: z.string(),
-    email: z.string().email(),
-    message: z.string(),
-  }),
+  outputSchema: {
+    schema: z.object({
+      name: z.string(),
+      email: z.string().email(),
+      message: z.string(),
+    }),
+    name: 'contactForm' as const,
+  },
 })
 ```
 
@@ -1623,9 +1631,12 @@ Use `{{path}}` syntax to bind props to runtime data:
     - Shipping address input
     - Confirm button
   `,
-  responseSchema: z.object({
-    shippingAddress: z.string(),
-  }),
+  outputSchema: {
+    schema: z.object({
+      shippingAddress: z.string(),
+    }),
+    name: 'orderConfirmation' as const,
+  },
 })
 ```
 
@@ -1645,39 +1656,42 @@ brain('User Onboarding')
       - Date of birth
       - Next button
     `,
-    responseSchema: z.object({
-      firstName: z.string(),
-      lastName: z.string(),
-      dob: z.string(),
-    }),
+    outputSchema: {
+      schema: z.object({
+        firstName: z.string(),
+        lastName: z.string(),
+        dob: z.string(),
+      }),
+      name: 'personalInfo' as const,
+    },
     notify: async ({ page, notify }) => {
       await notify(`Step 1: <%= '${page.url}' %>`);
     },
   })
-  .handle('Save Personal', ({ state, response }) => ({
-    ...state,
-    userData: { ...state.userData, ...response },
-  }))
+  // No .handle() needed — auto-merges onto state.personalInfo
 
   // Step 2: Preferences
   .ui('Preferences', {
     template: ({ state }) => `
-      Create preferences form for <%= '${state.userData.firstName}' %>:
+      Create preferences form for <%= '${state.personalInfo.firstName}' %>:
       - Newsletter subscription checkbox
       - Contact preference (email/phone/sms)
       - Complete button
     `,
-    responseSchema: z.object({
-      newsletter: z.boolean(),
-      contactMethod: z.enum(['email', 'phone', 'sms']),
-    }),
+    outputSchema: {
+      schema: z.object({
+        newsletter: z.boolean(),
+        contactMethod: z.enum(['email', 'phone', 'sms']),
+      }),
+      name: 'preferences' as const,
+    },
     notify: async ({ page, notify }) => {
       await notify(`Step 2: <%= '${page.url}' %>`);
     },
   })
-  .handle('Complete', ({ state, response }) => ({
+  // No .handle() needed — auto-merges onto state.preferences
+  .step('Complete', ({ state }) => ({
     ...state,
-    userData: { ...state.userData, preferences: response },
     onboardingComplete: true,
   }));
 ```
