@@ -173,53 +173,30 @@ export class BrainRunnerDO extends DurableObject<Env> {
   private eventStreamAdapter = new EventStreamAdapter();
   private abortController: AbortController | null = null;
   private pageAdapter: PageAdapter | null = null;
-  private runOwnerTableInitialized = false;
-  private signalsTableInitialized = false;
-  private waitTimeoutTableInitialized = false;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
     this.sql = state.storage.sql;
     this.brainRunId = state.id.toString();
     this.env = env;
-  }
 
-  private initializeRunOwnerTable() {
-    if (!this.runOwnerTableInitialized) {
-      this.sql.exec(runOwnerTableSQL);
-      this.runOwnerTableInitialized = true;
-    }
+    this.sql.exec(runOwnerTableSQL);
+    this.sql.exec(signalsTableSQL);
+    this.sql.exec(waitTimeoutTableSQL);
   }
 
   private storeRunOwner(userName: string) {
-    this.initializeRunOwnerTable();
     this.sql.exec(`INSERT INTO run_owner (user_name) VALUES (?)`, userName);
   }
 
   private getRunOwner(): string | null {
-    this.initializeRunOwnerTable();
     const results = this.sql
       .exec<{ user_name: string }>(`SELECT user_name FROM run_owner LIMIT 1`)
       .toArray();
     return results.length > 0 ? results[0].user_name : null;
   }
 
-  private initializeSignalsTable() {
-    if (!this.signalsTableInitialized) {
-      this.sql.exec(signalsTableSQL);
-      this.signalsTableInitialized = true;
-    }
-  }
-
-  private initializeWaitTimeoutTable() {
-    if (!this.waitTimeoutTableInitialized) {
-      this.sql.exec(waitTimeoutTableSQL);
-      this.waitTimeoutTableInitialized = true;
-    }
-  }
-
   storeWaitTimeout(brainRunId: string, timeoutAt: number) {
-    this.initializeWaitTimeoutTable();
     this.sql.exec(
       `INSERT OR REPLACE INTO wait_timeout (brain_run_id, timeout_at) VALUES (?, ?)`,
       brainRunId,
@@ -228,7 +205,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
   }
 
   clearWaitTimeout(brainRunId: string) {
-    this.initializeWaitTimeoutTable();
     this.sql.exec(
       `DELETE FROM wait_timeout WHERE brain_run_id = ?`,
       brainRunId
@@ -236,7 +212,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
   }
 
   getWaitTimeout(): { brainRunId: string; timeoutAt: number } | null {
-    this.initializeWaitTimeoutTable();
     const results = this.sql
       .exec<{ brain_run_id: string; timeout_at: number }>(
         `SELECT brain_run_id, timeout_at FROM wait_timeout LIMIT 1`
@@ -259,8 +234,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
     content?: string;
     response?: Record<string, unknown>;
   }): Promise<{ type: string; queuedAt: number }> {
-    this.initializeSignalsTable();
-
     // For WEBHOOK_RESPONSE, store the response as JSON in the content field
     const content =
       signal.type === 'WEBHOOK_RESPONSE' && signal.response
@@ -284,8 +257,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * @param filter 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
    */
   getAndConsumeSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): BrainSignal[] {
-    this.initializeSignalsTable();
-
     // Query signals ordered by priority
     let whereClause = '';
     if (filter === 'CONTROL') {
@@ -609,12 +580,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM brain_events WHERE event_id > ?`, cutoffEventId);
 
     // Clear signals and wait timeouts
-    // Use DROP + recreate pattern since tables may not exist if the brain
-    // never used signals/wait (e.g. basic-brain with no wait steps)
-    this.sql.exec(`DROP TABLE IF EXISTS brain_signals`);
-    this.sql.exec(`DROP TABLE IF EXISTS wait_timeout`);
-    this.signalsTableInitialized = false;
-    this.waitTimeoutTableInitialized = false;
+    this.sql.exec(`DELETE FROM brain_signals`);
+    this.sql.exec(`DELETE FROM wait_timeout`);
 
     // Cancel any pending alarm
     await this.ctx.storage.deleteAlarm();
@@ -632,25 +599,20 @@ export class BrainRunnerDO extends DurableObject<Env> {
     await this.wakeUp(this.brainRunId);
   }
 
-  async start(
-    brainTitle: string,
-    brainRunId: string,
-    currentUser: { name: string },
-    initialData?: Record<string, any>
-  ) {
-    const { sql } = this;
-
+  /**
+   * Resolve a brain from the manifest, create all adapters and the configured
+   * BrainRunner. Shared setup for both start() and wakeUp().
+   */
+  private async prepareRunner(brainTitle: string, brainRunId: string) {
     if (!manifest) {
       throw new Error('Runtime manifest not initialized');
     }
 
-    // Resolve the brain using the title/identifier
     const resolution = manifest.resolve(brainTitle);
     if (resolution.matchType === 'none') {
       console.error(
         `[DO ${brainRunId}] Brain ${brainTitle} not found in manifest.`
       );
-      console.error(JSON.stringify(manifest, null, 2));
       throw new Error(`Brain ${brainTitle} not found`);
     }
 
@@ -670,11 +632,10 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     const sqliteAdapter = new BrainRunSQLiteAdapter(
-      sql,
+      this.sql,
       this.env.RESOURCES_BUCKET,
       brainRunId
     );
-    const { eventStreamAdapter } = this;
     const monitorDOStub = this.env.MONITOR_DO.get(
       this.env.MONITOR_DO.idFromName('singleton')
     );
@@ -688,10 +649,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.env.RESOURCES_BUCKET
     );
 
-    // Create runtime environment with origin and secrets
     const env = await this.buildRuntimeEnv();
-
-    // Create pages service for brain to use
     const pagesService = createPagesService(
       brainRunId,
       this.env.RESOURCES_BUCKET,
@@ -705,42 +663,23 @@ export class BrainRunnerDO extends DurableObject<Env> {
       throw new Error('BrainRunner not initialized');
     }
 
-    // Load resources from R2
     const r2Resources = await this.loadResourcesFromR2();
-    // Create an enhanced runner with resources if available
-    let runnerWithResources = brainRunner;
+    let configuredRunner = brainRunner;
 
-    // Use R2 resources if available
     if (r2Resources) {
-      runnerWithResources = brainRunner.withResources(r2Resources);
+      configuredRunner = brainRunner.withResources(r2Resources);
     }
 
-    // Add pages service and runtime env
-    runnerWithResources = runnerWithResources
-      .withPages(pagesService)
-      .withEnv(env);
-
-    // Add signal provider for signal handling
     const signalProvider = new CloudflareSignalProvider((filter) =>
       this.getAndConsumeSignals(filter)
     );
-    runnerWithResources = runnerWithResources
+    configuredRunner = configuredRunner
+      .withPages(pagesService)
+      .withEnv(env)
       .withSignalProvider(signalProvider)
       .withGovernor((c) => rateGoverned(c))
       .withStoreProvider(createR2Backend(this.env.RESOURCES_BUCKET));
 
-    // Extract options and initialState from initialData if present
-    const options = initialData?.options;
-    const initialState =
-      initialData?.initialState ??
-      (initialData && !initialData.options && !initialData.initialState
-        ? initialData
-        : {});
-
-    // Persist run owner durably (immutable, not derived from events)
-    this.storeRunOwner(currentUser.name);
-
-    // Create abort controller for this run
     this.abortController = new AbortController();
 
     const iterateItemAdapter = new IterateItemAdapter(
@@ -753,30 +692,55 @@ export class BrainRunnerDO extends DurableObject<Env> {
       (time) => this.ctx.storage.setAlarm(time)
     );
 
-    runnerWithResources
-      .withAdapters([
-        sqliteAdapter,
-        eventStreamAdapter,
-        monitorAdapter,
-        scheduleAdapter,
-        webhookAdapter,
-        this.pageAdapter,
-        iterateItemAdapter,
-        timeoutAdapter,
-      ])
+    const runner = configuredRunner.withAdapters([
+      sqliteAdapter,
+      this.eventStreamAdapter,
+      monitorAdapter,
+      scheduleAdapter,
+      webhookAdapter,
+      this.pageAdapter,
+      iterateItemAdapter,
+      timeoutAdapter,
+    ]);
+
+    return { brainToRun, runner };
+  }
+
+  async start(
+    brainTitle: string,
+    brainRunId: string,
+    currentUser: { name: string },
+    initialData?: Record<string, any>
+  ) {
+    // Extract options and initialState from initialData if present
+    const options = initialData?.options;
+    const initialState =
+      initialData?.initialState ??
+      (initialData && !initialData.options && !initialData.initialState
+        ? initialData
+        : {});
+
+    // Persist run owner durably (immutable, not derived from events)
+    this.storeRunOwner(currentUser.name);
+
+    const { brainToRun, runner } = await this.prepareRunner(
+      brainTitle,
+      brainRunId
+    );
+
+    runner
       .run(brainToRun, {
         currentUser,
         initialState,
         brainRunId,
         ...(options && { options }),
-        signal: this.abortController.signal,
+        signal: this.abortController!.signal,
       })
       .catch((err: any) => {
         console.error(`[DO ${brainRunId}] BrainRunner run failed:`, err);
-        throw err; // Re-throw to ensure proper error propagation
+        throw err;
       })
       .finally(() => {
-        // Clean up abort controller when run completes
         this.abortController = null;
       });
   }
@@ -787,8 +751,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * This method reconstructs state and calls BrainRunner.resume().
    */
   async wakeUp(brainRunId: string) {
-    const { sql } = this;
-
     // Clear any pending timeout and cancel the alarm to prevent spurious alarm
     // fires after explicit resume. Safe because wakeUp() is only called when a
     // brain is suspended (waiting/paused), never during active iterate execution.
@@ -798,12 +760,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
       await this.ctx.storage.deleteAlarm();
     }
 
-    if (!manifest) {
-      throw new Error('Runtime manifest not initialized');
-    }
-
     // Use EventLoader to load events (handles R2 overflow transparently)
-    const eventLoader = new EventLoader(sql, this.env.RESOURCES_BUCKET);
+    const eventLoader = new EventLoader(this.sql, this.env.RESOURCES_BUCKET);
 
     // Get the brain title by loading the FIRST START event
     const startEvent = await eventLoader.loadEventByType(
@@ -838,128 +796,25 @@ export class BrainRunnerDO extends DurableObject<Env> {
       );
     }
 
-    // Resolve the brain using the title
-    const resolution = manifest.resolve(brainTitle);
-    if (resolution.matchType === 'none') {
-      console.error(
-        `[DO ${brainRunId}] Brain ${brainTitle} not found in manifest.`
-      );
-      throw new Error(`Brain ${brainTitle} not found`);
-    }
-
-    if (resolution.matchType === 'multiple') {
-      console.error(
-        `[DO ${brainRunId}] Multiple brains match identifier ${brainTitle}`,
-        resolution.candidates
-      );
-      throw new Error(`Multiple brains match identifier ${brainTitle}`);
-    }
-
-    const brainToRun = resolution.brain;
-    if (!brainToRun) {
-      throw new Error(
-        `Brain ${brainTitle} resolved but brain object is missing`
-      );
-    }
-
     // Load all events and feed them to the state machine to reconstruct execution tree
     const allEvents = await eventLoader.loadAllEvents();
-
-    // Create state machine and feed all historical events to reconstruct execution state
-    const machine = createBrainExecutionMachine({ initialState: initialState });
+    const machine = createBrainExecutionMachine({ initialState });
     for (const event of allEvents) {
       sendEvent(machine, event);
     }
 
-    const sqliteAdapter = new BrainRunSQLiteAdapter(
-      sql,
-      this.env.RESOURCES_BUCKET,
+    const { brainToRun, runner } = await this.prepareRunner(
+      brainTitle,
       brainRunId
     );
-    const { eventStreamAdapter } = this;
-    const monitorDOStub = this.env.MONITOR_DO.get(
-      this.env.MONITOR_DO.idFromName('singleton')
-    );
-    const monitorAdapter = new MonitorAdapter(monitorDOStub);
-    const scheduleAdapter = new ScheduleAdapter(
-      this.env.SCHEDULE_DO.get(this.env.SCHEDULE_DO.idFromName('singleton'))
-    );
-    const webhookAdapter = new WebhookAdapter(monitorDOStub);
-    this.pageAdapter = new PageAdapter(
-      monitorDOStub,
-      this.env.RESOURCES_BUCKET
-    );
 
-    // Create runtime environment with origin and secrets
-    const env = await this.buildRuntimeEnv();
-
-    // Create pages service for brain to use
-    const pagesService = createPagesService(
-      brainRunId,
-      this.env.RESOURCES_BUCKET,
-      monitorDOStub,
-      env
-    );
-
-    setGovernorBinding(this.env.GOVERNOR_DO);
-
-    if (!brainRunner) {
-      throw new Error('BrainRunner not initialized');
-    }
-
-    // Load resources from R2
-    const r2Resources = await this.loadResourcesFromR2();
-    let runnerWithResources = brainRunner;
-
-    if (r2Resources) {
-      runnerWithResources = brainRunner.withResources(r2Resources);
-    }
-
-    // Add pages service and runtime env
-    runnerWithResources = runnerWithResources
-      .withPages(pagesService)
-      .withEnv(env);
-
-    // Add signal provider for signal handling
-    // Webhook response comes from signals, consumed by the brain during execution
-    const signalProvider = new CloudflareSignalProvider((filter) =>
-      this.getAndConsumeSignals(filter)
-    );
-    runnerWithResources = runnerWithResources
-      .withSignalProvider(signalProvider)
-      .withGovernor((c) => rateGoverned(c))
-      .withStoreProvider(createR2Backend(this.env.RESOURCES_BUCKET));
-
-    // Create abort controller for this run
-    this.abortController = new AbortController();
-
-    const iterateItemAdapter = new IterateItemAdapter(
-      (signal) => this.queueSignal(signal),
-      (time) => this.ctx.storage.setAlarm(time)
-    );
-
-    const timeoutAdapter = new TimeoutAdapter(
-      (brainRunId, timeoutAt) => this.storeWaitTimeout(brainRunId, timeoutAt),
-      (time) => this.ctx.storage.setAlarm(time)
-    );
-
-    runnerWithResources
-      .withAdapters([
-        sqliteAdapter,
-        eventStreamAdapter,
-        monitorAdapter,
-        scheduleAdapter,
-        webhookAdapter,
-        this.pageAdapter,
-        iterateItemAdapter,
-        timeoutAdapter,
-      ])
+    runner
       .resume(brainToRun, {
         currentUser,
         machine,
         brainRunId: originalBrainRunId,
         options,
-        signal: this.abortController.signal,
+        signal: this.abortController!.signal,
       })
       .catch((err: any) => {
         console.error(
