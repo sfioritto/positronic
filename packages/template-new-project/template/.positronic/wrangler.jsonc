@@ -6,6 +6,10 @@
   "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
   "workers_dev": true,
   "preview_urls": true,
+  "build": {
+    "command": "node .positronic/build-brains.mjs",
+    "watch_dir": "../brains"
+  },
   "limits": {
     "cpu_ms": 300000
   },

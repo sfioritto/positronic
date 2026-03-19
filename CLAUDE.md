@@ -78,7 +78,7 @@ Templates in `.prompt()`, `.ui()`, and `.map()` steps can return JSX (`TemplateN
 - **Subpath export**: `@positronic/core/jsx-runtime` is exported from core's `package.json`
 - **Monorepo caveat**: Do NOT use JSX syntax in core tests. The root `.swcrc` uses React as `importSource` (for CLI/Ink). Construct `TemplateNode` trees manually using `{ type: Fragment, props: {}, children: [...] }`.
 - **Generated projects**: Use `jsxImportSource: "@positronic/core"` in their tsconfig
-- **SWC whitespace plugin**: A separate deliverable — preserves JSX text whitespace in generated projects
+- **Whitespace preservation**: `.positronic/build-brains.mjs` in generated projects — esbuild plugin (inlined) that preserves JSX text whitespace. Runs via wrangler's `build.command`. Without it, the JSX compiler collapses newlines in text to spaces.
 
 ## Keeping the Project Template in Sync
 

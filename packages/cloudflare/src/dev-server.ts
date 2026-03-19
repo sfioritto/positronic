@@ -192,9 +192,12 @@ export async function discoverBrains(
     entries
       .filter((e) => !e.name.startsWith('_'))
       .map(async (entry) => {
-        if (entry.isFile() && entry.name.endsWith('.ts')) {
+        if (
+          entry.isFile() &&
+          (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))
+        ) {
           return {
-            name: entry.name.replace(/\.ts$/, ''),
+            name: entry.name.replace(/\.tsx?$/, ''),
             relativePath: entry.name,
           };
         }
@@ -246,7 +249,7 @@ async function regenerateManifestFile(
 
   for (const brain of brains) {
     const importPath = `../../brains/${brain.relativePath.replace(
-      /\.ts$/,
+      /\.tsx?$/,
       '.js'
     )}`;
     const importAlias = `brain_${brain.name.replace(/[^a-zA-Z0-9_]/g, '_')}`;
