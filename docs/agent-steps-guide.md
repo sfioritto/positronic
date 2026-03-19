@@ -51,10 +51,8 @@ export default brain('my-agent', ({ slack, env }) => ({
       execute: ({ message }) => slack.postMessage('#general', message),
     },
   },
-  outputSchema: {
-    schema: z.object({ result: z.string() }),
-    name: 'agentResult' as const,
-  },
+  outputSchema: z.object({ result: z.string() }),
+  stateKey: 'agentResult' as const,
 }));
 ```
 
@@ -82,13 +80,11 @@ const myAgent = brain('math-helper', {
       execute: ({ expression }) => eval(expression),
     },
   },
-  outputSchema: {
-    schema: z.object({
-      answer: z.number(),
-      explanation: z.string(),
-    }),
-    name: 'mathResult' as const,
-  },
+  outputSchema: z.object({
+    answer: z.number(),
+    explanation: z.string(),
+  }),
+  stateKey: 'mathResult' as const,
 });
 ```
 
@@ -123,10 +119,8 @@ const dynamicAgent = brain('dynamic-helper', ({ tools }) => ({
       execute: ({ input }) => `Processed: ${input}`,
     },
   },
-  outputSchema: {
-    schema: z.object({ result: z.string() }),
-    name: 'helperResult' as const,
-  },
+  outputSchema: z.object({ result: z.string() }),
+  stateKey: 'helperResult' as const,
 }));
 ```
 
@@ -162,12 +156,12 @@ const innerBrain = brain('process-item').step('Process', ({ state }) => ({
 const outerBrain = brain('orchestrator')
   .step('Init', () => ({ items: ['a', 'b', 'c'] }))
   .brain('Run Inner', innerBrain, {
-    outputKey: 'result' as const,
+    stateKey: 'result' as const,
     initialState: ({ state }) => ({ item: state.items[0] }),
   });
 ```
 
-The `outputKey` stores the entire inner brain's final state under that key in the outer state. `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
+The `stateKey` stores the entire inner brain's final state under that key in the outer state. `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
 
 ### Options in Nested Brains
 
@@ -192,7 +186,7 @@ const innerBrain = brain('search')
 const outerBrain = brain('orchestrator')
   .withOptionsSchema(z.object({ searchQuery: z.string() }))
   .brain('Run Search', innerBrain, {
-    outputKey: 'searchResult' as const,
+    stateKey: 'searchResult' as const,
     options: ({ options }) => ({ query: options.searchQuery, limit: 5 }),
   })
   .step('Process', ({ state, options }) => {
@@ -221,7 +215,7 @@ const outerBrain = brain('batch')
     over: ({ state }) => state.items,
     initialState: (item) => ({ value: item, result: 0 }),
     options: ({ options }) => ({ multiplier: options.multiplier }),
-    outputKey: 'results' as const,
+    stateKey: 'results' as const,
   });
 ```
 
@@ -248,13 +242,11 @@ const myBrain = brain('simple-agent')
         execute: ({ a, b }) => a + b,
       },
     },
-    outputSchema: {
-      schema: z.object({
-        answer: z.number(),
-        explanation: z.string(),
-      }),
-      name: 'mathAnswer' as const,
-    },
+    outputSchema: z.object({
+      answer: z.number(),
+      explanation: z.string(),
+    }),
+    stateKey: 'mathAnswer' as const,
   });
 ```
 
@@ -279,12 +271,10 @@ const myBrain = brain('dynamic-agent')
         execute: ({ input }) => `Processed: ${input}`,
       },
     },
-    outputSchema: {
-      schema: z.object({
-        summary: z.string(),
-      }),
-      name: 'processingResult' as const,
-    },
+    outputSchema: z.object({
+      summary: z.string(),
+    }),
+    stateKey: 'processingResult' as const,
   }));
 ```
 
@@ -414,10 +404,8 @@ const myBrain = brain('with-defaults')
     system: 'You are helpful.',
     prompt: 'Help the user.',
     tools, // Uses defaultTools
-    outputSchema: {
-      schema: z.object({ result: z.string() }),
-      name: 'agentResult' as const,
-    },
+    outputSchema: z.object({ result: z.string() }),
+    stateKey: 'agentResult' as const,
   }));
 ```
 
@@ -437,10 +425,8 @@ Add custom tools while keeping defaults:
       execute: ({ data }) => processData(data),
     },
   },
-  outputSchema: {
-    schema: z.object({ result: z.string() }),
-    name: 'taskResult' as const,
-  },
+  outputSchema: z.object({ result: z.string() }),
+  stateKey: 'taskResult' as const,
 }))
 ```
 
@@ -462,10 +448,8 @@ Replace a default tool with a custom implementation:
       },
     },
   },
-  outputSchema: {
-    schema: z.object({ uiGenerated: z.boolean() }),
-    name: 'uiResult' as const,
-  },
+  outputSchema: z.object({ uiGenerated: z.boolean() }),
+  stateKey: 'uiResult' as const,
 }))
 ```
 
@@ -484,10 +468,8 @@ const uiBrain = brain('interactive')
     system: 'You can generate forms to collect user input.',
     prompt: 'Ask the user for their preferences.',
     tools, // includes generateUI
-    outputSchema: {
-      schema: z.object({ preferences: z.record(z.string()) }),
-      name: 'userPreferences' as const,
-    },
+    outputSchema: z.object({ preferences: z.record(z.string()) }),
+    stateKey: 'userPreferences' as const,
   }));
 ```
 
@@ -652,13 +634,11 @@ any sensitive actions, request approval first.`,
         },
       },
     },
-    outputSchema: {
-      schema: z.object({
-        resolution: z.string(),
-        followUpRequired: z.boolean(),
-      }),
-      name: 'ticketResolution' as const,
-    },
+    outputSchema: z.object({
+      resolution: z.string(),
+      followUpRequired: z.boolean(),
+    }),
+    stateKey: 'ticketResolution' as const,
     maxTokens: 50000,
   }))
   .step('Log Resolution', ({ state }) => {

@@ -65,10 +65,8 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   streamText: mockStreamText,
 };
 
-const dummyOutputSchema = {
-  schema: z.object({ result: z.string() }),
-  name: 'agentResult' as const,
-} as const;
+const dummyOutputSchema = z.object({ result: z.string() });
+const dummyStateKey = 'agentResult' as const;
 
 // Mock Resources for testing
 const mockResourceLoad = jest.fn(
@@ -397,17 +395,13 @@ describe('brain creation', () => {
     const testBrain = brain('Client Override Test')
       .prompt('Use default client', {
         template: () => 'prompt1',
-        outputSchema: {
-          schema: z.object({ override: z.boolean() }),
-          name: 'overrideResponse',
-        },
+        outputSchema: z.object({ override: z.boolean() }),
+        stateKey: 'overrideResponse',
       })
       .prompt('Use override client', {
         template: () => 'prompt2',
-        outputSchema: {
-          schema: z.object({ override: z.boolean() }),
-          name: 'overrideResponse',
-        },
+        outputSchema: z.object({ override: z.boolean() }),
+        stateKey: 'overrideResponse',
         client: overrideClient,
       });
 
@@ -432,12 +426,10 @@ describe('brain creation', () => {
     // Verify that each client was used correctly based on the supplied prompt configuration.
     expect(mockClient.generateObject).toHaveBeenCalledWith({
       schema: expect.any(z.ZodObject),
-      schemaName: 'overrideResponse',
       prompt: 'prompt1',
     });
     expect(overrideClient.generateObject).toHaveBeenCalledWith({
       schema: expect.any(z.ZodObject),
-      schemaName: 'overrideResponse',
       prompt: 'prompt2',
     });
 
@@ -456,10 +448,8 @@ describe('brain creation', () => {
       'Use override client',
       {
         template: () => 'prompt1',
-        outputSchema: {
-          schema: z.object({ derived: z.boolean() }),
-          name: 'overrideResponse' as const,
-        },
+        outputSchema: z.object({ derived: z.boolean() }),
+        stateKey: 'overrideResponse' as const,
         client: overrideClient,
       }
     );
@@ -542,10 +532,8 @@ describe('brain creation', () => {
             const templateContent = await (resources.myFile as any).loadText();
             return `Generate a summary for: ${templateContent}`;
           },
-          outputSchema: {
-            schema: z.object({ summary: z.string() }),
-            name: 'promptResult' as const,
-          },
+          outputSchema: z.object({ summary: z.string() }),
+          stateKey: 'promptResult' as const,
         }
       );
 
@@ -589,10 +577,8 @@ describe('brain creation', () => {
           template: ({ state }) => {
             return `Analyze this: ${state.existingData}`;
           },
-          outputSchema: {
-            schema: z.object({ analysis: z.string() }),
-            name: 'promptResult' as const,
-          },
+          outputSchema: z.object({ analysis: z.string() }),
+          stateKey: 'promptResult' as const,
         });
 
       mockGenerateObject.mockResolvedValue({
@@ -645,7 +631,7 @@ describe('brain creation', () => {
       const outerBrain = brain('Outer Resource Brain').brain(
         'Run Inner',
         innerBrain,
-        { outputKey: 'innerResult' as const }
+        { stateKey: 'innerResult' as const }
       );
 
       const run = outerBrain.run({
@@ -738,7 +724,7 @@ describe('error handling', () => {
     const outerBrain = brain('Outer Brain')
       .step('First step', () => ({ step: 'first' }))
       .brain('Run inner brain', innerBrain, {
-        outputKey: 'innerResult' as const,
+        stateKey: 'innerResult' as const,
         initialState: { value: 5 },
       });
 
@@ -1105,7 +1091,7 @@ describe('nested brains', () => {
     const outerBrain = brain('Outer Brain')
       .step('Set prefix', () => ({ prefix: 'test-' }))
       .brain('Run inner brain', innerBrain, {
-        outputKey: 'innerResult' as const,
+        stateKey: 'innerResult' as const,
         initialState: { value: 5 },
       });
 
@@ -1268,7 +1254,7 @@ describe('nested brains', () => {
     const outerBrain = brain('Outer Brain')
       .step('First step', () => ({ step: 'first' }))
       .brain('Run inner brain', innerBrain, {
-        outputKey: 'innerResult' as const,
+        stateKey: 'innerResult' as const,
         initialState: { value: 5 },
       });
 
@@ -1436,7 +1422,7 @@ describe('nested brains', () => {
         value: 5,
       }))
       .brain('Run inner brain', innerBrain, {
-        outputKey: 'result' as const,
+        stateKey: 'result' as const,
         initialState: ({ state }) => ({ value: state.value }),
       });
 
@@ -1495,7 +1481,7 @@ describe('nested brains', () => {
           .sort();
         return {};
       })
-      .brain('Run Inner', innerBrain, { outputKey: 'inner' as const });
+      .brain('Run Inner', innerBrain, { stateKey: 'inner' as const });
 
     // Create mock pages service
     const mockPages = {
@@ -1528,7 +1514,7 @@ describe('nested brains', () => {
     const outerBrain = brain('Outer Brain')
       .step('Outer step', () => ({ prefix: 'test-' }))
       .brain('Run inner brain', innerBrain, {
-        outputKey: 'innerResult' as const,
+        stateKey: 'innerResult' as const,
         initialState: { value: 5 },
       });
 
@@ -1578,7 +1564,7 @@ describe('nested brains', () => {
     const outerBrain = brain('Outer Brain')
       .step('Outer step 1', () => ({ prefix: 'outer-' }))
       .brain('Run inner brain', innerBrain, {
-        outputKey: 'innerResult' as const,
+        stateKey: 'innerResult' as const,
         initialState: { count: 0 },
       })
       .step('Outer step 2', ({ state }) => ({
@@ -1818,7 +1804,7 @@ describe('services support', () => {
       .withServices({ api: 'parent-api-url' })
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any, {
-        outputKey: 'child' as const,
+        stateKey: 'child' as const,
       });
 
     for await (const _ of parentBrain.run({
@@ -1844,7 +1830,7 @@ describe('services support', () => {
       .withServices({ api: 'parent-api-url' })
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain, {
-        outputKey: 'child' as const,
+        stateKey: 'child' as const,
       });
 
     for await (const _ of parentBrain.run({
@@ -1872,7 +1858,7 @@ describe('services support', () => {
       .withServices({ logger: testLogger })
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any, {
-        outputKey: 'child' as const,
+        stateKey: 'child' as const,
       });
 
     for await (const _ of parentBrain.run({
@@ -1907,7 +1893,7 @@ describe('services support', () => {
     const parentBrain = brain('Store Parent')
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any, {
-        outputKey: 'child' as const,
+        stateKey: 'child' as const,
       });
 
     for await (const _ of parentBrain.run({
@@ -1943,7 +1929,7 @@ describe('type inference', () => {
         value: 42,
       }))
       .brain('Nested brain', innerBrain, {
-        outputKey: 'nested' as const,
+        stateKey: 'nested' as const,
         initialState: {
           processedValue: 0,
           featureCount: 0,
@@ -2052,7 +2038,7 @@ describe('type inference', () => {
         status: 'ready',
       }))
       .brain('Nested brain', innerBrain, {
-        outputKey: 'innerResult' as const,
+        stateKey: 'innerResult' as const,
       })
       .step('Verify types', ({ state }) => {
         // Type assertion for merged state with outputKey
@@ -2107,7 +2093,7 @@ describe('type inference', () => {
         label: options.label,
       }))
       .brain('Compute', innerBrain, {
-        outputKey: 'computed' as const,
+        stateKey: 'computed' as const,
         initialState: ({ state }) => ({ value: state.value }),
         options: { multiplier: 3 },
       })
@@ -2195,10 +2181,8 @@ describe('type inference', () => {
     const testBrain = brain('Prompt Type Test')
       .prompt('Get user info', {
         template: () => "What is the user's info?",
-        outputSchema: {
-          schema: z.object({ name: z.string(), age: z.number() }),
-          name: 'userInfo' as const, // Must be const or type inference breaks
-        },
+        outputSchema: z.object({ name: z.string(), age: z.number() }),
+        stateKey: 'userInfo' as const, // Must be const or type inference breaks
       })
       .step('Use response', ({ state }) => {
         // Type assertion to verify state includes userInfo
@@ -2282,7 +2266,7 @@ describe('brain structure', () => {
     })
       .step('Outer step 1', ({ state }) => ({ ...state, outer1: true }))
       .brain('Run inner brain', innerBrain, {
-        outputKey: 'result' as const,
+        stateKey: 'result' as const,
       })
       .step('Outer step 2', ({ state }) => ({ ...state, outer2: true }));
 
@@ -2402,7 +2386,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item, state) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     const { finalState } = await runWithStateMachine(outerBrain, {
@@ -2428,7 +2412,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     const { events } = await runWithStateMachine(outerBrain, {
@@ -2476,7 +2460,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     const { events } = await runWithStateMachine(outerBrain, {
@@ -2493,7 +2477,7 @@ describe('.map()', () => {
     expect((iterateEvents[0] as any).processedCount).toBe(1);
     expect((iterateEvents[0] as any).totalItems).toBe(3);
     expect((iterateEvents[0] as any).result).toEqual({ value: 10 });
-    expect((iterateEvents[0] as any).schemaName).toBe('results');
+    expect((iterateEvents[0] as any).stateKey).toBe('results');
 
     expect((iterateEvents[1] as any).itemIndex).toBe(1);
     expect((iterateEvents[1] as any).processedCount).toBe(2);
@@ -2521,7 +2505,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
         error: (item, err) => ({ value: -1 }),
       });
 
@@ -2559,7 +2543,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
         error: () => null,
       });
 
@@ -2611,7 +2595,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     const events: BrainEvent<any>[] = [];
@@ -2668,7 +2652,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     const events: BrainEvent<any>[] = [];
@@ -2708,7 +2692,7 @@ describe('.map()', () => {
         run: innerBrain as any,
         over: ({ state }: any) => state.items,
         initialState: (item: any) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     let error: Error | undefined;
@@ -2740,7 +2724,7 @@ describe('.map()', () => {
         run: innerBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ value: item.n }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     const events: BrainEvent<any>[] = [];
@@ -2759,7 +2743,7 @@ describe('.map()', () => {
           ],
           processedCount: 2,
           totalItems: 4,
-          schemaName: 'results',
+          stateKey: 'results',
         },
       },
       brainRunId: 'test-resume',
@@ -2892,7 +2876,7 @@ describe('.map()', () => {
             run: innerBrain,
             over: ({ state }) => state.items,
             initialState: (item: any) => ({ value: item.n }),
-            outputKey: 'results' as const,
+            stateKey: 'results' as const,
             error: () => ({ value: -1 }),
           }),
       clientOverride: undefined as any,
@@ -2908,6 +2892,7 @@ describe('.map()', () => {
             tools,
             maxIterations: 2,
             outputSchema: dummyOutputSchema,
+            stateKey: dummyStateKey,
           })
         );
       },
@@ -2920,7 +2905,7 @@ describe('.map()', () => {
             run: innerBrain,
             over: ({ state }) => state.items,
             initialState: (item: any) => ({ url: item.url }),
-            outputKey: 'results' as const,
+            stateKey: 'results' as const,
             error: () => null,
           }),
       clientOverride: () => createAgentWithThrowingTool((n) => n === 2).client,
@@ -2935,6 +2920,7 @@ describe('.map()', () => {
             tools,
             maxIterations: 2,
             outputSchema: dummyOutputSchema,
+            stateKey: dummyStateKey,
           }))
           .step('Verify', ({ state }) => state);
       },
@@ -2947,7 +2933,7 @@ describe('.map()', () => {
             run: innerBrain,
             over: ({ state }) => state.items,
             initialState: (item: any) => ({ url: item.url }),
-            outputKey: 'results' as const,
+            stateKey: 'results' as const,
             error: () => null,
           }),
       clientOverride: () => createAgentWithThrowingTool((n) => n === 2).client,
@@ -2998,15 +2984,12 @@ describe('.map()', () => {
       .map('Categorize', {
         template: ({ item }: { item: { subject: string; from: string } }) =>
           `Categorize: ${item.subject} from ${item.from}`,
-        outputSchema: {
-          schema: z.object({
-            category: z.string(),
-            priority: z.enum(['high', 'medium', 'low']),
-          }),
-          name: 'categorization',
-        },
+        outputSchema: z.object({
+          category: z.string(),
+          priority: z.enum(['high', 'medium', 'low']),
+        }),
         over: ({ state }) => state.emails,
-        outputKey: 'categories' as const,
+        stateKey: 'categories' as const,
       });
 
     const { finalState, events } = await runWithStateMachine(outerBrain, {
@@ -3057,12 +3040,9 @@ describe('.map()', () => {
       }))
       .map('Summarize', {
         template: ({ item }: { item: string }) => `Summarize: ${item}`,
-        outputSchema: {
-          schema: z.object({ summary: z.string() }),
-          name: 'summary',
-        },
+        outputSchema: z.object({ summary: z.string() }),
         over: ({ state }) => state.items,
-        outputKey: 'summaries' as const,
+        stateKey: 'summaries' as const,
         error: () => ({ summary: 'fallback' }),
       });
 
@@ -3098,13 +3078,10 @@ describe('.map()', () => {
       }))
       .map('Process', {
         template: ({ item }: { item: { n: number } }) => `Process: ${item.n}`,
-        outputSchema: {
-          schema: z.object({ result: z.string() }),
-          name: 'result',
-        },
+        outputSchema: z.object({ result: z.string() }),
         client: customClient,
         over: ({ state }) => state.items,
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       });
 
     const { finalState } = await runWithStateMachine(outerBrain, {
@@ -3135,7 +3112,7 @@ describe('.map()', () => {
         run: processBrain,
         over: ({ state }) => state.items,
         initialState: (item) => item,
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
         error: () => null,
       })
       .step('Summarize', ({ state }) => ({
@@ -3147,7 +3124,7 @@ describe('.map()', () => {
       }));
 
     const outerBrain = brain('MapOuter').brain('Run inner', innerBrain, {
-      outputKey: 'inner' as const,
+      stateKey: 'inner' as const,
     });
 
     const { finalState } = await runWithStateMachine(outerBrain, {
@@ -3200,6 +3177,7 @@ describe('withTools vs withExtraTools semantics', () => {
         prompt: 'Do something',
         tools,
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
     const events: BrainEvent<any>[] = [];
@@ -3244,6 +3222,7 @@ describe('withTools vs withExtraTools semantics', () => {
         prompt: 'Do something',
         tools,
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
     const events: BrainEvent<any>[] = [];
@@ -3301,6 +3280,7 @@ describe('withTools vs withExtraTools semantics', () => {
           stepOnlyTool, // add step-specific tool
         },
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
     const events: BrainEvent<any>[] = [];
@@ -3353,6 +3333,7 @@ describe('withTools vs withExtraTools semantics', () => {
         prompt: 'Do something',
         tools,
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
     const events: BrainEvent<any>[] = [];
@@ -3393,7 +3374,7 @@ describe('IterateResult', () => {
         run: summarizeBrain,
         over: ({ state }) => state.items,
         initialState: (item) => ({ summary: '' }),
-        outputKey: 'results' as const,
+        stateKey: 'results' as const,
       })
       .step('Use IterateResult API', ({ state }) => {
         const summaries = state.results.values.map((r) => r.summary);
@@ -3483,10 +3464,8 @@ describe('UI steps', () => {
       .step('Init', () => ({ userName: 'Alice' }))
       .ui('Collect Feedback', {
         template: ({ state }) => `Create a form for ${state.userName}`,
-        outputSchema: {
-          schema: z.object({ rating: z.number() }),
-          name: 'feedback' as const,
-        },
+        outputSchema: z.object({ rating: z.number() }),
+        stateKey: 'feedback' as const,
       });
 
     const events: BrainEvent<any>[] = [];
@@ -3526,10 +3505,8 @@ describe('UI steps', () => {
       .step('Init', () => ({ userName: 'Alice' }))
       .ui('Collect Feedback', {
         template: ({ state }) => `Create a form for ${state.userName}`,
-        outputSchema: {
-          schema: feedbackSchema,
-          name: 'feedback' as const,
-        },
+        outputSchema: feedbackSchema,
+        stateKey: 'feedback' as const,
       })
       .step('After UI', ({ state }) => ({
         ...state,

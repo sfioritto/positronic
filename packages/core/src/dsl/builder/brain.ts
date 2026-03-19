@@ -7,7 +7,6 @@ import type {
   AgentTool,
   AgentConfig,
   AgentConfigWithOutput,
-  AgentOutputSchema,
   StepContext,
 } from '../types.js';
 
@@ -348,17 +347,17 @@ export class Brain<
     return this.nextBrain<TState>();
   }
 
-  // Overload 1: Nested brain with outputKey
+  // Overload 1: Nested brain with stateKey
   brain<
     TInnerOptions extends JsonObject,
     TInnerState extends State,
-    TOutputKey extends string & { readonly brand?: unique symbol },
-    TNewState extends State = TState & { [K in TOutputKey]: TInnerState }
+    TStateKey extends string & { readonly brand?: unique symbol },
+    TNewState extends State = TState & { [K in TStateKey]: TInnerState }
   >(
     title: string,
     innerBrain: Brain<TInnerOptions, TInnerState, any>,
     config: {
-      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      stateKey: TStateKey & (string extends TStateKey ? never : unknown);
       initialState?:
         | State
         | ((context: StepContext<TState, TOptions> & TServices) => State);
@@ -405,11 +404,9 @@ export class Brain<
     title: string,
     innerBrainOrConfig:
       | Brain<any, any, any>
-      | AgentConfig<any, any>
-      | ((
-          params: any
-        ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>),
-    configOrUndefined?: { outputKey: string; initialState?: any; options?: any }
+      | AgentConfig<any>
+      | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>),
+    configOrUndefined?: { stateKey: string; initialState?: any; options?: any }
   ): any {
     // Case 1: Nested brain instance
     if (
@@ -419,7 +416,7 @@ export class Brain<
       innerBrainOrConfig.type === 'brain'
     ) {
       const config = configOrUndefined as {
-        outputKey: string;
+        stateKey: string;
         initialState?: any;
         options?: any;
       };
@@ -427,7 +424,7 @@ export class Brain<
         type: 'brain',
         title,
         innerBrain: innerBrainOrConfig,
-        outputKey: config.outputKey,
+        stateKey: config.stateKey,
         initialState: config.initialState,
         options: config.options,
       };
@@ -439,17 +436,9 @@ export class Brain<
     const configFn =
       typeof innerBrainOrConfig === 'function'
         ? innerBrainOrConfig
-        : () => innerBrainOrConfig as AgentConfig<any, any>;
+        : () => innerBrainOrConfig as AgentConfig<any>;
 
-    const agentBlock: AgentBlock<
-      TState,
-      any,
-      TOptions,
-      TServices,
-      any,
-      any,
-      any
-    > = {
+    const agentBlock: AgentBlock<TState, any, TOptions, TServices, any, any> = {
       type: 'agent',
       title,
       configFn: configFn as any,
@@ -477,10 +466,8 @@ export class Brain<
       template: (
         context: TemplateContext<TState, TOptions>
       ) => string | Promise<string>;
-      outputSchema: {
-        schema: TSchema;
-        name: TResponseKey & (string extends TResponseKey ? never : unknown);
-      };
+      outputSchema: TSchema;
+      stateKey: TResponseKey & (string extends TResponseKey ? never : unknown);
       client?: ObjectGenerator;
     }
   ): Brain<TOptions, TNewState, TServices>;
@@ -501,10 +488,8 @@ export class Brain<
     title: string,
     config: {
       template: (context: any) => string | Promise<string>;
-      outputSchema?: {
-        schema: z.ZodObject<any>;
-        name: string;
-      };
+      outputSchema?: z.ZodObject<any>;
+      stateKey?: string;
       client?: ObjectGenerator;
     }
   ): any {
@@ -538,6 +523,7 @@ export class Brain<
     }
     // At this point, outputSchema is guaranteed to exist (schema-less case returned early)
     const outputSchema = config.outputSchema!;
+    const stateKey = config.stateKey!;
 
     // Single mode - run prompt once with current state
     const promptBlock: StepBlock<TState, any, TOptions, TServices, any, any> = {
@@ -545,16 +531,14 @@ export class Brain<
       title,
       client: config.client,
       action: async ({ state, options, client, resources }) => {
-        const { schema, name: schemaName } = outputSchema;
         const prompt = await config.template({ state, options, resources });
         const result = await client.generateObject({
-          schema,
-          schemaName,
+          schema: outputSchema,
           prompt,
         });
         return {
           ...state,
-          [outputSchema.name]: result.object,
+          [stateKey]: result.object,
         };
       },
     };
@@ -567,9 +551,9 @@ export class Brain<
     TItems extends any[],
     TInnerOptions extends JsonObject,
     TInnerState extends State,
-    TOutputKey extends string & { readonly brand?: unique symbol },
+    TStateKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItems[number], TInnerState>;
+      [K in TStateKey]: IterateResult<TItems[number], TInnerState>;
     }
   >(
     title: string,
@@ -579,7 +563,7 @@ export class Brain<
         context: StepContext<TState, TOptions> & TServices
       ) => TItems | Promise<TItems>;
       initialState: (item: TItems[number], outerState: TState) => State;
-      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      stateKey: TStateKey & (string extends TStateKey ? never : unknown);
       error?: (item: TItems[number], error: Error) => TInnerState | null;
       options?:
         | TInnerOptions
@@ -593,9 +577,9 @@ export class Brain<
   map<
     TItems extends any[],
     TSchema extends z.ZodObject<any>,
-    TOutputKey extends string & { readonly brand?: unique symbol },
+    TStateKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & {
-      [K in TOutputKey]: IterateResult<TItems[number], z.infer<TSchema>>;
+      [K in TStateKey]: IterateResult<TItems[number], z.infer<TSchema>>;
     }
   >(
     title: string,
@@ -605,15 +589,12 @@ export class Brain<
           item: NoInfer<TItems[number]>;
         }
       ) => string | Promise<string>;
-      outputSchema: {
-        schema: TSchema;
-        name: string;
-      };
+      outputSchema: TSchema;
       client?: ObjectGenerator;
       over: (
         context: StepContext<TState, TOptions> & TServices
       ) => TItems | Promise<TItems>;
-      outputKey: TOutputKey & (string extends TOutputKey ? never : unknown);
+      stateKey: TStateKey & (string extends TStateKey ? never : unknown);
       error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
     }
   ): Brain<TOptions, TNewState, TServices>;
@@ -624,14 +605,11 @@ export class Brain<
     config: {
       run?: any;
       template?: (context: any) => string | Promise<string>;
-      outputSchema?: {
-        schema: z.ZodObject<any>;
-        name: string;
-      };
+      outputSchema?: z.ZodObject<any>;
       client?: ObjectGenerator;
       over: (context: any) => any[] | Promise<any[]>;
       initialState?: (item: any, outerState: any) => State;
-      outputKey: string;
+      stateKey: string;
       error?: (item: any, error: Error) => any | null;
       options?: any;
     }
@@ -642,7 +620,7 @@ export class Brain<
       innerBrain: config.run,
       over: config.over,
       initialState: config.initialState,
-      outputKey: config.outputKey,
+      stateKey: config.stateKey,
       error: config.error,
       template: config.template,
       outputSchema: config.outputSchema,
@@ -707,10 +685,8 @@ export class Brain<
       template: (
         context: TemplateContext<TState, TOptions>
       ) => string | Promise<string>;
-      outputSchema: {
-        schema: TSchema;
-        name: TResponseKey & (string extends TResponseKey ? never : unknown);
-      };
+      outputSchema: TSchema;
+      stateKey: TResponseKey & (string extends TResponseKey ? never : unknown);
       notify?: (
         context: { page: GeneratedPage<TSchema> } & StepContext<
           TState,
@@ -740,7 +716,8 @@ export class Brain<
     title: string,
     config: {
       template: (context: any) => string | Promise<string>;
-      outputSchema?: { schema: z.ZodObject<any>; name: string };
+      outputSchema?: z.ZodObject<any>;
+      stateKey?: string;
       notify?: (context: any) => void | Promise<void>;
     }
   ): any {
@@ -751,6 +728,7 @@ export class Brain<
       uiConfig: {
         template: config.template as (context: any) => string | Promise<string>,
         outputSchema: config.outputSchema,
+        stateKey: config.stateKey,
         notify: config.notify,
       },
       action: async (params) => {
@@ -929,8 +907,8 @@ export function brain<
 export function brain(
   titleOrConfig: string | BrainConfig,
   agentConfig?:
-    | AgentConfig<any, any>
-    | ((params: any) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
+    | AgentConfig<any>
+    | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>)
 ): Brain<any, any, any> {
   const title =
     typeof titleOrConfig === 'string' ? titleOrConfig : titleOrConfig.title;

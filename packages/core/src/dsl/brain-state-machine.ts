@@ -118,7 +118,7 @@ export interface IterateContext {
   accumulatedResults: ([any, any] | undefined)[];
   processedCount: number;
   totalItems: number;
-  schemaName: string;
+  stateKey: string;
 }
 
 export interface BrainExecutionContext {
@@ -737,7 +737,7 @@ const iterateItemComplete = reduce<BrainExecutionContext, any>(
         accumulatedResults: newResults,
         processedCount: payload.processedCount,
         totalItems: payload.totalItems,
-        schemaName: payload.schemaName,
+        stateKey: payload.stateKey,
       },
     };
   }

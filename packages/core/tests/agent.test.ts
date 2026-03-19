@@ -31,10 +31,8 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   streamText: mockStreamText,
 };
 
-const dummyOutputSchema = {
-  schema: z.object({ result: z.string() }),
-  name: 'agentResult' as const,
-} as const;
+const dummyOutputSchema = z.object({ result: z.string() });
+const dummyStateKey = 'agentResult' as const;
 
 describe('agent step', () => {
   beforeEach(() => {
@@ -70,6 +68,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -170,6 +169,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -233,6 +233,7 @@ describe('agent step', () => {
           },
         },
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -295,6 +296,7 @@ describe('agent step', () => {
         },
         maxTokens: 1000, // Limit at 1000 tokens
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -370,6 +372,7 @@ describe('agent step', () => {
         },
         maxIterations: 3, // Limit at 3 iterations
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -417,6 +420,7 @@ describe('agent step', () => {
         () => ({
           prompt: 'Do something',
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
           // No maxIterations specified - should default to 100
         })
       );
@@ -467,6 +471,7 @@ describe('agent step', () => {
           },
         },
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -547,6 +552,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -623,6 +629,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -696,6 +703,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -757,6 +765,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -804,6 +813,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -843,6 +853,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -887,6 +898,7 @@ describe('agent step', () => {
         system: 'You are a helpful assistant.',
         prompt: 'Help the user',
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -926,6 +938,7 @@ describe('agent step', () => {
       const testBrain = brain('test-default-system').brain('No System', () => ({
         prompt: 'Do something',
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -971,6 +984,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         }));
 
       const events: BrainEvent[] = [];
@@ -1025,6 +1039,7 @@ describe('agent step', () => {
       const testBrain = brain('test-event-order').brain('Task', () => ({
         prompt: 'Do task',
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -1121,6 +1136,7 @@ describe('agent step', () => {
           },
         },
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -1172,6 +1188,7 @@ describe('agent step', () => {
       const testBrain = brain('test-event-order-raw').brain('Task', () => ({
         prompt: 'Do task',
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -1222,6 +1239,7 @@ describe('agent step', () => {
           },
         },
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
       }));
 
       const events: BrainEvent[] = [];
@@ -1285,6 +1303,7 @@ describe('agent step', () => {
             },
           },
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
         })
       );
 
@@ -1392,6 +1411,7 @@ describe('agent step', () => {
               },
             },
             outputSchema: dummyOutputSchema,
+            stateKey: dummyStateKey,
           };
         });
 
@@ -1449,6 +1469,7 @@ describe('agent step', () => {
               },
             },
             outputSchema: dummyOutputSchema,
+            stateKey: dummyStateKey,
           };
         });
 
@@ -1513,10 +1534,8 @@ describe('agent step', () => {
 
       const testBrain = brain('test-output-schema').brain('Process', {
         prompt: 'Analyze the data',
-        outputSchema: {
-          schema: z.object({ summary: z.string(), score: z.number() }),
-          name: 'analysis' as const,
-        },
+        outputSchema: z.object({ summary: z.string(), score: z.number() }),
+        stateKey: 'analysis' as const,
       });
 
       const events: BrainEvent[] = [];
@@ -1532,7 +1551,7 @@ describe('agent step', () => {
         expect.objectContaining({
           tools: expect.objectContaining({
             done: expect.objectContaining({
-              description: expect.stringContaining('analysis'),
+              description: expect.stringContaining('final result'),
             }),
           }),
         })
@@ -1571,10 +1590,8 @@ describe('agent step', () => {
         .step('Init', () => ({ name: 'Alice' }))
         .brain('Greet', ({ state }) => ({
           prompt: `Greet ${state.name}`,
-          outputSchema: {
-            schema: z.object({ message: z.string() }),
-            name: 'greeting' as const,
-          },
+          outputSchema: z.object({ message: z.string() }),
+          stateKey: 'greeting' as const,
         }));
 
       const events: BrainEvent[] = [];
@@ -1622,10 +1639,8 @@ describe('agent step', () => {
             terminal: true,
           },
         },
-        outputSchema: {
-          schema: z.object({ result: z.string() }),
-          name: 'output' as const,
-        },
+        outputSchema: z.object({ result: z.string() }),
+        stateKey: 'output' as const,
       });
 
       const events: BrainEvent[] = [];
@@ -1665,13 +1680,11 @@ describe('agent step', () => {
       const testBrain = brain('test-output-schema-flow')
         .brain('Extract', {
           prompt: 'Extract entities',
-          outputSchema: {
-            schema: z.object({
-              entities: z.array(z.string()),
-              count: z.number(),
-            }),
-            name: 'extracted' as const,
-          },
+          outputSchema: z.object({
+            entities: z.array(z.string()),
+            count: z.number(),
+          }),
+          stateKey: 'extracted' as const,
         })
         .step('Process', ({ state }) => {
           // This step can access state.extracted with proper types
@@ -1721,13 +1734,11 @@ describe('agent step', () => {
       // Using top-level brain() with config object directly (not .brain() step method)
       const testBrain = brain('direct-agent', {
         system: 'You are a friendly greeter',
-        outputSchema: {
-          schema: z.object({
-            userName: z.string(),
-            greeting: z.string(),
-          }),
-          name: 'welcome' as const,
-        },
+        outputSchema: z.object({
+          userName: z.string(),
+          greeting: z.string(),
+        }),
+        stateKey: 'welcome' as const,
       });
 
       const events: BrainEvent[] = [];
@@ -1772,13 +1783,11 @@ describe('agent step', () => {
         'Process',
         {
           prompt: 'Analyze data',
-          outputSchema: {
-            schema: z.object({
-              summary: z.string(),
-              score: z.number(),
-            }),
-            name: 'analysis' as const,
-          },
+          outputSchema: z.object({
+            summary: z.string(),
+            score: z.number(),
+          }),
+          stateKey: 'analysis' as const,
         }
       );
 
@@ -1834,10 +1843,8 @@ describe('agent step', () => {
               execute: async () => 'ok',
             },
           },
-          outputSchema: {
-            schema: z.object({ result: z.string() }),
-            name: 'output' as const,
-          },
+          outputSchema: z.object({ result: z.string() }),
+          stateKey: 'output' as const,
           maxIterations: 2,
         }
       );

@@ -599,10 +599,10 @@ export class BrainEventStream<
       // Get previous state before action
       const prevState = this.currentState;
 
-      // Update state with inner brain results using outputKey
+      // Update state with inner brain results using stateKey
       this.currentState = {
         ...this.currentState,
-        [brainBlock.outputKey]: innerState,
+        [brainBlock.stateKey]: innerState,
       };
       yield* this.completeStep(step, prevState);
     } else if (block.type === 'agent') {
@@ -663,7 +663,6 @@ export class BrainEventStream<
       TOptions,
       TServices,
       any,
-      any,
       any
     >;
     const prevState = this.currentState;
@@ -692,9 +691,9 @@ export class BrainEventStream<
     };
 
     // Generate a 'done' terminal tool for every agent using the required outputSchema
-    const { schema, name } = config.outputSchema;
+    const schema = config.outputSchema;
     mergedTools['done'] = {
-      description: `Signal that the task is complete and provide the final ${name} result.
+      description: `Signal that the task is complete and provide the final result.
 
 PURPOSE: End agent execution and return structured output to the calling system.
 
@@ -714,7 +713,7 @@ DO NOT CALL IF:
 - You are waiting for user input (use waitForWebhook instead)
 - The task is not yet complete
 
-The schema for this result is: ${name}`,
+The result key for this output is: ${config.stateKey}`,
       inputSchema: schema,
       terminal: true,
     };
@@ -924,7 +923,7 @@ The schema for this result is: ${name}`,
         };
         throw new Error(
           `Agent hit iteration limit (${maxIterations}) without producing required '${
-            config.outputSchema?.name ?? 'done'
+            config.stateKey ?? 'done'
           }' output`
         );
       }
@@ -1040,9 +1039,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         throw new Error(
           `Agent hit token limit (${
             config.maxTokens
-          }) without producing required '${
-            config.outputSchema?.name ?? 'done'
-          }' output`
+          }) without producing required '${config.stateKey ?? 'done'}' output`
         );
       }
 
@@ -1066,9 +1063,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       // exited without calling the 'done' tool to produce required output.
       if (!response.toolCalls || response.toolCalls.length === 0) {
         throw new Error(
-          `Agent exited without calling the 'done' tool. The LLM returned no tool calls despite toolChoice being 'required'. This is unexpected — the agent must call '${
-            config.outputSchema?.name ?? 'done'
-          }' to produce its output.`
+          `Agent exited without calling the 'done' tool. The LLM returned no tool calls despite toolChoice being 'required'. This is unexpected — the agent must call 'done' to produce its output.`
         );
       }
 
@@ -1115,18 +1110,18 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           };
 
           // Merge terminal result into state
-          // Namespace under outputSchema.name when 'done' tool is called
+          // Namespace under stateKey when 'done' tool is called
           if (toolCall.toolName === 'done') {
-            const parsed = config.outputSchema.schema.safeParse(toolCall.args);
+            const parsed = config.outputSchema!.safeParse(toolCall.args);
             if (!parsed.success) {
               throw new Error(
-                `Agent output does not match outputSchema '${config.outputSchema.name}': ${parsed.error.message}`
+                `Agent output does not match outputSchema '${config.stateKey}': ${parsed.error.message}`
               );
             }
-            // Namespace result under outputSchema.name
+            // Namespace result under stateKey
             this.currentState = {
               ...this.currentState,
-              [config.outputSchema.name]: parsed.data,
+              [config.stateKey!]: parsed.data,
             };
           } else {
             // Default behavior: spread into state root (for other terminal tools)
@@ -1351,8 +1346,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
               : block.client
             : this.client;
           const response = await client.generateObject({
-            schema: block.outputSchema!.schema,
-            schemaName: block.outputSchema!.name,
+            schema: block.outputSchema!,
             prompt,
           });
           result = [item, response.object];
@@ -1428,7 +1422,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         result: result ? result[1] : undefined,
         processedCount: i + 1,
         totalItems,
-        schemaName: block.outputKey,
+        stateKey: block.stateKey,
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
         canRelease: !!this.signalProvider,
@@ -1438,7 +1432,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const finalResults = new IterateResult([...resultsMap.values()]);
     this.currentState = {
       ...this.currentState,
-      [block.outputKey]: finalResults,
+      [block.stateKey]: finalResults,
     };
     yield* this.completeStep(step, prevState);
   }
@@ -1458,7 +1452,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     if (this.currentResponse && uiConfig.outputSchema) {
       this.currentState = {
         ...this.currentState,
-        [uiConfig.outputSchema.name]: this.currentResponse,
+        [uiConfig.stateKey!]: this.currentResponse,
       };
       this.currentResponse = undefined;
       yield* this.completeStep(step, prevState);
@@ -1488,7 +1482,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       client: this.client,
       prompt,
       components: this.components,
-      schema: uiConfig.outputSchema?.schema,
+      schema: uiConfig.outputSchema,
       data: this.currentState as Record<string, unknown>,
     });
 
@@ -1537,7 +1531,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       const webhook: WebhookRegistration = {
         slug: 'ui-form',
         identifier: webhookIdentifier,
-        schema: uiConfig.outputSchema.schema,
+        schema: uiConfig.outputSchema,
         token: formToken,
       };
 

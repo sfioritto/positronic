@@ -296,7 +296,7 @@ Use `.values` for simple extraction, `.filter()` for correlated filtering, and `
   }))
 ```
 
-**Name the `outputKey` after the content.** If results contain analyses, use `outputKey: 'analyses' as const`, not `outputKey: 'processedItems' as const`.
+**Name the `stateKey` after the content.** If results contain analyses, use `stateKey: 'analyses' as const`, not `stateKey: 'processedItems' as const`.
 
 ### Naming convention for filter/map parameters
 
@@ -316,15 +316,15 @@ The first parameter is always the input item (what you passed to `over`), and th
 
 ### Nested brain state mapping
 
-When a `.brain()` step runs an inner brain, use `outputKey` to store the inner brain's final state under a key in the outer state:
+When a `.brain()` step runs an inner brain, use `stateKey` to store the inner brain's final state under a key in the outer state:
 
 ```typescript
 .brain('Search and validate', searchAndValidate, {
-  outputKey: 'searchResults' as const,
+  stateKey: 'searchResults' as const,
 })
 ```
 
-The entire inner brain's final state is stored under the `outputKey`. Use `as const` on the key for proper type inference. The inner brain's state type is fully inferred from its definition, so subsequent steps can access the nested state with full type safety (e.g., `state.searchResults.matches`).
+The entire inner brain's final state is stored under the `stateKey`. Use `as const` on the key for proper type inference. The inner brain's state type is fully inferred from its definition, so subsequent steps can access the nested state with full type safety (e.g., `state.searchResults.matches`).
 
 ## Brain DSL Type Inference
 
@@ -365,10 +365,8 @@ If a brain receives its initial state from the outside — via `.map()`, `.brain
 const categorizeBrain = brain<{}, RawThread>('categorize-thread')
   .prompt('Categorize', {
     template: ({ state }) => `Categorize: <%= '${state.subject}' %>`,
-    outputSchema: {
-      schema: z.object({ category: z.string() }),
-      name: 'category' as const,
-    },
+    outputSchema: z.object({ category: z.string() }),
+    stateKey: 'category' as const,
   });
 
 // The parent brain maps over threads
@@ -378,7 +376,7 @@ brain('email-digest')
     run: categorizeBrain,
     over: ({ state }) => state.threads,
     initialState: (thread) => thread,
-    outputKey: 'categorized' as const,
+    stateKey: 'categorized' as const,
   });
 ```
 
@@ -433,7 +431,7 @@ Most generated brains should not have try-catch blocks. Only use them when the e
 
 ## UI Steps for Form Generation
 
-When you need to collect user input, use the `.ui()` method with `outputSchema`. The brain auto-suspends after generating the page, then auto-merges the form response onto state under `outputSchema.name`. Use the `notify` callback for side effects.
+When you need to collect user input, use the `.ui()` method with `outputSchema` and `stateKey`. The brain auto-suspends after generating the page, then auto-merges the form response onto state under the `stateKey`. Use the `notify` callback for side effects.
 
 ```typescript
 import { z } from 'zod';
@@ -451,13 +449,11 @@ brain('feedback-collector')
       - Comments textarea
       - Submit button
     <%= '\`' %>,
-    outputSchema: {
-      schema: z.object({
-        rating: z.number().min(1).max(5),
-        comments: z.string(),
-      }),
-      name: 'feedback' as const,
-    },
+    outputSchema: z.object({
+      rating: z.number().min(1).max(5),
+      comments: z.string(),
+    }),
+    stateKey: 'feedback' as const,
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
     },
@@ -473,8 +469,8 @@ brain('feedback-collector')
 Key points:
 - `page` is available inside the `notify` callback, not in a separate step
 - `page.url` - where to send users
-- The brain auto-suspends after `.ui()` with `outputSchema`
-- Form data auto-merges onto state under `outputSchema.name`
+- The brain auto-suspends after `.ui()` with `outputSchema` and `stateKey`
+- Form data auto-merges onto state under the `stateKey`
 - You control how users are notified (Slack, email, etc.) inside `notify`
 
 See `/docs/brain-dsl-guide.md` for more UI step examples.
@@ -793,13 +789,11 @@ export default feedbackBrain;
   .prompt('Analyze sentiment', {
     template: ({ state: { feedback } }) =>
       <%= '\`Analyze the sentiment of this feedback: "${feedback}"\`' %>,
-    outputSchema: {
-      schema: z.object({
-        sentiment: z.enum(['positive', 'neutral', 'negative']),
-        score: z.number().min(0).max(1)
-      }),
-      name: 'sentimentAnalysis' as const
-    }
+    outputSchema: z.object({
+      sentiment: z.enum(['positive', 'neutral', 'negative']),
+      score: z.number().min(0).max(1)
+    }),
+    stateKey: 'sentimentAnalysis' as const
   })
 
 // Step 5: Run again, check logs, test still fails (no response)
@@ -807,12 +801,10 @@ export default feedbackBrain;
   .prompt('Generate response', {
     template: ({ state: { sentimentAnalysis, feedback } }) =>
       <%= '\`Generate a brief response to this ${sentimentAnalysis.sentiment} feedback: "${feedback}"\`' %>,
-    outputSchema: {
-      schema: z.object({
-        response: z.string()
-      }),
-      name: 'responseData' as const
-    }
+    outputSchema: z.object({
+      response: z.string()
+    }),
+    stateKey: 'responseData' as const
   })
   .step('Format output', ({ state }) => ({
     ...state,

@@ -9,7 +9,8 @@ import type { WebhookRegistration } from '../webhook.js';
  * ```typescript
  * .ui('Create Form', {
  *   template: ({ state }) => `Create a form for ${state.user}`,
- *   outputSchema: { schema: z.object({ name: z.string() }), name: 'form' as const },
+ *   outputSchema: z.object({ name: z.string() }),
+ *   stateKey: 'form' as const,
  * })
  * // form data auto-merges onto state.form
  * ```

@@ -85,7 +85,7 @@ function buildResponseMessages(
 const mockClient: ObjectGenerator = {
   generateObject: async <T>(params: {
     schema: T;
-    schemaName: string;
+    schemaName?: string;
     schemaDescription?: string;
     prompt?: string;
     messages?: Message[];

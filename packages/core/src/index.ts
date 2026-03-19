@@ -36,7 +36,6 @@ export type {
   AgentTool,
   AgentConfig,
   AgentConfigWithOutput,
-  AgentOutputSchema,
   AgentMessage,
   AgentToolWaitFor,
   StepContext,

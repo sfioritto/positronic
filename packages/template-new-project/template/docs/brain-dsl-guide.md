@@ -83,14 +83,12 @@ brain('AI Education Assistant')
   .prompt('Generate explanation', {
     template: ({ state: { topic, context } }) =>
       `<%= '${context}' %>. Please provide a brief, beginner-friendly explanation of <%= '${topic}' %>.`,
-    outputSchema: {
-      schema: z.object({
-        explanation: z.string().describe('A clear explanation of the topic'),
-        keyPoints: z.array(z.string()).describe('3-5 key points about the topic'),
-        difficulty: z.enum(['beginner', 'intermediate', 'advanced']).describe('The difficulty level'),
-      }),
-      name: 'topicExplanation' as const,
-    },
+    outputSchema: z.object({
+      explanation: z.string().describe('A clear explanation of the topic'),
+      keyPoints: z.array(z.string()).describe('3-5 key points about the topic'),
+      difficulty: z.enum(['beginner', 'intermediate', 'advanced']).describe('The difficulty level'),
+    }),
+    stateKey: 'topicExplanation' as const,
   })
   .step('Format output', ({ state }) => ({
     ...state,
@@ -108,12 +106,10 @@ brain('AI Education Assistant')
         `Based on this explanation about <%= '${formattedOutput.topic}' %>: "<%= '${formattedOutput.explanation}' %>"
 
         Generate 3 thoughtful follow-up questions that a student might ask.`,
-      outputSchema: {
-        schema: z.object({
-          questions: z.array(z.string()).length(3).describe('Three follow-up questions'),
-        }),
-        name: 'followUpQuestions' as const,
-      },
+      outputSchema: z.object({
+        questions: z.array(z.string()).length(3).describe('Three follow-up questions'),
+      }),
+      stateKey: 'followUpQuestions' as const,
     },
     // Optional: Transform the response before merging with state
     ({ state, response }) => ({
@@ -131,7 +127,7 @@ Key points about prompt steps:
 - The `template` function receives the current state and resources, returning the prompt string
 - Templates can be async to load resources: `async (state, resources) => { ... }`
 - `outputSchema` defines the structure using Zod schemas
-- The `name` property determines where the response is stored in state
+- The `stateKey` determines where the response is stored in state
 - You can optionally provide a transform function as the third parameter
 - Type inference works throughout - TypeScript knows about your schema types
 
@@ -148,22 +144,18 @@ const smartModel = createAnthropicClient({ model: 'claude-sonnet-4-5-20250929' }
 brain('Multi-Model Brain')
   .prompt('Quick summary', {
     template: ({ state: { document } }) => `Summarize this briefly: <%= '${document}' %>`,
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'quickSummary' as const,
-    },
+    outputSchema: z.object({ summary: z.string() }),
+    stateKey: 'quickSummary' as const,
     client: fastModel,  // Use a fast, cheap model for summarization
   })
   .prompt('Deep analysis', {
     template: ({ state: { quickSummary } }) =>
       `Analyze the implications of this summary: <%= '${quickSummary.summary}' %>`,
-    outputSchema: {
-      schema: z.object({
-        insights: z.array(z.string()),
-        risks: z.array(z.string()),
-      }),
-      name: 'analysis' as const,
-    },
+    outputSchema: z.object({
+      insights: z.array(z.string()),
+      risks: z.array(z.string()),
+    }),
+    stateKey: 'analysis' as const,
     client: smartModel,  // Use a more capable model for analysis
   });
 ```
@@ -182,12 +174,12 @@ const subBrain = brain('Sub Process').step('Transform', ({ state }) => ({
 const mainBrain = brain('Main Process')
   .step('Prepare', () => ({ value: 10 }))
   .brain('Run Sub Process', subBrain, {
-    outputKey: 'processed' as const,
+    stateKey: 'processed' as const,
     initialState: ({ state }) => ({ input: state.value }),
   });
 ```
 
-The `outputKey` stores the entire inner brain's final state under that key in the outer state (e.g., `state.processed` will be `{ result: 20 }`). `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
+The `stateKey` stores the entire inner brain's final state under that key in the outer state (e.g., `state.processed` will be `{ result: 20 }`). `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
 
 ## Guard Clauses
 
@@ -201,7 +193,7 @@ brain('email-checker')
   })
   .guard(({ state }) => state.emails.some(e => e.important))
   // everything below only runs if guard passes
-  .ui('Review emails', { ..., outputSchema: { schema: ..., name: 'review' as const } })
+  .ui('Review emails', { ..., outputSchema: ..., stateKey: 'review' as const })
   // form data auto-merges onto state.review
 ```
 
@@ -416,7 +408,7 @@ Services are destructured alongside other parameters in:
 ```typescript
 .prompt('Generate', {
   template: ({ state }) => 'Generate something',
-  outputSchema: { schema, name: 'result' as const }
+  outputSchema: schema, stateKey: 'result' as const
 }, async ({ state, response, logger, database }) => {
   logger.info('Saving AI response');
   await database.save({ ...state, result: response });
@@ -427,7 +419,7 @@ Services are destructured alongside other parameters in:
 3. **Nested Brain Config**:
 ```typescript
 .brain('Run Sub-Brain', subBrain, {
-  outputKey: 'subResult' as const,
+  stateKey: 'subResult' as const,
 })
 ```
 
@@ -473,13 +465,11 @@ const analysisBrain = brain('Data Analysis')
   })
   .prompt('Analyze Data', {
     template: ({ state: { data } }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
-    outputSchema: {
-      schema: z.object({
-        insights: z.array(z.string()),
-        confidence: z.number()
-      }),
-      name: 'analysis' as const
-    }
+    outputSchema: z.object({
+      insights: z.array(z.string()),
+      confidence: z.number()
+    }),
+    stateKey: 'analysis' as const
   })
   .step('Save Results', async ({ state, api, cache, metrics }) => {
     // Save to cache for next time
@@ -584,10 +574,8 @@ const brainWithTools = brain('Tool Brain')
     system: 'You can fetch and save data.',
     prompt: 'Fetch user data and save the summary.',
     // Tools defined with withTools() are automatically available
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'dataSummary' as const,
-    },
+    outputSchema: z.object({ summary: z.string() }),
+    stateKey: 'dataSummary' as const,
   });
 ```
 
@@ -635,12 +623,10 @@ const brainWithComponents = brain('Custom UI Brain')
       - Account status: <%= '${state.status}' %>
       Use DataTable to show recent activity.
     `,
-    outputSchema: {
-      schema: z.object({
-        acknowledged: z.boolean()
-      }),
-      name: 'acknowledgement' as const,
-    },
+    outputSchema: z.object({
+      acknowledged: z.boolean()
+    }),
+    stateKey: 'acknowledgement' as const,
   });
 ```
 
@@ -937,10 +923,8 @@ brain('Template Example').prompt('Generate Content', {
     const template = await resources.prompts.customerSupport.load();
     return template.replace('{{issue}}', state.issue);
   },
-  outputSchema: {
-    schema: z.object({ response: z.string() }),
-    name: 'supportResponse' as const,
-  },
+  outputSchema: z.object({ response: z.string() }),
+  stateKey: 'supportResponse' as const,
 });
 ```
 
@@ -1040,13 +1024,11 @@ export const aiFilterPrompt = {
       .replace('{{articleList}}', articleList)
       .replace('{{preferences}}', state.userPreferences || 'No specific preferences');
   },
-  outputSchema: {
-    schema: z.object({
-      selectedArticles: z.array(z.number()).describe('Indices of selected articles'),
-      reasoning: z.string().describe('Brief explanation of selections'),
-    }),
-    name: 'filterResults' as const,
-  },
+  outputSchema: z.object({
+    selectedArticles: z.array(z.number()).describe('Indices of selected articles'),
+    reasoning: z.string().describe('Brief explanation of selections'),
+  }),
+  stateKey: 'filterResults' as const,
 };
 
 // brains/hn-bot/brain.ts
@@ -1100,7 +1082,7 @@ brain('Process All Items')
     run: processBrain,
     over: ({ state }) => state.items,
     initialState: (item) => ({ value: item.value, result: 0 }),
-    outputKey: 'results' as const,
+    stateKey: 'results' as const,
     error: (item, error) => ({ value: item.value, result: 0 }),
   })
   .step('Use Results', ({ state }) => ({
@@ -1125,12 +1107,9 @@ brain('Item Processor')
   }))
   .map('Summarize Items', {
     template: ({ item }) => `Summarize this item: <%= '${item.title}' %>`,
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'summary',
-    },
+    outputSchema: z.object({ summary: z.string() }),
     over: ({ state }) => state.items,
-    outputKey: 'summaries' as const,
+    stateKey: 'summaries' as const,
     error: () => ({ summary: 'Failed to summarize' }),
   })
   .step('Process Results', ({ state }) => ({
@@ -1142,7 +1121,7 @@ brain('Item Processor')
   }));
 ```
 
-The template receives `{ item, state, options, resources }` where `item` is the current iteration item. The result per item is `z.infer` of the `outputSchema.schema`. You can also pass `client` to use a different LLM client for the prompt.
+The template receives `{ item, state, options, resources }` where `item` is the current iteration item. The result per item is `z.infer` of the `outputSchema`. You can also pass `client` to use a different LLM client for the prompt.
 
 ### Iterating an Agent
 
@@ -1154,10 +1133,8 @@ const researchBrain = brain('Research Single')
     system: 'You are a research assistant.',
     prompt: `Research this topic: <%= '${state.name}' %>`,
     tools: { search: tools.search },
-    outputSchema: {
-      schema: z.object({ summary: z.string() }),
-      name: 'research' as const,
-    },
+    outputSchema: z.object({ summary: z.string() }),
+    stateKey: 'research' as const,
   }));
 
 brain('Research Topics')
@@ -1168,7 +1145,7 @@ brain('Research Topics')
     run: researchBrain,
     over: ({ state }) => state.topics,
     initialState: (topic) => ({ name: topic.name }),
-    outputKey: 'results' as const,
+    stateKey: 'results' as const,
   })
   .step('Use Results', ({ state }) => ({
     ...state,
@@ -1183,7 +1160,7 @@ brain('Research Topics')
 **Common options** (both modes):
 
 - `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, services, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, services, or any other context field. Can be async.
-- `outputKey: string` - Key under which results are stored in state (use `as const` for type inference)
+- `stateKey: string` - Key under which results are stored in state (use `as const` for type inference)
 - `error: (item, error) => Result | null` - Optional fallback when an item fails. Return `null` to skip the item entirely.
 
 **Brain mode** (use `run`):
@@ -1194,7 +1171,7 @@ brain('Research Topics')
 **Prompt mode** (use `template` + `outputSchema`):
 
 - `template: (context) => string` - Template function. Receives `{ item, state, options, resources }` where `item` is the current iteration item.
-- `outputSchema: { schema, name }` - Zod schema for the LLM output and a name for the schema.
+- `outputSchema: ZodSchema` - Zod schema for the LLM output.
 - `client?: ObjectGenerator` - Optional per-step LLM client override.
 
 #### Accessing options and services in `over`
@@ -1221,7 +1198,7 @@ brain('Dynamic Processor')
     run: processItemBrain,
     over: ({ state, options }) => state.items.filter(i => i.category === options.category),
     initialState: (item) => ({ id: item.id, result: '' }),
-    outputKey: 'results' as const,
+    stateKey: 'results' as const,
   })
 ```
 
@@ -1237,7 +1214,7 @@ By default, results are stored as an `IterateResult` — a collection that wraps
 - **`.map((item, result) => value)`** — maps over both item and result, returns a plain array
 - **`for...of`** — iterates as `[item, result]` tuples (backward compatible with destructuring)
 
-The key always comes from `outputKey`. The `outputSchema.name` in prompt mode is only used as the schema name for the LLM call.
+The key always comes from `stateKey`.
 
 ## Agent Steps
 
@@ -1273,13 +1250,11 @@ brain('Research Assistant')
         }
       }
     },
-    outputSchema: {
-      schema: z.object({
-        findings: z.array(z.string()),
-        summary: z.string(),
-      }),
-      name: 'research' as const,
-    },
+    outputSchema: z.object({
+      findings: z.array(z.string()),
+      summary: z.string(),
+    }),
+    stateKey: 'research' as const,
     maxTokens: 10000,
   })
   .step('Format Results', ({ state }) => ({
@@ -1293,7 +1268,8 @@ brain('Research Assistant')
 - `system: string` - System prompt for the agent
 - `prompt: string | ((state) => string)` - User prompt (can be a function)
 - `tools: Record<string, ToolDefinition>` - Tools available to the agent
-- `outputSchema: { schema, name }` - **Required.** Structured output schema that generates a terminal `done` tool (see below)
+- `outputSchema: ZodSchema` - **Required.** Structured output schema that generates a terminal `done` tool (see below)
+- `stateKey: string` - **Required.** Key under which the agent result is stored in state
 - `maxTokens: number` - Maximum tokens for the agent response
 - `maxIterations: number` - Maximum agent loop iterations (default: 100)
 
@@ -1334,12 +1310,10 @@ brain('Support Ticket Handler')
         },
       },
     },
-    outputSchema: {
-      schema: z.object({
-        resolution: z.string().describe('How the ticket was resolved'),
-      }),
-      name: 'ticketResult' as const,
-    },
+    outputSchema: z.object({
+      resolution: z.string().describe('How the ticket was resolved'),
+    }),
+    stateKey: 'ticketResult' as const,
   })
   .step('Process Result', ({ state }) => ({
     ...state,
@@ -1367,14 +1341,12 @@ brain('Entity Extractor')
   .brain('Extract Entities', {
     system: 'You are an entity extraction assistant.',
     prompt: 'Extract all people and organizations from the provided text.',
-    outputSchema: {
-      schema: z.object({
-        people: z.array(z.string()).describe('Names of people mentioned'),
-        organizations: z.array(z.string()).describe('Organization names'),
-        confidence: z.number().min(0).max(1).describe('Confidence score'),
-      }),
-      name: 'entities' as const,  // Use 'as const' for type inference
-    },
+    outputSchema: z.object({
+      people: z.array(z.string()).describe('Names of people mentioned'),
+      organizations: z.array(z.string()).describe('Organization names'),
+      confidence: z.number().min(0).max(1).describe('Confidence score'),
+    }),
+    stateKey: 'entities' as const,  // Use 'as const' for type inference
   })
   .step('Use Extracted Data', ({ state }) => {
     // TypeScript knows state.entities has people, organizations, and confidence
@@ -1388,11 +1360,11 @@ brain('Entity Extractor')
   });
 ```
 
-Key points about `outputSchema`:
+Key points about `outputSchema` and `stateKey`:
 - The agent automatically gets a `done` tool that uses your schema
-- The result is stored under `state[name]` (e.g., `state.entities`)
+- The result is stored under `state[stateKey]` (e.g., `state.entities`)
 - Full TypeScript type inference flows to subsequent steps
-- Use `as const` on the name for proper type narrowing
+- Use `as const` on the `stateKey` for proper type narrowing
 
 ## Environment and Pages Service
 
@@ -1540,7 +1512,7 @@ Without a token, the server will reject the form submission.
 
 ## UI Steps
 
-UI steps allow brains to generate dynamic user interfaces using AI. When `outputSchema` is provided, `.ui()` generates a page, auto-suspends the brain, and auto-merges the form response onto state under `outputSchema.name`. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
+UI steps allow brains to generate dynamic user interfaces using AI. When `outputSchema` and `stateKey` are provided, `.ui()` generates a page, auto-suspends the brain, and auto-merges the form response onto state under the `stateKey`. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
 
 ### Basic UI Step
 
@@ -1558,13 +1530,11 @@ brain('Feedback Collector')
       Create a feedback form for <%= '${state.userName}' %>.
       Include fields for rating (1-5) and comments.
     `,
-    outputSchema: {
-      schema: z.object({
-        rating: z.number().min(1).max(5),
-        comments: z.string(),
-      }),
-      name: 'feedback' as const,
-    },
+    outputSchema: z.object({
+      rating: z.number().min(1).max(5),
+      comments: z.string(),
+    }),
+    stateKey: 'feedback' as const,
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
     },
@@ -1583,7 +1553,7 @@ brain('Feedback Collector')
 2. **AI Generation**: The AI creates a component tree based on the prompt
 3. **Notify**: The optional `notify` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
 4. **Auto-Suspend**: The brain automatically suspends and waits for the form submission
-5. **Auto-Merge**: The form data is automatically merged onto state under `outputSchema.name`
+5. **Auto-Merge**: The form data is automatically merged onto state under the `stateKey`
 
 ### The `page` Object
 
@@ -1607,14 +1577,12 @@ Be specific about layout and content:
 
     Use a clean, centered single-column layout.
   `,
-  outputSchema: {
-    schema: z.object({
-      name: z.string(),
-      email: z.string().email(),
-      message: z.string(),
-    }),
-    name: 'contactForm' as const,
-  },
+  outputSchema: z.object({
+    name: z.string(),
+    email: z.string().email(),
+    message: z.string(),
+  }),
+  stateKey: 'contactForm' as const,
 })
 ```
 
@@ -1631,12 +1599,10 @@ Use `{{path}}` syntax to bind props to runtime data:
     - Shipping address input
     - Confirm button
   `,
-  outputSchema: {
-    schema: z.object({
-      shippingAddress: z.string(),
-    }),
-    name: 'orderConfirmation' as const,
-  },
+  outputSchema: z.object({
+    shippingAddress: z.string(),
+  }),
+  stateKey: 'orderConfirmation' as const,
 })
 ```
 
@@ -1656,14 +1622,12 @@ brain('User Onboarding')
       - Date of birth
       - Next button
     `,
-    outputSchema: {
-      schema: z.object({
-        firstName: z.string(),
-        lastName: z.string(),
-        dob: z.string(),
-      }),
-      name: 'personalInfo' as const,
-    },
+    outputSchema: z.object({
+      firstName: z.string(),
+      lastName: z.string(),
+      dob: z.string(),
+    }),
+    stateKey: 'personalInfo' as const,
     notify: async ({ page, notify }) => {
       await notify(`Step 1: <%= '${page.url}' %>`);
     },
@@ -1678,13 +1642,11 @@ brain('User Onboarding')
       - Contact preference (email/phone/sms)
       - Complete button
     `,
-    outputSchema: {
-      schema: z.object({
-        newsletter: z.boolean(),
-        contactMethod: z.enum(['email', 'phone', 'sms']),
-      }),
-      name: 'preferences' as const,
-    },
+    outputSchema: z.object({
+      newsletter: z.boolean(),
+      contactMethod: z.enum(['email', 'phone', 'sms']),
+    }),
+    stateKey: 'preferences' as const,
     notify: async ({ page, notify }) => {
       await notify(`Step 2: <%= '${page.url}' %>`);
     },
@@ -1735,13 +1697,11 @@ const completeBrain = brain({
       const template = await resources.templates.projectPlan.load();
       return template.replace('{{context}}', 'software project');
     },
-    outputSchema: {
-      schema: z.object({
-        tasks: z.array(z.string()),
-        duration: z.number(),
-      }),
-      name: 'plan' as const,
-    },
+    outputSchema: z.object({
+      tasks: z.array(z.string()),
+      duration: z.number(),
+    }),
+    stateKey: 'plan' as const,
   })
   .step('Process Plan', ({ state, logger, analytics }) => {
     logger.log(`Plan generated with <%= '${state.plan.tasks.length}' %> tasks`);

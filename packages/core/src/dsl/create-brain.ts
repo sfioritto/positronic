@@ -4,7 +4,6 @@ import type {
   AgentConfig,
   AgentConfigWithOutput,
   AgentTool,
-  AgentOutputSchema,
   StepContext,
   State,
   JsonObject,
@@ -158,10 +157,8 @@ export function createBrain<
   function brain(
     titleOrConfig: string | { title: string; description?: string },
     agentConfig?:
-      | AgentConfig<any, any>
-      | ((
-          params: AgentParams
-        ) => AgentConfig<any, any> | Promise<AgentConfig<any, any>>)
+      | AgentConfig<any>
+      | ((params: AgentParams) => AgentConfig<any> | Promise<AgentConfig<any>>)
   ): any {
     let base = coreBrain(titleOrConfig as any);
 

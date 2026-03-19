@@ -69,12 +69,10 @@ export interface ObjectGenerator {
    * multi-turn conversations via the `messages` array.
    */
   generateObject<T extends z.AnyZodObject>(params: {
-    /**
-     * The definition of the expected output object, including its Zod schema
-     * and a name for state management within the brain.
-     */
+    /** The Zod schema defining the expected output object structure. */
     schema: T;
-    schemaName: string;
+    /** Optional name passed to the underlying LLM provider (e.g., tool name for Claude, output name for Vercel AI SDK). Not used by the brain layer. */
+    schemaName?: string;
     schemaDescription?: string;
 
     /**
