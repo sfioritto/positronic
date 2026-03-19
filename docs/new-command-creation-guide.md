@@ -8,9 +8,16 @@ Our command implementation follows a Test-Driven Development (TDD) approach with
 
 1. **Research & Planning** - Understand existing patterns and plan the implementation
 2. **Spec Implementation** - Define API contracts in the spec package
-3. **CLI Implementation** - Create CLI components and command handlers
+3. **CLI Implementation** - Create a React component and wire it up in `cli.ts`
 4. **Testing** - Add comprehensive test coverage following CLI testing guidelines
 5. **Integration** - Wire everything together and verify end-to-end functionality
+
+Adding a new CLI command is a **2-touchpoint task**:
+
+1. Create the component in `packages/cli/src/components/`
+2. Add the yargs definition and handler in `packages/cli/src/cli.ts`
+
+There are no command class middlemen — handlers in `cli.ts` render components directly.
 
 ## Detailed Process
 
@@ -20,9 +27,9 @@ Our command implementation follows a Test-Driven Development (TDD) approach with
 2. **Research existing implementations**:
 
    - Check if similar commands exist in the codebase
-   - Look at `packages/cli/src/commands/*.ts` for patterns
    - Review `packages/cli/src/components/*.tsx` for UI patterns
-   - Examine test files `packages/cli/src/commands/*.test.ts` for testing approaches
+   - Look at `packages/cli/src/cli.ts` for how commands are wired up
+   - Examine test files `packages/cli/tests/*.test.ts` for testing approaches
 
 3. **Check API completeness**:
 
@@ -82,7 +89,7 @@ export const [category] = {
 
 ### Phase 3: CLI Implementation
 
-#### 3.1 Create Component (if needed)
+#### 3.1 Create Component
 
 In `packages/cli/src/components/your-component.tsx`:
 
@@ -155,31 +162,14 @@ export const YourComponent = ({ param }: YourComponentProps) => {
 };
 ```
 
-#### 3.2 Add Command Method
+#### 3.2 Wire Up in cli.ts
 
-In `packages/cli/src/commands/your-category.ts`:
-
-```typescript
-// Add interface for arguments
-interface YourCommandArgs {
-  param: string;
-  option?: string;
-}
-
-// Add to class
-yourCommand({
-  param,
-  option,
-}: ArgumentsCamelCase<YourCommandArgs>): React.ReactElement {
-  return React.createElement(YourComponent, { param, option });
-}
-```
-
-#### 3.3 Wire Up CLI Configuration
-
-In `packages/cli/src/cli.ts`:
+In `packages/cli/src/cli.ts`, add the component import and yargs command definition. The handler renders the component directly — no command class needed:
 
 ```typescript
+// At the top of cli.ts, add the import
+import { YourComponent } from './components/your-component.js';
+
 // Add to appropriate command group
 .command(
   'your-command <param>',
@@ -202,8 +192,10 @@ In `packages/cli/src/cli.ts`:
       );
   },
   (argv) => {
-    const element = yourCategoryCommand.yourCommand(argv as any);
-    render(element);
+    render(React.createElement(YourComponent, {
+      param: argv.param,
+      option: argv.option,
+    }));
   }
 )
 ```

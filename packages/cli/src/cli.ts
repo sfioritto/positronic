@@ -1,20 +1,77 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import React from 'react';
-import { ProjectCommand } from './commands/project.js';
 import { ServerCommand } from './commands/server.js';
-import { BrainCommand } from './commands/brain.js';
-import { ResourcesCommand } from './commands/resources.js';
-import { ScheduleCommand } from './commands/schedule.js';
-import { SecretsCommand } from './commands/secrets.js';
-import { PagesCommand } from './commands/pages.js';
-import { UsersCommand } from './commands/users.js';
-import { AuthCommand } from './commands/auth.js';
-import { StoreCommand } from './commands/store.js';
 import type { PositronicDevServer } from '@positronic/spec';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+
+// Brain components
+import { BrainList } from './components/brain-list.js';
+import { BrainHistory } from './components/brain-history.js';
+import { BrainShow } from './components/brain-show.js';
+import { RunShow } from './components/run-show.js';
+import { BrainRerun } from './components/brain-rerun.js';
+import { BrainRun } from './components/brain-run.js';
+import { BrainKill } from './components/brain-kill.js';
+import { BrainResolver } from './components/brain-resolver.js';
+import { WatchResolver } from './components/watch-resolver.js';
+import { TopNavigator } from './components/top-navigator.js';
+
+// Schedule components
+import { ScheduleCreate } from './components/schedule-create.js';
+import { ScheduleList } from './components/schedule-list.js';
+import { ScheduleDelete } from './components/schedule-delete.js';
+import { ScheduleRuns } from './components/schedule-runs.js';
+import { ScheduleTimezone } from './components/schedule-timezone.js';
+
+// Secrets components
+import { SecretsList } from './components/secrets-list.js';
+import { SecretsCreate } from './components/secrets-create.js';
+import { SecretsDelete } from './components/secrets-delete.js';
+import { SecretsBulk } from './components/secrets-bulk.js';
+
+// Pages components
+import { PagesList } from './components/pages-list.js';
+import { PageDelete } from './components/page-delete.js';
+
+// Users components
+import { UsersList } from './components/users-list.js';
+import { UsersCreate } from './components/users-create.js';
+import { UsersDelete } from './components/users-delete.js';
+import { UsersKeysList } from './components/users-keys-list.js';
+import { UsersKeysAdd } from './components/users-keys-add.js';
+import { UsersKeysRemove } from './components/users-keys-remove.js';
+
+// Auth components
+import { AuthLogin } from './components/auth-login.js';
+import { AuthLogout } from './components/auth-logout.js';
+import { Whoami } from './components/whoami.js';
+
+// Project components
+import { ProjectAdd } from './components/project-add.js';
+import { ProjectList } from './components/project-list.js';
+import { ProjectSelect } from './components/project-select.js';
+import { ProjectShow } from './components/project-show.js';
+import { ProjectCreate } from './components/project-create.js';
+import { ProjectRemove } from './components/project-remove.js';
+
+// Store components
+import { StoreExplorer } from './components/store-explorer.js';
+
+// Resource components
+import { ResourceList } from './components/resource-list.js';
+import { ResourceSync } from './components/resource-sync.js';
+import { ResourceClear } from './components/resource-clear.js';
+import { ResourceDelete } from './components/resource-delete.js';
+import { ResourceUpload } from './components/resource-upload.js';
+import { ResourceTypes } from './components/resource-types.js';
+
+// Shared
+import { ErrorComponent } from './components/error.js';
+import { ProjectConfigManager } from './commands/project-config-manager.js';
+import { scanLocalResources } from './commands/helpers.js';
 
 export interface CliOptions {
   argv?: string[];
@@ -88,6 +145,19 @@ export function buildCli(options: CliOptions) {
 
   const isLocalDevMode = server !== undefined;
 
+  function renderLocalDevOnly() {
+    render(
+      React.createElement(ErrorComponent, {
+        error: {
+          title: 'Command Not Available',
+          message: 'This command is only available in local dev mode',
+          details:
+            'Please run this command from within a Positronic project directory.',
+        },
+      })
+    );
+  }
+
   // Get version from package.json
   let version = 'TEST'; // Default version for test environment where package.json path differs
   try {
@@ -101,13 +171,7 @@ export function buildCli(options: CliOptions) {
     // so we use 'TEST' as the version to avoid breaking tests
   }
 
-  // Instantiate command classes, passing the determined mode and path
-  const projectCommand = new ProjectCommand();
-  const brainCommand = new BrainCommand();
-  const scheduleCommand = new ScheduleCommand();
-  const secretsCommand = new SecretsCommand();
-  const pagesCommand = new PagesCommand();
-  const usersCommand = new UsersCommand();
+  const configManager = new ProjectConfigManager();
 
   // Main CLI definition
   let cli = yargs(argv)
@@ -138,8 +202,11 @@ export function buildCli(options: CliOptions) {
             });
           },
           (argv) => {
-            const element = projectCommand.create(argv);
-            render(element);
+            render(
+              React.createElement(ProjectCreate, {
+                projectPathArg: argv.name,
+              })
+            );
           }
         );
       }
@@ -166,8 +233,13 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = projectCommand.add(argv);
-            render(element);
+            render(
+              React.createElement(ProjectAdd, {
+                name: argv.name,
+                url: argv.url,
+                projectConfig: configManager,
+              })
+            );
           }
         )
         .command(
@@ -186,8 +258,12 @@ export function buildCli(options: CliOptions) {
               .example('$0 project select', 'Interactive project selection');
           },
           (argv) => {
-            const element = projectCommand.select(argv);
-            render(element);
+            render(
+              React.createElement(ProjectSelect, {
+                name: argv.name,
+                projectConfig: configManager,
+              })
+            );
           }
         )
         .command(
@@ -195,8 +271,11 @@ export function buildCli(options: CliOptions) {
           'List all of your Positronic projects',
           () => {},
           () => {
-            const element = projectCommand.list();
-            render(element);
+            render(
+              React.createElement(ProjectList, {
+                projectConfig: configManager,
+              })
+            );
           }
         )
         .command(
@@ -204,8 +283,11 @@ export function buildCli(options: CliOptions) {
           'Display your currently selected project',
           () => {},
           () => {
-            const element = projectCommand.show();
-            render(element);
+            render(
+              React.createElement(ProjectShow, {
+                projectConfig: configManager,
+              })
+            );
           }
         )
         .command(
@@ -224,8 +306,12 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = projectCommand.remove(argv);
-            render(element);
+            render(
+              React.createElement(ProjectRemove, {
+                name: argv.name,
+                projectConfig: configManager,
+              })
+            );
           }
         )
         .demandCommand(
@@ -250,8 +336,9 @@ export function buildCli(options: CliOptions) {
         });
       },
       (argv) => {
-        const element = projectCommand.create(argv);
-        render(element);
+        render(
+          React.createElement(ProjectCreate, { projectPathArg: argv.name })
+        );
       }
     );
   }
@@ -320,9 +407,8 @@ export function buildCli(options: CliOptions) {
     'list',
     'List all brains in the active project\n',
     () => {},
-    (argv) => {
-      const element = brainCommand.list(argv);
-      render(element);
+    () => {
+      render(React.createElement(BrainList));
     }
   );
 
@@ -347,8 +433,16 @@ export function buildCli(options: CliOptions) {
         .example('$0 history my-brain --limit=20', 'List more recent runs');
     },
     (argv) => {
-      const element = brainCommand.history(argv);
-      render(element);
+      render(
+        React.createElement(BrainResolver, {
+          identifier: argv.brain,
+          children: (resolvedBrainTitle: string) =>
+            React.createElement(BrainHistory, {
+              brainName: resolvedBrainTitle,
+              limit: argv.limit,
+            }),
+        })
+      );
     }
   );
 
@@ -388,8 +482,28 @@ export function buildCli(options: CliOptions) {
         .example('$0 show --run-id abc123', 'Show details for a specific run');
     },
     (argv) => {
-      const element = brainCommand.show(argv as any);
-      render(element);
+      if (argv.runId) {
+        render(React.createElement(RunShow, { runId: argv.runId as string }));
+      } else if (argv.brain) {
+        render(
+          React.createElement(BrainShow, {
+            identifier: argv.brain,
+            showSteps: argv.steps || false,
+          })
+        );
+      } else {
+        render(
+          React.createElement(ErrorComponent, {
+            error: {
+              title: 'Missing Argument',
+              message:
+                'You must provide either a brain identifier or a run ID.',
+              details:
+                'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
+            },
+          })
+        );
+      }
     }
   );
 
@@ -413,8 +527,12 @@ export function buildCli(options: CliOptions) {
         .example('$0 rerun abc123 --starts-at=3', 'Rerun from step 3');
     },
     (argv) => {
-      const element = brainCommand.rerun(argv);
-      render(element);
+      render(
+        React.createElement(BrainRerun, {
+          runId: argv.runId as string,
+          startsAt: argv.startsAt as number,
+        })
+      );
     }
   );
 
@@ -494,8 +612,14 @@ export function buildCli(options: CliOptions) {
       } else if (argv.state) {
         initialState = argv.state as Record<string, unknown>;
       }
-      const element = brainCommand.run({ ...argv, initialState } as any);
-      render(element);
+      render(
+        React.createElement(BrainRun, {
+          identifier: argv.brain,
+          watch: argv.watch,
+          options: argv.options as Record<string, string> | undefined,
+          initialState,
+        })
+      );
     }
   );
 
@@ -524,8 +648,12 @@ export function buildCli(options: CliOptions) {
         .example('$0 watch my-brain --events', 'Watch with events log view');
     },
     (argv) => {
-      const element = brainCommand.watch(argv);
-      render(element);
+      render(
+        React.createElement(WatchResolver, {
+          identifier: argv.identifier,
+          startWithEvents: argv.events,
+        })
+      );
     }
   );
 
@@ -543,8 +671,7 @@ export function buildCli(options: CliOptions) {
         .example('$0 top my-brain', 'View running brains matching "my-brain"');
     },
     (argv) => {
-      const element = brainCommand.top(argv);
-      render(element);
+      render(React.createElement(TopNavigator, { brainFilter: argv.brain }));
     }
   );
 
@@ -555,9 +682,8 @@ export function buildCli(options: CliOptions) {
         'list',
         'List all brains in the active project\n',
         () => {},
-        (argv) => {
-          const element = brainCommand.list(argv);
-          render(element);
+        () => {
+          render(React.createElement(BrainList));
         }
       )
       .command(
@@ -585,8 +711,16 @@ export function buildCli(options: CliOptions) {
             );
         },
         (argv) => {
-          const element = brainCommand.history(argv);
-          render(element);
+          render(
+            React.createElement(BrainResolver, {
+              identifier: argv.brain,
+              children: (resolvedBrainTitle: string) =>
+                React.createElement(BrainHistory, {
+                  brainName: resolvedBrainTitle,
+                  limit: argv.limit,
+                }),
+            })
+          );
         }
       )
       .command(
@@ -627,8 +761,30 @@ export function buildCli(options: CliOptions) {
             );
         },
         (argv) => {
-          const element = brainCommand.show(argv as any);
-          render(element);
+          if (argv.runId) {
+            render(
+              React.createElement(RunShow, { runId: argv.runId as string })
+            );
+          } else if (argv.brain) {
+            render(
+              React.createElement(BrainShow, {
+                identifier: argv.brain,
+                showSteps: argv.steps || false,
+              })
+            );
+          } else {
+            render(
+              React.createElement(ErrorComponent, {
+                error: {
+                  title: 'Missing Argument',
+                  message:
+                    'You must provide either a brain identifier or a run ID.',
+                  details:
+                    'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
+                },
+              })
+            );
+          }
         }
       )
       .command(
@@ -653,8 +809,12 @@ export function buildCli(options: CliOptions) {
             );
         },
         (argv) => {
-          const element = brainCommand.rerun(argv);
-          render(element);
+          render(
+            React.createElement(BrainRerun, {
+              runId: argv.runId as string,
+              startsAt: argv.startsAt as number,
+            })
+          );
         }
       )
       .command(
@@ -731,8 +891,14 @@ export function buildCli(options: CliOptions) {
           } else if (argv.state) {
             initialState = argv.state as Record<string, unknown>;
           }
-          const element = brainCommand.run({ ...argv, initialState } as any);
-          render(element);
+          render(
+            React.createElement(BrainRun, {
+              identifier: argv.brain,
+              watch: argv.watch,
+              options: argv.options as Record<string, string> | undefined,
+              initialState,
+            })
+          );
         }
       )
       .command(
@@ -765,8 +931,12 @@ export function buildCli(options: CliOptions) {
             );
         },
         (argv) => {
-          const element = brainCommand.watch(argv);
-          render(element);
+          render(
+            React.createElement(WatchResolver, {
+              identifier: argv.identifier,
+              startWithEvents: argv.events,
+            })
+          );
         }
       )
       .command(
@@ -795,8 +965,12 @@ export function buildCli(options: CliOptions) {
             );
         },
         (argv) => {
-          const element = brainCommand.kill(argv);
-          render(element);
+          render(
+            React.createElement(BrainKill, {
+              runId: argv.runId as string,
+              force: argv.force,
+            })
+          );
         }
       )
       .command(
@@ -815,8 +989,9 @@ export function buildCli(options: CliOptions) {
             );
         },
         (argv) => {
-          const element = brainCommand.top(argv);
-          render(element);
+          render(
+            React.createElement(TopNavigator, { brainFilter: argv.brain })
+          );
         }
       )
       .demandCommand(
@@ -832,8 +1007,6 @@ export function buildCli(options: CliOptions) {
     'resources',
     'Resources are any data that can be used in your brains, agents, and prompts. They can be text or binaries.\n',
     (yargsResource) => {
-      const resourcesCommand = new ResourcesCommand(server);
-
       yargsResource.command(
         'list',
         'List all resources in the active project\n',
@@ -844,8 +1017,7 @@ export function buildCli(options: CliOptions) {
           );
         },
         () => {
-          const element = resourcesCommand.list();
-          render(element);
+          render(React.createElement(ResourceList));
         }
       );
 
@@ -861,8 +1033,23 @@ export function buildCli(options: CliOptions) {
           );
         },
         () => {
-          const element = resourcesCommand.sync();
-          render(element);
+          if (!server) {
+            renderLocalDevOnly();
+            return;
+          }
+
+          const resourcesDir = join(server.projectRootDir, 'resources');
+          if (!existsSync(resourcesDir)) {
+            mkdirSync(resourcesDir, { recursive: true });
+          }
+          const localResources = scanLocalResources(resourcesDir);
+
+          render(
+            React.createElement(ResourceSync, {
+              localResources,
+              resourcesDir,
+            })
+          );
         }
       );
 
@@ -876,8 +1063,16 @@ export function buildCli(options: CliOptions) {
           );
         },
         () => {
-          const element = resourcesCommand.types();
-          render(element);
+          if (!server) {
+            renderLocalDevOnly();
+            return;
+          }
+
+          render(
+            React.createElement(ResourceTypes, {
+              projectRootDir: server.projectRootDir,
+            })
+          );
         }
       );
 
@@ -890,11 +1085,8 @@ export function buildCli(options: CliOptions) {
             'Delete all resources from the server'
           );
         },
-        async () => {
-          const element = await resourcesCommand.clear();
-          if (element) {
-            render(element);
-          }
+        () => {
+          render(React.createElement(ResourceClear));
         }
       );
 
@@ -948,17 +1140,22 @@ export function buildCli(options: CliOptions) {
         },
         (argv) => {
           if (argv.delete) {
-            const element = resourcesCommand.delete(
-              argv.file as string,
-              argv.force as boolean
+            render(
+              React.createElement(ResourceDelete, {
+                resourceKey: argv.file as string,
+                resourcePath: argv.file as string,
+                projectRootPath: server?.projectRootDir,
+                force: argv.force as boolean,
+              })
             );
-            render(element);
           } else {
-            const element = resourcesCommand.upload(
-              argv.file as string,
-              argv.key as string | undefined
+            render(
+              React.createElement(ResourceUpload, {
+                filePath: argv.file as string,
+                customKey: argv.key as string | undefined,
+                projectRootPath: server?.projectRootDir,
+              })
             );
-            render(element);
           }
         }
       );
@@ -1030,8 +1227,11 @@ export function buildCli(options: CliOptions) {
       yargsSchedule.middleware(async (argv) => {
         // If -l flag is used, call list command
         if (argv.list) {
-          const element = scheduleCommand.list({ brain: argv.brain } as any);
-          const result = render(element);
+          const result = render(
+            React.createElement(ScheduleList, {
+              brainFilter: argv.brain as string | undefined,
+            })
+          );
           // Wait for the component to finish rendering (in production, Ink's render returns waitUntilExit)
           if (result && typeof result.waitUntilExit === 'function') {
             await result.waitUntilExit();
@@ -1041,11 +1241,12 @@ export function buildCli(options: CliOptions) {
         }
         // If -d flag is used, call delete command
         if (argv.delete) {
-          const element = scheduleCommand.delete({
-            scheduleId: argv.delete as string,
-            force: argv.force,
-          } as any);
-          const result = render(element);
+          const result = render(
+            React.createElement(ScheduleDelete, {
+              scheduleId: argv.delete as string,
+              force: argv.force as boolean,
+            })
+          );
           // Wait for the component to finish rendering (in production, Ink's render returns waitUntilExit)
           if (result && typeof result.waitUntilExit === 'function') {
             await result.waitUntilExit();
@@ -1139,11 +1340,18 @@ export function buildCli(options: CliOptions) {
             } else if (argv.state) {
               initialState = argv.state as Record<string, unknown>;
             }
-            const element = scheduleCommand.create({
-              ...argv,
-              initialState,
-            } as any);
-            render(element);
+            render(
+              React.createElement(BrainResolver, {
+                identifier: argv.brain,
+                children: (resolvedBrainTitle: string) =>
+                  React.createElement(ScheduleCreate, {
+                    identifier: resolvedBrainTitle,
+                    cronExpression: argv.cronExpression as string,
+                    options: argv.options as Record<string, string> | undefined,
+                    initialState,
+                  }),
+              })
+            );
           }
         )
         .command(
@@ -1163,8 +1371,11 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = scheduleCommand.timezone(argv as any);
-            render(element);
+            render(
+              React.createElement(ScheduleTimezone, {
+                timezone: argv.timezone,
+              })
+            );
           }
         )
         .command(
@@ -1199,8 +1410,17 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = scheduleCommand.runs(argv as any);
-            render(element);
+            render(
+              React.createElement(ScheduleRuns, {
+                scheduleId: argv.scheduleId as string | undefined,
+                limit: argv.limit,
+                status: argv.status as
+                  | 'triggered'
+                  | 'failed'
+                  | 'complete'
+                  | undefined,
+              })
+            );
           }
         );
 
@@ -1214,9 +1434,8 @@ export function buildCli(options: CliOptions) {
     'Manage pages created by brains\n',
     (yargsPages) => {
       yargsPages
-        .command('list', 'List all pages\n', {}, (argv) => {
-          const element = pagesCommand.list(argv);
-          render(element);
+        .command('list', 'List all pages\n', {}, () => {
+          render(React.createElement(PagesList));
         })
         .command(
           'delete <slug>',
@@ -1241,8 +1460,12 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = pagesCommand.delete(argv);
-            render(element);
+            render(
+              React.createElement(PageDelete, {
+                slug: argv.slug,
+                force: argv.force,
+              })
+            );
           }
         )
         .demandCommand(1, 'You need to specify a subcommand');
@@ -1258,8 +1481,7 @@ export function buildCli(options: CliOptions) {
     (yargsSecret) => {
       yargsSecret
         .command('list', 'List all secrets\n', {}, () => {
-          const element = secretsCommand.list();
-          render(element);
+          render(React.createElement(SecretsList));
         })
         .command(
           'create <name>',
@@ -1285,8 +1507,12 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = secretsCommand.create(argv);
-            render(element);
+            render(
+              React.createElement(SecretsCreate, {
+                name: argv.name,
+                value: argv.value,
+              })
+            );
           }
         )
         .command(
@@ -1305,8 +1531,7 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = secretsCommand.delete(argv);
-            render(element);
+            render(React.createElement(SecretsDelete, { name: argv.name }));
           }
         )
         .command(
@@ -1329,8 +1554,7 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = secretsCommand.bulk(argv);
-            render(element);
+            render(React.createElement(SecretsBulk, { file: argv.file }));
           }
         )
         .demandCommand(1, 'You need to specify a subcommand');
@@ -1346,8 +1570,7 @@ export function buildCli(options: CliOptions) {
     (yargsUsers) => {
       yargsUsers
         .command('list', 'List all users\n', {}, () => {
-          const element = usersCommand.list();
-          render(element);
+          render(React.createElement(UsersList));
         })
         .command(
           'create <name>',
@@ -1362,8 +1585,7 @@ export function buildCli(options: CliOptions) {
               .example('$0 users create admin', 'Create a user named admin');
           },
           (argv) => {
-            const element = usersCommand.create(argv);
-            render(element);
+            render(React.createElement(UsersCreate, { name: argv.name }));
           }
         )
         .command(
@@ -1389,8 +1611,12 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = usersCommand.delete(argv as any);
-            render(element);
+            render(
+              React.createElement(UsersDelete, {
+                userName: argv.name,
+                force: argv.force,
+              })
+            );
           }
         )
         .command(
@@ -1406,8 +1632,7 @@ export function buildCli(options: CliOptions) {
               .example('$0 users list-keys admin', 'List keys for a user');
           },
           (argv) => {
-            const element = usersCommand.listKeys(argv as any);
-            render(element);
+            render(React.createElement(UsersKeysList, { userName: argv.name }));
           }
         )
         .command(
@@ -1456,8 +1681,14 @@ export function buildCli(options: CliOptions) {
               );
           },
           (argv) => {
-            const element = usersCommand.addKey(argv as any);
-            render(element);
+            render(
+              React.createElement(UsersKeysAdd, {
+                userName: argv.name,
+                pubkeyPath: argv.pubkeyPath,
+                paste: argv.paste,
+                label: argv.label,
+              })
+            );
           }
         )
         .command(
@@ -1484,8 +1715,13 @@ export function buildCli(options: CliOptions) {
               .example('$0 users remove-key admin SHA256:...', 'Remove a key');
           },
           (argv) => {
-            const element = usersCommand.removeKey(argv as any);
-            render(element);
+            render(
+              React.createElement(UsersKeysRemove, {
+                userName: argv.name,
+                fingerprint: argv.fingerprint,
+                force: argv.force,
+              })
+            );
           }
         )
         .demandCommand(
@@ -1498,20 +1734,16 @@ export function buildCli(options: CliOptions) {
   );
 
   // --- Store Explorer Command ---
-  const storeCommand = new StoreCommand();
   cli = cli.command(
     'store',
     'Browse and manage brain store data\n',
     () => {},
     () => {
-      const element = storeCommand.explore();
-      render(element);
+      render(React.createElement(StoreExplorer));
     }
   );
 
   // --- Auth Commands (Top-level) ---
-  const authCommand = new AuthCommand(undefined, projectRootPath);
-
   cli = cli.command(
     'login',
     'Configure SSH key for authentication\n',
@@ -1532,8 +1764,14 @@ export function buildCli(options: CliOptions) {
         .example('$0 login --project', 'Set key for current project');
     },
     (argv) => {
-      const element = authCommand.login(argv as any);
-      render(element);
+      render(
+        React.createElement(AuthLogin, {
+          configManager,
+          keyPath: argv.path,
+          forProject: argv.project || false,
+          projectRootPath,
+        })
+      );
     }
   );
 
@@ -1551,8 +1789,13 @@ export function buildCli(options: CliOptions) {
         .example('$0 logout --project', 'Clear project-specific key');
     },
     (argv) => {
-      const element = authCommand.logout(argv as any);
-      render(element);
+      render(
+        React.createElement(AuthLogout, {
+          configManager,
+          forProject: argv.project || false,
+          projectRootPath,
+        })
+      );
     }
   );
 
@@ -1561,8 +1804,12 @@ export function buildCli(options: CliOptions) {
     'Show your current authenticated identity\n',
     () => {},
     () => {
-      const element = authCommand.whoami();
-      render(element);
+      render(
+        React.createElement(Whoami, {
+          configManager,
+          projectRootPath,
+        })
+      );
     }
   );
 
