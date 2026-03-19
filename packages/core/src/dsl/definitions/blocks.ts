@@ -6,7 +6,6 @@ import type {
   RuntimeEnv,
   AgentTool,
   AgentConfig,
-  AgentOutputSchema,
 } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
@@ -72,7 +71,8 @@ export type StepBlock<
     template: (
       context: TemplateContext<TStateIn, TOptions>
     ) => string | Promise<string>;
-    outputSchema?: { schema: z.ZodObject<any>; name: string };
+    outputSchema?: z.ZodObject<any>;
+    stateKey?: string;
     notify?: (context: any) => void | Promise<void>;
   };
   /** Per-step client override for prompt steps */
@@ -117,7 +117,7 @@ export type BrainBlock<
   type: 'brain';
   title: string;
   innerBrain: TInnerBrain;
-  outputKey: string;
+  stateKey: string;
   initialState?:
     | State
     | ((
@@ -136,11 +136,7 @@ export type AgentBlock<
   TOptions extends JsonObject = JsonObject,
   TServices extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TTools extends Record<string, AgentTool<any>> = Record<
-    string,
-    AgentTool<any>
-  >,
-  TOutputSchema extends AgentOutputSchema | undefined = undefined
+  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>
 > = {
   type: 'agent';
   title: string;
@@ -154,9 +150,7 @@ export type AgentBlock<
       pages?: PagesService;
       env: RuntimeEnv;
     } & TServices
-  ) =>
-    | AgentConfig<TTools, TOutputSchema>
-    | Promise<AgentConfig<TTools, TOutputSchema>>;
+  ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>;
 };
 
 export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
@@ -170,7 +164,7 @@ export type MapBlock = {
   type: 'map';
   title: string;
   over: (context: any) => any[] | Promise<any[]>;
-  outputKey: string;
+  stateKey: string;
   error?: (item: any, error: Error) => any | null;
   // Brain mode
   innerBrain?: any;
@@ -178,10 +172,7 @@ export type MapBlock = {
   options?: any | ((context: any) => any);
   // Prompt mode
   template?: (context: any) => string | Promise<string>;
-  outputSchema?: {
-    schema: z.ZodObject<any>;
-    name: string;
-  };
+  outputSchema?: z.ZodObject<any>;
   client?: ObjectGenerator;
 };
 

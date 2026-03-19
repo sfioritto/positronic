@@ -73,7 +73,7 @@ export class AnthropicClient implements ObjectGenerator {
 
   async generateObject<T extends z.AnyZodObject>(params: {
     schema: T;
-    schemaName: string;
+    schemaName?: string;
     schemaDescription?: string;
     prompt?: string;
     messages?: { role: 'user' | 'assistant' | 'system'; content: string }[];
@@ -107,7 +107,7 @@ export class AnthropicClient implements ObjectGenerator {
       model,
       response_model: {
         schema: params.schema,
-        name: params.schemaName,
+        name: params.schemaName ?? 'Data',
         description: params.schemaDescription,
       },
       max_tokens,

@@ -20,10 +20,8 @@ const memoryTools = {
   recallMemories: recallMemories as unknown as AgentTool<ZodType>,
 };
 
-const dummyOutputSchema = {
-  schema: z.object({ result: z.string() }),
-  name: 'agentResult' as const,
-} as const;
+const dummyOutputSchema = z.object({ result: z.string() });
+const dummyStateKey = 'agentResult' as const;
 
 // Mock ObjectGenerator with generateText support
 const mockGenerateText =
@@ -78,6 +76,7 @@ describe('Memory Tools Integration', () => {
         .brain('Remember', () => ({
           prompt: 'Remember that the user prefers dark mode',
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
           tools: {
             ...memoryTools,
           },
@@ -137,6 +136,7 @@ describe('Memory Tools Integration', () => {
         .brain('Remember User Pref', () => ({
           prompt: 'Store user preference',
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
           tools: {
             ...memoryTools,
           },
@@ -185,6 +185,7 @@ describe('Memory Tools Integration', () => {
       const testBrain = brain('test-no-memory').brain('Remember', () => ({
         prompt: 'Try to remember something',
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
         tools: {
           ...memoryTools,
         },
@@ -253,6 +254,7 @@ describe('Memory Tools Integration', () => {
         .brain('Recall Preferences', () => ({
           prompt: 'What are the user preferences?',
           outputSchema: dummyOutputSchema,
+          stateKey: dummyStateKey,
           tools: {
             ...memoryTools,
           },
@@ -320,6 +322,7 @@ describe('Memory Tools Integration', () => {
       const testBrain = brain('test-no-memory-recall').brain('Recall', () => ({
         prompt: 'Try to recall memories',
         outputSchema: dummyOutputSchema,
+        stateKey: dummyStateKey,
         tools: {
           ...memoryTools,
         },
@@ -382,6 +385,7 @@ describe('Mem0 Adapter Integration', () => {
     const testBrain = brain('test-adapter').brain('Help User', () => ({
       prompt: 'Hello, can you help me?',
       outputSchema: dummyOutputSchema,
+      stateKey: dummyStateKey,
       tools: {},
     }));
 
@@ -413,6 +417,7 @@ describe('Mem0 Adapter Integration', () => {
     const testBrain = brain('test-error').brain('Will Fail', () => ({
       prompt: 'This will fail',
       outputSchema: dummyOutputSchema,
+      stateKey: dummyStateKey,
       tools: {},
     }));
 
@@ -466,6 +471,7 @@ describe('Mem0 Adapter Integration', () => {
     const testBrain = brain('test-toolcalls').brain('Process', () => ({
       prompt: 'Help me',
       outputSchema: dummyOutputSchema,
+      stateKey: dummyStateKey,
       tools: {
         lookup: {
           description: 'Look something up',
@@ -526,6 +532,7 @@ describe('Mem0 Adapter Integration', () => {
     const testBrain = brain('test-no-toolcalls').brain('Process', () => ({
       prompt: 'Help me',
       outputSchema: dummyOutputSchema,
+      stateKey: dummyStateKey,
       tools: {
         lookup: {
           description: 'Look something up',

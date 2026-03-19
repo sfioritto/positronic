@@ -136,41 +136,23 @@ export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
 }
 
 /**
- * Configuration for agent output schema.
- * When provided, generates a terminal tool from the schema and
- * namespaces the result in state under the specified key.
- */
-export interface AgentOutputSchema<
-  TSchema extends z.ZodObject<any> = z.ZodObject<any>,
-  TName extends string = string
-> {
-  /** Zod schema defining the agent's output structure */
-  schema: TSchema;
-  /** Key name to store the result under in state (use `as const` for type inference) */
-  name: TName;
-}
-
-/**
- * AgentConfig with outputSchema required (not optional).
- * Used in overload signatures to enforce that outputSchema must be provided.
+ * AgentConfig with outputSchema and stateKey required (not optional).
+ * Used in overload signatures to enforce that outputSchema and stateKey must be provided.
  */
 export type AgentConfigWithOutput<
   TTools extends Record<string, AgentTool<any>>,
   TSchema extends z.ZodObject<any>,
   TName extends string
-> = AgentConfig<TTools, AgentOutputSchema<TSchema, TName>> & {
-  outputSchema: AgentOutputSchema<TSchema, TName>;
+> = Omit<AgentConfig<TTools>, 'outputSchema' | 'stateKey'> & {
+  outputSchema: TSchema;
+  stateKey: TName;
 };
 
 /**
  * Configuration for an agent step.
  */
 export interface AgentConfig<
-  TTools extends Record<string, AgentTool<any>> = Record<
-    string,
-    AgentTool<any>
-  >,
-  TOutputSchema extends AgentOutputSchema | undefined = undefined
+  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>
 > {
   /** System prompt for the LLM */
   system?: string;
@@ -184,10 +166,15 @@ export interface AgentConfig<
   maxIterations?: number;
   /**
    * Output schema for structured agent output.
-   * When provided, generates a terminal tool that validates output against the schema
-   * and stores the result under state[outputSchema.name].
+   * When provided, generates a terminal 'done' tool that validates output against the schema
+   * and stores the result under state[stateKey].
    */
-  outputSchema?: TOutputSchema;
+  outputSchema?: z.ZodObject<any>;
+  /**
+   * Key to store agent output under in state.
+   * Required when outputSchema is provided.
+   */
+  stateKey?: string;
   /**
    * Tool choice configuration for LLM calls.
    * - 'auto': Model chooses whether to call tools

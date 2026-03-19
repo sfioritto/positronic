@@ -271,7 +271,7 @@ function getEventDetailContent(event: BrainEvent): string {
         `Step: ${event.stepTitle}`,
         `Progress: ${event.processedCount}/${event.totalItems}`,
         `Item Index: ${event.itemIndex}`,
-        `Schema: ${event.schemaName}`,
+        `State Key: ${event.stateKey}`,
         '',
         'Item:',
         JSON.stringify(event.item, null, 2),

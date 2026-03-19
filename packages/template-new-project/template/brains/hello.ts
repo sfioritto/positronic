@@ -28,13 +28,11 @@ You have access to a few different tools. Use these tools to greet the user and 
 
 Once you have the user's name send them a personalized greeting!
 `,
-  outputSchema: {
-    schema: z.object({
-      userName: z.string().describe('The name the user provided'),
-      greeting: z.string().describe('A personalized welcome message for the user'),
-    }),
-    name: 'welcome' as const,
-  },
+  outputSchema: z.object({
+    userName: z.string().describe('The name the user provided'),
+    greeting: z.string().describe('A personalized welcome message for the user'),
+  }),
+  stateKey: 'welcome' as const,
 })
   .step('Log Welcome', ({ state }) => {
     // TypeScript knows state.welcome has userName and greeting

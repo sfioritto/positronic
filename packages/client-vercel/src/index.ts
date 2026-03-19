@@ -65,7 +65,7 @@ export class VercelClient implements ObjectGenerator {
 
   async generateObject<T extends z.AnyZodObject>(params: {
     schema: T;
-    schemaName: string;
+    schemaName?: string;
     schemaDescription?: string;
     prompt?: string;
     messages?: Message[];
@@ -75,8 +75,14 @@ export class VercelClient implements ObjectGenerator {
     usage?: { totalTokens: number };
     responseHeaders?: Record<string, string>;
   }> {
-    const { schema, schemaName, schemaDescription, prompt, messages, system } =
-      params;
+    const {
+      schema,
+      schemaName = 'Data',
+      schemaDescription,
+      prompt,
+      messages,
+      system,
+    } = params;
 
     const coreMessages: Message[] = [];
 

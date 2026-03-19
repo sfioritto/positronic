@@ -150,7 +150,7 @@ const outerInnerWebhookBrain = brain({
 })
   .step('Outer step 1', () => ({ prefix: 'outer-' }))
   .brain('Run inner brain', innerWebhookBrain, {
-    outputKey: 'innerResult' as const,
+    stateKey: 'innerResult' as const,
     initialState: { count: 0 },
   })
   .step('Outer step 2', ({ state }) => ({
@@ -172,7 +172,7 @@ const outerWebhookAfterInner = brain({
 })
   .step('Outer step 1', () => ({ started: true }))
   .brain('Run inner brain', simpleInnerBrain, {
-    outputKey: 'innerResult' as const,
+    stateKey: 'innerResult' as const,
   })
   .step('Prepare webhook wait', ({ state }) => ({
     ...state,
@@ -335,10 +335,8 @@ const agentWebhookBrain = brain({
       terminal: true,
     },
   },
-  outputSchema: {
-    schema: z.object({ result: z.string() }),
-    name: 'agentResult' as const,
-  },
+  outputSchema: z.object({ result: z.string() }),
+  stateKey: 'agentResult' as const,
 }));
 
 // Brain with an agent step that will trigger an API error (simulates "too many tokens")
@@ -358,10 +356,8 @@ const agentErrorBrain = brain({
       terminal: true,
     },
   },
-  outputSchema: {
-    schema: z.object({ result: z.string() }),
-    name: 'agentResult' as const,
-  },
+  outputSchema: z.object({ result: z.string() }),
+  stateKey: 'agentResult' as const,
 }));
 
 // Brain that generates a large state (> 1MB) to test R2 overflow
@@ -423,10 +419,8 @@ const iterateItemBrain = brain<{}, { item: string; result: string }>({
   description: 'Processes a single iterate item',
 }).prompt('Process item', {
   template: ({ state }) => `Process: ${state.item}`,
-  outputSchema: {
-    schema: z.object({ result: z.string() }),
-    name: 'result' as const,
-  },
+  outputSchema: z.object({ result: z.string() }),
+  stateKey: 'result' as const,
 });
 
 // Brain that does iterate processing followed by a webhook wait.
@@ -444,7 +438,7 @@ const iterateWebhookBrain = brain({
     run: iterateItemBrain,
     over: ({ state }) => state.items,
     initialState: (item) => ({ item, result: '' }),
-    outputKey: 'iterateResults' as const,
+    stateKey: 'iterateResults' as const,
   })
   .step('Prepare webhook wait', ({ state }) => ({
     ...state,
@@ -499,10 +493,8 @@ const governorTestBrain = brain({
   description: 'Tests governor rate limiting',
 }).prompt('Generate something', {
   template: () => 'Say hello',
-  outputSchema: {
-    schema: z.object({ greeting: z.string() }),
-    name: 'result' as const,
-  },
+  outputSchema: z.object({ greeting: z.string() }),
+  stateKey: 'result' as const,
 });
 
 // Inner brain for iterate testing - just doubles a number
@@ -527,7 +519,7 @@ const iterateBrainTestBrain = brain({
     run: iterateTestInnerBrain,
     over: ({ state }) => state.items,
     initialState: (item) => ({ value: item, doubled: 0 }),
-    outputKey: 'results' as const,
+    stateKey: 'results' as const,
   });
 
 // Inner brain for iterate-with-options testing - multiplies value by multiplier from options
@@ -565,7 +557,7 @@ const iterateOptionsTestBrain = brain({
       result: 0,
     }),
     options: ({ options }) => ({ multiplier: options.multiplier }),
-    outputKey: 'results' as const,
+    stateKey: 'results' as const,
   })
   .step('Verify options', ({ state, options }) => ({
     ...state,

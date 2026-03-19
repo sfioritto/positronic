@@ -230,7 +230,7 @@ export interface IterateItemCompleteEvent<
   result: any;
   processedCount: number;
   totalItems: number;
-  schemaName: string;
+  stateKey: string;
   canRelease: boolean;
 }
 
