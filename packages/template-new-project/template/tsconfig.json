@@ -9,8 +9,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./"
+    "rootDir": "./",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@positronic/core"
   },
-  "include": ["brains/**/*.ts", "resources.d.ts"],
+  "include": ["brains/**/*.ts", "brains/**/*.tsx", "resources.d.ts"],
   "exclude": ["node_modules", ".positronic"]
 }

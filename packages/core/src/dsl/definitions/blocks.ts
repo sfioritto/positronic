@@ -11,6 +11,9 @@ import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
 import type { WebhookRegistration } from '../webhook.js';
+import type { TemplateChild } from '../../jsx-runtime.js';
+
+export type TemplateReturn = TemplateChild | Promise<TemplateChild>;
 
 // Context passed to template callbacks (prompt, ui, map)
 export interface TemplateContext<TState, TOptions extends JsonObject> {
@@ -68,9 +71,7 @@ export type StepBlock<
   isUIStep?: boolean;
   /** Configuration for UI generation steps */
   uiConfig?: {
-    template: (
-      context: TemplateContext<TStateIn, TOptions>
-    ) => string | Promise<string>;
+    template: (context: TemplateContext<TStateIn, TOptions>) => TemplateReturn;
     outputSchema?: z.ZodObject<any>;
     stateKey?: string;
     notify?: (context: any) => void | Promise<void>;
@@ -171,7 +172,7 @@ export type MapBlock = {
   initialState?: (item: any, outerState: any) => State;
   options?: any | ((context: any) => any);
   // Prompt mode
-  template?: (context: any) => string | Promise<string>;
+  template?: (context: any) => TemplateReturn;
   outputSchema?: z.ZodObject<any>;
   client?: ObjectGenerator;
 };

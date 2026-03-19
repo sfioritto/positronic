@@ -60,6 +60,10 @@ const myBrain = brain('my-brain')
 export default myBrain;
 ```
 
+### JSX Templates
+
+Templates in `.prompt()`, `.ui()`, and `.map()` steps can be written as JSX for better readability. Rename the brain file to `.tsx` and return JSX from the template function. See `/docs/brain-dsl-guide.md` for details.
+
 ## Resource System
 
 Resources are files that brains can access during execution. They're stored in the `/resources` directory and are automatically typed based on the manifest.

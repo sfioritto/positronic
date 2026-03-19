@@ -224,6 +224,27 @@ When you still need `state` (e.g. for `...state` in the return value), destructu
   })
 ```
 
+## JSX for Prompt Templates
+
+For complex, multi-line prompts, use JSX instead of template literals. Rename the file to `.tsx` and return JSX from the template function:
+
+```tsx
+// Before (template literal — hard to read when indented in builder chain)
+template: ({ state: { user, order } }) =>
+  `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.
+<%= '${order.isExpress ? "\\nThis is an express order." : ""}' %>`,
+
+// After (JSX — Prettier manages indentation, conditionals are clean)
+template: ({ state: { user, order } }) => (
+  <>
+    Hello {user.name}, your order {order.id} is ready.
+    {order.isExpress && <>This is an express order.</>}
+  </>
+)
+```
+
+See `/docs/brain-dsl-guide.md` for full JSX template documentation including loops, reusable components, and async components for resource loading.
+
 ## State Shape
 
 ### Each step should have one clear purpose, and add one thing to state

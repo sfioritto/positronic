@@ -69,6 +69,17 @@ The project uses npm workspaces with the following packages:
 
 6. **Origin URL**: The origin URL (e.g., `https://myapp.workers.dev`) is stored in R2 at `__config/origin`, written at deploy time and dev server startup. To read it, use `getOrigin(bucket)` from `packages/cloudflare/src/origin.ts`. Never use environment variables for origin — R2 is the single source of truth.
 
+### JSX Templates
+
+Templates in `.prompt()`, `.ui()`, and `.map()` steps can return JSX (`TemplateNode`) in addition to strings. The runner detects the return type and renders JSX to a string via `renderTemplate()`.
+
+- **JSX runtime**: `packages/core/src/jsx-runtime.ts` — exports `jsx`, `jsxs`, `Fragment` for the automatic JSX transform
+- **Rendering**: `packages/core/src/template/render.ts` — `renderTemplate()`, `resolveTemplate()`, `isTemplateNode()`
+- **Subpath export**: `@positronic/core/jsx-runtime` is exported from core's `package.json`
+- **Monorepo caveat**: Do NOT use JSX syntax in core tests. The root `.swcrc` uses React as `importSource` (for CLI/Ink). Construct `TemplateNode` trees manually using `{ type: Fragment, props: {}, children: [...] }`.
+- **Generated projects**: Use `jsxImportSource: "@positronic/core"` in their tsconfig
+- **SWC whitespace plugin**: A separate deliverable — preserves JSX text whitespace in generated projects
+
 ## Keeping the Project Template in Sync
 
 The project template (`packages/template-new-project/template/.positronic/`) is what `px project new` uses to scaffold new projects. It has its own `wrangler.jsonc` and `src/index.ts` that are **separate from** the cloudflare test-project's versions. There are no tests that verify the template produces a working project, so you must keep it in sync manually.
