@@ -110,6 +110,3 @@ export async function queueWebhookAndWakeUp(
     message: 'No brain waiting for this webhook',
   };
 }
-
-// Re-export parseFormData from core for backwards compatibility
-export { parseFormData } from '@positronic/core';

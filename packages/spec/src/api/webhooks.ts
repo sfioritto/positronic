@@ -179,8 +179,7 @@ export const webhooks = {
    *
    * The endpoint:
    * - Accepts form data (application/x-www-form-urlencoded or multipart/form-data)
-   * - Requires an `identifier` query parameter to match the waiting brain
-   * - Requires a `__positronic_token` field for CSRF validation
+   * - Requires `identifier` and `token` query parameters
    * - Returns { received: true, action: 'resumed' | 'not_found', ... }
    */
   async uiForm(
@@ -192,7 +191,6 @@ export const webhooks = {
     try {
       // Build URLSearchParams from form data
       const params = new URLSearchParams();
-      params.append('__positronic_token', token);
       for (const [key, value] of Object.entries(formData)) {
         if (Array.isArray(value)) {
           for (const v of value) {
@@ -206,7 +204,7 @@ export const webhooks = {
       const request = new Request(
         `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
           identifier
-        )}`,
+        )}&token=${encodeURIComponent(token)}`,
         {
           method: 'POST',
           headers: {
@@ -313,11 +311,11 @@ export const webhooks = {
 
   /**
    * Test POST /webhooks/system/ui-form without a CSRF token - Should return 403.
-   * The endpoint checks for missing token before looking up a waiting brain.
+   * The endpoint checks for missing token query param before looking up a waiting brain.
    */
   async uiFormMissingToken(fetch: Fetch, identifier: string): Promise<boolean> {
     try {
-      // Send form data without __positronic_token
+      // Send form data without token query param
       const params = new URLSearchParams();
       params.append('name', 'Test User');
 
@@ -383,7 +381,6 @@ export const webhooks = {
   ): Promise<boolean> {
     try {
       const params = new URLSearchParams();
-      params.append('__positronic_token', wrongToken);
       for (const [key, value] of Object.entries(formData)) {
         if (Array.isArray(value)) {
           for (const v of value) {
@@ -397,7 +394,7 @@ export const webhooks = {
       const request = new Request(
         `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
           identifier
-        )}`,
+        )}&token=${encodeURIComponent(wrongToken)}`,
         {
           method: 'POST',
           headers: {

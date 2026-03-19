@@ -1549,12 +1549,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Generate CSRF token for form submission validation
     const formToken = crypto.randomUUID();
 
-    // Construct form action URL for the webhook
+    // Construct form action URL for the webhook (includes CSRF token as query param)
     const formAction = `${
       this.env.origin
     }/webhooks/system/ui-form?identifier=${encodeURIComponent(
       webhookIdentifier
-    )}`;
+    )}&token=${encodeURIComponent(formToken)}`;
 
     // Generate HTML page
     const html = generatePageHtml({
@@ -1563,7 +1563,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       data: this.currentState as Record<string, unknown>,
       title: stepBlock.title,
       formAction,
-      formToken,
     });
 
     const page = await this.pages.create(html);

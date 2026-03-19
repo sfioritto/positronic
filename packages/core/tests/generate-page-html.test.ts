@@ -143,7 +143,7 @@ describe('generatePageHtml', () => {
     expect(html).toContain('{{user.email}}');
   });
 
-  it('should embed formToken as global and hidden input for Form components', () => {
+  it('should not include token-related globals or hidden inputs', () => {
     const placements: Placement[] = [
       { id: 'form-1', component: 'Form', props: {}, parentId: null },
       {
@@ -154,37 +154,17 @@ describe('generatePageHtml', () => {
       },
     ];
 
-    const token = 'test-csrf-token-123';
-
     const html = generatePageHtml({
       placements,
       rootId: 'form-1',
       data: {},
-      formAction: '/api/submit',
-      formToken: token,
+      formAction: '/api/submit?token=test-csrf-token-123',
     });
 
-    // Token should be embedded as a global variable
-    expect(html).toContain('window.__POSITRONIC_FORM_TOKEN__');
-    expect(html).toContain(token);
-
-    // Bootstrap runtime should include hidden input injection logic
-    expect(html).toContain('__positronic_token');
-    expect(html).toContain('formToken');
-  });
-
-  it('should set formToken global to null when not provided', () => {
-    const placements: Placement[] = [
-      { id: 'root', component: 'Form', props: {}, parentId: null },
-    ];
-
-    const html = generatePageHtml({
-      placements,
-      rootId: 'root',
-      data: {},
-    });
-
-    expect(html).toContain('window.__POSITRONIC_FORM_TOKEN__ = null');
+    // Token should be in the form action URL, not as a separate global
+    expect(html).toContain('test-csrf-token-123');
+    expect(html).not.toContain('window.__POSITRONIC_FORM_TOKEN__');
+    expect(html).not.toContain('__positronic_token');
   });
 
   describe('generateFormToken', () => {
