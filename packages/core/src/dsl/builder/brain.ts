@@ -117,17 +117,8 @@ export class Brain<
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
-
-    // Set services
+    this.copyConfigTo(nextBrain);
     nextBrain.services = services;
-    // Copy optionsSchema to maintain it through the chain
-    nextBrain.optionsSchema = this.optionsSchema;
-    nextBrain.components = this.components;
-    nextBrain.defaultTools = this.defaultTools;
-    nextBrain.extraTools = this.extraTools;
-    nextBrain.memoryProvider = this.memoryProvider;
-    nextBrain.storeSchema = this.storeSchema;
-
     return nextBrain;
   }
 
@@ -138,15 +129,8 @@ export class Brain<
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
-
+    this.copyConfigTo(nextBrain);
     nextBrain.optionsSchema = schema;
-    nextBrain.services = this.services;
-    nextBrain.components = this.components;
-    nextBrain.defaultTools = this.defaultTools;
-    nextBrain.extraTools = this.extraTools;
-    nextBrain.memoryProvider = this.memoryProvider;
-    nextBrain.storeSchema = this.storeSchema;
-
     return nextBrain;
   }
 
@@ -171,15 +155,8 @@ export class Brain<
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
-
-    nextBrain.optionsSchema = this.optionsSchema;
-    nextBrain.services = this.services;
+    this.copyConfigTo(nextBrain);
     nextBrain.components = components;
-    nextBrain.defaultTools = this.defaultTools;
-    nextBrain.extraTools = this.extraTools;
-    nextBrain.memoryProvider = this.memoryProvider;
-    nextBrain.storeSchema = this.storeSchema;
-
     return nextBrain;
   }
 
@@ -265,15 +242,8 @@ export class Brain<
       TState,
       TServices & { memory: ScopedMemory }
     >(this.title, this.description).withBlocks(this.blocks as any);
-
-    nextBrain.optionsSchema = this.optionsSchema;
-    nextBrain.services = this.services as any;
-    nextBrain.components = this.components;
-    nextBrain.defaultTools = this.defaultTools;
-    nextBrain.extraTools = this.extraTools;
+    this.copyConfigTo(nextBrain);
     nextBrain.memoryProvider = provider;
-    nextBrain.storeSchema = this.storeSchema;
-
     return nextBrain;
   }
 
@@ -306,15 +276,8 @@ export class Brain<
       TState,
       TServices & { store: Store<InferStoreTypes<T>> }
     >(this.title, this.description).withBlocks(this.blocks as any);
-
-    nextBrain.optionsSchema = this.optionsSchema;
-    nextBrain.services = this.services as any;
-    nextBrain.components = this.components;
-    nextBrain.defaultTools = this.defaultTools;
-    nextBrain.extraTools = this.extraTools;
-    nextBrain.memoryProvider = this.memoryProvider;
+    this.copyConfigTo(nextBrain);
     nextBrain.storeSchema = storeSchema;
-
     return nextBrain;
   }
 
@@ -844,32 +807,26 @@ export class Brain<
     return this;
   }
 
+  private copyConfigTo(target: Brain<any, any, any>): void {
+    target.services = this.services;
+    target.optionsSchema = this.optionsSchema;
+    target.components = this.components;
+    target.defaultTools = this.defaultTools;
+    target.extraTools = this.extraTools;
+    target.memoryProvider = this.memoryProvider;
+    target.storeSchema = this.storeSchema;
+  }
+
   private nextBrain<TNewState extends State>(): Brain<
     TOptions,
     TNewState,
     TServices
   > {
-    // Pass default options to the next brain
     const nextBrain = new Brain<TOptions, TNewState, TServices>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
-
-    // Copy services to the next brain
-    nextBrain.services = this.services;
-    // Copy optionsSchema to the next brain
-    nextBrain.optionsSchema = this.optionsSchema;
-    // Copy components to the next brain
-    nextBrain.components = this.components;
-    // Copy defaultTools to the next brain
-    nextBrain.defaultTools = this.defaultTools;
-    // Copy extraTools to the next brain
-    nextBrain.extraTools = this.extraTools;
-    // Copy memoryProvider to the next brain
-    nextBrain.memoryProvider = this.memoryProvider;
-    // Copy store schema to the next brain
-    nextBrain.storeSchema = this.storeSchema;
-
+    this.copyConfigTo(nextBrain);
     return nextBrain;
   }
 
@@ -884,18 +841,11 @@ export class Brain<
     return new Continuation<TOptions, TState, TServices, TResponse>(
       (block) => blocks.push(block),
       <TNewState extends State>() => {
-        // Create a new Brain sharing our blocks array (already mutated by addBlock)
         const next = new Brain<TOptions, TNewState, TServices>(
           self.title,
           self.description
         ).withBlocks(blocks as any);
-        next.services = self.services;
-        next.optionsSchema = self.optionsSchema;
-        next.components = self.components;
-        next.defaultTools = self.defaultTools;
-        next.extraTools = self.extraTools;
-        next.memoryProvider = self.memoryProvider;
-        next.storeSchema = self.storeSchema;
+        self.copyConfigTo(next);
         return next;
       }
     );
