@@ -36,7 +36,7 @@ function jsxTextPlugin() {
             replacements.push({
               start: node.getStart(sourceFile),
               end: node.getEnd(),
-              text: `{\`<%= '${escaped}' %>\`}`,
+              text: `{\`${escaped}\`}`,
             });
           }
           ts.forEachChild(node, visit);
