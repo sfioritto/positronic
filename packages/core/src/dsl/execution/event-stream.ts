@@ -237,15 +237,7 @@ export class BrainEventStream<
         };
 
         // Emit initial step status after brain starts
-        yield {
-          type: BRAIN_EVENTS.STEP_STATUS,
-          steps: steps.map((step) => {
-            const { patch, ...rest } = step.serialized;
-            return rest;
-          }),
-          options,
-          brainRunId,
-        };
+        yield this.stepStatusEvent();
 
         // Validate options after START so errors are visible in watch/history
         if (this.optionsSchema) {
@@ -375,15 +367,7 @@ export class BrainEventStream<
         step.withStatus(STATUS.RUNNING);
 
         // Step Status Event to indicate that the step is running
-        yield {
-          type: BRAIN_EVENTS.STEP_STATUS,
-          steps: steps.map((step) => {
-            const { patch, ...rest } = step.serialized;
-            return rest;
-          }),
-          options,
-          brainRunId,
-        };
+        yield this.stepStatusEvent();
 
         // Execute step and yield the STEP_COMPLETE event and
         // all events from inner brains if any
@@ -395,15 +379,7 @@ export class BrainEventStream<
         }
 
         // Step Status Event
-        yield {
-          type: BRAIN_EVENTS.STEP_STATUS,
-          steps: steps.map((step) => {
-            const { patch, ...rest } = step.serialized;
-            return rest;
-          }),
-          options,
-          brainRunId,
-        };
+        yield this.stepStatusEvent();
 
         this.currentStepIndex++;
       }
@@ -436,18 +412,22 @@ export class BrainEventStream<
       };
 
       // Step Status Event
-      yield {
-        type: BRAIN_EVENTS.STEP_STATUS,
-        steps: steps.map((step) => {
-          const { patch, ...rest } = step.serialized;
-          return rest;
-        }),
-        options,
-        brainRunId,
-      };
+      yield this.stepStatusEvent();
 
       throw error;
     }
+  }
+
+  private stepStatusEvent(): BrainEvent<TOptions> {
+    return {
+      type: BRAIN_EVENTS.STEP_STATUS,
+      steps: this.steps.map((s) => {
+        const { patch, ...rest } = s.serialized;
+        return rest;
+      }),
+      options: this.options,
+      brainRunId: this.brainRunId,
+    };
   }
 
   private buildStepContext(step: Step) {
@@ -649,18 +629,8 @@ export class BrainEventStream<
 
       const result = await Promise.resolve(
         stepBlock.action({
-          state: this.currentState,
-          options: this.options ?? ({} as TOptions),
+          ...this.buildStepContext(step),
           client: stepClient,
-          resources: this.resources,
-          response: this.currentResponse,
-          page: this.currentPage,
-          pages: this.pages,
-          env: this.env,
-          memory: this.scopedMemory,
-          store: this.store,
-          currentUser: this.currentUser,
-          ...this.services,
         })
       );
 
@@ -705,20 +675,9 @@ export class BrainEventStream<
 
     // Get agent configuration - inject tools and components
     const config = await block.configFn({
-      state: this.currentState,
-      options: this.options ?? ({} as TOptions),
+      ...this.buildStepContext(step),
       tools: allTools,
       components,
-      client: this.client,
-      resources: this.resources,
-      response: this.currentResponse,
-      page: this.currentPage,
-      pages: this.pages,
-      env: this.env,
-      memory: this.scopedMemory,
-      store: this.store,
-      currentUser: this.currentUser,
-      ...this.services,
     });
 
     // Reset currentPage after configFn consumes it (page is ephemeral)
@@ -1638,42 +1597,15 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     step.withStatus(STATUS.RUNNING);
 
-    yield {
-      type: BRAIN_EVENTS.STEP_STATUS,
-      steps: steps.map((s) => {
-        const { patch, ...rest } = s.serialized;
-        return rest;
-      }),
-      options,
-      brainRunId,
-    };
+    yield this.stepStatusEvent();
 
     // Execute the wait action (side effects like notifications happen here)
-    const result = await waitBlock.action({
-      state: this.currentState,
-      options: this.options ?? ({} as TOptions),
-      client: this.client,
-      resources: this.resources,
-      page: this.currentPage,
-      pages: this.pages,
-      env: this.env,
-      store: this.store,
-      currentUser: this.currentUser,
-      ...this.services,
-    });
+    const result = await waitBlock.action(this.buildStepContext(step));
 
     // Complete step (state unchanged, generates empty patch)
     yield* this.completeStep(step, this.currentState);
 
-    yield {
-      type: BRAIN_EVENTS.STEP_STATUS,
-      steps: steps.map((s) => {
-        const { patch, ...rest } = s.serialized;
-        return rest;
-      }),
-      options,
-      brainRunId,
-    };
+    yield this.stepStatusEvent();
 
     // Normalize result to array (handle single webhook case)
     const webhooks = Array.isArray(result) ? result : [result];
@@ -1723,28 +1655,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     step.withStatus(STATUS.RUNNING);
 
-    yield {
-      type: BRAIN_EVENTS.STEP_STATUS,
-      steps: steps.map((s) => {
-        const { patch, ...rest } = s.serialized;
-        return rest;
-      }),
-      options,
-      brainRunId,
-    };
+    yield this.stepStatusEvent();
 
     // Complete the guard step (state unchanged, empty patch)
     yield* this.completeStep(step, this.currentState);
 
-    yield {
-      type: BRAIN_EVENTS.STEP_STATUS,
-      steps: steps.map((s) => {
-        const { patch, ...rest } = s.serialized;
-        return rest;
-      }),
-      options,
-      brainRunId,
-    };
+    yield this.stepStatusEvent();
 
     this.currentStepIndex++;
 
@@ -1768,15 +1684,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
         this.currentStepIndex++;
       }
 
-      yield {
-        type: BRAIN_EVENTS.STEP_STATUS,
-        steps: steps.map((s) => {
-          const { patch, ...rest } = s.serialized;
-          return rest;
-        }),
-        options,
-        brainRunId,
-      };
+      yield this.stepStatusEvent();
     }
   }
 
