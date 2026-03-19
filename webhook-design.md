@@ -87,9 +87,9 @@ export const slackWebhook = createWebhook(
 **Return Types:**
 
 - **`type: 'verification'`** - Returns `{ "challenge": "..." }` as JSON, satisfying webhook verification protocols
-- **`type: 'webhook'`** - Processes the webhook and either resumes a waiting brain or queues the event
-
-When a `verification` response is returned, the webhook framework immediately responds with the challenge and does not attempt to resume or start any brain.
+- **`type: 'webhook'`** - Resumes a waiting brain matched by `identifier`, or queues the event
+- **`type: 'trigger'`** - Starts a new brain run (requires `triggers` config on the webhook)
+- **`type: 'ignore'`** - Acknowledges receipt but takes no action (returns 200)
 
 ### Using Webhooks in Brains
 
@@ -130,7 +130,7 @@ export default brain('customer-feedback')
 
 #### Starting New Brain Runs
 
-> **Note**: The `brain` field for cold-starting brains from webhooks is planned but not yet implemented.
+Webhooks can start fresh brain runs by returning `{ type: 'trigger' }` from the handler and providing a `triggers` config:
 
 ```typescript
 // webhooks/github.ts
@@ -148,11 +148,14 @@ export const githubWebhook = createWebhook(
   async (request: Request) => {
     const body = await request.json();
 
-    // PLANNED: Future support for cold-starting brains from webhooks
-    // For now, webhooks can only resume waiting brains
+    // Ignore events we don't care about
+    if (body.action !== 'opened') {
+      return { type: 'ignore' as const };
+    }
+
+    // Start a new brain run with the PR data as initial state
     return {
-      type: 'webhook' as const,
-      identifier: `${body.repository.full_name}#${body.pull_request.number}`,
+      type: 'trigger' as const,
       response: {
         action: body.action,
         prNumber: body.pull_request?.number,
@@ -160,9 +163,19 @@ export const githubWebhook = createWebhook(
         author: body.pull_request?.user.login || body.sender.login,
       },
     };
-  }
+  },
+  { brain: 'code-review', runAs: 'github-webhook' }
 );
 ```
+
+**Return Types:**
+
+- **`type: 'verification'`** - Returns challenge response for webhook URL verification
+- **`type: 'webhook'`** - Resumes a waiting brain matched by `identifier`
+- **`type: 'trigger'`** - Starts a new brain run (requires `triggers` config on the webhook)
+- **`type: 'ignore'`** - Acknowledges receipt, takes no action (returns 200)
+
+The `triggers` config specifies which brain to start (`brain`) and the user identity for the run (`runAs`). The handler validates the incoming request first — only webhooks with explicit `triggers` config can start brains.
 
 ### Loop Integration
 

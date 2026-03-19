@@ -29,6 +29,8 @@ import { createResources, type ResourceManifest } from '@positronic/core';
 import { getOrigin } from './origin.js';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
+import { v4 as uuidv4 } from 'uuid';
+
 let manifest: PositronicManifest | null = null;
 export function setManifest(generatedManifest: PositronicManifest) {
   manifest = generatedManifest;
@@ -36,6 +38,23 @@ export function setManifest(generatedManifest: PositronicManifest) {
 
 export function getManifest(): PositronicManifest | null {
   return manifest;
+}
+
+/**
+ * Start a new brain run on a fresh BrainRunnerDO.
+ * Shared by the API endpoint, ScheduleDO, and webhook triggers.
+ */
+export async function startBrainRun(
+  namespace: DurableObjectNamespace<BrainRunnerDO>,
+  brainTitle: string,
+  currentUser: { name: string },
+  initialData?: Record<string, any>
+): Promise<string> {
+  const brainRunId = uuidv4();
+  const doId = namespace.idFromName(brainRunId);
+  const stub = namespace.get(doId);
+  await stub.start(brainTitle, brainRunId, currentUser, initialData);
+  return brainRunId;
 }
 
 let brainRunner: BrainRunner | null = null;

@@ -174,6 +174,116 @@ export const webhooks = {
   },
 
   /**
+   * Test POST /webhooks/:slug - Webhook triggers a new brain run.
+   * The webhook handler returns { type: 'trigger', response } and the webhook
+   * has a triggers config specifying which brain to start.
+   * Expects 201 with { received: true, action: 'triggered', brainRunId }.
+   */
+  async trigger(fetch: Fetch, slug: string, payload: any): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/webhooks/${encodeURIComponent(slug)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (response.status !== 201) {
+        console.error(
+          `POST /webhooks/${slug} (trigger) returned ${response.status}, expected 201`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as {
+        received: boolean;
+        action: string;
+        brainRunId?: string;
+      };
+
+      if (typeof data.received !== 'boolean' || !data.received) {
+        console.error(`Expected received to be true, got ${data.received}`);
+        return false;
+      }
+
+      if (data.action !== 'triggered') {
+        console.error(
+          `Expected action to be 'triggered', got '${data.action}'`
+        );
+        return false;
+      }
+
+      if (!data.brainRunId || typeof data.brainRunId !== 'string') {
+        console.error(
+          `Expected brainRunId to be a string, got ${typeof data.brainRunId}`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test POST /webhooks/${slug} (trigger):`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Test POST /webhooks/:slug - Webhook handler returns ignore.
+   * The webhook handler returns { type: 'ignore' } to acknowledge
+   * receipt but take no action.
+   * Expects 200 with { received: true, action: 'ignored' }.
+   */
+  async ignore(fetch: Fetch, slug: string, payload: any): Promise<boolean> {
+    try {
+      const request = new Request(
+        `http://example.com/webhooks/${encodeURIComponent(slug)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const response = await fetch(request);
+
+      if (response.status !== 200) {
+        console.error(
+          `POST /webhooks/${slug} (ignore) returned ${response.status}, expected 200`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as {
+        received: boolean;
+        action: string;
+      };
+
+      if (typeof data.received !== 'boolean' || !data.received) {
+        console.error(`Expected received to be true, got ${data.received}`);
+        return false;
+      }
+
+      if (data.action !== 'ignored') {
+        console.error(`Expected action to be 'ignored', got '${data.action}'`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to test POST /webhooks/${slug} (ignore):`, error);
+      return false;
+    }
+  },
+
+  /**
    * Test POST /webhooks/system/ui-form - Built-in webhook for UI form submissions.
    * This is used by pages generated via .ui() steps to submit form data.
    *

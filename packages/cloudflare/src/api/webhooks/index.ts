@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { getWebhookManifest } from '../../brain-runner-do.js';
+import { getWebhookManifest, startBrainRun } from '../../brain-runner-do.js';
 import type { Bindings } from '../types.js';
 import { queueWebhookAndWakeUp } from './coordination.js';
 import system from './system.js';
@@ -43,6 +43,34 @@ webhooks.post('/:slug', async (context: Context) => {
     // Handle verification challenge (for Slack, Stripe, GitHub, Discord)
     if (handlerResult.type === 'verification') {
       return context.json({ challenge: handlerResult.challenge });
+    }
+
+    // Handler determined this event should be ignored
+    if (handlerResult.type === 'ignore') {
+      return context.json({ received: true, action: 'ignored' });
+    }
+
+    // Trigger a new brain run
+    if (handlerResult.type === 'trigger') {
+      if (!webhook.triggers) {
+        return context.json(
+          {
+            error: `Webhook '${slug}' returned trigger result but has no triggers config`,
+          },
+          400
+        );
+      }
+
+      const brainRunId = await startBrainRun(
+        context.env.BRAIN_RUNNER_DO,
+        webhook.triggers.brain,
+        { name: webhook.triggers.runAs },
+        { initialState: handlerResult.response }
+      );
+      return context.json(
+        { received: true, action: 'triggered', brainRunId },
+        201
+      );
     }
 
     // CSRF token is passed as a query parameter (if present)

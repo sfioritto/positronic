@@ -335,6 +335,20 @@ describe('Positronic Spec', () => {
       );
       expect(result).toBe(true);
     });
+
+    it('passes POST /webhooks/:slug trigger test (201)', async () => {
+      const result = await webhooks.trigger(createFetch(), 'trigger-webhook', {
+        data: 'spec-test-payload',
+      });
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /webhooks/:slug ignore test (200)', async () => {
+      const result = await webhooks.ignore(createFetch(), 'trigger-webhook', {
+        action: 'ignore',
+      });
+      expect(result).toBe(true);
+    });
   });
 
   describe('Pages', () => {

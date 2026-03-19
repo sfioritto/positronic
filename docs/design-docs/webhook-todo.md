@@ -27,31 +27,24 @@ The `action` property (`'resumed'` | `'queued'`) is currently returned in POST `
 
 ## 2. Add webhook integration specs to spec package
 
-**Status**: Pending
+**Status**: Partially complete
 **Priority**: High
 
 ### Description
 
-Current webhook specs in `packages/spec/src/api.ts` don't validate the full integration flow (pause → webhook → resume). Need comprehensive specs that backends must implement.
+Current webhook specs in `packages/spec/src/api/webhooks.ts` don't validate the full integration flow (pause → webhook → resume). Need comprehensive specs that backends must implement.
 
-### Requirements
+### Completed
 
-- Specs should test with a webhook-enabled brain
-- Should verify:
-  - Brain starts and emits WEBHOOK event
-  - Brain pauses correctly
-  - POST to webhook endpoint succeeds
-  - Brain resumes with webhook response data
-  - Brain completes successfully
-- Should be achievable via API calls and event monitoring
-- Backends provide a test brain that uses webhooks
+- [x] `webhooks.trigger(fetch, slug, payload)` — spec for webhook-triggered brain runs (201 + brainRunId)
+- [x] `webhooks.ignore(fetch, slug, payload)` — spec for ignored webhook events (200 + action: 'ignored')
+- [x] Cloudflare backend passes both new specs
 
-### Tasks
+### Remaining
 
-- [ ] Design spec API for webhook integration testing
-- [ ] Implement spec function in `packages/spec/src/api.ts`
-- [ ] Update Cloudflare backend to pass new spec tests
-- [ ] Document webhook spec requirements
+- [ ] Full integration flow spec (start brain → wait → webhook → resume → complete)
+- [ ] This would require backends to provide a test brain that uses `.wait()` with webhooks
+- [ ] Current specs only test the webhook endpoint behavior, not the full lifecycle
 
 ---
 
