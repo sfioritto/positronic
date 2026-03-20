@@ -15,13 +15,6 @@ import type { TemplateChild } from '../../jsx-runtime.js';
 
 export type TemplateReturn = TemplateChild | Promise<TemplateChild>;
 
-// Context passed to template callbacks (prompt, ui, map)
-export interface TemplateContext<TState, TOptions extends JsonObject> {
-  state: TState;
-  options: TOptions;
-  resources: Resources;
-}
-
 // Shared interface for step action functions
 export type StepAction<
   TStateIn,
@@ -71,7 +64,7 @@ export type StepBlock<
   isUIStep?: boolean;
   /** Configuration for UI generation steps */
   uiConfig?: {
-    template: (context: TemplateContext<TStateIn, TOptions>) => TemplateReturn;
+    template: (context: any) => TemplateReturn;
     outputSchema?: z.ZodObject<any>;
     stateKey?: string;
     notify?: (context: any) => void | Promise<void>;
@@ -119,16 +112,8 @@ export type BrainBlock<
   title: string;
   innerBrain: TInnerBrain;
   stateKey: string;
-  initialState?:
-    | State
-    | ((
-        context: { state: TOuterState; options: TOptions } & TServices
-      ) => State);
-  options?:
-    | JsonObject
-    | ((
-        context: { state: TOuterState; options: TOptions } & TServices
-      ) => JsonObject);
+  initialState?: State | ((context: any) => State);
+  options?: JsonObject | ((context: any) => JsonObject);
 };
 
 export type AgentBlock<
@@ -157,7 +142,7 @@ export type AgentBlock<
 export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
   type: 'guard';
   title: string;
-  predicate: (params: { state: TStateIn; options: TOptions }) => boolean;
+  predicate: (params: any) => boolean;
 };
 
 // MapBlock: runs an inner brain or prompt once per item from the `over` list
@@ -169,7 +154,7 @@ export type MapBlock = {
   error?: (item: any, error: Error) => any | null;
   // Brain mode
   innerBrain?: any;
-  initialState?: (item: any, outerState: any) => State;
+  initialState?: (item: any, context: any) => State;
   options?: any | ((context: any) => any);
   // Prompt mode
   template?: (context: any) => TemplateReturn;
