@@ -71,7 +71,7 @@ The project uses npm workspaces with the following packages:
 
 ### JSX Templates
 
-Templates in `.prompt()`, `.ui()`, and `.map()` steps can return JSX (`TemplateNode`) in addition to strings. The runner detects the return type and renders JSX to a string via `renderTemplate()`.
+Templates in `.prompt()`, `.page()`, and `.map()` steps can return JSX (`TemplateNode`) in addition to strings. The runner detects the return type and renders JSX to a string via `renderTemplate()`.
 
 - **JSX runtime**: `packages/core/src/jsx-runtime.ts` — exports `jsx`, `jsxs`, `Fragment` for the automatic JSX transform
 - **Rendering**: `packages/core/src/template/render.ts` — `renderTemplate()`, `resolveTemplate()`, `isTemplateNode()`

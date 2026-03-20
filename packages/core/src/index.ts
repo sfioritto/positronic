@@ -100,7 +100,7 @@ export type {
 export {
   createTool,
   defaultTools,
-  generateUI,
+  generatePage,
   waitForWebhook,
   print,
   consoleLog,

@@ -393,15 +393,15 @@ describe('brain creation', () => {
     });
 
     const testBrain = brain('Client Override Test')
-      .prompt('Use default client', {
-        template: () => 'prompt1',
+      .prompt('Use default client', () => ({
+        message: 'prompt1',
         outputSchema: z.object({ override: z.boolean() }),
-      })
-      .prompt('Use override client', {
-        template: () => 'prompt2',
+      }))
+      .prompt('Use override client', () => ({
+        message: 'prompt2',
         outputSchema: z.object({ override: z.boolean() }),
         client: overrideClient,
-      });
+      }));
 
     // Run the brain and capture all events
     const events = [];
@@ -444,11 +444,11 @@ describe('brain creation', () => {
 
     const testBrain = brain('Client Plain Override Test').prompt(
       'Use override client',
-      {
-        template: () => 'prompt1',
+      () => ({
+        message: 'prompt1',
         outputSchema: z.object({ derived: z.boolean() }),
         client: overrideClient,
-      }
+      })
     );
 
     const events = [];
@@ -524,13 +524,12 @@ describe('brain creation', () => {
     it('should pass resources to prompt template function', async () => {
       const testBrain = brain('Resource Prompt Template Test').prompt(
         'Generate Summary',
-        {
-          template: async ({ state, resources }) => {
-            const templateContent = await (resources.myFile as any).loadText();
-            return `Generate a summary for: ${templateContent}`;
-          },
+        async ({ resources }) => ({
+          message: `Generate a summary for: ${await (
+            resources.myFile as any
+          ).loadText()}`,
           outputSchema: z.object({ summary: z.string() }),
-        }
+        })
       );
 
       mockGenerateObject.mockResolvedValue({
@@ -569,12 +568,10 @@ describe('brain creation', () => {
     it('templates can use state', async () => {
       const testBrain = brain('State Template Test')
         .step('Set Data', () => ({ existingData: 'legacy data' }))
-        .prompt('Analyze Data', {
-          template: ({ state }) => {
-            return `Analyze this: ${state.existingData}`;
-          },
+        .prompt('Analyze Data', ({ state }) => ({
+          message: `Analyze this: ${state.existingData}`,
           outputSchema: z.object({ analysis: z.string() }),
-        });
+        }));
 
       mockGenerateObject.mockResolvedValue({
         object: { analysis: 'Analysis result' },
@@ -2148,10 +2145,10 @@ describe('type inference', () => {
 
   it('should correctly infer prompt response types in subsequent steps', async () => {
     const testBrain = brain('Prompt Type Test')
-      .prompt('Get user info', {
-        template: () => "What is the user's info?",
+      .prompt('Get user info', () => ({
+        message: "What is the user's info?",
         outputSchema: z.object({ name: z.string(), age: z.number() }),
-      })
+      }))
       .step('Use response', ({ state }) => {
         // Type assertion to verify state includes prompt result spread flat
         type ExpectedState = {
@@ -2344,12 +2341,11 @@ describe('.map()', () => {
       .step('Init', () => ({
         items: [{ n: 3 }, { n: 5 }, { n: 7 }],
       }))
-      .map('Process Items', {
+      .map('Process Items', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
-        initialState: (item, state) => ({ value: item.n }),
-        stateKey: 'results' as const,
-      });
+        over: state.items,
+        initialState: (item) => ({ value: item.n }),
+      }));
 
     const { finalState } = await runWithStateMachine(outerBrain, {
       client: mockClient,
@@ -2370,12 +2366,11 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => ({ value: item.n }),
-        stateKey: 'results' as const,
-      });
+      }));
 
     const { events } = await runWithStateMachine(outerBrain, {
       client: mockClient,
@@ -2418,12 +2413,11 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => ({ value: item.n }),
-        stateKey: 'results' as const,
-      });
+      }));
 
     const { events } = await runWithStateMachine(outerBrain, {
       client: mockClient,
@@ -2463,13 +2457,12 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => ({ value: item.n }),
-        stateKey: 'results' as const,
         error: (item, err) => ({ value: -1 }),
-      });
+      }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
@@ -2501,13 +2494,12 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => ({ value: item.n }),
-        stateKey: 'results' as const,
         error: () => null,
-      });
+      }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
@@ -2553,12 +2545,11 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => ({ value: item.n }),
-        stateKey: 'results' as const,
-      });
+      }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
@@ -2610,12 +2601,11 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => ({ value: item.n }),
-        stateKey: 'results' as const,
-      });
+      }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
@@ -2650,12 +2640,11 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }: any) => ({
         run: innerBrain as any,
-        over: ({ state }: any) => state.items,
+        over: state.items,
         initialState: (item: any) => ({ value: item.n }),
-        stateKey: 'results' as const,
-      });
+      }));
 
     let error: Error | undefined;
     try {
@@ -2682,12 +2671,11 @@ describe('.map()', () => {
 
     const outerBrain = brain('Outer')
       .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }] }))
-      .map('Iterate', {
+      .map('Iterate', 'results' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => ({ value: item.n }),
-        stateKey: 'results' as const,
-      });
+      }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of outerBrain.run({
@@ -2834,13 +2822,12 @@ describe('.map()', () => {
       makeOuterBrain: (innerBrain: any) =>
         brain('StackOuter')
           .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
-          .map('Iterate', {
+          .map('Iterate', 'results' as const, ({ state }) => ({
             run: innerBrain,
-            over: ({ state }) => state.items,
+            over: state.items,
             initialState: (item: any) => ({ value: item.n }),
-            stateKey: 'results' as const,
             error: () => ({ value: -1 }),
-          }),
+          })),
       clientOverride: undefined as any,
     },
     {
@@ -2863,13 +2850,12 @@ describe('.map()', () => {
           .step('Init', () => ({
             items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
           }))
-          .map('Iterate', {
+          .map('Iterate', 'results' as const, ({ state }) => ({
             run: innerBrain,
-            over: ({ state }) => state.items,
+            over: state.items,
             initialState: (item: any) => ({ url: item.url }),
-            stateKey: 'results' as const,
             error: () => null,
-          }),
+          })),
       clientOverride: () => createAgentWithThrowingTool((n) => n === 2).client,
     },
     {
@@ -2891,13 +2877,12 @@ describe('.map()', () => {
           .step('Init', () => ({
             items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
           }))
-          .map('Iterate', {
+          .map('Iterate', 'results' as const, ({ state }) => ({
             run: innerBrain,
-            over: ({ state }) => state.items,
+            over: state.items,
             initialState: (item: any) => ({ url: item.url }),
-            stateKey: 'results' as const,
             error: () => null,
-          }),
+          })),
       clientOverride: () => createAgentWithThrowingTool((n) => n === 2).client,
     },
   ])(
@@ -2943,16 +2928,17 @@ describe('.map()', () => {
           { subject: 'Weekend plans', from: 'friend@home.com' },
         ],
       }))
-      .map('Categorize', {
-        template: ({ item }: { item: { subject: string; from: string } }) =>
-          `Categorize: ${item.subject} from ${item.from}`,
-        outputSchema: z.object({
-          category: z.string(),
-          priority: z.enum(['high', 'medium', 'low']),
-        }),
-        over: ({ state }) => state.emails,
-        stateKey: 'categories' as const,
-      });
+      .map('Categorize', 'categories' as const, ({ state }) => ({
+        prompt: {
+          message: (item: { subject: string; from: string }) =>
+            `Categorize: ${item.subject} from ${item.from}`,
+          outputSchema: z.object({
+            category: z.string(),
+            priority: z.enum(['high', 'medium', 'low']),
+          }),
+        },
+        over: state.emails,
+      }));
 
     const { finalState, events } = await runWithStateMachine(outerBrain, {
       client: mockClient,
@@ -3000,13 +2986,14 @@ describe('.map()', () => {
       .step('Init', () => ({
         items: ['a', 'b', 'c'],
       }))
-      .map('Summarize', {
-        template: ({ item }: { item: string }) => `Summarize: ${item}`,
-        outputSchema: z.object({ summary: z.string() }),
-        over: ({ state }) => state.items,
-        stateKey: 'summaries' as const,
+      .map('Summarize', 'summaries' as const, ({ state }) => ({
+        prompt: {
+          message: (item: string) => `Summarize: ${item}`,
+          outputSchema: z.object({ summary: z.string() }),
+        },
+        over: state.items,
         error: () => ({ summary: 'fallback' }),
-      });
+      }));
 
     const { finalState } = await runWithStateMachine(outerBrain, {
       client: mockClient,
@@ -3038,13 +3025,14 @@ describe('.map()', () => {
       .step('Init', () => ({
         items: [{ n: 1 }],
       }))
-      .map('Process', {
-        template: ({ item }: { item: { n: number } }) => `Process: ${item.n}`,
-        outputSchema: z.object({ result: z.string() }),
+      .map('Process', 'results' as const, ({ state }) => ({
+        prompt: {
+          message: (item: { n: number }) => `Process: ${item.n}`,
+          outputSchema: z.object({ result: z.string() }),
+        },
         client: customClient,
-        over: ({ state }) => state.items,
-        stateKey: 'results' as const,
-      });
+        over: state.items,
+      }));
 
     const { finalState } = await runWithStateMachine(outerBrain, {
       client: mockClient,
@@ -3070,13 +3058,12 @@ describe('.map()', () => {
       .step('Init', () => ({
         items: [{ value: 1 }, { value: 2 }, { value: 3 }],
       }))
-      .map('Process items', {
+      .map('Process items', 'results' as const, ({ state }) => ({
         run: processBrain,
-        over: ({ state }) => state.items,
+        over: state.items,
         initialState: (item) => item,
-        stateKey: 'results' as const,
         error: () => null,
-      })
+      }))
       .step('Summarize', ({ state }) => ({
         ...state,
         total: state.results.values.reduce(
@@ -3330,14 +3317,13 @@ describe('IterateResult', () => {
           { name: 'gamma', important: true },
         ],
       }))
-      .map('Summarize', {
+      .map('Summarize', 'results' as const, ({ state }) => ({
         run: summarizeBrain,
-        over: ({ state }) => state.items,
-        initialState: (item) => ({ summary: '' }),
-        stateKey: 'results' as const,
-      })
+        over: state.items,
+        initialState: (item: any) => ({ summary: '' }),
+      }))
       .step('Use IterateResult API', ({ state }) => {
-        const summaries = state.results.values.map((r) => r.summary);
+        const summaries = state.results.values.map((r: any) => r.summary);
         const importantNames = state.results
           .filter((item) => item.important)
           .items.map((i) => i.name);
@@ -3393,18 +3379,16 @@ describe('IterateResult rehydration on resume', () => {
         itemsA: [{ id: 'a1' }, { id: 'a2' }],
         itemsB: [{ id: 'b1' }],
       }))
-      .map('MapA', {
+      .map('MapA', 'resultsA' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.itemsA,
-        initialState: (item) => ({ doubled: 1 }),
-        stateKey: 'resultsA' as const,
-      })
-      .map('MapB', {
+        over: state.itemsA,
+        initialState: (item: any) => ({ doubled: 1 }),
+      }))
+      .map('MapB', 'resultsB' as const, ({ state }) => ({
         run: innerBrain,
-        over: ({ state }) => state.itemsB,
-        initialState: (item) => ({ doubled: 3 }),
-        stateKey: 'resultsB' as const,
-      })
+        over: state.itemsB,
+        initialState: (item: any) => ({ doubled: 3 }),
+      }))
       .step('Merge', ({ state }) => {
         // This uses IterateResult.map() — would break with Array.prototype.map
         const idsA = state.resultsA.map((item, result) => item.id);
@@ -3512,10 +3496,10 @@ describe('UI steps', () => {
     const testBrain = brain('UI Form Test')
       .withComponents(mockComponents)
       .step('Init', () => ({ userName: 'Alice' }))
-      .ui('Collect Feedback', {
-        template: ({ state }) => `Create a form for ${state.userName}`,
-        outputSchema: z.object({ rating: z.number() }),
-      });
+      .page('Collect Feedback', ({ state }) => ({
+        prompt: `Create a form for ${state.userName}`,
+        formSchema: z.object({ rating: z.number() }),
+      }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of testBrain.run({
@@ -3552,10 +3536,10 @@ describe('UI steps', () => {
     const testBrain = brain('UI Resume Test')
       .withComponents(mockComponents)
       .step('Init', () => ({ userName: 'Alice' }))
-      .ui('Collect Feedback', {
-        template: ({ state }) => `Create a form for ${state.userName}`,
-        outputSchema: feedbackSchema,
-      })
+      .page('Collect Feedback', ({ state }) => ({
+        prompt: `Create a form for ${state.userName}`,
+        formSchema: feedbackSchema,
+      }))
       .step('After UI', ({ state }) => ({
         ...state,
         processed: true,
@@ -3607,9 +3591,9 @@ describe('UI steps', () => {
     const testBrain = brain('Read-only UI Test')
       .withComponents(mockComponents)
       .step('Init', () => ({ data: 'hello' }))
-      .ui('Dashboard', {
-        template: ({ state }) => `Show dashboard for ${state.data}`,
-      })
+      .page('Dashboard', ({ state }) => ({
+        prompt: `Show dashboard for ${state.data}`,
+      }))
       .step('After', ({ state }) => ({ ...state, done: true }));
 
     const events: BrainEvent<any>[] = [];

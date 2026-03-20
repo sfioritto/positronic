@@ -426,12 +426,12 @@ Replace a default tool with a custom implementation:
 
 ```typescript
 .brain('Override Agent', ({ tools }) => ({
-  system: 'Custom generateUI behavior.',
+  system: 'Custom generatePage behavior.',
   prompt: 'Generate UI.',
   tools: {
     ...tools,
-    generateUI: {
-      ...tools.generateUI,
+    generatePage: {
+      ...tools.generatePage,
       execute: (input) => {
         // Custom logic here
         return myCustomUIHandler(input);
@@ -442,9 +442,9 @@ Replace a default tool with a custom implementation:
 }))
 ```
 
-## The `generateUI` Default Tool
+## The `generatePage` Default Tool
 
-The `generateUI` tool allows agents to create interactive UI and wait for user responses:
+The `generatePage` tool allows agents to create interactive UI and wait for user responses:
 
 ```typescript
 import { brain, defaultTools } from '@positronic/core';
@@ -452,16 +452,16 @@ import { z } from 'zod';
 
 const uiBrain = brain('interactive')
   .withTools(defaultTools)
-  .withComponents(myComponents) // Required for generateUI
+  .withComponents(myComponents) // Required for generatePage
   .brain('Ask User', ({ tools, components }) => ({
     system: 'You can generate forms to collect user input.',
     prompt: 'Ask the user for their preferences.',
-    tools, // includes generateUI
+    tools, // includes generatePage
     outputSchema: z.object({ preferences: z.record(z.string()) }),
   }));
 ```
 
-When the agent calls `generateUI`, execution suspends until the user submits the form.
+When the agent calls `generatePage`, execution suspends until the user submits the form.
 
 ## Agent Events
 
@@ -538,7 +538,7 @@ The config function receives typed parameters:
   client,     // ObjectGenerator for LLM calls
   resources,  // Resource loader
   response,   // Webhook response (if resuming)
-  page,       // Generated page (from .ui() step)
+  page,       // Generated page (from .page() step)
   pages,      // Pages service
   env,        // Runtime environment
   ...services // Custom services (from withServices)
@@ -650,6 +650,6 @@ const finalState = await runner.run(supportAgent);
 
 5. **Handle webhooks properly**: When using webhook tools, ensure your system can route webhook responses back to the suspended brain.
 
-6. **Use default tools**: The `defaultTools` export provides commonly needed functionality like `generateUI`.
+6. **Use default tools**: The `defaultTools` export provides commonly needed functionality like `generatePage`.
 
 7. **Type your tools**: Use Zod schemas to ensure type safety for tool inputs and outputs.

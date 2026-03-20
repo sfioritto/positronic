@@ -81,7 +81,7 @@ brain('AI Education Assistant')
     context: 'We are creating an educational example',
   }))
   .prompt('Generate explanation', {
-    template: ({ state: { topic, context } }) =>
+    message: ({ state: { topic, context } }) =>
       `<%= '${context}' %>. Please provide a brief, beginner-friendly explanation of <%= '${topic}' %>.`,
     outputSchema: z.object({
       explanation: z.string().describe('A clear explanation of the topic'),
@@ -101,7 +101,7 @@ brain('AI Education Assistant')
   .prompt(
     'Generate follow-up questions',
     {
-      template: ({ state: { formattedOutput } }) =>
+      message: ({ state: { formattedOutput } }) =>
         `Based on this explanation about <%= '${formattedOutput.topic}' %>: "<%= '${formattedOutput.explanation}' %>"
 
         Generate 3 thoughtful follow-up questions that a student might ask.`,
@@ -122,8 +122,8 @@ brain('AI Education Assistant')
 ```
 
 Key points about prompt steps:
-- The `template` function receives the current state and resources, returning the prompt string
-- Templates can be async to load resources: `async (state, resources) => { ... }`
+- The `message` function receives the current state and resources, returning the prompt string
+- The `message` function can be async to load resources: `async ({ state, resources }) => { ... }`
 - `outputSchema` defines the structure using Zod schemas
 - The schema result is spread directly onto state (`{ ...state, ...result }`)
 - To namespace, wrap your schema in a parent key (e.g., `z.object({ plan: z.object({ ... }) })`)
@@ -142,12 +142,12 @@ const smartModel = createAnthropicClient({ model: 'claude-sonnet-4-5-20250929' }
 
 brain('Multi-Model Brain')
   .prompt('Quick summary', {
-    template: ({ state: { document } }) => `Summarize this briefly: <%= '${document}' %>`,
+    message: ({ state: { document } }) => `Summarize this briefly: <%= '${document}' %>`,
     outputSchema: z.object({ summary: z.string() }),
     client: fastModel,  // Use a fast, cheap model for summarization
   })
   .prompt('Deep analysis', {
-    template: ({ state: { summary } }) =>
+    message: ({ state: { summary } }) =>
       `Analyze the implications of this summary: <%= '${summary}' %>`,
     outputSchema: z.object({
       insights: z.array(z.string()),
@@ -189,7 +189,7 @@ brain('email-checker')
   })
   .guard(({ state }) => state.emails.some(e => e.important))
   // everything below only runs if guard passes
-  .ui('Review emails', { ..., outputSchema: ... })
+  .page('Review emails', (ctx) => ({ ..., formSchema: ... }))
   // form data auto-merges onto state
 ```
 
@@ -225,7 +225,7 @@ Each step receives these parameters:
 - `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
 - Custom services (if configured with `.withServices()` or `createBrain()`)
 
-> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.ui()` with `outputSchema`, the response is spread directly onto state. See [UI Steps](#ui-steps) and [Webhooks](#webhooks) for details.
+> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.page()` with `formSchema`, the response is spread directly onto state. See [Page Steps](#page-steps) and [Webhooks](#webhooks) for details.
 
 ## Configuration Methods
 
@@ -403,7 +403,7 @@ Services are destructured alongside other parameters in:
 2. **Prompt Reduce Functions**:
 ```typescript
 .prompt('Generate', {
-  template: ({ state }) => 'Generate something',
+  message: ({ state }) => 'Generate something',
   outputSchema: schema,
 }, async ({ state, response, logger, database }) => {
   logger.info('Saving AI response');
@@ -458,7 +458,7 @@ const analysisBrain = brain('Data Analysis')
     return { ...state, data };
   })
   .prompt('Analyze Data', {
-    template: ({ state: { data } }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
+    message: ({ state: { data } }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
     outputSchema: z.object({
       insights: z.array(z.string()),
       confidence: z.number()
@@ -575,7 +575,7 @@ const brainWithTools = brain('Tool Brain')
 
 ### Component Configuration with `withComponents()`
 
-The `withComponents()` method registers custom UI components for use in `.ui()` steps:
+The `withComponents()` method registers custom UI components for use in `.page()` steps:
 
 ```typescript
 const brainWithComponents = brain('Custom UI Brain')
@@ -610,17 +610,17 @@ const brainWithComponents = brain('Custom UI Brain')
       }
     }
   })
-  .ui('Dashboard', {
-    template: ({ state }) => `
+  .page('Dashboard', ({ state }) => ({
+    prompt: `
       Create a dashboard using CustomCard components to display:
       - User name: <%= '${state.userName}' %>
       - Account status: <%= '${state.status}' %>
       Use DataTable to show recent activity.
     `,
-    outputSchema: z.object({
+    formSchema: z.object({
       acknowledged: z.boolean()
     }),
-  });
+  }));
 ```
 
 ### Typed Store with `withStore()`
@@ -912,7 +912,7 @@ Resources are also available in prompt templates:
 
 ```typescript
 brain('Template Example').prompt('Generate Content', {
-  template: async ({ state, resources }) => {
+  message: async ({ state, resources }) => {
     const template = await resources.prompts.customerSupport.load();
     return template.replace('{{issue}}', state.issue);
   },
@@ -1003,7 +1003,7 @@ interface FilterPromptState {
 
 // Export the prompt configuration
 export const aiFilterPrompt = {
-  template: async ({ state, resources }: { state: FilterPromptState, resources: Resources }) => {
+  message: async ({ state, resources }: { state: FilterPromptState, resources: Resources }) => {
     // Load a prompt template from resources
     const template = await resources.prompts.hnFilter.load();
 
@@ -1044,9 +1044,9 @@ export default brain('HN Article Filter')
 ### When to Extract Prompts
 
 Extract prompts to separate files when:
-- The template is more than 2-3 lines
+- The message is more than 2-3 lines
 - The prompt uses complex logic or formatting
-- You need to load resources or templates
+- You need to load resources
 - The prompt might be reused in other brains
 - You want to test the prompt logic separately
 
@@ -1056,7 +1056,7 @@ Templates can be written as JSX instead of template literal strings. This improv
 
 ### Basic Usage
 
-Rename your brain file from `.ts` to `.tsx` and return JSX from the template function:
+Rename your brain file from `.ts` to `.tsx` and return JSX from the message function:
 
 ```tsx
 // src/brains/analyze.tsx
@@ -1065,7 +1065,7 @@ import { z } from 'zod';
 
 export default brain('analyze')
   .prompt('Analyze', {
-    template: ({ state: { topic, context } }) => (
+    message: ({ state: { topic, context } }) => (
       <>
         Analyze the following topic: {topic}
 
@@ -1085,7 +1085,7 @@ export default brain('analyze')
   });
 ```
 
-No `render()` call is needed — the runner handles JSX rendering internally. Old string templates still work, so this is fully opt-in.
+No `render()` call is needed — the runner handles JSX rendering internally. Old string messages still work, so this is fully opt-in.
 
 ### Conditionals
 
@@ -1093,7 +1093,7 @@ Use `&&` for boolean conditions and ternaries when you need both branches or whe
 
 ```tsx
 // && works when the condition is strictly boolean
-template: ({ state: { user, isVIP } }) => (
+message: ({ state: { user, isVIP } }) => (
   <>
     Create a greeting for {user.name}.
     {isVIP && <>This is a VIP customer. Use premium language.</>}
@@ -1101,7 +1101,7 @@ template: ({ state: { user, isVIP } }) => (
 )
 
 // Ternary for either/or content
-template: ({ state: { user, tier } }) => (
+message: ({ state: { user, tier } }) => (
   <>
     Create a greeting for {user.name}.
     {tier === 'premium'
@@ -1119,7 +1119,7 @@ template: ({ state: { user, tier } }) => (
 Use `.map()` naturally inside JSX:
 
 ```tsx
-template: ({ state: { items } }) => (
+message: ({ state: { items } }) => (
   <>
     Review the following items:
     {items.map(item => (
@@ -1143,8 +1143,8 @@ const CategoryInstructions = ({ categories }: { categories: string[] }) => (
   </>
 );
 
-// Use in a template
-template: ({ state: { email, categories } }) => (
+// Use in a message
+message: ({ state: { email, categories } }) => (
   <>
     Categorize this email:
     From: {email.from}
@@ -1165,7 +1165,7 @@ const Resource = async ({ from }: { from: any }) => {
   return <>{content}</>;
 };
 
-template: ({ state, resources }) => (
+message: ({ state, resources }) => (
   <>
     Summarize this document using the guidelines below:
 
@@ -1196,11 +1196,10 @@ brain('Process All Items')
   .step('Initialize', () => ({
     items: [{ value: 1 }, { value: 2 }, { value: 3 }]
   }))
-  .map('Process Each', {
+  .map('Process Each', 'results', {
     run: processBrain,
     over: ({ state }) => state.items,
     initialState: (item) => ({ value: item.value, result: 0 }),
-    stateKey: 'results' as const,
     error: (item, error) => ({ value: item.value, result: 0 }),
   })
   .step('Use Results', ({ state }) => ({
@@ -1212,7 +1211,7 @@ brain('Process All Items')
 
 ### Iterating a Prompt
 
-Use `.map()` with `template` and `outputSchema` to run a prompt per item:
+Use `.map()` with `prompt: { message, outputSchema }` to run a prompt per item:
 
 ```typescript
 brain('Item Processor')
@@ -1223,11 +1222,12 @@ brain('Item Processor')
       { id: 3, title: 'Third item' },
     ]
   }))
-  .map('Summarize Items', {
-    template: ({ item }) => `Summarize this item: <%= '${item.title}' %>`,
-    outputSchema: z.object({ summary: z.string() }),
+  .map('Summarize Items', 'summaries', {
+    prompt: {
+      message: ({ item }) => `Summarize this item: <%= '${item.title}' %>`,
+      outputSchema: z.object({ summary: z.string() }),
+    },
     over: ({ state }) => state.items,
-    stateKey: 'summaries' as const,
     error: () => ({ summary: 'Failed to summarize' }),
   })
   .step('Process Results', ({ state }) => ({
@@ -1239,7 +1239,7 @@ brain('Item Processor')
   }));
 ```
 
-The template receives `{ item, state, options, resources }` where `item` is the current iteration item. The result per item is `z.infer` of the `outputSchema`. You can also pass `client` to use a different LLM client for the prompt.
+The `message` function receives `{ item, state, options, resources }` where `item` is the current iteration item. The result per item is `z.infer` of the `outputSchema`. You can also pass `client` to use a different LLM client for the prompt.
 
 ### Iterating an Agent
 
@@ -1258,11 +1258,10 @@ brain('Research Topics')
   .step('Initialize', () => ({
     topics: [{ name: 'AI' }, { name: 'Robotics' }]
   }))
-  .map('Research Each', {
+  .map('Research Each', 'results', {
     run: researchBrain,
     over: ({ state }) => state.topics,
     initialState: (topic) => ({ name: topic.name }),
-    stateKey: 'results' as const,
   })
   .step('Use Results', ({ state }) => ({
     ...state,
@@ -1274,10 +1273,11 @@ brain('Research Topics')
 
 `.map()` has two modes: **brain mode** (run an inner brain per item) and **prompt mode** (run a prompt per item).
 
+Note: The `stateKey` is now the 2nd argument to `.map()`: `.map('title', 'stateKey', { ... })`.
+
 **Common options** (both modes):
 
 - `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, services, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, services, or any other context field. Can be async.
-- `stateKey: string` - Key under which results are stored in state (use `as const` for type inference)
 - `error: (item, error) => Result | null` - Optional fallback when an item fails. Return `null` to skip the item entirely.
 
 **Brain mode** (use `run`):
@@ -1285,10 +1285,10 @@ brain('Research Topics')
 - `run: Brain` - The inner brain to execute for each item
 - `initialState: (item, outerState) => State` - Function to create the inner brain's initial state from each item
 
-**Prompt mode** (use `template` + `outputSchema`):
+**Prompt mode** (use `prompt: { message, outputSchema }`):
 
-- `template: (context) => string` - Template function. Receives `{ item, state, options, resources }` where `item` is the current iteration item.
-- `outputSchema: ZodSchema` - Zod schema for the LLM output.
+- `prompt.message: (context) => string` - Message function. Receives `{ item, state, options, resources }` where `item` is the current iteration item.
+- `prompt.outputSchema: ZodSchema` - Zod schema for the LLM output.
 - `client?: ObjectGenerator` - Optional per-step LLM client override.
 
 #### Accessing options and services in `over`
@@ -1311,11 +1311,10 @@ brain('Dynamic Processor')
       { id: 3, category: 'a' },
     ]
   }))
-  .map('Process', {
+  .map('Process', 'results', {
     run: processItemBrain,
     over: ({ state, options }) => state.items.filter(i => i.category === options.category),
     initialState: (item) => ({ id: item.id, result: '' }),
-    stateKey: 'results' as const,
   })
 ```
 
@@ -1544,7 +1543,7 @@ The created page object contains:
 
 ### Custom Pages with Forms (CSRF Token)
 
-When building custom HTML pages with forms, you must include a CSRF token to prevent unauthorized submissions. The `.ui()` step handles this automatically, but custom pages require manual setup. This applies whether you submit to the built-in `ui-form` endpoint or to a custom webhook.
+When building custom HTML pages with forms, you must include a CSRF token to prevent unauthorized submissions. The `.page()` step handles this automatically, but custom pages require manual setup. This applies whether you submit to the built-in `page-form` endpoint or to a custom webhook.
 
 The token is always passed as a **query parameter** on the form's action URL (`?token=xyz`), not as a hidden form field.
 
@@ -1579,9 +1578,9 @@ brain('Archive Workflow')
   }));
 ```
 
-#### Using the System `ui-form` Endpoint
+#### Using the System `page-form` Endpoint
 
-If your page submits to the built-in `ui-form` endpoint, include the token in the action URL and in the webhook registration object:
+If your page submits to the built-in `page-form` endpoint, include the token in the action URL and in the webhook registration object:
 
 ```typescript
 import { generateFormToken } from '@positronic/core';
@@ -1590,7 +1589,7 @@ brain('Custom Form')
   .step('Create Form Page', async ({ state, pages, env }) => {
     const formToken = generateFormToken();
     const webhookIdentifier = `custom-form-<%= '${Date.now()}' %>`;
-    const formAction = `<%= '${env.origin}' %>/webhooks/system/ui-form?identifier=<%= '${encodeURIComponent(webhookIdentifier)}' %>&token=<%= '${formToken}' %>`;
+    const formAction = `<%= '${env.origin}' %>/webhooks/system/page-form?identifier=<%= '${encodeURIComponent(webhookIdentifier)}' %>&token=<%= '${formToken}' %>`;
 
     const page = await pages.create('my-form', `<html>
       <body>
@@ -1604,7 +1603,7 @@ brain('Custom Form')
     return {
       ...state,
       pageUrl: page.url,
-      webhook: { slug: 'ui-form', identifier: webhookIdentifier, token: formToken },
+      webhook: { slug: 'page-form', identifier: webhookIdentifier, token: formToken },
     };
   })
   .wait('Wait for form', ({ state }) => state.webhook)
@@ -1619,15 +1618,15 @@ brain('Custom Form')
 The three required pieces for any custom page with a form:
 1. Call `generateFormToken()` to get a token
 2. Include the token as a **query parameter** on the form's action URL (e.g., `action="<%= '${webhookUrl}' %>?token=<%= '${formToken}' %>"`)
-3. Include the `token` in your webhook registration — either as the second argument to a custom webhook function (e.g., `myWebhook(identifier, token)`) or in the registration object for `ui-form`
+3. Include the `token` in your webhook registration — either as the second argument to a custom webhook function (e.g., `myWebhook(identifier, token)`) or in the registration object for `page-form`
 
 Without a token, the server will reject the form submission.
 
-## UI Steps
+## Page Steps
 
-UI steps allow brains to generate dynamic user interfaces using AI. When `outputSchema` is provided, `.ui()` generates a page, auto-suspends the brain, and spreads the form response directly onto state. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
+Page steps allow brains to generate dynamic user interfaces using AI. When `formSchema` is provided, `.page()` generates a page, auto-suspends the brain, and spreads the form response directly onto state. Use the optional `onCreated` callback for side effects (Slack messages, emails) that need access to the generated page URL.
 
-### Basic UI Step
+### Basic Page Step
 
 ```typescript
 import { z } from 'zod';
@@ -1637,20 +1636,20 @@ brain('Feedback Collector')
     ...state,
     userName: 'John Doe',
   }))
-  // Generate the form, notify users, auto-suspend, auto-merge response
-  .ui('Collect Feedback', {
-    template: ({ state }) => `
+  // Generate the form, onCreated users, auto-suspend, auto-merge response
+  .page('Collect Feedback', ({ state, slack }) => ({
+    prompt: `
       Create a feedback form for <%= '${state.userName}' %>.
       Include fields for rating (1-5) and comments.
     `,
-    outputSchema: z.object({
+    formSchema: z.object({
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
-    notify: async ({ page, slack }) => {
+    onCreated: async (page) => {
       await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
     },
-  })
+  }))
   // No .handle() needed — form data spreads onto state
   .step('Process Feedback', ({ state }) => ({
     ...state,
@@ -1659,27 +1658,27 @@ brain('Feedback Collector')
   }));
 ```
 
-### How UI Steps Work
+### How Page Steps Work
 
-1. **Template**: The `template` function generates a prompt describing the desired UI
+1. **Prompt**: The `prompt` value describes the desired UI
 2. **AI Generation**: The AI creates a component tree based on the prompt
-3. **Notify**: The optional `notify` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
+3. **onCreated**: The optional `onCreated` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
 4. **Auto-Suspend**: The brain automatically suspends and waits for the form submission
 5. **Auto-Spread**: The form data is automatically spread onto state (`{ ...state, ...formData }`)
 
 ### The `page` Object
 
-The `page` object is available inside the `notify` callback:
+The `page` object is available inside the `onCreated` callback:
 - `page.url` - URL where users can access the form
 - `page.webhook` - Pre-configured webhook for form submissions
 
-### Template Best Practices
+### Prompt Best Practices
 
 Be specific about layout and content:
 
 ```typescript
-.ui('Contact Form', {
-  template: ({ state }) => `
+.page('Contact Form', ({ state }) => ({
+  prompt: `
     Create a contact form with:
     - Header: "Get in Touch"
     - Name field (required)
@@ -1689,12 +1688,12 @@ Be specific about layout and content:
 
     Use a clean, centered single-column layout.
   `,
-  outputSchema: z.object({
+  formSchema: z.object({
     name: z.string(),
     email: z.string().email(),
     message: z.string(),
   }),
-})
+}))
 ```
 
 ### Data Bindings
@@ -1702,63 +1701,63 @@ Be specific about layout and content:
 Use `{{path}}` syntax to bind props to runtime data:
 
 ```typescript
-.ui('Order Summary', {
-  template: ({ state }) => `
+.page('Order Summary', ({ state }) => ({
+  prompt: `
     Create an order summary showing:
     - List of items from {{cart.items}}
     - Total: {{cart.total}}
     - Shipping address input
     - Confirm button
   `,
-  outputSchema: z.object({
+  formSchema: z.object({
     shippingAddress: z.string(),
   }),
-})
+}))
 ```
 
 ### Multi-Step Forms
 
-Chain UI steps for multi-page workflows:
+Chain page steps for multi-page workflows:
 
 ```typescript
 brain('User Onboarding')
   .step('Start', () => ({ userData: {} }))
 
   // Step 1: Personal info
-  .ui('Personal Info', {
-    template: () => `
+  .page('Personal Info', ({ notify }) => ({
+    prompt: `
       Create a form for personal information:
       - First name, Last name
       - Date of birth
       - Next button
     `,
-    outputSchema: z.object({
+    formSchema: z.object({
       firstName: z.string(),
       lastName: z.string(),
       dob: z.string(),
     }),
-    notify: async ({ page, notify }) => {
+    onCreated: async (page) => {
       await notify(`Step 1: <%= '${page.url}' %>`);
     },
-  })
+  }))
   // No .handle() needed — form data spreads onto state
 
   // Step 2: Preferences
-  .ui('Preferences', {
-    template: ({ state }) => `
+  .page('Preferences', ({ state, notify }) => ({
+    prompt: `
       Create preferences form for <%= '${state.firstName}' %>:
       - Newsletter subscription checkbox
       - Contact preference (email/phone/sms)
       - Complete button
     `,
-    outputSchema: z.object({
+    formSchema: z.object({
       newsletter: z.boolean(),
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
-    notify: async ({ page, notify }) => {
+    onCreated: async (page) => {
       await notify(`Step 2: <%= '${page.url}' %>`);
     },
-  })
+  }))
   // No .handle() needed — form data spreads onto state
   .step('Complete', ({ state }) => ({
     ...state,
@@ -1766,7 +1765,7 @@ brain('User Onboarding')
   }));
 ```
 
-For more details on UI steps, see the full UI Step Guide in the main Positronic documentation.
+For more details on page steps, see the full Page Step Guide in the main Positronic documentation.
 
 ## Complete Example
 
@@ -1800,7 +1799,7 @@ const completeBrain = brain({
     return { startTime: Date.now() };
   })
   .prompt('Generate Plan', {
-    template: async ({ state, resources }) => {
+    message: async ({ state, resources }) => {
       // Load a template from resources
       const template = await resources.templates.projectPlan.load();
       return template.replace('{{context}}', 'software project');

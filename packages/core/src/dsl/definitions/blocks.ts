@@ -60,14 +60,10 @@ export type StepBlock<
     JsonObject | undefined,
     TPageIn
   >;
-  /** If true, this is a UI generation step that requires components configuration */
-  isUIStep?: boolean;
-  /** Configuration for UI generation steps */
-  uiConfig?: {
-    template: (context: any) => TemplateReturn;
-    outputSchema?: z.ZodObject<any>;
-    notify?: (context: any) => void | Promise<void>;
-  };
+  /** If true, this is a page generation step that requires components configuration */
+  isPageStep?: boolean;
+  /** Config function for page generation steps — called with step context, returns page config */
+  pageConfigFn?: (context: any) => PageConfig | Promise<PageConfig>;
   /** Per-step client override for prompt steps */
   client?: ObjectGenerator;
 };
@@ -143,21 +139,36 @@ export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
   predicate: (params: any) => boolean;
 };
 
+export type PageConfig = {
+  prompt: TemplateReturn;
+  formSchema?: z.ZodObject<any>;
+  onCreated?: (page: GeneratedPage) => void | Promise<void>;
+  props?: Record<string, unknown>;
+  ttl?: number;
+  persist?: boolean;
+};
+
+export type MapConfig = {
+  over: any[];
+  error?: (item: any, error: Error) => any | null;
+  // Brain mode
+  run?: any;
+  initialState?: (item: any) => State;
+  options?: any;
+  // Prompt mode
+  prompt?: {
+    message: (item: any) => TemplateReturn;
+    outputSchema: z.ZodObject<any>;
+  };
+  client?: ObjectGenerator;
+};
+
 // MapBlock: runs an inner brain or prompt once per item from the `over` list
 export type MapBlock = {
   type: 'map';
   title: string;
-  over: (context: any) => any[] | Promise<any[]>;
   stateKey: string;
-  error?: (item: any, error: Error) => any | null;
-  // Brain mode
-  innerBrain?: any;
-  initialState?: (item: any, context: any) => State;
-  options?: any | ((context: any) => any);
-  // Prompt mode
-  template?: (context: any) => TemplateReturn;
-  outputSchema?: z.ZodObject<any>;
-  client?: ObjectGenerator;
+  configFn: (context: any) => MapConfig | Promise<MapConfig>;
 };
 
 export type Block<

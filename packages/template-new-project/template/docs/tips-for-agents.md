@@ -31,11 +31,11 @@ This also applies to variable declarations and function parameters:
 ```typescript
 // ❌ DON'T DO THIS
 const names: string[] = options.notify.split(',');
-template: ({ state }: any) => { ... }
+message: ({ state }: any) => { ... }
 
 // ✅ DO THIS
 const names = options.notify.split(',');
-template: ({ state }) => { ... }
+message: ({ state }) => { ... }
 ```
 
 If you genuinely need a cast to fix a type error, prefer the narrowest cast possible and add it only after seeing the error.
@@ -199,10 +199,10 @@ The same applies to prompt templates:
 
 ```typescript
 // ❌ DON'T DO THIS
-template: ({ state }) => `Hello <%= '${state.user.name}' %>, your order <%= '${state.order.id}' %> is ready.`,
+message: ({ state }) => `Hello <%= '${state.user.name}' %>, your order <%= '${state.order.id}' %> is ready.`,
 
 // ✅ DO THIS
-template: ({ state: { user, order } }) => `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.`,
+message: ({ state: { user, order } }) => `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.`,
 ```
 
 When you still need `state` (e.g. for `...state` in the return value), destructure in the function body instead:
@@ -230,12 +230,12 @@ For complex, multi-line prompts, use JSX instead of template literals. Rename th
 
 ```tsx
 // Before (template literal — hard to read when indented in builder chain)
-template: ({ state: { user, order } }) =>
+message: ({ state: { user, order } }) =>
   `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.
 <%= '${order.isExpress ? "\\nThis is an express order." : ""}' %>`,
 
 // After (JSX — Prettier manages indentation, conditionals are clean)
-template: ({ state: { user, order } }) => (
+message: ({ state: { user, order } }) => (
   <>
     Hello {user.name}, your order {order.id} is ready.
     {order.isExpress && <>This is an express order.</>}
@@ -317,7 +317,7 @@ Use `.values` for simple extraction, `.filter()` for correlated filtering, and `
   }))
 ```
 
-**Name the `stateKey` after the content.** If results contain analyses, use `stateKey: 'analyses' as const`, not `stateKey: 'processedItems' as const`.
+**Name the `stateKey` after the content.** The stateKey is now the 2nd argument to `.map()`. If results contain analyses, use `.map('title', 'analyses', { ... })`, not `.map('title', 'processedItems', { ... })`.
 
 ### Naming convention for filter/map parameters
 
@@ -403,18 +403,17 @@ If a brain receives its initial state from the outside — via `.map()`, `.brain
 // This brain is used inside .map() — it receives thread data as initial state
 const categorizeBrain = brain<{}, RawThread>('categorize-thread')
   .prompt('Categorize', {
-    template: ({ state }) => `Categorize: <%= '${state.subject}' %>`,
+    message: ({ state }) => `Categorize: <%= '${state.subject}' %>`,
     outputSchema: z.object({ category: z.string() }),
   });
 
 // The parent brain maps over threads
 brain('email-digest')
   .step('Fetch', async () => ({ threads: await fetchThreads() }))
-  .map('Categorize', {
+  .map('Categorize', 'categorized', {
     run: categorizeBrain,
     over: ({ state }) => state.threads,
     initialState: (thread) => thread,
-    stateKey: 'categorized' as const,
   });
 ```
 
@@ -467,9 +466,9 @@ brain('validation-example')
 
 Most generated brains should not have try-catch blocks. Only use them when the error state is meaningful to subsequent steps in the workflow.
 
-## UI Steps for Form Generation
+## Page Steps for Form Generation
 
-When you need to collect user input, use the `.ui()` method with `outputSchema`. The brain auto-suspends after generating the page, then auto-merges the form response directly onto state. Use the `notify` callback for side effects.
+When you need to collect user input, use the `.page()` method with `formSchema`. The brain auto-suspends after generating the page, then auto-merges the form response directly onto state. Use the `onCreated` callback for side effects.
 
 ```typescript
 import { z } from 'zod';
@@ -479,22 +478,22 @@ brain('feedback-collector')
     ...state,
     userName: 'John',
   }))
-  // Generate the form, notify, auto-suspend, auto-merge response
-  .ui('Collect Feedback', {
-    template: ({ state }) => <%= '\`' %>
+  // Generate the form, onCreated, auto-suspend, auto-merge response
+  .page('Collect Feedback', ({ state, slack }) => ({
+    prompt: <%= '\`' %>
       Create a feedback form for <%= '${state.userName}' %>:
       - Rating (1-5)
       - Comments textarea
       - Submit button
     <%= '\`' %>,
-    outputSchema: z.object({
+    formSchema: z.object({
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
-    notify: async ({ page, slack }) => {
+    onCreated: async (page) => {
       await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
     },
-  })
+  }))
   // No .handle() needed — form data auto-merges directly onto state
   .step('Process', ({ state }) => ({
     ...state,
@@ -504,13 +503,13 @@ brain('feedback-collector')
 ```
 
 Key points:
-- `page` is available inside the `notify` callback, not in a separate step
+- `page` is available inside the `onCreated` callback, not in a separate step
 - `page.url` - where to send users
-- The brain auto-suspends after `.ui()` with `outputSchema`
+- The brain auto-suspends after `.page()` with `formSchema`
 - Form data is spread directly onto state (e.g., `state.rating`, `state.comments`)
-- You control how users are notified (Slack, email, etc.) inside `notify`
+- You control how users are notified (Slack, email, etc.) inside `onCreated`
 
-See `/docs/brain-dsl-guide.md` for more UI step examples.
+See `/docs/brain-dsl-guide.md` for more page step examples.
 
 ## Service Organization
 
@@ -824,7 +823,7 @@ export default feedbackBrain;
 // Step 3: Run and check logs, see it doesn't analyze yet
 // Step 4: Add sentiment analysis step
   .prompt('Analyze sentiment', {
-    template: ({ state: { feedback } }) =>
+    message: ({ state: { feedback } }) =>
       <%= '\`Analyze the sentiment of this feedback: "${feedback}"\`' %>,
     outputSchema: z.object({
       sentiment: z.enum(['positive', 'neutral', 'negative']),
@@ -835,7 +834,7 @@ export default feedbackBrain;
 // Step 5: Run again, check logs, test still fails (no response)
 // Step 6: Add response generation
   .prompt('Generate response', {
-    template: ({ state: { sentiment, feedback } }) =>
+    message: ({ state: { sentiment, feedback } }) =>
       <%= '\`Generate a brief response to this ${sentiment} feedback: "${feedback}"\`' %>,
     outputSchema: z.object({
       response: z.string()

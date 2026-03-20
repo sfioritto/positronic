@@ -99,30 +99,28 @@ const test3 = brain('test-3')
       threadsById,
     };
   })
-  .map('Categorize', {
-    template: ({ item }: { item: RawThread }) =>
-      `Categorize this email:\nFrom: ${item.from}\nSubject: ${item.subject}`,
-    outputSchema: z.object({
-      category: z.string(),
-      priority: z.enum(['high', 'medium', 'low']),
-    }),
-    over: ({ state }) => Object.values(state.threadsById),
-    stateKey: 'categoryResult' as const,
-  });
+  .map('Categorize', 'categoryResult' as const, ({ state }) => ({
+    prompt: {
+      message: (item: RawThread) =>
+        `Categorize this email:\nFrom: ${item.from}\nSubject: ${item.subject}`,
+      outputSchema: z.object({
+        category: z.string(),
+        priority: z.enum(['high', 'medium', 'low']),
+      }),
+    },
+    over: Object.values(state.threadsById),
+  }));
 
 // Test 4: Single prompt followed by step
-const singlePrompt = {
-  template: ({ state }: { state: { count: number } }) =>
-    `Count is ${state.count}`,
-  outputSchema: z.object({ summary: z.string() }),
-};
-
 const test4 = brain('test-4')
   .step('Initialize', () => ({
     count: 5,
     items: ['a', 'b', 'c'],
   }))
-  .prompt('Summarize', singlePrompt)
+  .prompt('Summarize', ({ state }) => ({
+    message: `Count is ${state.count}`,
+    outputSchema: z.object({ summary: z.string() }),
+  }))
   .step('After prompt', ({ state }) => {
     // state.summary should be string (spread from outputSchema)
     const summaryText: string = state.summary;
@@ -139,12 +137,13 @@ const test5 = brain('test-5')
   .step('Initialize', () => ({
     items: ['a', 'b', 'c'],
   }))
-  .map('Process items', {
-    template: ({ item }: { item: string }) => `Process: ${item}`,
-    outputSchema: z.object({ result: z.string() }),
-    over: ({ state }) => state.items,
-    stateKey: 'results' as const,
-  })
+  .map('Process items', 'results' as const, ({ state }) => ({
+    prompt: {
+      message: (item: string) => `Process: ${item}`,
+      outputSchema: z.object({ result: z.string() }),
+    },
+    over: state.items,
+  }))
   .step('After batch prompt', ({ state }) => {
     // state.results is an IterateResult<string, { result: string }>
     const results = state.results;
@@ -166,15 +165,16 @@ const test6 = brain('test-6')
       { id: '1', from: 'alice@test.com', subject: 'Hello', body: 'Hi' },
     ] as RawThread[],
   }))
-  .map('First categorize', {
-    template: ({ item }: { item: RawThread }) => `Categorize: ${item.subject}`,
-    outputSchema: z.object({
-      category: z.string(),
-      priority: z.enum(['high', 'medium', 'low']),
-    }),
-    over: ({ state }) => state.threads,
-    stateKey: 'firstCategories' as const,
-  })
+  .map('First categorize', 'firstCategories' as const, ({ state }) => ({
+    prompt: {
+      message: (item: RawThread) => `Categorize: ${item.subject}`,
+      outputSchema: z.object({
+        category: z.string(),
+        priority: z.enum(['high', 'medium', 'low']),
+      }),
+    },
+    over: state.threads,
+  }))
   .step('After first prompt', ({ state }) => {
     // state.firstCategories should be the batch results
     const categories = state.firstCategories;
@@ -183,16 +183,16 @@ const test6 = brain('test-6')
       categorizedCount: categories.length,
     };
   })
-  .map('Second categorize', {
-    template: ({ item }: { item: RawThread }) =>
-      `Re-categorize: ${item.subject}`,
-    outputSchema: z.object({
-      category: z.string(),
-      priority: z.enum(['high', 'medium', 'low']),
-    }),
-    over: ({ state }) => state.threads,
-    stateKey: 'secondCategories' as const,
-  });
+  .map('Second categorize', 'secondCategories' as const, ({ state }) => ({
+    prompt: {
+      message: (item: RawThread) => `Re-categorize: ${item.subject}`,
+      outputSchema: z.object({
+        category: z.string(),
+        priority: z.enum(['high', 'medium', 'low']),
+      }),
+    },
+    over: state.threads,
+  }));
 
 // Export to prevent unused variable warnings
 export { test1, test2, test3, test4, test5, test6 };

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AgentTool, AgentToolWaitFor, StepContext } from '../dsl/types.js';
 import type { WebhookRegistration } from '../dsl/webhook.js';
-import { generateUI as generateUICore } from '../ui/generate-ui.js';
+import { generateUI as generatePageCore } from '../ui/generate-ui.js';
 import { generatePageHtml } from '../ui/generate-page-html.js';
 import { parseDuration } from '../dsl/duration.js';
 
@@ -42,7 +42,7 @@ export function createTool<T extends z.ZodSchema>(config: {
   return config;
 }
 
-const generateUIInputSchema = z.object({
+const generatePageInputSchema = z.object({
   prompt: z
     .string()
     .describe(
@@ -95,19 +95,19 @@ const generateUIInputSchema = z.object({
  *
  * The description is enriched at runtime with available component information.
  */
-export const generateUI: AgentTool<typeof generateUIInputSchema> = {
+export const generatePage: AgentTool<typeof generatePageInputSchema> = {
   description: `Generate a web page for displaying rich content or collecting user input.
 
 Sometimes you need more than simple notifications to communicate with users. This tool creates web pages that can display formatted content, dashboards, or forms to collect information.
 
-Pass structured data via the 'data' parameter to populate the page with dynamic content. The UI generator uses {{path.to.value}} template bindings to render your data.
+Pass structured data via the 'data' parameter to populate the page with dynamic content. The page generator uses {{path.to.value}} template bindings to render your data.
 
 RETURNS: { url: string, webhook: { slug: string, identifier: string, token: string } | null }
 - url: The page URL
 - webhook: For forms (hasForm=true), contains slug, identifier, and token that must be passed to waitForWebhook to pause execution until the user submits the form
 
 IMPORTANT: Users have no way to discover the page URL on their own. After generating a page, you must tell them the URL using whatever communication tools are available.`,
-  inputSchema: generateUIInputSchema,
+  inputSchema: generatePageInputSchema,
   async execute(
     input,
     context
@@ -121,13 +121,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     if (!components || Object.keys(components).length === 0) {
       throw new Error(
-        'generateUI requires components to be configured. ' +
+        'generatePage requires components to be configured. ' +
           'Use createBrain({ components }) or brain.withComponents() to register UI components.'
       );
     }
 
-    // Generate the UI using the core generateUI function
-    const uiResult = await generateUICore({
+    const uiResult = await generatePageCore({
       client,
       prompt: input.prompt,
       components,
@@ -138,12 +137,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       const placementCount = uiResult.placements.length;
       if (placementCount === 0) {
         throw new Error(
-          `UI generation failed - no components were generated. ` +
+          `Page generation failed - no components were generated. ` +
             `The LLM may not have understood the prompt. Try being more specific.`
         );
       } else {
         throw new Error(
-          `UI generation failed - no root component found. ` +
+          `Page generation failed - no root component found. ` +
             `${placementCount} component(s) were placed but all have a parentId.`
         );
       }
@@ -159,15 +158,15 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     let formToken: string | undefined;
 
     if (hasForm) {
-      const webhookIdentifier = `${brainRunId}-${stepId}-generateui-${Date.now()}`;
+      const webhookIdentifier = `${brainRunId}-${stepId}-generatepage-${Date.now()}`;
       formToken = crypto.randomUUID();
       formAction = `${
         env.origin
-      }/webhooks/system/ui-form?identifier=${encodeURIComponent(
+      }/webhooks/system/page-form?identifier=${encodeURIComponent(
         webhookIdentifier
       )}&token=${encodeURIComponent(formToken)}`;
       webhookInfo = {
-        slug: 'ui-form',
+        slug: 'page-form',
         identifier: webhookIdentifier,
         token: formToken,
       };
@@ -198,22 +197,22 @@ const waitForWebhookInputSchema = z.object({
     .string()
     .describe(
       'The webhook slug that identifies the type of webhook. ' +
-        'For generateUI forms, this is always "ui-form". ' +
+        'For generatePage forms, this is always "page-form". ' +
         'Use the exact slug value returned by the tool that created the webhook.'
     ),
   identifier: z
     .string()
     .describe(
       'The unique identifier for this specific webhook instance. ' +
-        'This is returned by generateUI in webhook.identifier. ' +
-        'Each generateUI call creates a unique identifier - use the one from the specific page you want to wait for.'
+        'This is returned by generatePage in webhook.identifier. ' +
+        'Each generatePage call creates a unique identifier - use the one from the specific page you want to wait for.'
     ),
   token: z
     .string()
     .optional()
     .describe(
       'The CSRF token for form submission validation. ' +
-        'This is returned by generateUI in webhook.token. ' +
+        'This is returned by generatePage in webhook.token. ' +
         'Pass it through to ensure only submissions from the actual page are accepted.'
     ),
   timeout: z
@@ -229,7 +228,7 @@ const waitForWebhookInputSchema = z.object({
 /**
  * Wait for webhook tool - pauses execution until a webhook receives a response.
  *
- * Use this after generating a UI page with a form to wait for the user's submission.
+ * Use this after generating a page with a form to wait for the user's submission.
  * The form data will be returned as the tool result when the webhook fires.
  *
  * IMPORTANT: Before calling this tool, ensure the user knows the page URL
@@ -238,13 +237,13 @@ const waitForWebhookInputSchema = z.object({
 export const waitForWebhook: AgentTool<typeof waitForWebhookInputSchema> = {
   description: `Pause agent execution and wait for an external event (webhook response).
 
-PURPOSE: Suspend the agent until a user action occurs, such as submitting a form generated by generateUI.
+PURPOSE: Suspend the agent until a user action occurs, such as submitting a form generated by generatePage.
 
 ⚠️ CRITICAL - BEFORE CALLING THIS TOOL:
 You MUST have already communicated the page URL to the user in your response. The user has no other way to discover the URL. If you call this tool without first telling the user where to go, the job will freeze with no easy recovery.
 
 CORRECT SEQUENCE:
-1. Call generateUI to create the page
+1. Call generatePage to create the page
 2. In your response text, tell the user the URL (e.g., "Please complete the form at: {url}")
 3. THEN call waitForWebhook
 
@@ -257,7 +256,7 @@ BEHAVIOR:
 - The form data will be available as key-value pairs (e.g., { name: "John", email: "john@example.com" })
 
 WHEN TO USE:
-- After generateUI with hasForm=true, to wait for form submission
+- After generatePage with hasForm=true, to wait for form submission
 - Any workflow requiring human input or approval before continuing
 
 FAILURE MODE: If the user doesn't know the URL, they cannot submit the form, and the agent waits until timeout. The only recovery is to kill the job or manually inspect the event stream for the URL.
@@ -353,7 +352,7 @@ export const consoleLog = createTool({
  * ```
  */
 export const defaultTools = {
-  generateUI,
+  generatePage,
   waitForWebhook,
   print,
   consoleLog,

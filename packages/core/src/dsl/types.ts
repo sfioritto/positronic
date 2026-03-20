@@ -77,8 +77,8 @@ export interface AgentToolWaitFor {
  * Generic parameters allow type-safe access to state and options.
  * For tools (which are defined statically), use the non-generic defaults.
  *
- * Ephemeral data like `response` (from webhooks) and `page` (from UI steps)
- * is only available inside `.handle()` callbacks after `.wait()` and `.ui()` `notify` callbacks,
+ * Ephemeral data like `response` (from webhooks) and `page` (from page steps)
+ * is only available inside `.handle()` callbacks after `.wait()` and `.page()` `notify` callbacks,
  * where it's injected via intersection types.
  */
 export interface StepContext<TState = object, TOptions = JsonObject> {
@@ -90,11 +90,11 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
   client: import('../clients/types.js').ObjectGenerator;
   /** Resource loader for accessing brain resources */
   resources: import('../resources/resources.js').Resources;
-  /** Page service for creating UI pages */
+  /** Page service for creating pages */
   pages: import('./pages.js').PagesService;
   /** Runtime environment (origin, secrets) */
   env: RuntimeEnv;
-  /** UI components available for generateUI */
+  /** UI components available for generatePage */
   components?: Record<string, import('../ui/types.js').UIComponent<any>>;
   /** Current brain run ID (for creating unique webhook identifiers) */
   brainRunId: string;
