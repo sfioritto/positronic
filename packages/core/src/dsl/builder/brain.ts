@@ -30,7 +30,6 @@ import type {
   GuardBlock,
   WaitBlock,
   MapBlock,
-  TemplateContext,
   TemplateReturn,
 } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
@@ -337,7 +336,7 @@ export class Brain<
   }
 
   guard(
-    predicate: (params: { state: TState; options: TOptions }) => boolean,
+    predicate: (params: StepContext<TState, TOptions> & TServices) => boolean,
     title?: string
   ): Brain<TOptions, TState, TServices> {
     const guardBlock: GuardBlock<TState, TOptions> = {
@@ -465,7 +464,9 @@ export class Brain<
   >(
     title: string,
     config: {
-      template: (context: TemplateContext<TState, TOptions>) => TemplateReturn;
+      template: (
+        context: StepContext<TState, TOptions> & TServices
+      ) => TemplateReturn;
       outputSchema: TSchema;
       stateKey: TResponseKey & (string extends TResponseKey ? never : unknown);
       client?: ObjectGenerator;
@@ -476,7 +477,9 @@ export class Brain<
   prompt(
     title: string,
     config: {
-      template: (context: TemplateContext<TState, TOptions>) => TemplateReturn;
+      template: (
+        context: StepContext<TState, TOptions> & TServices
+      ) => TemplateReturn;
       client?: ObjectGenerator;
     }
   ): Continuation<TOptions, TState, TServices, { text: string }>;
@@ -499,17 +502,15 @@ export class Brain<
           type: 'step',
           title,
           client: config.client,
-          action: async ({ state, options, client, resources }) => {
-            const prompt = await resolveTemplate(
-              config.template({ state, options, resources })
-            );
-            const result = await client.generateObject({
+          action: async (context) => {
+            const prompt = await resolveTemplate(config.template(context));
+            const result = await context.client.generateObject({
               schema: textSchema,
               schemaName: 'TextResponse',
               prompt,
             });
             return {
-              state,
+              state: context.state,
               promptResponse: result.object,
             };
           },
@@ -526,16 +527,14 @@ export class Brain<
       type: 'step',
       title,
       client: config.client,
-      action: async ({ state, options, client, resources }) => {
-        const prompt = await resolveTemplate(
-          config.template({ state, options, resources })
-        );
-        const result = await client.generateObject({
+      action: async (context) => {
+        const prompt = await resolveTemplate(config.template(context));
+        const result = await context.client.generateObject({
           schema: outputSchema,
           prompt,
         });
         return {
-          ...state,
+          ...context.state,
           [stateKey]: result.object,
         };
       },
@@ -560,7 +559,10 @@ export class Brain<
       over: (
         context: StepContext<TState, TOptions> & TServices
       ) => TItems | Promise<TItems>;
-      initialState: (item: TItems[number], outerState: TState) => State;
+      initialState: (
+        item: TItems[number],
+        context: StepContext<TState, TOptions> & TServices
+      ) => State;
       stateKey: TStateKey & (string extends TStateKey ? never : unknown);
       error?: (item: TItems[number], error: Error) => TInnerState | null;
       options?:
@@ -583,9 +585,10 @@ export class Brain<
     title: string,
     config: {
       template: (
-        context: TemplateContext<TState, TOptions> & {
-          item: NoInfer<TItems[number]>;
-        }
+        context: StepContext<TState, TOptions> &
+          TServices & {
+            item: NoInfer<TItems[number]>;
+          }
       ) => TemplateReturn;
       outputSchema: TSchema;
       client?: ObjectGenerator;
@@ -606,7 +609,7 @@ export class Brain<
       outputSchema?: z.ZodObject<any>;
       client?: ObjectGenerator;
       over: (context: any) => any[] | Promise<any[]>;
-      initialState?: (item: any, outerState: any) => State;
+      initialState?: (item: any, context: any) => State;
       stateKey: string;
       error?: (item: any, error: Error) => any | null;
       options?: any;
@@ -680,7 +683,9 @@ export class Brain<
   >(
     title: string,
     config: {
-      template: (context: TemplateContext<TState, TOptions>) => TemplateReturn;
+      template: (
+        context: StepContext<TState, TOptions> & TServices
+      ) => TemplateReturn;
       outputSchema: TSchema;
       stateKey: TResponseKey & (string extends TResponseKey ? never : unknown);
       notify?: (
@@ -697,7 +702,9 @@ export class Brain<
   ui(
     title: string,
     config: {
-      template: (context: TemplateContext<TState, TOptions>) => TemplateReturn;
+      template: (
+        context: StepContext<TState, TOptions> & TServices
+      ) => TemplateReturn;
       notify?: (
         context: { page: GeneratedPage } & StepContext<TState, TOptions> &
           TServices

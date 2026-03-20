@@ -44,10 +44,7 @@ export type {
   BrainSignal,
   SignalProvider,
 } from './dsl/types.js';
-export type {
-  TemplateContext,
-  TemplateReturn,
-} from './dsl/definitions/blocks.js';
+export type { TemplateReturn } from './dsl/definitions/blocks.js';
 export type { TemplateNode, TemplateChild } from './jsx-runtime.js';
 export { Fragment } from './jsx-runtime.js';
 export {
