@@ -7,8 +7,8 @@
   "workers_dev": true,
   "preview_urls": true,
   "build": {
-    "command": "node .positronic/build-brains.mjs",
-    "watch_dir": "../brains"
+    "command": "node build-brains.mjs",
+    "watch_dir": "../src/brains"
   },
   "limits": {
     "cpu_ms": 300000

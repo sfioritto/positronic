@@ -702,7 +702,7 @@ await store.has('key');     // Returns boolean
 You can declare store fields at the project level so all brains share the same store shape:
 
 ```typescript
-// brain.ts
+// src/brain.ts
 export const brain = createBrain({
   services: { slack },
   store: {
@@ -715,7 +715,7 @@ export const brain = createBrain({
 Or declare per-brain stores for brain-specific data:
 
 ```typescript
-// brains/my-brain.ts
+// src/brains/my-brain.ts
 export default brain('my-brain')
   .withStore({ counter: z.number() })
   .step('Increment', async ({ store }) => {
@@ -727,10 +727,10 @@ export default brain('my-brain')
 
 ### Using `createBrain()` for Project Configuration
 
-For project-wide configuration, use `createBrain()` in your `brain.ts` file:
+For project-wide configuration, use `createBrain()` in your `src/brain.ts` file:
 
 ```typescript
-// brain.ts
+// src/brain.ts
 import { createBrain } from '@positronic/core';
 import { z } from 'zod';
 
@@ -983,7 +983,7 @@ When prompts become more than a sentence or two, extract them into separate file
 For complex brains, organize your code into folders:
 
 ```
-brains/
+src/brains/
 ├── hn-bot/
 │   ├── brain.ts           # Main brain definition
 │   └── ai-filter-prompt.ts # Complex prompt configuration
@@ -995,7 +995,7 @@ brains/
 When you extract a prompt to a separate file, you'll need to explicitly specify the state type:
 
 ```typescript
-// brains/hn-bot/ai-filter-prompt.ts
+// src/brains/hn-bot/ai-filter-prompt.ts
 import { z } from 'zod';
 import type { Resources } from '@positronic/core';
 
@@ -1031,8 +1031,8 @@ export const aiFilterPrompt = {
   stateKey: 'filterResults' as const,
 };
 
-// brains/hn-bot/brain.ts
-import { brain } from '../brain.js';
+// src/brains/hn-bot/brain.ts
+import { brain } from '../../brain.js';
 import { aiFilterPrompt } from './ai-filter-prompt.js';
 
 export default brain('HN Article Filter')
@@ -1068,7 +1068,7 @@ Templates can be written as JSX instead of template literal strings. This improv
 Rename your brain file from `.ts` to `.tsx` and return JSX from the template function:
 
 ```tsx
-// brains/analyze.tsx
+// src/brains/analyze.tsx
 import { brain } from '../brain.js';
 import { z } from 'zod';
 

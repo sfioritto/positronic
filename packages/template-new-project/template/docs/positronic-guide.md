@@ -7,18 +7,23 @@ This guide covers project-level patterns and best practices for Positronic appli
 A typical Positronic project has the following structure:
 
 ```
-├── brain.ts         # Project brain wrapper
-├── brains/          # Brain definitions
+├── src/
+│   ├── brain.ts         # Project brain wrapper
+│   ├── brains/          # Brain definitions
+│   ├── webhooks/        # Webhook definitions
+│   ├── runner.ts        # Local runner for development
+│   ├── services/        # Service implementations
+│   ├── utils/           # Shared utilities
+│   └── components/      # Reusable UI/prompt components
 ├── resources/       # Files accessible to brains
 ├── tests/           # Test files
 ├── docs/            # Documentation
-├── runner.ts        # Local runner for development
 └── positronic.config.json  # Project configuration
 ```
 
 ## The Project Brain Pattern
 
-Every Positronic project includes a `brain.ts` file in the root directory. This file exports a custom `brain` function that wraps the core Positronic brain function.
+Every Positronic project includes a `src/brain.ts` file. This file exports a custom `brain` function that wraps the core Positronic brain function.
 
 ### Why Use a Project Brain?
 
@@ -33,7 +38,7 @@ The project brain pattern provides a single place to:
 All brains in your project should import from `../brain.js` instead of `@positronic/core`:
 
 ```typescript
-// ✅ DO THIS (from a file in the brains/ directory)
+// ✅ DO THIS (from a file in src/brains/)
 import { brain } from '../brain.js';
 
 // ❌ NOT THIS
@@ -42,7 +47,7 @@ import { brain } from '@positronic/core';
 
 ### Configuring Services
 
-To add project-wide services, modify the `brain.ts` file in the root directory using `createBrain()`:
+To add project-wide services, modify the `src/brain.ts` file using `createBrain()`:
 
 ```typescript
 import { createBrain } from '@positronic/core';
@@ -120,7 +125,7 @@ See `/docs/brain-testing-guide.md` for detailed testing guidance.
 ## Development Workflow
 
 1. **Start the development server**: `px server -d`
-2. **Create or modify brains**: Always import from `./brain.js`
+2. **Create or modify brains**: Always import from `../brain.js` (from files in `src/brains/`)
 3. **Test locally**: 
    ```bash
    # Basic run
@@ -162,7 +167,7 @@ CLOUDFLARE_API_TOKEN=your-api-token
 
 ## Best Practices
 
-1. **Services**: Configure once in `brain.ts`, use everywhere
+1. **Services**: Configure once in `src/brain.ts`, use everywhere
 2. **Resources**: Use for content that non-developers should be able to edit
 3. **Secrets**: Never commit API keys; use environment variables
 4. **Organization**: Group related brains in folders as your project grows
@@ -174,7 +179,7 @@ CLOUDFLARE_API_TOKEN=your-api-token
 ### Logging and Monitoring
 
 ```typescript
-// In brain.ts
+// In src/brain.ts
 interface ProjectServices {
   metrics: {
     track: (event: string, properties?: any) => void;
@@ -202,7 +207,7 @@ export default brain('Analytics Brain')
 ### API Integration
 
 ```typescript
-// In brain.ts
+// In src/brain.ts
 interface ProjectServices {
   api: {
     get: (path: string) => Promise<any>;
@@ -247,8 +252,8 @@ The way `currentUser` is provided depends on how the brain is running:
 **Local development with `runner.ts`**: When calling `runner.run()` directly, you must pass `currentUser`:
 
 ```typescript
-import { runner } from './runner.js';
-import myBrain from './brains/my-brain.js';
+import { runner } from './src/runner.js';
+import myBrain from './src/brains/my-brain.js';
 
 await runner.run(myBrain, {
   currentUser: { name: 'local-dev-user' },

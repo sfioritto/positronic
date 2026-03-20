@@ -7,7 +7,7 @@
  * When you add custom components to components/index.ts, they will automatically
  * be included in the bundle.
  */
-import { components } from '../components/index.js';
+import { components } from './components/index.js';
 
 // Extract the React component from each UIComponent and expose to window
 const PositronicComponents: Record<string, React.ComponentType<any>> = {};
