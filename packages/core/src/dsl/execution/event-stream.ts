@@ -486,9 +486,9 @@ export class BrainEventStream<
         any
       >;
 
-      // Check if this is a UI step - handle specially
-      if (stepBlock.isUIStep) {
-        yield* this.executeUIStep(step, stepBlock);
+      // Check if this is a page step - handle specially
+      if (stepBlock.isPageStep) {
+        yield* this.executePageStep(step, stepBlock);
         return;
       }
     }
@@ -956,9 +956,9 @@ The output must conform to the provided schema.`,
         const tool = toolDef as AgentTool;
         let description = tool.description;
 
-        // Enrich generateUI description with available component information
+        // Enrich generatePage description with available component information
         if (
-          name === 'generateUI' &&
+          name === 'generatePage' &&
           components &&
           Object.keys(components).length > 0
         ) {
@@ -1295,7 +1295,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
   private async *executeMap(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as MapBlock;
     const prevState = this.currentState;
-    const items = await block.over(this.buildStepContext(step));
+    const config = await block.configFn(this.buildStepContext(step));
+    const items = await config.over;
     const totalItems = items.length;
 
     // Resume support
@@ -1341,38 +1342,26 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       let result: [any, any] | undefined;
 
       try {
-        if (block.template) {
+        if (config.prompt) {
           // Prompt mode: call generateObject directly per item
-          const prompt = await resolveTemplate(
-            block.template({
-              item,
-              ...this.buildStepContext(step),
-            })
-          );
-          const client = block.client
+          const prompt = await resolveTemplate(config.prompt.message(item));
+          const client = config.client
             ? this.governor
-              ? this.governor(block.client)
-              : block.client
+              ? this.governor(config.client)
+              : config.client
             : this.client;
           const response = await client.generateObject({
-            schema: block.outputSchema!,
+            schema: config.prompt.outputSchema,
             prompt,
           });
           result = [item, response.object];
         } else {
           // Brain mode: run inner brain per item
-          const initialState = block.initialState!(
-            item,
-            this.buildStepContext(step)
-          );
+          const initialState = config.initialState!(item);
 
-          const mapInnerOptions = block.options
-            ? typeof block.options === 'function'
-              ? block.options(this.buildStepContext(step))
-              : block.options
-            : {};
+          const mapInnerOptions = config.options ?? {};
 
-          const innerRun = block.innerBrain.run({
+          const innerRun = config.run.run({
             resources: this.resources,
             client: this.client,
             currentUser: this.currentUser,
@@ -1409,8 +1398,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           result = [item, innerState];
         }
       } catch (error) {
-        if (block.error) {
-          const fallback = block.error(item, error as Error);
+        if (config.error) {
+          const fallback = config.error(item, error as Error);
           result = fallback !== null ? [item, fallback] : undefined;
         } else {
           throw error;
@@ -1446,18 +1435,19 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
   }
 
   /**
-   * Execute a UI generation step.
+   * Execute a page generation step.
    * Generates UI components, renders to HTML, creates page, and sets up webhook.
    */
-  private async *executeUIStep(
+  private async *executePageStep(
     step: Step,
     stepBlock: StepBlock<any, any, TOptions, TServices, any, any>
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const prevState = this.currentState;
-    const uiConfig = stepBlock.uiConfig!;
+    const pageConfigFn = stepBlock.pageConfigFn!;
+    const pageConfig = await pageConfigFn(this.buildStepContext(step));
 
     // Resume path: form response already available, spread onto state and complete
-    if (this.currentResponse && uiConfig.outputSchema) {
+    if (this.currentResponse && pageConfig.formSchema) {
       this.currentState = {
         ...this.currentState,
         ...this.currentResponse,
@@ -1470,30 +1460,30 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     // Validate required configuration
     if (!this.components) {
       throw new Error(
-        `UI step "${stepBlock.title}" requires components to be configured via brain.withComponents()`
+        `Page step "${stepBlock.title}" requires components to be configured via brain.withComponents()`
       );
     }
     if (!this.pages) {
       throw new Error(
-        `UI step "${stepBlock.title}" requires pages service to be configured`
+        `Page step "${stepBlock.title}" requires pages service to be configured`
       );
     }
 
-    // Get the prompt from the template callback
-    const prompt = await resolveTemplate(
-      uiConfig.template(this.buildStepContext(step))
-    );
+    const prompt = await resolveTemplate(pageConfig.prompt);
+    const data = (pageConfig.props ?? this.currentState) as Record<
+      string,
+      unknown
+    >;
 
     const uiResult = await generateUI({
       client: this.client,
       prompt,
       components: this.components,
-      schema: uiConfig.outputSchema,
-      data: this.currentState as Record<string, unknown>,
+      schema: pageConfig.formSchema,
+      data,
     });
 
     if (!uiResult.rootId) {
-      // Provide detailed debug information
       const placementCount = uiResult.placements.length;
       const placementInfo = uiResult.placements
         .map((p) => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
@@ -1501,53 +1491,55 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
       if (placementCount === 0) {
         throw new Error(
-          `UI generation failed for step "${stepBlock.title}" - no components were placed. ` +
+          `Page generation failed for step "${stepBlock.title}" - no components were placed. ` +
             `The LLM may not have called any component tools. ` +
             `LLM response text: ${uiResult.text ?? '(none)'}`
         );
       } else {
         throw new Error(
-          `UI generation failed for step "${stepBlock.title}" - no root component found. ` +
+          `Page generation failed for step "${stepBlock.title}" - no root component found. ` +
             `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
             `The first component should be placed without a parentId to serve as the root.`
         );
       }
     }
 
-    if (uiConfig.outputSchema) {
-      // Form UI: create webhook, CSRF token, suspend for submission
+    const pageCreateOptions = {
+      persist: pageConfig.persist ?? (pageConfig.ttl ? true : false),
+      ttl: pageConfig.ttl,
+    };
+
+    if (pageConfig.formSchema) {
+      // Form page: create webhook, CSRF token, suspend for submission
       const webhookIdentifier = `${this.brainRunId}-${step.id}`;
       const formToken = crypto.randomUUID();
       const formAction = `${
         this.env.origin
-      }/webhooks/system/ui-form?identifier=${encodeURIComponent(
+      }/webhooks/system/page-form?identifier=${encodeURIComponent(
         webhookIdentifier
       )}&token=${encodeURIComponent(formToken)}`;
 
       const html = generatePageHtml({
         placements: uiResult.placements,
         rootId: uiResult.rootId,
-        data: this.currentState as Record<string, unknown>,
+        data,
         title: stepBlock.title,
         formAction,
       });
 
-      const page = await this.pages.create(html);
+      const page = await this.pages.create(html, pageCreateOptions);
 
       const webhook: WebhookRegistration = {
-        slug: 'ui-form',
+        slug: 'page-form',
         identifier: webhookIdentifier,
-        schema: uiConfig.outputSchema,
+        schema: pageConfig.formSchema,
         token: formToken,
       };
 
       this.currentPage = { url: page.url, webhook };
 
-      if (uiConfig.notify) {
-        await uiConfig.notify({
-          ...this.buildStepContext(step),
-          page: this.currentPage,
-        });
+      if (pageConfig.onCreated) {
+        await pageConfig.onCreated(this.currentPage);
       }
 
       // Suspend — step completes on resume (see resume path above)
@@ -1565,21 +1557,18 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       };
       this.currentPage = undefined;
     } else {
-      // Read-only UI: no form, no webhook
+      // Read-only page: no form, no webhook
       const html = generatePageHtml({
         placements: uiResult.placements,
         rootId: uiResult.rootId,
-        data: this.currentState as Record<string, unknown>,
+        data,
         title: stepBlock.title,
       });
 
-      const page = await this.pages.create(html);
+      const page = await this.pages.create(html, pageCreateOptions);
 
-      if (uiConfig.notify) {
-        await uiConfig.notify({
-          ...this.buildStepContext(step),
-          page: { url: page.url },
-        });
+      if (pageConfig.onCreated) {
+        await pageConfig.onCreated({ url: page.url });
       }
 
       yield* this.completeStep(step, prevState, { url: page.url });

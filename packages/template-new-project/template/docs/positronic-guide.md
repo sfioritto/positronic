@@ -291,6 +291,6 @@ export default brain('greet')
 
 - **Documentation**: https://positronic.dev
 - **CLI Help**: `px --help`
-- **Brain DSL Guide**: `/docs/brain-dsl-guide.md` (includes UI steps for generating forms)
+- **Brain DSL Guide**: `/docs/brain-dsl-guide.md` (includes page steps for generating forms)
 - **Memory Guide**: `/docs/memory-guide.md`
 - **Testing Guide**: `/docs/brain-testing-guide.md`

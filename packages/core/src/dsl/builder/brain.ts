@@ -30,6 +30,8 @@ import type {
   GuardBlock,
   WaitBlock,
   MapBlock,
+  MapConfig,
+  PageConfig,
   TemplateReturn,
 } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
@@ -87,13 +89,9 @@ export class Brain<
             title: block.title,
           };
         } else if (block.type === 'map') {
-          const mapBlock = block as MapBlock;
           return {
             type: 'map' as const,
             title: block.title,
-            ...(mapBlock.innerBrain
-              ? { innerBrain: mapBlock.innerBrain.structure }
-              : {}),
           };
         } else {
           // block.type === 'brain'
@@ -135,7 +133,7 @@ export class Brain<
   }
 
   /**
-   * Configure UI components for generative UI steps.
+   * Configure UI components for page generation steps.
    *
    * @param components - Record of component definitions
    *
@@ -145,7 +143,7 @@ export class Brain<
    *
    * const myBrain = brain('my-brain')
    *   .withComponents(components)
-   *   .ui('Show Form', formPrompt);
+   *   .page('Show Form', ({ state }) => ({ prompt: `Create a form for ${state.userName}` }));
    * ```
    */
   withComponents(
@@ -440,84 +438,42 @@ export class Brain<
     return this.nextBrain<any>();
   }
 
-  // Overload 1: Single execution - runs prompt once with current state (auto-merges onto state)
   prompt<
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
-    config: {
-      template: (
-        context: StepContext<TState, TOptions> & TServices
-      ) => TemplateReturn;
-      outputSchema: TSchema;
-      client?: ObjectGenerator;
-    }
-  ): Brain<TOptions, TNewState, TServices>;
-
-  // Overload 2: Schema-less prompt - returns Continuation with text response
-  prompt(
-    title: string,
-    config: {
-      template: (
-        context: StepContext<TState, TOptions> & TServices
-      ) => TemplateReturn;
-      client?: ObjectGenerator;
-    }
-  ): Continuation<TOptions, TState, TServices, { text: string }>;
-
-  // Implementation
-  prompt(
-    title: string,
-    config: {
-      template: (context: any) => TemplateReturn;
-      outputSchema?: z.ZodObject<any>;
-      client?: ObjectGenerator;
-    }
-  ): any {
-    // Schema-less prompt - returns Continuation with text response
-    if (!config.outputSchema) {
-      const textSchema = z.object({ text: z.string() });
-      const promptBlock: StepBlock<TState, any, TOptions, TServices, any, any> =
-        {
-          type: 'step',
-          title,
-          client: config.client,
-          action: async (context) => {
-            const prompt = await resolveTemplate(config.template(context));
-            const result = await context.client.generateObject({
-              schema: textSchema,
-              schemaName: 'TextResponse',
-              prompt,
-            });
-            return {
-              state: context.state,
-              promptResponse: result.object,
-            };
-          },
-        };
-      this.blocks.push(promptBlock);
-      return this.continuationCallbacks<{ text: string }>();
-    }
-    // At this point, outputSchema is guaranteed to exist (schema-less case returned early)
-    const outputSchema = config.outputSchema!;
-
-    // Single mode - run prompt once with current state, spread result onto state
+    configFn: (context: StepContext<TState, TOptions> & TServices) =>
+      | {
+          message: TemplateReturn;
+          outputSchema: TSchema;
+          client?: ObjectGenerator;
+        }
+      | Promise<{
+          message: TemplateReturn;
+          outputSchema: TSchema;
+          client?: ObjectGenerator;
+        }>
+  ): Brain<TOptions, TNewState, TServices> {
+    const action = async (
+      context: StepContext<TState, TOptions> & TServices
+    ) => {
+      const config = await configFn(context);
+      const client = config.client ?? context.client;
+      const prompt = await resolveTemplate(config.message);
+      const result = await client.generateObject({
+        schema: config.outputSchema,
+        prompt,
+      });
+      return {
+        ...context.state,
+        ...result.object,
+      };
+    };
     const promptBlock: StepBlock<TState, any, TOptions, TServices, any, any> = {
       type: 'step',
       title,
-      client: config.client,
-      action: async (context) => {
-        const prompt = await resolveTemplate(config.template(context));
-        const result = await context.client.generateObject({
-          schema: outputSchema,
-          prompt,
-        });
-        return {
-          ...context.state,
-          ...result.object,
-        };
-      },
+      action: action as any,
     };
     this.blocks.push(promptBlock);
     return this.nextBrain<any>();
@@ -534,22 +490,13 @@ export class Brain<
     }
   >(
     title: string,
-    config: {
+    stateKey: TStateKey & (string extends TStateKey ? never : unknown),
+    configFn: (context: StepContext<TState, TOptions> & TServices) => {
       run: Brain<TInnerOptions, TInnerState, any>;
-      over: (
-        context: StepContext<TState, TOptions> & TServices
-      ) => TItems | Promise<TItems>;
-      initialState: (
-        item: TItems[number],
-        context: StepContext<TState, TOptions> & TServices
-      ) => State;
-      stateKey: TStateKey & (string extends TStateKey ? never : unknown);
+      over: TItems | Promise<TItems>;
+      initialState: (item: TItems[number]) => State;
       error?: (item: TItems[number], error: Error) => TInnerState | null;
-      options?:
-        | TInnerOptions
-        | ((
-            context: StepContext<TState, TOptions> & TServices
-          ) => TInnerOptions);
+      options?: TInnerOptions;
     }
   ): Brain<TOptions, TNewState, TServices>;
 
@@ -563,19 +510,14 @@ export class Brain<
     }
   >(
     title: string,
-    config: {
-      template: (
-        context: StepContext<TState, TOptions> &
-          TServices & {
-            item: NoInfer<TItems[number]>;
-          }
-      ) => TemplateReturn;
-      outputSchema: TSchema;
+    stateKey: TStateKey & (string extends TStateKey ? never : unknown),
+    configFn: (context: StepContext<TState, TOptions> & TServices) => {
+      prompt: {
+        message: (item: NoInfer<TItems[number]>) => TemplateReturn;
+        outputSchema: TSchema;
+      };
       client?: ObjectGenerator;
-      over: (
-        context: StepContext<TState, TOptions> & TServices
-      ) => TItems | Promise<TItems>;
-      stateKey: TStateKey & (string extends TStateKey ? never : unknown);
+      over: TItems | Promise<TItems>;
       error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
     }
   ): Brain<TOptions, TNewState, TServices>;
@@ -583,143 +525,67 @@ export class Brain<
   // Implementation
   map(
     title: string,
-    config: {
-      run?: any;
-      template?: (context: any) => TemplateReturn;
-      outputSchema?: z.ZodObject<any>;
-      client?: ObjectGenerator;
-      over: (context: any) => any[] | Promise<any[]>;
-      initialState?: (item: any, context: any) => State;
-      stateKey: string;
-      error?: (item: any, error: Error) => any | null;
-      options?: any;
-    }
+    stateKey: string,
+    configFn: (context: any) => MapConfig | Promise<MapConfig>
   ): Brain<TOptions, any, TServices> {
     const mapBlock: MapBlock = {
       type: 'map',
       title,
-      innerBrain: config.run,
-      over: config.over,
-      initialState: config.initialState,
-      stateKey: config.stateKey,
-      error: config.error,
-      template: config.template,
-      outputSchema: config.outputSchema,
-      client: config.client,
-      options: config.options,
+      stateKey,
+      configFn,
     };
     this.blocks.push(mapBlock);
     return this.nextBrain<any>();
   }
 
-  /**
-   * Add a UI generation step that creates an interactive page.
-   *
-   * When `outputSchema` is provided, the brain automatically suspends after
-   * generating the page (waiting for the form submission) and spreads
-   * the form response directly onto state.
-   *
-   * When no `outputSchema` is provided, the step generates a read-only page
-   * and returns the `Brain` directly for continued chaining.
-   *
-   * Use the optional `notify` callback for side effects (sending Slack messages, etc.)
-   * that need access to the generated page URL.
-   *
-   * @example
-   * ```typescript
-   * // UI with form submission (auto-merges response onto state)
-   * brain('feedback-form')
-   *   .step('Initialize', () => ({ userName: 'John' }))
-   *   .ui('Create Form', {
-   *     template: ({ state }) => `Create a feedback form for ${state.userName}`,
-   *     outputSchema: z.object({
-   *       rating: z.number().min(1).max(5),
-   *       comments: z.string(),
-   *     }),
-   *     notify: async ({ page, slack }) => {
-   *       await slack.post('#general', `Please fill out: ${page.url}`);
-   *     },
-   *   })
-   *   // No .handle() needed — form data is spread directly onto state
-   *
-   * // Read-only UI (returns Brain directly)
-   * brain('report')
-   *   .ui('Dashboard', {
-   *     template: ({ state }) => `Dashboard for ${state.project}`,
-   *   })
-   *   .step('Next', ({ state }) => state)
-   * ```
-   */
-  // Overload 1: With outputSchema - auto-merges response onto state
-  ui<
+  // Overload 1: With formSchema - auto-merges response onto state
+  page<
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
-    config: {
-      template: (
-        context: StepContext<TState, TOptions> & TServices
-      ) => TemplateReturn;
-      outputSchema: TSchema;
-      notify?: (
-        context: { page: GeneratedPage<TSchema> } & StepContext<
-          TState,
-          TOptions
-        > &
-          TServices
-      ) => void | Promise<void>;
+    configFn: (context: StepContext<TState, TOptions> & TServices) => {
+      prompt: TemplateReturn;
+      formSchema: TSchema;
+      onCreated?: (page: GeneratedPage<TSchema>) => void | Promise<void>;
+      props?: Record<string, unknown>;
+      ttl?: number;
+      persist?: boolean;
     }
   ): Brain<TOptions, TNewState, TServices>;
 
-  // Overload 2: Without outputSchema - returns Brain
-  ui(
+  // Overload 2: Without formSchema - returns Brain with unchanged state
+  page(
     title: string,
-    config: {
-      template: (
-        context: StepContext<TState, TOptions> & TServices
-      ) => TemplateReturn;
-      notify?: (
-        context: { page: GeneratedPage } & StepContext<TState, TOptions> &
-          TServices
-      ) => void | Promise<void>;
+    configFn: (context: StepContext<TState, TOptions> & TServices) => {
+      prompt: TemplateReturn;
+      onCreated?: (page: GeneratedPage) => void | Promise<void>;
+      props?: Record<string, unknown>;
+      ttl?: number;
+      persist?: boolean;
     }
   ): Brain<TOptions, TState, TServices>;
 
   // Implementation
-  ui(
+  page(
     title: string,
-    config: {
-      template: (context: any) => TemplateReturn;
-      outputSchema?: z.ZodObject<any>;
-      notify?: (context: any) => void | Promise<void>;
-    }
+    configFn: (context: any) => PageConfig | Promise<PageConfig>
   ): any {
-    const uiBlock: StepBlock<TState, TState, TOptions, TServices, any, any> = {
-      type: 'step',
-      title,
-      isUIStep: true,
-      uiConfig: {
-        template: config.template as (context: any) => TemplateReturn,
-        outputSchema: config.outputSchema,
-        notify: config.notify,
-      },
-      action: async (params) => {
-        // The actual UI generation is handled by BrainRunner/BrainEventStream
-        // This action is a placeholder that gets replaced during execution
-        // when the runner detects `isUIStep: true` and has components configured
-        throw new Error(
-          `UI step "${title}" requires components to be configured via BrainRunner.withComponents(). ` +
-            `The UI generation is handled by the runner, not the step action directly.`
-        );
-      },
-    };
-    this.blocks.push(uiBlock);
-
-    if (config.outputSchema) {
-      return this.nextBrain<any>();
-    }
-
-    return this.nextBrain<TState>();
+    const pageBlock: StepBlock<TState, TState, TOptions, TServices, any, any> =
+      {
+        type: 'step',
+        title,
+        isPageStep: true,
+        pageConfigFn: configFn,
+        action: async () => {
+          throw new Error(
+            `Page step "${title}" requires components to be configured via brain.withComponents(). ` +
+              `Page generation is handled by the runner, not the step action directly.`
+          );
+        },
+      };
+    this.blocks.push(pageBlock);
+    return this.nextBrain<any>();
   }
 
   // Overload signatures

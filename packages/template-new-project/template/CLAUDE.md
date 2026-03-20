@@ -67,7 +67,7 @@ export default myBrain;
 
 ### JSX Templates
 
-Templates in `.prompt()`, `.ui()`, and `.map()` steps can be written as JSX for better readability. Rename the brain file to `.tsx` and return JSX from the template function. See `/docs/brain-dsl-guide.md` for details.
+Templates in `.prompt()`, `.page()`, and `.map()` steps can be written as JSX for better readability. Rename the brain file to `.tsx` and return JSX from the template function. See `/docs/brain-dsl-guide.md` for details.
 
 ## Resource System
 
@@ -142,7 +142,7 @@ If your brain generates a custom HTML page with a form that submits to a webhook
 
 Do NOT use a hidden form field for the token — it must be in the URL query string.
 
-The `.ui()` step handles this automatically. See `/docs/brain-dsl-guide.md` for full examples.
+The `.page()` step handles this automatically. See `/docs/brain-dsl-guide.md` for full examples.
 
 ### Starting Brain Runs from Webhooks
 

@@ -284,8 +284,8 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/system/ui-form test', async () => {
-      const result = await webhooks.uiForm(
+    it('passes POST /webhooks/system/page-form test', async () => {
+      const result = await webhooks.pageForm(
         createFetch(),
         'test-identifier-123',
         {
@@ -297,8 +297,8 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/system/ui-form with array values test', async () => {
-      const result = await webhooks.uiForm(
+    it('passes POST /webhooks/system/page-form with array values test', async () => {
+      const result = await webhooks.pageForm(
         createFetch(),
         'test-identifier-456',
         {
@@ -310,21 +310,21 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/system/ui-form missing identifier test (400)', async () => {
-      const result = await webhooks.uiFormMissingIdentifier(createFetch());
+    it('passes POST /webhooks/system/page-form missing identifier test (400)', async () => {
+      const result = await webhooks.pageFormMissingIdentifier(createFetch());
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/system/ui-form missing token test (403)', async () => {
-      const result = await webhooks.uiFormMissingToken(
+    it('passes POST /webhooks/system/page-form missing token test (403)', async () => {
+      const result = await webhooks.pageFormMissingToken(
         createFetch(),
         'test-identifier-no-token'
       );
       expect(result).toBe(true);
     });
 
-    it('passes POST /webhooks/system/ui-form wrong token test (not 200)', async () => {
-      const result = await webhooks.uiFormWrongToken(
+    it('passes POST /webhooks/system/page-form wrong token test (not 200)', async () => {
+      const result = await webhooks.pageFormWrongToken(
         createFetch(),
         'test-identifier-wrong-token',
         {

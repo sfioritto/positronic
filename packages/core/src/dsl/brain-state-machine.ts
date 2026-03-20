@@ -146,9 +146,9 @@ export interface BrainExecutionContext {
   // Non-null when we're inside an iterate step (or paused from one)
   iterateContext: IterateContext | null;
 
-  // Page context - tracks the current page from a read-only UI step.
-  // Set when a UI step completes with pageContext (read-only UI, no outputSchema).
-  // Used for resume when a .wait() follows a read-only .ui() step.
+  // Page context - tracks the current page from a read-only page step.
+  // Set when a page step completes with pageContext (read-only page, no outputSchema).
+  // Used for resume when a .wait() follows a read-only .page() step.
   currentPage: SerializedPageContext | null;
 
   // Derived state (updated by reducers)
@@ -631,7 +631,7 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     const newIterateContext =
       ctx.iterateContext?.stepId === stepId ? null : ctx.iterateContext;
 
-    // Track page context: set when UI step completes (has pageContext),
+    // Track page context: set when page step completes (has pageContext),
     // clear when the next step completes (page is ephemeral)
     const newCurrentPage = pageContext ?? null;
 

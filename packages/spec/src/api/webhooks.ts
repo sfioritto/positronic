@@ -284,15 +284,15 @@ export const webhooks = {
   },
 
   /**
-   * Test POST /webhooks/system/ui-form - Built-in webhook for UI form submissions.
-   * This is used by pages generated via .ui() steps to submit form data.
+   * Test POST /webhooks/system/page-form - Built-in webhook for page form submissions.
+   * This is used by pages generated via .page() steps to submit form data.
    *
    * The endpoint:
    * - Accepts form data (application/x-www-form-urlencoded or multipart/form-data)
    * - Requires `identifier` and `token` query parameters
    * - Returns { received: true, action: 'resumed' | 'not_found', ... }
    */
-  async uiForm(
+  async pageForm(
     fetch: Fetch,
     identifier: string,
     formData: Record<string, string | string[]>,
@@ -312,7 +312,7 @@ export const webhooks = {
       }
 
       const request = new Request(
-        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
+        `http://example.com/webhooks/system/page-form?identifier=${encodeURIComponent(
           identifier
         )}&token=${encodeURIComponent(token)}`,
         {
@@ -329,7 +329,7 @@ export const webhooks = {
       // Accept 200 (found and processed) or 404 (no brain waiting)
       if (response.status !== 200 && response.status !== 404) {
         console.error(
-          `POST /webhooks/system/ui-form returned ${response.status}, expected 200 or 404`
+          `POST /webhooks/system/page-form returned ${response.status}, expected 200 or 404`
         );
         return false;
       }
@@ -365,18 +365,18 @@ export const webhooks = {
 
       return true;
     } catch (error) {
-      console.error('Failed to test POST /webhooks/system/ui-form:', error);
+      console.error('Failed to test POST /webhooks/system/page-form:', error);
       return false;
     }
   },
 
   /**
-   * Test POST /webhooks/system/ui-form with missing identifier - Should return 400
+   * Test POST /webhooks/system/page-form with missing identifier - Should return 400
    */
-  async uiFormMissingIdentifier(fetch: Fetch): Promise<boolean> {
+  async pageFormMissingIdentifier(fetch: Fetch): Promise<boolean> {
     try {
       const request = new Request(
-        'http://example.com/webhooks/system/ui-form',
+        'http://example.com/webhooks/system/page-form',
         {
           method: 'POST',
           headers: {
@@ -390,7 +390,7 @@ export const webhooks = {
 
       if (response.status !== 400) {
         console.error(
-          `POST /webhooks/system/ui-form without identifier returned ${response.status}, expected 400`
+          `POST /webhooks/system/page-form without identifier returned ${response.status}, expected 400`
         );
         return false;
       }
@@ -412,7 +412,7 @@ export const webhooks = {
       return true;
     } catch (error) {
       console.error(
-        'Failed to test POST /webhooks/system/ui-form without identifier:',
+        'Failed to test POST /webhooks/system/page-form without identifier:',
         error
       );
       return false;
@@ -420,17 +420,20 @@ export const webhooks = {
   },
 
   /**
-   * Test POST /webhooks/system/ui-form without a CSRF token - Should return 403.
+   * Test POST /webhooks/system/page-form without a CSRF token - Should return 403.
    * The endpoint checks for missing token query param before looking up a waiting brain.
    */
-  async uiFormMissingToken(fetch: Fetch, identifier: string): Promise<boolean> {
+  async pageFormMissingToken(
+    fetch: Fetch,
+    identifier: string
+  ): Promise<boolean> {
     try {
       // Send form data without token query param
       const params = new URLSearchParams();
       params.append('name', 'Test User');
 
       const request = new Request(
-        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
+        `http://example.com/webhooks/system/page-form?identifier=${encodeURIComponent(
           identifier
         )}`,
         {
@@ -446,7 +449,7 @@ export const webhooks = {
 
       if (response.status !== 403) {
         console.error(
-          `POST /webhooks/system/ui-form without token returned ${response.status}, expected 403`
+          `POST /webhooks/system/page-form without token returned ${response.status}, expected 403`
         );
         return false;
       }
@@ -470,7 +473,7 @@ export const webhooks = {
       return true;
     } catch (error) {
       console.error(
-        'Failed to test POST /webhooks/system/ui-form without token:',
+        'Failed to test POST /webhooks/system/page-form without token:',
         error
       );
       return false;
@@ -478,12 +481,12 @@ export const webhooks = {
   },
 
   /**
-   * Test POST /webhooks/system/ui-form with a wrong CSRF token.
+   * Test POST /webhooks/system/page-form with a wrong CSRF token.
    * Without a brain waiting, the endpoint returns 404 (not_found) since
    * token comparison only runs after a brain is found. The key assertion
    * is that a wrong token never produces a successful 200 "resumed" response.
    */
-  async uiFormWrongToken(
+  async pageFormWrongToken(
     fetch: Fetch,
     identifier: string,
     formData: Record<string, string | string[]>,
@@ -502,7 +505,7 @@ export const webhooks = {
       }
 
       const request = new Request(
-        `http://example.com/webhooks/system/ui-form?identifier=${encodeURIComponent(
+        `http://example.com/webhooks/system/page-form?identifier=${encodeURIComponent(
           identifier
         )}&token=${encodeURIComponent(wrongToken)}`,
         {
@@ -521,7 +524,7 @@ export const webhooks = {
         const data = (await response.json()) as { action?: string };
         if (data.action === 'resumed') {
           console.error(
-            'POST /webhooks/system/ui-form with wrong token returned 200 with action "resumed" — token validation failed'
+            'POST /webhooks/system/page-form with wrong token returned 200 with action "resumed" — token validation failed'
           );
           return false;
         }
@@ -530,7 +533,7 @@ export const webhooks = {
       // Accept 403 (token mismatch) or 404 (no brain waiting — token check happens after brain lookup)
       if (response.status !== 403 && response.status !== 404) {
         console.error(
-          `POST /webhooks/system/ui-form with wrong token returned ${response.status}, expected 403 or 404`
+          `POST /webhooks/system/page-form with wrong token returned ${response.status}, expected 403 or 404`
         );
         return false;
       }
@@ -538,7 +541,7 @@ export const webhooks = {
       return true;
     } catch (error) {
       console.error(
-        'Failed to test POST /webhooks/system/ui-form with wrong token:',
+        'Failed to test POST /webhooks/system/page-form with wrong token:',
         error
       );
       return false;

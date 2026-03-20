@@ -205,17 +205,16 @@ describe('brain integration with JSX templates', () => {
       object: { result: 'analyzed' },
     } as any);
 
-    const testBrain = brain('jsx-prompt-test').prompt('Ask', {
-      template: ({ state }) =>
-        node(
-          Fragment,
-          {},
-          'Analyze the following:\n',
-          'Topic: test-topic\n',
-          'Please provide insights.'
-        ),
+    const testBrain = brain('jsx-prompt-test').prompt('Ask', () => ({
+      message: node(
+        Fragment,
+        {},
+        'Analyze the following:\n',
+        'Topic: test-topic\n',
+        'Please provide insights.'
+      ),
       outputSchema: z.object({ result: z.string() }),
-    });
+    }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of testBrain.run({
@@ -247,10 +246,10 @@ describe('brain integration with JSX templates', () => {
       object: { answer: 'yes' },
     } as any);
 
-    const testBrain = brain('string-prompt-test').prompt('Ask', {
-      template: () => 'Is this working?',
+    const testBrain = brain('string-prompt-test').prompt('Ask', () => ({
+      message: 'Is this working?',
       outputSchema: z.object({ answer: z.string() }),
-    });
+    }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of testBrain.run({
@@ -274,11 +273,10 @@ describe('brain integration with JSX templates', () => {
 
     const AsyncContent = async () => 'loaded content from resource';
 
-    const testBrain = brain('async-component-test').prompt('Summarize', {
-      template: () =>
-        node(Fragment, {}, 'Summarize this:\n', node(AsyncContent, {})),
+    const testBrain = brain('async-component-test').prompt('Summarize', () => ({
+      message: node(Fragment, {}, 'Summarize this:\n', node(AsyncContent, {})),
       outputSchema: z.object({ summary: z.string() }),
-    });
+    }));
 
     const events: BrainEvent<any>[] = [];
     for await (const event of testBrain.run({

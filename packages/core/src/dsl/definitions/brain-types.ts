@@ -2,12 +2,12 @@ import { z } from 'zod';
 import type { WebhookRegistration } from '../webhook.js';
 
 /**
- * Page object available after a .ui() step.
- * Contains URL and, for form UIs, a pre-configured webhook for submissions.
+ * Page object available after a .page() step.
+ * Contains URL and, for form pages, a pre-configured webhook for submissions.
  *
  * Usage:
  * ```typescript
- * .ui('Create Form', {
+ * .page('Create Form', {
  *   template: ({ state }) => `Create a form for ${state.user}`,
  *   outputSchema: z.object({ name: z.string() }),
  * })
