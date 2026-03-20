@@ -140,7 +140,7 @@ function createValidateTemplateTool(
 4. Form components have a Button for submission
 5. The form fields will produce data matching the expected schema (if schema provided)
 
-Returns resolvedBindings showing what each binding resolves to in the actual data. Use this to verify bindings point to the right values.
+Returns resolvedBindings showing whether each binding path is valid. Use this to verify bindings reference valid data paths.
 
 Call this after generating your YAML template to verify it's correct before finalizing.`,
     inputSchema: z.object({
@@ -371,14 +371,21 @@ function buildUserPrompt(
   data: Record<string, unknown>,
   schema: FormSchema | undefined
 ): string {
-  const dataShape = describeDataShape(data);
+  const hasData = Object.keys(data).length > 0;
 
-  let userPrompt = `## Available Data
+  let userPrompt = '';
+
+  if (hasData) {
+    const dataShape = describeDataShape(data, { includeExamples: false });
+    userPrompt += `## Available Data
 \`\`\`typescript
 ${dataShape}
 \`\`\`
 
-## Instructions
+`;
+  }
+
+  userPrompt += `## Instructions
 ${prompt}`;
 
   if (schema) {
