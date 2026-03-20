@@ -1470,10 +1470,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     const prompt = await resolveTemplate(pageConfig.prompt);
-    const data = (pageConfig.props ?? this.currentState) as Record<
-      string,
-      unknown
-    >;
+    const data = (pageConfig.props ?? {}) as Record<string, unknown>;
 
     const uiResult = await generateUI({
       client: this.client,

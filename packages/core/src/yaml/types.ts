@@ -99,7 +99,6 @@ export interface ResolvedBinding {
   path: string; // The binding path, e.g. "email.subject"
   component: string; // Component name, e.g. "Text"
   prop: string; // Prop name, e.g. "content"
-  value: string; // Summarized string representation of resolved value
   resolved: boolean; // true if resolved to a non-undefined value
 }
 

@@ -82,7 +82,11 @@ function formatExample(value: unknown): string {
  * @param indent - Current indentation level
  * @returns Multi-line string describing the type with examples
  */
-export function inferTypeWithExamples(value: unknown, indent = 0): string {
+export function inferTypeWithExamples(
+  value: unknown,
+  indent = 0,
+  includeExamples = true
+): string {
   const spaces = '  '.repeat(indent);
 
   if (value === null) {
@@ -94,15 +98,17 @@ export function inferTypeWithExamples(value: unknown, indent = 0): string {
   }
 
   if (typeof value === 'string') {
-    return `string // e.g., ${formatExample(value)}`;
+    return includeExamples
+      ? `string // e.g., ${formatExample(value)}`
+      : 'string';
   }
 
   if (typeof value === 'number') {
-    return `number // e.g., ${value}`;
+    return includeExamples ? `number // e.g., ${value}` : 'number';
   }
 
   if (typeof value === 'boolean') {
-    return `boolean // e.g., ${value}`;
+    return includeExamples ? `boolean // e.g., ${value}` : 'boolean';
   }
 
   if (Array.isArray(value)) {
@@ -111,7 +117,11 @@ export function inferTypeWithExamples(value: unknown, indent = 0): string {
     }
 
     const firstElement = value[0];
-    const elementType = inferTypeWithExamples(firstElement, indent + 1);
+    const elementType = inferTypeWithExamples(
+      firstElement,
+      indent + 1,
+      includeExamples
+    );
 
     // For primitive arrays, keep it compact
     if (
@@ -119,9 +129,13 @@ export function inferTypeWithExamples(value: unknown, indent = 0): string {
       typeof firstElement === 'number' ||
       typeof firstElement === 'boolean'
     ) {
-      return `Array<${inferTypeDescription(firstElement)}> // ${
-        value.length
-      } items, e.g., ${formatExample(firstElement)}`;
+      return includeExamples
+        ? `Array<${inferTypeDescription(firstElement)}> // ${
+            value.length
+          } items, e.g., ${formatExample(firstElement)}`
+        : `Array<${inferTypeDescription(firstElement)}> // ${
+            value.length
+          } items`;
     }
 
     // For object arrays, show the structure
@@ -136,7 +150,7 @@ export function inferTypeWithExamples(value: unknown, indent = 0): string {
 
     const lines = ['{'];
     for (const [key, val] of entries) {
-      const valType = inferTypeWithExamples(val, indent + 1);
+      const valType = inferTypeWithExamples(val, indent + 1, includeExamples);
       lines.push(`${spaces}  ${key}: ${valType}`);
     }
     lines.push(`${spaces}}`);
@@ -174,6 +188,9 @@ export function inferTypeWithExamples(value: unknown, indent = 0): string {
  * // }
  * ```
  */
-export function describeDataShape(data: Record<string, unknown>): string {
-  return inferTypeWithExamples(data, 0);
+export function describeDataShape(
+  data: Record<string, unknown>,
+  options?: { includeExamples?: boolean }
+): string {
+  return inferTypeWithExamples(data, 0, options?.includeExamples ?? true);
 }

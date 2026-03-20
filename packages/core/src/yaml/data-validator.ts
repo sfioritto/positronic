@@ -230,39 +230,6 @@ export function resolvePathValue(
 }
 
 /**
- * Summarize a value for LLM consumption.
- * Keeps output compact — no full data dumps.
- */
-export function summarizeValue(value: unknown): string {
-  if (value === undefined) return 'undefined';
-  if (value === null) return 'null';
-
-  if (typeof value === 'string') {
-    if (value.length <= 60) return JSON.stringify(value);
-    return JSON.stringify(value.slice(0, 57) + '...');
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  if (Array.isArray(value)) {
-    if (value.length === 0) return 'Array(0) []';
-    const firstPreview = summarizeValue(value[0]);
-    return `Array(${value.length}) [${firstPreview}, ...]`;
-  }
-
-  if (typeof value === 'object') {
-    const keys = Object.keys(value as Record<string, unknown>);
-    const keyPreview = keys.slice(0, 5).join(', ');
-    const suffix = keys.length > 5 ? ', ...' : '';
-    return `{ ${keyPreview}${suffix} } (${keys.length} keys)`;
-  }
-
-  return String(value);
-}
-
-/**
  * Walk the ComponentNode tree and resolve every binding against real data.
  *
  * @param root - The root ComponentNode
@@ -287,7 +254,6 @@ export function resolveBindings(
           path: propValue.path,
           component: node.component,
           prop: propName,
-          value: summarizeValue(value),
           resolved: value !== undefined,
         });
       }

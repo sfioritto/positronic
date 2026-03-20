@@ -564,7 +564,6 @@ This form collects a name.`,
           path: 'user.name',
           component: 'Heading',
           prop: 'content',
-          value: '"John Smith"',
           resolved: true,
         });
 
@@ -575,7 +574,6 @@ This form collects a name.`,
           path: 'user.email',
           component: 'Text',
           prop: 'content',
-          value: '"john@example.com"',
           resolved: true,
         });
 
@@ -612,7 +610,6 @@ This form collects a name.`,
           path: 'user.inbox',
           component: 'Text',
           prop: 'content',
-          value: 'undefined',
           resolved: false,
         });
 
@@ -653,7 +650,6 @@ This form collects a name.`,
         );
         expect(itemsBinding).toBeDefined();
         expect(itemsBinding!.resolved).toBe(true);
-        expect(itemsBinding!.value).toContain('Array(2)');
 
         // The loop body binding resolved against first element
         const subjectBinding = result.resolvedBindings!.find(
@@ -663,7 +659,6 @@ This form collects a name.`,
           path: 'email.subject',
           component: 'Text',
           prop: 'content',
-          value: '"Hello"',
           resolved: true,
         });
 
@@ -710,7 +705,6 @@ This form collects a name.`,
           (b) => b.path === 'emails'
         );
         expect(itemsBinding!.resolved).toBe(true);
-        expect(itemsBinding!.value).toBe('Array(0) []');
 
         // Loop body binding is unresolved because no sample element
         const subjectBinding = result.resolvedBindings!.find(
@@ -720,7 +714,6 @@ This form collects a name.`,
           path: 'email.subject',
           component: 'Text',
           prop: 'content',
-          value: 'undefined',
           resolved: false,
         });
 
@@ -796,44 +789,6 @@ This form collects a name.`,
         prompt: 'Broken template',
         components: { Container, Text },
         data: {},
-      });
-    });
-
-    it('should truncate long string values in summaries', async () => {
-      const longString = 'A'.repeat(100);
-
-      mockStreamText.mockImplementationOnce(async (params) => {
-        const result = (await params.tools.validate_template.execute!({
-          yaml: `Container:
-  children:
-    - Text:
-        content: "{{message}}"`,
-        })) as ValidationResult;
-
-        expect(result.resolvedBindings).toBeDefined();
-        expect(result.resolvedBindings).toHaveLength(1);
-
-        const binding = result.resolvedBindings![0];
-        expect(binding.resolved).toBe(true);
-        // Should be truncated to 60 chars + quotes
-        expect(binding.value.length).toBeLessThan(70);
-        expect(binding.value).toContain('...');
-
-        return {
-          toolCalls: [],
-          text: `Container:
-  children:
-    - Text:
-        content: "{{message}}"`,
-          usage: { totalTokens: 100 },
-        };
-      });
-
-      await generateUI({
-        client: mockClient,
-        prompt: 'Show long message',
-        components: { Container, Text },
-        data: { message: longString },
       });
     });
   });
