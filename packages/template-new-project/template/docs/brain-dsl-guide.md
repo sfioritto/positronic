@@ -1562,7 +1562,7 @@ brain('Archive Workflow')
 
     const html = `<html>
       <body>
-        <form method="POST" action="${env.origin}/webhooks/archive?token=${formToken}">
+        <form method="POST" action="<%= '${env.origin}' %>/webhooks/archive?token=<%= '${formToken}' %>">
           <input type="text" name="name" placeholder="Your name">
           <button type="submit">Submit</button>
         </form>
@@ -1589,12 +1589,12 @@ import { generateFormToken } from '@positronic/core';
 brain('Custom Form')
   .step('Create Form Page', async ({ state, pages, env }) => {
     const formToken = generateFormToken();
-    const webhookIdentifier = `custom-form-${Date.now()}`;
-    const formAction = `${env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}&token=${formToken}`;
+    const webhookIdentifier = `custom-form-<%= '${Date.now()}' %>`;
+    const formAction = `<%= '${env.origin}' %>/webhooks/system/ui-form?identifier=<%= '${encodeURIComponent(webhookIdentifier)}' %>&token=<%= '${formToken}' %>`;
 
     const page = await pages.create('my-form', `<html>
       <body>
-        <form method="POST" action="${formAction}">
+        <form method="POST" action="<%= '${formAction}' %>">
           <input type="text" name="name" placeholder="Your name">
           <button type="submit">Submit</button>
         </form>
@@ -1618,7 +1618,7 @@ brain('Custom Form')
 
 The three required pieces for any custom page with a form:
 1. Call `generateFormToken()` to get a token
-2. Include the token as a **query parameter** on the form's action URL (e.g., `action="${webhookUrl}?token=${formToken}"`)
+2. Include the token as a **query parameter** on the form's action URL (e.g., `action="<%= '${webhookUrl}' %>?token=<%= '${formToken}' %>"`)
 3. Include the `token` in your webhook registration — either as the second argument to a custom webhook function (e.g., `myWebhook(identifier, token)`) or in the registration object for `ui-form`
 
 Without a token, the server will reject the form submission.

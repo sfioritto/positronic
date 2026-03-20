@@ -137,7 +137,7 @@ The optional `timeout` parameter accepts durations like `'30m'`, `'1h'`, `'24h'`
 If your brain generates a custom HTML page with a form that submits to a webhook, you must include a CSRF token. Without a token, the server will reject the submission.
 
 1. Generate a token with `generateFormToken()` from `@positronic/core`
-2. Include the token as a **query parameter** on the form's action URL: `action="${webhookUrl}?token=${formToken}"`
+2. Include the token as a **query parameter** on the form's action URL: `action="<%= '${webhookUrl}' %>?token=<%= '${formToken}' %>"`
 3. Pass the token when creating the webhook registration: `myWebhook(identifier, token)`
 
 Do NOT use a hidden form field for the token — it must be in the URL query string.
