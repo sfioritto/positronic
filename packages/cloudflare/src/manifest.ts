@@ -38,7 +38,9 @@ class DynamicImportStrategy implements BrainImportStrategy {
 
   async import(filename: string): Promise<Brain | undefined> {
     try {
-      const module = await import(`${this.brainsDir}/${filename}.ts`);
+      const module = await import(`${this.brainsDir}/${filename}.tsx`).catch(
+        () => import(`${this.brainsDir}/${filename}.ts`)
+      );
       return module.default;
     } catch (e) {
       console.error(`Failed to import brain ${filename}:`, e);
