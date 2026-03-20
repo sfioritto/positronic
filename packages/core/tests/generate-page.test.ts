@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { z } from 'zod'; // Still needed for schema in tests
-import { generateUI } from '../src/ui/generate-ui.js';
+import { generatePage } from '../src/ui/generate-page.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
 import type { UIComponent } from '../src/ui/types.js';
 import type { ResolvedBinding } from '../src/yaml/types.js';
@@ -35,7 +35,7 @@ const Form: UIComponent<{ submitLabel?: string }> = {
   description: 'A form container',
 };
 
-describe('generateUI', () => {
+describe('generatePage', () => {
   beforeEach(() => {
     mockStreamText.mockClear();
   });
@@ -55,7 +55,7 @@ describe('generateUI', () => {
       usage: { totalTokens: 150 },
     });
 
-    const result = await generateUI({
+    const result = await generatePage({
       client: mockClient,
       prompt: 'Create a form with an email input and submit button',
       components: { Form, Input, Button },
@@ -101,7 +101,7 @@ describe('generateUI', () => {
       usage: { totalTokens: 30 },
     });
 
-    const result = await generateUI({
+    const result = await generatePage({
       client: mockClient,
       prompt: 'Show a blank page',
       components: { Input },
@@ -128,7 +128,7 @@ This form collects a name.`,
       usage: { totalTokens: 100 },
     });
 
-    const result = await generateUI({
+    const result = await generatePage({
       client: mockClient,
       prompt: 'Create a name form',
       components: { Form, Input },
@@ -190,7 +190,7 @@ This form collects a name.`,
       };
     });
 
-    const result = await generateUI({
+    const result = await generatePage({
       client: mockClient,
       prompt: 'Create a contact form',
       components: { Form, Input, Button },
@@ -255,7 +255,7 @@ This form collects a name.`,
       };
     });
 
-    await generateUI({
+    await generatePage({
       client: mockClient,
       prompt: 'Create a signup form',
       components: { Form, Input, Button },
@@ -293,7 +293,7 @@ This form collects a name.`,
       usage: { totalTokens: 100 },
     });
 
-    const result = await generateUI({
+    const result = await generatePage({
       client: mockClient,
       prompt: 'Create a form with default email',
       components: { Form, Input },
@@ -338,7 +338,7 @@ This form collects a name.`,
       };
     });
 
-    await generateUI({
+    await generatePage({
       client: mockClient,
       prompt: 'Create a form',
       components: { Form, Input },
@@ -359,7 +359,7 @@ This form collects a name.`,
       usage: { totalTokens: 50 },
     });
 
-    const result = await generateUI({
+    const result = await generatePage({
       client: mockClient,
       prompt: 'Simple form',
       components: { Form },
@@ -397,7 +397,7 @@ This form collects a name.`,
       };
     });
 
-    await generateUI({
+    await generatePage({
       client: mockClient,
       prompt: 'Create a form',
       components: { Form, Input },
@@ -433,7 +433,7 @@ This form collects a name.`,
       };
     });
 
-    await generateUI({
+    await generatePage({
       client: mockClient,
       prompt: 'Create a form with submit button',
       components: { Form, Input, Button },
@@ -478,7 +478,7 @@ This form collects a name.`,
       };
     });
 
-    await generateUI({
+    await generatePage({
       client: mockClient,
       prompt: 'Create a form with nested button',
       components: { Form, Input, Button, Container },
@@ -515,7 +515,7 @@ This form collects a name.`,
       };
     });
 
-    await generateUI({
+    await generatePage({
       client: mockClient,
       prompt: 'Create a container with input',
       components: { Container, Input },
@@ -587,7 +587,7 @@ This form collects a name.`,
         };
       });
 
-      await generateUI({
+      await generatePage({
         client: mockClient,
         prompt: 'Show user info',
         components: { Container, Heading, Text },
@@ -623,7 +623,7 @@ This form collects a name.`,
         };
       });
 
-      await generateUI({
+      await generatePage({
         client: mockClient,
         prompt: 'Show inbox',
         components: { Container, Text },
@@ -674,7 +674,7 @@ This form collects a name.`,
         };
       });
 
-      await generateUI({
+      await generatePage({
         client: mockClient,
         prompt: 'Show emails',
         components: { Container, Text, List },
@@ -727,7 +727,7 @@ This form collects a name.`,
         };
       });
 
-      await generateUI({
+      await generatePage({
         client: mockClient,
         prompt: 'Show emails',
         components: { Container, Text, List },
@@ -757,7 +757,7 @@ This form collects a name.`,
         };
       });
 
-      await generateUI({
+      await generatePage({
         client: mockClient,
         prompt: 'Static page',
         components: { Container, Text },
@@ -784,7 +784,7 @@ This form collects a name.`,
         };
       });
 
-      await generateUI({
+      await generatePage({
         client: mockClient,
         prompt: 'Broken template',
         components: { Container, Text },

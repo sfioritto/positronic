@@ -69,9 +69,9 @@ function formatPropsSchema(schema: z.ZodObject<z.ZodRawShape>): string {
 }
 
 /**
- * Result of generateUI - contains all component placements from the agent loop.
+ * Result of generatePage - contains all component placements from the agent loop.
  */
-export interface GenerateUIResult {
+export interface GeneratePageResult {
   placements: Placement[];
   rootId: string | undefined;
   yaml?: string;
@@ -421,7 +421,7 @@ Call validate_template after generating your YAML to verify correctness.`;
  * ```typescript
  * import { components } from '@positronic/gen-ui-components';
  *
- * const result = await generateUI({
+ * const result = await generatePage({
  *   client,
  *   prompt: 'Create a form to collect user name and email',
  *   components,
@@ -434,7 +434,7 @@ Call validate_template after generating your YAML to verify correctness.`;
  * // result.yaml is the generated YAML template
  * ```
  */
-export async function generateUI(params: {
+export async function generatePage(params: {
   client: ObjectGenerator;
   prompt: string;
   components: Record<string, UIComponent<any>>;
@@ -442,7 +442,7 @@ export async function generateUI(params: {
   data?: Record<string, unknown>;
   system?: string;
   maxSteps?: number;
-}): Promise<GenerateUIResult> {
+}): Promise<GeneratePageResult> {
   const {
     client,
     prompt,

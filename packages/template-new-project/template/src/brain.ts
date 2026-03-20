@@ -14,7 +14,7 @@ import { components } from './components/index.js';
  * ```
  *
  * Default tools available in agent steps:
- * - generateUI: Generate interactive UI components
+ * - generatePage: Generate interactive UI pages
  * - consoleLog: Log messages for debugging
  * - done: Complete the agent and return a result
  *
@@ -54,7 +54,7 @@ import { components } from './components/index.js';
  *   system: 'You are a helpful assistant',
  *   prompt: 'Help the user with their request',
  *   tools: {
- *     ...tools, // includes generateUI, consoleLog, done
+ *     ...tools, // includes generatePage, consoleLog, done
  *     notify: {
  *       description: 'Send a Slack notification',
  *       inputSchema: z.object({ message: z.string() }),

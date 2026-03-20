@@ -11,7 +11,7 @@ import { z } from 'zod';
  * onto state - making it available for subsequent steps.
  *
  * This brain:
- * 1. Uses generateUI to create a form asking for the user's name
+ * 1. Uses generatePage to create a form asking for the user's name
  * 2. Waits for the user to submit the form
  * 3. Completes with a structured welcome message (via outputSchema)
  * 4. The follow-up step logs the greeting, demonstrating type inference
