@@ -192,9 +192,12 @@ export async function discoverBrains(
     entries
       .filter((e) => !e.name.startsWith('_'))
       .map(async (entry) => {
-        if (entry.isFile() && entry.name.endsWith('.ts')) {
+        if (
+          entry.isFile() &&
+          (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))
+        ) {
           return {
-            name: entry.name.replace(/\.ts$/, ''),
+            name: entry.name.replace(/\.tsx?$/, ''),
             relativePath: entry.name,
           };
         }
@@ -235,8 +238,8 @@ async function regenerateManifestFile(
   projectRootPath: string,
   targetSrcDir: string
 ) {
-  const runnerPath = path.join(projectRootPath, 'runner.ts');
-  const brainsDir = path.join(projectRootPath, 'brains');
+  const runnerPath = path.join(projectRootPath, 'src', 'runner.ts');
+  const brainsDir = path.join(projectRootPath, 'src', 'brains');
   const manifestPath = path.join(targetSrcDir, '_manifest.ts');
 
   let importStatements = `import type { Brain } from '@positronic/core';\n`;
@@ -245,10 +248,9 @@ async function regenerateManifestFile(
   const brains = await discoverBrains(brainsDir);
 
   for (const brain of brains) {
-    const importPath = `../../brains/${brain.relativePath.replace(
-      /\.ts$/,
-      '.js'
-    )}`;
+    // All brains are compiled to .positronic/brains/ by build-brains.mjs
+    const jsFile = brain.relativePath.replace(/\.tsx?$/, '.js');
+    const importPath = `../brains/${jsFile}`;
     const importAlias = `brain_${brain.name.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 
     importStatements += `import * as ${importAlias} from '${importPath}';\n`;
@@ -284,7 +286,7 @@ async function regenerateWebhookManifestFile(
   projectRootPath: string,
   targetSrcDir: string
 ) {
-  const webhooksDir = path.join(projectRootPath, 'webhooks');
+  const webhooksDir = path.join(projectRootPath, 'src', 'webhooks');
   const manifestPath = path.join(targetSrcDir, '_webhookManifest.ts');
 
   const webhooks = await discoverWebhooks(webhooksDir);
@@ -293,7 +295,8 @@ async function regenerateWebhookManifestFile(
   let manifestEntries = '';
 
   for (const webhook of webhooks) {
-    const importPath = `../../webhooks/${webhook.relativePath.replace(
+    // Webhooks are imported through symlink: .positronic/webhooks -> ../src/webhooks
+    const importPath = `../webhooks/${webhook.relativePath.replace(
       /\.ts$/,
       '.js'
     )}`;
@@ -350,6 +353,10 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     // Ensure .positronic directory exists
     await this.ensureServerDirectory(projectRoot, serverDir, force);
+
+    // Create symlinks from .positronic/ to src/* (except brains/)
+    // so compiled brains' relative imports resolve correctly
+    await this.createSrcSymlinks(projectRoot, serverDir);
 
     // Sync environment variables to .dev.vars
     await this.syncEnvironmentVariables(projectRoot, serverDir);
@@ -426,6 +433,24 @@ export class CloudflareDevServer implements PositronicDevServer {
           fs.rmSync(tempDir, { recursive: true, force: true });
         }
       }
+    }
+  }
+
+  private async createSrcSymlinks(
+    projectRoot: string,
+    serverDir: string
+  ): Promise<void> {
+    const srcDir = path.join(projectRoot, 'src');
+    const entries = await fsPromises
+      .readdir(srcDir, { withFileTypes: true })
+      .catch(() => [] as Dirent[]);
+
+    for (const entry of entries) {
+      if (entry.name === 'brains') continue;
+      const symlinkPath = path.join(serverDir, entry.name);
+      const target = path.join('..', 'src', entry.name);
+      await fsPromises.rm(symlinkPath, { recursive: true, force: true });
+      await fsPromises.symlink(target, symlinkPath);
     }
   }
 
@@ -607,14 +632,16 @@ export class CloudflareDevServer implements PositronicDevServer {
     const bundleOutputPath = path.join(distDir, 'components.js');
 
     // Check if components directory exists
-    const componentsDir = path.join(projectRoot, 'components');
+    const componentsDir = path.join(projectRoot, 'src', 'components');
     const hasComponents = await fsPromises
       .access(componentsDir)
       .then(() => true)
       .catch(() => false);
 
     if (!hasComponents) {
-      console.log('📦 No components/ directory found, skipping bundle build');
+      console.log(
+        '📦 No src/components/ directory found, skipping bundle build'
+      );
       return;
     }
 
@@ -808,20 +835,20 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     // Determine if this is a brain, webhook, or component file change
     if (
-      relativePath.startsWith('brains/') ||
-      relativePath.startsWith('brains\\')
+      relativePath.startsWith('src/brains/') ||
+      relativePath.startsWith('src\\brains\\')
     ) {
       console.log(`Brain file ${event}: ${relativePath}`);
       await regenerateManifestFile(projectRoot, srcDir);
     } else if (
-      relativePath.startsWith('webhooks/') ||
-      relativePath.startsWith('webhooks\\')
+      relativePath.startsWith('src/webhooks/') ||
+      relativePath.startsWith('src\\webhooks\\')
     ) {
       console.log(`Webhook file ${event}: ${relativePath}`);
       await regenerateWebhookManifestFile(projectRoot, srcDir);
     } else if (
-      relativePath.startsWith('components/') ||
-      relativePath.startsWith('components\\')
+      relativePath.startsWith('src/components/') ||
+      relativePath.startsWith('src\\components\\')
     ) {
       console.log(`Component file ${event}: ${relativePath}`);
       await this.buildAndUploadBundle(projectRoot);

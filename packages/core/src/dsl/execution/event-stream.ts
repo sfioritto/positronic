@@ -51,6 +51,7 @@ import type {
 
 import { Step } from '../builder/step.js';
 import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT } from './constants.js';
+import { resolveTemplate } from '../../template/render.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -486,21 +487,13 @@ export class BrainEventStream<
       >;
       const initialState = brainBlock.initialState
         ? typeof brainBlock.initialState === 'function'
-          ? brainBlock.initialState({
-              state: this.currentState,
-              options: this.options,
-              ...this.services,
-            })
+          ? brainBlock.initialState(this.buildStepContext(step))
           : brainBlock.initialState
         : {};
 
       const innerOptions = brainBlock.options
         ? typeof brainBlock.options === 'function'
-          ? brainBlock.options({
-              state: this.currentState,
-              options: this.options,
-              ...this.services,
-            })
+          ? brainBlock.options(this.buildStepContext(step))
           : brainBlock.options
         : {};
 
@@ -1334,12 +1327,12 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       try {
         if (block.template) {
           // Prompt mode: call generateObject directly per item
-          const prompt = await block.template({
-            item,
-            state: this.currentState,
-            options: this.options,
-            resources: this.resources,
-          });
+          const prompt = await resolveTemplate(
+            block.template({
+              item,
+              ...this.buildStepContext(step),
+            })
+          );
           const client = block.client
             ? this.governor
               ? this.governor(block.client)
@@ -1352,15 +1345,14 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           result = [item, response.object];
         } else {
           // Brain mode: run inner brain per item
-          const initialState = block.initialState!(item, this.currentState);
+          const initialState = block.initialState!(
+            item,
+            this.buildStepContext(step)
+          );
 
           const mapInnerOptions = block.options
             ? typeof block.options === 'function'
-              ? block.options({
-                  state: this.currentState,
-                  options: this.options,
-                  ...this.services,
-                })
+              ? block.options(this.buildStepContext(step))
               : block.options
             : {};
 
@@ -1472,11 +1464,9 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     }
 
     // Get the prompt from the template callback
-    const prompt = await uiConfig.template({
-      state: this.currentState,
-      options: this.options ?? ({} as TOptions),
-      resources: this.resources,
-    });
+    const prompt = await resolveTemplate(
+      uiConfig.template(this.buildStepContext(step))
+    );
 
     const uiResult = await generateUI({
       client: this.client,
@@ -1639,10 +1629,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     guard: GuardBlock<any, any>
   ): Generator<BrainEvent<TOptions>> {
     const { steps, options, brainRunId } = this;
-    const predicateResult = guard.predicate({
-      state: this.currentState,
-      options: this.options,
-    });
+    const predicateResult = guard.predicate(this.buildStepContext(step));
 
     // Emit STEP_START for the guard
     yield {

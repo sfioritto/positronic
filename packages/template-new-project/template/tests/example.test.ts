@@ -1,5 +1,5 @@
 import { createMockClient, runBrainTest } from './test-utils.js';
-import exampleBrain from '../brains/example.js';
+import exampleBrain from '../src/brains/example.js';
 
 describe('example brain', () => {
   it('should complete successfully with welcome messages', async () => {

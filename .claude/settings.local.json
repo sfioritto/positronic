@@ -75,7 +75,16 @@
       "WebFetch(domain:nango.dev)",
       "WebFetch(domain:docs.composio.dev)",
       "WebFetch(domain:vite.dev)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "WebFetch(domain:swc.rs)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:docs.swc.rs)",
+      "Bash(rustup --version)",
+      "WebFetch(domain:plugins.swc.rs)",
+      "Bash(source \"$HOME/.cargo/env\")",
+      "Bash(cargo search:*)",
+      "Bash(source $HOME/.cargo/env)",
+      "Bash(gh api:*)"
     ],
     "deny": []
   }

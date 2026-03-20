@@ -8,13 +8,17 @@ This is a Positronic project - an AI-powered framework for building and running 
 
 ## Project Structure
 
-- **`/brains`** - AI workflow definitions using the Brain DSL
-- **`/webhooks`** - Webhook definitions for external integrations (auto-discovered)
+- **`/src`** - Application source code
+  - **`/src/brain.ts`** - Project brain wrapper (custom `brain` function)
+  - **`/src/brains`** - AI workflow definitions using the Brain DSL
+  - **`/src/webhooks`** - Webhook definitions for external integrations (auto-discovered)
+  - **`/src/runner.ts`** - The main entry point for running brains locally
+  - **`/src/utils`** - Shared utilities (e.g., `bottleneck` for rate limiting)
+  - **`/src/services`** - Service implementations for external integrations
+  - **`/src/components`** - Reusable UI/prompt components
 - **`/resources`** - Files and documents that brains can access via the resource system
 - **`/tests`** - Test files for brains (kept separate to avoid deployment issues)
-- **`/utils`** - Shared utilities (e.g., `bottleneck` for rate limiting)
 - **`/docs`** - Documentation including brain testing guide
-- **`/runner.ts`** - The main entry point for running brains locally
 - **`/positronic.config.json`** - Project configuration
 
 ## Key Commands
@@ -40,6 +44,7 @@ The Brain DSL provides a fluent API for defining AI workflows:
 
 ```typescript
 // Import from the project brain wrapper (see positronic-guide.md)
+// From a file in src/brains/, brain.ts is at src/brain.ts
 import { brain } from '../brain.js';
 
 const myBrain = brain('my-brain')
@@ -60,20 +65,24 @@ const myBrain = brain('my-brain')
 export default myBrain;
 ```
 
+### JSX Templates
+
+Templates in `.prompt()`, `.ui()`, and `.map()` steps can be written as JSX for better readability. Rename the brain file to `.tsx` and return JSX from the template function. See `/docs/brain-dsl-guide.md` for details.
+
 ## Resource System
 
 Resources are files that brains can access during execution. They're stored in the `/resources` directory and are automatically typed based on the manifest.
 
 ## Webhooks
 
-Webhooks allow brains to pause execution and wait for external events, or to start new brain runs from incoming requests (like GitHub events or Slack messages). Webhooks are auto-discovered from the `/webhooks` directory.
+Webhooks allow brains to pause execution and wait for external events, or to start new brain runs from incoming requests (like GitHub events or Slack messages). Webhooks are auto-discovered from the `/src/webhooks` directory.
 
 ### Creating a Webhook
 
-Create a file in the `/webhooks` directory with a default export:
+Create a file in the `/src/webhooks` directory with a default export:
 
 ```typescript
-// webhooks/approval.ts
+// src/webhooks/approval.ts
 import { createWebhook } from '@positronic/core';
 import { z } from 'zod';
 
@@ -107,6 +116,7 @@ Import the webhook and use `.wait()` to pause execution:
 ```typescript
 import { brain } from '../brain.js';
 import approvalWebhook from '../webhooks/approval.js';
+// Note: these imports work from src/brains/ since both brain.ts and webhooks/ are in src/
 
 export default brain('approval-workflow')
   .step('Request approval', ({ state }) => ({
@@ -137,7 +147,7 @@ The `.ui()` step handles this automatically. See `/docs/brain-dsl-guide.md` for 
 Webhooks can also trigger new brain runs by adding a `triggers` config and returning `{ type: 'trigger' }` from the handler:
 
 ```typescript
-// webhooks/github-pr.ts
+// src/webhooks/github-pr.ts
 import { createWebhook } from '@positronic/core';
 import { z } from 'zod';
 
@@ -168,14 +178,14 @@ The `triggers` config requires `brain` (brain title to start) and `runAs` (user 
 
 ### How Auto-Discovery Works
 
-- Place webhook files in `/webhooks` directory
+- Place webhook files in `/src/webhooks` directory
 - Each file must have a default export using `createWebhook()`
 - The dev server generates `_webhookManifest.ts` automatically
 - Webhook name comes from the filename (e.g., `approval.ts` → `'approval'`)
 
 ## Development Workflow
 
-1. Define your brain in `/brains`
+1. Define your brain in `/src/brains`
 2. Add any required resources to `/resources`
 3. Run `px brain run <brain-name>` to test locally
 4. Deploy using backend-specific commands

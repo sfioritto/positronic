@@ -224,6 +224,27 @@ When you still need `state` (e.g. for `...state` in the return value), destructu
   })
 ```
 
+## JSX for Prompt Templates
+
+For complex, multi-line prompts, use JSX instead of template literals. Rename the file to `.tsx` and return JSX from the template function:
+
+```tsx
+// Before (template literal — hard to read when indented in builder chain)
+template: ({ state: { user, order } }) =>
+  `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.
+<%= '${order.isExpress ? "\\nThis is an express order." : ""}' %>`,
+
+// After (JSX — Prettier manages indentation, conditionals are clean)
+template: ({ state: { user, order } }) => (
+  <>
+    Hello {user.name}, your order {order.id} is ready.
+    {order.isExpress && <>This is an express order.</>}
+  </>
+)
+```
+
+See `/docs/brain-dsl-guide.md` for full JSX template documentation including loops, reusable components, and async components for resource loading.
+
 ## State Shape
 
 ### Each step should have one clear purpose, and add one thing to state
@@ -477,17 +498,17 @@ See `/docs/brain-dsl-guide.md` for more UI step examples.
 
 ## Service Organization
 
-When implementing services for the project brain, consider creating a `services/` directory at the root of your project to keep service implementations organized and reusable:
+When implementing services for the project brain, keep service implementations in the `src/services/` directory to stay organized and reusable:
 
 ```
-services/
+src/services/
 ├── gmail.js         # Gmail API integration
 ├── slack.js         # Slack notifications
 ├── database.js      # Database client
 └── analytics.js     # Analytics tracking
 ```
 
-Then in your `brain.ts` (at the project root):
+Then in your `src/brain.ts`:
 
 ```typescript
 import { createBrain } from '@positronic/core';
@@ -543,7 +564,7 @@ const slow = bottleneck({ rpd: 1000 }); // 1000 per day
 Create one limiter per API and wrap all calls through it:
 
 ```typescript
-// services/github.ts
+// src/services/github.ts
 import { bottleneck } from '../utils/bottleneck.js';
 
 const limit = bottleneck({ rps: 10 });
@@ -633,9 +654,9 @@ This project uses ES modules (ESM). **Always include the `.js` extension in your
 
 ```typescript
 // ✅ CORRECT - Include .js extension
-import { brain } from '../brain.js';  // From a file in brains/ directory
-import { analyzeData } from '../utils/analyzer.js';
-import gmail from '../services/gmail.js';
+import { brain } from '../brain.js';  // From a file in src/brains/ (brain.ts is at src/brain.ts)
+import { analyzeData } from '../utils/analyzer.js';  // From src/brains/ to src/utils/
+import gmail from '../services/gmail.js';  // From src/brains/ to src/services/
 
 // ❌ WRONG - Missing .js extension
 import { brain } from '../brain';
@@ -663,7 +684,7 @@ Start by following the brain testing guide (`/docs/brain-testing-guide.md`) and 
 // tests/my-new-brain.test.ts
 import { describe, it, expect } from '@jest/globals';
 import { createMockClient, runBrainTest } from './test-utils.js';
-import myNewBrain from '../brains/my-new-brain.js';
+import myNewBrain from '../src/brains/my-new-brain.js';
 
 describe('MyNewBrain', () => {
   it('should process data and return expected result', async () => {
@@ -726,7 +747,7 @@ Build the brain one step at a time, testing as you go. **Actually run the brain 
 
 ```bash
 # 1. Create the brain with just the first step
-# Write minimal implementation in brains/my-new-brain.ts
+# Write minimal implementation in src/brains/my-new-brain.ts
 
 # 2. Run the brain to test the first step
 px brain run my-new-brain

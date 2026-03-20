@@ -153,6 +153,7 @@ module.exports = {
     if (!ctx.answers.claudemd) {
       ctx.files = ctx.files.filter(file => file.path !== 'CLAUDE.md');
     }
+
   },
   complete: async ctx => {
     // Display getting started message
