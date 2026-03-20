@@ -3378,6 +3378,96 @@ describe('IterateResult', () => {
   });
 });
 
+describe('IterateResult rehydration on resume', () => {
+  it('should re-wrap plain arrays as IterateResult when resuming after a completed map step', async () => {
+    const innerBrain = brain<{}, { doubled: number }>('Doubler').step(
+      'Double',
+      ({ state }) => ({ doubled: state.doubled * 2 })
+    );
+
+    // Brain: Init -> MapA -> MapB -> Merge
+    // We simulate resuming at MapB (stepIndex: 2), meaning MapA already completed.
+    // MapA's results are in state as a plain array (from JSON patch reconstruction).
+    const outerBrain = brain('RehydrationTest')
+      .step('Init', () => ({
+        itemsA: [{ id: 'a1' }, { id: 'a2' }],
+        itemsB: [{ id: 'b1' }],
+      }))
+      .map('MapA', {
+        run: innerBrain,
+        over: ({ state }) => state.itemsA,
+        initialState: (item) => ({ doubled: 1 }),
+        stateKey: 'resultsA' as const,
+      })
+      .map('MapB', {
+        run: innerBrain,
+        over: ({ state }) => state.itemsB,
+        initialState: (item) => ({ doubled: 3 }),
+        stateKey: 'resultsB' as const,
+      })
+      .step('Merge', ({ state }) => {
+        // This uses IterateResult.map() — would break with Array.prototype.map
+        const idsA = state.resultsA.map((item, result) => item.id);
+        const idsB = state.resultsB.map((item, result) => item.id);
+        return { ...state, mergedIds: [...idsA, ...idsB] };
+      });
+
+    // Resume at step 2 (MapB). State contains MapA's results as a PLAIN ARRAY
+    // (simulating what happens when state is reconstructed from JSON patches).
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      resume: {
+        state: {
+          itemsA: [{ id: 'a1' }, { id: 'a2' }],
+          itemsB: [{ id: 'b1' }],
+          // This is what IterateResult.toJSON() produces — a plain array of tuples.
+          // After JSON patch reconstruction, it's just a regular array.
+          resultsA: [
+            [{ id: 'a1' }, { doubled: 2 }],
+            [{ id: 'a2' }, { doubled: 2 }],
+          ],
+        },
+        stepIndex: 2, // Skip Init and MapA, resume at MapB
+      },
+      brainRunId: 'test-rehydrate',
+    })) {
+      events.push(event);
+    }
+
+    // Verify no errors
+    const errorEvents = events.filter((e) => e.type === BRAIN_EVENTS.ERROR);
+    expect(errorEvents).toHaveLength(0);
+
+    // The Merge step's patch should contain the expected mergedIds,
+    // proving IterateResult.map() worked on the rehydrated resultsA.
+    const mergeComplete = events.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        'stepTitle' in e &&
+        e.stepTitle === 'Merge'
+    ) as any;
+    expect(mergeComplete).toBeDefined();
+    expect(mergeComplete.patch).toBeDefined();
+
+    // Apply only the Merge step's patch to see what it produced
+    const stateBeforeMerge = {
+      itemsA: [{ id: 'a1' }, { id: 'a2' }],
+      itemsB: [{ id: 'b1' }],
+      resultsA: [
+        [{ id: 'a1' }, { doubled: 2 }],
+        [{ id: 'a2' }, { doubled: 2 }],
+      ],
+      resultsB: [[{ id: 'b1' }, { doubled: 6 }]],
+    };
+    const finalState = applyPatches(stateBeforeMerge, [
+      mergeComplete.patch,
+    ]) as any;
+    expect(finalState.mergedIds).toEqual(['a1', 'a2', 'b1']);
+  });
+});
+
 describe('UI steps', () => {
   // Mock components for UI generation
   const mockComponents = {

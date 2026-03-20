@@ -185,6 +185,27 @@ export class BrainEventStream<
         this.steps[i].withStatus(STATUS.COMPLETE);
       }
 
+      // Re-wrap IterateResult instances that were serialized to plain arrays.
+      // During suspension, JSON patches call toJSON() on IterateResult, turning
+      // them into plain [item, result][] arrays. Re-wrap so downstream steps
+      // can use IterateResult methods (.map, .filter, etc.)
+      for (let i = 0; i < resume.stepIndex; i++) {
+        const block = this.steps[i].block;
+        if (block.type === 'map') {
+          const mapBlock = block as MapBlock;
+          const value = (this.currentState as any)[mapBlock.stateKey];
+          if (
+            value != null &&
+            Array.isArray(value) &&
+            !(value instanceof IterateResult)
+          ) {
+            (this.currentState as any)[mapBlock.stateKey] = new IterateResult(
+              value
+            );
+          }
+        }
+      }
+
       // For inner brains (no signalProvider), check for webhookResponse
       // The outer brain will have set this from the signal
       if (!signalProvider && resume.webhookResponse && !resume.agentContext) {
