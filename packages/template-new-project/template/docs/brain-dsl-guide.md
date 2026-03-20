@@ -1546,9 +1546,11 @@ The created page object contains:
 
 When building custom HTML pages with forms, you must include a CSRF token to prevent unauthorized submissions. The `.ui()` step handles this automatically, but custom pages require manual setup. This applies whether you submit to the built-in `ui-form` endpoint or to a custom webhook.
 
+The token is always passed as a **query parameter** on the form's action URL (`?token=xyz`), not as a hidden form field.
+
 #### Using a Custom Webhook
 
-If your page submits to a custom webhook (e.g., `/webhooks/archive`), pass the token as the second argument when creating the webhook registration:
+If your page submits to a custom webhook (e.g., `/webhooks/archive`), include the token in the action URL and pass it as the second argument when creating the webhook registration:
 
 ```typescript
 import { generateFormToken } from '@positronic/core';
@@ -1560,8 +1562,7 @@ brain('Archive Workflow')
 
     const html = `<html>
       <body>
-        <form method="POST" action="<%= '${env.origin}' %>/webhooks/archive">
-          <input type="hidden" name="__positronic_token" value="<%= '${formToken}' %>">
+        <form method="POST" action="${env.origin}/webhooks/archive?token=${formToken}">
           <input type="text" name="name" placeholder="Your name">
           <button type="submit">Submit</button>
         </form>
@@ -1580,7 +1581,7 @@ brain('Archive Workflow')
 
 #### Using the System `ui-form` Endpoint
 
-If your page submits to the built-in `ui-form` endpoint, include the token in the webhook registration object:
+If your page submits to the built-in `ui-form` endpoint, include the token in the action URL and in the webhook registration object:
 
 ```typescript
 import { generateFormToken } from '@positronic/core';
@@ -1588,13 +1589,12 @@ import { generateFormToken } from '@positronic/core';
 brain('Custom Form')
   .step('Create Form Page', async ({ state, pages, env }) => {
     const formToken = generateFormToken();
-    const webhookIdentifier = `custom-form-<%= '${Date.now()}' %>`;
-    const formAction = `<%= '${env.origin}' %>/webhooks/system/ui-form?identifier=<%= '${encodeURIComponent(webhookIdentifier)}' %>`;
+    const webhookIdentifier = `custom-form-${Date.now()}`;
+    const formAction = `${env.origin}/webhooks/system/ui-form?identifier=${encodeURIComponent(webhookIdentifier)}&token=${formToken}`;
 
     const page = await pages.create('my-form', `<html>
       <body>
-        <form method="POST" action="<%= '${formAction}' %>">
-          <input type="hidden" name="__positronic_token" value="<%= '${formToken}' %>">
+        <form method="POST" action="${formAction}">
           <input type="text" name="name" placeholder="Your name">
           <button type="submit">Submit</button>
         </form>
@@ -1618,7 +1618,7 @@ brain('Custom Form')
 
 The three required pieces for any custom page with a form:
 1. Call `generateFormToken()` to get a token
-2. Add `<input type="hidden" name="__positronic_token" value="...">` to your form
+2. Include the token as a **query parameter** on the form's action URL (e.g., `action="${webhookUrl}?token=${formToken}"`)
 3. Include the `token` in your webhook registration — either as the second argument to a custom webhook function (e.g., `myWebhook(identifier, token)`) or in the registration object for `ui-form`
 
 Without a token, the server will reject the form submission.
