@@ -84,7 +84,8 @@
       "Bash(source \"$HOME/.cargo/env\")",
       "Bash(cargo search:*)",
       "Bash(source $HOME/.cargo/env)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(sort -t'\\(' -k2 -n)"
     ],
     "deny": []
   }
