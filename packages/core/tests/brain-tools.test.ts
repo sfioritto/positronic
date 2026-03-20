@@ -66,10 +66,10 @@ describe('withTools vs withExtraTools semantics', () => {
     const agentStart = events.find(
       (e) => e.type === BRAIN_EVENTS.AGENT_START
     ) as any;
-    // Should have myTool and done (auto-generated), but NOT the defaults like generateUI, consoleLog, etc.
+    // Should have myTool and done (auto-generated), but NOT the defaults like generatePage, consoleLog, etc.
     expect(agentStart.tools).toContain('myTool');
     expect(agentStart.tools).toContain('done');
-    expect(agentStart.tools).not.toContain('generateUI');
+    expect(agentStart.tools).not.toContain('generatePage');
     expect(agentStart.tools).not.toContain('consoleLog');
     expect(agentStart.tools).not.toContain('print');
     expect(agentStart.tools).not.toContain('waitForWebhook');

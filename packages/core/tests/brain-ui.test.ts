@@ -42,7 +42,7 @@ describe('UI steps', () => {
     mockGenerateObject.mockClear();
     mockPages.create.mockClear();
 
-    // Mock streamText to return a valid YAML template for generateUI
+    // Mock streamText to return a valid YAML template for generatePage
     mockStreamText.mockResolvedValue({
       toolCalls: [],
       text: `Form:\n  children:\n    - Input:\n        name: "field1"\n        label: "Field 1"`,

@@ -26,7 +26,7 @@ import type {
 } from '../webhook.js';
 import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
-import { generateUI } from '../../ui/generate-ui.js';
+import { generatePage } from '../../ui/generate-page.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
 import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
@@ -1472,7 +1472,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const prompt = await resolveTemplate(pageConfig.prompt);
     const data = (pageConfig.props ?? {}) as Record<string, unknown>;
 
-    const uiResult = await generateUI({
+    const uiResult = await generatePage({
       client: this.client,
       prompt,
       components: this.components,

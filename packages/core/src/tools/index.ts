@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AgentTool, AgentToolWaitFor, StepContext } from '../dsl/types.js';
 import type { WebhookRegistration } from '../dsl/webhook.js';
-import { generateUI as generatePageCore } from '../ui/generate-ui.js';
+import { generatePage as generatePageCore } from '../ui/generate-page.js';
 import { generatePageHtml } from '../ui/generate-page-html.js';
 import { parseDuration } from '../dsl/duration.js';
 
