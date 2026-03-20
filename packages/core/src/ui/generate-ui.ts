@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { ObjectGenerator } from '../clients/types.js';
+import { IterateResult } from '../dsl/iterate-result.js';
 import type { UIComponent, Placement, FormSchema } from './types.js';
 import { parseTemplate } from '../yaml/parser.js';
 import {
@@ -393,11 +394,7 @@ ${prompt}`;
       .map(([name, field]) => {
         const isOptional = field instanceof z.ZodOptional;
         const baseType = isOptional ? field.unwrap() : field;
-        let typeName = 'unknown';
-        if (baseType instanceof z.ZodString) typeName = 'string';
-        else if (baseType instanceof z.ZodNumber) typeName = 'number';
-        else if (baseType instanceof z.ZodBoolean) typeName = 'boolean';
-        else if (baseType instanceof z.ZodArray) typeName = `${typeName}[]`;
+        const typeName = getZodTypeName(baseType);
         return `- ${name}: ${typeName}${isOptional ? ' (optional)' : ''}`;
       })
       .join('\n');
@@ -451,9 +448,17 @@ export async function generateUI(params: {
     prompt,
     components,
     schema,
-    data = {},
+    data: rawData = {},
     maxSteps = 10,
   } = params;
+
+  // Unwrap IterateResult values to plain arrays so the LLM sees a clean data shape
+  const data = Object.fromEntries(
+    Object.entries(rawData).map(([k, v]) => [
+      k,
+      v instanceof IterateResult ? v.values : v,
+    ])
+  ) as Record<string, unknown>;
 
   const systemPrompt = params.system ?? buildSystemPrompt(components, !!schema);
   const userPrompt = buildUserPrompt(prompt, data, schema);
