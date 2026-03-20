@@ -1,11 +1,12 @@
 /**
- * Pre-compiles .tsx brain files to .js, preserving JSX text whitespace.
+ * Pre-compiles brain files from src/brains/ to .positronic/brains/.
  *
- * This runs before wrangler's internal bundler so that JSX text formatting
- * (newlines, indentation) is preserved exactly as written in the source.
- * Without this step, the JSX compiler collapses whitespace in text nodes.
+ * For .tsx files, an esbuild plugin preserves JSX text whitespace by wrapping
+ * JSXText nodes in expression containers before the JSX transform runs.
+ * For .ts files, esbuild simply transpiles TypeScript to JavaScript.
  *
- * Run: node .positronic/build-brains.mjs
+ * The compiled output lives in .positronic/brains/ and resolves its relative
+ * imports (../brain.js, ../services/...) through symlinks that mirror src/.
  */
 import * as esbuild from 'esbuild';
 import ts from 'typescript';
@@ -36,7 +37,7 @@ function jsxTextPlugin() {
             replacements.push({
               start: node.getStart(sourceFile),
               end: node.getEnd(),
-              text: `{\`${escaped}\`}`,
+              text: `{\`<%= '${escaped}' %>\`}`,
             });
           }
           ts.forEachChild(node, visit);
@@ -55,26 +56,32 @@ function jsxTextPlugin() {
   };
 }
 
-// Find all .tsx files in brains/
-function findTsxFiles(dir) {
+// Find all .ts and .tsx files recursively
+function findBrainFiles(dir) {
   const results = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+  for (const entry of entries) {
     if (entry.name.startsWith('_')) continue;
     const fullPath = join(dir, entry.name);
-    if (entry.isFile() && entry.name.endsWith('.tsx')) {
+    if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))) {
       results.push(fullPath);
     } else if (entry.isDirectory()) {
-      results.push(...findTsxFiles(fullPath));
+      results.push(...findBrainFiles(fullPath));
     }
   }
   return results;
 }
 
-const tsxFiles = findTsxFiles('brains');
+const brainFiles = findBrainFiles('../src/brains');
 
-if (tsxFiles.length > 0) {
+if (brainFiles.length > 0) {
   await esbuild.build({
-    entryPoints: tsxFiles,
+    entryPoints: brainFiles,
     outdir: 'brains',
     format: 'esm',
     jsx: 'automatic',

@@ -154,9 +154,6 @@ module.exports = {
       ctx.files = ctx.files.filter(file => file.path !== 'CLAUDE.md');
     }
 
-    // build-brains.mjs uses JS template literals — skip caz processing
-    const buildScript = ctx.files.find(f => f.path === '.positronic/build-brains.mjs');
-    if (buildScript) buildScript.binary = true;
   },
   complete: async ctx => {
     // Display getting started message

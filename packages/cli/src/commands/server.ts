@@ -48,7 +48,7 @@ export class ServerCommand {
     // Write PID file for foreground process too
     fs.writeFileSync(pidFile, String(process.pid));
 
-    const brainsDir = path.join(this.server.projectRootDir, 'brains');
+    const brainsDir = path.join(this.server.projectRootDir, 'src', 'brains');
     const resourcesDir = path.join(this.server.projectRootDir, 'resources');
 
     let serverHandle: ServerHandle | null = null;
@@ -198,7 +198,7 @@ export class ServerCommand {
       // Watcher setup - target the user's brains, resources directories, and .env file
       const envFilePath = path.join(this.server.projectRootDir, '.env');
       const watchPaths = [
-        path.join(brainsDir, '*.ts'),
+        path.join(brainsDir, '**/*.{ts,tsx}'),
         path.join(resourcesDir, '**/*'),
         envFilePath,
       ];
