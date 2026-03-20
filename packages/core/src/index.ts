@@ -44,7 +44,14 @@ export type {
   BrainSignal,
   SignalProvider,
 } from './dsl/types.js';
-export type { TemplateContext } from './dsl/definitions/blocks.js';
+export type { TemplateReturn } from './dsl/definitions/blocks.js';
+export type { TemplateNode, TemplateChild } from './jsx-runtime.js';
+export { Fragment } from './jsx-runtime.js';
+export {
+  renderTemplate,
+  isTemplateNode,
+  resolveTemplate,
+} from './template/render.js';
 export { applyPatches } from './dsl/json-patch.js';
 export { IterateResult } from './dsl/iterate-result.js';
 export { parseDuration } from './dsl/duration.js';

@@ -702,7 +702,7 @@ await store.has('key');     // Returns boolean
 You can declare store fields at the project level so all brains share the same store shape:
 
 ```typescript
-// brain.ts
+// src/brain.ts
 export const brain = createBrain({
   services: { slack },
   store: {
@@ -715,7 +715,7 @@ export const brain = createBrain({
 Or declare per-brain stores for brain-specific data:
 
 ```typescript
-// brains/my-brain.ts
+// src/brains/my-brain.ts
 export default brain('my-brain')
   .withStore({ counter: z.number() })
   .step('Increment', async ({ store }) => {
@@ -727,10 +727,10 @@ export default brain('my-brain')
 
 ### Using `createBrain()` for Project Configuration
 
-For project-wide configuration, use `createBrain()` in your `brain.ts` file:
+For project-wide configuration, use `createBrain()` in your `src/brain.ts` file:
 
 ```typescript
-// brain.ts
+// src/brain.ts
 import { createBrain } from '@positronic/core';
 import { z } from 'zod';
 
@@ -983,7 +983,7 @@ When prompts become more than a sentence or two, extract them into separate file
 For complex brains, organize your code into folders:
 
 ```
-brains/
+src/brains/
 ├── hn-bot/
 │   ├── brain.ts           # Main brain definition
 │   └── ai-filter-prompt.ts # Complex prompt configuration
@@ -995,7 +995,7 @@ brains/
 When you extract a prompt to a separate file, you'll need to explicitly specify the state type:
 
 ```typescript
-// brains/hn-bot/ai-filter-prompt.ts
+// src/brains/hn-bot/ai-filter-prompt.ts
 import { z } from 'zod';
 import type { Resources } from '@positronic/core';
 
@@ -1031,8 +1031,8 @@ export const aiFilterPrompt = {
   stateKey: 'filterResults' as const,
 };
 
-// brains/hn-bot/brain.ts
-import { brain } from '../brain.js';
+// src/brains/hn-bot/brain.ts
+import { brain } from '../../brain.js';
 import { aiFilterPrompt } from './ai-filter-prompt.js';
 
 export default brain('HN Article Filter')
@@ -1058,6 +1058,134 @@ Extract prompts to separate files when:
 - You need to load resources or templates
 - The prompt might be reused in other brains
 - You want to test the prompt logic separately
+
+## JSX Templates
+
+Templates can be written as JSX instead of template literal strings. This improves readability for complex prompts with conditionals, loops, and multi-line content. Prettier formats JSX automatically, keeping your prompts properly indented within the builder chain.
+
+### Basic Usage
+
+Rename your brain file from `.ts` to `.tsx` and return JSX from the template function:
+
+```tsx
+// src/brains/analyze.tsx
+import { brain } from '../brain.js';
+import { z } from 'zod';
+
+export default brain('analyze')
+  .prompt('Analyze', {
+    template: ({ state: { topic, context } }) => (
+      <>
+        Analyze the following topic: {topic}
+
+        Context: {context}
+
+        Please provide:
+        - A summary
+        - Key insights
+        - Recommendations
+      </>
+    ),
+    outputSchema: z.object({
+      summary: z.string(),
+      insights: z.array(z.string()),
+      recommendations: z.array(z.string()),
+    }),
+    stateKey: 'analysis' as const,
+  });
+```
+
+No `render()` call is needed — the runner handles JSX rendering internally. Old string templates still work, so this is fully opt-in.
+
+### Conditionals
+
+Use `&&` for boolean conditions and ternaries when you need both branches or when the condition could be a falsy non-boolean (like `0` or `""`):
+
+```tsx
+// && works when the condition is strictly boolean
+template: ({ state: { user, isVIP } }) => (
+  <>
+    Create a greeting for {user.name}.
+    {isVIP && <>This is a VIP customer. Use premium language.</>}
+  </>
+)
+
+// Ternary for either/or content
+template: ({ state: { user, tier } }) => (
+  <>
+    Create a greeting for {user.name}.
+    {tier === 'premium'
+      ? <>Use premium, personalized language.</>
+      : <>Use friendly, standard language.</>
+    }
+  </>
+)
+```
+
+**Watch out for non-boolean falsy values.** `{count && <>...</>}` renders `"0"` when count is 0 — use `{count > 0 && <>...</>}` or a ternary instead.
+
+### Loops
+
+Use `.map()` naturally inside JSX:
+
+```tsx
+template: ({ state: { items } }) => (
+  <>
+    Review the following items:
+    {items.map(item => (
+      <>
+        - {item.name}: {item.description}
+      </>
+    ))}
+  </>
+)
+```
+
+### Reusable Prompt Components
+
+Extract common prompt sections into function components:
+
+```tsx
+const CategoryInstructions = ({ categories }: { categories: string[] }) => (
+  <>
+    Valid categories: {categories.join(', ')}
+    Always pick exactly one. If unsure, pick "other".
+  </>
+);
+
+// Use in a template
+template: ({ state: { email, categories } }) => (
+  <>
+    Categorize this email:
+    From: {email.from}
+    Subject: {email.subject}
+
+    <CategoryInstructions categories={categories} />
+  </>
+)
+```
+
+### Async Components
+
+Function components can be async, which is useful for loading resources:
+
+```tsx
+const Resource = async ({ from }: { from: any }) => {
+  const content = await from.loadText();
+  return <>{content}</>;
+};
+
+template: ({ state, resources }) => (
+  <>
+    Summarize this document using the guidelines below:
+
+    <Resource from={resources.guidelines} />
+
+    Document:
+    {state.document}
+  </>
+)
+```
 
 ## Iterating Over Items
 
