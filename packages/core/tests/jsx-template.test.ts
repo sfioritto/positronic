@@ -5,15 +5,11 @@ import {
   isTemplateNode,
   resolveTemplate,
 } from '../src/template/render.js';
-import { brain } from '../src/dsl/brain.js';
+import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import type { ObjectGenerator } from '../src/clients/types.js';
-import {
-  createBrainExecutionMachine,
-  sendEvent,
-} from '../src/dsl/brain-state-machine.js';
-import type { BrainEvent } from '../src/dsl/brain.js';
+import { finalStateFromEvents } from './brain-test-helpers.js';
 
 // Helper to build TemplateNode trees (simulates what jsx/jsxs produce)
 function node(
@@ -22,14 +18,6 @@ function node(
   ...children: TemplateChild[]
 ): TemplateNode {
   return { type, props, children };
-}
-
-function finalStateFromEvents(events: BrainEvent<any>[]) {
-  const sm = createBrainExecutionMachine();
-  for (const event of events) {
-    sendEvent(sm, event as any);
-  }
-  return sm.context.currentState;
 }
 
 describe('renderTemplate', () => {
