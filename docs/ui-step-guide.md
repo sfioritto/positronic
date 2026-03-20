@@ -4,7 +4,7 @@ This guide explains how to use the `.ui()` method to generate dynamic user inter
 
 ## Overview
 
-The UI step allows brains to generate React-based user interfaces dynamically using AI. When `.ui()` is called with an `outputSchema`, the brain generates a page, runs an optional `notify` callback (for side effects like Slack messages), then auto-suspends until the form is submitted. The form response is auto-merged onto state under the `stateKey`.
+The UI step allows brains to generate React-based user interfaces dynamically using AI. When `.ui()` is called with an `outputSchema`, the brain generates a page, runs an optional `notify` callback (for side effects like Slack messages), then auto-suspends until the form is submitted. The form response is spread directly onto state.
 
 ## Basic Usage
 
@@ -27,16 +27,15 @@ const feedbackBrain = brain('Collect Feedback')
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
-    stateKey: 'feedback' as const,
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Please fill out: ${page.url}`);
     },
   })
-  // No .handle() needed — form data auto-merges onto state.feedback
+  // No .handle() needed — form data is spread directly onto state
   .step('Process Feedback', ({ state }) => ({
     ...state,
     feedbackReceived: true,
-    // state.feedback.rating and state.feedback.comments are typed
+    // state.rating and state.comments are typed
   }));
 ```
 
@@ -50,7 +49,7 @@ const feedbackBrain = brain('Collect Feedback')
 
 4. **Auto-Suspend**: When `outputSchema` is provided, the brain automatically suspends and waits for the form to be submitted.
 
-5. **Auto-Merge**: The form data is automatically merged onto state under the `stateKey`.
+5. **Auto-Merge**: The form data is automatically spread directly onto state.
 
 ## Complete Example
 
@@ -86,7 +85,6 @@ const supportTicketBrain = brain('Support Ticket')
       - Submit button labeled "Create Ticket"
     `,
     outputSchema: ticketSchema,
-    stateKey: 'ticketData' as const,
     notify: async ({ page, state, email }) => {
       await email.send({
         to: state.defaultEmail,
@@ -96,16 +94,16 @@ const supportTicketBrain = brain('Support Ticket')
     },
   })
 
-  // Form data is on state.ticketData — build the ticket
+  // Form data is spread directly onto state
   .step('Process Ticket', ({ state }) => ({
     ...state,
     notificationSent: true,
     ticket: {
       id: state.ticketId,
-      subject: state.ticketData.subject,
-      priority: state.ticketData.priority,
-      description: state.ticketData.description,
-      contactEmail: state.ticketData.contactEmail,
+      subject: state.subject,
+      priority: state.priority,
+      description: state.description,
+      contactEmail: state.contactEmail,
       createdAt: new Date().toISOString(),
       status: 'open',
     },
@@ -130,11 +128,10 @@ export default supportTicketBrain;
 ### Signature
 
 ```typescript
-// With outputSchema + stateKey — auto-merges response onto state, returns Brain
+// With outputSchema — auto-spreads response onto state, returns Brain
 .ui(title: string, config: {
   template: (context: { state: TState; options: TOptions; resources: Resources }) => string | Promise<string>;
   outputSchema: z.ZodObject<any>;
-  stateKey: TResponseKey;
   notify?: (context: { page: GeneratedPage } & StepContext & Services) => void | Promise<void>;
 }): Brain
 
@@ -149,8 +146,7 @@ export default supportTicketBrain;
 
 - **`title`**: A descriptive name for this UI step (shown in logs and events)
 - **`config.template`**: A function that generates the prompt for the AI to create the UI
-- **`config.outputSchema`**: A Zod schema defining expected form data. When provided along with `stateKey`, the brain auto-suspends.
-- **`config.stateKey`**: The key under which the response is merged onto state.
+- **`config.outputSchema`**: A Zod schema defining expected form data. When provided, the brain auto-suspends and the response is spread directly onto state.
 - **`config.notify`**: Optional callback for side effects (Slack, email, etc.) that need the `page` object
 
 ### The `page` Object
@@ -185,7 +181,6 @@ interface GeneratedPage<TSchema> {
     email: z.string().email(),
     bio: z.string().optional(),
   }),
-  stateKey: 'profile' as const,
 })
 ```
 
@@ -205,7 +200,6 @@ The template can reference state values that will be resolved at render time usi
   outputSchema: z.object({
     shippingAddress: z.string(),
   }),
-  stateKey: 'orderConfirmation' as const,
 })
 ```
 
@@ -222,7 +216,6 @@ The template can reference state values that will be resolved at render time usi
   outputSchema: z.object({
     answers: z.array(z.string()),
   }),
-  stateKey: 'surveyAnswers' as const,
 })
 ```
 
@@ -231,7 +224,7 @@ The template can reference state values that will be resolved at render time usi
 The `outputSchema` defines what data the form collects. This provides:
 
 1. **Validation**: The AI-generated form is validated to ensure it has inputs for all required fields
-2. **Type Safety**: The response is auto-merged onto state under the `stateKey` with full type inference
+2. **Type Safety**: The response is spread directly onto state with full type inference
 
 ### Schema Examples
 
@@ -281,17 +274,16 @@ brain('User Onboarding')
       lastName: z.string(),
       dateOfBirth: z.string(),
     }),
-    stateKey: 'personalInfo' as const,
     notify: async ({ page, notify }) => {
       await notify(`Complete step 1: ${page.url}`);
     },
   })
-  // No .handle() needed — auto-merges onto state.personalInfo
+  // No .handle() needed — form data is spread directly onto state
 
   // Step 2: Preferences
   .ui('Preferences Form', {
     template: ({ state }) => `
-      Create a preferences form for ${state.personalInfo.firstName}:
+      Create a preferences form for ${state.firstName}:
       - Newsletter subscription (checkbox)
       - Contact method (select: email, phone, sms)
       - Complete button
@@ -300,12 +292,11 @@ brain('User Onboarding')
       newsletter: z.boolean(),
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
-    stateKey: 'preferences' as const,
     notify: async ({ page, notify }) => {
       await notify(`Complete step 2: ${page.url}`);
     },
   })
-  // No .handle() needed — auto-merges onto state.preferences
+  // No .handle() needed — form data is spread directly onto state
   .step('Complete Onboarding', ({ state }) => ({
     ...state,
     step: 'complete',
@@ -351,9 +342,10 @@ Data bindings are resolved when the page is rendered.
 
 ### Auto-Merge Behavior
 
-- When `outputSchema` and `stateKey` are provided, form data auto-merges onto state under the `stateKey`
+- When `outputSchema` is provided, form data is spread directly onto state
 - The merged data is fully typed based on the schema
 - No `.handle()` step is needed
+- To namespace results, wrap them in the schema itself (e.g., `z.object({ feedback: z.object({ rating: z.number() }) })`)
 
 ### Separation of Concerns
 

@@ -592,10 +592,10 @@ export class BrainEventStream<
       // Get previous state before action
       const prevState = this.currentState;
 
-      // Update state with inner brain results using stateKey
+      // Spread inner brain's final state onto outer state
       this.currentState = {
         ...this.currentState,
-        [brainBlock.stateKey]: innerState,
+        ...innerState,
       };
       yield* this.completeStep(step, prevState);
     } else if (block.type === 'agent') {
@@ -706,7 +706,7 @@ DO NOT CALL IF:
 - You are waiting for user input (use waitForWebhook instead)
 - The task is not yet complete
 
-The result key for this output is: ${config.stateKey}`,
+The output must conform to the provided schema.`,
       inputSchema: schema,
       terminal: true,
     };
@@ -915,9 +915,7 @@ The result key for this output is: ${config.stateKey}`,
           brainRunId: this.brainRunId,
         };
         throw new Error(
-          `Agent hit iteration limit (${maxIterations}) without producing required '${
-            config.stateKey ?? 'done'
-          }' output`
+          `Agent hit iteration limit (${maxIterations}) without producing required 'done' output`
         );
       }
 
@@ -1030,9 +1028,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           brainRunId: this.brainRunId,
         };
         throw new Error(
-          `Agent hit token limit (${
-            config.maxTokens
-          }) without producing required '${config.stateKey ?? 'done'}' output`
+          `Agent hit token limit (${config.maxTokens}) without producing required 'done' output`
         );
       }
 
@@ -1103,18 +1099,17 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
           };
 
           // Merge terminal result into state
-          // Namespace under stateKey when 'done' tool is called
           if (toolCall.toolName === 'done') {
             const parsed = config.outputSchema!.safeParse(toolCall.args);
             if (!parsed.success) {
               throw new Error(
-                `Agent output does not match outputSchema '${config.stateKey}': ${parsed.error.message}`
+                `Agent output does not match outputSchema: ${parsed.error.message}`
               );
             }
-            // Namespace result under stateKey
+            // Spread result onto state
             this.currentState = {
               ...this.currentState,
-              [config.stateKey!]: parsed.data,
+              ...parsed.data,
             };
           } else {
             // Default behavior: spread into state root (for other terminal tools)
@@ -1440,11 +1435,11 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     const prevState = this.currentState;
     const uiConfig = stepBlock.uiConfig!;
 
-    // Resume path: form response already available, merge onto state and complete
+    // Resume path: form response already available, spread onto state and complete
     if (this.currentResponse && uiConfig.outputSchema) {
       this.currentState = {
         ...this.currentState,
-        [uiConfig.stateKey!]: this.currentResponse,
+        ...this.currentResponse,
       };
       this.currentResponse = undefined;
       yield* this.completeStep(step, prevState);

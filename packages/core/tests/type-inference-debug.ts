@@ -115,7 +115,6 @@ const singlePrompt = {
   template: ({ state }: { state: { count: number } }) =>
     `Count is ${state.count}`,
   outputSchema: z.object({ summary: z.string() }),
-  stateKey: 'summary' as const,
 };
 
 const test4 = brain('test-4')
@@ -125,8 +124,8 @@ const test4 = brain('test-4')
   }))
   .prompt('Summarize', singlePrompt)
   .step('After prompt', ({ state }) => {
-    // state.summary should be { summary: string }
-    const summaryText: string = state.summary.summary;
+    // state.summary should be string (spread from outputSchema)
+    const summaryText: string = state.summary;
     // state.count should still be number
     const count: number = state.count;
     return {

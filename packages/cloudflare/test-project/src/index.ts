@@ -150,7 +150,6 @@ const outerInnerWebhookBrain = brain({
 })
   .step('Outer step 1', () => ({ prefix: 'outer-' }))
   .brain('Run inner brain', innerWebhookBrain, {
-    stateKey: 'innerResult' as const,
     initialState: { count: 0 },
   })
   .step('Outer step 2', ({ state }) => ({
@@ -171,9 +170,7 @@ const outerWebhookAfterInner = brain({
   description: 'Outer brain with webhook after inner brain completes',
 })
   .step('Outer step 1', () => ({ started: true }))
-  .brain('Run inner brain', simpleInnerBrain, {
-    stateKey: 'innerResult' as const,
-  })
+  .brain('Run inner brain', simpleInnerBrain)
   .step('Prepare webhook wait', ({ state }) => ({
     ...state,
     waitingForWebhook: true,
@@ -336,7 +333,6 @@ const agentWebhookBrain = brain({
     },
   },
   outputSchema: z.object({ result: z.string() }),
-  stateKey: 'agentResult' as const,
 }));
 
 // Brain with an agent step that will trigger an API error (simulates "too many tokens")
@@ -357,7 +353,6 @@ const agentErrorBrain = brain({
     },
   },
   outputSchema: z.object({ result: z.string() }),
-  stateKey: 'agentResult' as const,
 }));
 
 // Brain that generates a large state (> 1MB) to test R2 overflow
@@ -420,7 +415,6 @@ const iterateItemBrain = brain<{}, { item: string; result: string }>({
 }).prompt('Process item', {
   template: ({ state }) => `Process: ${state.item}`,
   outputSchema: z.object({ result: z.string() }),
-  stateKey: 'result' as const,
 });
 
 // Brain that does iterate processing followed by a webhook wait.
@@ -494,7 +488,6 @@ const governorTestBrain = brain({
 }).prompt('Generate something', {
   template: () => 'Say hello',
   outputSchema: z.object({ greeting: z.string() }),
-  stateKey: 'result' as const,
 });
 
 // Inner brain for iterate testing - just doubles a number

@@ -115,27 +115,25 @@ export function createBrain<
   // Overload 1: Direct agent with config object WITH outputSchema (required)
   function brain<
     T extends Record<string, AgentTool<any>>,
-    TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = { [K in TName]: z.infer<TSchema> }
+    TNewState extends State = z.infer<TSchema>
   >(
     title: string,
-    config: AgentConfigWithOutput<T, TSchema, TName>
+    config: AgentConfigWithOutput<T, TSchema>
   ): Brain<{}, TNewState, AllServices>;
 
   // Overload 2: Direct agent with config function WITH outputSchema (required)
   function brain<
     T extends Record<string, AgentTool<any>>,
-    TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = { [K in TName]: z.infer<TSchema> }
+    TNewState extends State = z.infer<TSchema>
   >(
     title: string,
     configFn: (
       params: AgentParams
     ) =>
-      | AgentConfigWithOutput<T, TSchema, TName>
-      | Promise<AgentConfigWithOutput<T, TSchema, TName>>
+      | AgentConfigWithOutput<T, TSchema>
+      | Promise<AgentConfigWithOutput<T, TSchema>>
   ): Brain<{}, TNewState, AllServices>;
 
   // Overload 3: Builder pattern with title string

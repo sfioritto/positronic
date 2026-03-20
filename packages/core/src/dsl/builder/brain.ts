@@ -348,17 +348,15 @@ export class Brain<
     return this.nextBrain<TState>();
   }
 
-  // Overload 1: Nested brain with stateKey
+  // Overload 1: Nested brain — spreads inner brain's final state onto outer state
   brain<
     TInnerOptions extends JsonObject,
     TInnerState extends State,
-    TStateKey extends string & { readonly brand?: unique symbol },
-    TNewState extends State = TState & { [K in TStateKey]: TInnerState }
+    TNewState extends State = TState & TInnerState
   >(
     title: string,
     innerBrain: Brain<TInnerOptions, TInnerState, any>,
-    config: {
-      stateKey: TStateKey & (string extends TStateKey ? never : unknown);
+    config?: {
       initialState?:
         | State
         | ((context: StepContext<TState, TOptions> & TServices) => State);
@@ -373,20 +371,18 @@ export class Brain<
   // Overload 2: Agent config object WITH outputSchema (required)
   brain<
     TTools extends Record<string, AgentTool<any>>,
-    TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & { [K in TName]: z.infer<TSchema> }
+    TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
-    config: AgentConfigWithOutput<TTools, TSchema, TName>
+    config: AgentConfigWithOutput<TTools, TSchema>
   ): Brain<TOptions, TNewState, TServices>;
 
   // Overload 3: Agent config function WITH outputSchema (required)
   brain<
     TTools extends Record<string, AgentTool<any>>,
-    TName extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & { [K in TName]: z.infer<TSchema> }
+    TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
     configFn: (
@@ -396,8 +392,8 @@ export class Brain<
           tools: Record<string, AgentTool<any>>;
         }
     ) =>
-      | AgentConfigWithOutput<TTools, TSchema, TName>
-      | Promise<AgentConfigWithOutput<TTools, TSchema, TName>>
+      | AgentConfigWithOutput<TTools, TSchema>
+      | Promise<AgentConfigWithOutput<TTools, TSchema>>
   ): Brain<TOptions, TNewState, TServices>;
 
   // Implementation
@@ -407,7 +403,7 @@ export class Brain<
       | Brain<any, any, any>
       | AgentConfig<any>
       | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>),
-    configOrUndefined?: { stateKey: string; initialState?: any; options?: any }
+    configOrUndefined?: { initialState?: any; options?: any }
   ): any {
     // Case 1: Nested brain instance
     if (
@@ -416,16 +412,11 @@ export class Brain<
       'type' in innerBrainOrConfig &&
       innerBrainOrConfig.type === 'brain'
     ) {
-      const config = configOrUndefined as {
-        stateKey: string;
-        initialState?: any;
-        options?: any;
-      };
+      const config = configOrUndefined ?? {};
       const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
         type: 'brain',
         title,
         innerBrain: innerBrainOrConfig,
-        stateKey: config.stateKey,
         initialState: config.initialState,
         options: config.options,
       };
@@ -449,18 +440,10 @@ export class Brain<
     return this.nextBrain<any>();
   }
 
-  // TResponseKey:
-  // The response key must be a string literal, so if defining a response model
-  // a consumer of this brain must use "as const" to ensure the key is a string literal
-  // this type makes sure that the will get a ts error if they don't.
-
-  // Overload 1: Single execution - runs prompt once with current state (auto-merges)
+  // Overload 1: Single execution - runs prompt once with current state (auto-merges onto state)
   prompt<
-    TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & {
-      [K in TResponseKey]: z.infer<TSchema>;
-    }
+    TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
     config: {
@@ -468,7 +451,6 @@ export class Brain<
         context: StepContext<TState, TOptions> & TServices
       ) => TemplateReturn;
       outputSchema: TSchema;
-      stateKey: TResponseKey & (string extends TResponseKey ? never : unknown);
       client?: ObjectGenerator;
     }
   ): Brain<TOptions, TNewState, TServices>;
@@ -490,7 +472,6 @@ export class Brain<
     config: {
       template: (context: any) => TemplateReturn;
       outputSchema?: z.ZodObject<any>;
-      stateKey?: string;
       client?: ObjectGenerator;
     }
   ): any {
@@ -520,9 +501,8 @@ export class Brain<
     }
     // At this point, outputSchema is guaranteed to exist (schema-less case returned early)
     const outputSchema = config.outputSchema!;
-    const stateKey = config.stateKey!;
 
-    // Single mode - run prompt once with current state
+    // Single mode - run prompt once with current state, spread result onto state
     const promptBlock: StepBlock<TState, any, TOptions, TServices, any, any> = {
       type: 'step',
       title,
@@ -535,7 +515,7 @@ export class Brain<
         });
         return {
           ...context.state,
-          [stateKey]: result.object,
+          ...result.object,
         };
       },
     };
@@ -636,8 +616,8 @@ export class Brain<
    * Add a UI generation step that creates an interactive page.
    *
    * When `outputSchema` is provided, the brain automatically suspends after
-   * generating the page (waiting for the form submission) and auto-merges
-   * the form response onto state under `outputSchema.name`.
+   * generating the page (waiting for the form submission) and spreads
+   * the form response directly onto state.
    *
    * When no `outputSchema` is provided, the step generates a read-only page
    * and returns the `Brain` directly for continued chaining.
@@ -652,18 +632,15 @@ export class Brain<
    *   .step('Initialize', () => ({ userName: 'John' }))
    *   .ui('Create Form', {
    *     template: ({ state }) => `Create a feedback form for ${state.userName}`,
-   *     outputSchema: {
-   *       schema: z.object({
-   *         rating: z.number().min(1).max(5),
-   *         comments: z.string(),
-   *       }),
-   *       name: 'feedback' as const,
-   *     },
+   *     outputSchema: z.object({
+   *       rating: z.number().min(1).max(5),
+   *       comments: z.string(),
+   *     }),
    *     notify: async ({ page, slack }) => {
    *       await slack.post('#general', `Please fill out: ${page.url}`);
    *     },
    *   })
-   *   // No .handle() needed — form data auto-merges onto state.feedback
+   *   // No .handle() needed — form data is spread directly onto state
    *
    * // Read-only UI (returns Brain directly)
    * brain('report')
@@ -675,11 +652,8 @@ export class Brain<
    */
   // Overload 1: With outputSchema - auto-merges response onto state
   ui<
-    TResponseKey extends string & { readonly brand?: unique symbol },
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & {
-      [K in TResponseKey]: z.infer<TSchema>;
-    }
+    TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
     config: {
@@ -687,7 +661,6 @@ export class Brain<
         context: StepContext<TState, TOptions> & TServices
       ) => TemplateReturn;
       outputSchema: TSchema;
-      stateKey: TResponseKey & (string extends TResponseKey ? never : unknown);
       notify?: (
         context: { page: GeneratedPage<TSchema> } & StepContext<
           TState,
@@ -718,7 +691,6 @@ export class Brain<
     config: {
       template: (context: any) => TemplateReturn;
       outputSchema?: z.ZodObject<any>;
-      stateKey?: string;
       notify?: (context: any) => void | Promise<void>;
     }
   ): any {
@@ -729,7 +701,6 @@ export class Brain<
       uiConfig: {
         template: config.template as (context: any) => TemplateReturn,
         outputSchema: config.outputSchema,
-        stateKey: config.stateKey,
         notify: config.notify,
       },
       action: async (params) => {
@@ -879,20 +850,18 @@ export function brain<
 // Overload 3: Direct agent with config object WITH outputSchema (required)
 export function brain<
   TTools extends Record<string, AgentTool<any>>,
-  TName extends string & { readonly brand?: unique symbol },
   TSchema extends z.ZodObject<any>,
-  TNewState extends State = { [K in TName]: z.infer<TSchema> }
+  TNewState extends State = z.infer<TSchema>
 >(
   title: string,
-  config: AgentConfigWithOutput<TTools, TSchema, TName>
+  config: AgentConfigWithOutput<TTools, TSchema>
 ): Brain<JsonObject, TNewState, object>;
 
 // Overload 4: Direct agent with config function WITH outputSchema (required)
 export function brain<
   TTools extends Record<string, AgentTool<any>>,
-  TName extends string & { readonly brand?: unique symbol },
   TSchema extends z.ZodObject<any>,
-  TNewState extends State = { [K in TName]: z.infer<TSchema> }
+  TNewState extends State = z.infer<TSchema>
 >(
   title: string,
   configFn: (
@@ -900,8 +869,8 @@ export function brain<
       tools: Record<string, AgentTool<any>>;
     }
   ) =>
-    | AgentConfigWithOutput<TTools, TSchema, TName>
-    | Promise<AgentConfigWithOutput<TTools, TSchema, TName>>
+    | AgentConfigWithOutput<TTools, TSchema>
+    | Promise<AgentConfigWithOutput<TTools, TSchema>>
 ): Brain<JsonObject, TNewState, object>;
 
 // Implementation

@@ -10,9 +10,8 @@ import type { WebhookRegistration } from '../webhook.js';
  * .ui('Create Form', {
  *   template: ({ state }) => `Create a form for ${state.user}`,
  *   outputSchema: z.object({ name: z.string() }),
- *   stateKey: 'form' as const,
  * })
- * // form data auto-merges onto state.form
+ * // form data is spread directly onto state
  * ```
  */
 export type GeneratedPage<TSchema extends z.ZodSchema = z.ZodSchema> = {

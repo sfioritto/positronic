@@ -88,15 +88,14 @@ brain('AI Education Assistant')
       keyPoints: z.array(z.string()).describe('3-5 key points about the topic'),
       difficulty: z.enum(['beginner', 'intermediate', 'advanced']).describe('The difficulty level'),
     }),
-    stateKey: 'topicExplanation' as const,
   })
   .step('Format output', ({ state }) => ({
     ...state,
     formattedOutput: {
       topic: state.topic,
-      explanation: state.topicExplanation.explanation || '',
-      summary: `This explanation covers <%= '${state.topicExplanation.keyPoints?.length || 0}' %> key points at a <%= '${state.topicExplanation.difficulty || \'unknown\'}' %> level.`,
-      points: state.topicExplanation.keyPoints || [],
+      explanation: state.explanation || '',
+      summary: `This explanation covers <%= '${state.keyPoints?.length || 0}' %> key points at a <%= '${state.difficulty || \'unknown\'}' %> level.`,
+      points: state.keyPoints || [],
     },
   }))
   .prompt(
@@ -109,7 +108,6 @@ brain('AI Education Assistant')
       outputSchema: z.object({
         questions: z.array(z.string()).length(3).describe('Three follow-up questions'),
       }),
-      stateKey: 'followUpQuestions' as const,
     },
     // Optional: Transform the response before merging with state
     ({ state, response }) => ({
@@ -127,7 +125,8 @@ Key points about prompt steps:
 - The `template` function receives the current state and resources, returning the prompt string
 - Templates can be async to load resources: `async (state, resources) => { ... }`
 - `outputSchema` defines the structure using Zod schemas
-- The `stateKey` determines where the response is stored in state
+- The schema result is spread directly onto state (`{ ...state, ...result }`)
+- To namespace, wrap your schema in a parent key (e.g., `z.object({ plan: z.object({ ... }) })`)
 - You can optionally provide a transform function as the third parameter
 - Type inference works throughout - TypeScript knows about your schema types
 
@@ -145,17 +144,15 @@ brain('Multi-Model Brain')
   .prompt('Quick summary', {
     template: ({ state: { document } }) => `Summarize this briefly: <%= '${document}' %>`,
     outputSchema: z.object({ summary: z.string() }),
-    stateKey: 'quickSummary' as const,
     client: fastModel,  // Use a fast, cheap model for summarization
   })
   .prompt('Deep analysis', {
-    template: ({ state: { quickSummary } }) =>
-      `Analyze the implications of this summary: <%= '${quickSummary.summary}' %>`,
+    template: ({ state: { summary } }) =>
+      `Analyze the implications of this summary: <%= '${summary}' %>`,
     outputSchema: z.object({
       insights: z.array(z.string()),
       risks: z.array(z.string()),
     }),
-    stateKey: 'analysis' as const,
     client: smartModel,  // Use a more capable model for analysis
   });
 ```
@@ -174,12 +171,11 @@ const subBrain = brain('Sub Process').step('Transform', ({ state }) => ({
 const mainBrain = brain('Main Process')
   .step('Prepare', () => ({ value: 10 }))
   .brain('Run Sub Process', subBrain, {
-    stateKey: 'processed' as const,
     initialState: ({ state }) => ({ input: state.value }),
   });
 ```
 
-The `stateKey` stores the entire inner brain's final state under that key in the outer state (e.g., `state.processed` will be `{ result: 20 }`). `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
+The inner brain's final state is spread directly onto the outer state (e.g., `state.result` will be `20`). `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`. To namespace, design the inner brain to return its results under a single key.
 
 ## Guard Clauses
 
@@ -193,8 +189,8 @@ brain('email-checker')
   })
   .guard(({ state }) => state.emails.some(e => e.important))
   // everything below only runs if guard passes
-  .ui('Review emails', { ..., outputSchema: ..., stateKey: 'review' as const })
-  // form data auto-merges onto state.review
+  .ui('Review emails', { ..., outputSchema: ... })
+  // form data auto-merges onto state
 ```
 
 Key points:
@@ -229,7 +225,7 @@ Each step receives these parameters:
 - `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
 - Custom services (if configured with `.withServices()` or `createBrain()`)
 
-> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.ui()` with `outputSchema`, the response is auto-merged onto state. See [UI Steps](#ui-steps) and [Webhooks](#webhooks) for details.
+> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.ui()` with `outputSchema`, the response is spread directly onto state. See [UI Steps](#ui-steps) and [Webhooks](#webhooks) for details.
 
 ## Configuration Methods
 
@@ -408,19 +404,17 @@ Services are destructured alongside other parameters in:
 ```typescript
 .prompt('Generate', {
   template: ({ state }) => 'Generate something',
-  outputSchema: schema, stateKey: 'result' as const
+  outputSchema: schema,
 }, async ({ state, response, logger, database }) => {
   logger.info('Saving AI response');
-  await database.save({ ...state, result: response });
+  await database.save({ ...state, ...response });
   return state;
 })
 ```
 
 3. **Nested Brain Config**:
 ```typescript
-.brain('Run Sub-Brain', subBrain, {
-  stateKey: 'subResult' as const,
-})
+.brain('Run Sub-Brain', subBrain)
 ```
 
 #### Real-World Example
@@ -469,20 +463,21 @@ const analysisBrain = brain('Data Analysis')
       insights: z.array(z.string()),
       confidence: z.number()
     }),
-    stateKey: 'analysis' as const
   })
   .step('Save Results', async ({ state, api, cache, metrics }) => {
+    const { insights, confidence } = state;
+
     // Save to cache for next time
-    await cache.set('analysis_result', state.analysis);
+    await cache.set('analysis_result', { insights, confidence });
 
     // Submit to API
-    await api.submitResult(state.analysis);
+    await api.submitResult({ insights, confidence });
 
     // Track completion
     state.endTimer(); // End the timer
     metrics.track('analysis_complete', {
-      insights_count: state.analysis.insights.length,
-      confidence: state.analysis.confidence,
+      insights_count: insights.length,
+      confidence,
       from_cache: state.fromCache
     });
 
@@ -575,7 +570,6 @@ const brainWithTools = brain('Tool Brain')
     prompt: 'Fetch user data and save the summary.',
     // Tools defined with withTools() are automatically available
     outputSchema: z.object({ summary: z.string() }),
-    stateKey: 'dataSummary' as const,
   });
 ```
 
@@ -626,7 +620,6 @@ const brainWithComponents = brain('Custom UI Brain')
     outputSchema: z.object({
       acknowledged: z.boolean()
     }),
-    stateKey: 'acknowledgement' as const,
   });
 ```
 
@@ -924,7 +917,6 @@ brain('Template Example').prompt('Generate Content', {
     return template.replace('{{issue}}', state.issue);
   },
   outputSchema: z.object({ response: z.string() }),
-  stateKey: 'supportResponse' as const,
 });
 ```
 
@@ -1028,7 +1020,6 @@ export const aiFilterPrompt = {
     selectedArticles: z.array(z.number()).describe('Indices of selected articles'),
     reasoning: z.string().describe('Brief explanation of selections'),
   }),
-  stateKey: 'filterResults' as const,
 };
 
 // src/brains/hn-bot/brain.ts
@@ -1043,10 +1034,10 @@ export default brain('HN Article Filter')
   })
   .prompt('Filter Articles', aiFilterPrompt)
   .step('Format Results', ({ state }) => ({
-    selectedArticles: state.filterResults.selectedArticles.map(
+    selectedArticles: state.selectedArticles.map(
       i => state.articles[i]
     ),
-    reasoning: state.filterResults.reasoning,
+    reasoning: state.reasoning,
   }));
 ```
 
@@ -1091,7 +1082,6 @@ export default brain('analyze')
       insights: z.array(z.string()),
       recommendations: z.array(z.string()),
     }),
-    stateKey: 'analysis' as const,
   });
 ```
 
@@ -1262,7 +1252,6 @@ const researchBrain = brain('Research Single')
     prompt: `Research this topic: <%= '${state.name}' %>`,
     tools: { search: tools.search },
     outputSchema: z.object({ summary: z.string() }),
-    stateKey: 'research' as const,
   }));
 
 brain('Research Topics')
@@ -1277,7 +1266,7 @@ brain('Research Topics')
   })
   .step('Use Results', ({ state }) => ({
     ...state,
-    summaries: state.results.values.map(result => result.research.summary),
+    summaries: state.results.values.map(result => result.summary),
   }));
 ```
 
@@ -1382,12 +1371,11 @@ brain('Research Assistant')
       findings: z.array(z.string()),
       summary: z.string(),
     }),
-    stateKey: 'research' as const,
     maxTokens: 10000,
   })
   .step('Format Results', ({ state }) => ({
     ...state,
-    researchResults: state.research.summary,
+    researchResults: state.summary,
   }));
 ```
 
@@ -1396,8 +1384,7 @@ brain('Research Assistant')
 - `system: string` - System prompt for the agent
 - `prompt: string | ((state) => string)` - User prompt (can be a function)
 - `tools: Record<string, ToolDefinition>` - Tools available to the agent
-- `outputSchema: ZodSchema` - **Required.** Structured output schema that generates a terminal `done` tool (see below)
-- `stateKey: string` - **Required.** Key under which the agent result is stored in state
+- `outputSchema: ZodSchema` - **Required.** Structured output schema that generates a terminal `done` tool (see below). The result is spread directly onto state.
 - `maxTokens: number` - Maximum tokens for the agent response
 - `maxIterations: number` - Maximum agent loop iterations (default: 100)
 
@@ -1441,7 +1428,6 @@ brain('Support Ticket Handler')
     outputSchema: z.object({
       resolution: z.string().describe('How the ticket was resolved'),
     }),
-    stateKey: 'ticketResult' as const,
   })
   .step('Process Result', ({ state }) => ({
     ...state,
@@ -1474,25 +1460,24 @@ brain('Entity Extractor')
       organizations: z.array(z.string()).describe('Organization names'),
       confidence: z.number().min(0).max(1).describe('Confidence score'),
     }),
-    stateKey: 'entities' as const,  // Use 'as const' for type inference
   })
   .step('Use Extracted Data', ({ state }) => {
-    // TypeScript knows state.entities has people, organizations, and confidence
-    console.log('Found ' + state.entities.people.length + ' people');
-    console.log('Found ' + state.entities.organizations.length + ' organizations');
+    // TypeScript knows state has people, organizations, and confidence
+    console.log('Found ' + state.people.length + ' people');
+    console.log('Found ' + state.organizations.length + ' organizations');
     return {
       ...state,
-      summary: 'Extracted ' + state.entities.people.length + ' people and ' +
-               state.entities.organizations.length + ' organizations',
+      summary: 'Extracted ' + state.people.length + ' people and ' +
+               state.organizations.length + ' organizations',
     };
   });
 ```
 
-Key points about `outputSchema` and `stateKey`:
+Key points about `outputSchema`:
 - The agent automatically gets a `done` tool that uses your schema
-- The result is stored under `state[stateKey]` (e.g., `state.entities`)
+- The schema result is spread directly onto state (e.g., `state.people`, `state.organizations`)
+- To namespace, wrap your schema in a parent key (e.g., `z.object({ entities: z.object({ ... }) })`)
 - Full TypeScript type inference flows to subsequent steps
-- Use `as const` on the `stateKey` for proper type narrowing
 
 ## Environment and Pages Service
 
@@ -1640,7 +1625,7 @@ Without a token, the server will reject the form submission.
 
 ## UI Steps
 
-UI steps allow brains to generate dynamic user interfaces using AI. When `outputSchema` and `stateKey` are provided, `.ui()` generates a page, auto-suspends the brain, and auto-merges the form response onto state under the `stateKey`. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
+UI steps allow brains to generate dynamic user interfaces using AI. When `outputSchema` is provided, `.ui()` generates a page, auto-suspends the brain, and spreads the form response directly onto state. Use the optional `notify` callback for side effects (Slack messages, emails) that need access to the generated page URL.
 
 ### Basic UI Step
 
@@ -1662,16 +1647,15 @@ brain('Feedback Collector')
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
-    stateKey: 'feedback' as const,
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
     },
   })
-  // No .handle() needed — form data auto-merges onto state.feedback
+  // No .handle() needed — form data spreads onto state
   .step('Process Feedback', ({ state }) => ({
     ...state,
     feedbackReceived: true,
-    // state.feedback.rating and state.feedback.comments are typed
+    // state.rating and state.comments are typed
   }));
 ```
 
@@ -1681,7 +1665,7 @@ brain('Feedback Collector')
 2. **AI Generation**: The AI creates a component tree based on the prompt
 3. **Notify**: The optional `notify` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
 4. **Auto-Suspend**: The brain automatically suspends and waits for the form submission
-5. **Auto-Merge**: The form data is automatically merged onto state under the `stateKey`
+5. **Auto-Spread**: The form data is automatically spread onto state (`{ ...state, ...formData }`)
 
 ### The `page` Object
 
@@ -1710,7 +1694,6 @@ Be specific about layout and content:
     email: z.string().email(),
     message: z.string(),
   }),
-  stateKey: 'contactForm' as const,
 })
 ```
 
@@ -1730,7 +1713,6 @@ Use `{{path}}` syntax to bind props to runtime data:
   outputSchema: z.object({
     shippingAddress: z.string(),
   }),
-  stateKey: 'orderConfirmation' as const,
 })
 ```
 
@@ -1755,17 +1737,16 @@ brain('User Onboarding')
       lastName: z.string(),
       dob: z.string(),
     }),
-    stateKey: 'personalInfo' as const,
     notify: async ({ page, notify }) => {
       await notify(`Step 1: <%= '${page.url}' %>`);
     },
   })
-  // No .handle() needed — auto-merges onto state.personalInfo
+  // No .handle() needed — form data spreads onto state
 
   // Step 2: Preferences
   .ui('Preferences', {
     template: ({ state }) => `
-      Create preferences form for <%= '${state.personalInfo.firstName}' %>:
+      Create preferences form for <%= '${state.firstName}' %>:
       - Newsletter subscription checkbox
       - Contact preference (email/phone/sms)
       - Complete button
@@ -1774,12 +1755,11 @@ brain('User Onboarding')
       newsletter: z.boolean(),
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
-    stateKey: 'preferences' as const,
     notify: async ({ page, notify }) => {
       await notify(`Step 2: <%= '${page.url}' %>`);
     },
   })
-  // No .handle() needed — auto-merges onto state.preferences
+  // No .handle() needed — form data spreads onto state
   .step('Complete', ({ state }) => ({
     ...state,
     onboardingComplete: true,
@@ -1829,17 +1809,16 @@ const completeBrain = brain({
       tasks: z.array(z.string()),
       duration: z.number(),
     }),
-    stateKey: 'plan' as const,
   })
   .step('Process Plan', ({ state, logger, analytics }) => {
-    logger.log(`Plan generated with <%= '${state.plan.tasks.length}' %> tasks`);
+    logger.log(`Plan generated with <%= '${state.tasks.length}' %> tasks`);
     analytics.track('plan_processed', {
-      task_count: state.plan.tasks.length,
-      duration: state.plan.duration
+      task_count: state.tasks.length,
+      duration: state.duration
     });
     return {
       ...state,
-      taskCount: state.plan.tasks.length,
+      taskCount: state.tasks.length,
       endTime: Date.now(),
     };
   });
