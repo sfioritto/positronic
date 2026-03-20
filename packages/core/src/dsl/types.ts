@@ -136,16 +136,14 @@ export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
 }
 
 /**
- * AgentConfig with outputSchema and stateKey required (not optional).
- * Used in overload signatures to enforce that outputSchema and stateKey must be provided.
+ * AgentConfig with outputSchema required (not optional).
+ * Used in overload signatures to enforce that outputSchema must be provided.
  */
 export type AgentConfigWithOutput<
   TTools extends Record<string, AgentTool<any>>,
-  TSchema extends z.ZodObject<any>,
-  TName extends string
-> = Omit<AgentConfig<TTools>, 'outputSchema' | 'stateKey'> & {
+  TSchema extends z.ZodObject<any>
+> = Omit<AgentConfig<TTools>, 'outputSchema'> & {
   outputSchema: TSchema;
-  stateKey: TName;
 };
 
 /**
@@ -167,14 +165,9 @@ export interface AgentConfig<
   /**
    * Output schema for structured agent output.
    * When provided, generates a terminal 'done' tool that validates output against the schema
-   * and stores the result under state[stateKey].
+   * and spreads the result onto state.
    */
   outputSchema?: z.ZodObject<any>;
-  /**
-   * Key to store agent output under in state.
-   * Required when outputSchema is provided.
-   */
-  stateKey?: string;
   /**
    * Tool choice configuration for LLM calls.
    * - 'auto': Model chooses whether to call tools

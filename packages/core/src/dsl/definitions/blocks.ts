@@ -66,7 +66,6 @@ export type StepBlock<
   uiConfig?: {
     template: (context: any) => TemplateReturn;
     outputSchema?: z.ZodObject<any>;
-    stateKey?: string;
     notify?: (context: any) => void | Promise<void>;
   };
   /** Per-step client override for prompt steps */
@@ -111,7 +110,6 @@ export type BrainBlock<
   type: 'brain';
   title: string;
   innerBrain: TInnerBrain;
-  stateKey: string;
   initialState?: State | ((context: any) => State);
   options?: JsonObject | ((context: any) => JsonObject);
 };

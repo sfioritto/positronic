@@ -7,8 +7,8 @@ import { z } from 'zod';
  * This brain uses only a system prompt and tools - no explicit user prompt needed.
  * When prompt is omitted, the agent automatically starts with "Begin."
  *
- * The outputSchema ensures the agent returns structured data that gets stored
- * in state.welcome - making it available for subsequent steps.
+ * The outputSchema ensures the agent returns structured data that gets spread
+ * onto state - making it available for subsequent steps.
  *
  * This brain:
  * 1. Uses generateUI to create a form asking for the user's name
@@ -32,11 +32,10 @@ Once you have the user's name send them a personalized greeting!
     userName: z.string().describe('The name the user provided'),
     greeting: z.string().describe('A personalized welcome message for the user'),
   }),
-  stateKey: 'welcome' as const,
 })
   .step('Log Welcome', ({ state }) => {
-    // TypeScript knows state.welcome has userName and greeting
-    console.log('\n✨ ' + state.welcome.greeting);
-    console.log('   Welcome aboard, ' + state.welcome.userName + '!\n');
+    // TypeScript knows state has userName and greeting (spread from outputSchema)
+    console.log('\n✨ ' + state.greeting);
+    console.log('   Welcome aboard, ' + state.userName + '!\n');
     return state;
   });

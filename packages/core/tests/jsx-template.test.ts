@@ -215,7 +215,6 @@ describe('brain integration with JSX templates', () => {
           'Please provide insights.'
         ),
       outputSchema: z.object({ result: z.string() }),
-      stateKey: 'analysis' as const,
     });
 
     const events: BrainEvent<any>[] = [];
@@ -238,9 +237,9 @@ describe('brain integration with JSX templates', () => {
       })
     );
 
-    // Verify state was updated
+    // Verify state was updated (results spread flat onto state)
     const finalState = finalStateFromEvents(events);
-    expect(finalState.analysis).toEqual({ result: 'analyzed' });
+    expect(finalState.result).toEqual('analyzed');
   });
 
   it('prompt step still works with plain string templates', async () => {
@@ -251,7 +250,6 @@ describe('brain integration with JSX templates', () => {
     const testBrain = brain('string-prompt-test').prompt('Ask', {
       template: () => 'Is this working?',
       outputSchema: z.object({ answer: z.string() }),
-      stateKey: 'response' as const,
     });
 
     const events: BrainEvent<any>[] = [];
@@ -280,7 +278,6 @@ describe('brain integration with JSX templates', () => {
       template: () =>
         node(Fragment, {}, 'Summarize this:\n', node(AsyncContent, {})),
       outputSchema: z.object({ summary: z.string() }),
-      stateKey: 'result' as const,
     });
 
     const events: BrainEvent<any>[] = [];

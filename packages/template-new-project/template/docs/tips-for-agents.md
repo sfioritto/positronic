@@ -335,17 +335,35 @@ state.transcripts.filter((match, extraction) => extraction.hasTranscript)
 
 The first parameter is always the input item (what you passed to `over`), and the second is the AI's output (what the `outputSchema` describes). A single-parameter callback only receives the item — if you need the AI result, you must use both parameters.
 
-### Nested brain state mapping
+### Nested brain state spreading
 
-When a `.brain()` step runs an inner brain, use `stateKey` to store the inner brain's final state under a key in the outer state:
+When a `.brain()` step runs an inner brain, the inner brain's final state is spread directly onto the outer state:
 
 ```typescript
-.brain('Search and validate', searchAndValidate, {
-  stateKey: 'searchResults' as const,
-})
+.brain('Search and validate', searchAndValidate)
 ```
 
-The entire inner brain's final state is stored under the `stateKey`. Use `as const` on the key for proper type inference. The inner brain's state type is fully inferred from its definition, so subsequent steps can access the nested state with full type safety (e.g., `state.searchResults.matches`).
+All properties from the inner brain's final state are merged onto the outer state. Subsequent steps can access those properties directly (e.g., `state.matches`). The inner brain's state type is fully inferred from its definition, so you get full type safety.
+
+If you want namespacing (to avoid collisions with existing state properties), design the inner brain to return a namespaced state shape:
+
+```typescript
+// Inner brain returns its results under a single key
+const searchAndValidate = brain('search-and-validate')
+  .step('Search', ({ state }) => ({ ...state, matches: [] }))
+  .step('Package', ({ state }) => ({
+    searchResults: { matches: state.matches }
+  }));
+
+// Outer brain accesses via state.searchResults.matches
+brain('parent')
+  .step('Init', () => ({ query: 'test' }))
+  .brain('Search and validate', searchAndValidate)
+  .step('Use results', ({ state }) => ({
+    ...state,
+    count: state.searchResults.matches.length,
+  }));
+```
 
 ## Brain DSL Type Inference
 
@@ -387,7 +405,6 @@ const categorizeBrain = brain<{}, RawThread>('categorize-thread')
   .prompt('Categorize', {
     template: ({ state }) => `Categorize: <%= '${state.subject}' %>`,
     outputSchema: z.object({ category: z.string() }),
-    stateKey: 'category' as const,
   });
 
 // The parent brain maps over threads
@@ -452,7 +469,7 @@ Most generated brains should not have try-catch blocks. Only use them when the e
 
 ## UI Steps for Form Generation
 
-When you need to collect user input, use the `.ui()` method with `outputSchema` and `stateKey`. The brain auto-suspends after generating the page, then auto-merges the form response onto state under the `stateKey`. Use the `notify` callback for side effects.
+When you need to collect user input, use the `.ui()` method with `outputSchema`. The brain auto-suspends after generating the page, then auto-merges the form response directly onto state. Use the `notify` callback for side effects.
 
 ```typescript
 import { z } from 'zod';
@@ -474,15 +491,14 @@ brain('feedback-collector')
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
-    stateKey: 'feedback' as const,
     notify: async ({ page, slack }) => {
       await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
     },
   })
-  // No .handle() needed — form data auto-merges onto state.feedback
+  // No .handle() needed — form data auto-merges directly onto state
   .step('Process', ({ state }) => ({
     ...state,
-    // state.feedback.rating and state.feedback.comments are typed
+    // state.rating and state.comments are typed
     processed: true,
   }));
 ```
@@ -490,8 +506,8 @@ brain('feedback-collector')
 Key points:
 - `page` is available inside the `notify` callback, not in a separate step
 - `page.url` - where to send users
-- The brain auto-suspends after `.ui()` with `outputSchema` and `stateKey`
-- Form data auto-merges onto state under the `stateKey`
+- The brain auto-suspends after `.ui()` with `outputSchema`
+- Form data is spread directly onto state (e.g., `state.rating`, `state.comments`)
 - You control how users are notified (Slack, email, etc.) inside `notify`
 
 See `/docs/brain-dsl-guide.md` for more UI step examples.
@@ -814,24 +830,17 @@ export default feedbackBrain;
       sentiment: z.enum(['positive', 'neutral', 'negative']),
       score: z.number().min(0).max(1)
     }),
-    stateKey: 'sentimentAnalysis' as const
   })
 
 // Step 5: Run again, check logs, test still fails (no response)
 // Step 6: Add response generation
   .prompt('Generate response', {
-    template: ({ state: { sentimentAnalysis, feedback } }) =>
-      <%= '\`Generate a brief response to this ${sentimentAnalysis.sentiment} feedback: "${feedback}"\`' %>,
+    template: ({ state: { sentiment, feedback } }) =>
+      <%= '\`Generate a brief response to this ${sentiment} feedback: "${feedback}"\`' %>,
     outputSchema: z.object({
       response: z.string()
     }),
-    stateKey: 'responseData' as const
-  })
-  .step('Format output', ({ state }) => ({
-    ...state,
-    sentiment: state.sentimentAnalysis.sentiment,
-    response: state.responseData.response
-  }));
+  });
 
 // Step 7: Run test - it should pass now!
 ```

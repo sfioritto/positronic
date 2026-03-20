@@ -52,7 +52,6 @@ export default brain('my-agent', ({ slack, env }) => ({
     },
   },
   outputSchema: z.object({ result: z.string() }),
-  stateKey: 'agentResult' as const,
 }));
 ```
 
@@ -84,7 +83,6 @@ const myAgent = brain('math-helper', {
     answer: z.number(),
     explanation: z.string(),
   }),
-  stateKey: 'mathResult' as const,
 });
 ```
 
@@ -120,7 +118,6 @@ const dynamicAgent = brain('dynamic-helper', ({ tools }) => ({
     },
   },
   outputSchema: z.object({ result: z.string() }),
-  stateKey: 'helperResult' as const,
 }));
 ```
 
@@ -156,12 +153,11 @@ const innerBrain = brain('process-item').step('Process', ({ state }) => ({
 const outerBrain = brain('orchestrator')
   .step('Init', () => ({ items: ['a', 'b', 'c'] }))
   .brain('Run Inner', innerBrain, {
-    stateKey: 'result' as const,
     initialState: ({ state }) => ({ item: state.items[0] }),
   });
 ```
 
-The `stateKey` stores the entire inner brain's final state under that key in the outer state. `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`.
+The inner brain's final state is spread directly onto the outer state. `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`. To namespace, wrap the inner brain's state shape accordingly.
 
 ### Options in Nested Brains
 
@@ -186,7 +182,6 @@ const innerBrain = brain('search')
 const outerBrain = brain('orchestrator')
   .withOptionsSchema(z.object({ searchQuery: z.string() }))
   .brain('Run Search', innerBrain, {
-    stateKey: 'searchResult' as const,
     options: ({ options }) => ({ query: options.searchQuery, limit: 5 }),
   })
   .step('Process', ({ state, options }) => {
@@ -215,7 +210,6 @@ const outerBrain = brain('batch')
     over: ({ state }) => state.items,
     initialState: (item) => ({ value: item, result: 0 }),
     options: ({ options }) => ({ multiplier: options.multiplier }),
-    stateKey: 'results' as const,
   });
 ```
 
@@ -246,7 +240,6 @@ const myBrain = brain('simple-agent')
       answer: z.number(),
       explanation: z.string(),
     }),
-    stateKey: 'mathAnswer' as const,
   });
 ```
 
@@ -274,7 +267,6 @@ const myBrain = brain('dynamic-agent')
     outputSchema: z.object({
       summary: z.string(),
     }),
-    stateKey: 'processingResult' as const,
   }));
 ```
 
@@ -405,7 +397,6 @@ const myBrain = brain('with-defaults')
     prompt: 'Help the user.',
     tools, // Uses defaultTools
     outputSchema: z.object({ result: z.string() }),
-    stateKey: 'agentResult' as const,
   }));
 ```
 
@@ -426,7 +417,6 @@ Add custom tools while keeping defaults:
     },
   },
   outputSchema: z.object({ result: z.string() }),
-  stateKey: 'taskResult' as const,
 }))
 ```
 
@@ -449,7 +439,6 @@ Replace a default tool with a custom implementation:
     },
   },
   outputSchema: z.object({ uiGenerated: z.boolean() }),
-  stateKey: 'uiResult' as const,
 }))
 ```
 
@@ -469,7 +458,6 @@ const uiBrain = brain('interactive')
     prompt: 'Ask the user for their preferences.',
     tools, // includes generateUI
     outputSchema: z.object({ preferences: z.record(z.string()) }),
-    stateKey: 'userPreferences' as const,
   }));
 ```
 
@@ -638,11 +626,10 @@ any sensitive actions, request approval first.`,
       resolution: z.string(),
       followUpRequired: z.boolean(),
     }),
-    stateKey: 'ticketResolution' as const,
     maxTokens: 50000,
   }))
   .step('Log Resolution', ({ state }) => {
-    console.log('Ticket resolved:', state.ticketResolution);
+    console.log('Ticket resolved:', state.resolution);
     return state;
   });
 
