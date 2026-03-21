@@ -3,13 +3,17 @@
 // jsxImportSource is set to "@positronic/core".
 
 export const Fragment = Symbol.for('positronic.fragment');
+export const File = Symbol.for('positronic.file');
+export const Resource = Symbol.for('positronic.resource');
+
+type BuiltinComponent = typeof Fragment | typeof File | typeof Resource;
 
 export type FunctionComponent = (
   props: Record<string, unknown>
 ) => TemplateChild | Promise<TemplateChild>;
 
 export interface TemplateNode {
-  type: typeof Fragment | FunctionComponent;
+  type: BuiltinComponent | FunctionComponent;
   props: Record<string, unknown>;
   children: TemplateChild[];
 }
@@ -25,7 +29,7 @@ export type TemplateChild =
 
 // Called by the automatic JSX transform for elements with a single child
 export function jsx(
-  type: typeof Fragment | FunctionComponent,
+  type: BuiltinComponent | FunctionComponent,
   props: Record<string, unknown>
 ): TemplateNode {
   const { children, ...rest } = props;
