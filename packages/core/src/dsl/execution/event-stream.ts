@@ -745,6 +745,11 @@ The output must conform to the provided schema.`,
     // This ensures all events for the same agent use the same stepId across resumes
     const effectiveStepId = agentContext?.stepId ?? step.id;
 
+    // Resolve JSX templates for system prompt once (used in both fresh and loop paths)
+    const resolvedSystem = config.system
+      ? await resolveTemplate(config.system)
+      : undefined;
+
     if (agentContext) {
       // Check if this is a webhook resume (has webhook response) or pause resume
       if (
@@ -830,8 +835,8 @@ The output must conform to the provided schema.`,
       // Clear resume so it's only used once
       this.resume = undefined;
     } else {
-      // Use "Begin." as default prompt if not provided
-      const prompt = config.prompt ?? 'Begin.';
+      // Use "Begin." as default prompt if not provided, resolve JSX templates
+      const prompt = await resolveTemplate(config.prompt ?? 'Begin.');
 
       // Emit agent start event (only for fresh starts)
       yield {
@@ -839,7 +844,7 @@ The output must conform to the provided schema.`,
         stepTitle: step.block.title,
         stepId: effectiveStepId,
         prompt,
-        system: config.system,
+        system: resolvedSystem,
         tools: Object.keys(mergedTools),
         options: this.options ?? ({} as TOptions),
         brainRunId: this.brainRunId,
@@ -990,8 +995,8 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       }
 
       // Prepend default system prompt to user's system prompt
-      const systemPrompt = config.system
-        ? `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${config.system}`
+      const systemPrompt = resolvedSystem
+        ? `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${resolvedSystem}`
         : DEFAULT_AGENT_SYSTEM_PROMPT;
 
       const response = await this.client.generateText({
