@@ -109,6 +109,8 @@ export {
   waitForWebhook,
   print,
   consoleLog,
+  readFile,
+  writeFile,
 } from './tools/index.js';
 
 // Store types

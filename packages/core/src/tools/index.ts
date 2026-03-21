@@ -323,6 +323,46 @@ export const consoleLog = createTool({
 });
 
 /**
+ * Read a file by name. The agent decides which files to read.
+ * Returns the file content as text.
+ */
+export const readFile = createTool({
+  description:
+    'Read the contents of a file by name. Returns the file content as text.',
+  inputSchema: z.object({
+    name: z.string().describe('The file name to read'),
+  }),
+  async execute({ name }, context) {
+    if (!context.files) {
+      throw new Error(
+        'readFile tool requires a files service to be configured'
+      );
+    }
+    return { content: await context.files.open(name).read() };
+  },
+});
+
+/**
+ * Write text content to a file. The agent decides what to write and where.
+ */
+export const writeFile = createTool({
+  description: 'Write text content to a file. Creates or overwrites the file.',
+  inputSchema: z.object({
+    name: z.string().describe('The file name to write'),
+    content: z.string().describe('The text content to write'),
+  }),
+  async execute({ name, content }, context) {
+    if (!context.files) {
+      throw new Error(
+        'writeFile tool requires a files service to be configured'
+      );
+    }
+    await context.files.write(name, content);
+    return { written: true, name };
+  },
+});
+
+/**
  * Default tools bundle.
  *
  * Use with createBrain's defaultTools option or .withTools() to include

@@ -10,6 +10,7 @@ import type {
   FileRef,
   ZipBuilder,
 } from '../src/files/types.js';
+import { readFile, writeFile } from '../src/tools/index.js';
 
 const collectEvents = async <T>(
   iterator: AsyncIterableIterator<T>
@@ -551,5 +552,47 @@ describe('files service', () => {
     expect((fileEvents[0] as any).fileName).toBe('a.txt');
     expect((fileEvents[2] as any).fileName).toBe('b.txt');
     expect((fileEvents[4] as any).fileName).toBe('bundle.zip');
+  });
+});
+
+describe('file agent tools', () => {
+  it('readFile tool reads via context.files', async () => {
+    const filesService = createInMemoryFilesService();
+    await filesService.write('data.txt', 'tool read content');
+
+    const context = { files: filesService } as any;
+    const result = (await readFile.execute!(
+      { name: 'data.txt' },
+      context
+    )) as any;
+    expect(result.content).toBe('tool read content');
+  });
+
+  it('writeFile tool writes via context.files', async () => {
+    const filesService = createInMemoryFilesService();
+
+    const context = { files: filesService } as any;
+    const result = (await writeFile.execute!(
+      { name: 'output.txt', content: 'tool write content' },
+      context
+    )) as any;
+    expect(result.written).toBe(true);
+
+    const content = await filesService.open('output.txt').read();
+    expect(content).toBe('tool write content');
+  });
+
+  it('readFile throws when files service not available', async () => {
+    const context = {} as any;
+    await expect(
+      readFile.execute!({ name: 'data.txt' }, context)
+    ).rejects.toThrow('readFile tool requires a files service');
+  });
+
+  it('writeFile throws when files service not available', async () => {
+    const context = {} as any;
+    await expect(
+      writeFile.execute!({ name: 'out.txt', content: 'x' }, context)
+    ).rejects.toThrow('writeFile tool requires a files service');
   });
 });
