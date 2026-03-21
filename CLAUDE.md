@@ -80,6 +80,30 @@ Templates in `.prompt()`, `.page()`, `.map()`, and `.brain()` steps can return J
 - **Generated projects**: Use `jsxImportSource: "@positronic/core"` in their tsconfig
 - **Whitespace preservation**: `.positronic/build-brains.mjs` in generated projects — esbuild plugin (inlined) that preserves JSX text whitespace. Runs via wrangler's `build.command`. Without it, the JSX compiler collapses newlines in text to spaces.
 
+### Files Service
+
+The `files` service provides framework-level file storage for brain steps. Available on the step context as `files`. Required for all backends.
+
+- **Core types**: `packages/core/src/files/types.ts` — `FilesService`, `FileHandle`, `FileRef`, `FileInput`, `FileOptions`, `ZipBuilder`
+- **Cloudflare implementation**: `packages/cloudflare/src/files-service.ts` — R2-backed, scope-based key resolution
+- **API route**: `packages/cloudflare/src/api/files.ts` — public GET for serving files
+- **Content type**: `packages/cloudflare/src/content-type.ts` — shared MIME type inference
+- **File handle utility**: `packages/cloudflare/src/file-utils.ts` — shared `isFileHandle` type guard
+- **Zip builder**: `packages/cloudflare/src/zip-builder.ts` — fflate + R2 multipart upload streaming
+- **Event channel**: `packages/core/src/dsl/execution/event-channel.ts` — async queue for mid-step event emission
+- **Event wrapper**: `packages/core/src/files/event-wrapper.ts` — wraps FilesService to emit FILE_WRITE_START/COMPLETE events
+- **MIME inference**: `packages/core/src/files/mime.ts` — used by `.prompt()` attachments to resolve content type from file names
+
+**Scoping**: All files are per-user. Three scopes: `'run'` (ephemeral), `'brain'` (default, persists across runs), `'global'` (cross-brain). R2 key pattern: `files/user/{userName}/{brainTitle}/{name}`.
+
+**Built-in JSX components**: `File` and `Resource` are Symbols exported from `@positronic/core` (like `Fragment`). The template renderer resolves them via `TemplateContext.readFile`/`readResource`. Built once per execution via `buildTemplateContext()` in `packages/core/src/template/render.ts`.
+
+**Agent tools**: `readFile` and `writeFile` are standalone tools exported from `@positronic/core`. They access `context.files` in their execute function.
+
+**Prompt attachments**: `.prompt()` config accepts `attachments: FileHandle[]`. The framework resolves handles to `Attachment` objects (name, mimeType, data) before calling the client. Vercel client maps to `FilePart` content blocks.
+
+**Mid-step events**: File operations emit `FILE_WRITE_START`/`FILE_WRITE_COMPLETE` events via a `Promise.race` loop in `event-stream.ts`. The event channel + wrapper are in core (not backend-specific), so all backends get event emission for free.
+
 ## Keeping the Project Template in Sync
 
 The project template (`packages/template-new-project/template/.positronic/`) is what `px project new` uses to scaffold new projects. It has its own `wrangler.jsonc` and `src/index.ts` that are **separate from** the cloudflare test-project's versions. There are no tests that verify the template produces a working project, so you must keep it in sync manually.

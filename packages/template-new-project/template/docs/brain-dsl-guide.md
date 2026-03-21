@@ -1831,3 +1831,85 @@ const runner = new BrainRunner({
 const finalState = await runner.run(completeBrain);
 console.log('Completed:', finalState);
 ```
+
+## Files Service
+
+The `files` service is available on the step context for creating, reading, and managing files.
+
+### Basic Usage
+
+```typescript
+.step("Save report", async ({ files }) => {
+  const file = files.open('report.txt');
+  await file.write('Report content');
+  const url = file.url; // public download URL
+  return { reportFile: file.name }; // store name in state, not URL
+})
+```
+
+### Streaming Writes
+
+```typescript
+// Stream from a URL — never buffered
+await file.write(await fetch('https://example.com/large.mp3'));
+
+// Copy between files
+await file.write(files.open('source.txt'));
+```
+
+### Zip Builder
+
+```typescript
+.step("Bundle", async ({ state, files }) => {
+  const zip = files.zip('results.zip');
+  await zip.write('data.txt', 'content');
+  await zip.write('audio.mp3', await fetch(state.mp3Url));
+  const ref = await zip.finalize();
+  return { downloadUrl: files.open(ref.name).url };
+})
+```
+
+### Scoping
+
+```typescript
+files.open('data.txt');                          // 'brain' (default) — persists across runs
+files.open('temp.txt', { scope: 'run' });        // cleaned up after run
+files.open('profile.json', { scope: 'global' }); // persists across brains
+```
+
+### JSX Components
+
+```tsx
+import { File, Resource } from '@positronic/core';
+
+.prompt("Analyze", ({ state }) => ({
+  prompt: (
+    <>
+      <Resource name="guidelines" />
+      <File name={state.transcriptFile} />
+    </>
+  ),
+  outputSchema: z.object({ summary: z.string() }),
+}))
+```
+
+### Attachments
+
+```typescript
+.prompt("Analyze PDF", async ({ files }) => ({
+  prompt: "Analyze the attached document.",
+  attachments: [files.open('report.pdf')],
+  outputSchema: z.object({ summary: z.string() }),
+}))
+```
+
+### Agent Tools
+
+```typescript
+import { readFile, writeFile } from '@positronic/core';
+
+.brain("Analyze", () => ({
+  prompt: "Review the files and write a summary.",
+  tools: { readFile, writeFile },
+}))
+```
