@@ -196,6 +196,18 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `User message: "${truncate(event.content, 50)}"`,
         color: 'cyan',
       };
+    case BRAIN_EVENTS.FILE_WRITE_START:
+      return {
+        symbol: '[↑]',
+        text: `Writing: ${event.fileName}`,
+        color: 'blue',
+      };
+    case BRAIN_EVENTS.FILE_WRITE_COMPLETE:
+      return {
+        symbol: '[✓]',
+        text: `Written: ${event.fileName}`,
+        color: 'green',
+      };
     default:
       return {
         symbol: '[?]',

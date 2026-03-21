@@ -27,6 +27,9 @@ export const BRAIN_EVENTS = {
   AGENT_USER_MESSAGE: 'agent:user_message',
   // Iterate events (prompt/brain with `over`)
   ITERATE_ITEM_COMPLETE: 'iterate:item_complete',
+  // File events
+  FILE_WRITE_START: 'file:write_start',
+  FILE_WRITE_COMPLETE: 'file:write_complete',
 } as const;
 
 export const STATUS = {

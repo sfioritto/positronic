@@ -88,6 +88,10 @@ function getEventSymbol(event: BrainEvent): { symbol: string; color: string } {
       return { symbol: '[i]', color: 'green' };
     case BRAIN_EVENTS.AGENT_USER_MESSAGE:
       return { symbol: '[U]', color: 'cyan' };
+    case BRAIN_EVENTS.FILE_WRITE_START:
+      return { symbol: '[↑]', color: 'blue' };
+    case BRAIN_EVENTS.FILE_WRITE_COMPLETE:
+      return { symbol: '[✓]', color: 'green' };
     default:
       return { symbol: '[?]', color: 'gray' };
   }
@@ -288,6 +292,12 @@ function getEventDetailContent(event: BrainEvent): string {
         'Message:',
         event.content,
       ].join('\n');
+
+    case BRAIN_EVENTS.FILE_WRITE_START:
+      return [`File: ${event.fileName}`, `Step: ${event.stepTitle}`].join('\n');
+
+    case BRAIN_EVENTS.FILE_WRITE_COMPLETE:
+      return [`File: ${event.fileName}`, `Step: ${event.stepTitle}`].join('\n');
 
     default:
       // Show all fields for any event type
