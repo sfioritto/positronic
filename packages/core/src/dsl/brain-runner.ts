@@ -18,6 +18,7 @@ import type { Resources } from '../resources/resources.js';
 import type { PagesService } from './pages.js';
 import type { BrainCancelledEvent } from './definitions/events.js';
 import type { StoreProvider } from '../store/types.js';
+import type { FilesService } from '../files/types.js';
 import type { ResumeParams } from './definitions/run-params.js';
 
 /**
@@ -48,6 +49,7 @@ export class BrainRunner {
       signalProvider?: SignalProvider;
       governor?: (client: ObjectGenerator) => ObjectGenerator;
       storeProvider?: StoreProvider;
+      files?: FilesService;
     }
   ) {}
 
@@ -107,6 +109,13 @@ export class BrainRunner {
     return new BrainRunner({
       ...this.options,
       storeProvider,
+    });
+  }
+
+  withFiles(files: FilesService): BrainRunner {
+    return new BrainRunner({
+      ...this.options,
+      files,
     });
   }
 
@@ -229,6 +238,7 @@ export class BrainRunner {
       signalProvider,
       governor,
       storeProvider,
+      files,
     } = this.options;
     const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
@@ -260,6 +270,7 @@ export class BrainRunner {
           client,
           resources: resources ?? {},
           pages,
+          files,
           env: resolvedEnv,
           signalProvider,
           governor,
@@ -273,6 +284,7 @@ export class BrainRunner {
           brainRunId,
           resources: resources ?? {},
           pages,
+          files,
           env: resolvedEnv,
           signalProvider,
           governor,

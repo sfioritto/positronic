@@ -8,6 +8,7 @@ import secrets from './secrets.js';
 import bundle from './bundle.js';
 import users from './users.js';
 import store from './store.js';
+import files from './files.js';
 import { authMiddleware } from './auth-middleware.js';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -57,6 +58,11 @@ app.use('*', async (c, next) => {
     return next();
   }
 
+  // Skip auth for files (download URLs are public)
+  if (c.req.method === 'GET' && c.req.path.startsWith('/files/')) {
+    return next();
+  }
+
   // Skip auth for all webhook POST requests (external services and browser forms can't send JWT)
   if (c.req.method === 'POST' && c.req.path.startsWith('/webhooks/')) {
     return next();
@@ -83,6 +89,7 @@ app.route('/secrets', secrets);
 app.route('/bundle', bundle);
 app.route('/users', users);
 app.route('/store', store);
+app.route('/files', files);
 
 export default app;
 

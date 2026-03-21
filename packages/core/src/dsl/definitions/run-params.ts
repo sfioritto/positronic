@@ -15,6 +15,7 @@ import type {
 } from '../brain-state-machine.js';
 import type { SerializedPageContext } from '../webhook.js';
 import type { StoreProvider } from '../../store/types.js';
+import type { FilesService } from '../../files/types.js';
 
 export interface ResumeParams {
   state: JsonObject;
@@ -35,6 +36,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   signalProvider?: SignalProvider;
   governor?: (client: ObjectGenerator) => ObjectGenerator;
   storeProvider?: StoreProvider;
+  files?: FilesService;
   currentUser: CurrentUser;
   services?: Record<string, any>;
 }
