@@ -205,6 +205,13 @@ describe('Positronic Spec', () => {
       expect(rerunId).toBeTruthy();
       expect(rerunId).toBe(brainRunId);
 
+      // Verify MonitorDO was reset: status should no longer be 'complete'
+      const statusResponse = await fetch(
+        new Request(`http://example.com/brains/runs/${brainRunId}`)
+      );
+      const statusData = (await statusResponse.json()) as { status: string };
+      expect(statusData.status).not.toBe('complete');
+
       // Wait for the rerun to complete so the DO's async work doesn't
       // outlive the test (causes isolated storage errors in vitest)
       expect(await waitForCompletion(brainRunId!)).toBe(true);

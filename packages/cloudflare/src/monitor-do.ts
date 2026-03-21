@@ -228,6 +228,33 @@ export class MonitorDO extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Reset MonitorDO tracking state for a brain run that is about to be rerun.
+   * Clears stale events (keeping START for hydration), resets status to RUNNING,
+   * and broadcasts so `top` subscribers see the brain immediately.
+   */
+  prepareForRerun(runId: string) {
+    // Delete all events except START (needed for state machine hydration)
+    this.storage.exec(
+      `DELETE FROM brain_events WHERE run_id = ? AND event_type != ?`,
+      runId,
+      BRAIN_EVENTS.START
+    );
+
+    // Reset status to RUNNING, clear terminal fields
+    this.storage.exec(
+      `UPDATE brain_runs SET status = ?, completed_at = NULL, error = NULL WHERE run_id = ?`,
+      STATUS.RUNNING,
+      runId
+    );
+
+    // Clear cached machine so it re-hydrates from [START] → running state
+    this.machines.delete(runId);
+
+    // Notify top subscribers immediately
+    this.broadcastRunningBrains();
+  }
+
   private async broadcastRunningBrains() {
     const runningBrains = await this.storage
       .exec(
