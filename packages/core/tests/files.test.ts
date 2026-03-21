@@ -8,6 +8,7 @@ import type {
   FileInput,
   FileOptions,
   FileRef,
+  ZipBuilder,
 } from '../src/files/types.js';
 
 const collectEvents = async <T>(
@@ -131,6 +132,30 @@ function createInMemoryFilesService(
       async delete(name: string) {
         const handle = createHandle(name);
         await handle.delete();
+      },
+      zip(name: string, options?: FileOptions): ZipBuilder {
+        const entries: Array<{ name: string; content: string | Uint8Array }> =
+          [];
+        return {
+          async write(entryName: string, content: FileInput) {
+            if (typeof content === 'string') {
+              entries.push({ name: entryName, content });
+            } else if (content instanceof Uint8Array) {
+              entries.push({ name: entryName, content });
+            } else if ('read' in (content as any)) {
+              const text = await (content as FileHandle).read();
+              entries.push({ name: entryName, content: text });
+            } else {
+              entries.push({ name: entryName, content: '[stream]' });
+            }
+          },
+          async finalize() {
+            // Store entries as JSON so tests can inspect what went into the zip
+            const key = resolveKey(name, options);
+            storage.set(key, JSON.stringify(entries.map((e) => e.name)));
+            return { name };
+          },
+        };
       },
     };
 
@@ -385,5 +410,60 @@ describe('files service', () => {
 
     const content = await filesService.open('quick.txt').read();
     expect(content).toBe('fast write');
+  });
+
+  it('should create a zip builder synchronously', () => {
+    const filesService = createInMemoryFilesService();
+    const zip = filesService.zip('bundle.zip');
+    expect(zip).toBeDefined();
+    expect(zip.write).toBeDefined();
+    expect(zip.finalize).toBeDefined();
+  });
+
+  it('should add entries to zip and finalize', async () => {
+    const filesService = createInMemoryFilesService();
+    const zip = filesService.zip('bundle.zip');
+
+    await zip.write('file1.txt', 'hello');
+    await zip.write('file2.txt', 'world');
+    const ref = await zip.finalize();
+
+    expect(ref.name).toBe('bundle.zip');
+  });
+
+  it('should add file handle to zip', async () => {
+    const filesService = createInMemoryFilesService();
+
+    await filesService.write('source.txt', 'source content');
+    const sourceHandle = filesService.open('source.txt');
+
+    const zip = filesService.zip('bundle.zip');
+    await zip.write('included.txt', sourceHandle);
+    const ref = await zip.finalize();
+
+    expect(ref.name).toBe('bundle.zip');
+  });
+
+  it('should use zip in a brain step', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'Create zip',
+      async ({ files }) => {
+        const zip = files!.zip('results.zip');
+        await zip.write('data.txt', 'test data');
+        const ref = await zip.finalize();
+        return { zipFile: ref.name };
+      }
+    );
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
   });
 });

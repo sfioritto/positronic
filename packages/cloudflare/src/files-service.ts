@@ -4,22 +4,14 @@ import type {
   FileInput,
   FileOptions,
   FileRef,
+  ZipBuilder,
   RuntimeEnv,
   CurrentUser,
 } from '@positronic/core';
 import type { R2Bucket } from '@cloudflare/workers-types';
 import { guessContentType } from './content-type.js';
-
-function isFileHandle(value: unknown): value is FileHandle {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    'name' in value &&
-    'url' in value &&
-    'read' in value &&
-    typeof (value as any).read === 'function'
-  );
-}
+import { createR2ZipBuilder } from './zip-builder.js';
+import { isFileHandle } from './file-utils.js';
 
 export function createFilesService(
   bucket: R2Bucket,
@@ -156,6 +148,11 @@ export function createFilesService(
     async delete(name: string): Promise<void> {
       const handle = createFileHandle(name);
       await handle.delete();
+    },
+
+    zip(name: string, options?: FileOptions): ZipBuilder {
+      const key = resolveKey(name, options);
+      return createR2ZipBuilder(bucket, key, name);
     },
   };
 }

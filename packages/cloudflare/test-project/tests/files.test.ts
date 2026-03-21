@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { createFilesService } from '../../src/files-service.js';
 import type { FilesService } from '@positronic/core';
+import { unzipSync } from 'fflate';
 
 interface TestEnv {
   TEST_RESOURCES_BUCKET: R2Bucket;
@@ -196,5 +197,81 @@ describe('createFilesService', () => {
     );
     expect(object).not.toBeNull();
     expect(object!.httpMetadata?.contentType).toBe('application/json');
+  });
+
+  it('should create a zip with text files', async () => {
+    const service = createService();
+    const zip = service.zip('bundle.zip');
+
+    await zip.write('hello.txt', 'hello world');
+    await zip.write('goodbye.txt', 'goodbye world');
+    const ref = await zip.finalize();
+
+    expect(ref.name).toBe('bundle.zip');
+
+    // Read the zip back and verify contents
+    const zipBytes = await service.open('bundle.zip').readBytes();
+    const unzipped = unzipSync(zipBytes);
+
+    const helloContent = new TextDecoder().decode(unzipped['hello.txt']);
+    const goodbyeContent = new TextDecoder().decode(unzipped['goodbye.txt']);
+    expect(helloContent).toBe('hello world');
+    expect(goodbyeContent).toBe('goodbye world');
+  });
+
+  it('should create a zip with binary content', async () => {
+    const service = createService();
+    const zip = service.zip('binary.zip');
+
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    await zip.write('data.bin', bytes);
+    const ref = await zip.finalize();
+
+    const zipBytes = await service.open('binary.zip').readBytes();
+    const unzipped = unzipSync(zipBytes);
+    expect(unzipped['data.bin']).toEqual(bytes);
+  });
+
+  it('should create a zip with file handle content', async () => {
+    const service = createService();
+
+    // Write a file first
+    await service.write('source.txt', 'file handle content');
+    const sourceHandle = service.open('source.txt');
+
+    // Add it to a zip via handle
+    const zip = service.zip('from-handle.zip');
+    await zip.write('included.txt', sourceHandle);
+    const ref = await zip.finalize();
+
+    const zipBytes = await service.open('from-handle.zip').readBytes();
+    const unzipped = unzipSync(zipBytes);
+    const content = new TextDecoder().decode(unzipped['included.txt']);
+    expect(content).toBe('file handle content');
+  });
+
+  it('should store zip with correct content type', async () => {
+    const service = createService();
+    const zip = service.zip('typed.zip');
+    await zip.write('a.txt', 'data');
+    await zip.finalize();
+
+    const object = await testEnv.TEST_RESOURCES_BUCKET.head(
+      'files/user/test-user/test-brain/typed.zip'
+    );
+    expect(object).not.toBeNull();
+    expect(object!.httpMetadata?.contentType).toBe('application/zip');
+  });
+
+  it('should scope zip files like regular files', async () => {
+    const service = createService();
+    const zip = service.zip('run-scoped.zip', { scope: 'run' });
+    await zip.write('data.txt', 'ephemeral');
+    await zip.finalize();
+
+    const object = await testEnv.TEST_RESOURCES_BUCKET.head(
+      'files/user/test-user/test-brain/runs/run-123/run-scoped.zip'
+    );
+    expect(object).not.toBeNull();
   });
 });

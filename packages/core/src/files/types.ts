@@ -66,6 +66,18 @@ export interface FileHandle {
 }
 
 /**
+ * Streaming zip builder. Created by files.zip() — no I/O until write() is called.
+ * Content is streamed through a zip encoder and uploaded to storage via multipart upload.
+ * Peak memory: ~5MB part buffer + one in-flight chunk.
+ */
+export interface ZipBuilder {
+  /** Add content to the zip. Same input types as file.write(). */
+  write(name: string, content: FileInput): Promise<void>;
+  /** Complete the zip and upload. Returns a ref to the zip file. */
+  finalize(): Promise<FileRef>;
+}
+
+/**
  * Service for creating and managing files during brain execution.
  * Available on the step context as `files`.
  *
@@ -90,4 +102,7 @@ export interface FilesService {
 
   /** Delete a file by name */
   delete(name: string): Promise<void>;
+
+  /** Create a streaming zip builder. Returns synchronously — no I/O until write(). */
+  zip(name: string, options?: FileOptions): ZipBuilder;
 }
