@@ -121,7 +121,8 @@ export type {
   InferStoreTypes,
 } from './store/types.js';
 
-// Files types
+// Files
+export { guessMimeType } from './files/mime.js';
 export type {
   FileInput,
   FileOptions,
