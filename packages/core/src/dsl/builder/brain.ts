@@ -35,7 +35,10 @@ import type {
   TemplateReturn,
 } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
-import { resolveTemplate } from '../../template/render.js';
+import {
+  resolveTemplate,
+  buildTemplateContext,
+} from '../../template/render.js';
 import type {
   InitialRunParams,
   ResumeRunParams,
@@ -460,7 +463,10 @@ export class Brain<
     ) => {
       const config = await configFn(context);
       const client = config.client ?? context.client;
-      const prompt = await resolveTemplate(config.message);
+      const prompt = await resolveTemplate(
+        config.message,
+        buildTemplateContext(context.files, context.resources)
+      );
       const result = await client.generateObject({
         schema: config.outputSchema,
         prompt,

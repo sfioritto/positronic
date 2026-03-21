@@ -1,4 +1,4 @@
-import { Fragment } from '../src/jsx-runtime.js';
+import { Fragment, File, Resource } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import {
   renderTemplate,
@@ -13,7 +13,7 @@ import { finalStateFromEvents } from './brain-test-helpers.js';
 
 // Helper to build TemplateNode trees (simulates what jsx/jsxs produce)
 function node(
-  type: typeof Fragment | ((props: any) => any),
+  type: typeof Fragment | typeof File | typeof Resource | ((props: any) => any),
   props: Record<string, unknown>,
   ...children: TemplateChild[]
 ): TemplateNode {
@@ -277,6 +277,89 @@ describe('brain integration with JSX templates', () => {
     expect(mockGenerateObject).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: expect.stringContaining('loaded content from resource'),
+      })
+    );
+  });
+
+  it('renders <File> node via TemplateContext.readFile', async () => {
+    const tree = node(
+      Fragment,
+      {},
+      'Content: ',
+      node(File, { name: 'report.txt' })
+    );
+    const result = await renderTemplate(tree, {
+      readFile: async (name) => `file:${name}`,
+    });
+    expect(result).toBe('Content: file:report.txt');
+  });
+
+  it('renders <Resource> node via TemplateContext.readResource', async () => {
+    const tree = node(
+      Fragment,
+      {},
+      'Rules: ',
+      node(Resource, { name: 'guidelines' })
+    );
+    const result = await renderTemplate(tree, {
+      readResource: async (name) => `resource:${name}`,
+    });
+    expect(result).toBe('Rules: resource:guidelines');
+  });
+
+  it('throws when <File> is used without readFile in context', async () => {
+    const tree = node(File, { name: 'report.txt' });
+    await expect(renderTemplate(tree, {})).rejects.toThrow(
+      '<File> requires a files service'
+    );
+  });
+
+  it('resolves <File> and <Resource> through full brain execution', async () => {
+    mockGenerateObject.mockResolvedValue({
+      object: { summary: 'done' },
+    } as any);
+
+    const files = {
+      open: (name: string) => ({
+        read: async () => `content of ${name}`,
+      }),
+    };
+
+    const resources = {
+      loadText: async (name: string) => `resource: ${name}`,
+    };
+
+    const testBrain = brain('file-resource-template-test').prompt(
+      'Analyze',
+      () => ({
+        message: node(
+          Fragment,
+          {},
+          node(Resource, { name: 'guidelines' }),
+          '\n',
+          node(File, { name: 'transcript.txt' })
+        ),
+        outputSchema: z.object({ summary: z.string() }),
+      })
+    );
+
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test' },
+      files: files as any,
+      resources: resources as any,
+    })) {
+      // collect events
+    }
+
+    expect(mockGenerateObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('content of transcript.txt'),
+      })
+    );
+    expect(mockGenerateObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('resource: guidelines'),
       })
     );
   });

@@ -54,7 +54,11 @@ import type {
 
 import { Step } from '../builder/step.js';
 import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT } from './constants.js';
-import { resolveTemplate } from '../../template/render.js';
+import {
+  resolveTemplate,
+  buildTemplateContext,
+  type TemplateContext,
+} from '../../template/render.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -87,6 +91,7 @@ export class BrainEventStream<
   private store?: Store<any>;
   private storeProvider?: StoreProvider;
   private files?: FilesService;
+  private templateContext: TemplateContext;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private currentUser: CurrentUser;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
@@ -157,6 +162,7 @@ export class BrainEventStream<
     this.store = store;
     this.storeProvider = storeProvider;
     this.files = files;
+    this.templateContext = buildTemplateContext(this.files, this.resources);
     this.optionsSchema = params.optionsSchema;
 
     // Create scoped memory if provider is configured
@@ -796,7 +802,7 @@ The output must conform to the provided schema.`,
 
     // Resolve JSX templates for system prompt once (used in both fresh and loop paths)
     const resolvedSystem = config.system
-      ? await resolveTemplate(config.system)
+      ? await resolveTemplate(config.system, this.templateContext)
       : undefined;
 
     if (agentContext) {
@@ -885,7 +891,10 @@ The output must conform to the provided schema.`,
       this.resume = undefined;
     } else {
       // Use "Begin." as default prompt if not provided, resolve JSX templates
-      const prompt = await resolveTemplate(config.prompt ?? 'Begin.');
+      const prompt = await resolveTemplate(
+        config.prompt ?? 'Begin.',
+        this.templateContext
+      );
 
       // Emit agent start event (only for fresh starts)
       yield {
@@ -1398,7 +1407,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       try {
         if (config.prompt) {
           // Prompt mode: call generateObject directly per item
-          const prompt = await resolveTemplate(config.prompt.message(item));
+          const prompt = await resolveTemplate(
+            config.prompt.message(item),
+            this.templateContext
+          );
           const client = config.client
             ? this.governor
               ? this.governor(config.client)
@@ -1524,7 +1536,10 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
       );
     }
 
-    const prompt = await resolveTemplate(pageConfig.prompt);
+    const prompt = await resolveTemplate(
+      pageConfig.prompt,
+      this.templateContext
+    );
     const data = (pageConfig.props ?? {}) as Record<string, unknown>;
 
     const uiResult = await generatePage({
