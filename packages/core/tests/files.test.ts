@@ -1,0 +1,389 @@
+import { jest } from '@jest/globals';
+import { brain } from '../src/dsl/builder/brain.js';
+import { BRAIN_EVENTS } from '../src/dsl/constants.js';
+import type { ObjectGenerator } from '../src/clients/types.js';
+import type {
+  FilesService,
+  FileHandle,
+  FileInput,
+  FileOptions,
+  FileRef,
+} from '../src/files/types.js';
+
+const collectEvents = async <T>(
+  iterator: AsyncIterableIterator<T>
+): Promise<T[]> => {
+  const events: T[] = [];
+  for await (const event of iterator) {
+    events.push(event);
+  }
+  return events;
+};
+
+function createInMemoryFilesService(
+  origin: string = 'http://localhost:8787'
+): FilesService & { storage: Map<string, string | Uint8Array> } {
+  const storage = new Map<string, string | Uint8Array>();
+
+  function resolveKey(name: string, options?: FileOptions): string {
+    const scope = options?.scope ?? 'brain';
+    switch (scope) {
+      case 'run':
+        return `files/user/test-user/test-brain/runs/run-1/${name}`;
+      case 'brain':
+        return `files/user/test-user/test-brain/${name}`;
+      case 'global':
+        return `files/user/test-user/${name}`;
+    }
+  }
+
+  function createHandle(name: string, options?: FileOptions): FileHandle {
+    const key = resolveKey(name, options);
+
+    const handle: FileHandle = {
+      name,
+      get url() {
+        return `${origin}/files/${key.slice('files/'.length)}`;
+      },
+      async read() {
+        const data = storage.get(key);
+        if (data === undefined) throw new Error(`File '${name}' not found`);
+        if (typeof data === 'string') return data;
+        return new TextDecoder().decode(data);
+      },
+      async readBytes() {
+        const data = storage.get(key);
+        if (data === undefined) throw new Error(`File '${name}' not found`);
+        if (data instanceof Uint8Array) return data;
+        return new TextEncoder().encode(data);
+      },
+      async write(content: FileInput) {
+        if (typeof content === 'string') {
+          storage.set(key, content);
+        } else if (content instanceof Uint8Array) {
+          storage.set(key, content);
+        } else if (content instanceof Response) {
+          const text = await content.text();
+          storage.set(key, text);
+        } else if (
+          content !== null &&
+          typeof content === 'object' &&
+          'read' in content &&
+          typeof (content as any).read === 'function'
+        ) {
+          // FileHandle
+          const sourceContent = await (content as FileHandle).read();
+          storage.set(key, sourceContent);
+        } else {
+          // ReadableStream — collect all chunks
+          const reader = (content as ReadableStream).getReader();
+          const chunks: Uint8Array[] = [];
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+          }
+          const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+          const result = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const chunk of chunks) {
+            result.set(chunk, offset);
+            offset += chunk.length;
+          }
+          storage.set(key, result);
+        }
+        return { name };
+      },
+      async exists() {
+        return storage.has(key);
+      },
+      async delete() {
+        storage.delete(key);
+      },
+    };
+
+    return handle;
+  }
+
+  const service: FilesService & { storage: Map<string, string | Uint8Array> } =
+    {
+      storage,
+      open(name: string, options?: FileOptions) {
+        return createHandle(name, options);
+      },
+      async write(name: string, content: FileInput, options?: FileOptions) {
+        const handle = createHandle(name, options);
+        return handle.write(content);
+      },
+      async list() {
+        const prefix = 'files/user/test-user/test-brain/';
+        const refs: FileRef[] = [];
+        for (const key of storage.keys()) {
+          if (key.startsWith(prefix)) {
+            const name = key.slice(prefix.length);
+            if (!name.startsWith('runs/')) {
+              refs.push({ name });
+            }
+          }
+        }
+        return refs;
+      },
+      async delete(name: string) {
+        const handle = createHandle(name);
+        await handle.delete();
+      },
+    };
+
+  return service;
+}
+
+const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
+  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
+  streamText: jest.fn<ObjectGenerator['streamText']>(),
+});
+
+describe('files service', () => {
+  it('should inject files into step context', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    let receivedFiles: FilesService | undefined;
+
+    const testBrain = brain('test-brain').step('Check files', ({ files }) => {
+      receivedFiles = files;
+      return { done: true };
+    });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+
+    expect(receivedFiles).toBeDefined();
+    expect(receivedFiles).toBe(filesService);
+  });
+
+  it('should write and read text files', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'Write and read',
+      async ({ files }) => {
+        const file = files!.open('report.txt');
+        await file.write('hello world');
+
+        const content = await file.read();
+        return { content };
+      }
+    );
+
+    const events = await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+
+    const completeEvent = events.find(
+      (e: any) => e.type === BRAIN_EVENTS.STEP_COMPLETE
+    ) as any;
+    expect(completeEvent).toBeDefined();
+
+    // Verify the file was stored
+    expect(
+      filesService.storage.has('files/user/test-user/test-brain/report.txt')
+    ).toBe(true);
+  });
+
+  it('should write binary content', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'Write binary',
+      async ({ files }) => {
+        const file = files!.open('data.bin');
+        const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+        await file.write(bytes);
+
+        const readBack = await file.readBytes();
+        return { length: readBack.length };
+      }
+    );
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+
+    expect(
+      filesService.storage.has('files/user/test-user/test-brain/data.bin')
+    ).toBe(true);
+  });
+
+  it('should compute url from origin', async () => {
+    const filesService = createInMemoryFilesService(
+      'https://myapp.workers.dev'
+    );
+
+    const file = filesService.open('report.txt');
+    expect(file.url).toBe(
+      'https://myapp.workers.dev/files/user/test-user/test-brain/report.txt'
+    );
+  });
+
+  it('should handle file existence check', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'Check existence',
+      async ({ files }) => {
+        const file = files!.open('maybe.txt');
+        const beforeWrite = await file.exists();
+        await file.write('content');
+        const afterWrite = await file.exists();
+        return { beforeWrite, afterWrite };
+      }
+    );
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+  });
+
+  it('should delete files', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'Delete file',
+      async ({ files }) => {
+        await files!.write('temp.txt', 'temporary');
+        const existsBefore = await files!.open('temp.txt').exists();
+        await files!.delete('temp.txt');
+        const existsAfter = await files!.open('temp.txt').exists();
+        return { existsBefore, existsAfter };
+      }
+    );
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+  });
+
+  it('should list files', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'List files',
+      async ({ files }) => {
+        await files!.write('file1.txt', 'content 1');
+        await files!.write('file2.txt', 'content 2');
+        const list = await files!.list();
+        return { count: list.length };
+      }
+    );
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+  });
+
+  it('should scope files by scope option', async () => {
+    const filesService = createInMemoryFilesService();
+
+    // Write to different scopes
+    await filesService.write('shared.txt', 'brain scope');
+    await filesService.write('temp.txt', 'run scope', { scope: 'run' });
+    await filesService.write('global.txt', 'global scope', {
+      scope: 'global',
+    });
+
+    // Verify different keys were used
+    expect(
+      filesService.storage.has('files/user/test-user/test-brain/shared.txt')
+    ).toBe(true);
+    expect(
+      filesService.storage.has(
+        'files/user/test-user/test-brain/runs/run-1/temp.txt'
+      )
+    ).toBe(true);
+    expect(filesService.storage.has('files/user/test-user/global.txt')).toBe(
+      true
+    );
+  });
+
+  it('should copy content between files', async () => {
+    const filesService = createInMemoryFilesService();
+
+    const source = filesService.open('source.txt');
+    await source.write('original content');
+
+    const dest = filesService.open('dest.txt');
+    await dest.write(source);
+
+    const content = await dest.read();
+    expect(content).toBe('original content');
+  });
+
+  it('should propagate files to inner brains', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    let innerReceivedFiles: FilesService | undefined;
+
+    const innerBrain = brain('inner-brain').step('Inner step', ({ files }) => {
+      innerReceivedFiles = files;
+      return { inner: true };
+    });
+
+    const outerBrain = brain('test-brain')
+      .step('Outer step', () => ({ started: true }))
+      .brain('Run inner', innerBrain, {
+        initialState: () => ({}),
+      });
+
+    await collectEvents(
+      outerBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+
+    expect(innerReceivedFiles).toBeDefined();
+    expect(innerReceivedFiles).toBe(filesService);
+  });
+
+  it('should use convenience write method', async () => {
+    const filesService = createInMemoryFilesService();
+
+    const ref = await filesService.write('quick.txt', 'fast write');
+    expect(ref.name).toBe('quick.txt');
+
+    const content = await filesService.open('quick.txt').read();
+    expect(content).toBe('fast write');
+  });
+});

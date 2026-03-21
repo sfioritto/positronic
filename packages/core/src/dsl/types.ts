@@ -107,6 +107,8 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
   memory?: import('../memory/types.js').ScopedMemory;
   /** Typed key-value store — present at runtime when a store schema is configured. Use withStore() for non-optional typing in step callbacks. */
   store?: import('../store/types.js').Store<any>;
+  /** File storage service for creating, reading, and managing files. Present when the backend provides it. */
+  files?: import('../files/types.js').FilesService;
 }
 
 /**

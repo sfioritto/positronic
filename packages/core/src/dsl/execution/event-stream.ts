@@ -31,6 +31,7 @@ import { generatePageHtml } from '../../ui/generate-page-html.js';
 import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
 import type { Store, StoreProvider } from '../../store/types.js';
+import type { FilesService } from '../../files/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type {
@@ -83,6 +84,7 @@ export class BrainEventStream<
   private scopedMemory?: ScopedMemory;
   private store?: Store<any>;
   private storeProvider?: StoreProvider;
+  private files?: FilesService;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private currentUser: CurrentUser;
   private guards: Map<number, GuardBlock<any, any>> = new Map();
@@ -123,6 +125,7 @@ export class BrainEventStream<
       memoryProvider,
       store,
       storeProvider,
+      files,
       currentUser,
     } = params;
 
@@ -151,6 +154,7 @@ export class BrainEventStream<
     this.memoryProvider = memoryProvider;
     this.store = store;
     this.storeProvider = storeProvider;
+    this.files = files;
     this.optionsSchema = params.optionsSchema;
 
     // Create scoped memory if provider is configured
@@ -466,6 +470,7 @@ export class BrainEventStream<
       env: this.env,
       memory: this.scopedMemory,
       store: this.store,
+      files: this.files,
       currentUser: this.currentUser,
       brainRunId: this.brainRunId,
       stepId: step.id,
@@ -547,6 +552,7 @@ export class BrainEventStream<
             governor: this.governor,
             services: this.services as Record<string, any>,
             storeProvider: this.storeProvider,
+            files: this.files,
           })
         : brainBlock.innerBrain.run({
             resources: this.resources,
@@ -560,6 +566,7 @@ export class BrainEventStream<
             governor: this.governor,
             services: this.services as Record<string, any>,
             storeProvider: this.storeProvider,
+            files: this.files,
           });
 
       // Context has been forwarded to the inner brain — clear so outer
@@ -1378,6 +1385,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
             governor: this.governor,
             services: this.services as Record<string, any>,
             storeProvider: this.storeProvider,
+            files: this.files,
           });
 
           let patches: any[] = [];

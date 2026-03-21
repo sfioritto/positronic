@@ -114,6 +114,15 @@ export type {
   InferStoreTypes,
 } from './store/types.js';
 
+// Files types
+export type {
+  FileInput,
+  FileOptions,
+  FileRef,
+  FileHandle,
+  FilesService,
+} from './files/types.js';
+
 // Memory types and utilities
 export type {
   Memory,

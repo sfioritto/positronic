@@ -18,6 +18,7 @@ import { TimeoutAdapter } from './timeout-adapter.js';
 import { PageAdapter } from './page-adapter.js';
 import { EventLoader } from './event-loader.js';
 import { createPagesService } from './pages-service.js';
+import { createFilesService } from './files-service.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
 import type { GovernorDO } from './governor-do.js';
@@ -622,7 +623,11 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * Resolve a brain from the manifest, create all adapters and the configured
    * BrainRunner. Shared setup for both start() and wakeUp().
    */
-  private async prepareRunner(brainTitle: string, brainRunId: string) {
+  private async prepareRunner(
+    brainTitle: string,
+    brainRunId: string,
+    currentUser: { name: string }
+  ) {
     if (!manifest) {
       throw new Error('Runtime manifest not initialized');
     }
@@ -675,6 +680,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
       monitorDOStub,
       env
     );
+    const filesService = createFilesService(
+      this.env.RESOURCES_BUCKET,
+      brainTitle,
+      brainRunId,
+      currentUser,
+      env
+    );
 
     setGovernorBinding(this.env.GOVERNOR_DO);
 
@@ -694,6 +706,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     );
     configuredRunner = configuredRunner
       .withPages(pagesService)
+      .withFiles(filesService)
       .withEnv(env)
       .withSignalProvider(signalProvider)
       .withGovernor((c) => rateGoverned(c))
@@ -744,7 +757,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const { brainToRun, runner } = await this.prepareRunner(
       brainTitle,
-      brainRunId
+      brainRunId,
+      currentUser
     );
 
     runner
@@ -824,7 +838,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     const { brainToRun, runner } = await this.prepareRunner(
       brainTitle,
-      brainRunId
+      brainRunId,
+      currentUser
     );
 
     runner
