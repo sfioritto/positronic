@@ -104,6 +104,28 @@ Fix: add a `submit_template` tool that signals completion, and require `validate
 
 ---
 
+## JSX `<Resource>` and `<File>` template components
+
+Add JSX components that resolve during `resolveTemplate()` for declarative content injection in prompts:
+
+```tsx
+.prompt("Analyze", ({ state }) => ({
+  prompt: (
+    <>
+      Here are the guidelines:
+      <Resource name="guidelines" />
+
+      Now analyze this transcript:
+      <File name={state.transcriptFile} />
+    </>
+  ),
+}))
+```
+
+`<Resource>` resolves via the existing resource loader. `<File>` resolves via the files service. Keeps prompts declarative, avoids manual `await resources.loadText()` / `await file.read()` calls. Framework controls the loading.
+
+---
+
 ---
 
 # Todos & Loose Ends

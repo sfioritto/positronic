@@ -88,7 +88,8 @@
       "Bash(sort -t'\\(' -k2 -n)",
       "Bash(git diff:*)",
       "Bash(git mv:*)",
-      "WebFetch(domain:ui.shadcn.com)"
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(git -C /Users/seanfioritto/projects/positronic diff packages/core/src/ui/generate-ui.ts)"
     ],
     "deny": []
   }
