@@ -39,6 +39,8 @@ import {
   resolveTemplate,
   buildTemplateContext,
 } from '../../template/render.js';
+import type { FileHandle } from '../../files/types.js';
+import { guessMimeType } from '../../files/mime.js';
 import type {
   InitialRunParams,
   ResumeRunParams,
@@ -451,11 +453,13 @@ export class Brain<
           message: TemplateReturn;
           outputSchema: TSchema;
           client?: ObjectGenerator;
+          attachments?: FileHandle[];
         }
       | Promise<{
           message: TemplateReturn;
           outputSchema: TSchema;
           client?: ObjectGenerator;
+          attachments?: FileHandle[];
         }>
   ): Brain<TOptions, TNewState, TServices> {
     const action = async (
@@ -467,9 +471,19 @@ export class Brain<
         config.message,
         buildTemplateContext(context.files, context.resources)
       );
+      const attachments = config.attachments
+        ? await Promise.all(
+            config.attachments.map(async (handle) => ({
+              name: handle.name,
+              mimeType: guessMimeType(handle.name),
+              data: await handle.readBytes(),
+            }))
+          )
+        : undefined;
       const result = await client.generateObject({
         schema: config.outputSchema,
         prompt,
+        attachments,
       });
       return {
         ...context.state,

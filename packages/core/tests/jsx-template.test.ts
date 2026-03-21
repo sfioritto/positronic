@@ -363,4 +363,60 @@ describe('brain integration with JSX templates', () => {
       })
     );
   });
+
+  it('resolves FileHandle attachments to Attachment objects in .prompt()', async () => {
+    mockGenerateObject.mockResolvedValue({
+      object: { answer: 'analyzed' },
+    } as any);
+
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF header
+    const files = {
+      open: (name: string) => ({
+        name,
+        url: '',
+        read: async () => 'text',
+        readBytes: async () => pdfBytes,
+        write: async () => ({ name }),
+        exists: async () => true,
+        delete: async () => {},
+      }),
+      write: async () => ({ name: '' }),
+      list: async () => [],
+      delete: async () => {},
+      zip: () => ({
+        write: async () => {},
+        finalize: async () => ({ name: '' }),
+      }),
+    };
+
+    const testBrain = brain('attachment-test').prompt(
+      'Analyze PDF',
+      ({ files: f }) => ({
+        message: 'Analyze the attached document.',
+        attachments: [f!.open('report.pdf')],
+        outputSchema: z.object({ answer: z.string() }),
+      })
+    );
+
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test' },
+      files: files as any,
+    })) {
+      // collect
+    }
+
+    expect(mockGenerateObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'Analyze the attached document.',
+        attachments: [
+          expect.objectContaining({
+            name: 'report.pdf',
+            mimeType: 'application/pdf',
+            data: pdfBytes,
+          }),
+        ],
+      })
+    );
+  });
 });

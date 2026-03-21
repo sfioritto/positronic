@@ -27,6 +27,7 @@ export type {
   ToolCall,
   ResponseMessage,
   ToolChoice,
+  Attachment,
 } from './clients/types.js';
 export type {
   State,

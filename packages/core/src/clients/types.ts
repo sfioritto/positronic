@@ -9,6 +9,17 @@ import { z } from 'zod';
 export type ToolChoice = 'auto' | 'required' | 'none';
 
 /**
+ * A resolved file attachment for LLM prompts.
+ * Created by resolving FileHandle objects — brain authors pass handles,
+ * the framework resolves them to Attachment before calling the client.
+ */
+export interface Attachment {
+  name: string;
+  mimeType: string;
+  data: Uint8Array;
+}
+
+/**
  * Represents a message in a conversation, used as input for the Generator.
  */
 export type Message = {
@@ -97,6 +108,9 @@ export interface ObjectGenerator {
      * prepend this as a `system` role message to the full message list.
      */
     system?: string;
+
+    /** File attachments to include with the prompt (PDFs, images, etc.) */
+    attachments?: Attachment[];
   }): Promise<{
     object: z.infer<T>;
     usage?: { totalTokens: number };

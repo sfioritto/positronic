@@ -4,6 +4,7 @@ import type {
   ToolMessage,
   ResponseMessage,
   ToolChoice,
+  Attachment,
 } from '@positronic/core';
 import {
   generateText,
@@ -70,6 +71,7 @@ export class VercelClient implements ObjectGenerator {
     prompt?: string;
     messages?: Message[];
     system?: string;
+    attachments?: Attachment[];
   }): Promise<{
     object: z.infer<T>;
     usage?: { totalTokens: number };
@@ -82,9 +84,10 @@ export class VercelClient implements ObjectGenerator {
       prompt,
       messages,
       system,
+      attachments,
     } = params;
 
-    const coreMessages: Message[] = [];
+    const coreMessages: ModelMessage[] = [];
 
     if (system) {
       coreMessages.push({ role: 'system', content: system });
@@ -97,7 +100,21 @@ export class VercelClient implements ObjectGenerator {
     }
 
     if (prompt) {
-      coreMessages.push({ role: 'user', content: prompt });
+      if (attachments?.length) {
+        coreMessages.push({
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            ...attachments.map((a) => ({
+              type: 'file' as const,
+              data: a.data,
+              mimeType: a.mimeType,
+            })),
+          ],
+        });
+      } else {
+        coreMessages.push({ role: 'user', content: prompt });
+      }
     }
 
     // AI SDK v5 requires either messages or prompt, but not both as undefined
