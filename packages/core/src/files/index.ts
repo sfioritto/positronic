@@ -4,4 +4,5 @@ export type {
   FileRef,
   FileHandle,
   FilesService,
+  ZipBuilder,
 } from './types.js';

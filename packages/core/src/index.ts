@@ -121,6 +121,7 @@ export type {
   FileRef,
   FileHandle,
   FilesService,
+  ZipBuilder,
 } from './files/types.js';
 
 // Memory types and utilities
