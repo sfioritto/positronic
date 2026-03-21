@@ -85,7 +85,10 @@
       "Bash(cargo search:*)",
       "Bash(source $HOME/.cargo/env)",
       "Bash(gh api:*)",
-      "Bash(sort -t'\\(' -k2 -n)"
+      "Bash(sort -t'\\(' -k2 -n)",
+      "Bash(git diff:*)",
+      "Bash(git mv:*)",
+      "WebFetch(domain:ui.shadcn.com)"
     ],
     "deny": []
   }
