@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { WebhookRegistration } from './webhook.js';
 import type { ToolChoice } from '../clients/types.js';
+import type { TemplateChild } from '../jsx-runtime.js';
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonArray = JsonValue[];
@@ -152,10 +153,10 @@ export type AgentConfigWithOutput<
 export interface AgentConfig<
   TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>
 > {
-  /** System prompt for the LLM */
-  system?: string;
-  /** Initial user prompt to start the conversation. If omitted, uses "Begin." */
-  prompt?: string;
+  /** System prompt for the LLM. Supports JSX templates. */
+  system?: string | TemplateChild;
+  /** Initial user prompt to start the conversation. If omitted, uses "Begin.". Supports JSX templates. */
+  prompt?: string | TemplateChild;
   /** Tools available to the LLM. Optional - merged with withTools defaults */
   tools?: TTools;
   /** Safety valve - exit if cumulative tokens exceed this limit */
