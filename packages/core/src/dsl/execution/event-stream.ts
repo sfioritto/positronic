@@ -32,6 +32,8 @@ import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
 import type { Store, StoreProvider } from '../../store/types.js';
 import type { FilesService } from '../../files/types.js';
+import { EventChannel } from './event-channel.js';
+import { wrapFilesWithEvents } from '../../files/event-wrapper.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type {
@@ -650,12 +652,52 @@ export class BrainEventStream<
           : stepBlock.client
         : this.client;
 
-      const result = await Promise.resolve(
+      // Event channel lets file operations (and potentially other services)
+      // emit events mid-step. The race loop yields them as they arrive.
+      // If no events are pushed, the loop resolves immediately with the step.
+      const channel = new EventChannel<BrainEvent>();
+      const context = this.buildStepContext(step);
+      const wrappedFiles = this.files
+        ? wrapFilesWithEvents(this.files, channel, {
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+            stepTitle: stepBlock.title,
+          })
+        : undefined;
+
+      let stepDone = false;
+      let stepResult: any;
+      let stepError: any;
+
+      const stepPromise = Promise.resolve(
         stepBlock.action({
-          ...this.buildStepContext(step),
+          ...context,
           client: stepClient,
+          ...(wrappedFiles && { files: wrappedFiles }),
         })
+      ).then(
+        (r) => {
+          stepDone = true;
+          stepResult = r;
+        },
+        (e) => {
+          stepDone = true;
+          stepError = e;
+        }
       );
+
+      while (!stepDone) {
+        await Promise.race([stepPromise, channel.wait()]);
+        for (const event of channel.drain()) {
+          yield event as BrainEvent<TOptions>;
+        }
+      }
+      for (const event of channel.drain()) {
+        yield event as BrainEvent<TOptions>;
+      }
+
+      if (stepError) throw stepError;
+      const result = stepResult;
 
       // Extract state from result (handles promptResponse case)
       if (result && typeof result === 'object' && 'promptResponse' in result) {

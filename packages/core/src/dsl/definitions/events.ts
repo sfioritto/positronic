@@ -234,6 +234,21 @@ export interface IterateItemCompleteEvent<
   canRelease: boolean;
 }
 
+export interface FileWriteStartEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.FILE_WRITE_START;
+  fileName: string;
+  stepTitle: string;
+}
+
+export interface FileWriteCompleteEvent<
+  TOptions extends JsonObject = JsonObject
+> extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.FILE_WRITE_COMPLETE;
+  fileName: string;
+  stepTitle: string;
+}
+
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -258,4 +273,6 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | AgentWebhookEvent<TOptions>
   | AgentRawResponseMessageEvent<TOptions>
   | AgentUserMessageEvent<TOptions>
-  | IterateItemCompleteEvent<TOptions>;
+  | IterateItemCompleteEvent<TOptions>
+  | FileWriteStartEvent<TOptions>
+  | FileWriteCompleteEvent<TOptions>;

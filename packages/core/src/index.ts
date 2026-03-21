@@ -94,6 +94,8 @@ export type {
   WebhookResponseEvent,
   BrainPausedEvent,
   IterateItemCompleteEvent,
+  FileWriteStartEvent,
+  FileWriteCompleteEvent,
 } from './dsl/definitions/events.js';
 
 // Default tools

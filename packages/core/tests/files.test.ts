@@ -188,7 +188,8 @@ describe('files service', () => {
     );
 
     expect(receivedFiles).toBeDefined();
-    expect(receivedFiles).toBe(filesService);
+    // Receives a wrapped version (for event emission), not the raw service
+    expect(receivedFiles).not.toBe(filesService);
   });
 
   it('should write and read text files', async () => {
@@ -373,16 +374,17 @@ describe('files service', () => {
     expect(content).toBe('original content');
   });
 
-  it('should propagate files to inner brains', async () => {
+  it('should propagate files to inner brains and inner writes work', async () => {
     const filesService = createInMemoryFilesService();
     const mockClient = createMockClient();
 
-    let innerReceivedFiles: FilesService | undefined;
-
-    const innerBrain = brain('inner-brain').step('Inner step', ({ files }) => {
-      innerReceivedFiles = files;
-      return { inner: true };
-    });
+    const innerBrain = brain('inner-brain').step(
+      'Inner write',
+      async ({ files }) => {
+        await files!.write('inner-file.txt', 'from inner brain');
+        return { inner: true };
+      }
+    );
 
     const outerBrain = brain('test-brain')
       .step('Outer step', () => ({ started: true }))
@@ -398,8 +400,9 @@ describe('files service', () => {
       })
     );
 
-    expect(innerReceivedFiles).toBeDefined();
-    expect(innerReceivedFiles).toBe(filesService);
+    // Verify the inner brain's write actually worked
+    const content = await filesService.open('inner-file.txt').read();
+    expect(content).toBe('from inner brain');
   });
 
   it('should use convenience write method', async () => {
@@ -465,5 +468,88 @@ describe('files service', () => {
         files: filesService,
       })
     );
+  });
+
+  it('should emit file events mid-step for writes and handle writes', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'Write files',
+      async ({ files }) => {
+        // Convenience write
+        await files!.write('report.txt', 'hello');
+        // Handle write
+        const file = files!.open('output.txt');
+        await file.write('via handle');
+        return { done: true };
+      }
+    );
+
+    const events = await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+
+    const fileEvents = events.filter(
+      (e: any) =>
+        e.type === BRAIN_EVENTS.FILE_WRITE_START ||
+        e.type === BRAIN_EVENTS.FILE_WRITE_COMPLETE
+    );
+
+    // 2 writes × (START + COMPLETE) = 4 events
+    expect(fileEvents.length).toBe(4);
+    expect((fileEvents[0] as any).fileName).toBe('report.txt');
+    expect((fileEvents[2] as any).fileName).toBe('output.txt');
+    expect((fileEvents[0] as any).stepTitle).toBe('Write files');
+
+    // File events appear between step start and step complete
+    const types = events.map((e: any) => e.type);
+    const stepStartIdx = types.indexOf(BRAIN_EVENTS.STEP_START);
+    const stepCompleteIdx = types.indexOf(BRAIN_EVENTS.STEP_COMPLETE);
+    const fileStartIdx = types.indexOf(BRAIN_EVENTS.FILE_WRITE_START);
+
+    expect(fileStartIdx).toBeGreaterThan(stepStartIdx);
+    expect(fileStartIdx).toBeLessThan(stepCompleteIdx);
+  });
+
+  it('should emit events for zip write and finalize operations', async () => {
+    const filesService = createInMemoryFilesService();
+    const mockClient = createMockClient();
+
+    const testBrain = brain('test-brain').step(
+      'Build zip',
+      async ({ files }) => {
+        const zip = files!.zip('bundle.zip');
+        await zip.write('a.txt', 'content a');
+        await zip.write('b.txt', 'content b');
+        await zip.finalize();
+        return { done: true };
+      }
+    );
+
+    const events = await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        files: filesService,
+      })
+    );
+
+    const fileEvents = events.filter(
+      (e: any) =>
+        e.type === BRAIN_EVENTS.FILE_WRITE_START ||
+        e.type === BRAIN_EVENTS.FILE_WRITE_COMPLETE
+    );
+
+    // 3 operations: write a.txt, write b.txt, finalize bundle.zip
+    // Each has START + COMPLETE = 6 events
+    expect(fileEvents.length).toBe(6);
+    expect((fileEvents[0] as any).fileName).toBe('a.txt');
+    expect((fileEvents[2] as any).fileName).toBe('b.txt');
+    expect((fileEvents[4] as any).fileName).toBe('bundle.zip');
   });
 });

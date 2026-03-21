@@ -126,6 +126,20 @@ Add JSX components that resolve during `resolveTemplate()` for declarative conte
 
 ---
 
+## File event visualization in CLI
+
+The event channel + Promise.race pattern now yields FILE_WRITE_START/COMPLETE events mid-step. Next steps:
+
+1. **State machine tracking**: Add file state to `BrainExecutionContext` so the state machine tracks in-progress file operations. File events are currently passthrough (ignored by the machine). Tracking them would enable the CLI to show a live file operations panel.
+
+2. **CLI progress UI**: Build a file operations component (like the step status display) that shows active downloads, completed files, zip progress. Would plug into the watch view alongside the events list.
+
+3. **Progress events**: Add FILE_WRITE_PROGRESS for streaming operations (large downloads, zip building). The event channel already supports this — just needs the files wrapper to emit progress events at intervals during streaming writes. Would need Content-Length from fetch responses to show percentages.
+
+The event channel pattern is generic — once file events prove the concept, the same mechanism could add progress events for any service (store, memory, etc.).
+
+---
+
 ---
 
 # Todos & Loose Ends
