@@ -469,6 +469,7 @@ export class BrainEventStream<
       page: this.currentPage,
       pages: this.pages,
       env: this.env,
+      components: this.components,
       memory: this.scopedMemory,
       store: this.store,
       files: this.files,
