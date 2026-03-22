@@ -72,13 +72,29 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
       scope: MemoryScope,
       options?: { limit?: number }
     ): Promise<Memory[]> {
-      // Build filters for scoping (v2 API)
-      // Note: user_id is omitted — Mem0's API accepts it but doesn't actually
-      // scope memories by user_id (tested 2026-03-22). Memories are scoped by
-      // agent_id only. Re-add user_id filtering if Mem0 fixes this.
-      const filters: Record<string, unknown> = {};
-      if (scope.agentId) {
-        filters.agent_id = scope.agentId;
+      // Two-tier filter strategy:
+      // - Mem0 treats user_id and agent_id as mutually exclusive scopes.
+      //   A single record belongs to one or the other, never both.
+      // - Tier 1 (agent-level): memories stored with agent_id, shared across all users.
+      // - Tier 2 (per-user-per-agent): memories stored with user_id + metadata.associated_agent.
+      // - When userId is present, search both tiers with an OR filter.
+      // - When userId is absent, search only Tier 1 (agent-level).
+      let filters: Record<string, unknown>;
+
+      if (scope.userId) {
+        filters = {
+          OR: [
+            { agent_id: scope.agentId },
+            {
+              AND: [
+                { user_id: scope.userId },
+                { metadata: { associated_agent: scope.agentId } },
+              ],
+            },
+          ],
+        };
+      } else {
+        filters = { agent_id: scope.agentId };
       }
 
       const body: Record<string, unknown> = {
@@ -118,19 +134,30 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
       scope: MemoryScope,
       options?: { metadata?: Record<string, unknown> }
     ): Promise<void> {
+      // Two-tier storage strategy:
+      // - When userId is present, store as Tier 2 (per-user-per-agent):
+      //   user_id as the primary scope, associated_agent in metadata.
+      // - When userId is absent, store as Tier 1 (agent-level):
+      //   agent_id as the primary scope.
       const body: Record<string, unknown> = {
         messages: messages.map((m) => ({
           role: m.role,
           content: m.content,
         })),
-        agent_id: scope.agentId,
         version: 'v2',
       };
 
-      // user_id omitted — Mem0 doesn't scope by it (see search comment above)
-
-      if (options?.metadata) {
-        body.metadata = options.metadata;
+      if (scope.userId) {
+        body.user_id = scope.userId;
+        body.metadata = {
+          ...options?.metadata,
+          associated_agent: scope.agentId,
+        };
+      } else {
+        body.agent_id = scope.agentId;
+        if (options?.metadata) {
+          body.metadata = options.metadata;
+        }
       }
 
       const response = await fetch(`${baseUrl}/v1/memories/`, {
