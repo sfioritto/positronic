@@ -29,7 +29,7 @@ MEM0_API_KEY=your-api-key-here
 
 ### 3. Configure in runner.ts
 
-The memory provider is configured on the runner, not on `createBrain`:
+The memory provider is configured on the runner via the `providers` bag, not on `createBrain`:
 
 ```typescript
 import { BrainRunner } from '@positronic/core';
@@ -41,7 +41,9 @@ const memory = createMem0Provider({
 
 export const runner = new BrainRunner({
   client: myClient,
-  memory,
+  providers: {
+    memory,
+  },
 });
 ```
 
@@ -143,6 +145,9 @@ const adapter = createMem0Adapter({ provider });
 export const runner = new BrainRunner({
   adapters: [adapter],
   client: myClient,
+  providers: {
+    memory: provider,
+  },
 });
 ```
 
