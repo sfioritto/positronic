@@ -26,6 +26,20 @@ export function finalStateFromEvents(events: BrainEvent<any>[]): any {
   return sm.context.currentState;
 }
 
+// Helper: run brain, feed events into state machine, return events + final state + machine.
+export const runWithStateMachine = async (
+  brainInstance: any,
+  runParams: any
+) => {
+  const sm = createBrainExecutionMachine();
+  const events: BrainEvent<any>[] = [];
+  for await (const event of brainInstance.run(runParams)) {
+    events.push(event);
+    sendEvent(sm, event as any);
+  }
+  return { events, finalState: sm.context.currentState as any, sm };
+};
+
 // Define a Logger interface for testing
 interface Logger {
   log: (message: string) => void;
@@ -49,9 +63,15 @@ export type AssertEquals<T, U> = 0 extends 1 & T
 // Mock ObjectGenerator for testing
 export const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
 export const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
+export const mockGenerateText =
+  jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+export const mockCreateToolResultMessage =
+  jest.fn<NonNullable<ObjectGenerator['createToolResultMessage']>>();
 export const mockClient: jest.Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
   streamText: mockStreamText,
+  generateText: mockGenerateText,
+  createToolResultMessage: mockCreateToolResultMessage,
 };
 
 export const dummyOutputSchema = z.object({ result: z.string() });
