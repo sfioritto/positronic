@@ -70,10 +70,11 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
         const startEvent = event as BrainStartEvent;
         const existing = buffers.get(brainRunId);
         if (existing) {
+          existing.agentId = startEvent.brainTitle;
           existing.userId = startEvent.currentUser.name;
         } else {
           buffers.set(brainRunId, {
-            agentId: '',
+            agentId: startEvent.brainTitle,
             userId: startEvent.currentUser.name,
             messages: [],
           });
