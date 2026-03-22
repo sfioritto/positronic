@@ -27,20 +27,20 @@ Add your Mem0 API key to `.env`:
 MEM0_API_KEY=your-api-key-here
 ```
 
-### 3. Configure in brain.ts
+### 3. Configure in runner.ts
+
+The memory provider is configured on the runner, not on `createBrain`:
 
 ```typescript
-import { createBrain, defaultTools } from '@positronic/core';
-import { createMem0Provider, createMem0Tools } from '@positronic/mem0';
-import { components } from './components/index.js';
+import { BrainRunner } from '@positronic/core';
+import { createMem0Provider } from '@positronic/mem0';
 
 const memory = createMem0Provider({
   apiKey: process.env.MEM0_API_KEY!,
 });
 
-export const brain = createBrain({
-  components,
-  defaultTools,
+export const runner = new BrainRunner({
+  client: myClient,
   memory,
 });
 ```
@@ -271,8 +271,8 @@ Memories are scoped by two identifiers:
 Automatically set to the brain/step title. Memories are isolated per agent:
 
 ```typescript
-brain('support-agent').withMemory(memory)  // agentId = 'support-agent'
-brain('sales-agent').withMemory(memory)    // agentId = 'sales-agent'
+brain('support-agent').withMemory()  // agentId = 'support-agent'
+brain('sales-agent').withMemory()    // agentId = 'sales-agent'
 ```
 
 ### userId

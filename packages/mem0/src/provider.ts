@@ -43,7 +43,7 @@ interface Mem0SearchResult {
  * });
  *
  * const myBrain = brain('my-brain')
- *   .withMemory(memory)
+ *   .withMemory()
  *   .prompt('Chat', async ({ memory }) => {
  *     const prefs = await memory.search('user preferences');
  *     return { message: 'Help', outputSchema: z.object({ response: z.string() }) };
