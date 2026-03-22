@@ -12,7 +12,7 @@ The Brain DSL provides a fluent, type-safe API for building stateful AI workflow
 
 The brain function provides full type safety through its fluent API. State types are automatically inferred as you build your brain, and options can be validated at runtime using schemas.
 
-For runtime options validation, use the `withOptionsSchema` method with a Zod schema:
+For runtime options validation, use the `withOptions` method with a Zod schema:
 
 ```typescript
 import { z } from 'zod';
@@ -23,7 +23,7 @@ const optionsSchema = z.object({
 });
 
 const myBrain = brain('My Brain')
-  .withOptionsSchema(optionsSchema)
+  .withOptions(optionsSchema)
   .step('Process', ({ options }) => {
     // options is fully typed based on the schema
     if (options.verbose) {
@@ -235,7 +235,7 @@ Options provide runtime configuration for your brains, allowing different behavi
 
 #### Typing Options
 
-To use options in your brain, define a Zod schema with `withOptionsSchema`:
+To use options in your brain, define a Zod schema with `withOptions`:
 
 ```typescript
 import { z } from 'zod';
@@ -247,9 +247,9 @@ const notificationSchema = z.object({
   includeTimestamp: z.boolean().default(true)
 });
 
-// Use withOptionsSchema to add runtime validation
+// Use withOptions to add runtime validation
 const notificationBrain = brain('Notification Brain')
-  .withOptionsSchema(notificationSchema)
+  .withOptions(notificationSchema)
   .step('Send Alert', async ({ state, options, slack }) => {
     // TypeScript knows the exact shape of options from the schema
     const message = options.includeTimestamp 
@@ -320,7 +320,7 @@ const notificationSchema = z.object({
 });
 
 const notificationBrain = brain('Smart Notifier')
-  .withOptionsSchema(notificationSchema)
+  .withOptions(notificationSchema)
   .withServices({ 
     slack: slackClient,
     email: emailClient 
@@ -1306,7 +1306,7 @@ const processItemBrain = brain('Process Single')
   }));
 
 brain('Dynamic Processor')
-  .withOptionsSchema(z.object({ category: z.string() }))
+  .withOptions(z.object({ category: z.string() }))
   .step('Load items', () => ({
     items: [
       { id: 1, category: 'a' },
