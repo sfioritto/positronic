@@ -80,11 +80,11 @@ const myBrain = brain('my-brain')
   });
 ```
 
-When you attach memory, all steps and agent blocks receive a `memory` object in their context that's scoped to the current brain (agentId is automatically set to the step/brain title).
+When you attach memory, all steps receive a `memory` object in their context that's scoped to the current brain and user.
 
 ## Memory Tools
 
-The package provides two tools that agents can use to interact with memory:
+The package provides two tools that can be used in prompt loop steps to interact with memory:
 
 ### rememberFact
 
@@ -93,12 +93,12 @@ Stores a fact in long-term memory:
 ```typescript
 import { rememberFact } from '@positronic/mem0';
 
-// The agent can call this tool to store information
+// The LLM can call this tool to store information
 // Input: { fact: string }
 // Output: { remembered: boolean, fact: string }
 ```
 
-When the agent calls `rememberFact({ fact: "User prefers dark mode" })`, the fact is stored in Mem0 and can be retrieved later.
+When the LLM calls `rememberFact({ fact: "User prefers dark mode" })`, the fact is stored in Mem0 and can be retrieved later.
 
 ### recallMemories
 
@@ -107,14 +107,14 @@ Searches for relevant memories:
 ```typescript
 import { recallMemories } from '@positronic/mem0';
 
-// The agent can call this tool to search memory
+// The LLM can call this tool to search memory
 // Input: { query: string, limit?: number }
 // Output: { found: number, memories: Array<{ content: string, relevance?: number }> }
 ```
 
-When the agent calls `recallMemories({ query: "user preferences" })`, it receives matching memories with relevance scores.
+When the LLM calls `recallMemories({ query: "user preferences" })`, it receives matching memories with relevance scores.
 
-### Using Memory Tools in Agents
+### Using Memory Tools in Prompt Loops
 
 ```typescript
 import { createMem0Tools } from '@positronic/mem0';
@@ -123,7 +123,7 @@ const memoryTools = createMem0Tools();
 
 const myBrain = brain('personalized-assistant')
   .withMemory(memory)
-  .brain('Chat', () => ({
+  .prompt('Chat', () => ({
     system: `You are a personalized assistant.
 
 Use rememberFact to store important information about the user:
@@ -132,20 +132,17 @@ Use rememberFact to store important information about the user:
 - Any facts they want you to remember
 
 Use recallMemories before responding to check for relevant context.`,
-    prompt: userMessage,
-    tools: {
-      ...memoryTools,
-    },
-    outputSchema: {
-      schema: z.object({ response: z.string() }),
-      name: 'chatResult' as const,
+    message: userMessage,
+    outputSchema: z.object({ response: z.string() }),
+    loop: {
+      tools: { ...memoryTools },
     },
   }));
 ```
 
 ## Automatic Conversation Indexing
 
-The Mem0 adapter automatically stores all agent conversations to memory. This is useful for building up context over time without explicit tool calls.
+The Mem0 adapter automatically stores all prompt loop conversations to memory. This is useful for building up context over time without explicit tool calls.
 
 ### Setting Up the Adapter
 
