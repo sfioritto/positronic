@@ -12,7 +12,7 @@ import type {
   SignalProvider,
   CurrentUser,
   ToolWaitFor,
-  StepContext,
+  ToolContext,
 } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
@@ -1188,7 +1188,7 @@ The output must conform to the provided schema.`,
         if (tool.execute) {
           toolResult = await tool.execute(
             args,
-            this.buildStepContext(step) as StepContext
+            this.buildStepContext(step) as ToolContext
           );
 
           // Check for webhook suspension
