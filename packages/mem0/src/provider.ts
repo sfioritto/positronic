@@ -73,12 +73,12 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
       options?: { limit?: number }
     ): Promise<Memory[]> {
       // Build filters for scoping (v2 API)
+      // Note: user_id is omitted — Mem0's API accepts it but doesn't actually
+      // scope memories by user_id (tested 2026-03-22). Memories are scoped by
+      // agent_id only. Re-add user_id filtering if Mem0 fixes this.
       const filters: Record<string, unknown> = {};
       if (scope.agentId) {
         filters.agent_id = scope.agentId;
-      }
-      if (scope.userId) {
-        filters.user_id = scope.userId;
       }
 
       const body: Record<string, unknown> = {
@@ -127,9 +127,7 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
         version: 'v2',
       };
 
-      if (scope.userId) {
-        body.user_id = scope.userId;
-      }
+      // user_id omitted — Mem0 doesn't scope by it (see search comment above)
 
       if (options?.metadata) {
         body.metadata = options.metadata;
