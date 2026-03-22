@@ -105,16 +105,16 @@ export class Brain<
     };
   }
 
-  // New method to add services
   withServices<TNewServices extends object>(
     services: TNewServices
-  ): Brain<TOptions, TState, TNewServices> {
-    const nextBrain = new Brain<TOptions, TState, TNewServices>(
+  ): Brain<TOptions, TState, TServices & TNewServices> {
+    const nextBrain = new Brain<TOptions, TState, TServices & TNewServices>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
     this.copyConfigTo(nextBrain);
-    nextBrain.services = services;
+    nextBrain.services = { ...this.services, ...services } as TServices &
+      TNewServices;
     return nextBrain;
   }
 
