@@ -509,7 +509,7 @@ SOFTWARE.
 
 `docs/agent-steps-guide.md`:
 
-```md
+````md
 # Agent Steps Guide
 
 This guide covers the agent step functionality in Positronic brains - a powerful way to create LLM-powered agents that can use tools, generate UI, and interact with external systems.
@@ -539,6 +539,7 @@ export const brain = createBrain({
   components,
 });
 ```
+````
 
 Now all brains in your project have type-safe access to services:
 
@@ -1166,7 +1167,7 @@ const finalState = await runner.run(supportAgent);
 
 7. **Type your tools**: Use Zod schemas to ensure type safety for tool inputs and outputs.
 
-```
+````
 
 `docs/atomic-commits/literate-atomic-commits.md`:
 
@@ -1203,7 +1204,7 @@ The author acknowledges that actual development is messy. The recommended approa
 
 Quality commits improve code review efficiency, enable better use of tools like `git bisect` and `git blame`, and demonstrate genuine understanding of the changes being made.
 
-```
+````
 
 `docs/atomic-commits/literate-commits.md`:
 
@@ -1239,7 +1240,6 @@ This transforms `git log` from mundane record-keeping into an educational artifa
 **Professional Development**: The practice reinforces good habits through intentional, observed workflow.
 
 Corey emphasizes this approach works best for deliberate practice rather than production codebases, offering a practical middle ground between ideal documentation and real-world development constraints.
-
 ```
 
 `docs/atomic-commits/telling-stories-with-git.md`:
@@ -1272,12 +1272,11 @@ The author illustrates this through a practical example showing how a simple New
 ## Counter to Common Objections
 
 The author acknowledges the effort required but dismisses two frequent excuses: that atomic commits are "too much work" and that they clutter the main branch. The latter can be addressed through commit squashing before merging.
-
 ```
 
 `docs/cli-testing-guide.md`:
 
-```md
+````md
 # CLI Testing Guide
 
 ## Overview
@@ -1299,6 +1298,7 @@ create(args): React.ReactElement {
 // The CLI calls render() with the returned component
 // This allows tests to inject their own render function
 ```
+````
 
 ### 2. Test Environment Setup
 
@@ -1425,7 +1425,7 @@ describe('command name', () => {
 });
 ```
 
-```
+````
 
 `docs/files-guide.md`:
 
@@ -1458,7 +1458,7 @@ The files service lets brain steps create, read, and manage files. It handles st
   // Store just the name in state — lightweight, portable
   return { reportFile: file.name };
 })
-```
+````
 
 ### Convenience Methods
 
@@ -1612,7 +1612,7 @@ Write to files early, pass names through state:
 
 File write operations emit `FILE_WRITE_START` and `FILE_WRITE_COMPLETE` events during step execution. These appear in the CLI event view between `STEP_START` and `STEP_COMPLETE`.
 
-```
+````
 
 `docs/journal/2026-03-10-auth-user-cleanup.md`:
 
@@ -1683,7 +1683,7 @@ Five-phase refactor + clean-slate pass touching 40+ files across all packages:
 
 All 720 tests pass (540 Jest + 180 vitest). Typecheck clean (only pre-existing RESOURCES_BUCKET errors in test-project).
 
-```
+````
 
 `docs/journal/2026-03-10-root-key-env-newline-bug.md`:
 
@@ -1709,9 +1709,10 @@ The auth setup flow is actually well-wired:
 3. `CloudflareDevServer.setup()` calls `syncEnvironmentVariables()` which reads `.env` via `dotenv.parse()` and writes to `.dev.vars`
 
 The generated `.env` file had `ROOT_PUBLIC_KEY` on what appeared to be line 36 — but examining the actual file content revealed it was concatenated onto the end of the previous comment line:
-
 ```
+
 # CLOUDFLARE_ACCOUNT_ID=ROOT_PUBLIC_KEY='{"kty":"RSA",...}'
+
 ```
 
 Since dotenv treats any line starting with `#` as a comment, the key was silently swallowed.
@@ -1821,7 +1822,6 @@ The reducer is much simpler than `completeBrain` — it doesn't need the `innerS
 
 - **Manual patch application in tests** — initially tried to reconstruct state by collecting all STEP_COMPLETE patches and applying them. Inner brain patches are relative to inner state, not outer state, causing OPERATION_PATH_UNRESOLVABLE errors. The state machine handles this correctly by tracking depth.
 - **Synthetic events in the event stream** — the reverted approach emitted fake AGENT_COMPLETE + COMPLETE events from the catch block in `executeIterateBrain`. This required tracking `agentRunning` and `innerBrainStarted` flags — effectively shadowing the state machine's state inside the event stream. Fragile, wrong layer. The state machine should own its own transitions.
-
 ```
 
 `docs/journal/2026-03-15-outputschema-validation.md`:
@@ -1873,7 +1873,6 @@ The user's inner brain was typed as `brain<any, ...>`. With `any` as the state t
 ## Dead ends
 
 None — the fix was straightforward once the code path was traced.
-
 ```
 
 `docs/journal/2026-03-16-destructive-rerun.md`:
@@ -1940,7 +1939,6 @@ Review caught that `brainTitle` was being used as the success condition (`brainT
 ## Solution
 
 Added `loadAllEventsWithIds()` to EventLoader, a `rerun()` RPC method on BrainRunnerDO that replays events to find the cutoff point then truncates, fixed the API endpoint to use the existing DO and return `brainTitle`, simplified the CLI to `rerun <run-id> --starts-at N` (no brain identifier needed), and wired up the spec test with proper completion polling.
-
 ```
 
 `docs/journal/2026-03-16-iterate-brain-silent-drops.md`:
@@ -2022,7 +2020,6 @@ Also added `.swcrc` with `"target": "es2022"` to the core package — produces n
 The `completeStep` reducer in `brain-state-machine.ts` was unconditionally clearing `iterateContext` on every `STEP_COMPLETE` event. Inner brain steps during iteration triggered this, wiping accumulated results before the iterate step itself completed. The fix adds a `stepId` to `IterateContext` and only clears it when the completing step matches the iterate step.
 
 Also added a regression test (`iterate-brain.test.ts`) in the cloudflare test-project that runs 7 items through a `.brain()` iterate step in workerd.
-
 ```
 
 `docs/journal/2026-03-16-iterate-result-class.md`:
@@ -2073,7 +2070,6 @@ Created `IterateResult<TItem, TResult>` class and removed `mapOutput`:
 - Removed `IterateResult.from()` — unnecessary since resumed brains don't re-run steps that consume iterate results
 - 1 integration test exercises `.values`, `.filter().items`, `.map()`, `.length` during live execution
 - 4 mapOutput tests removed
-
 ```
 
 `docs/journal/2026-03-16-over-full-context.md`:
@@ -2114,7 +2110,6 @@ The test-project's `iterateOptionsTestBrain` at line 556 has a pre-existing over
 ## Solution
 
 Changed `over: (state) => items[]` to `over: (context) => items[] | Promise<items[]>` where `context` is the same `StepContext & TServices & StoreContext` that step actions receive. Updated type definitions, ~10 overload signatures, 3 runtime call sites (with `await`), ~40 test instances, and template documentation. Extracted `buildStepContext` helper to reduce duplication at call sites.
-
 ```
 
 `docs/journal/2026-03-17-iterate-pause-leak.md`:
@@ -2166,12 +2161,11 @@ The fix is a single boolean `canRelease` on the `ITERATE_ITEM_COMPLETE` event, s
 ## Solution
 
 Added `canRelease: boolean` to `IterateItemCompleteEvent`. Set to `!!this.signalProvider` at all three iterate emit sites in `event-stream.ts`. The `IterateItemAdapter` in `brain-runner-do.ts` checks `canRelease` before queuing PAUSE. Inner brains (no signal provider) get `canRelease: false`, so their events are ignored by the adapter — no stale PAUSE leaks.
-
 ```
 
 `docs/journal/2026-03-17-iterate-titem-inference.md`:
 
-```md
+````md
 # Iterate prompt `TItem` inference regression
 
 **Status:** shipped
@@ -2210,6 +2204,7 @@ class Test<TState> {
   ): void {}
 }
 ```
+````
 
 The real issue: **TypeScript evaluates function arguments left-to-right.** When `TItem` appears as a callback parameter in an earlier argument (`template`) and as a callback return type in a later argument (`over`), TypeScript locks `TItem = unknown` while processing the first argument and never backtracks after processing the second.
 
@@ -2254,7 +2249,7 @@ Reverted the full `StepContext` intersection back to the old simple signature. S
 
 Replace `TItem` with `TItems extends any[]` across all iterate overloads. Use `TItems[number]` everywhere the element type is needed (template, error, initialState, configFn, IterateResult). TypeScript infers `TItems` from `over`'s return type and derives element types via indexed access. No API changes — callers don't need to change anything. The `| Promise<TItems>` union on `over` works fine since it's the whole array being inferred, not the element.
 
-```
+````
 
 `docs/journal/2026-03-17-template-context-object.md`:
 
@@ -2295,7 +2290,7 @@ Added `TemplateContext<TState, TOptions>` and `IterateTemplateContext<TItem, TSt
 
 Breaking change by design — all existing `(state) =>` callbacks become `({ state }) =>` and `(item) =>` becomes `({ item }) =>`. Zero-arg templates `() => 'string'` are unaffected since TS allows fewer params.
 
-```
+````
 
 `docs/journal/2026-03-18-agent-completion-cleanup.md`:
 
@@ -2339,7 +2334,6 @@ The "no tool calls" test originally expected silent completion. Updated it to ex
 ## Solution
 
 Five targeted changes across core, both clients, and the test file. The framework (`event-stream.ts`) is now the single source of truth for `toolChoice` defaulting, dead schema exports are gone, and impossible code paths throw instead of silently returning.
-
 ```
 
 `docs/journal/2026-03-18-brain-step-depth-tracking.md`:
@@ -2390,7 +2384,6 @@ This variable is purely local — it doesn't affect the state machine's depth tr
 ## Solution
 
 Two-line conceptual change in `packages/core/src/dsl/execution/event-stream.ts`: added `innerDepth` counter with START/COMPLETE/ERROR tracking. Test added in `brain.test.ts` confirming `.map()` brain mode works correctly when the parent brain runs as a child via `.brain()`.
-
 ```
 
 `docs/journal/2026-03-18-continuation-pattern.md`:
@@ -2441,12 +2434,11 @@ Two agent tests accessed `response` on the config function params to verify it w
 Removed `TResponse` and `TPage` from `Brain` (now 4 generic params), removed `response` and `page` from `StepContext` (now 2 generic params). Operations producing ephemeral data return `Continuation` whose `.handle()` injects `response` via intersection type. Runtime execution unchanged — `buildStepContext()` still constructs the full context object.
 
 Files: new `continuation.ts`, modified `brain.ts`, `types.ts`, `blocks.ts`, `event-stream.ts`, `create-brain.ts`, barrel exports, and test migrations across 5 test files + `example-webhook.ts` + cloudflare test-project.
-
 ```
 
 `docs/journal/2026-03-18-decouple-inner-brain-options.md`:
 
-```md
+````md
 # Decouple Inner Brain Options from Parent
 
 **Status:** shipped
@@ -2473,6 +2465,7 @@ config: { outputKey, initialState? } & (JsonObject extends TInnerOptions
   ? { options?: TInnerOptions | ... }
   : { options: TInnerOptions | ... })
 ```
+````
 
 This doesn't work with TypeScript's overload resolution. The project uses `composite: true` with project references, so `tsc --noEmit` resolves types from built `.d.ts` files. But even after rebuilding, the conditional type that depends on a type parameter being inferred in the same overload signature gets deferred by TypeScript — it can't evaluate `JsonObject extends TInnerOptions` while `TInnerOptions` is still being inferred from the `innerBrain` argument. The result: TypeScript shows the config type without the intersection at all, treating `options` as an unknown property.
 
@@ -2498,7 +2491,7 @@ Seemed like the perfect TypeScript pattern — `JsonObject extends TInnerOptions
 
 Added `options` field to `BrainBlock` and `MapBlock` block types. Updated `.brain()` and `.map()` overloads to accept `Brain<TInnerOptions, TInnerState, any>` (decoupled from parent's `TOptions`), with an optional `options` config field typed as `TInnerOptions | ((context) => TInnerOptions)`. Runtime evaluates the options config (static or function) and passes the result to the inner brain's `run()` call, replacing the old `this.options` propagation. Services (`TServices`) still propagate from parent to child — only options are decoupled.
 
-```
+````
 
 `docs/journal/2026-03-18-delete-resumecontext-tree.md`:
 
@@ -2546,7 +2539,7 @@ Grouped the 7 fields into `ResumeParams` — a flat (non-recursive) container. `
 
 New `ResumeParams` flat container type. `ResumeRunParams.resume: ResumeParams` is the single field. Event-stream stores one `private resume?: ResumeParams`. Inner brain forwarding: build a new `ResumeParams` from the current one's `innerStack`, pass all context fields through, then `this.resume = undefined`. Deleted `ResumeContext`, `AgentResumeContext`, `executionStackToResumeContext()`, `findWebhookResponseInResumeContext()`, and `agent-messages.ts`.
 
-```
+````
 
 `docs/journal/2026-03-18-eliminate-command-class-middlemen.md`:
 
@@ -2588,12 +2581,11 @@ Rewrote `cli.ts` to import components directly and render them in yargs handlers
 ## Solution
 
 Deleted 9 command class files. All `React.createElement` calls now live directly in yargs handlers in `cli.ts`. Updated `docs/new-command-creation-guide.md` to document the 2-touchpoint pattern. 559 + 183 tests pass, build clean.
-
 ```
 
 `docs/journal/2026-03-18-map-prompt-mode.md`:
 
-```md
+````md
 # Add prompt mode to .map()
 
 **Status:** shipped
@@ -2646,10 +2638,11 @@ Added a second overload to `.map()` with flat prompt config:
   error: () => null,
 })
 ```
+````
 
 Execution in `executeMap()` checks `block.prompt` — if present, calls `generateObject` per item instead of running an inner brain. Results are collected as `IterateResult<TItem, z.infer<TSchema>>` tuples, same as brain mode.
 
-```
+````
 
 `docs/journal/2026-03-18-map-replaces-iterate-overloads.md`:
 
@@ -2702,11 +2695,11 @@ Single `.map()` method on Brain builder, single `MapBlock` type, single `execute
   outputKey: 'results' as const,
   error?: (item, error) => fallbackOrNull,
 })
-```
+````
 
 All existing iterate behavior (resume support, signal checking, error handling, IterateResult accumulation) is preserved in the single execution path. The Cloudflare adapter's `IterateItemAdapter` works unchanged because it's event-driven.
 
-```
+````
 
 `docs/journal/2026-03-18-nested-brain-services-propagation.md`:
 
@@ -2752,7 +2745,7 @@ The `.brain()` overload signature requires `innerBrain: Brain<TOptions, TInnerSt
 
 Four small edits across three files, plus four new tests. The merge happens in `Brain.run()` with spread operator — parent/runtime services as base, brain's own services spread on top. `storeProvider` is stored as a private field on `BrainEventStream` and passed through to all three nested brain call sites.
 
-```
+````
 
 `docs/journal/2026-03-18-unify-ui-prompt-api.md`:
 
@@ -2807,7 +2800,6 @@ Two changes:
 
 1. **Rename `responseSchema` → `outputSchema`** in `.ui()` to match `.prompt()`'s `{ schema, name }` shape. `.ui()` overload 1 returns `Brain` instead of `Continuation`.
 2. **Auto-merge inside the UI step**: on resume, `executeUIStep` merges `currentResponse` onto state under `outputSchema.name` and completes the step with a patch. No hidden steps, no `.handle()` needed.
-
 ```
 
 `docs/journal/2026-03-18-watch-machine-useReducer.md`:
@@ -2861,7 +2853,6 @@ robot3/react-robot stay in the CLI package — `brain-run.tsx`, `watch-resolver.
 ## Solution
 
 564 lines of robot3 machine → 280 lines of useReducer. The flat state shape with explicit status enums (`killStatus`, `pauseResumeStatus`, `messageStatus`) replaced both the machine state names and the context bag. The `watch.tsx` changes were minimal — just updating imports and destructuring from `watchState` directly instead of `watchState.context`.
-
 ```
 
 `docs/journal/2026-03-18-webhook-triggers.md`:
@@ -2915,7 +2906,6 @@ None — the design discussion happened before implementation and the approach w
 ## Solution
 
 Extended `WebhookHandlerResult` with two new variants (`trigger` and `ignore`), added `WebhookTriggerConfig` to `createWebhook`, and branched on the handler's return type in the webhook route handler. Trigger webhooks resolve the brain from the manifest and start a fresh `BrainRunnerDO` via the shared `startBrainRun` utility. All existing webhook behavior (resume, verification) is unchanged.
-
 ```
 
 `docs/journal/2026-03-19-jsx-prompt-templates.md`:
@@ -2972,21 +2962,22 @@ Explore replacing template literal functions in the Brain DSL with JSX-based pro
 - Main maintenance concern: SWC plugin version coupling (plugins must match `swc_core` version)
 
 ### Architecture summary
-
 ```
+
 User writes JSX in .tsx
-  ↓
+↓
 SWC plugin: JSXText → JSXExpressionContainer (preserves whitespace)
-  ↓
+↓
 SWC JSX transform: createElement/Fragment calls (expressions pass through)
-  ↓
+↓
 Runtime: createElement builds TemplateNode tree
-  ↓
+↓
 Brain runner: detects TemplateNode return, calls renderTemplate()
-  ↓
+↓
 renderTemplate: walks tree, concatenates strings, auto-dedents → final string
-  ↓
+↓
 String goes to AI client as prompt
+
 ```
 
 **Pieces to build:**
@@ -3092,7 +3083,6 @@ The symlink approach works because compiled files at `.positronic/brains/my-brai
 - **`file.binary = true` in caz prepare hook:** The template-new-project CLAUDE.md described this as working but it doesn't. Caz checks buffer content, not object properties.
 - **Bifurcated manifest paths (`.tsx` → `../brains/`, `.ts` → `../../brains/`):** First attempt at handling compiled output in `.positronic/brains/`. Worked for single files but broke on relative imports within the compiled files.
 - **In-place output with `.gen.js` extension:** Would work but keeps artifacts in the source tree. The user preferred a cleaner approach.
-
 ```
 
 `docs/journal/2026-03-19-remove-statekey.md`:
@@ -3151,7 +3141,6 @@ None — the design was clear from the discussion phase. The only question was w
 - **Runtime**: Changed `{ ...state, [stateKey]: result }` to `{ ...state, ...result }` in event-stream.ts for nested brain execution, agent done tool, and UI resume path.
 - **Tests**: Updated ~80 test assertions across brain.test.ts, agent.test.ts, signals.test.ts, current-user.test.ts, jsx-template.test.ts, type-inference-debug.ts.
 - **Docs**: Updated brain-dsl-guide.md, tips-for-agents.md, ui-step-guide.md, agent-steps-guide.md, and template brains.
-
 ```
 
 `docs/journal/2026-03-19-unify-step-context.md`:
@@ -3203,7 +3192,6 @@ None — this was a straightforward mechanical refactor once the investigation w
 ## Solution
 
 Updated 7 runtime call sites in `event-stream.ts` to use `buildStepContext(step)`, 2 prompt action closures in `brain.ts` to pass full context to templates, and all builder overload signatures to use `StepContext`. Removed `TemplateContext` type entirely. All 777 tests pass, typecheck clean.
-
 ```
 
 `docs/journal/2026-03-21-files-service.md`:
@@ -3327,12 +3315,11 @@ Prompt attachments. `Attachment` type on `generateObject` params, resolved from 
 6. **Attachments** — `Attachment` type on `generateObject`, FileHandle resolution in `.prompt()`, Vercel FilePart mapping
 7. **Agent tools** — `readFile`/`writeFile` standalone tools accessing `context.files`
 8. **Documentation** — CLAUDE.md, standalone guide, template brain-dsl-guide
-
 ```
 
 `docs/memory-guide.md`:
 
-```md
+````md
 # Memory Guide
 
 This guide covers the memory system in Positronic, which enables brains to store and retrieve long-term memories using [Mem0](https://mem0.ai) or other memory providers.
@@ -3351,6 +3338,7 @@ The memory system provides:
 ```bash
 npm install @positronic/mem0
 ```
+````
 
 ## Quick Start
 
@@ -3782,7 +3770,7 @@ const myBrain = brain('my-brain').withMemory(customProvider);
 // ...
 ```
 
-```
+````
 
 `docs/new-command-creation-guide.md`:
 
@@ -3874,7 +3862,7 @@ export const [category] = {
     }
   },
 };
-```
+````
 
 ### Phase 3: CLI Implementation
 
@@ -4218,7 +4206,7 @@ The key is that any backend must satisfy the spec contracts defined in `packages
 
 This process has been proven successful for implementing multiple commands and ensures comprehensive, well-tested functionality that follows established patterns.
 
-```
+````
 
 `docs/removed-agent-system.md`:
 
@@ -4244,7 +4232,7 @@ brain<TTools, TSchema>(
   title: string,
   config: AgentConfigWithOutput<TTools, TSchema>
 ): Brain<TOptions, TState & z.infer<TSchema>, TServices>
-```
+````
 
 **Overload 3: Agent config function with outputSchema**
 
@@ -4652,7 +4640,7 @@ if (block.type === 'agent') {
 - `packages/client-vercel/src/index.ts` — `generateText()` implementation
 - `packages/client-anthropic/src/index.ts` — `generateText()` implementation
 
-```
+````
 
 `docs/testing-philosophy.md`:
 
@@ -4678,12 +4666,15 @@ This document outlines the testing philosophy for the Positronic monorepo, based
 
 Rather than the traditional testing pyramid, we follow the "Testing Trophy" approach:
 
-```
+````
+
        🏆
     E2E Tests
-  Integration Tests
+
+Integration Tests
 Unit Tests & Static
-```
+
+````
 
 - **Static Analysis**: TypeScript, ESLint (foundation)
 - **Unit Tests**: For complex business logic and utilities
@@ -4735,7 +4726,7 @@ it('should create a new schedule', async () => {
     await env.stopAndCleanup();
   }
 });
-```
+````
 
 **Why this follows our philosophy:**
 
@@ -4855,7 +4846,7 @@ Our testing philosophy emphasizes:
 
 Remember: The more your tests resemble the way your software is used, the more confidence they can give you.
 
-```
+````
 
 `docs/ui-step-guide.md`:
 
@@ -4899,7 +4890,7 @@ const feedbackBrain = brain('Collect Feedback')
     feedbackReceived: true,
     // state.rating and state.comments are typed
   }));
-```
+````
 
 ## How It Works
 
@@ -5241,7 +5232,7 @@ See the Brain DSL Guide's "Custom Pages with Forms" section for full examples.
 4. **Test Incrementally**: Test each UI step independently before combining
 5. **Use Meaningful Titles**: Step titles appear in logs and help with debugging
 
-```
+````
 
 `ideas.md`:
 
@@ -5368,7 +5359,7 @@ Add JSX components that resolve during `resolveTemplate()` for declarative conte
     </>
   ),
 }))
-```
+````
 
 `<Resource>` resolves via the existing resource loader. `<File>` resolves via the files service. Keeps prompts declarative, avoids manual `await resources.loadText()` / `await file.read()` calls. Framework controls the loading.
 
@@ -5424,7 +5415,7 @@ In-code TODO at `packages/cloudflare/src/dev-server.ts:324-329` — 5 improvemen
 
 ~15 local branches for merged features still exist: `feature/loops`, `feature/options`, `feature/webhooks`, `feature/signals`, `feature/ssh-keys`, `feature/current-user`, `feature/rate-limit`, `feature/brain-over`, `feature/tool-choice`, `feature/watch-accept-name-or-run-id`, `feature/webhooks-first-attempt`, `fix/monitor-do-inner-brain-status`, `refactor/brainName`. The `feature/pause-and-chat` branch has unmerged work relevant to `px chat`.
 
-```
+````
 
 `jest.config.js`:
 
@@ -5497,7 +5488,7 @@ const config = {
 
 export default config;
 
-```
+````
 
 `nodemon.json`:
 
@@ -5511,7 +5502,6 @@ export default config;
   ],
   "ext": "ts,js,json,tsx"
 }
-
 ```
 
 `package.json`:
@@ -5572,12 +5562,11 @@ export default config;
     "trailingComma": "es5"
   }
 }
-
 ```
 
 `packages/cli/CHANGELOG.md`:
 
-```md
+````md
 # @positronic/cli
 
 ## 0.0.77
@@ -6064,8 +6053,9 @@ export default config;
 
   export default myWebhook;
   ```
+````
 
-  This change also improves error handling when webhooks are not found, returning a 404 with "Webhook 'name' not found" instead of a 500 error.
+This change also improves error handling when webhooks are not found, returning a 404 with "Webhook 'name' not found" instead of a 500 error.
 
 ## 0.0.49
 
@@ -6680,7 +6670,7 @@ export default config;
   - @positronic/spec@0.0.11
   - @positronic/template-new-project@0.0.11
 
-```
+````
 
 `packages/cli/package.json`:
 
@@ -6738,7 +6728,7 @@ export default config;
   }
 }
 
-```
+````
 
 `packages/cli/src/cli.ts`:
 
@@ -8562,7 +8552,6 @@ export function buildCli(options: CliOptions) {
 
   return cli;
 }
-
 ```
 
 `packages/cli/src/commands/backend.ts`:
@@ -8639,7 +8628,6 @@ export async function createDevServer(
   const { DevServer } = await loadBackendModule(projectRootPath);
   return new DevServer(projectRootPath);
 }
-
 ```
 
 `packages/cli/src/commands/helpers.ts`:
@@ -9692,7 +9680,6 @@ async function uploadLargeFileWithProgress(
     fileStream.pipe(req);
   });
 }
-
 ```
 
 `packages/cli/src/commands/project-config-manager.ts`:
@@ -9963,7 +9950,6 @@ export class ProjectConfigManager {
     return project?.privateKeyPath;
   }
 }
-
 ```
 
 `packages/cli/src/commands/server.ts`:
@@ -10358,7 +10344,6 @@ export class ServerCommand {
     }
   }
 }
-
 ```
 
 `packages/cli/src/components/agent-chat-view.tsx`:
@@ -10486,7 +10471,6 @@ export const AgentChatView = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/auth-login.tsx`:
@@ -10718,7 +10702,6 @@ export const AuthLogin = ({
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/auth-logout.tsx`:
@@ -10854,7 +10837,6 @@ export const AuthLogout = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/brain-history.tsx`:
@@ -11076,7 +11058,6 @@ export const BrainHistory = ({ brainName, limit }: BrainHistoryProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/brain-kill.tsx`:
@@ -11235,7 +11216,6 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/brain-list.tsx`:
@@ -11445,7 +11425,6 @@ export const BrainList = () => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/brain-rerun.tsx`:
@@ -11534,7 +11513,6 @@ export const BrainRerun = ({ runId, startsAt }: BrainRerunProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/brain-resolver.tsx`:
@@ -11685,7 +11663,6 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/brain-run.tsx`:
@@ -12027,7 +12004,6 @@ export const BrainRun = ({
       return null;
   }
 };
-
 ```
 
 `packages/cli/src/components/brain-show.tsx`:
@@ -12277,7 +12253,6 @@ export const BrainShow = ({ identifier, showSteps }: BrainShowProps) => {
     </BrainResolver>
   );
 };
-
 ```
 
 `packages/cli/src/components/brain-top-table.tsx`:
@@ -12514,7 +12489,6 @@ export const BrainTopTable = ({
 
 // Re-export the RunningBrain type for consumers
 export type { RunningBrain };
-
 ```
 
 `packages/cli/src/components/brain-top.tsx`:
@@ -12622,7 +12596,6 @@ export const BrainTop = ({ brainFilter }: BrainTopProps) => {
     <BrainTopTable runningBrains={runningBrains} brainFilter={brainFilter} />
   );
 };
-
 ```
 
 `packages/cli/src/components/brain-watch.tsx`:
@@ -12772,7 +12745,6 @@ export const BrainWatchWithResolver = ({
     </BrainResolver>
   );
 };
-
 ```
 
 `packages/cli/src/components/error.tsx`:
@@ -12806,7 +12778,6 @@ export const ErrorComponent = ({ error }: ErrorComponentProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/event-detail.tsx`:
@@ -13179,7 +13150,6 @@ export const EventDetail = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/events-view.tsx`:
@@ -13605,7 +13575,6 @@ export const EventsView = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/page-delete.tsx`:
@@ -13736,7 +13705,6 @@ export const PageDelete = ({ slug, force }: PageDeleteProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/pages-list.tsx`:
@@ -13906,7 +13874,6 @@ export const PagesList = () => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/project-add.tsx`:
@@ -13975,7 +13942,6 @@ export const ProjectAdd = ({ name, url, projectConfig }: ProjectAddProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/project-auth-setup.tsx`:
@@ -14209,7 +14175,6 @@ export const ProjectAuthSetup = ({
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/project-create.tsx`:
@@ -14346,7 +14311,6 @@ export const ProjectCreate = ({ projectPathArg }: ProjectCreateProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/project-list.tsx`:
@@ -14443,7 +14407,6 @@ function truncate(text: string, maxWidth: number): string {
   if (text.length <= maxWidth) return text;
   return text.substring(0, maxWidth - 3) + '...';
 }
-
 ```
 
 `packages/cli/src/components/project-remove.tsx`:
@@ -14508,7 +14471,6 @@ export const ProjectRemove = ({ name, projectConfig }: ProjectRemoveProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/project-select.tsx`:
@@ -14706,7 +14668,6 @@ export const ProjectSelect = ({ name, projectConfig }: ProjectSelectProps) => {
 
   return <Text>Processing...</Text>;
 };
-
 ```
 
 `packages/cli/src/components/project-show.tsx`:
@@ -14766,15 +14727,14 @@ export const ProjectShow = ({ projectConfig }: ProjectShowProps) => {
         <Box marginTop={1}>
           <Text dimColor>
             {projects.length - 1} other project
-            {projects.length - 1 === 1 ? '' : 's'} available. Use "px project
-            list" to see all.
+            {projects.length - 1 === 1 ? '' : 's'} available. Use "px project list"
+            to see all.
           </Text>
         </Box>
       )}
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/resource-clear.tsx`:
@@ -14925,7 +14885,6 @@ export const ResourceClear = () => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/resource-delete.tsx`:
@@ -15115,7 +15074,6 @@ export const ResourceDelete = ({
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/resource-list.tsx`:
@@ -15317,7 +15275,6 @@ function formatSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
-
 ```
 
 `packages/cli/src/components/resource-sync.tsx`:
@@ -15521,7 +15478,6 @@ export const ResourceSync = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/resource-types.tsx`:
@@ -15586,7 +15542,6 @@ export const ResourceTypes: React.FC<ResourceTypesProps> = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/resource-upload.tsx`:
@@ -15788,7 +15743,6 @@ function formatSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
-
 ```
 
 `packages/cli/src/components/run-show.tsx`:
@@ -16017,7 +15971,6 @@ export const RunShow = ({ runId }: RunShowProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/schedule-create.tsx`:
@@ -16148,7 +16101,6 @@ export const ScheduleCreate = ({
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/schedule-delete.tsx`:
@@ -16281,7 +16233,6 @@ export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/schedule-list.tsx`:
@@ -16542,7 +16493,6 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/schedule-runs.tsx`:
@@ -16714,7 +16664,6 @@ export const ScheduleRuns = ({
 const padRight = (text: string, width: number): string => {
   return text + ' '.repeat(Math.max(0, width - text.length));
 };
-
 ```
 
 `packages/cli/src/components/schedule-timezone.tsx`:
@@ -16852,7 +16801,6 @@ export const ScheduleTimezone = ({ timezone }: ScheduleTimezoneProps) => {
 
   return <TimezoneGet />;
 };
-
 ```
 
 `packages/cli/src/components/secrets-bulk.tsx`:
@@ -16985,7 +16933,6 @@ export const SecretsBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/secrets-create.tsx`:
@@ -17083,7 +17030,6 @@ export const SecretsCreate = ({ name, value }: SecretCreateProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/secrets-delete.tsx`:
@@ -17143,7 +17089,6 @@ export const SecretsDelete = ({ name }: SecretDeleteProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/secrets-list.tsx`:
@@ -17268,7 +17213,6 @@ export const SecretsList = () => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/select-list.tsx`:
@@ -17359,7 +17303,6 @@ export const SelectList = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/state-view.tsx`:
@@ -17447,7 +17390,6 @@ export const StateView = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/store-explorer.tsx`:
@@ -17911,7 +17853,6 @@ export const StoreExplorer = () => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/top-navigator.tsx`:
@@ -18243,7 +18184,6 @@ export const TopNavigator = ({ brainFilter }: TopNavigatorProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/types.ts`:
@@ -18261,7 +18201,6 @@ export interface StoredEvent {
 }
 
 export type EventsViewMode = 'auto' | 'navigating' | 'detail';
-
 ```
 
 `packages/cli/src/components/users-create.tsx`:
@@ -18358,7 +18297,6 @@ export const UsersCreate = ({ name }: UsersCreateProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/users-delete.tsx`:
@@ -18480,7 +18418,6 @@ export const UsersDelete = ({ userName, force }: UsersDeleteProps) => {
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/users-keys-add.tsx`:
@@ -18700,7 +18637,6 @@ export const UsersKeysAdd = ({
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/users-keys-list.tsx`:
@@ -18856,7 +18792,6 @@ export const UsersKeysList = ({ userName }: UsersKeysListProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/users-keys-remove.tsx`:
@@ -18989,7 +18924,6 @@ export const UsersKeysRemove = ({
 
   return null;
 };
-
 ```
 
 `packages/cli/src/components/users-list.tsx`:
@@ -19101,7 +19035,6 @@ export const UsersList = () => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/watch-keyboard.ts`:
@@ -19312,7 +19245,6 @@ function handleProgressAndEventsKeys(
 
   return null;
 }
-
 ```
 
 `packages/cli/src/components/watch-machine.ts`:
@@ -19715,7 +19647,6 @@ export function useWatchReducer(runId: string, startWithEvents = false) {
 
   return [state, send] as const;
 }
-
 ```
 
 `packages/cli/src/components/watch-resolver.tsx`:
@@ -20152,7 +20083,6 @@ export const WatchResolver = ({
       return null;
   }
 };
-
 ```
 
 `packages/cli/src/components/watch.tsx`:
@@ -20919,7 +20849,6 @@ export const Watch = ({
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/components/whoami.tsx`:
@@ -21012,7 +20941,6 @@ export const Whoami = ({ configManager, projectRootPath }: WhoamiProps) => {
     </Box>
   );
 };
-
 ```
 
 `packages/cli/src/hooks/useAlternateScreen.ts`:
@@ -21036,7 +20964,6 @@ export function useAlternateScreen(enabled = true) {
     };
   }, [write, enabled]);
 }
-
 ```
 
 `packages/cli/src/hooks/useApi.ts`:
@@ -21337,7 +21264,6 @@ export function useApiDelete(resourceType: string) {
 
   return { loading, error, execute };
 }
-
 ```
 
 `packages/cli/src/hooks/useBrainMachine.ts`:
@@ -21361,7 +21287,6 @@ export function useBrainMachine(key?: unknown, options?: CreateMachineOptions) {
   const machine = useMemo(() => createBrainMachine(options), [key]);
   return useMachine(machine);
 }
-
 ```
 
 `packages/cli/src/lib/jwt-auth.ts`:
@@ -21818,7 +21743,6 @@ export const authenticatedFetch: typeof fetch = async (
     },
   });
 };
-
 ```
 
 `packages/cli/src/lib/local-auth.ts`:
@@ -21865,7 +21789,6 @@ export function clearLocalAuth(projectRoot: string): void {
     unlinkSync(filePath);
   }
 }
-
 ```
 
 `packages/cli/src/lib/ssh-agent-signer.ts`:
@@ -21955,7 +21878,6 @@ export class AgentSigner {
     });
   }
 }
-
 ```
 
 `packages/cli/src/lib/ssh-key-utils.ts`:
@@ -22264,7 +22186,6 @@ export function generateSSHKey(
     };
   }
 }
-
 ```
 
 `packages/cli/src/positronic.ts`:
@@ -22334,7 +22255,6 @@ const cli = buildCli({
 
 // Parse the arguments
 cli.parse();
-
 ```
 
 `packages/cli/src/types/sshpk-agent.d.ts`:
@@ -22389,7 +22309,6 @@ declare module 'sshpk-agent' {
 
   export { Client, ClientOptions };
 }
-
 ```
 
 `packages/cli/src/utils/agent-utils.ts`:
@@ -22466,7 +22385,6 @@ export function getAgentLoops(
     })
   );
 }
-
 ```
 
 `packages/cli/tests/agent-utils.test.ts`:
@@ -22718,7 +22636,6 @@ describe('getAgentLoops', () => {
     expect(result[0].startEvent.tools).toEqual(['search', 'calculate']);
   });
 });
-
 ```
 
 `packages/cli/tests/auth.test.ts`:
@@ -23037,7 +22954,6 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
   });
 });
-
 ```
 
 `packages/cli/tests/brain-kill.test.ts`:
@@ -23223,7 +23139,6 @@ describe('brain kill command', () => {
     }
   });
 });
-
 ```
 
 `packages/cli/tests/brain-top.test.ts`:
@@ -23513,7 +23428,6 @@ describe('CLI Integration: positronic top command', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/brain.test.ts`:
@@ -25956,21 +25870,18 @@ describe('CLI Integration: positronic brain commands', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/data/resources/config.json`:
 
 ```json
 { "setting": true }
-
 ```
 
 `packages/cli/tests/data/resources/data/config.json`:
 
 ```json
 {}
-
 ```
 
 `packages/cli/tests/data/resources/docs/api.md`:
@@ -25979,7 +25890,6 @@ describe('CLI Integration: positronic brain commands', () => {
 # API Documentation
 
 This is API documentation for testing purposes.
-
 ```
 
 `packages/cli/tests/data/resources/docs/readme.md`:
@@ -25988,7 +25898,6 @@ This is API documentation for testing purposes.
 # Readme
 
 This is a readme file in the docs directory.
-
 ```
 
 `packages/cli/tests/data/resources/example.md`:
@@ -25997,7 +25906,6 @@ This is a readme file in the docs directory.
 # Example
 
 This is an example markdown file for testing.
-
 ```
 
 `packages/cli/tests/data/resources/file with spaces.txt`:
@@ -26012,7 +25920,6 @@ content
 # README
 
 This is a README file for testing purposes.
-
 ```
 
 `packages/cli/tests/data/resources/test.txt`:
@@ -26511,7 +26418,6 @@ describe('Helper Functions Unit Tests', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/jest.setup.ts`:
@@ -26541,7 +26447,6 @@ afterEach(() => {
   nock.enableNetConnect();
   nock.cleanAll();
 });
-
 ```
 
 `packages/cli/tests/mock-api-client.ts`:
@@ -26699,7 +26604,6 @@ export function createMockApiClient(
   }
   return client;
 }
-
 ```
 
 `packages/cli/tests/pages.test.ts`:
@@ -26926,7 +26830,6 @@ describe('pages command', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/project.test.ts`:
@@ -27449,7 +27352,6 @@ describe('CLI Integration: project commands', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/resources.test.ts`:
@@ -28522,7 +28424,6 @@ describe('CLI Integration: positronic resources types', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/schedule.test.ts`:
@@ -29271,7 +29172,6 @@ describe('schedule command', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/secrets.test.ts`:
@@ -29562,7 +29462,6 @@ EXISTING_KEY=updated-value`;
     });
   });
 });
-
 ```
 
 `packages/cli/tests/server.test.ts`:
@@ -30064,7 +29963,6 @@ describe('CLI Integration: positronic server', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/store.test.ts`:
@@ -30439,7 +30337,6 @@ describe('store command', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tests/test-dev-server.ts`:
@@ -32362,7 +32259,6 @@ export class TestDevServer implements PositronicDevServer {
     }
   }
 }
-
 ```
 
 `packages/cli/tests/test-utils.ts`:
@@ -32714,7 +32610,6 @@ async function runCli(
 
   return capturedElement;
 }
-
 ```
 
 `packages/cli/tests/tsconfig.json`:
@@ -32728,7 +32623,6 @@ async function runCli(
     "jsx": "react-jsx"
   }
 }
-
 ```
 
 `packages/cli/tests/users.test.ts`:
@@ -33011,7 +32905,6 @@ describe('users command', () => {
     });
   });
 });
-
 ```
 
 `packages/cli/tsconfig.json`:
@@ -33028,7 +32921,6 @@ describe('users command', () => {
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }
-
 ```
 
 `packages/client-anthropic/CHANGELOG.md`:
@@ -33964,7 +33856,6 @@ describe('users command', () => {
 - Bump all packages to next patch version
 - Updated dependencies
   - @positronic/core@0.0.11
-
 ```
 
 `packages/client-anthropic/package.json`:
@@ -33981,10 +33872,7 @@ describe('users command', () => {
   "main": "dist/src/index.js",
   "types": "dist/types/index.ts",
   "license": "MIT",
-  "files": [
-    "dist",
-    "package.json"
-  ],
+  "files": ["dist", "package.json"],
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
@@ -34001,7 +33889,6 @@ describe('users command', () => {
     "zod-to-json-schema": "^3.24.1"
   }
 }
-
 ```
 
 `packages/client-anthropic/src/index.ts`:
@@ -34414,7 +34301,6 @@ export class AnthropicClient implements ObjectGenerator {
     };
   }
 }
-
 ```
 
 `packages/client-anthropic/tsconfig.json`:
@@ -34430,7 +34316,6 @@ export class AnthropicClient implements ObjectGenerator {
   "include": ["**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }
-
 ```
 
 `packages/client-vercel/CHANGELOG.md`:
@@ -35366,7 +35251,6 @@ export class AnthropicClient implements ObjectGenerator {
 - Bump all packages to next patch version
 - Updated dependencies
   - @positronic/core@0.0.11
-
 ```
 
 `packages/client-vercel/package.json`:
@@ -35383,10 +35267,7 @@ export class AnthropicClient implements ObjectGenerator {
   "main": "dist/src/index.js",
   "types": "dist/types/index.d.ts",
   "license": "MIT",
-  "files": [
-    "dist",
-    "package.json"
-  ],
+  "files": ["dist", "package.json"],
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
@@ -35401,7 +35282,6 @@ export class AnthropicClient implements ObjectGenerator {
     "zod": "^3.24.1"
   }
 }
-
 ```
 
 `packages/client-vercel/src/index.ts`:
@@ -35841,7 +35721,6 @@ export class VercelClient implements ObjectGenerator {
     };
   }
 }
-
 ```
 
 `packages/client-vercel/tsconfig.json`:
@@ -35859,12 +35738,11 @@ export class VercelClient implements ObjectGenerator {
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }
-
 ```
 
 `packages/cloudflare/CHANGELOG.md`:
 
-```md
+````md
 # @positronic/cloudflare
 
 ## 0.0.77
@@ -36351,8 +36229,9 @@ export class VercelClient implements ObjectGenerator {
 
   export default myWebhook;
   ```
+````
 
-  This change also improves error handling when webhooks are not found, returning a 404 with "Webhook 'name' not found" instead of a 500 error.
+This change also improves error handling when webhooks are not found, returning a 404 with "Webhook 'name' not found" instead of a 500 error.
 
 ## 0.0.49
 
@@ -36967,7 +36846,7 @@ export class VercelClient implements ObjectGenerator {
   - @positronic/spec@0.0.11
   - @positronic/template-new-project@0.0.11
 
-```
+````
 
 `packages/cloudflare/package.json`:
 
@@ -37027,7 +36906,7 @@ export class VercelClient implements ObjectGenerator {
   }
 }
 
-```
+````
 
 `packages/cloudflare/src/api/auth-middleware.ts`:
 
@@ -37178,7 +37057,6 @@ export function authMiddleware(): MiddlewareHandler<{ Bindings: Bindings }> {
     return c.json({ error: 'Invalid or expired token' }, 401);
   };
 }
-
 ```
 
 `packages/cloudflare/src/api/brains.ts`:
@@ -37790,7 +37668,6 @@ brains.get('/:identifier', async (context: Context) => {
 });
 
 export default brains;
-
 ```
 
 `packages/cloudflare/src/api/bundle.ts`:
@@ -37853,7 +37730,6 @@ bundle.get('/components.js', async (context: Context) => {
 });
 
 export default bundle;
-
 ```
 
 `packages/cloudflare/src/api/files.ts`:
@@ -37902,7 +37778,6 @@ files.get('/*', async (context: Context) => {
 });
 
 export default files;
-
 ```
 
 `packages/cloudflare/src/api/index.ts`:
@@ -38010,7 +37885,6 @@ export type {
   CreateBrainRunRequest,
   CreateBrainRunResponse,
 } from './types.js';
-
 ```
 
 `packages/cloudflare/src/api/pages.ts`:
@@ -38325,7 +38199,6 @@ pages.delete('/:slug', async (context: Context) => {
 });
 
 export default pages;
-
 ```
 
 `packages/cloudflare/src/api/resources.ts`:
@@ -38623,7 +38496,6 @@ resources.post('/presigned-link', async (context: Context) => {
 });
 
 export default resources;
-
 ```
 
 `packages/cloudflare/src/api/secrets.ts`:
@@ -39006,7 +38878,6 @@ secrets.post('/bulk', async (context: Context) => {
 });
 
 export default secrets;
-
 ```
 
 `packages/cloudflare/src/api/store.ts`:
@@ -39302,7 +39173,6 @@ store.get('/', async (context: Context) => {
 });
 
 export default store;
-
 ```
 
 `packages/cloudflare/src/api/types.ts`:
@@ -39345,7 +39215,6 @@ export type CreateBrainRunRequest = {
 export type CreateBrainRunResponse = {
   brainRunId: string;
 };
-
 ```
 
 `packages/cloudflare/src/api/users.ts`:
@@ -39576,7 +39445,6 @@ app.delete('/:name/keys/:fingerprint', async (c) => {
 });
 
 export default app;
-
 ```
 
 `packages/cloudflare/src/api/webhooks/coordination.ts`:
@@ -39694,7 +39562,6 @@ export async function queueWebhookAndWakeUp(
     message: 'No brain waiting for this webhook',
   };
 }
-
 ```
 
 `packages/cloudflare/src/api/webhooks/index.ts`:
@@ -39805,7 +39672,6 @@ webhooks.post('/:slug', async (context: Context) => {
 });
 
 export default webhooks;
-
 ```
 
 `packages/cloudflare/src/api/webhooks/system.ts`:
@@ -39885,7 +39751,6 @@ system.post('/page-form', async (context: Context) => {
 });
 
 export default system;
-
 ```
 
 `packages/cloudflare/src/auth-do.ts`:
@@ -40090,7 +39955,6 @@ export class AuthDO extends DurableObject<AuthEnv> {
     };
   }
 }
-
 ```
 
 `packages/cloudflare/src/brain-resolver.ts`:
@@ -40239,7 +40103,6 @@ export class BrainResolver {
     return Object.keys(this.enhancedManifest);
   }
 }
-
 ```
 
 `packages/cloudflare/src/brain-runner-do.ts`:
@@ -41178,7 +41041,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
   }
 }
-
 ```
 
 `packages/cloudflare/src/content-type.ts`:
@@ -41191,7 +41053,6 @@ export function guessContentType(nameOrKey: string): string {
   if (mime.startsWith('text/')) return `${mime}; charset=utf-8`;
   return mime;
 }
-
 ```
 
 `packages/cloudflare/src/create-r2-store.ts`:
@@ -41273,7 +41134,6 @@ export function createR2Backend(bucket: R2Bucket): StoreProvider {
     return store;
   };
 }
-
 ```
 
 `packages/cloudflare/src/dev-server.ts`:
@@ -42583,7 +42443,6 @@ export class CloudflareDevServer implements PositronicDevServer {
     });
   }
 }
-
 ```
 
 `packages/cloudflare/src/event-loader.ts`:
@@ -42713,7 +42572,6 @@ export class EventLoader {
     return events.filter((e): e is BrainEvent => e !== null);
   }
 }
-
 ```
 
 `packages/cloudflare/src/file-utils.ts`:
@@ -42731,7 +42589,6 @@ export function isFileHandle(value: unknown): value is FileHandle {
     typeof (value as any).read === 'function'
   );
 }
-
 ```
 
 `packages/cloudflare/src/files-service.ts`:
@@ -42895,7 +42752,6 @@ export function createFilesService(
     },
   };
 }
-
 ```
 
 `packages/cloudflare/src/governor-client-wrapper.ts`:
@@ -43063,7 +42919,6 @@ export function rateGoverned(client: ObjectGenerator): ObjectGenerator {
 
   return wrapper;
 }
-
 ```
 
 `packages/cloudflare/src/governor-do.ts`:
@@ -43226,7 +43081,6 @@ export class GovernorDO extends DurableObject<Env> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
-
 ```
 
 `packages/cloudflare/src/index.ts`:
@@ -43246,7 +43100,6 @@ export { rateGoverned, setGovernorBinding } from './governor-client-wrapper.js';
 export { createR2Backend } from './create-r2-store.js';
 export { PositronicManifest, type BrainMetadata } from './manifest.js';
 export { default as api } from './api/index.js';
-
 ```
 
 `packages/cloudflare/src/manifest.ts`:
@@ -43354,7 +43207,6 @@ export class PositronicManifest {
     return this.importStrategy.list();
   }
 }
-
 ```
 
 `packages/cloudflare/src/monitor-do.ts`:
@@ -44001,7 +43853,6 @@ class EventStreamHandler {
     });
   }
 }
-
 ```
 
 `packages/cloudflare/src/node-index.ts`:
@@ -44030,7 +43881,6 @@ export { CloudflareDevServer as DevServer } from './dev-server.js';
 
 // Note: We do NOT export BrainRunnerDO, MonitorDO, or api here
 // because they depend on cloudflare:workers runtime
-
 ```
 
 `packages/cloudflare/src/origin.ts`:
@@ -44051,7 +43901,6 @@ export async function getOrigin(bucket: R2Bucket): Promise<string> {
   }
   return 'http://localhost:8787';
 }
-
 ```
 
 `packages/cloudflare/src/page-adapter.ts`:
@@ -44108,7 +43957,6 @@ export class PageAdapter implements Adapter {
     }
   }
 }
-
 ```
 
 `packages/cloudflare/src/pages-service.ts`:
@@ -44275,7 +44123,6 @@ export function createPagesService(
     },
   };
 }
-
 ```
 
 `packages/cloudflare/src/r2-loader.ts`:
@@ -44308,7 +44155,6 @@ export class CloudflareR2Loader implements ResourceLoader {
     return object.text();
   }
 }
-
 ```
 
 `packages/cloudflare/src/rate-limit-headers.ts`:
@@ -44412,7 +44258,6 @@ export function parseRateLimitHeaders(
 
   return hasAnyValue ? result : null;
 }
-
 ```
 
 `packages/cloudflare/src/schedule-do.ts`:
@@ -44907,7 +44752,6 @@ export class ScheduleDO extends DurableObject<Env> {
     return (await this.ctx.storage.get<string>('projectTimezone')) || 'UTC';
   }
 }
-
 ```
 
 `packages/cloudflare/src/signal-provider.ts`:
@@ -44932,7 +44776,6 @@ export class CloudflareSignalProvider implements SignalProvider {
     return this.getAndConsumeSignals(filter);
   }
 }
-
 ```
 
 `packages/cloudflare/src/sqlite-adapter.ts`:
@@ -45043,7 +44886,6 @@ export class BrainRunSQLiteAdapter implements Adapter {
     }
   }
 }
-
 ```
 
 `packages/cloudflare/src/timeout-adapter.ts`:
@@ -45078,7 +44920,6 @@ export class TimeoutAdapter implements Adapter {
     await this.setAlarm(timeoutAt);
   }
 }
-
 ```
 
 `packages/cloudflare/src/token-estimator.ts`:
@@ -45170,7 +45011,6 @@ export function estimateRequestTokens({
 
   return estimateTokens(parts.join('\n'));
 }
-
 ```
 
 `packages/cloudflare/src/webhook-adapter.ts`:
@@ -45206,7 +45046,6 @@ export class WebhookAdapter implements Adapter {
     }
   }
 }
-
 ```
 
 `packages/cloudflare/src/zip-builder.ts`:
@@ -45370,7 +45209,6 @@ export function createR2ZipBuilder(
     },
   };
 }
-
 ```
 
 `packages/cloudflare/test-project/package.json`:
@@ -45399,7 +45237,6 @@ export function createR2ZipBuilder(
     "zod": "^3.24.1"
   }
 }
-
 ```
 
 `packages/cloudflare/test-project/src/_webhookManifest.ts`:
@@ -45422,7 +45259,6 @@ export const webhookManifest: Record<string, any> = {
   'trigger-webhook': webhook_trigger_webhook,
   'trigger-no-config': webhook_trigger_no_config,
 };
-
 ```
 
 `packages/cloudflare/test-project/src/index.ts`:
@@ -46114,7 +45950,6 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 export { BrainRunnerDO, MonitorDO, ScheduleDO, GovernorDO, AuthDO };
-
 ```
 
 `packages/cloudflare/test-project/src/runner.ts`:
@@ -46311,7 +46146,6 @@ export const runner = new BrainRunner({
   adapters: [],
   client: mockClient,
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/api-error.test.ts`:
@@ -46815,7 +46649,6 @@ describe('Brain API Error Handling', () => {
     });
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/api.test.ts`:
@@ -48683,7 +48516,6 @@ describe('Hono API Tests', () => {
     });
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/auth.test.ts`:
@@ -48920,7 +48752,6 @@ describe('Auth Middleware', () => {
     });
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/brain-kill.test.ts`:
@@ -49294,7 +49125,6 @@ describe('Brain Kill API', () => {
     expect(pageDeletedResponse.status).toBe(404);
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/files.test.ts`:
@@ -49577,7 +49407,6 @@ describe('createFilesService', () => {
     expect(object).not.toBeNull();
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/governor.test.ts`:
@@ -49737,7 +49566,6 @@ describe('GovernorDO Integration Tests', () => {
     await stub.waitForCapacity('unknown-model', 100);
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/iterate-brain.test.ts`:
@@ -49859,7 +49687,6 @@ describe('Iterate Brain Tests', () => {
     }
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/iterate-options.test.ts`:
@@ -49987,7 +49814,6 @@ describe('Iterate with Options Tests', () => {
     expect(multiplierOp?.value).toBe(10);
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/pages.test.ts`:
@@ -50932,7 +50758,6 @@ describe('Pages API Tests', () => {
     });
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/r2loader.test.ts`:
@@ -51011,7 +50836,6 @@ describe('CloudflareR2Loader Tests', () => {
     expect(content).toBe(subDirFileContent);
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/resources-api.test.ts`:
@@ -51740,7 +51564,6 @@ describe('Resources API Tests', () => {
     // The spec test validates the API contract when credentials are configured.
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/signals.test.ts`:
@@ -52247,7 +52070,6 @@ describe('Signal API Tests', () => {
     });
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/spec.test.ts`:
@@ -53039,7 +52861,6 @@ describe('Positronic Spec', () => {
     });
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/sse-helpers.ts`:
@@ -53249,7 +53070,6 @@ export async function readUntilEvent(
 
   return { events, found };
 }
-
 ```
 
 `packages/cloudflare/test-project/tests/store.test.ts`:
@@ -53422,7 +53242,6 @@ describe('createR2Backend', () => {
     );
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/test-auth-helper.ts`:
@@ -53593,7 +53412,6 @@ export async function createUserFetch(
 
   return { fetch: userFetch, userName };
 }
-
 ```
 
 `packages/cloudflare/test-project/tests/tsconfig.json`:
@@ -53606,7 +53424,6 @@ export async function createUserFetch(
   },
   "include": ["./**/*.ts"]
 }
-
 ```
 
 `packages/cloudflare/test-project/tests/user-scoping.test.ts`:
@@ -53681,7 +53498,6 @@ describe('User-scoped authorization (spec)', () => {
     expect(result).toBe(true);
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/wait-timeout.test.ts`:
@@ -54063,7 +53879,6 @@ describe('Wait Timeout Tests', () => {
     expect(lastEvent?.status).toBe(STATUS.CANCELLED);
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tests/webhook-trigger.test.ts`:
@@ -54210,7 +54025,6 @@ describe('Webhook Trigger Tests', () => {
     expect(body.error).toContain('no triggers config');
   });
 });
-
 ```
 
 `packages/cloudflare/test-project/tsconfig.json`:
@@ -54236,7 +54050,6 @@ describe('Webhook Trigger Tests', () => {
     "skipLibCheck": true
   }
 }
-
 ```
 
 `packages/cloudflare/test-project/vitest.config.ts`:
@@ -54254,7 +54067,6 @@ export default defineWorkersConfig({
     },
   },
 });
-
 ```
 
 `packages/cloudflare/test-project/webhooks/inner-webhook.ts`:
@@ -54284,7 +54096,6 @@ const innerWebhook = createWebhook(
 );
 
 export default innerWebhook;
-
 ```
 
 `packages/cloudflare/test-project/webhooks/loop-escalation.ts`:
@@ -54317,7 +54128,6 @@ const loopEscalationWebhook = createWebhook(
 );
 
 export default loopEscalationWebhook;
-
 ```
 
 `packages/cloudflare/test-project/webhooks/notification.ts`:
@@ -54352,7 +54162,6 @@ const notificationWebhook = createWebhook(
 );
 
 export default notificationWebhook;
-
 ```
 
 `packages/cloudflare/test-project/webhooks/test-webhook.ts`:
@@ -54399,7 +54208,6 @@ const testWebhook = createWebhook(
 );
 
 export default testWebhook;
-
 ```
 
 `packages/cloudflare/test-project/webhooks/trigger-no-config.ts`:
@@ -54427,7 +54235,6 @@ const triggerNoConfig = createWebhook(
 );
 
 export default triggerNoConfig;
-
 ```
 
 `packages/cloudflare/test-project/webhooks/trigger-webhook.ts`:
@@ -54474,7 +54281,6 @@ const triggerWebhook = createWebhook(
 );
 
 export default triggerWebhook;
-
 ```
 
 `packages/cloudflare/test-project/wrangler.jsonc`:
@@ -54554,7 +54360,6 @@ export default triggerWebhook;
     "enabled": true
   }
 }
-
 ```
 
 `packages/cloudflare/tests/discover-brains.test.ts`:
@@ -54685,7 +54490,6 @@ describe('discoverBrains', () => {
     expect(brains).toEqual([]);
   });
 });
-
 ```
 
 `packages/cloudflare/tests/rate-limit-headers.test.ts`:
@@ -54862,7 +54666,6 @@ describe('getGoogleModelDefaults', () => {
     }
   });
 });
-
 ```
 
 `packages/cloudflare/tests/token-estimator.test.ts`:
@@ -54998,7 +54801,6 @@ describe('token-estimator', () => {
     });
   });
 });
-
 ```
 
 `packages/cloudflare/tsconfig.json`:
@@ -55015,7 +54817,6 @@ describe('token-estimator', () => {
   "include": ["**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts", "test-project"]
 }
-
 ```
 
 `packages/core/CHANGELOG.md`:
@@ -55786,12 +55587,11 @@ describe('token-estimator', () => {
 ### Patch Changes
 
 - Bump all packages to next patch version
-
 ```
 
 `packages/core/docs/core-testing-guide.md`:
 
-```md
+````md
 # Core Testing Guide
 
 ## Overview
@@ -55821,6 +55621,7 @@ for await (const event of brain.run()) {
   expect(event).toBeDefined(); // This can miss events!
 }
 ```
+````
 
 ### 2. State Reconstruction via State Machine
 
@@ -56102,7 +55903,7 @@ npm run test:watch                 # Watch mode
 npm run build:workspaces          # Ensure TypeScript compiles
 ```
 
-```
+````
 
 `packages/core/package.json`:
 
@@ -56157,7 +55958,7 @@ npm run build:workspaces          # Ensure TypeScript compiles
   }
 }
 
-```
+````
 
 `packages/core/src/adapters/types.ts`:
 
@@ -56168,7 +55969,6 @@ import type { JsonObject } from '../dsl/types.js';
 export interface Adapter<Options extends JsonObject = any> {
   dispatch(event: BrainEvent<Options>): void | Promise<void>;
 }
-
 ```
 
 `packages/core/src/clients/types.ts`:
@@ -56404,7 +56204,6 @@ export interface ObjectGenerator {
     responseHeaders?: Record<string, string>;
   }>;
 }
-
 ```
 
 `packages/core/src/dsl/brain-runner.ts`:
@@ -56766,7 +56565,6 @@ export class BrainRunner {
     return machine.context.currentState as TState;
   }
 }
-
 ```
 
 `packages/core/src/dsl/brain-state-machine.ts`:
@@ -57908,7 +57706,6 @@ export function sendEvent(
  * The machine is created with default initial context - only the state definitions matter for validation.
  */
 export const brainMachineDefinition = makeBrainMachine(createInitialContext());
-
 ```
 
 `packages/core/src/dsl/brain.ts`:
@@ -57970,12 +57767,11 @@ export type {
 
 // Execution - Constants
 export { DEFAULT_ENV } from './execution/constants.js';
-
 ```
 
 `packages/core/src/dsl/builder/brain.ts`:
 
-```ts
+````ts
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
 import type { IterateResult } from '../iterate-result.js';
@@ -58760,8 +58556,7 @@ export function brain(
 
   return newBrain;
 }
-
-```
+````
 
 `packages/core/src/dsl/builder/continuation.ts`:
 
@@ -58812,7 +58607,6 @@ export class Continuation<
     return new Continuation(this.addBlock, this.createNextBrain);
   }
 }
-
 ```
 
 `packages/core/src/dsl/builder/step.ts`:
@@ -58853,7 +58647,6 @@ export class Step {
     };
   }
 }
-
 ```
 
 `packages/core/src/dsl/constants.ts`:
@@ -58906,12 +58699,11 @@ export const STATUS = {
   // Publicly this maps to RUNNING for consumers.
   AGENT_LOOP: 'agent_loop',
 } as const;
-
 ```
 
 `packages/core/src/dsl/create-brain.ts`:
 
-```ts
+````ts
 import { z } from 'zod';
 import { brain as coreBrain, Brain } from './builder/brain.js';
 import type {
@@ -59103,8 +58895,7 @@ export function createBrain<
 
   return brain;
 }
-
-```
+````
 
 `packages/core/src/dsl/definitions/blocks.ts`:
 
@@ -59296,12 +59087,11 @@ export type Block<
   | GuardBlock<TStateIn, TOptions>
   | WaitBlock<TStateIn, TOptions, TServices, TPageIn>
   | MapBlock;
-
 ```
 
 `packages/core/src/dsl/definitions/brain-types.ts`:
 
-```ts
+````ts
 import { z } from 'zod';
 import type { WebhookRegistration } from '../webhook.js';
 
@@ -59330,8 +59120,7 @@ export type GeneratedPage<TSchema extends z.ZodSchema = z.ZodSchema> = {
  * or an object with title and optional description.
  */
 export type BrainConfig = string | { title: string; description?: string };
-
-```
+````
 
 `packages/core/src/dsl/definitions/events.ts`:
 
@@ -59614,7 +59403,6 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | IterateItemCompleteEvent<TOptions>
   | FileWriteStartEvent<TOptions>
   | FileWriteCompleteEvent<TOptions>;
-
 ```
 
 `packages/core/src/dsl/definitions/run-params.ts`:
@@ -59675,7 +59463,6 @@ export interface ResumeRunParams<TOptions extends JsonObject = JsonObject>
   resume: ResumeParams;
   brainRunId: string;
 }
-
 ```
 
 `packages/core/src/dsl/definitions/steps.ts`:
@@ -59705,7 +59492,6 @@ export interface BrainStructure {
     innerBrain?: BrainStructure;
   }>;
 }
-
 ```
 
 `packages/core/src/dsl/duration.ts`:
@@ -59743,7 +59529,6 @@ export function parseDuration(input: number | string): number {
   }
   return result;
 }
-
 ```
 
 `packages/core/src/dsl/example-webhook.ts`:
@@ -59821,7 +59606,6 @@ const myBrain = brain('My Brain')
   });
 
 export default myBrain;
-
 ```
 
 `packages/core/src/dsl/execution/constants.ts`:
@@ -59855,7 +59639,6 @@ You are running as an automated agent in a headless workflow. This is NOT a chat
 
 ## Resumption
 When resuming after a webhook, that response appears as the tool result in your conversation history.`;
-
 ```
 
 `packages/core/src/dsl/execution/event-channel.ts`:
@@ -59894,7 +59677,6 @@ export class EventChannel<T> {
     return items;
   }
 }
-
 ```
 
 `packages/core/src/dsl/execution/event-stream.ts`:
@@ -61674,7 +61456,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     };
   }
 }
-
 ```
 
 `packages/core/src/dsl/execution/retry.ts`:
@@ -61685,7 +61466,6 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
  */
 export const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
-
 ```
 
 `packages/core/src/dsl/iterate-result.ts`:
@@ -61734,7 +61514,6 @@ export class IterateResult<TItem, TResult> {
     return this.data;
   }
 }
-
 ```
 
 `packages/core/src/dsl/json-patch.ts`:
@@ -61782,7 +61561,6 @@ export function applyPatches(
     { ...state }
   );
 }
-
 ```
 
 `packages/core/src/dsl/pages.ts`:
@@ -61874,7 +61652,6 @@ export interface PagesService {
    */
   update(slug: string, html: string): Promise<Page>;
 }
-
 ```
 
 `packages/core/src/dsl/signal-validation.ts`:
@@ -62000,7 +61777,6 @@ export function getValidSignals(
 
   return validSignals;
 }
-
 ```
 
 `packages/core/src/dsl/types.ts`:
@@ -62254,7 +62030,6 @@ export interface SignalProvider {
    */
   getSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): Promise<BrainSignal[]>;
 }
-
 ```
 
 `packages/core/src/dsl/webhook.ts`:
@@ -62362,7 +62137,6 @@ export type ExtractWebhookResponses<T> = T extends readonly [...infer Items]
     ? ExtractSchema<Item>
     : never
   : never;
-
 ```
 
 `packages/core/src/files/event-wrapper.ts`:
@@ -62493,7 +62267,6 @@ export function wrapFilesWithEvents(
     },
   };
 }
-
 ```
 
 `packages/core/src/files/index.ts`:
@@ -62507,7 +62280,6 @@ export type {
   FilesService,
   ZipBuilder,
 } from './types.js';
-
 ```
 
 `packages/core/src/files/mime.ts`:
@@ -62543,7 +62315,6 @@ export function guessMimeType(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase();
   return MIME_TYPES[ext ?? ''] ?? 'application/octet-stream';
 }
-
 ```
 
 `packages/core/src/files/types.ts`:
@@ -62657,7 +62428,6 @@ export interface FilesService {
   /** Create a streaming zip builder. Returns synchronously — no I/O until write(). */
   zip(name: string, options?: FileOptions): ZipBuilder;
 }
-
 ```
 
 `packages/core/src/index.ts`:
@@ -62848,7 +62618,6 @@ export type {
   IterateContext,
   ExecutionNode,
 } from './dsl/brain-state-machine.js';
-
 ```
 
 `packages/core/src/jsx-runtime.ts`:
@@ -62909,12 +62678,11 @@ export namespace JSX {
     children: {};
   }
 }
-
 ```
 
 `packages/core/src/memory/scoped-memory.ts`:
 
-```ts
+````ts
 import type {
   MemoryProvider,
   ScopedMemory,
@@ -62967,8 +62735,7 @@ export function createScopedMemory(
     },
   };
 }
-
-```
+````
 
 `packages/core/src/memory/types.ts`:
 
@@ -63087,7 +62854,6 @@ export interface ScopedMemory {
    */
   add(messages: MemoryMessage[], options?: MemoryAddOptions): Promise<void>;
 }
-
 ```
 
 `packages/core/src/resources/resource-loader.ts`:
@@ -63101,7 +62867,6 @@ export interface ResourceLoader {
     type?: 'text' | 'binary'
   ): Promise<string | Buffer>;
 }
-
 ```
 
 `packages/core/src/resources/resources.ts`:
@@ -63374,7 +63139,6 @@ export function createResources<M extends Manifest>(
 
   return createProxiedResources(initialManifest);
 }
-
 ```
 
 `packages/core/src/store/index.ts`:
@@ -63386,7 +63150,6 @@ export type {
   PerUserField,
   InferStoreTypes,
 } from './types.js';
-
 ```
 
 `packages/core/src/store/types.ts`:
@@ -63443,7 +63206,6 @@ export type StoreProvider = (config: {
   brainTitle: string;
   currentUser?: CurrentUser;
 }) => Store<any>;
-
 ```
 
 `packages/core/src/template/render.ts`:
@@ -63563,12 +63325,11 @@ function dedent(text: string): string {
   // Strip common indentation
   return lines.map((line) => line.slice(minIndent)).join('\n');
 }
-
 ```
 
 `packages/core/src/tools/index.ts`:
 
-```ts
+````ts
 import { z } from 'zod';
 import type { AgentTool, AgentToolWaitFor, StepContext } from '../dsl/types.js';
 import type { WebhookRegistration } from '../dsl/webhook.js';
@@ -63968,12 +63729,11 @@ export const defaultTools = {
   print,
   consoleLog,
 };
-
-```
+````
 
 `packages/core/src/ui/component-utils.ts`:
 
-```ts
+````ts
 import type { UIComponent } from './types.js';
 
 /**
@@ -64003,12 +63763,11 @@ export function mergeComponents(
   }
   return merged;
 }
-
-```
+````
 
 `packages/core/src/ui/generate-page-html.ts`:
 
-```ts
+````ts
 import type { Placement } from './types.js';
 
 /**
@@ -64243,12 +64002,11 @@ ${bootstrapRuntime}
 </body>
 </html>`;
 }
-
-```
+````
 
 `packages/core/src/ui/generate-page.ts`:
 
-```ts
+````ts
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { ObjectGenerator } from '../clients/types.js';
@@ -64762,8 +64520,7 @@ export async function generatePage(params: {
     usage: result.usage,
   };
 }
-
-```
+````
 
 `packages/core/src/ui/parse-form-data.ts`:
 
@@ -64798,12 +64555,11 @@ export function parseFormData(formData: FormData): Record<string, unknown> {
 
   return result;
 }
-
 ```
 
 `packages/core/src/ui/types.ts`:
 
-```ts
+````ts
 import type { ComponentType } from 'react';
 import { z } from 'zod';
 
@@ -64958,8 +64714,7 @@ function isFormPrimitive(schema: z.ZodSchema): schema is FormPrimitive {
     schema instanceof z.ZodEnum
   );
 }
-
-```
+````
 
 `packages/core/src/validate-webhook-token.ts`:
 
@@ -64982,7 +64737,6 @@ export function validateWebhookToken(
   }
   return { valid: true };
 }
-
 ```
 
 `packages/core/src/yaml/data-validator.ts`:
@@ -65293,7 +65047,6 @@ export function resolveBindings(
   walkNode(root, new Map());
   return results;
 }
-
 ```
 
 `packages/core/src/yaml/index.ts`:
@@ -65318,12 +65071,11 @@ export {
   validateAgainstZod,
 } from './schema-extractor.js';
 export { describeDataShape, inferTypeWithExamples } from './type-inference.js';
-
 ```
 
 `packages/core/src/yaml/parser.ts`:
 
-```ts
+````ts
 /**
  * YAML parser for UI templates.
  *
@@ -65469,8 +65221,7 @@ export function stringifyTemplate(template: Template): string {
 
   return stringifyYaml(nodeToObject(template.root));
 }
-
-```
+````
 
 `packages/core/src/yaml/schema-extractor.ts`:
 
@@ -65746,12 +65497,11 @@ export function validateAgainstZod(
 
   return errors;
 }
-
 ```
 
 `packages/core/src/yaml/type-inference.ts`:
 
-```ts
+````ts
 /**
  * Type inference for generating readable data shape descriptions.
  *
@@ -65948,8 +65698,7 @@ export function describeDataShape(
 ): string {
   return inferTypeWithExamples(data, 0, options?.includeExamples ?? true);
 }
-
-```
+````
 
 `packages/core/src/yaml/types.ts`:
 
@@ -66066,7 +65815,6 @@ export type DataType =
   | { kind: 'array'; elementType: DataType }
   | { kind: 'object'; properties: Record<string, DataType> }
   | { kind: 'unknown' };
-
 ```
 
 `packages/core/tests/agent.test.ts`:
@@ -67920,7 +67668,6 @@ describe('agent step', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/brain-config.test.ts`:
@@ -68177,7 +67924,6 @@ describe('services support', () => {
     expect(storeData.get('Store Child:counter')).toBe(42);
   });
 });
-
 ```
 
 `packages/core/tests/brain-creation.test.ts`:
@@ -68731,7 +68477,6 @@ describe('brain creation', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/brain-errors.test.ts`:
@@ -68963,7 +68708,6 @@ describe('error handling', () => {
     );
   });
 });
-
 ```
 
 `packages/core/tests/brain-map.test.ts`:
@@ -69817,7 +69561,6 @@ describe('IterateResult', () => {
     ]);
   });
 });
-
 ```
 
 `packages/core/tests/brain-nested.test.ts`:
@@ -70412,7 +70155,6 @@ describe('nested brains', () => {
     expect(outerStep2).toBeDefined();
   });
 });
-
 ```
 
 `packages/core/tests/brain-options-schema.test.ts`:
@@ -70714,7 +70456,6 @@ describe('Brain withOptionsSchema', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/brain-resumption.test.ts`:
@@ -70893,7 +70634,6 @@ describe('IterateResult rehydration on resume', () => {
     expect(finalState.mergedIds).toEqual(['a1', 'a2', 'b1']);
   });
 });
-
 ```
 
 `packages/core/tests/brain-runner.test.ts`:
@@ -71488,7 +71228,6 @@ describe('BrainRunner', () => {
     expect(completeEvents.length).toBe(1);
   });
 });
-
 ```
 
 `packages/core/tests/brain-state-machine.test.ts`:
@@ -72203,7 +71942,6 @@ describe('brain-state-machine', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/brain-steps.test.ts`:
@@ -72472,7 +72210,6 @@ describe('brain structure', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/brain-test-helpers.ts`:
@@ -72573,7 +72310,6 @@ export const testManifest = {
   },
 } as const;
 export const mockResources = createResources(mockResourceLoader, testManifest);
-
 ```
 
 `packages/core/tests/brain-tools.test.ts`:
@@ -72809,7 +72545,6 @@ describe('withTools vs withExtraTools semantics', () => {
     expect(agentStart.tools).not.toContain('projectDefault');
   });
 });
-
 ```
 
 `packages/core/tests/brain-types.test.ts`:
@@ -73129,7 +72864,6 @@ describe('type inference', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/brain-ui.test.ts`:
@@ -73320,7 +73054,6 @@ describe('UI steps', () => {
     expect(finalState.done).toBe(true);
   });
 });
-
 ```
 
 `packages/core/tests/current-user.test.ts`:
@@ -73503,7 +73236,6 @@ describe('currentUser', () => {
     expect(usersReceived[2]).toEqual({ name: 'persistent-user' });
   });
 });
-
 ```
 
 `packages/core/tests/duration.test.ts`:
@@ -73564,7 +73296,6 @@ describe('parseDuration', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/files.test.ts`:
@@ -74168,7 +73899,6 @@ describe('file agent tools', () => {
     ).rejects.toThrow('writeFile tool requires a files service');
   });
 });
-
 ```
 
 `packages/core/tests/generate-page-html.test.ts`:
@@ -74359,7 +74089,6 @@ describe('generatePageHtml', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/generate-page.test.ts`:
@@ -75160,7 +74889,6 @@ This form collects a name.`,
     });
   });
 });
-
 ```
 
 `packages/core/tests/guard.test.ts`:
@@ -75608,7 +75336,6 @@ describe('guard', () => {
     expect(finalState2).toEqual({ value: 5, processed: true });
   });
 });
-
 ```
 
 `packages/core/tests/jsx-template.test.ts`:
@@ -76036,7 +75763,6 @@ describe('brain integration with JSX templates', () => {
     );
   });
 });
-
 ```
 
 `packages/core/tests/memory.test.ts`:
@@ -76338,7 +76064,6 @@ describe('Brain.withMemory', () => {
     expect(receivedMemory).toBeUndefined();
   });
 });
-
 ```
 
 `packages/core/tests/mock-signal-provider.ts`:
@@ -76402,7 +76127,6 @@ export class MockSignalProvider implements SignalProvider {
     this.signals = [];
   }
 }
-
 ```
 
 `packages/core/tests/resources.test.ts`:
@@ -76656,7 +76380,6 @@ describe('Resources API', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/signal-validation.test.ts`:
@@ -76972,7 +76695,6 @@ describe('signal validation', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/signals.test.ts`:
@@ -77793,7 +77515,6 @@ describe('signal handling', () => {
     });
   });
 });
-
 ```
 
 `packages/core/tests/store.test.ts`:
@@ -78150,7 +77871,6 @@ describe('Brain.withStore', () => {
     expect(receivedStore).toBeDefined();
   });
 });
-
 ```
 
 `packages/core/tests/test-utils.ts`:
@@ -78431,7 +78151,6 @@ export async function runBrainTest<
     completed: testAdapter.isCompleted(),
   };
 }
-
 ```
 
 `packages/core/tests/type-inference-debug.ts`:
@@ -78635,7 +78354,6 @@ const test6 = brain('test-6')
 
 // Export to prevent unused variable warnings
 export { test1, test2, test3, test4, test5, test6 };
-
 ```
 
 `packages/core/tests/waitfor.test.ts`:
@@ -78815,7 +78533,6 @@ describe('wait step timeout', () => {
     }).toThrow('Invalid duration string');
   });
 });
-
 ```
 
 `packages/core/tsconfig.check.json`:
@@ -78835,7 +78552,6 @@ describe('wait step timeout', () => {
   "include": ["src/**/*", "tests/**/*"],
   "exclude": ["dist", "node_modules"]
 }
-
 ```
 
 `packages/core/tsconfig.json`:
@@ -78851,7 +78567,6 @@ describe('wait step timeout', () => {
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }
-
 ```
 
 `packages/gen-ui-components/CHANGELOG.md`:
@@ -79033,7 +78748,6 @@ describe('wait step timeout', () => {
 
 - Updated dependencies
   - @positronic/core@0.0.53
-
 ```
 
 `packages/gen-ui-components/package.json`:
@@ -79050,10 +78764,7 @@ describe('wait step timeout', () => {
   "main": "dist/src/index.js",
   "types": "dist/types/index.d.ts",
   "license": "MIT",
-  "files": [
-    "dist",
-    "package.json"
-  ],
+  "files": ["dist", "package.json"],
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist/src --strip-leading-paths",
@@ -79070,7 +78781,6 @@ describe('wait step timeout', () => {
     "@types/react": "^18.2.0"
   }
 }
-
 ```
 
 `packages/gen-ui-components/src/components/Button.tsx`:
@@ -79121,7 +78831,6 @@ export const Button: UIComponent<ButtonProps> = {
   description: `A clickable button. Use type="submit" for form submission buttons. Use variants to indicate importance: primary for main actions, secondary for alternatives, danger for destructive actions.`,
   propsSchema: ButtonPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Checkbox.tsx`:
@@ -79172,7 +78881,6 @@ export const Checkbox: UIComponent<CheckboxProps> = {
   description: `A checkbox for selecting items. When used in a List, set value to the item's ID so the form returns an array of selected IDs. For simple boolean toggles, omit value.`,
   propsSchema: CheckboxPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Container.tsx`:
@@ -79240,7 +78948,6 @@ export const Container: UIComponent<ContainerProps> = {
   description: `A layout container that groups child components. Use to organize page sections, create visual hierarchy, add spacing. Children are placed inside this container.`,
   propsSchema: ContainerPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Form.tsx`:
@@ -79269,7 +78976,6 @@ export const Form: UIComponent<FormProps> = {
   description: `A form container that wraps form fields. Place Input, TextArea, Checkbox, Select, and Button components inside. Always include a Button with type="submit" for form submission.`,
   propsSchema: FormPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Heading.tsx`:
@@ -79317,7 +79023,6 @@ export const Heading: UIComponent<HeadingProps> = {
   description: `A heading/title for sections of the page. Use level 1 for page title, level 2 for major sections, level 3-4 for subsections.`,
   propsSchema: HeadingPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/HiddenInput.tsx`:
@@ -79342,7 +79047,6 @@ export const HiddenInput: UIComponent<HiddenInputProps> = {
   description: `A hidden form field for passing data that shouldn't be visible to users. Use to include IDs, tokens, or other metadata in form submissions.`,
   propsSchema: HiddenInputPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Input.tsx`:
@@ -79394,7 +79098,6 @@ export const Input: UIComponent<InputProps> = {
   description: `A single-line text input field. Use for short text like names, emails, titles. For longer text, use TextArea instead.`,
   propsSchema: InputPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Link.tsx`:
@@ -79445,7 +79148,6 @@ export const Link: UIComponent<LinkProps> = {
   description: `A hyperlink for navigation. Use for linking to external resources, documentation, or other pages. Set external=true for links that should open in a new tab (automatically adds security attributes). Use variant="muted" for less prominent links.`,
   propsSchema: LinkPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/MultiTextInput.tsx`:
@@ -79519,7 +79221,6 @@ export const MultiTextInput: UIComponent<MultiTextInputProps> = {
   description: `A dynamic list of text inputs where users can add or remove items. Use for collecting multiple values like tags, email addresses, or list items. Returns an array of strings.`,
   propsSchema: MultiTextInputPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Select.tsx`:
@@ -79583,7 +79284,6 @@ export const Select: UIComponent<SelectProps> = {
   description: `A dropdown select menu for choosing one option from a list. Use for mutually exclusive choices like categories, statuses, or types.`,
   propsSchema: SelectPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/Text.tsx`:
@@ -79619,7 +79319,6 @@ export const Text: UIComponent<TextProps> = {
   description: `A paragraph of text for displaying information. Use for descriptions, instructions, or any body text. Not a form input - just displays content.`,
   propsSchema: TextPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/TextArea.tsx`:
@@ -79674,7 +79373,6 @@ export const TextArea: UIComponent<TextAreaProps> = {
   description: `A multi-line text input field. Use for longer text like descriptions, comments, messages. For short single-line text, use Input instead.`,
   propsSchema: TextAreaPropsSchema,
 };
-
 ```
 
 `packages/gen-ui-components/src/components/index.ts`:
@@ -79715,12 +79413,11 @@ export type { HiddenInputProps } from './HiddenInput.js';
 
 export { Link } from './Link.js';
 export type { LinkProps } from './Link.js';
-
 ```
 
 `packages/gen-ui-components/src/index.ts`:
 
-```ts
+````ts
 import { Input } from './components/Input.js';
 import { TextArea } from './components/TextArea.js';
 import { Checkbox } from './components/Checkbox.js';
@@ -79796,8 +79493,7 @@ export type {
   HiddenInputProps,
   LinkProps,
 } from './components/index.js';
-
-```
+````
 
 `packages/gen-ui-components/tsconfig.json`:
 
@@ -79815,7 +79511,6 @@ export type {
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }
-
 ```
 
 `packages/mem0/CHANGELOG.md`:
@@ -79969,7 +79664,6 @@ export type {
 
 - Updated dependencies
   - @positronic/core@0.0.57
-
 ```
 
 `packages/mem0/package.json`:
@@ -79986,10 +79680,7 @@ export type {
   "main": "dist/src/index.js",
   "types": "dist/types/index.d.ts",
   "license": "MIT",
-  "files": [
-    "dist",
-    "package.json"
-  ],
+  "files": ["dist", "package.json"],
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
@@ -80009,12 +79700,11 @@ export type {
     "@positronic/core": "^0.0.77"
   }
 }
-
 ```
 
 `packages/mem0/src/adapter.ts`:
 
-```ts
+````ts
 import type {
   Adapter,
   BrainEvent,
@@ -80206,12 +79896,11 @@ export function createMem0Adapter(config: Mem0AdapterConfig): Adapter {
     }
   }
 }
-
-```
+````
 
 `packages/mem0/src/helpers.ts`:
 
-```ts
+````ts
 import type {
   Memory,
   ScopedMemory,
@@ -80379,8 +80068,7 @@ export async function getMemoryContext(
   const memories = await memory.search(query, options);
   return formatMemories(memories, { emptyText: '' });
 }
-
-```
+````
 
 `packages/mem0/src/index.ts`:
 
@@ -80406,12 +80094,11 @@ export type {
   FormatMemoriesOptions,
   CreateMemorySystemPromptOptions,
 } from './helpers.js';
-
 ```
 
 `packages/mem0/src/provider.ts`:
 
-```ts
+````ts
 import type {
   MemoryProvider,
   MemoryScope,
@@ -80564,12 +80251,11 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
     },
   };
 }
-
-```
+````
 
 `packages/mem0/src/tools.ts`:
 
-```ts
+````ts
 import { z } from 'zod';
 import type { AgentTool, StepContext } from '@positronic/core';
 
@@ -80730,8 +80416,7 @@ export function createMem0Tools(): {
     recallMemories,
   };
 }
-
-```
+````
 
 `packages/mem0/tests/helpers.test.ts`:
 
@@ -80920,7 +80605,6 @@ describe('getMemoryContext', () => {
     });
   });
 });
-
 ```
 
 `packages/mem0/tests/integration.test.ts`:
@@ -81508,12 +81192,11 @@ describe('Mem0 Adapter Integration', () => {
     expect(provider.getAddCalls()).toHaveLength(0);
   });
 });
-
 ```
 
 `packages/mem0/tests/test-helpers.ts`:
 
-```ts
+````ts
 import type {
   Memory,
   MemoryProvider,
@@ -81649,8 +81332,7 @@ export async function collectEvents<T>(
   }
   return events;
 }
-
-```
+````
 
 `packages/mem0/tsconfig.json`:
 
@@ -81665,7 +81347,6 @@ export async function collectEvents<T>(
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }
-
 ```
 
 `packages/shell/CHANGELOG.md`:
@@ -82436,7 +82117,6 @@ export async function collectEvents<T>(
 ### Patch Changes
 
 - Bump all packages to next patch version
-
 ```
 
 `packages/shell/package.json`:
@@ -82453,10 +82133,7 @@ export async function collectEvents<T>(
   "main": "dist/src/index.js",
   "types": "dist/types/index.ts",
   "license": "MIT",
-  "files": [
-    "dist",
-    "package.json"
-  ],
+  "files": ["dist", "package.json"],
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
@@ -82470,7 +82147,6 @@ export async function collectEvents<T>(
     "@types/ssh2": "^1.15.4"
   }
 }
-
 ```
 
 `packages/shell/src/index.ts`:
@@ -82480,7 +82156,6 @@ import { LocalShell } from './local-shell.js';
 import { SSH2Shell } from './ssh2-shell.js';
 
 export { LocalShell, SSH2Shell };
-
 ```
 
 `packages/shell/src/local-shell.ts`:
@@ -82586,7 +82261,6 @@ export class LocalShell implements Shell {
     return stream === 'stdout' ? result.stdout : result.stderr;
   }
 }
-
 ```
 
 `packages/shell/src/ssh2-shell.ts`:
@@ -82742,7 +82416,6 @@ export class SSH2Shell implements Shell {
     this.client.end();
   }
 }
-
 ```
 
 `packages/shell/src/types.ts`:
@@ -82781,7 +82454,6 @@ export interface Shell {
     options?: ExecCommandOptions
   ): Promise<string | ExecCommandResponse>;
 }
-
 ```
 
 `packages/shell/tsconfig.json`:
@@ -82797,7 +82469,6 @@ export interface Shell {
   "include": ["**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }
-
 ```
 
 `packages/spec/CHANGELOG.md`:
@@ -83568,7 +83239,6 @@ export interface Shell {
 ### Patch Changes
 
 - Bump all packages to next patch version
-
 ```
 
 `packages/spec/package.json`:
@@ -83583,10 +83253,7 @@ export interface Shell {
   "description": "Specifications and interfaces for Positronic framework",
   "type": "module",
   "license": "MIT",
-  "files": [
-    "dist",
-    "package.json"
-  ],
+  "files": ["dist", "package.json"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -83606,7 +83273,6 @@ export interface Shell {
     "typescript": "^5.0.0"
   }
 }
-
 ```
 
 `packages/spec/src/api/auth.ts`:
@@ -83711,7 +83377,6 @@ export const auth = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/brains.ts`:
@@ -85357,7 +85022,6 @@ export const brains = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/bundle.ts`:
@@ -85429,7 +85093,6 @@ export const bundle = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/helpers.ts`:
@@ -85522,7 +85185,6 @@ export async function startBrainRun(
     return null;
   }
 }
-
 ```
 
 `packages/spec/src/api/index.ts`:
@@ -85544,7 +85206,6 @@ export { store } from './store.js';
 export type { User, UserKey } from './users.js';
 export type { AuthSetupResponse, WhoamiResponse } from './auth.js';
 export type { Fetch, FetchFactory } from './types.js';
-
 ```
 
 `packages/spec/src/api/pages.ts`:
@@ -86070,7 +85731,6 @@ export const pages = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/resources.ts`:
@@ -86478,7 +86138,6 @@ export const resources = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/schedules.ts`:
@@ -86820,7 +86479,6 @@ export const schedules = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/scoping.ts`:
@@ -87248,7 +86906,6 @@ export const scoping = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/secrets.ts`:
@@ -87636,7 +87293,6 @@ export const secrets = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/signals.ts`:
@@ -88079,7 +87735,6 @@ export const signals = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/status.ts`:
@@ -88113,7 +87768,6 @@ export async function testStatus(fetch: Fetch): Promise<boolean> {
     return false;
   }
 }
-
 ```
 
 `packages/spec/src/api/store.ts`:
@@ -88520,7 +88174,6 @@ export const store = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/types.ts`:
@@ -88530,7 +88183,6 @@ export type Fetch = (request: Request) => Promise<Response>;
 export type FetchFactory = (
   userName: string
 ) => Promise<{ fetch: Fetch; userName: string }>;
-
 ```
 
 `packages/spec/src/api/users.ts`:
@@ -88848,7 +88500,6 @@ export const users = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/api/webhooks.ts`:
@@ -89404,7 +89055,6 @@ export const webhooks = {
     }
   },
 };
-
 ```
 
 `packages/spec/src/index.ts`:
@@ -89562,7 +89212,6 @@ export {
   store,
 } from './api/index.js';
 export type { AuthSetupResponse, Fetch, FetchFactory } from './api/index.js';
-
 ```
 
 `packages/spec/tsconfig.json`:
@@ -89579,7 +89228,6 @@ export type { AuthSetupResponse, Fetch, FetchFactory } from './api/index.js';
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }
-
 ```
 
 `packages/template-new-project/CHANGELOG.md`:
@@ -90350,15 +89998,14 @@ export type { AuthSetupResponse, Fetch, FetchFactory } from './api/index.js';
 ### Patch Changes
 
 - Bump all packages to next patch version
-
 ```
 
 `packages/template-new-project/index.js`:
 
 ```js
-const { name, version } = require('./package.json')
-const path = require('path')
-const { existsSync } = require('fs')
+const { name, version } = require('./package.json');
+const path = require('path');
+const { existsSync } = require('fs');
 
 module.exports = {
   name,
@@ -90368,7 +90015,7 @@ module.exports = {
       name: 'name',
       type: 'text',
       message: 'Project name',
-      initial: 'my-positronic-project'
+      initial: 'my-positronic-project',
     },
     {
       name: 'backend',
@@ -90381,35 +90028,35 @@ module.exports = {
         { title: 'Azure Functions', value: 'azure', disabled: true },
         { title: 'Google Cloud Functions', value: 'gcp', disabled: true },
         { title: 'Fly.io', value: 'fly', disabled: true },
-        { title: 'None (Core only)', value: 'none' }
+        { title: 'None (Core only)', value: 'none' },
       ],
-      initial: 0
+      initial: 0,
     },
     {
       name: 'install',
       type: 'confirm',
       message: 'Install dependencies',
-      initial: true
+      initial: true,
     },
     {
       name: 'pm',
-      type: prev => prev ? 'select' : null,
+      type: (prev) => (prev ? 'select' : null),
       message: 'Package manager',
       hint: ' ',
       choices: [
         { title: 'npm', value: 'npm' },
         { title: 'pnpm', value: 'pnpm' },
-        { title: 'yarn', value: 'yarn' }
-      ]
+        { title: 'yarn', value: 'yarn' },
+      ],
     },
     {
       name: 'claudemd',
       type: 'confirm',
       message: 'Initialize CLAUDE.md for AI-assisted development',
-      initial: true
-    }
+      initial: true,
+    },
   ],
-  setup: async ctx => {
+  setup: async (ctx) => {
     const devRootPath = process.env.POSITRONIC_LOCAL_PATH;
     let coreVersion = '^0.0.77';
     let cloudflareVersion = '^0.0.77';
@@ -90418,30 +90065,38 @@ module.exports = {
 
     // Map backend selection to package names
     const backendPackageMap = {
-      'cloudflare': '@positronic/cloudflare',
-      'aws': '@positronic/aws-lambda', // Future
-      'azure': '@positronic/azure-functions', // Future
-      'gcp': '@positronic/gcp-functions', // Future
-      'fly': '@positronic/fly', // Future
-      'none': null
+      cloudflare: '@positronic/cloudflare',
+      aws: '@positronic/aws-lambda', // Future
+      azure: '@positronic/azure-functions', // Future
+      gcp: '@positronic/gcp-functions', // Future
+      fly: '@positronic/fly', // Future
+      none: null,
     };
 
     ctx.answers.backendPackage = backendPackageMap[ctx.answers.backend];
 
     if (devRootPath) {
-      console.log(`Found POSITRONIC_LOCAL_PATH: ${devRootPath}. Using local file path for @positronic/core.`);
+      console.log(
+        `Found POSITRONIC_LOCAL_PATH: ${devRootPath}. Using local file path for @positronic/core.`
+      );
       const corePath = path.resolve(devRootPath, 'packages', 'core');
       coreVersion = `file:${corePath}`;
       console.log(`  - Mapping @positronic/core to ${coreVersion}`);
 
       // Handle backend packages for local development
       if (ctx.answers.backend === 'cloudflare') {
-        const cloudflarePath = path.resolve(devRootPath, 'packages', 'cloudflare');
+        const cloudflarePath = path.resolve(
+          devRootPath,
+          'packages',
+          'cloudflare'
+        );
         if (existsSync(cloudflarePath)) {
           cloudflareVersion = `file:${cloudflarePath}`;
           // Also update the backend package for the config file
           ctx.answers.backendPackage = `file:${cloudflarePath}`;
-          console.log(`  - Mapping @positronic/cloudflare to ${cloudflareVersion}`);
+          console.log(
+            `  - Mapping @positronic/cloudflare to ${cloudflareVersion}`
+          );
         }
       }
       // Add similar blocks for other backends when they exist
@@ -90453,15 +90108,25 @@ module.exports = {
       //   }
       // }
 
-      const clientVercelPath = path.resolve(devRootPath, 'packages', 'client-vercel');
+      const clientVercelPath = path.resolve(
+        devRootPath,
+        'packages',
+        'client-vercel'
+      );
       if (existsSync(clientVercelPath)) {
         clientVercelVersion = `file:${clientVercelPath}`;
       }
 
-      const genUIComponentsPath = path.resolve(devRootPath, 'packages', 'gen-ui-components');
+      const genUIComponentsPath = path.resolve(
+        devRootPath,
+        'packages',
+        'gen-ui-components'
+      );
       if (existsSync(genUIComponentsPath)) {
         genUIComponentsVersion = `file:${genUIComponentsPath}`;
-        console.log(`  - Mapping @positronic/gen-ui-components to ${genUIComponentsVersion}`);
+        console.log(
+          `  - Mapping @positronic/gen-ui-components to ${genUIComponentsVersion}`
+        );
       }
     }
 
@@ -90492,16 +90157,16 @@ module.exports = {
 
     ctx.answers.projectName = ctx.answers.name;
   },
-  prepare: async ctx => {
+  prepare: async (ctx) => {
     // Find our specially named gitignore file in the list of files to be processed
-    const gitignoreFile = ctx.files.find(file => file.path === '_gitignore');
+    const gitignoreFile = ctx.files.find((file) => file.path === '_gitignore');
     if (gitignoreFile) {
       // Change its path to '.gitignore' so it's correctly named in the generated project
       gitignoreFile.path = '.gitignore';
     }
 
     // Find our specially named env file in the list of files to be processed
-    const envFile = ctx.files.find(file => file.path === '_env');
+    const envFile = ctx.files.find((file) => file.path === '_env');
     if (envFile) {
       // Change its path to '.env' so it's correctly named in the generated project
       envFile.path = '.env';
@@ -90509,11 +90174,10 @@ module.exports = {
 
     // Remove CLAUDE.md if user chose not to include it
     if (!ctx.answers.claudemd) {
-      ctx.files = ctx.files.filter(file => file.path !== 'CLAUDE.md');
+      ctx.files = ctx.files.filter((file) => file.path !== 'CLAUDE.md');
     }
-
   },
-  complete: async ctx => {
+  complete: async (ctx) => {
     // Display getting started message
     console.log('\n✨ Project created successfully!\n');
     console.log(`📁 Project location: ${ctx.dest}\n`);
@@ -90541,10 +90205,12 @@ module.exports = {
     console.log('   • CLI Help: px --help\n');
 
     if (ctx.answers.claudemd) {
-      console.log('💡 Pro tip: Check out CLAUDE.md in your project for AI-assisted development guidance!\n');
+      console.log(
+        '💡 Pro tip: Check out CLAUDE.md in your project for AI-assisted development guidance!\n'
+      );
     }
-  }
-}
+  },
+};
 ```
 
 `packages/template-new-project/package.json`:
@@ -90564,16 +90230,11 @@ module.exports = {
   },
   "author": "",
   "license": "MIT",
-  "files": [
-    "index.js",
-    "package.json",
-    "template"
-  ],
+  "files": ["index.js", "package.json", "template"],
   "devDependencies": {
     "caz": "^2.0.0"
   }
 }
-
 ```
 
 `packages/template-new-project/template/_env`:
@@ -90652,7 +90313,7 @@ secrets.d.ts
 
 `packages/template-new-project/template/docs/brain-dsl-guide.md`:
 
-```md
+````md
 # Brain DSL User Guide
 
 This guide explains how to use the Positronic Brain DSL to create AI-powered workflows.
@@ -90674,7 +90335,7 @@ import { z } from 'zod';
 
 const optionsSchema = z.object({
   environment: z.enum(['dev', 'staging', 'prod']),
-  verbose: z.boolean().default(false)
+  verbose: z.boolean().default(false),
 });
 
 const myBrain = brain('My Brain')
@@ -90687,6 +90348,7 @@ const myBrain = brain('My Brain')
     return { status: 'complete' };
   });
 ```
+````
 
 ## Basic Brain Structure
 
@@ -90777,6 +90439,7 @@ brain('AI Education Assistant')
 ```
 
 Key points about prompt steps:
+
 - The `message` function receives the current state and resources, returning the prompt string
 - The `message` function can be async to load resources: `async ({ state, resources }) => { ... }`
 - `outputSchema` defines the structure using Zod schemas
@@ -90793,13 +90456,16 @@ You can use a different AI model for a specific prompt step by passing a `client
 import { createAnthropicClient } from '@positronic/client-anthropic';
 
 const fastModel = createAnthropicClient({ model: 'claude-haiku-4-5-20251001' });
-const smartModel = createAnthropicClient({ model: 'claude-sonnet-4-5-20250929' });
+const smartModel = createAnthropicClient({
+  model: 'claude-sonnet-4-5-20250929',
+});
 
 brain('Multi-Model Brain')
   .prompt('Quick summary', {
-    message: ({ state: { document } }) => `Summarize this briefly: <%= '${document}' %>`,
+    message: ({ state: { document } }) =>
+      `Summarize this briefly: <%= '${document}' %>`,
     outputSchema: z.object({ summary: z.string() }),
-    client: fastModel,  // Use a fast, cheap model for summarization
+    client: fastModel, // Use a fast, cheap model for summarization
   })
   .prompt('Deep analysis', {
     message: ({ state: { summary } }) =>
@@ -90808,7 +90474,7 @@ brain('Multi-Model Brain')
       insights: z.array(z.string()),
       risks: z.array(z.string()),
     }),
-    client: smartModel,  // Use a more capable model for analysis
+    client: smartModel, // Use a more capable model for analysis
   });
 ```
 
@@ -90849,6 +90515,7 @@ brain('email-checker')
 ```
 
 Key points:
+
 - The predicate is synchronous and receives `{ state, options }`
 - Returns `true` to continue, `false` to skip all remaining steps
 - The guard doesn't transform state — if you need to set "early exit" fields, do it in the step before the guard
@@ -90899,7 +90566,7 @@ import { z } from 'zod';
 const notificationSchema = z.object({
   slackChannel: z.string(),
   priority: z.enum(['low', 'normal', 'high']),
-  includeTimestamp: z.boolean().default(true)
+  includeTimestamp: z.boolean().default(true),
 });
 
 // Use withOptionsSchema to add runtime validation
@@ -90907,20 +90574,21 @@ const notificationBrain = brain('Notification Brain')
   .withOptionsSchema(notificationSchema)
   .step('Send Alert', async ({ state, options, slack }) => {
     // TypeScript knows the exact shape of options from the schema
-    const message = options.includeTimestamp 
+    const message = options.includeTimestamp
       ? `[<%= '${new Date().toISOString()}' %>] <%= '${state.alert}' %>`
       : state.alert;
-    
+
     await slack.post(options.slackChannel, {
       text: message,
-      priority: options.priority  // Type-safe: must be 'low' | 'normal' | 'high'
+      priority: options.priority, // Type-safe: must be 'low' | 'normal' | 'high'
     });
-    
+
     return state;
   });
 ```
 
 The schema approach provides:
+
 - Runtime validation of options
 - Automatic TypeScript type inference
 - Clear error messages for invalid options
@@ -90948,11 +90616,13 @@ Options are passed as simple key=value pairs and are available as strings in you
 Understanding when to use each:
 
 - **Options**: Runtime configuration (channels, endpoints, feature flags)
+
   - Override from CLI with `-o key=value`
   - Don't change during execution
   - Examples: `slackChannel`, `apiEndpoint`, `debugMode`
 
 - **Services**: External dependencies and side effects (clients, loggers, databases)
+
   - Configure once with `.withServices()`
   - Available in all steps
   - Not serializable
@@ -90971,21 +90641,22 @@ Understanding when to use each:
 const notificationSchema = z.object({
   channel: z.string(),
   priority: z.string().default('normal'),
-  includeDetails: z.string().default('false')
+  includeDetails: z.string().default('false'),
 });
 
 const notificationBrain = brain('Smart Notifier')
   .withOptionsSchema(notificationSchema)
-  .withServices({ 
+  .withServices({
     slack: slackClient,
-    email: emailClient 
+    email: emailClient,
   })
   .step('Process Alert', ({ state, options }) => ({
     ...state,
-    formattedMessage: options.includeDetails === 'true'
-      ? `Alert: <%= '${state.message}' %> - Details: <%= '${state.details}' %>`
-      : `Alert: <%= '${state.message}' %>`,
-    isPriority: options.priority === 'high'
+    formattedMessage:
+      options.includeDetails === 'true'
+        ? `Alert: <%= '${state.message}' %> - Details: <%= '${state.details}' %>`
+        : `Alert: <%= '${state.message}' %>`,
+    isPriority: options.priority === 'high',
   }))
   .step('Send Notification', async ({ state, options, slack, email }) => {
     // Use options to control behavior
@@ -90993,10 +90664,10 @@ const notificationBrain = brain('Smart Notifier')
       // High priority goes to email too
       await email.send('admin@example.com', state.formattedMessage);
     }
-    
+
     // Always send to Slack channel from options
     await slack.post(options.channel, state.formattedMessage);
-    
+
     return { ...state, notified: true };
   });
 
@@ -91011,14 +90682,17 @@ const notificationBrain = brain('Smart Notifier')
 const result = await runBrainTest(notificationBrain, {
   client: mockClient,
   initialState: { message: 'System down', details: 'Database unreachable' },
-  options: { 
+  options: {
     channel: '#test-channel',
     priority: 'high',
-    includeDetails: true
-  }
+    includeDetails: true,
+  },
 });
 
-expect(mockSlack.post).toHaveBeenCalledWith('#test-channel', expect.any(String));
+expect(mockSlack.post).toHaveBeenCalledWith(
+  '#test-channel',
+  expect.any(String)
+);
 expect(mockEmail.send).toHaveBeenCalled(); // High priority triggers email
 ```
 
@@ -91048,6 +90722,7 @@ const brainWithServices = brain('Service Brain')
 Services are destructured alongside other parameters in:
 
 1. **Step Actions**:
+
 ```typescript
 .step('Process', ({ state, logger, database }) => {
   logger.info('Step executing');
@@ -91056,6 +90731,7 @@ Services are destructured alongside other parameters in:
 ```
 
 2. **Prompt Reduce Functions**:
+
 ```typescript
 .prompt('Generate', {
   message: ({ state }) => 'Generate something',
@@ -91068,6 +90744,7 @@ Services are destructured alongside other parameters in:
 ```
 
 3. **Nested Brain Config**:
+
 ```typescript
 .brain('Run Sub-Brain', subBrain)
 ```
@@ -91096,7 +90773,7 @@ const analysisBrain = brain('Data Analysis')
   .withServices<Services>({
     api: apiClient,
     cache: redisClient,
-    metrics: analyticsClient
+    metrics: analyticsClient,
   })
   .step('Start Timing', ({ metrics }) => {
     const endTimer = metrics.time('analysis_duration');
@@ -91113,10 +90790,11 @@ const analysisBrain = brain('Data Analysis')
     return { ...state, data };
   })
   .prompt('Analyze Data', {
-    message: ({ state: { data } }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
+    message: ({ state: { data } }) =>
+      `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
     outputSchema: z.object({
       insights: z.array(z.string()),
-      confidence: z.number()
+      confidence: z.number(),
     }),
   })
   .step('Save Results', async ({ state, api, cache, metrics }) => {
@@ -91133,7 +90811,7 @@ const analysisBrain = brain('Data Analysis')
     metrics.track('analysis_complete', {
       insights_count: insights.length,
       confidence,
-      from_cache: state.fromCache
+      from_cache: state.fromCache,
     });
 
     return state;
@@ -91150,12 +90828,12 @@ import { createMockClient, runBrainTest } from '../tests/test-utils.js';
 
 const mockLogger = {
   info: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
 };
 
 const mockDatabase = {
   save: jest.fn().mockResolvedValue(undefined),
-  find: jest.fn().mockResolvedValue({ id: '123', name: 'Test' })
+  find: jest.fn().mockResolvedValue({ id: '123', name: 'Test' }),
 };
 
 const testBrain = brain('Test Brain')
@@ -91168,7 +90846,7 @@ const testBrain = brain('Test Brain')
 
 // Run test
 const result = await runBrainTest(testBrain, {
-  client: createMockClient()
+  client: createMockClient(),
 });
 
 // Verify service calls
@@ -91197,28 +90875,30 @@ const brainWithTools = brain('Tool Brain')
       description: 'Fetch data from an external API',
       inputSchema: z.object({
         endpoint: z.string(),
-        params: z.record(z.string()).optional()
+        params: z.record(z.string()).optional(),
       }),
       execute: async ({ endpoint, params }) => {
         const url = new URL(endpoint);
         if (params) {
-          Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+          Object.entries(params).forEach(([k, v]) =>
+            url.searchParams.set(k, v)
+          );
         }
         const response = await fetch(url);
         return response.json();
-      }
+      },
     },
     saveToDatabase: {
       description: 'Save data to the database',
       inputSchema: z.object({
         table: z.string(),
-        data: z.any()
+        data: z.any(),
       }),
       execute: async ({ table, data }) => {
         // Database save logic
         return { success: true, id: 'generated-id' };
-      }
-    }
+      },
+    },
   })
   .brain('Data Agent', {
     system: 'You can fetch and save data.',
@@ -91240,30 +90920,45 @@ const brainWithComponents = brain('Custom UI Brain')
       props: z.object({
         title: z.string(),
         content: z.string(),
-        variant: z.enum(['default', 'highlighted', 'warning']).default('default')
+        variant: z
+          .enum(['default', 'highlighted', 'warning'])
+          .default('default'),
       }),
       render: (props) => `
         <div class="card card-<%= '${props.variant}' %>">
           <h3><%= '${props.title}' %></h3>
           <p><%= '${props.content}' %></p>
         </div>
-      `
+      `,
     },
     DataTable: {
       description: 'A table for displaying structured data',
       props: z.object({
         headers: z.array(z.string()),
-        rows: z.array(z.array(z.string()))
+        rows: z.array(z.array(z.string())),
       }),
       render: (props) => {
         // Build table HTML from headers and rows
-        const headerRow = props.headers.map(h => '<th>' + h + '</th>').join('');
-        const bodyRows = props.rows.map(row =>
-          '<tr>' + row.map(cell => '<td>' + cell + '</td>').join('') + '</tr>'
-        ).join('');
-        return '<table><thead><tr>' + headerRow + '</tr></thead><tbody>' + bodyRows + '</tbody></table>';
-      }
-    }
+        const headerRow = props.headers
+          .map((h) => '<th>' + h + '</th>')
+          .join('');
+        const bodyRows = props.rows
+          .map(
+            (row) =>
+              '<tr>' +
+              row.map((cell) => '<td>' + cell + '</td>').join('') +
+              '</tr>'
+          )
+          .join('');
+        return (
+          '<table><thead><tr>' +
+          headerRow +
+          '</tr></thead><tbody>' +
+          bodyRows +
+          '</tbody></table>'
+        );
+      },
+    },
   })
   .page('Dashboard', ({ state }) => ({
     prompt: `
@@ -91273,7 +90968,7 @@ const brainWithComponents = brain('Custom UI Brain')
       Use DataTable to show recent activity.
     `,
     formSchema: z.object({
-      acknowledged: z.boolean()
+      acknowledged: z.boolean(),
     }),
   }));
 ```
@@ -91296,7 +90991,7 @@ const myBrain = brain('email-preferences')
   })
   .step('Process', async ({ store }) => {
     // Typed get — returns the value or undefined if not set
-    const deselected = await store.get('deselectedThreads') ?? [];
+    const deselected = (await store.get('deselectedThreads')) ?? [];
     const lastTime = await store.get('lastProcessedAt');
 
     // Typed set
@@ -91313,12 +91008,15 @@ Mark fields as per-user to scope them to the current user. This is useful for us
 ```typescript
 const myBrain = brain('dashboard')
   .withStore({
-    globalConfig: z.object({ theme: z.string() }),           // shared across all users
-    userPreferences: { type: z.object({ darkMode: z.boolean() }), perUser: true },  // per-user
+    globalConfig: z.object({ theme: z.string() }), // shared across all users
+    userPreferences: {
+      type: z.object({ darkMode: z.boolean() }),
+      perUser: true,
+    }, // per-user
   })
   .step('Load Preferences', async ({ store }) => {
     const config = await store.get('globalConfig');
-    const prefs = await store.get('userPreferences');  // scoped to currentUser automatically
+    const prefs = await store.get('userPreferences'); // scoped to currentUser automatically
     return { config, prefs };
   });
 ```
@@ -91339,10 +91037,10 @@ There is no global scope — every field belongs to a specific brain.
 The store provides four operations:
 
 ```typescript
-await store.get('key');     // Returns T | undefined
-await store.set('key', value);  // Sets the value
-await store.delete('key');  // Removes the key
-await store.has('key');     // Returns boolean
+await store.get('key'); // Returns T | undefined
+await store.set('key', value); // Sets the value
+await store.delete('key'); // Removes the key
+await store.has('key'); // Returns boolean
 ```
 
 #### Using with `createBrain()`
@@ -91355,7 +91053,10 @@ export const brain = createBrain({
   services: { slack },
   store: {
     processedCount: z.number(),
-    userSettings: { type: z.object({ notifications: z.boolean() }), perUser: true },
+    userSettings: {
+      type: z.object({ notifications: z.boolean() }),
+      perUser: true,
+    },
   },
 });
 ```
@@ -91367,7 +91068,7 @@ Or declare per-brain stores for brain-specific data:
 export default brain('my-brain')
   .withStore({ counter: z.number() })
   .step('Increment', async ({ store }) => {
-    const count = await store.get('counter') ?? 0;
+    const count = (await store.get('counter')) ?? 0;
     await store.set('counter', count + 1);
     return { count: count + 1 };
   });
@@ -91385,25 +91086,29 @@ import { z } from 'zod';
 export const brain = createBrain({
   services: {
     logger: console,
-    api: apiClient
+    api: apiClient,
   },
   tools: {
     search: {
       description: 'Search the web',
       inputSchema: z.object({ query: z.string() }),
-      execute: async ({ query }) => searchWeb(query)
-    }
+      execute: async ({ query }) => searchWeb(query),
+    },
   },
   components: {
     Alert: {
       description: 'Alert banner',
-      props: z.object({ message: z.string(), type: z.enum(['info', 'warning', 'error']) }),
-      render: (props) => `<div class="alert alert-<%= '${props.type}' %>"><%= '${props.message}' %></div>`
-    }
+      props: z.object({
+        message: z.string(),
+        type: z.enum(['info', 'warning', 'error']),
+      }),
+      render: (props) =>
+        `<div class="alert alert-<%= '${props.type}' %>"><%= '${props.message}' %></div>`,
+    },
   },
   store: {
     processedCount: z.number(),
-  }
+  },
 });
 ```
 
@@ -91420,18 +91125,21 @@ You can provide type parameters to `brain()` to type the initial state and optio
 // Both parameters are optional and default to {} and object respectively.
 
 // Type just the initial state (pass {} for options)
-const myBrain = brain<{}, { userId: string; email: string }>('process-user')
-  .step('Greet', ({ state }) => {
-    // state.userId and state.email are correctly typed
-    return { ...state, greeting: 'Hello ' + state.email };
-  });
+const myBrain = brain<{}, { userId: string; email: string }>(
+  'process-user'
+).step('Greet', ({ state }) => {
+  // state.userId and state.email are correctly typed
+  return { ...state, greeting: 'Hello ' + state.email };
+});
 
 // Type both options and initial state
-const myBrain = brain<{ verbose: boolean }, { count: number }>('counter')
-  .step('Process', ({ state, options }) => {
+const myBrain = brain<{ verbose: boolean }, { count: number }>('counter').step(
+  'Process',
+  ({ state, options }) => {
     if (options.verbose) console.log('Count:', state.count);
     return { ...state, doubled: state.count * 2 };
-  });
+  }
+);
 ```
 
 This is useful in several situations:
@@ -91476,13 +91184,13 @@ import { BrainRunner } from '@positronic/core';
 const runner = new BrainRunner({
   client: aiClient,
   adapters: [loggingAdapter],
-  resources: resourceLoader
+  resources: resourceLoader,
 });
 
 // Get final state directly
 const finalState = await runner.run(myBrain, {
   initialState: { count: 0 },
-  options: { debug: true }
+  options: { debug: true },
 });
 ```
 
@@ -91658,21 +91366,35 @@ interface FilterPromptState {
 
 // Export the prompt configuration
 export const aiFilterPrompt = {
-  message: async ({ state, resources }: { state: FilterPromptState, resources: Resources }) => {
+  message: async ({
+    state,
+    resources,
+  }: {
+    state: FilterPromptState;
+    resources: Resources;
+  }) => {
     // Load a prompt template from resources
     const template = await resources.prompts.hnFilter.load();
 
     // Build the prompt with state data
     const articleList = state.articles
-      .map((a, i) => `<%= '${i + 1}' %>. <%= '${a.title}' %> (score: <%= '${a.score}' %>)`)
+      .map(
+        (a, i) =>
+          `<%= '${i + 1}' %>. <%= '${a.title}' %> (score: <%= '${a.score}' %>)`
+      )
       .join('\n');
 
     return template
       .replace('{{articleList}}', articleList)
-      .replace('{{preferences}}', state.userPreferences || 'No specific preferences');
+      .replace(
+        '{{preferences}}',
+        state.userPreferences || 'No specific preferences'
+      );
   },
   outputSchema: z.object({
-    selectedArticles: z.array(z.number()).describe('Indices of selected articles'),
+    selectedArticles: z
+      .array(z.number())
+      .describe('Indices of selected articles'),
     reasoning: z.string().describe('Brief explanation of selections'),
   }),
 };
@@ -91689,9 +91411,7 @@ export default brain('HN Article Filter')
   })
   .prompt('Filter Articles', aiFilterPrompt)
   .step('Format Results', ({ state }) => ({
-    selectedArticles: state.selectedArticles.map(
-      i => state.articles[i]
-    ),
+    selectedArticles: state.selectedArticles.map((i) => state.articles[i]),
     reasoning: state.reasoning,
   }));
 ```
@@ -91699,6 +91419,7 @@ export default brain('HN Article Filter')
 ### When to Extract Prompts
 
 Extract prompts to separate files when:
+
 - The message is more than 2-3 lines
 - The prompt uses complex logic or formatting
 - You need to load resources
@@ -91718,26 +91439,20 @@ Rename your brain file from `.ts` to `.tsx` and return JSX from the message func
 import { brain } from '../brain.js';
 import { z } from 'zod';
 
-export default brain('analyze')
-  .prompt('Analyze', {
-    message: ({ state: { topic, context } }) => (
-      <>
-        Analyze the following topic: {topic}
-
-        Context: {context}
-
-        Please provide:
-        - A summary
-        - Key insights
-        - Recommendations
-      </>
-    ),
-    outputSchema: z.object({
-      summary: z.string(),
-      insights: z.array(z.string()),
-      recommendations: z.array(z.string()),
-    }),
-  });
+export default brain('analyze').prompt('Analyze', {
+  message: ({ state: { topic, context } }) => (
+    <>
+      Analyze the following topic: {topic}
+      Context: {context}
+      Please provide: - A summary - Key insights - Recommendations
+    </>
+  ),
+  outputSchema: z.object({
+    summary: z.string(),
+    insights: z.array(z.string()),
+    recommendations: z.array(z.string()),
+  }),
+});
 ```
 
 No `render()` call is needed — the runner handles JSX rendering internally. Old string messages still work, so this is fully opt-in.
@@ -91753,18 +91468,19 @@ message: ({ state: { user, isVIP } }) => (
     Create a greeting for {user.name}.
     {isVIP && <>This is a VIP customer. Use premium language.</>}
   </>
-)
+);
 
 // Ternary for either/or content
 message: ({ state: { user, tier } }) => (
   <>
     Create a greeting for {user.name}.
-    {tier === 'premium'
-      ? <>Use premium, personalized language.</>
-      : <>Use friendly, standard language.</>
-    }
+    {tier === 'premium' ? (
+      <>Use premium, personalized language.</>
+    ) : (
+      <>Use friendly, standard language.</>
+    )}
   </>
-)
+);
 ```
 
 **Watch out for non-boolean falsy values.** `{count && <>...</>}` renders `"0"` when count is 0 — use `{count > 0 && <>...</>}` or a ternary instead.
@@ -91777,13 +91493,13 @@ Use `.map()` naturally inside JSX:
 message: ({ state: { items } }) => (
   <>
     Review the following items:
-    {items.map(item => (
+    {items.map((item) => (
       <>
         - {item.name}: {item.description}
       </>
     ))}
   </>
-)
+);
 ```
 
 ### Reusable Prompt Components
@@ -91801,13 +91517,11 @@ const CategoryInstructions = ({ categories }: { categories: string[] }) => (
 // Use in a message
 message: ({ state: { email, categories } }) => (
   <>
-    Categorize this email:
-    From: {email.from}
+    Categorize this email: From: {email.from}
     Subject: {email.subject}
-
     <CategoryInstructions categories={categories} />
   </>
-)
+);
 ```
 
 ### Async Components
@@ -91823,13 +91537,11 @@ const Resource = async ({ from }: { from: any }) => {
 message: ({ state, resources }) => (
   <>
     Summarize this document using the guidelines below:
-
     <Resource from={resources.guidelines} />
-
     Document:
     {state.document}
   </>
-)
+);
 ```
 
 ## Iterating Over Items
@@ -91841,15 +91553,14 @@ When you need to run the same operation over multiple items, use `.map()`. You c
 Run a nested brain once per item:
 
 ```typescript
-const processBrain = brain('Process Item')
-  .step('Transform', ({ state }) => ({
-    ...state,
-    result: state.value * 2,
-  }));
+const processBrain = brain('Process Item').step('Transform', ({ state }) => ({
+  ...state,
+  result: state.value * 2,
+}));
 
 brain('Process All Items')
   .step('Initialize', () => ({
-    items: [{ value: 1 }, { value: 2 }, { value: 3 }]
+    items: [{ value: 1 }, { value: 2 }, { value: 3 }],
   }))
   .map('Process Each', 'results', {
     run: processBrain,
@@ -91860,7 +91571,7 @@ brain('Process All Items')
   .step('Use Results', ({ state }) => ({
     ...state,
     // results is an IterateResult — use .values to get just the results
-    totals: state.results.values.map(result => result.result),
+    totals: state.results.values.map((result) => result.result),
   }));
 ```
 
@@ -91875,7 +91586,7 @@ brain('Item Processor')
       { id: 1, title: 'First item' },
       { id: 2, title: 'Second item' },
       { id: 3, title: 'Third item' },
-    ]
+    ],
   }))
   .map('Summarize Items', 'summaries', {
     prompt: {
@@ -91901,17 +91612,19 @@ The `message` function receives `{ item, state, options, resources }` where `ite
 To iterate an agent over items, wrap it in a brain and use `.map()`:
 
 ```typescript
-const researchBrain = brain('Research Single')
-  .brain('Research', ({ state, tools }) => ({
+const researchBrain = brain('Research Single').brain(
+  'Research',
+  ({ state, tools }) => ({
     system: 'You are a research assistant.',
     prompt: `Research this topic: <%= '${state.name}' %>`,
     tools: { search: tools.search },
     outputSchema: z.object({ summary: z.string() }),
-  }));
+  })
+);
 
 brain('Research Topics')
   .step('Initialize', () => ({
-    topics: [{ name: 'AI' }, { name: 'Robotics' }]
+    topics: [{ name: 'AI' }, { name: 'Robotics' }],
   }))
   .map('Research Each', 'results', {
     run: researchBrain,
@@ -91920,7 +91633,7 @@ brain('Research Topics')
   })
   .step('Use Results', ({ state }) => ({
     ...state,
-    summaries: state.results.values.map(result => result.summary),
+    summaries: state.results.values.map((result) => result.summary),
   }));
 ```
 
@@ -91951,11 +91664,13 @@ Note: The `stateKey` is now the 2nd argument to `.map()`: `.map('title', 'stateK
 Since `over` receives the full step context, you can use options or services to determine which items to iterate over:
 
 ```typescript
-const processItemBrain = brain('Process Single')
-  .step('Process', ({ state }) => ({
+const processItemBrain = brain('Process Single').step(
+  'Process',
+  ({ state }) => ({
     ...state,
     result: `Processed item <%= '${state.id}' %>`,
-  }));
+  })
+);
 
 brain('Dynamic Processor')
   .withOptionsSchema(z.object({ category: z.string() }))
@@ -91964,13 +91679,14 @@ brain('Dynamic Processor')
       { id: 1, category: 'a' },
       { id: 2, category: 'b' },
       { id: 3, category: 'a' },
-    ]
+    ],
   }))
   .map('Process', 'results', {
     run: processItemBrain,
-    over: ({ state, options }) => state.items.filter(i => i.category === options.category),
+    over: ({ state, options }) =>
+      state.items.filter((i) => i.category === options.category),
     initialState: (item) => ({ id: item.id, result: '' }),
-  })
+  });
 ```
 
 ### Result Format
@@ -91994,7 +91710,7 @@ For complex AI workflows that require tool use, use the `.brain()` method with a
 ```typescript
 brain('Research Assistant')
   .step('Initialize', () => ({
-    query: 'What are the latest developments in AI?'
+    query: 'What are the latest developments in AI?',
   }))
   .brain('Research Agent', {
     system: 'You are a helpful research assistant with access to search tools.',
@@ -92003,23 +91719,23 @@ brain('Research Assistant')
       search: {
         description: 'Search the web for information',
         inputSchema: z.object({
-          query: z.string().describe('The search query')
+          query: z.string().describe('The search query'),
         }),
         execute: async ({ query }) => {
           // Implement search logic
           const results = await searchWeb(query);
           return { results };
-        }
+        },
       },
       summarize: {
         description: 'Summarize a piece of text',
         inputSchema: z.object({
-          text: z.string().describe('Text to summarize')
+          text: z.string().describe('Text to summarize'),
         }),
         execute: async ({ text }) => {
           return { summary: text.slice(0, 100) + '...' };
-        }
-      }
+        },
+      },
     },
     outputSchema: z.object({
       findings: z.array(z.string()),
@@ -92045,6 +91761,7 @@ brain('Research Assistant')
 ### Tool Definition
 
 Each tool requires:
+
 - `description: string` - What the tool does
 - `inputSchema: ZodSchema` - Zod schema for the tool's input
 - `execute: (input, context) => Promise<any>` - Function to execute when the tool is called
@@ -92059,8 +91776,10 @@ import approvalWebhook from '../webhooks/approval.js';
 
 brain('Support Ticket Handler')
   .brain('Handle Support Request', {
-    system: 'You are a support agent. Escalate complex issues for human review.',
-    prompt: ({ ticket }) => `Handle this support ticket: <%= '${ticket.description}' %>`,
+    system:
+      'You are a support agent. Escalate complex issues for human review.',
+    prompt: ({ ticket }) =>
+      `Handle this support ticket: <%= '${ticket.description}' %>`,
     tools: {
       escalateToHuman: {
         description: 'Escalate the ticket to a human reviewer for approval',
@@ -92070,7 +91789,11 @@ brain('Support Ticket Handler')
         }),
         execute: async ({ summary, recommendation }, context) => {
           // Send notification to human reviewer (e.g., via Slack, email)
-          await notifyReviewer({ summary, recommendation, ticketId: context.state.ticketId });
+          await notifyReviewer({
+            summary,
+            recommendation,
+            ticketId: context.state.ticketId,
+          });
 
           // Return waitFor to pause until the webhook fires
           return {
@@ -92093,6 +91816,7 @@ brain('Support Ticket Handler')
 ```
 
 Key points about tool `waitFor`:
+
 - Return `{ waitFor: webhook(...) }` to pause the agent and wait for an external event
 - The webhook response is fed back to the agent as a tool result — the agent continues its loop with this data
 - You can wait for multiple webhooks (first response wins): `{ waitFor: [webhook1(...), webhook2(...)] }`
@@ -92121,13 +91845,18 @@ brain('Entity Extractor')
     console.log('Found ' + state.organizations.length + ' organizations');
     return {
       ...state,
-      summary: 'Extracted ' + state.people.length + ' people and ' +
-               state.organizations.length + ' organizations',
+      summary:
+        'Extracted ' +
+        state.people.length +
+        ' people and ' +
+        state.organizations.length +
+        ' organizations',
     };
   });
 ```
 
 Key points about `outputSchema`:
+
 - The agent automatically gets a `done` tool that uses your schema
 - The schema result is spread directly onto state (e.g., `state.people`, `state.organizations`)
 - To namespace, wrap your schema in a parent key (e.g., `z.object({ entities: z.object({ ... }) })`)
@@ -92140,20 +91869,19 @@ Key points about `outputSchema`:
 Steps have access to the runtime environment via the `env` parameter:
 
 ```typescript
-brain('Environment Example')
-  .step('Use Environment', ({ state, env }) => {
-    // env.origin - Base URL of the deployment
-    console.log('Running at:', env.origin);
+brain('Environment Example').step('Use Environment', ({ state, env }) => {
+  // env.origin - Base URL of the deployment
+  console.log('Running at:', env.origin);
 
-    // env.secrets - Type-augmented secrets object
-    const apiKey = env.secrets.EXTERNAL_API_KEY;
+  // env.secrets - Type-augmented secrets object
+  const apiKey = env.secrets.EXTERNAL_API_KEY;
 
-    return {
-      ...state,
-      baseUrl: env.origin,
-      configured: true
-    };
-  });
+  return {
+    ...state,
+    baseUrl: env.origin,
+    configured: true,
+  };
+});
 ```
 
 ### The `pages` Service
@@ -92171,17 +91899,20 @@ brain('Page Creator')
           <p>Your dashboard is ready.</p>
         </body>
       </html>`,
-      { persist: true }  // Keep the page after brain completes
+      { persist: true } // Keep the page after brain completes
     );
 
     return {
       ...state,
-      dashboardUrl: page.url,      // URL where users can view the page
-      pageWebhook: page.webhook    // Webhook for form submissions (if any)
+      dashboardUrl: page.url, // URL where users can view the page
+      pageWebhook: page.webhook, // Webhook for form submissions (if any)
     };
   })
   .step('Notify User', async ({ state, slack }) => {
-    await slack.post('#general', `Your dashboard: <%= '${state.dashboardUrl}' %>`);
+    await slack.post(
+      '#general',
+      `Your dashboard: <%= '${state.dashboardUrl}' %>`
+    );
     return state;
   });
 ```
@@ -92193,6 +91924,7 @@ brain('Page Creator')
 ### Page Object
 
 The created page object contains:
+
 - `url: string` - Public URL to access the page
 - `webhook: WebhookConfig` - Webhook configuration for handling form submissions
 
@@ -92226,7 +91958,11 @@ brain('Archive Workflow')
     await pages.create('my-page', html);
     return { ...state, formToken };
   })
-  .wait('Wait for submission', ({ state }) => archiveWebhook(state.sessionId, state.formToken), { timeout: '24h' })
+  .wait(
+    'Wait for submission',
+    ({ state }) => archiveWebhook(state.sessionId, state.formToken),
+    { timeout: '24h' }
+  )
   .handle('Process', ({ state, response }) => ({
     ...state,
     name: response.name,
@@ -92244,21 +91980,32 @@ brain('Custom Form')
   .step('Create Form Page', async ({ state, pages, env }) => {
     const formToken = generateFormToken();
     const webhookIdentifier = `custom-form-<%= '${Date.now()}' %>`;
-    const formAction = `<%= '${env.origin}' %>/webhooks/system/page-form?identifier=<%= '${encodeURIComponent(webhookIdentifier)}' %>&token=<%= '${formToken}' %>`;
+    const formAction = `<%= '${
+      env.origin
+    }' %>/webhooks/system/page-form?identifier=<%= '${encodeURIComponent(
+      webhookIdentifier
+    )}' %>&token=<%= '${formToken}' %>`;
 
-    const page = await pages.create('my-form', `<html>
+    const page = await pages.create(
+      'my-form',
+      `<html>
       <body>
         <form method="POST" action="<%= '${formAction}' %>">
           <input type="text" name="name" placeholder="Your name">
           <button type="submit">Submit</button>
         </form>
       </body>
-    </html>`);
+    </html>`
+    );
 
     return {
       ...state,
       pageUrl: page.url,
-      webhook: { slug: 'page-form', identifier: webhookIdentifier, token: formToken },
+      webhook: {
+        slug: 'page-form',
+        identifier: webhookIdentifier,
+        token: formToken,
+      },
     };
   })
   .wait('Wait for form', ({ state }) => state.webhook)
@@ -92271,6 +92018,7 @@ brain('Custom Form')
 #### Summary
 
 The three required pieces for any custom page with a form:
+
 1. Call `generateFormToken()` to get a token
 2. Include the token as a **query parameter** on the form's action URL (e.g., `action="<%= '${webhookUrl}' %>?token=<%= '${formToken}' %>"`)
 3. Include the `token` in your webhook registration — either as the second argument to a custom webhook function (e.g., `myWebhook(identifier, token)`) or in the registration object for `page-form`
@@ -92324,6 +92072,7 @@ brain('Feedback Collector')
 ### The `page` Object
 
 The `page` object is available inside the `onCreated` callback:
+
 - `page.url` - URL where users can access the form
 - `page.webhook` - Pre-configured webhook for form submissions
 
@@ -92445,8 +92194,8 @@ const completeBrain = brain({
   .withServices<Services>({
     logger: console,
     analytics: {
-      track: (event, props) => console.log('Track:', event, props)
-    }
+      track: (event, props) => console.log('Track:', event, props),
+    },
   })
   .step('Initialize', ({ logger, analytics }) => {
     logger.log('Starting workflow');
@@ -92468,7 +92217,7 @@ const completeBrain = brain({
     logger.log(`Plan generated with <%= '${state.tasks.length}' %> tasks`);
     analytics.track('plan_processed', {
       task_count: state.tasks.length,
-      duration: state.duration
+      duration: state.duration,
     });
     return {
       ...state,
@@ -92527,8 +92276,8 @@ await file.write(files.open('source.txt'));
 ### Scoping
 
 ```typescript
-files.open('data.txt');                          // 'brain' (default) — persists across runs
-files.open('temp.txt', { scope: 'run' });        // cleaned up after run
+files.open('data.txt'); // 'brain' (default) — persists across runs
+files.open('temp.txt', { scope: 'run' }); // cleaned up after run
 files.open('profile.json', { scope: 'global' }); // persists across brains
 ```
 
@@ -92569,7 +92318,7 @@ import { readFile, writeFile } from '@positronic/core';
 }))
 ```
 
-```
+````
 
 `packages/template-new-project/template/docs/brain-testing-guide.md`:
 
@@ -92621,7 +92370,7 @@ describe('your-brain', () => {
     expect(result.finalState.recommendations).toHaveLength(2);
   });
 });
-```
+````
 
 ## API Reference
 
@@ -92629,14 +92378,15 @@ describe('your-brain', () => {
 
 ```typescript
 const result = await runBrainTest(brain, {
-  client: mockClient,           // Optional: defaults to createMockClient()
-  initialState: { count: 0 },   // Optional: initial state
-  resources: resourceLoader,    // Optional: resources
-  options: { mode: 'test' } // Optional: brain-specific options
+  client: mockClient, // Optional: defaults to createMockClient()
+  initialState: { count: 0 }, // Optional: initial state
+  resources: resourceLoader, // Optional: resources
+  options: { mode: 'test' }, // Optional: brain-specific options
 });
 ```
 
 **Returns:**
+
 - `completed: boolean` - Whether the brain completed successfully
 - `error: Error | null` - Any error that occurred
 - `finalState: State` - The final state after all steps
@@ -92677,7 +92427,7 @@ expect(mockClient.generateObject).toHaveBeenCalledTimes(3);
 // Check call parameters
 expect(mockClient.generateObject).toHaveBeenCalledWith(
   expect.objectContaining({
-    prompt: expect.stringContaining('Generate a summary')
+    prompt: expect.stringContaining('Generate a summary'),
   })
 );
 
@@ -92685,7 +92435,7 @@ expect(mockClient.generateObject).toHaveBeenCalledWith(
 expect(mockClient.generateObject).toHaveBeenNthCalledWith(
   1,
   expect.objectContaining({
-    prompt: expect.stringContaining('first prompt')
+    prompt: expect.stringContaining('first prompt'),
   })
 );
 ```
@@ -92707,7 +92457,7 @@ it('should generate personalized recommendations', async () => {
   // Act
   const result = await runBrainTest(recommendationBrain, {
     client: mockClient,
-    initialState: { userId: '123' }
+    initialState: { userId: '123' },
   });
 
   // Assert outcomes, not implementation
@@ -92725,9 +92475,9 @@ To test error handling, create a mock client that throws:
 it('should handle API failures gracefully', async () => {
   // Arrange - create a mock that throws on the first call
   const errorClient = {
-    generateObject: jest.fn().mockRejectedValue(
-      new Error('Service temporarily unavailable')
-    )
+    generateObject: jest
+      .fn()
+      .mockRejectedValue(new Error('Service temporarily unavailable')),
   };
 
   // Act
@@ -92756,13 +92506,13 @@ it('should use customer data to generate personalized content', async () => {
   // Act
   const result = await runBrainTest(emailBrain, {
     client: mockClient,
-    initialState: { customerName }
+    initialState: { customerName },
   });
 
   // Assert that the AI used the customer data
   expect(mockClient.generateObject).toHaveBeenCalledWith(
     expect.objectContaining({
-      prompt: expect.stringContaining(customerName)
+      prompt: expect.stringContaining(customerName),
     })
   );
   expect(result.finalState.email).toContain('Personalized email content');
@@ -92772,15 +92522,18 @@ it('should use customer data to generate personalized content', async () => {
 ## Best Practices
 
 1. **Test Behavior, Not Implementation**
+
    - ✅ Test what the brain produces
    - ❌ Don't test internal event sequences
    - ❌ Don't test step counts unless it's a user requirement
 
 2. **Use Descriptive Test Names**
+
    - ✅ `it('should generate a summary from user feedback')`
    - ❌ `it('should complete 4 steps and emit events')`
 
 3. **Keep Tests Simple**
+
    - Arrange: Set up mock responses
    - Act: Run the brain
    - Assert: Check the outcome
@@ -92795,11 +92548,13 @@ it('should use customer data to generate personalized content', async () => {
 Following testing best practices, avoid testing:
 
 1. **Implementation Details**
+
    - Don't check specific event types
    - Don't verify internal state transformations
    - Don't count patch operations
 
 2. **Framework Behavior**
+
    - Trust that the brain framework works
    - Don't test that steps execute in order
    - Don't verify event emission
@@ -92821,15 +92576,15 @@ describe('analysis-brain', () => {
     mockClient.mockResponses({
       sentiment: 'positive',
       keywords: ['innovation', 'quality', 'service'],
-      summary: 'Customers appreciate product quality and innovation'
+      summary: 'Customers appreciate product quality and innovation',
     });
 
     // Act: Run analysis on customer feedback
     const result = await runBrainTest(analysisBrain, {
       client: mockClient,
       initialState: {
-        feedback: 'Your product is innovative and high quality...'
-      }
+        feedback: 'Your product is innovative and high quality...',
+      },
     });
 
     // Assert: Verify we got actionable insights
@@ -92838,22 +92593,22 @@ describe('analysis-brain', () => {
       sentiment: 'positive',
       topThemes: ['innovation', 'quality', 'service'],
       actionable: true,
-      summary: 'Customers appreciate product quality and innovation'
+      summary: 'Customers appreciate product quality and innovation',
     });
   });
 
   it('should handle analysis service outages', async () => {
     // Arrange: Simulate service failure
     const errorClient = {
-      generateObject: jest.fn().mockRejectedValue(
-        new Error('Analysis service unavailable')
-      )
+      generateObject: jest
+        .fn()
+        .mockRejectedValue(new Error('Analysis service unavailable')),
     };
 
     // Act: Attempt analysis
     const result = await runBrainTest(analysisBrain, {
       client: errorClient,
-      initialState: { feedback: 'Some feedback...' }
+      initialState: { feedback: 'Some feedback...' },
     });
 
     // Assert: Verify graceful failure
@@ -92868,6 +92623,7 @@ describe('analysis-brain', () => {
 ### TypeScript Issues
 
 The test utilities are fully typed. If you get type errors:
+
 ```typescript
 // ✅ Type-safe: result.finalState is typed as your brain's state
 const result = await runBrainTest(myBrain, { initialState });
@@ -92885,10 +92641,16 @@ expect(result.finalState.myProperty).toBe('value');
 ```typescript
 // See what prompts were sent to AI
 const calls = mockClient.generateObject.mock.calls;
-console.log('AI prompts:', calls.map(c => c[0].prompt));
+console.log(
+  'AI prompts:',
+  calls.map((c) => c[0].prompt)
+);
 
 // Check events that occurred during execution
-console.log('Events:', result.events.map(e => e.type));
+console.log(
+  'Events:',
+  result.events.map((e) => e.type)
+);
 ```
 
 ## Next Steps
@@ -92896,7 +92658,8 @@ console.log('Events:', result.events.map(e => e.type));
 - Review the [Brain DSL Guide](./brain-dsl-guide.md) for more information on brain structure
 - Check example tests in the codebase for real-world testing patterns
 - Remember: focus on testing what matters to users, not how the brain works internally
-```
+
+````
 
 `packages/template-new-project/template/docs/memory-guide.md`:
 
@@ -92920,7 +92683,7 @@ The memory system provides:
 
 ```bash
 npm install @positronic/mem0
-```
+````
 
 ### 2. Set up the provider
 
@@ -92957,19 +92720,18 @@ import { z } from 'zod';
 
 const memoryTools = createMem0Tools();
 
-export default brain('assistant')
-  .brain('Help User', () => ({
-    system: 'You are helpful. Use rememberFact to store user preferences.',
-    prompt: 'The user said: I prefer dark mode',
-    tools: {
-      ...memoryTools,
-      done: {
-        description: 'Complete the task',
-        inputSchema: z.object({ result: z.string() }),
-        terminal: true,
-      },
+export default brain('assistant').brain('Help User', () => ({
+  system: 'You are helpful. Use rememberFact to store user preferences.',
+  prompt: 'The user said: I prefer dark mode',
+  tools: {
+    ...memoryTools,
+    done: {
+      description: 'Complete the task',
+      inputSchema: z.object({ result: z.string() }),
+      terminal: true,
     },
-  }));
+  },
+}));
 ```
 
 ## Memory Tools
@@ -93003,9 +92765,8 @@ import { z } from 'zod';
 
 const memoryTools = createMem0Tools();
 
-export default brain('personalized-assistant')
-  .brain('Chat', () => ({
-    system: `You are a personalized assistant.
+export default brain('personalized-assistant').brain('Chat', () => ({
+  system: `You are a personalized assistant.
 
 Use rememberFact to store important information about the user:
 - Preferences (theme, communication style, etc.)
@@ -93013,16 +92774,16 @@ Use rememberFact to store important information about the user:
 - Any facts they want you to remember
 
 Use recallMemories before responding to check for relevant context.`,
-    prompt: userMessage,
-    tools: {
-      ...memoryTools,
-      done: {
-        description: 'Send final response',
-        inputSchema: z.object({ response: z.string() }),
-        terminal: true,
-      },
+  prompt: userMessage,
+  tools: {
+    ...memoryTools,
+    done: {
+      description: 'Send final response',
+      inputSchema: z.object({ response: z.string() }),
+      terminal: true,
     },
-  }));
+  },
+}));
 ```
 
 ## Automatic Conversation Indexing
@@ -93074,35 +92835,37 @@ When memory is attached, you can access it directly in step functions:
 ### In Regular Steps
 
 ```typescript
-export default brain('my-brain')
-  .step('Load Context', async ({ memory }) => {
-    const memories = await memory.search('user preferences', {
-      limit: 5,
-    });
-
-    return {
-      context: memories.map(m => m.content).join('\n'),
-    };
+export default brain('my-brain').step('Load Context', async ({ memory }) => {
+  const memories = await memory.search('user preferences', {
+    limit: 5,
   });
+
+  return {
+    context: memories.map((m) => m.content).join('\n'),
+  };
+});
 ```
 
 ### In Agent Config Functions
 
 ```typescript
-export default brain('my-brain')
-  .brain('Process', async ({ memory }) => {
-    const prefs = await memory.search('user preferences');
+export default brain('my-brain').brain('Process', async ({ memory }) => {
+  const prefs = await memory.search('user preferences');
 
-    const context = prefs.length > 0
-      ? '\n\nUser preferences:\n' + prefs.map(p => '- ' + p.content).join('\n')
+  const context =
+    prefs.length > 0
+      ? '\n\nUser preferences:\n' +
+        prefs.map((p) => '- ' + p.content).join('\n')
       : '';
 
-    return {
-      system: 'You are helpful.' + context,
-      prompt: 'Help the user with their request',
-      tools: { /* ... */ },
-    };
-  });
+  return {
+    system: 'You are helpful.' + context,
+    prompt: 'Help the user with their request',
+    tools: {
+      /* ... */
+    },
+  };
+});
 ```
 
 ## Helper Functions
@@ -93135,20 +92898,25 @@ Creates a system prompt augmented with relevant memories:
 ```typescript
 import { createMemorySystemPrompt } from '@positronic/mem0';
 
-export default brain('my-brain')
-  .brain('Chat', async ({ memory }) => {
-    const system = await createMemorySystemPrompt(
-      memory,
-      'You are a helpful assistant.',
-      'user context and preferences',
-      {
-        limit: 10,
-        memoriesHeader: '\n\nUser context:',
-      }
-    );
+export default brain('my-brain').brain('Chat', async ({ memory }) => {
+  const system = await createMemorySystemPrompt(
+    memory,
+    'You are a helpful assistant.',
+    'user context and preferences',
+    {
+      limit: 10,
+      memoriesHeader: '\n\nUser context:',
+    }
+  );
 
-    return { system, prompt: userMessage, tools: { /* ... */ } };
-  });
+  return {
+    system,
+    prompt: userMessage,
+    tools: {
+      /* ... */
+    },
+  };
+});
 ```
 
 ### getMemoryContext
@@ -93162,7 +92930,8 @@ const context = await getMemoryContext(memory, 'user preferences', {
   limit: 5,
 });
 
-const system = 'You are helpful.\n\n' + (context ? '## User Context\n' + context : '');
+const system =
+  'You are helpful.\n\n' + (context ? '## User Context\n' + context : '');
 ```
 
 ## Memory Scoping
@@ -93174,8 +92943,8 @@ Memories are scoped by two identifiers:
 Automatically set to the brain/step title. Memories are isolated per agent:
 
 ```typescript
-brain('support-agent').withMemory(memory)  // agentId = 'support-agent'
-brain('sales-agent').withMemory(memory)    // agentId = 'sales-agent'
+brain('support-agent').withMemory(memory); // agentId = 'support-agent'
+brain('sales-agent').withMemory(memory); // agentId = 'sales-agent'
 ```
 
 ### userId
@@ -93188,13 +92957,13 @@ await memory.search('preferences');
 await memory.add(messages);
 
 // In tools — the agent just passes the fact/query, userId is automatic
-rememberFact({ fact: 'Prefers dark mode' })
-recallMemories({ query: 'preferences' })
+rememberFact({ fact: 'Prefers dark mode' });
+recallMemories({ query: 'preferences' });
 ```
 
 See the [currentUser section in positronic-guide.md](positronic-guide.md#currentuser) for how to set the current user when running brains.
 
-```
+````
 
 `packages/template-new-project/template/docs/positronic-guide.md`:
 
@@ -93207,20 +92976,22 @@ This guide covers project-level patterns and best practices for Positronic appli
 
 A typical Positronic project has the following structure:
 
-```
+````
+
 ├── src/
-│   ├── brain.ts         # Project brain wrapper
-│   ├── brains/          # Brain definitions
-│   ├── webhooks/        # Webhook definitions
-│   ├── runner.ts        # Local runner for development
-│   ├── services/        # Service implementations
-│   ├── utils/           # Shared utilities
-│   └── components/      # Reusable UI/prompt components
-├── resources/       # Files accessible to brains
-├── tests/           # Test files
-├── docs/            # Documentation
-└── positronic.config.json  # Project configuration
-```
+│ ├── brain.ts # Project brain wrapper
+│ ├── brains/ # Brain definitions
+│ ├── webhooks/ # Webhook definitions
+│ ├── runner.ts # Local runner for development
+│ ├── services/ # Service implementations
+│ ├── utils/ # Shared utilities
+│ └── components/ # Reusable UI/prompt components
+├── resources/ # Files accessible to brains
+├── tests/ # Test files
+├── docs/ # Documentation
+└── positronic.config.json # Project configuration
+
+````
 
 ## The Project Brain Pattern
 
@@ -93244,7 +93015,7 @@ import { brain } from '../brain.js';
 
 // ❌ NOT THIS
 import { brain } from '@positronic/core';
-```
+````
 
 ### Configuring Services
 
@@ -93269,8 +93040,14 @@ interface ProjectServices {
 export const brain = createBrain({
   services: {
     logger: {
-      info: (msg) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),
-      error: (msg) => console.error(`[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`)
+      info: (msg) =>
+        console.log(
+          `[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`
+        ),
+      error: (msg) =>
+        console.error(
+          `[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`
+        ),
     },
     database: {
       get: async (key) => {
@@ -93280,9 +93057,9 @@ export const brain = createBrain({
       set: async (key, value) => {
         // Your database implementation
         localStorage.setItem(key, JSON.stringify(value));
-      }
-    }
-  }
+      },
+    },
+  },
 });
 ```
 
@@ -93291,12 +93068,14 @@ Now all brains automatically have access to these services:
 ```typescript
 import { brain } from '../brain.js';
 
-export default brain('User Processor')
-  .step('Load User', async ({ logger, database }) => {
+export default brain('User Processor').step(
+  'Load User',
+  async ({ logger, database }) => {
     logger.info('Loading user data');
     const userData = await database.get('current-user');
     return { user: userData };
-  });
+  }
+);
 ```
 
 ## Resource Organization
@@ -93317,6 +93096,7 @@ resources/
 ## Testing Strategy
 
 Keep test files in the `tests/` directory to avoid deployment issues. Tests should:
+
 - Focus on brain outcomes, not implementation
 - Use mock clients and services
 - Verify the final state and important side effects
@@ -93327,17 +93107,19 @@ See `/docs/brain-testing-guide.md` for detailed testing guidance.
 
 1. **Start the development server**: `px server -d`
 2. **Create or modify brains**: Always import from `../brain.js` (from files in `src/brains/`)
-3. **Test locally**: 
+3. **Test locally**:
+
    ```bash
    # Basic run
    px brain run <brain-name>
-   
+
    # Run with options
    px brain run <brain-name> -o channel=#dev -o debug=true
-   
+
    # Watch execution in real-time
    px brain run <brain-name> --watch
    ```
+
 4. **Run tests**: `npm test`
 5. **Deploy**: Backend-specific commands (e.g., `px deploy` for Cloudflare)
 
@@ -93420,7 +93202,7 @@ interface ProjectServices {
 const api = {
   get: async (path: string) => {
     const response = await fetch(`https://api.example.com<%= '${path}' %>`, {
-      headers: { 'Authorization': `Bearer <%= '${process.env.API_KEY}' %>` }
+      headers: { Authorization: `Bearer <%= '${process.env.API_KEY}' %>` },
     });
     return response.json();
   },
@@ -93428,13 +93210,13 @@ const api = {
     const response = await fetch(`https://api.example.com<%= '${path}' %>`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer <%= '${process.env.API_KEY}' %>`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer <%= '${process.env.API_KEY}' %>`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
     return response.json();
-  }
+  },
 };
 ```
 
@@ -93482,10 +93264,9 @@ const events = await collectEvents(
 `currentUser` is available in step context if you need it:
 
 ```typescript
-export default brain('greet')
-  .step('Hello', ({ currentUser }) => ({
-    greeting: 'Hello, user ' + currentUser.name,
-  }));
+export default brain('greet').step('Hello', ({ currentUser }) => ({
+  greeting: 'Hello, user ' + currentUser.name,
+}));
 ```
 
 ## Getting Help
@@ -93495,7 +93276,8 @@ export default brain('greet')
 - **Brain DSL Guide**: `/docs/brain-dsl-guide.md` (includes page steps for generating forms)
 - **Memory Guide**: `/docs/memory-guide.md`
 - **Testing Guide**: `/docs/brain-testing-guide.md`
-```
+
+````
 
 `packages/template-new-project/template/docs/tips-for-agents.md`:
 
@@ -93526,7 +93308,7 @@ error: (thread: any, error: any) => { ... }
 .map(pr => pr.author)
 .map(n => n.trim())
 error: (thread, error) => { ... }
-```
+````
 
 This also applies to variable declarations and function parameters:
 
@@ -93549,6 +93331,7 @@ When you need to run a development server, use the `--log-file` option to captur
 ### 1. Start the server with logging
 
 **Default mode (recommended for most cases):**
+
 ```bash
 px server -d
 ```
@@ -93558,6 +93341,7 @@ This starts the server on the default port (3000) with logs written to `.positro
 **Custom port mode (when you need a specific port):**
 
 First, generate a random port between 30000 and 50000:
+
 ```bash
 echo $((30000 + RANDOM % 20000))
 ```
@@ -93575,6 +93359,7 @@ The `-d` flag runs the server in detached/background mode. The server will outpu
 ### 2. Run commands using your server
 
 **If using default port (3000):**
+
 ```bash
 # No need to set POSITRONIC_PORT
 px brain list
@@ -93582,6 +93367,7 @@ px brain run my-brain
 ```
 
 **If using custom port:**
+
 ```bash
 # Set the port environment variable for subsequent commands (using your remembered port)
 export POSITRONIC_PORT=38291
@@ -93594,6 +93380,7 @@ px brain run my-brain
 ### 3. Check server logs when needed
 
 **Default server:**
+
 ```bash
 # View the entire log file
 cat .positronic-server.log
@@ -93603,6 +93390,7 @@ tail -n 50 .positronic-server.log
 ```
 
 **Custom port server:**
+
 ```bash
 # View the entire log file (using your remembered port)
 cat /tmp/server-38291.log
@@ -93614,12 +93402,14 @@ tail -n 50 /tmp/server-38291.log
 ### 4. Stop the server when done
 
 **Using the built-in kill option (recommended for default server):**
+
 ```bash
 # Kill default server
 px server -k
 ```
 
 **Manual methods:**
+
 ```bash
 # Default server
 kill $(cat .positronic-server.pid)
@@ -93632,6 +93422,7 @@ kill $(lsof -ti:38291)
 ```
 
 ### Important Notes
+
 - The `-d` flag runs the server in detached/background mode (similar to Docker's -d)
 - Default server: PID stored in `.positronic-server.pid`, logs in `.positronic-server.log`
 - Custom port servers: PID stored in `.positronic-server-{port}.pid`
@@ -93655,6 +93446,7 @@ brain('approval-example')
 ```
 
 Key rules:
+
 - Predicate returns `true` to continue, `false` to skip all remaining steps
 - The predicate is synchronous and receives `{ state, options }`
 - State type is unchanged after a guard
@@ -93827,12 +93619,12 @@ Use `.values` for simple extraction, `.filter()` for correlated filtering, and `
 
 ```typescript
 // ❌ DON'T DO THIS - generic parameter names
-state.validations.filter((item, r) => r.matches)
-state.transcripts.filter((t) => t.hasTranscript)  // WRONG: single param is the item, not the result
+state.validations.filter((item, r) => r.matches);
+state.transcripts.filter((t) => t.hasTranscript); // WRONG: single param is the item, not the result
 
 // ✅ DO THIS - descriptive names that reflect the data
-state.validations.filter((crawledResult, validation) => validation.matches)
-state.transcripts.filter((match, extraction) => extraction.hasTranscript)
+state.validations.filter((crawledResult, validation) => validation.matches);
+state.transcripts.filter((match, extraction) => extraction.hasTranscript);
 ```
 
 The first parameter is always the input item (what you passed to `over`), and the second is the AI's output (what the `outputSchema` describes). A single-parameter callback only receives the item — if you need the AI result, you must use both parameters.
@@ -93854,7 +93646,7 @@ If you want namespacing (to avoid collisions with existing state properties), de
 const searchAndValidate = brain('search-and-validate')
   .step('Search', ({ state }) => ({ ...state, matches: [] }))
   .step('Package', ({ state }) => ({
-    searchResults: { matches: state.matches }
+    searchResults: { matches: state.matches },
   }));
 
 // Outer brain accesses via state.searchResults.matches
@@ -93876,23 +93668,23 @@ The Brain DSL has very strong type inference capabilities. **Important**: You sh
 brain('example')
   .step('init', ({ state }: { state: {} }) => ({
     count: 0,
-    name: 'test'
+    name: 'test',
   }))
   .step('process', ({ state }: { state: { count: number; name: string } }) => ({
     ...state,
-    processed: true
-  }))
+    processed: true,
+  }));
 
 // ✅ DO THIS - let TypeScript infer the types
 brain('example')
   .step('init', ({ state }) => ({
     count: 0,
-    name: 'test'
+    name: 'test',
   }))
   .step('process', ({ state }) => ({
-    ...state,  // TypeScript knows state has count: number and name: string
-    processed: true
-  }))
+    ...state, // TypeScript knows state has count: number and name: string
+    processed: true,
+  }));
 ```
 
 The type inference flows through the entire chain, making the code cleaner and more maintainable.
@@ -93903,11 +93695,13 @@ If a brain receives its initial state from the outside — via `.map()`, `.brain
 
 ```typescript
 // This brain is used inside .map() — it receives thread data as initial state
-const categorizeBrain = brain<{}, RawThread>('categorize-thread')
-  .prompt('Categorize', {
+const categorizeBrain = brain<{}, RawThread>('categorize-thread').prompt(
+  'Categorize',
+  {
     message: ({ state }) => `Categorize: <%= '${state.subject}' %>`,
     outputSchema: z.object({ category: z.string() }),
-  });
+  }
+);
 
 // The parent brain maps over threads
 brain('email-digest')
@@ -93927,23 +93721,21 @@ Without the generic, `TState` defaults to `object` and steps can't see any prope
 
 ```typescript
 // ❌ DON'T DO THIS - unnecessary error catching
-brain('example')
-  .step('fetch data', async ({ state }) => {
-    try {
-      const data = await fetchSomeData();
-      return { ...state, data };
-    } catch (error) {
-      console.error('Error:', error);
-      return { ...state, error: error.message };
-    }
-  })
+brain('example').step('fetch data', async ({ state }) => {
+  try {
+    const data = await fetchSomeData();
+    return { ...state, data };
+  } catch (error) {
+    console.error('Error:', error);
+    return { ...state, error: error.message };
+  }
+});
 
 // ✅ DO THIS - let errors propagate
-brain('example')
-  .step('fetch data', async ({ state }) => {
-    const data = await fetchSomeData(); // If this throws, the runner handles it
-    return { ...state, data };
-  })
+brain('example').step('fetch data', async ({ state }) => {
+  const data = await fetchSomeData(); // If this throws, the runner handles it
+  return { ...state, data };
+});
 
 // ✅ ONLY catch errors when it's part of the workflow logic
 brain('validation-example')
@@ -93953,7 +93745,11 @@ brain('validation-example')
       return { ...state, valid: true, result };
     } catch (validationError) {
       // Only if the next step needs to know about validation failures
-      return { ...state, valid: false, validationError: validationError.message };
+      return {
+        ...state,
+        valid: false,
+        validationError: validationError.message,
+      };
     }
   })
   .step('process based on validation', ({ state }) => {
@@ -93963,7 +93759,7 @@ brain('validation-example')
     }
     // Continue with valid data
     return { ...state, status: 'processing' };
-  })
+  });
 ```
 
 Most generated brains should not have try-catch blocks. Only use them when the error state is meaningful to subsequent steps in the workflow.
@@ -94005,6 +93801,7 @@ brain('feedback-collector')
 ```
 
 Key points:
+
 - `page` is available inside the `onCreated` callback, not in a separate step
 - `page.url` - where to send users
 - The brain auto-suspends after `.page()` with `formSchema`
@@ -94039,8 +93836,8 @@ export const brain = createBrain({
     gmail,
     slack,
     database,
-    analytics
-  }
+    analytics,
+  },
 });
 ```
 
@@ -94072,7 +93869,7 @@ Pass exactly one of these (TypeScript enforces this):
 - `rpd` — requests per day
 
 ```typescript
-const fast = bottleneck({ rps: 10 });   // 10 per second
+const fast = bottleneck({ rps: 10 }); // 10 per second
 const slow = bottleneck({ rpd: 1000 }); // 1000 per day
 ```
 
@@ -94088,15 +93885,17 @@ const limit = bottleneck({ rps: 10 });
 
 async function getRepo(owner: string, repo: string) {
   return limit(() =>
-    fetch('https://api.github.com/repos/' + owner + '/' + repo)
-      .then(r => r.json())
+    fetch('https://api.github.com/repos/' + owner + '/' + repo).then((r) =>
+      r.json()
+    )
   );
 }
 
 async function listIssues(owner: string, repo: string) {
   return limit(() =>
-    fetch('https://api.github.com/repos/' + owner + '/' + repo + '/issues')
-      .then(r => r.json())
+    fetch(
+      'https://api.github.com/repos/' + owner + '/' + repo + '/issues'
+    ).then((r) => r.json())
   );
 }
 
@@ -94116,7 +93915,7 @@ brain('process-items')
   .step('Init', ({ state }) => ({ items: state.items }))
   .step('Fetch details', async ({ state }) => {
     const details = await Promise.all(
-      state.items.map(item => limit(() => api.getDetail(item.id)))
+      state.items.map((item) => limit(() => api.getDetail(item.id)))
     );
     return { ...state, details };
   });
@@ -94137,14 +93936,14 @@ import { z } from 'zod';
 const alertSchema = z.object({
   slackChannel: z.string(),
   emailEnabled: z.string().default('false'),
-  alertThreshold: z.string().default('10')
+  alertThreshold: z.string().default('10'),
 });
 
 const alertBrain = brain('Alert System')
   .withOptionsSchema(alertSchema)
   .step('Check Threshold', ({ state, options }) => ({
     ...state,
-    shouldAlert: state.errorCount > parseInt(options.alertThreshold)
+    shouldAlert: state.errorCount > parseInt(options.alertThreshold),
   }))
   .step('Send Alerts', async ({ state, options, slack }) => {
     if (!state.shouldAlert) return state;
@@ -94161,6 +93960,7 @@ const alertBrain = brain('Alert System')
 ```
 
 Remember:
+
 - Options from CLI are always strings (even numbers and booleans)
 - Options are for configuration, not data
 - Document available options in comments above the brain
@@ -94171,9 +93971,9 @@ This project uses ES modules (ESM). **Always include the `.js` extension in your
 
 ```typescript
 // ✅ CORRECT - Include .js extension
-import { brain } from '../brain.js';  // From a file in src/brains/ (brain.ts is at src/brain.ts)
-import { analyzeData } from '../utils/analyzer.js';  // From src/brains/ to src/utils/
-import gmail from '../services/gmail.js';  // From src/brains/ to src/services/
+import { brain } from '../brain.js'; // From a file in src/brains/ (brain.ts is at src/brain.ts)
+import { analyzeData } from '../utils/analyzer.js'; // From src/brains/ to src/utils/
+import gmail from '../services/gmail.js'; // From src/brains/ to src/services/
 
 // ❌ WRONG - Missing .js extension
 import { brain } from '../brain';
@@ -94182,6 +93982,7 @@ import gmail from '../services/gmail';
 ```
 
 This applies to all imports in:
+
 - Brain files
 - Service files
 - Test files
@@ -94208,13 +94009,11 @@ describe('MyNewBrain', () => {
     const mockClient = createMockClient();
 
     // Mock any AI responses if the brain uses prompts
-    mockClient.mockResponses(
-      { processedData: 'expected output' }
-    );
+    mockClient.mockResponses({ processedData: 'expected output' });
 
     const result = await runBrainTest(myNewBrain, {
       client: mockClient,
-      initialState: { input: 'test data' }
+      initialState: { input: 'test data' },
     });
 
     expect(result.completed).toBe(true);
@@ -94226,6 +94025,7 @@ describe('MyNewBrain', () => {
 ### 2. Review Documentation
 
 Before implementing the brain:
+
 - Re-read the **Brain DSL guide** (`/docs/brain-dsl-guide.md`) to understand the DSL patterns
 - Re-read this **Tips for Agents** document if you haven't already
 - Pay special attention to type inference and error handling guidelines
@@ -94243,6 +94043,7 @@ px brain list
 ```
 
 If you need a custom port (e.g., when running multiple servers):
+
 ```bash
 # 1. Generate a random port
 PORT=$(echo $((30000 + RANDOM % 20000)))
@@ -94358,7 +94159,7 @@ export default feedbackBrain;
 - Run `npm run typecheck` frequently to catch type errors early
 - Stop the server when done: `px server -k` (default server) or `kill $(cat .positronic-server.pid)`
 
-```
+````
 
 `packages/template-new-project/template/jest.config.js`:
 
@@ -94387,7 +94188,7 @@ export default {
   moduleFileExtensions: ['ts', 'js', 'json'],
   collectCoverageFrom: ['brains/**/*.ts'],
 };
-```
+````
 
 `packages/template-new-project/template/package.json`:
 
@@ -94440,12 +94241,11 @@ export default {
   },
   "version": "1"
 }
-
 ```
 
 `packages/template-new-project/template/src/brain.ts`:
 
-```ts
+````ts
 import { createBrain, defaultTools } from '@positronic/core';
 import { components } from './components/index.js';
 
@@ -94542,8 +94342,7 @@ export const brain = createBrain({
   components,
   defaultTools,
 });
-
-```
+````
 
 `packages/template-new-project/template/src/brains/example.ts`:
 
@@ -94568,7 +94367,9 @@ const exampleBrain = brain('example')
       }),
       schemaName: 'greeting',
       prompt:
-        'Create a friendly greeting about ' + state.topic + '. Include a fun fact.',
+        'Create a friendly greeting about ' +
+        state.topic +
+        '. Include a fun fact.',
     });
     return {
       ...state,
@@ -94619,21 +94420,21 @@ Once you have the user's name send them a personalized greeting!
 `,
   outputSchema: z.object({
     userName: z.string().describe('The name the user provided'),
-    greeting: z.string().describe('A personalized welcome message for the user'),
+    greeting: z
+      .string()
+      .describe('A personalized welcome message for the user'),
   }),
-})
-  .step('Log Welcome', ({ state }) => {
-    // TypeScript knows state has userName and greeting (spread from outputSchema)
-    console.log('\n✨ ' + state.greeting);
-    console.log('   Welcome aboard, ' + state.userName + '!\n');
-    return state;
-  });
-
+}).step('Log Welcome', ({ state }) => {
+  // TypeScript knows state has userName and greeting (spread from outputSchema)
+  console.log('\n✨ ' + state.greeting);
+  console.log('   Welcome aboard, ' + state.userName + '!\n');
+  return state;
+});
 ```
 
 `packages/template-new-project/template/src/components/index.ts`:
 
-```ts
+````ts
 /**
  * UI Components for this project.
  *
@@ -94660,12 +94461,11 @@ import { components as defaultComponents } from '@positronic/gen-ui-components';
 export const components = {
   ...defaultComponents,
 };
-
-```
+````
 
 `packages/template-new-project/template/src/runner.ts`:
 
-```ts
+````ts
 import { BrainRunner } from '@positronic/core';
 import { VercelClient } from '@positronic/client-vercel';
 import { google } from '@ai-sdk/google';
@@ -94733,8 +94533,7 @@ export const runner = new BrainRunner({
   client,
   resources: {},
 });
-
-```
+````
 
 `packages/template-new-project/template/src/utils/bottleneck.ts`:
 
@@ -94761,11 +94560,12 @@ export function bottleneck(config: BottleneckConfig) {
 function configToInterval(config: BottleneckConfig) {
   if ('rps' in config && config.rps !== undefined) return 1000 / config.rps;
   if ('rpm' in config && config.rpm !== undefined) return 60_000 / config.rpm;
-  if ('rph' in config && config.rph !== undefined) return 3_600_000 / config.rph;
-  if ('rpd' in config && config.rpd !== undefined) return 86_400_000 / config.rpd;
+  if ('rph' in config && config.rph !== undefined)
+    return 3_600_000 / config.rph;
+  if ('rpd' in config && config.rpd !== undefined)
+    return 86_400_000 / config.rpd;
   return 0;
 }
-
 ```
 
 `packages/template-new-project/template/tests/example.test.ts`:
@@ -94778,16 +94578,16 @@ describe('example brain', () => {
   it('should complete successfully with welcome messages', async () => {
     // Arrange
     const mockClient = createMockClient();
-    
+
     // Act
     const result = await runBrainTest(exampleBrain, { client: mockClient });
-    
+
     // Assert
     expect(result.completed).toBe(true);
     expect(result.error).toBeNull();
     expect(result.finalState).toMatchObject({
       message: 'Welcome to Positronic!',
-      finalMessage: 'Welcome to Positronic! Your project is set up.'
+      finalMessage: 'Welcome to Positronic! Your project is set up.',
     });
   });
 });
@@ -94871,7 +94671,9 @@ export async function runBrainTest<
     };
 
     // If brain has services, we need to apply them first
-    const brainToRun = params?.services ? brain.withServices(params.services) : brain;
+    const brainToRun = params?.services
+      ? brain.withServices(params.services)
+      : brain;
 
     for await (const event of brainToRun.run(runOptions)) {
       events.push(event);
@@ -94958,7 +94760,6 @@ export async function runBrainTest<
     { "path": "./packages/gen-ui-components" }
   ]
 }
-
 ```
 
 `tsconfig.test.json`:
@@ -94984,5 +94785,18 @@ export async function runBrainTest<
     "packages/cloudflare/test-project"
   ]
 }
-
 ```
+
+## Tool Composition for Data-Driven Page Generation
+
+Problem: When an LLM in a prompt loop calls `generatePage`, it currently has to pass data through itself — fetch data with one tool, then pass it to `generatePage` via the `data` parameter. This means the LLM sees the raw data, which breaks the design principle that data should never flow through the LLM. The LLM should generate a template, and deterministic code should fill it in.
+
+The `.page()` step handles this correctly via `props` — data goes directly to the page generator without the LLM seeing it. But inside a prompt loop, the LLM is the orchestrator and there's no way to compose tools such that one tool's output feeds directly into another tool's input without the LLM being the middleman.
+
+Idea: Give the LLM a way to compose tools declaratively. For example, the LLM could say "fetch HN articles and store the result under key `stories`" and then "generate a page with `stories` as data" — and the framework wires the data through without the LLM ever seeing it. Something like:
+
+- Tools can write to a scratch/context store (keyed data the LLM can reference but doesn't see the values of)
+- `generatePage` can reference scratch keys as its data source
+- The LLM sees the _shape_ of stored data (via type descriptions) but not the values
+
+This would let prompt loops orchestrate data-heavy workflows (fetch → transform → display) without data flowing through the LLM context window. The LLM stays in the "decide what to do" lane, and deterministic code handles the actual data.
