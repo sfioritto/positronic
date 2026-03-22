@@ -11,6 +11,7 @@ import type { PagesService } from '../pages.js';
 import type {
   ExecutionStackEntry,
   IterateContext,
+  PromptLoopContext,
 } from '../brain-state-machine.js';
 import type { SerializedPageContext } from '../webhook.js';
 import type { StoreProvider } from '../../store/types.js';
@@ -23,6 +24,7 @@ export interface ResumeParams {
   iterateProgress?: Omit<IterateContext, 'stepId'>;
   currentPage?: SerializedPageContext;
   webhookResponse?: JsonObject;
+  promptLoopContext?: PromptLoopContext;
 }
 
 export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {

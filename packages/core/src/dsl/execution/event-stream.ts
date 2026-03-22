@@ -809,26 +809,67 @@ The output must conform to the provided schema.`,
       inputSchema: config.outputSchema,
     };
 
-    const stepId = step.id;
+    const resumeCtx = this.resume?.promptLoopContext;
+
+    // Preserve stepId across resumes so all events correlate
+    const stepId = resumeCtx?.stepId ?? step.id;
     const stepTitle = block.title;
 
-    // Emit PROMPT_START
-    yield {
-      type: BRAIN_EVENTS.PROMPT_START,
-      stepTitle,
-      stepId,
-      prompt,
-      system: system,
-      tools: Object.keys(toolDefs),
-      options: this.options ?? ({} as TOptions),
-      brainRunId: this.brainRunId,
-    };
-
-    // Conversation state
+    // Conversation state — restored from resume context or fresh
     const initialMessages: ToolMessage[] = [{ role: 'user', content: prompt }];
     let responseMessages: ResponseMessage[] | undefined;
     let totalTokens = 0;
     let iteration = 0;
+
+    if (resumeCtx) {
+      // Resuming a paused/waiting prompt loop
+      iteration = resumeCtx.iteration;
+      totalTokens = resumeCtx.totalTokens;
+      responseMessages = resumeCtx.responseMessages;
+
+      // If resuming from webhook, inject the response as a tool result
+      const webhookResponse = this.resume?.webhookResponse;
+      if (
+        webhookResponse &&
+        resumeCtx.pendingToolCallId &&
+        resumeCtx.pendingToolName
+      ) {
+        const toolResultMsg = client.createToolResultMessage!(
+          resumeCtx.pendingToolCallId,
+          resumeCtx.pendingToolName,
+          webhookResponse
+        );
+        responseMessages = [...responseMessages, toolResultMsg];
+
+        yield {
+          type: BRAIN_EVENTS.PROMPT_TOOL_RESULT,
+          stepTitle,
+          stepId,
+          toolName: resumeCtx.pendingToolName,
+          toolCallId: resumeCtx.pendingToolCallId,
+          result: webhookResponse,
+          iteration,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+      }
+
+      // Safe to clear: only the block that caused the pause reads this.resume,
+      // and the main loop already processed webhookResponse/resumed before here
+      this.resume = undefined;
+    } else {
+      // Fresh start — emit PROMPT_START
+      yield {
+        type: BRAIN_EVENTS.PROMPT_START,
+        stepTitle,
+        stepId,
+        prompt,
+        system,
+        tools: Object.keys(toolDefs),
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+    }
 
     while (true) {
       iteration++;

@@ -179,7 +179,8 @@ export class BrainRunner {
       currentUser,
     } = options;
 
-    const { executionStack, iterateContext, currentPage } = machine.context;
+    const { executionStack, iterateContext, currentPage, promptLoopContext } =
+      machine.context;
 
     if (executionStack.length === 0) {
       throw new Error('Cannot resume from empty execution stack');
@@ -196,6 +197,7 @@ export class BrainRunner {
         innerStack,
         iterateProgress: iterateContext ?? undefined,
         currentPage: currentPage ?? undefined,
+        promptLoopContext: promptLoopContext ?? undefined,
       },
       machine,
       options: brainOptions,
