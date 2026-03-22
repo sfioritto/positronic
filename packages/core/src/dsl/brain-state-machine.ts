@@ -737,7 +737,7 @@ interface PromptIterationPayload {
 }
 
 interface PromptRawMessagePayload {
-  message: ResponseMessage;
+  message: ResponseMessage[];
 }
 
 interface PromptWebhookPayload {
@@ -785,11 +785,13 @@ const promptIteration = reduce<BrainExecutionContext, PromptIterationPayload>(
 const promptRawMessage = reduce<BrainExecutionContext, PromptRawMessagePayload>(
   (ctx, { message }) => {
     if (!ctx.promptLoopContext) return ctx;
+    // Replace, don't append — each emission carries the full conversation
+    // history from generateText (the SDK accumulates internally)
     return {
       ...ctx,
       promptLoopContext: {
         ...ctx.promptLoopContext,
-        responseMessages: [...ctx.promptLoopContext.responseMessages, message],
+        responseMessages: message,
       },
     };
   }
