@@ -8,14 +8,6 @@ import type {
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
-import type { ProviderContext } from '../src/dsl/definitions/providers.js';
-
-function memoryProviders(provider: MemoryProvider) {
-  return {
-    memory: (ctx: ProviderContext) =>
-      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
-  };
-}
 
 // Helper function to collect all events from a brain run
 const collectEvents = async <T>(
@@ -130,7 +122,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        providers: memoryProviders(mockProvider),
+        providers: { memory: mockProvider },
       })
     );
 
@@ -158,7 +150,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        providers: memoryProviders(mockProvider),
+        providers: { memory: mockProvider },
       })
     );
 
@@ -188,7 +180,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        providers: memoryProviders(mockProvider),
+        providers: { memory: mockProvider },
       })
     );
 
@@ -223,7 +215,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        providers: memoryProviders(mockProvider),
+        providers: { memory: mockProvider },
       })
     );
 
@@ -259,7 +251,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        providers: memoryProviders(mockProvider),
+        providers: { memory: mockProvider },
       })
     );
 
@@ -286,5 +278,63 @@ describe('Brain.withMemory', () => {
     );
 
     expect(receivedMemory).toBeUndefined();
+  });
+
+  it('should scope to user only when scope is "user"', async () => {
+    const mockProvider = createMockProvider();
+    const mockClient = createMockClient();
+    mockProvider.search.mockResolvedValue([]);
+
+    const testBrain = brain('test-brain')
+      .withMemory({ scope: 'user' })
+      .step('Search', async ({ memory }) => {
+        await memory.search('query');
+        return { done: true };
+      });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        resources: {} as any,
+        providers: { memory: mockProvider },
+      })
+    );
+
+    // scope: 'user' → agentId should be empty, userId should be set
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      'query',
+      { agentId: '', userId: 'test-user' },
+      { limit: undefined }
+    );
+  });
+
+  it('should scope to brain only when scope is "brain"', async () => {
+    const mockProvider = createMockProvider();
+    const mockClient = createMockClient();
+    mockProvider.search.mockResolvedValue([]);
+
+    const testBrain = brain('test-brain')
+      .withMemory({ scope: 'brain' })
+      .step('Search', async ({ memory }) => {
+        await memory.search('query');
+        return { done: true };
+      });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        resources: {} as any,
+        providers: { memory: mockProvider },
+      })
+    );
+
+    // scope: 'brain' → agentId should be set, userId should be empty
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      'query',
+      { agentId: 'test-brain', userId: '' },
+      { limit: undefined }
+    );
   });
 });

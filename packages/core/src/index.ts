@@ -145,7 +145,6 @@ export type {
   FilesProvider,
   PagesProvider,
   StoreProviderFactory,
-  MemoryProviderFactory,
   ServiceProviders,
 } from './dsl/definitions/providers.js';
 
