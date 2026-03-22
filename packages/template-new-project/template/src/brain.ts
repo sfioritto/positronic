@@ -23,7 +23,7 @@ import { components } from './components/index.js';
  * export default brain('my-brain')
  *   .prompt('Do Work', ({ state }) => ({
  *     system: 'You are a helpful assistant',
- *     message: `Help the user with: ${state.task}`,
+ *     message: `Help the user with: <%= '${state.task}' %>`,
  *     outputSchema: z.object({ result: z.string() }),
  *     loop: {
  *       tools: { generatePage, waitForWebhook },
