@@ -229,7 +229,7 @@ export interface PromptRawResponseMessageEvent<
   stepTitle: string;
   stepId: string;
   iteration: number;
-  message: ResponseMessage;
+  message: ResponseMessage[];
 }
 
 export interface PromptWebhookEvent<TOptions extends JsonObject = JsonObject>
