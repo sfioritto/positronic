@@ -112,8 +112,3 @@ export interface Memory {
    */
   add(messages: MemoryMessage[], options?: MemoryAddOptions): Promise<void>;
 }
-
-/**
- * @deprecated Use Memory instead.
- */
-export type ScopedMemory = Memory;
