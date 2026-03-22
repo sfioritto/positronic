@@ -174,5 +174,6 @@ export type {
   ExecutionState,
   CreateMachineOptions,
   IterateContext,
+  PromptLoopContext,
   ExecutionNode,
 } from './dsl/brain-state-machine.js';

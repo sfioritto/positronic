@@ -7,6 +7,7 @@ import { BRAIN_EVENTS, STATUS } from './constants.js';
 import { applyPatches } from './json-patch.js';
 import type { JsonPatch, JsonObject } from './types.js';
 import type { SerializedPageContext } from './webhook.js';
+import type { ResponseMessage } from '../clients/types.js';
 
 // ============================================================================
 // Types
@@ -100,6 +101,22 @@ export interface IterateContext {
   stateKey: string;
 }
 
+/**
+ * Context for tracking prompt loop execution state across pause/resume cycles.
+ * Preserves conversation history so the loop can resume from where it left off.
+ */
+export interface PromptLoopContext {
+  stepId: string;
+  stepTitle: string;
+  prompt: string;
+  system?: string;
+  responseMessages: ResponseMessage[];
+  pendingToolCallId: string | null;
+  pendingToolName: string | null;
+  iteration: number;
+  totalTokens: number;
+}
+
 export interface BrainExecutionContext {
   // === Flat storage (source of truth) ===
   // These are the authoritative data structures. O(1) access to current brain.
@@ -120,6 +137,10 @@ export interface BrainExecutionContext {
   // Iterate context - tracks iterate execution state for pause/resume
   // Non-null when we're inside an iterate step (or paused from one)
   iterateContext: IterateContext | null;
+
+  // Prompt loop context - tracks prompt loop execution state for pause/resume
+  // Non-null when we're inside a prompt loop (or paused/waiting from one)
+  promptLoopContext: PromptLoopContext | null;
 
   // Page context - tracks the current page from a read-only page step.
   // Set when a page step completes with pageContext (read-only page, no outputSchema).
@@ -251,6 +272,7 @@ const createInitialContext = (
   currentState: opts?.initialState ?? {},
   options: opts?.options ?? {},
   iterateContext: null,
+  promptLoopContext: null,
   currentPage: null,
   status: STATUS.PENDING,
   isTopLevel: false,
@@ -590,6 +612,10 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
     const newIterateContext =
       ctx.iterateContext?.stepId === stepId ? null : ctx.iterateContext;
 
+    // Clear promptLoopContext when the prompt step completes
+    const newPromptLoopContext =
+      ctx.promptLoopContext?.stepId === stepId ? null : ctx.promptLoopContext;
+
     // Track page context: set when page step completes (has pageContext),
     // clear when the next step completes (page is ephemeral)
     const newCurrentPage = pageContext ?? null;
@@ -601,6 +627,7 @@ const completeStep = reduce<BrainExecutionContext, CompleteStepPayload>(
       currentState: newState,
       topLevelStepCount: newStepCount,
       iterateContext: newIterateContext,
+      promptLoopContext: newPromptLoopContext,
       currentPage: newCurrentPage,
     };
   }
@@ -695,6 +722,100 @@ const iterateItemComplete = reduce<BrainExecutionContext, any>(
   }
 );
 
+// Prompt loop payload types
+
+interface PromptStartPayload {
+  stepId: string;
+  stepTitle: string;
+  prompt: string;
+  system?: string;
+}
+
+interface PromptIterationPayload {
+  iteration: number;
+  totalTokens: number;
+}
+
+interface PromptRawMessagePayload {
+  message: ResponseMessage;
+}
+
+interface PromptWebhookPayload {
+  toolCallId: string;
+  toolName: string;
+}
+
+// Prompt loop reducers
+// responseMessages and pendingToolCallId/Name are tracked here because on
+// resume the DO replays persisted events through a fresh state machine to
+// reconstruct context, then runner.resume() extracts promptLoopContext to
+// pass into the new event stream's ResumeParams.
+
+const promptStart = reduce<BrainExecutionContext, PromptStartPayload>(
+  (ctx, { stepId, stepTitle, prompt, system }) => ({
+    ...ctx,
+    promptLoopContext: {
+      stepId,
+      stepTitle,
+      prompt,
+      system,
+      responseMessages: [],
+      pendingToolCallId: null,
+      pendingToolName: null,
+      iteration: 0,
+      totalTokens: 0,
+    },
+  })
+);
+
+const promptIteration = reduce<BrainExecutionContext, PromptIterationPayload>(
+  (ctx, { iteration, totalTokens }) => {
+    if (!ctx.promptLoopContext) return ctx;
+    return {
+      ...ctx,
+      promptLoopContext: {
+        ...ctx.promptLoopContext,
+        iteration,
+        totalTokens,
+      },
+    };
+  }
+);
+
+const promptRawMessage = reduce<BrainExecutionContext, PromptRawMessagePayload>(
+  (ctx, { message }) => {
+    if (!ctx.promptLoopContext) return ctx;
+    return {
+      ...ctx,
+      promptLoopContext: {
+        ...ctx.promptLoopContext,
+        responseMessages: [...ctx.promptLoopContext.responseMessages, message],
+      },
+    };
+  }
+);
+
+const promptWebhook = reduce<BrainExecutionContext, PromptWebhookPayload>(
+  (ctx, { toolCallId, toolName }) => {
+    if (!ctx.promptLoopContext) return ctx;
+    return {
+      ...ctx,
+      promptLoopContext: {
+        ...ctx.promptLoopContext,
+        pendingToolCallId: toolCallId,
+        pendingToolName: toolName,
+      },
+    };
+  }
+);
+
+const promptComplete = reduce<BrainExecutionContext, object>((ctx) => ({
+  ...ctx,
+  promptLoopContext: null,
+}));
+
+const passthrough = reduce<BrainExecutionContext, object>((ctx) => ctx);
+
 // ============================================================================
 // Guards - Conditional transitions
 // ============================================================================
@@ -778,7 +899,51 @@ const makeBrainMachine = (initialContext: BrainExecutionContext) =>
           BRAIN_EVENTS.ITERATE_ITEM_COMPLETE,
           'running',
           iterateItemComplete
-        ) as any
+        ) as any,
+
+        // Prompt loop events - stay in running, update promptLoopContext
+        transition(BRAIN_EVENTS.PROMPT_START, 'running', promptStart) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_ITERATION,
+          'running',
+          promptIteration
+        ) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_TOOL_CALL,
+          'running',
+          passthrough
+        ) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_TOOL_RESULT,
+          'running',
+          passthrough
+        ) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_ASSISTANT_MESSAGE,
+          'running',
+          passthrough
+        ) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_COMPLETE,
+          'running',
+          promptComplete
+        ) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_TOKEN_LIMIT,
+          'running',
+          promptComplete
+        ) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_ITERATION_LIMIT,
+          'running',
+          promptComplete
+        ) as any,
+        transition(
+          BRAIN_EVENTS.PROMPT_RAW_RESPONSE_MESSAGE,
+          'running',
+          promptRawMessage
+        ) as any,
+        transition(BRAIN_EVENTS.PROMPT_WEBHOOK, 'running', promptWebhook) as any
       ),
 
       paused: state(
