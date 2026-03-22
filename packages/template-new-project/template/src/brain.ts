@@ -59,25 +59,20 @@ import { components } from './components/index.js';
  *   });
  * ```
  *
- * To add memory (long-term storage with semantic search):
+ * To add memory (long-term storage with semantic search),
+ * call `.withMemory()` on individual brains that need it:
  *
  * ```typescript
- * import { createBrain } from '@positronic/core';
- * import { createMem0Provider } from '@positronic/mem0';
- * import { components } from './components/index.js';
- *
- * const memory = createMem0Provider({
- *   apiKey: process.env.MEM0_API_KEY!,
- * });
- *
- * export const brain = createBrain({
- *   components,
- *   memory, // All brains now have access to memory
- * });
+ * export default brain('my-brain')
+ *   .withMemory()
+ *   .step('Remember', async ({ memory }) => {
+ *     const prefs = await memory.search('user preferences');
+ *     return { preferences: prefs };
+ *   });
  * ```
  *
- * Memory is automatically scoped to the current user (via currentUser.name)
- * and the brain name. No need to pass userId manually.
+ * The memory provider is configured on the runner, not in createBrain.
+ * Memory is automatically scoped to the current user and brain name.
  *
  * See docs/memory-guide.md for full details.
  */

@@ -95,7 +95,7 @@ export interface CreateMemorySystemPromptOptions extends MemorySearchOptions {
  * @example
  * ```typescript
  * const myBrain = brain('my-brain')
- *   .withMemory(provider)
+ *   .withMemory()
  *   .brain('agent', async ({ memory }) => {
  *     const system = await createMemorySystemPrompt(
  *       memory,

@@ -669,7 +669,7 @@ const alertSchema = z.object({
 });
 
 const alertBrain = brain('Alert System')
-  .withOptionsSchema(alertSchema)
+  .withOptions(alertSchema)
   .step('Check Threshold', ({ state, options }) => ({
     ...state,
     shouldAlert: state.errorCount > parseInt(options.alertThreshold)

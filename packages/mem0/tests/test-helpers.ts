@@ -43,7 +43,7 @@ export interface MockMemoryProvider extends MemoryProvider {
  * provider.seedMemories([{ id: '1', content: 'User likes dark mode', score: 0.95 }]);
  *
  * // Use in brain
- * const testBrain = brain('test').withMemory(provider).step(...);
+ * const testBrain = brain('test').withMemory().step(...);
  * await collectEvents(testBrain.run({ client }));
  *
  * // Verify calls

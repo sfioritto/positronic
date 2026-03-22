@@ -31,7 +31,7 @@ const recallMemoriesSchema = z.object({
  * const tools = createMem0Tools();
  *
  * const myBrain = brain('my-brain')
- *   .withMemory(memory)
+ *   .withMemory()
  *   .brain('agent', ({ tools: defaultTools }) => ({
  *     system: 'You are helpful. Store user preferences with rememberFact.',
  *     prompt: 'User says: I prefer dark mode',
@@ -80,7 +80,7 @@ The fact should be a clear, standalone statement that can be retrieved later.`,
  * const tools = createMem0Tools();
  *
  * const myBrain = brain('my-brain')
- *   .withMemory(memory)
+ *   .withMemory()
  *   .brain('agent', ({ tools: defaultTools }) => ({
  *     system: 'Use recallMemories to find relevant user preferences.',
  *     prompt: 'What theme does the user prefer?',
@@ -141,7 +141,7 @@ The query should describe what you're looking for. Results include relevance sco
  * const memoryTools = createMem0Tools();
  *
  * const myBrain = brain('my-brain')
- *   .withMemory(provider)
+ *   .withMemory()
  *   .brain('agent', () => ({
  *     system: 'You can remember and recall information.',
  *     prompt: 'Help the user',
