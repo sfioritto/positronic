@@ -303,56 +303,59 @@ const pageWebhookBrain = brain({
     webhookResponse: response,
   }));
 
-// Brain with an agent step that uses webhooks for escalation
+// Brain with a prompt loop step that uses webhooks for escalation
 const agentWebhookBrain = brain({
   title: 'agent-webhook-brain',
-  description: 'A brain that uses agent with webhook escalation',
-}).brain('Process with escalation', ({ state }) => ({
+  description: 'A brain that uses prompt loop with webhook escalation',
+}).prompt('Process with escalation', () => ({
   system: 'You are an AI assistant that can escalate to humans when needed.',
-  prompt:
+  message:
     'Please process this request. If you need human review, use the escalate tool.',
-  tools: {
-    escalate: {
-      description: 'Escalate to a human for review',
-      inputSchema: z.object({
-        reason: z.string().describe('Why escalation is needed'),
-      }),
-      execute: async () => {
-        // Return waitFor to suspend the agent and wait for webhook
-        return {
-          waitFor: loopEscalationWebhook('test-escalation-123'),
-        };
+  outputSchema: z.object({ result: z.string() }),
+  loop: {
+    tools: {
+      escalate: {
+        description: 'Escalate to a human for review',
+        inputSchema: z.object({
+          reason: z.string().describe('Why escalation is needed'),
+        }),
+        execute: async () => {
+          return {
+            waitFor: loopEscalationWebhook('test-escalation-123'),
+          };
+        },
+      },
+      finish: {
+        description: 'Complete the task with a final result',
+        inputSchema: z.object({
+          result: z.string().describe('The final result'),
+        }),
+        terminal: true,
       },
     },
-    finish: {
-      description: 'Complete the task with a final result',
-      inputSchema: z.object({
-        result: z.string().describe('The final result'),
-      }),
-      terminal: true,
-    },
   },
-  outputSchema: z.object({ result: z.string() }),
 }));
 
-// Brain with an agent step that will trigger an API error (simulates "too many tokens")
+// Brain with a prompt loop step that will trigger an API error (simulates "too many tokens")
 // The mock client can be configured to throw an error via setMockError()
 const agentErrorBrain = brain({
   title: 'agent-error-brain',
-  description: 'A brain that triggers an API error in its agent step',
-}).brain('Process request', ({ state }) => ({
+  description: 'A brain that triggers an API error in its prompt loop step',
+}).prompt('Process request', () => ({
   system: 'You are a helpful assistant.',
-  prompt: 'Please process this request.',
-  tools: {
-    finish: {
-      description: 'Complete the task',
-      inputSchema: z.object({
-        result: z.string().describe('The final result'),
-      }),
-      terminal: true,
+  message: 'Please process this request.',
+  outputSchema: z.object({ result: z.string() }),
+  loop: {
+    tools: {
+      finish: {
+        description: 'Complete the task',
+        inputSchema: z.object({
+          result: z.string().describe('The final result'),
+        }),
+        terminal: true,
+      },
     },
   },
-  outputSchema: z.object({ result: z.string() }),
 }));
 
 // Brain that generates a large state (> 1MB) to test R2 overflow
