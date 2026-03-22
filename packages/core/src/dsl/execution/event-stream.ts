@@ -838,6 +838,27 @@ export class BrainEventStream<
       };
     }
 
+    // Enrich generatePage description with available components so the outer
+    // LLM (which reads tool descriptions to decide how to call them) knows what
+    // UI components exist. This only matters in the prompt loop — it's the only
+    // path where an LLM reads tool descriptions. Direct tool.execute() calls
+    // (e.g., from a regular step) don't need this because they don't go through
+    // LLM tool selection.
+    if (toolDefs['generatePage'] && this.components) {
+      const componentList = Object.entries(this.components)
+        .map(([name, comp]) => `- ${name}: ${comp.description.split('\n')[0]}`)
+        .join('\n');
+      toolDefs['generatePage'] = {
+        ...toolDefs['generatePage'],
+        description:
+          toolDefs['generatePage'].description +
+          `\n\nAvailable UI Components:\n${componentList}` +
+          `\n\nIMPORTANT: When generating a page with a form (hasForm=true), the page generator` +
+          ` automatically creates a Form component. You do NOT need to include Form in your prompt.` +
+          ` Just describe the form fields you need and the page generator handles the rest.`,
+      };
+    }
+
     // Auto-generate 'done' tool from outputSchema
     toolDefs['done'] = {
       description: `Signal that the task is complete and provide the final result.
