@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { createScopedMemory } from '../src/memory/scoped-memory.js';
+import { createMemory } from '../src/memory/create-memory.js';
 import type {
   MemoryProvider,
   MemoryEntry,
@@ -13,7 +13,7 @@ import type { ProviderContext } from '../src/dsl/definitions/providers.js';
 function memoryProviders(provider: MemoryProvider) {
   return {
     memory: (ctx: ProviderContext) =>
-      createScopedMemory(provider, ctx.brainTitle, ctx.currentUser.name),
+      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
   };
 }
 
@@ -40,7 +40,7 @@ const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
   streamText: jest.fn<ObjectGenerator['streamText']>(),
 });
 
-describe('createScopedMemory', () => {
+describe('createMemory()', () => {
   it('should bind agentId and userId to search calls', async () => {
     const mockProvider = createMockProvider();
     const testMemories: MemoryEntry[] = [
@@ -49,12 +49,8 @@ describe('createScopedMemory', () => {
     ];
     mockProvider.search.mockResolvedValue(testMemories);
 
-    const scopedMemory = createScopedMemory(
-      mockProvider,
-      'my-brain',
-      'user-123'
-    );
-    const result = await scopedMemory.search('test query');
+    const memory = createMemory(mockProvider, 'my-brain', 'user-123');
+    const result = await memory.search('test query');
 
     expect(mockProvider.search).toHaveBeenCalledWith(
       'test query',
@@ -66,13 +62,9 @@ describe('createScopedMemory', () => {
 
   it('should pass limit to search calls', async () => {
     const mockProvider = createMockProvider();
-    const scopedMemory = createScopedMemory(
-      mockProvider,
-      'my-brain',
-      'user-123'
-    );
+    const memory = createMemory(mockProvider, 'my-brain', 'user-123');
 
-    await scopedMemory.search('test query', { limit: 5 });
+    await memory.search('test query', { limit: 5 });
 
     expect(mockProvider.search).toHaveBeenCalledWith(
       'test query',
@@ -83,18 +75,14 @@ describe('createScopedMemory', () => {
 
   it('should bind agentId and userId to add calls', async () => {
     const mockProvider = createMockProvider();
-    const scopedMemory = createScopedMemory(
-      mockProvider,
-      'my-brain',
-      'user-123'
-    );
+    const memory = createMemory(mockProvider, 'my-brain', 'user-123');
 
     const messages: MemoryMessage[] = [
       { role: 'user', content: 'Hello' },
       { role: 'assistant', content: 'Hi there!' },
     ];
 
-    await scopedMemory.add(messages);
+    await memory.add(messages);
 
     expect(mockProvider.add).toHaveBeenCalledWith(
       messages,
@@ -105,17 +93,13 @@ describe('createScopedMemory', () => {
 
   it('should pass metadata to add calls', async () => {
     const mockProvider = createMockProvider();
-    const scopedMemory = createScopedMemory(
-      mockProvider,
-      'my-brain',
-      'user-123'
-    );
+    const memory = createMemory(mockProvider, 'my-brain', 'user-123');
 
     const messages: MemoryMessage[] = [
       { role: 'assistant', content: 'User prefers dark mode' },
     ];
 
-    await scopedMemory.add(messages, {
+    await memory.add(messages, {
       metadata: { source: 'preference' },
     });
 

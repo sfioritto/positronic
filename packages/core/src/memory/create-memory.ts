@@ -8,7 +8,7 @@ import type {
 } from './types.js';
 
 /**
- * Creates a scoped memory instance with agentId and userId pre-bound.
+ * Creates a Memory instance with agentId and userId pre-bound.
  *
  * This wraps a MemoryProvider and automatically includes the agentId
  * and userId in all calls, so brain steps don't need to pass them explicitly.
@@ -21,13 +21,13 @@ import type {
  * @example
  * ```typescript
  * const provider = createMem0Provider({ apiKey: '...' });
- * const scopedMemory = createScopedMemory(provider, 'my-brain', 'user-123');
+ * const memory = createMemory(provider, 'my-brain', 'user-123');
  *
  * // Now search without passing agentId or userId
- * const memories = await scopedMemory.search('user preferences');
+ * const memories = await memory.search('user preferences');
  * ```
  */
-export function createScopedMemory(
+export function createMemory(
   provider: MemoryProvider,
   agentId: string,
   userId: string
