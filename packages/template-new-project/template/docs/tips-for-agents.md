@@ -511,6 +511,36 @@ Key points:
 
 See `/docs/brain-dsl-guide.md` for more page step examples.
 
+### Use `.page()` for Data Display, Not `generatePage` in Loops
+
+When a brain needs to display data and collect user input, prefer `.page()` steps over calling the `generatePage` tool inside a `.prompt()` loop. The `.page()` step passes data via `props` — the page generation LLM never sees the actual data, only its shape. This is more reliable and keeps data out of the LLM context.
+
+```typescript
+// ❌ DON'T DO THIS - LLM fetches data then passes it to generatePage
+brain('reader')
+  .prompt('Show Articles', () => ({
+    message: 'Fetch articles and create a page showing them',
+    outputSchema: z.object({ articlesShown: z.number() }),
+    loop: { tools: { fetchArticles, generatePage, waitForWebhook } },
+  }))
+
+// ✅ DO THIS - fetch data in a step, display with .page()
+brain('reader')
+  .step('Fetch Articles', async () => {
+    const articles = await fetchArticles();
+    return { articles };
+  })
+  .page('Show Articles', ({ state }) => ({
+    prompt: 'Create a reading list with checkboxes to mark articles as read',
+    props: { articles: state.articles },
+    formSchema: z.object({
+      readArticleIds: z.array(z.string()),
+    }),
+  }))
+```
+
+The `.page()` step automatically suspends, waits for the form submission, and merges the response onto state. Use `.prompt()` loops for tasks that genuinely need LLM decision-making with tools (research, multi-step reasoning, human-in-the-loop via webhooks), not for data display.
+
 ## Service Organization
 
 When implementing services for the project brain, keep service implementations in the `src/services/` directory to stay organized and reusable:
