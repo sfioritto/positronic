@@ -11,6 +11,8 @@ import type {
   RuntimeEnv,
   SignalProvider,
   CurrentUser,
+  ToolWaitFor,
+  StepContext,
 } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
@@ -761,8 +763,437 @@ export class BrainEventStream<
       return;
     }
 
-    // Loop path: tool-calling iteration (Phase 3)
-    throw new Error(`Prompt loop not yet implemented in step "${block.title}"`);
+    // Loop path: tool-calling iteration
+    const {
+      tools: userTools,
+      maxIterations = 100,
+      maxTokens,
+      toolChoice = 'required',
+    } = config.loop;
+
+    if (!client.generateText) {
+      throw new Error(
+        `Client does not support generateText, required for prompt loop in step "${block.title}"`
+      );
+    }
+    if (!client.createToolResultMessage) {
+      throw new Error(
+        `Client does not support createToolResultMessage, required for prompt loop in step "${block.title}"`
+      );
+    }
+
+    // Build tool definitions for the LLM (description + inputSchema only)
+    const toolDefs: Record<
+      string,
+      { description: string; inputSchema: z.ZodSchema }
+    > = {};
+    for (const [name, tool] of Object.entries(userTools)) {
+      toolDefs[name] = {
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      };
+    }
+
+    // Auto-generate 'done' tool from outputSchema
+    toolDefs['done'] = {
+      description: `Signal that the task is complete and provide the final result.
+
+This is a TERMINAL tool - calling it immediately ends execution.
+No further tools will execute after this. No further iterations will occur.
+The input you provide becomes the final output.
+
+Call this when you have completed the assigned task and have the final answer ready.
+Do NOT call if you still need to gather more information.
+
+The output must conform to the provided schema.`,
+      inputSchema: config.outputSchema,
+    };
+
+    const stepId = step.id;
+    const stepTitle = block.title;
+
+    // Emit PROMPT_START
+    yield {
+      type: BRAIN_EVENTS.PROMPT_START,
+      stepTitle,
+      stepId,
+      prompt,
+      system: system,
+      tools: Object.keys(toolDefs),
+      options: this.options ?? ({} as TOptions),
+      brainRunId: this.brainRunId,
+    };
+
+    // Conversation state
+    const initialMessages: ToolMessage[] = [{ role: 'user', content: prompt }];
+    let responseMessages: ResponseMessage[] | undefined;
+    let totalTokens = 0;
+    let iteration = 0;
+
+    while (true) {
+      iteration++;
+
+      // Check iteration limit before LLM call
+      if (iteration > maxIterations) {
+        yield {
+          type: BRAIN_EVENTS.PROMPT_ITERATION_LIMIT,
+          stepTitle,
+          stepId,
+          totalIterations: iteration - 1,
+          maxIterations,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+        throw new Error(
+          `Iteration limit (${maxIterations}) reached in prompt loop "${stepTitle}"`
+        );
+      }
+
+      // Check signals
+      if (this.signalProvider) {
+        const signals = await this.signalProvider.getSignals('CONTROL');
+        for (const signal of signals) {
+          if (signal.type === 'KILL') {
+            this.stopped = true;
+            yield {
+              type: BRAIN_EVENTS.CANCELLED,
+              status: STATUS.CANCELLED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+          if (signal.type === 'PAUSE') {
+            this.stopped = true;
+            yield {
+              type: BRAIN_EVENTS.PAUSED,
+              status: STATUS.PAUSED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+        }
+      }
+
+      // Call LLM
+      const llmResult = await client.generateText!({
+        system: system,
+        messages: iteration === 1 ? initialMessages : [],
+        responseMessages,
+        tools: toolDefs,
+        toolChoice,
+      });
+
+      const tokensThisIteration = llmResult.usage.totalTokens;
+      totalTokens += tokensThisIteration;
+      responseMessages = llmResult.responseMessages;
+
+      // Emit raw response message for replay
+      yield {
+        type: BRAIN_EVENTS.PROMPT_RAW_RESPONSE_MESSAGE,
+        stepTitle,
+        stepId,
+        iteration,
+        message: llmResult.responseMessages,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+
+      // Emit iteration event
+      yield {
+        type: BRAIN_EVENTS.PROMPT_ITERATION,
+        stepTitle,
+        stepId,
+        iteration,
+        tokensThisIteration,
+        totalTokens,
+        options: this.options ?? ({} as TOptions),
+        brainRunId: this.brainRunId,
+      };
+
+      // Check token limit
+      if (maxTokens && totalTokens >= maxTokens) {
+        yield {
+          type: BRAIN_EVENTS.PROMPT_TOKEN_LIMIT,
+          stepTitle,
+          stepId,
+          totalTokens,
+          maxTokens,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+        throw new Error(
+          `Token limit (${maxTokens}) reached in prompt loop "${stepTitle}"`
+        );
+      }
+
+      // Emit assistant text if any
+      if (llmResult.text) {
+        yield {
+          type: BRAIN_EVENTS.PROMPT_ASSISTANT_MESSAGE,
+          stepTitle,
+          stepId,
+          text: llmResult.text,
+          iteration,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+      }
+
+      // Check tool calls
+      if (!llmResult.toolCalls || llmResult.toolCalls.length === 0) {
+        if (toolChoice === 'required') {
+          throw new Error(
+            `LLM did not call any tools with toolChoice 'required' in step "${stepTitle}"`
+          );
+        }
+        continue;
+      }
+
+      // Process tool calls sequentially
+      let pendingWebhook: {
+        toolCallId: string;
+        toolName: string;
+        input: unknown;
+        waitFor: ToolWaitFor;
+      } | null = null;
+
+      for (const toolCall of llmResult.toolCalls) {
+        const { toolCallId, toolName, args } = toolCall;
+
+        // Emit tool call event
+        yield {
+          type: BRAIN_EVENTS.PROMPT_TOOL_CALL,
+          stepTitle,
+          stepId,
+          toolName,
+          toolCallId,
+          input: args,
+          iteration,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+
+        // Handle 'done' tool
+        if (toolName === 'done') {
+          const parsed = config.outputSchema.safeParse(args);
+          if (!parsed.success) {
+            // Feed validation error back to LLM so it can retry
+            const errorMsg = `Invalid output: ${parsed.error.message}. Please fix and try again.`;
+            const toolResultMsg = client.createToolResultMessage!(
+              toolCallId,
+              'done',
+              errorMsg
+            );
+            responseMessages = [...(responseMessages ?? []), toolResultMsg];
+            yield {
+              type: BRAIN_EVENTS.PROMPT_TOOL_RESULT,
+              stepTitle,
+              stepId,
+              toolName: 'done',
+              toolCallId,
+              result: errorMsg,
+              iteration,
+              options: this.options ?? ({} as TOptions),
+              brainRunId: this.brainRunId,
+            };
+            break; // Break to next iteration so LLM can retry
+          }
+
+          // Valid output — merge onto state and complete
+          this.currentState = {
+            ...this.currentState,
+            ...parsed.data,
+          } as TState;
+
+          yield {
+            type: BRAIN_EVENTS.PROMPT_TOOL_RESULT,
+            stepTitle,
+            stepId,
+            toolName: 'done',
+            toolCallId,
+            result: parsed.data,
+            iteration,
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+          };
+
+          yield {
+            type: BRAIN_EVENTS.PROMPT_COMPLETE,
+            stepTitle,
+            stepId,
+            result: parsed.data,
+            terminalTool: 'done',
+            totalIterations: iteration,
+            totalTokens,
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+          };
+
+          yield* this.completeStep(step, prevState);
+          return;
+        }
+
+        // Handle user-defined tools
+        const tool = userTools[toolName];
+        if (!tool) {
+          throw new Error(
+            `Unknown tool "${toolName}" called in step "${stepTitle}"`
+          );
+        }
+
+        // Check for other terminal tools
+        if (tool.terminal) {
+          this.currentState = {
+            ...this.currentState,
+            ...(args as Record<string, unknown>),
+          } as TState;
+
+          yield {
+            type: BRAIN_EVENTS.PROMPT_TOOL_RESULT,
+            stepTitle,
+            stepId,
+            toolName,
+            toolCallId,
+            result: args,
+            iteration,
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+          };
+
+          yield {
+            type: BRAIN_EVENTS.PROMPT_COMPLETE,
+            stepTitle,
+            stepId,
+            result: args,
+            terminalTool: toolName,
+            totalIterations: iteration,
+            totalTokens,
+            options: this.options ?? ({} as TOptions),
+            brainRunId: this.brainRunId,
+          };
+
+          yield* this.completeStep(step, prevState);
+          return;
+        }
+
+        // Execute non-terminal tool
+        let toolResult: unknown;
+        if (tool.execute) {
+          toolResult = await tool.execute(
+            args,
+            this.buildStepContext(step) as StepContext
+          );
+
+          // Check for webhook suspension
+          if (
+            toolResult &&
+            typeof toolResult === 'object' &&
+            'waitFor' in toolResult
+          ) {
+            pendingWebhook = {
+              toolCallId,
+              toolName,
+              input: args,
+              waitFor: toolResult as ToolWaitFor,
+            };
+
+            // Emit tool result with waiting status
+            yield {
+              type: BRAIN_EVENTS.PROMPT_TOOL_RESULT,
+              stepTitle,
+              stepId,
+              toolName,
+              toolCallId,
+              result: 'Waiting for webhook response...',
+              iteration,
+              status: 'waiting_for_webhook' as const,
+              options: this.options ?? ({} as TOptions),
+              brainRunId: this.brainRunId,
+            };
+
+            // Add placeholder to conversation
+            const placeholderMsg = client.createToolResultMessage!(
+              toolCallId,
+              toolName,
+              'Waiting for webhook response...'
+            );
+            responseMessages = [...(responseMessages ?? []), placeholderMsg];
+
+            // Continue processing remaining tool calls in this iteration
+            continue;
+          }
+        } else {
+          toolResult = { success: true };
+        }
+
+        // Feed tool result back to LLM
+        const toolResultMsg = client.createToolResultMessage!(
+          toolCallId,
+          toolName,
+          toolResult
+        );
+        responseMessages = [...(responseMessages ?? []), toolResultMsg];
+
+        yield {
+          type: BRAIN_EVENTS.PROMPT_TOOL_RESULT,
+          stepTitle,
+          stepId,
+          toolName,
+          toolCallId,
+          result: toolResult,
+          iteration,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+      }
+
+      // After all tool calls: if pending webhook, suspend
+      if (pendingWebhook) {
+        const { waitFor: toolWaitFor } = pendingWebhook;
+        const webhooks = Array.isArray(toolWaitFor.waitFor)
+          ? toolWaitFor.waitFor
+          : [toolWaitFor.waitFor];
+
+        const serializedWaitFor: SerializedWebhookRegistration[] = webhooks.map(
+          (registration: WebhookRegistration) => ({
+            slug: registration.slug,
+            identifier: registration.identifier,
+            token: registration.token,
+          })
+        );
+
+        // Emit prompt-level webhook event
+        yield {
+          type: BRAIN_EVENTS.PROMPT_WEBHOOK,
+          stepTitle,
+          stepId,
+          toolCallId: pendingWebhook.toolCallId,
+          toolName: pendingWebhook.toolName,
+          input: pendingWebhook.input,
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+
+        // Emit brain-level webhook event (triggers state machine transition to waiting)
+        yield {
+          type: BRAIN_EVENTS.WEBHOOK,
+          waitFor: serializedWaitFor,
+          ...(toolWaitFor.timeout !== undefined && {
+            timeout: toolWaitFor.timeout,
+          }),
+          options: this.options ?? ({} as TOptions),
+          brainRunId: this.brainRunId,
+        };
+
+        return;
+      }
+    }
   }
 
   /**
