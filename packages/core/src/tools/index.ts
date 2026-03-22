@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Tool, ToolWaitFor, StepContext } from '../dsl/types.js';
+import type { Tool, ToolWaitFor, ToolContext } from '../dsl/types.js';
 import type { WebhookRegistration } from '../dsl/webhook.js';
 import { generatePage as generatePageCore } from '../ui/generate-page.js';
 import { generatePageHtml } from '../ui/generate-page-html.js';
@@ -31,7 +31,7 @@ export function createTool<T extends z.ZodSchema>(config: {
   inputSchema: T;
   execute?: (
     input: z.infer<T>,
-    context: StepContext
+    context: ToolContext
   ) => unknown | Promise<unknown> | ToolWaitFor | Promise<ToolWaitFor>;
   terminal?: boolean;
 }): Tool<T> {
