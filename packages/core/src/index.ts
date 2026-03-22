@@ -83,6 +83,16 @@ export type {
   IterateItemCompleteEvent,
   FileWriteStartEvent,
   FileWriteCompleteEvent,
+  PromptStartEvent,
+  PromptIterationEvent,
+  PromptToolCallEvent,
+  PromptToolResultEvent,
+  PromptAssistantMessageEvent,
+  PromptCompleteEvent,
+  PromptTokenLimitEvent,
+  PromptIterationLimitEvent,
+  PromptRawResponseMessageEvent,
+  PromptWebhookEvent,
 } from './dsl/definitions/events.js';
 
 // Default tools

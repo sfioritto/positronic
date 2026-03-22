@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import type { ObjectGenerator } from '../../clients/types.js';
-import type { State, JsonObject, RuntimeEnv } from '../types.js';
+import type { ObjectGenerator, ToolChoice } from '../../clients/types.js';
+import type { State, JsonObject, RuntimeEnv, Tool } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
 import type { WebhookRegistration } from '../webhook.js';
 import type { TemplateChild } from '../../jsx-runtime.js';
+import type { FileHandle } from '../../files/types.js';
 
 export type TemplateReturn = TemplateChild | Promise<TemplateChild>;
 
@@ -119,6 +120,29 @@ export type PageConfig = {
   persist?: boolean;
 };
 
+export type PromptLoopConfig = {
+  tools: Record<string, Tool<any>>;
+  maxIterations?: number;
+  maxTokens?: number;
+  toolChoice?: ToolChoice;
+};
+
+export type PromptConfig<TSchema extends z.ZodObject<any> = z.ZodObject<any>> =
+  {
+    message: TemplateReturn;
+    system?: TemplateReturn;
+    outputSchema: TSchema;
+    client?: ObjectGenerator;
+    attachments?: FileHandle[];
+    loop?: PromptLoopConfig;
+  };
+
+export type PromptBlock = {
+  type: 'prompt';
+  title: string;
+  configFn: (context: any) => PromptConfig | Promise<PromptConfig>;
+};
+
 export type MapConfig = {
   over: any[];
   error?: (item: any, error: Error) => any | null;
@@ -129,7 +153,9 @@ export type MapConfig = {
   // Prompt mode
   prompt?: {
     message: (item: any) => TemplateReturn;
+    system?: TemplateReturn | ((item: any) => TemplateReturn);
     outputSchema: z.ZodObject<any>;
+    loop?: PromptLoopConfig;
   };
   client?: ObjectGenerator;
 };
@@ -154,4 +180,5 @@ export type Block<
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
   | GuardBlock<TStateIn, TOptions>
   | WaitBlock<TStateIn, TOptions, TServices, TPageIn>
-  | MapBlock;
+  | MapBlock
+  | PromptBlock;

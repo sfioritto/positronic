@@ -5,6 +5,7 @@ import type {
   SerializedWebhookRegistration,
   SerializedPageContext,
 } from '../webhook.js';
+import type { ResponseMessage } from '../../clients/types.js';
 
 export type SerializedError = {
   name: string;
@@ -137,6 +138,110 @@ export interface FileWriteCompleteEvent<
   stepTitle: string;
 }
 
+// Prompt Loop Events
+export interface PromptStartEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_START;
+  stepTitle: string;
+  stepId: string;
+  prompt: string;
+  system?: string;
+  tools: string[];
+}
+
+export interface PromptIterationEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_ITERATION;
+  stepTitle: string;
+  stepId: string;
+  iteration: number;
+  tokensThisIteration: number;
+  totalTokens: number;
+}
+
+export interface PromptToolCallEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_TOOL_CALL;
+  stepTitle: string;
+  stepId: string;
+  toolName: string;
+  toolCallId: string;
+  input: unknown;
+  iteration: number;
+}
+
+export interface PromptToolResultEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_TOOL_RESULT;
+  stepTitle: string;
+  stepId: string;
+  toolName: string;
+  toolCallId: string;
+  result: unknown;
+  iteration: number;
+  status?: 'waiting_for_webhook';
+}
+
+export interface PromptAssistantMessageEvent<
+  TOptions extends JsonObject = JsonObject
+> extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_ASSISTANT_MESSAGE;
+  stepTitle: string;
+  stepId: string;
+  text: string;
+  iteration: number;
+}
+
+export interface PromptCompleteEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_COMPLETE;
+  stepTitle: string;
+  stepId: string;
+  result: unknown;
+  terminalTool?: string;
+  totalIterations: number;
+  totalTokens: number;
+}
+
+export interface PromptTokenLimitEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_TOKEN_LIMIT;
+  stepTitle: string;
+  stepId: string;
+  totalTokens: number;
+  maxTokens: number;
+}
+
+export interface PromptIterationLimitEvent<
+  TOptions extends JsonObject = JsonObject
+> extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_ITERATION_LIMIT;
+  stepTitle: string;
+  stepId: string;
+  totalIterations: number;
+  maxIterations: number;
+}
+
+export interface PromptRawResponseMessageEvent<
+  TOptions extends JsonObject = JsonObject
+> extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_RAW_RESPONSE_MESSAGE;
+  stepTitle: string;
+  stepId: string;
+  iteration: number;
+  message: ResponseMessage;
+}
+
+export interface PromptWebhookEvent<TOptions extends JsonObject = JsonObject>
+  extends BaseEvent<TOptions> {
+  type: typeof BRAIN_EVENTS.PROMPT_WEBHOOK;
+  stepTitle: string;
+  stepId: string;
+  toolCallId: string;
+  toolName: string;
+  input: unknown;
+}
+
 // Union type of all possible events
 export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | BrainStartEvent<TOptions>
@@ -152,4 +257,14 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | WebhookResponseEvent<TOptions>
   | IterateItemCompleteEvent<TOptions>
   | FileWriteStartEvent<TOptions>
-  | FileWriteCompleteEvent<TOptions>;
+  | FileWriteCompleteEvent<TOptions>
+  | PromptStartEvent<TOptions>
+  | PromptIterationEvent<TOptions>
+  | PromptToolCallEvent<TOptions>
+  | PromptToolResultEvent<TOptions>
+  | PromptAssistantMessageEvent<TOptions>
+  | PromptCompleteEvent<TOptions>
+  | PromptTokenLimitEvent<TOptions>
+  | PromptIterationLimitEvent<TOptions>
+  | PromptRawResponseMessageEvent<TOptions>
+  | PromptWebhookEvent<TOptions>;
