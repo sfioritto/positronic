@@ -45,6 +45,7 @@ import type {
   MapBlock,
   PromptBlock,
   PromptConfig,
+  PromptLoopConfig,
 } from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
 import type {
@@ -764,23 +765,65 @@ export class BrainEventStream<
     }
 
     // Loop path: tool-calling iteration
+    const loopGen = this.runPromptLoop({
+      step,
+      prompt,
+      system,
+      client,
+      outputSchema: config.outputSchema,
+      loopConfig: config.loop,
+      allowWebhookSuspension: true,
+      resume: this.resume,
+    });
+
+    for await (const event of loopGen) {
+      yield event;
+      // If the loop caused a pause/cancel/webhook, stop
+      if (this.stopped) return;
+      if (event.type === BRAIN_EVENTS.WEBHOOK) return;
+    }
+
+    yield* this.completeStep(step, prevState);
+  }
+
+  /**
+   * Shared prompt loop generator. Contains the core iteration logic:
+   * resume handling, signal checks, LLM calls, tool processing, and event emission.
+   *
+   * Yields all PROMPT_* events. When the done tool or a terminal tool fires,
+   * updates this.currentState, yields PROMPT_COMPLETE, and returns.
+   * The caller is responsible for calling completeStep().
+   *
+   * When a webhook suspension occurs and allowWebhookSuspension is true,
+   * yields PROMPT_WEBHOOK + WEBHOOK events and returns. If false, throws.
+   */
+  private async *runPromptLoop(params: {
+    step: Step;
+    prompt: string;
+    system: string | undefined;
+    client: ObjectGenerator;
+    outputSchema: z.ZodObject<any>;
+    loopConfig: PromptLoopConfig;
+    allowWebhookSuspension: boolean;
+    resume?: ResumeParams;
+  }): AsyncGenerator<BrainEvent<TOptions>> {
+    const {
+      step,
+      prompt,
+      system,
+      client,
+      outputSchema,
+      loopConfig,
+      allowWebhookSuspension,
+      resume,
+    } = params;
+
     const {
       tools: userTools,
       maxIterations = 100,
       maxTokens,
       toolChoice = 'required',
-    } = config.loop;
-
-    if (!client.generateText) {
-      throw new Error(
-        `Client does not support generateText, required for prompt loop in step "${block.title}"`
-      );
-    }
-    if (!client.createToolResultMessage) {
-      throw new Error(
-        `Client does not support createToolResultMessage, required for prompt loop in step "${block.title}"`
-      );
-    }
+    } = loopConfig;
 
     // Build tool definitions for the LLM (description + inputSchema only)
     const toolDefs: Record<
@@ -806,14 +849,25 @@ Call this when you have completed the assigned task and have the final answer re
 Do NOT call if you still need to gather more information.
 
 The output must conform to the provided schema.`,
-      inputSchema: config.outputSchema,
+      inputSchema: outputSchema,
     };
 
-    const resumeCtx = this.resume?.promptLoopContext;
+    if (!client.generateText) {
+      throw new Error(
+        `Client does not support generateText, required for prompt loop in step "${step.block.title}"`
+      );
+    }
+    if (!client.createToolResultMessage) {
+      throw new Error(
+        `Client does not support createToolResultMessage, required for prompt loop in step "${step.block.title}"`
+      );
+    }
+
+    const resumeCtx = resume?.promptLoopContext;
 
     // Preserve stepId across resumes so all events correlate
     const stepId = resumeCtx?.stepId ?? step.id;
-    const stepTitle = block.title;
+    const stepTitle = step.block.title;
 
     // Conversation state — restored from resume context or fresh
     const initialMessages: ToolMessage[] = [{ role: 'user', content: prompt }];
@@ -828,7 +882,7 @@ The output must conform to the provided schema.`,
       responseMessages = resumeCtx.responseMessages;
 
       // If resuming from webhook, inject the response as a tool result
-      const webhookResponse = this.resume?.webhookResponse;
+      const webhookResponse = resume?.webhookResponse;
       if (
         webhookResponse &&
         resumeCtx.pendingToolCallId &&
@@ -1022,7 +1076,7 @@ The output must conform to the provided schema.`,
 
         // Handle 'done' tool
         if (toolName === 'done') {
-          const parsed = config.outputSchema.safeParse(args);
+          const parsed = outputSchema.safeParse(args);
           if (!parsed.success) {
             // Feed validation error back to LLM so it can retry
             const errorMsg = `Invalid output: ${parsed.error.message}. Please fix and try again.`;
@@ -1076,7 +1130,6 @@ The output must conform to the provided schema.`,
             brainRunId: this.brainRunId,
           };
 
-          yield* this.completeStep(step, prevState);
           return;
         }
 
@@ -1119,7 +1172,6 @@ The output must conform to the provided schema.`,
             brainRunId: this.brainRunId,
           };
 
-          yield* this.completeStep(step, prevState);
           return;
         }
 
@@ -1137,6 +1189,14 @@ The output must conform to the provided schema.`,
             typeof toolResult === 'object' &&
             'waitFor' in toolResult
           ) {
+            if (!allowWebhookSuspension) {
+              throw new Error(
+                `Webhook/wait inside .map() prompt loop is not supported. ` +
+                  `Step "${step.block.title}" tool "${toolName}" triggered a webhook. ` +
+                  `Remove webhook-returning tools from the map prompt loop.`
+              );
+            }
+
             pendingWebhook = {
               toolCallId,
               toolName,
@@ -1292,21 +1352,47 @@ The output must conform to the provided schema.`,
 
       try {
         if (config.prompt) {
-          // Prompt mode: call generateObject directly per item
           const prompt = await resolveTemplate(
             config.prompt.message(item),
             this.templateContext
           );
+          const itemSystem = config.prompt.system
+            ? typeof config.prompt.system === 'function'
+              ? await resolveTemplate(
+                  config.prompt.system(item),
+                  this.templateContext
+                )
+              : await resolveTemplate(
+                  config.prompt.system,
+                  this.templateContext
+                )
+            : undefined;
           const client = config.client
             ? this.governor
               ? this.governor(config.client)
               : config.client
             : this.client;
-          const response = await client.generateObject({
-            schema: config.prompt.outputSchema,
-            prompt,
-          });
-          result = [item, response.object];
+
+          if (config.prompt.loop) {
+            // Prompt + loop mode: run tool-calling loop per item
+            const loopResult = await this.runMapPromptLoop(
+              step,
+              prompt,
+              itemSystem,
+              client,
+              config.prompt.outputSchema,
+              config.prompt.loop
+            );
+            result = [item, loopResult];
+          } else {
+            // Prompt mode: call generateObject directly per item
+            const response = await client.generateObject({
+              schema: config.prompt.outputSchema,
+              prompt,
+              system: itemSystem,
+            });
+            result = [item, response.object];
+          }
         } else {
           // Brain mode: run inner brain per item
           const initialState = config.initialState!(item);
@@ -1633,6 +1719,45 @@ The output must conform to the provided schema.`,
 
       yield this.stepStatusEvent();
     }
+  }
+
+  /**
+   * Run a prompt loop for a single map item. Delegates to the shared
+   * runPromptLoop generator, drains events (map doesn't forward prompt events),
+   * and extracts the result from the PROMPT_COMPLETE event.
+   */
+  private async runMapPromptLoop(
+    step: Step,
+    prompt: string,
+    system: string | undefined,
+    client: ObjectGenerator,
+    outputSchema: z.ZodObject<any>,
+    loopConfig: PromptLoopConfig
+  ): Promise<Record<string, unknown>> {
+    const loopGen = this.runPromptLoop({
+      step,
+      prompt,
+      system,
+      client,
+      outputSchema,
+      loopConfig,
+      allowWebhookSuspension: false,
+    });
+
+    let result: Record<string, unknown> | undefined;
+    for await (const event of loopGen) {
+      if (event.type === BRAIN_EVENTS.PROMPT_COMPLETE) {
+        result = event.result as Record<string, unknown>;
+      }
+    }
+
+    if (!result) {
+      throw new Error(
+        `Prompt loop in map step "${step.block.title}" did not produce a result`
+      );
+    }
+
+    return result;
   }
 
   private *completeStep(

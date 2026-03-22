@@ -26,6 +26,7 @@ import type {
   PageConfig,
   PromptBlock,
   PromptConfig,
+  PromptLoopConfig,
   TemplateReturn,
 } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
@@ -373,7 +374,11 @@ export class Brain<
     configFn: (context: StepContext<TState, TOptions> & TServices) => {
       prompt: {
         message: (item: NoInfer<TItems[number]>) => TemplateReturn;
+        system?:
+          | TemplateReturn
+          | ((item: NoInfer<TItems[number]>) => TemplateReturn);
         outputSchema: TSchema;
+        loop?: PromptLoopConfig;
       };
       client?: ObjectGenerator;
       over: TItems | Promise<TItems>;
