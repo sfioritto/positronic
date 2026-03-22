@@ -322,11 +322,17 @@ describe('.prompt() with loop', () => {
       toolCallResponse('done', { result: 'ok' }, 'call-2')
     );
 
-    const testBrain = brain('test').prompt('Cap', () => ({
-      message: 'Capture context',
-      outputSchema: z.object({ result: z.string() }),
-      loop: { tools: { capture: captureTool } },
-    }));
+    const fakeComponents = {
+      MyComponent: { component: () => null, description: 'A test component' },
+    };
+
+    const testBrain = brain('test')
+      .withComponents(fakeComponents)
+      .prompt('Cap', () => ({
+        message: 'Capture context',
+        outputSchema: z.object({ result: z.string() }),
+        loop: { tools: { capture: captureTool } },
+      }));
 
     await runWithStateMachine(testBrain, {
       client: mockClient,
@@ -337,6 +343,7 @@ describe('.prompt() with loop', () => {
     expect(receivedContext.client).toBeDefined();
     expect(receivedContext.brainRunId).toBeDefined();
     expect(receivedContext.currentUser).toEqual({ name: 'test-user' });
+    expect(receivedContext.components).toBe(fakeComponents);
   });
 
   it('text and tool calls in same response', async () => {
