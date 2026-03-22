@@ -43,6 +43,7 @@ import type {
 import { Continuation } from './continuation.js';
 import { BrainEventStream } from '../execution/event-stream.js';
 import { parseDuration } from '../duration.js';
+import { createMemory } from '../../memory/create-memory.js';
 
 export class Brain<
   TOptions extends JsonObject = JsonObject,
@@ -480,9 +481,17 @@ export class Brain<
         ? providers.store({ ...providerCtx, schema: this.storeSchema })
         : undefined;
     // Create memory if this brain opted in via withMemory()
+    // The framework handles scoping — users just pass a raw MemoryProvider.
+    // Default: scoped to both brain + user (per-brain-per-user).
+    // scope: 'user' → omit brainTitle so memories span all brains for this user.
+    // scope: 'brain' → omit userId so memories span all users for this brain.
     const memory =
       this.useMemory && providers?.memory
-        ? providers.memory({ ...providerCtx, scope: this.memoryScope })
+        ? createMemory(
+            providers.memory,
+            this.memoryScope === 'user' ? '' : providerCtx.brainTitle,
+            this.memoryScope === 'brain' ? '' : providerCtx.currentUser.name
+          )
         : undefined;
 
     const stream = new BrainEventStream({

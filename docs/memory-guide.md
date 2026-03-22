@@ -81,23 +81,21 @@ When you call `.withMemory()`, all steps receive a `memory` object in their cont
 
 ### Runner Configuration
 
-The memory provider factory is passed to the runner via the `providers` bag — not to the brain. In generated projects, the runner/backend handles this automatically, so brain authors just call `.withMemory()`.
+The memory provider is passed to the runner via the `providers` bag — not to the brain. The framework handles scoping (binding brainTitle and currentUser) automatically. In generated projects, the runner/backend handles this, so brain authors just call `.withMemory()`.
 
 ```typescript
 import { createMem0Provider } from '@positronic/mem0';
-import { createMemory } from '@positronic/core';
 
 const provider = createMem0Provider({
   apiKey: process.env.MEM0_API_KEY!,
 });
 
-// Pass the memory provider factory in the runner's providers bag
+// Pass the raw memory provider — the framework handles scoping
 brain.run({
   client: myClient,
   currentUser: { name: 'user-123' },
   providers: {
-    memory: (ctx) =>
-      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
+    memory: provider,
   },
 });
 ```
@@ -167,7 +165,6 @@ The Mem0 adapter automatically stores all prompt loop conversations to memory. T
 ### Setting Up the Adapter
 
 ```typescript
-import { createMemory } from '@positronic/core';
 import { createMem0Adapter, createMem0Provider } from '@positronic/mem0';
 
 const provider = createMem0Provider({
@@ -176,19 +173,18 @@ const provider = createMem0Provider({
 
 const adapter = createMem0Adapter({ provider });
 
-// Attach to BrainRunner
+// Attach to BrainRunner with memory provider
 const runner = new BrainRunner({
   adapters: [adapter],
   client: myClient,
+  providers: {
+    memory: provider,
+  },
 });
 
-// Run brain — memory provider goes in providers bag, conversations are automatically indexed
+// Run brain — conversations are automatically indexed
 await runner.run(myBrain, {
   currentUser: { name: 'user-123' },
-  providers: {
-    memory: (ctx) =>
-      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
-  },
 });
 ```
 
@@ -377,7 +373,7 @@ recallMemories({ query: 'preferences' });
 Here's a complete example of a personalized assistant that remembers user preferences:
 
 ```typescript
-import { brain, BrainRunner, createMemory } from '@positronic/core';
+import { brain, BrainRunner } from '@positronic/core';
 import {
   createMem0Provider,
   createMem0Tools,
@@ -398,7 +394,7 @@ const memoryTools = createMem0Tools();
 // Define brain — just opt in with .withMemory(), no provider needed here
 const assistant = brain('personal-assistant')
   .withMemory()
-  .withOptionsSchema(
+  .withOptions(
     z.object({
       message: z.string(),
     })
@@ -429,20 +425,18 @@ When you need context, use recallMemories to search your memory.`,
   });
 
 // Run with adapter for automatic conversation indexing
-// Memory provider goes in the providers bag on the runner side
 const runner = new BrainRunner({
   adapters: [adapter],
   client: myClient,
+  providers: {
+    memory: provider,
+  },
 });
 
 const result = await runner.run(assistant, {
   currentUser: { name: 'user-123' },
   options: {
     message: 'I prefer dark mode and concise responses',
-  },
-  providers: {
-    memory: (ctx) =>
-      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
   },
 });
 ```
@@ -474,13 +468,12 @@ const customProvider: MemoryProvider = {
 // Brain side: just opt in with .withMemory()
 const myBrain = brain('my-brain').withMemory();
 
-// Runner side: pass the custom provider via the providers bag
+// Runner side: pass the custom provider — framework handles scoping
 myBrain.run({
   client: myClient,
   currentUser: { name: 'user-123' },
   providers: {
-    memory: (ctx) =>
-      createMemory(customProvider, ctx.brainTitle, ctx.currentUser.name),
+    memory: customProvider,
   },
 });
 ```

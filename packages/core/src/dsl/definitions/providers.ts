@@ -1,7 +1,7 @@
 import type { CurrentUser } from '../types.js';
 import type { FilesService } from '../../files/types.js';
 import type { PagesService } from '../pages.js';
-import type { Memory } from '../../memory/types.js';
+import type { MemoryProvider } from '../../memory/types.js';
 import type { Store, StoreSchema } from '../../store/types.js';
 
 /**
@@ -33,21 +33,14 @@ export type StoreProviderFactory = (
 ) => Store<any>;
 
 /**
- * Factory that creates a scoped Memory service for a brain run.
- * Receives the scope config declared by the brain via withMemory().
- */
-export type MemoryProviderFactory = (
-  ctx: ProviderContext & { scope?: 'user' | 'brain' }
-) => Memory;
-
-/**
  * Service providers that the runner passes to brain.run().
- * Each provider is a factory function that creates a scoped service instance.
+ * Factory functions create scoped service instances per brain run.
+ * Memory is a raw MemoryProvider — the framework handles scoping internally.
  * All providers are optional — missing providers throw at point of use.
  */
 export interface ServiceProviders {
   files?: FilesProvider;
   pages?: PagesProvider;
   store?: StoreProviderFactory;
-  memory?: MemoryProviderFactory;
+  memory?: MemoryProvider;
 }
