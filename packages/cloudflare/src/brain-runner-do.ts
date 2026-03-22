@@ -273,7 +273,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
   /**
    * Get and consume (delete) pending signals.
-   * Signals are returned in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
+   * Signals are returned in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME
    * @param filter 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
    */
   getAndConsumeSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): BrainSignal[] {
@@ -293,7 +293,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
            WHEN 'PAUSE' THEN 2
            WHEN 'WEBHOOK_RESPONSE' THEN 3
            WHEN 'RESUME' THEN 4
-           WHEN 'USER_MESSAGE' THEN 5
          END`
       )
       .toArray();
@@ -308,9 +307,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // Convert to BrainSignal format
     return results.map((r) => {
-      if (r.signal_type === 'USER_MESSAGE') {
-        return { type: 'USER_MESSAGE' as const, content: r.content ?? '' };
-      }
       if (r.signal_type === 'WEBHOOK_RESPONSE') {
         return {
           type: 'WEBHOOK_RESPONSE' as const,

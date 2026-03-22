@@ -2,9 +2,8 @@ import { jest } from '@jest/globals';
 import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
-import type { CurrentUser, StepContext } from '../src/dsl/types.js';
+import type { CurrentUser } from '../src/dsl/types.js';
 import type { BrainStartEvent } from '../src/dsl/definitions/events.js';
-import { z } from 'zod';
 
 // Helper function to collect all events from a brain run
 const collectEvents = async <T>(
@@ -22,8 +21,6 @@ const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
   generateObject: jest.fn<ObjectGenerator['generateObject']>(),
   streamText: jest.fn<ObjectGenerator['streamText']>(),
 });
-
-const dummyOutputSchema = z.object({ result: z.string() });
 
 describe('currentUser', () => {
   it('should be available in step context when provided via run params', async () => {
@@ -68,78 +65,6 @@ describe('currentUser', () => {
     ) as BrainStartEvent;
     expect(startEvent).toBeDefined();
     expect(startEvent.currentUser).toEqual({ name: 'user-456' });
-  });
-
-  it('should be available in agent tool execute context', async () => {
-    const mockClient = createMockClient();
-    let toolReceivedUser: CurrentUser | undefined;
-
-    // Mock generateText for the agent
-    mockClient.generateText = jest.fn<any>().mockResolvedValue({
-      text: '',
-      toolCalls: [
-        {
-          toolName: 'checkUser',
-          toolCallId: 'call-1',
-          args: { input: 'test' },
-        },
-      ],
-      responseMessages: [{ role: 'assistant', content: 'test' }],
-      usage: { totalTokens: 10 },
-    });
-
-    // After checkUser is called, the next iteration returns the done tool
-    (mockClient.generateText as any)
-      .mockResolvedValueOnce({
-        text: '',
-        toolCalls: [
-          {
-            toolName: 'checkUser',
-            toolCallId: 'call-1',
-            args: { input: 'test' },
-          },
-        ],
-        responseMessages: [{ role: 'assistant', content: 'test' }],
-        usage: { totalTokens: 10 },
-      })
-      .mockResolvedValueOnce({
-        text: '',
-        toolCalls: [
-          {
-            toolName: 'done',
-            toolCallId: 'call-2',
-            args: { result: 'completed' },
-          },
-        ],
-        responseMessages: [{ role: 'assistant', content: 'done' }],
-        usage: { totalTokens: 5 },
-      });
-
-    const testBrain = brain('test-brain').brain('Agent Step', {
-      system: 'You are a test agent',
-      prompt: 'Check the user',
-      outputSchema: dummyOutputSchema,
-      tools: {
-        checkUser: {
-          description: 'Check who the current user is',
-          inputSchema: z.object({ input: z.string() }),
-          execute: async (input: any, context: StepContext) => {
-            toolReceivedUser = context.currentUser;
-            return 'checked';
-          },
-        },
-      },
-    });
-
-    await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        resources: {} as any,
-        currentUser: { name: 'user-789' },
-      })
-    );
-
-    expect(toolReceivedUser).toEqual({ name: 'user-789' });
   });
 
   it('should persist through step chains (same value in all steps)', async () => {

@@ -100,7 +100,7 @@ export function handleKeyboardInput(
 
     case 'agent-chat':
       // Agent chat view: 'b' or escape goes back to previous view
-      // j/k scrolling is handled by AgentChatView component
+      // j/k scrolling is handled by the chat view component
       if (input === 'b' || key.escape) {
         return { type: 'GO_BACK' };
       }

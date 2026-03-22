@@ -25,9 +25,6 @@ import {
   type EventsViewMode,
 } from './events-view.js';
 import { StateView } from './state-view.js';
-import { AgentChatView } from './agent-chat-view.js';
-import { SelectList } from './select-list.js';
-import { getAgentLoops } from '../utils/agent-utils.js';
 import {
   handleKeyboardInput,
   type ViewMode,
@@ -407,9 +404,7 @@ export const Watch = ({
   }, [pauseResumeMessage, sendWatch]);
 
   // Build keyboard context for the handler
-  const brainTitle = rootBrain?.brainTitle;
-  const agentLoops = getAgentLoops(events, brainTitle);
-  const hasAgents = agentLoops.length > 0;
+  const hasAgents = false;
 
   // Keyboard handling - uses extracted handler for event mapping
   useInput((input, key) => {
@@ -475,20 +470,10 @@ export const Watch = ({
         const fromView = (
           viewMode === 'events' ? 'events' : 'progress'
         ) as PreviousView;
-        if (agentLoops.length === 1) {
-          // Go directly to chat view for single agent
-          sendWatch({
-            type: 'GO_TO_AGENTS',
-            selectedAgentId: agentLoops[0].stepId,
-            fromView,
-          });
-        } else {
-          // Show picker for multiple agents
-          sendWatch({
-            type: 'GO_TO_AGENTS',
-            fromView,
-          });
-        }
+        sendWatch({
+          type: 'GO_TO_AGENTS',
+          fromView,
+        });
         break;
       }
 
@@ -586,58 +571,11 @@ export const Watch = ({
           )}
           {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
         </>
-      ) : viewMode === 'agent-picker' ? (
-        <>
-          <SelectList
-            items={agentLoops.map((agent) => ({
-              id: agent.stepId,
-              label: agent.label,
-              description: `${agent.rawResponseEvents.length} response(s)`,
-            }))}
-            header="Select an agent to view:"
-            onSelect={(item) => {
-              sendWatch({ type: 'AGENT_SELECTED', agentId: item.id });
-            }}
-            onCancel={() => sendWatch({ type: 'GO_BACK' })}
-            footer="j/k select | Enter view | b back"
-          />
-          {connectionErrorProps && (
-            <ErrorComponent error={connectionErrorProps} />
-          )}
-          {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
-        </>
-      ) : viewMode === 'agent-chat' && selectedAgentId ? (
-        (() => {
-          const selectedAgent = agentLoops.find(
-            (a) => a.stepId === selectedAgentId
-          );
-          if (!selectedAgent) {
-            return <Text>Agent not found</Text>;
-          }
-          return (
-            <>
-              <AgentChatView
-                label={selectedAgent.label}
-                agentStartEvent={selectedAgent.startEvent}
-                rawResponseEvents={selectedAgent.rawResponseEvents}
-                scrollOffset={agentChatScrollOffset}
-                onScrollChange={(offset) =>
-                  sendWatch({ type: 'SET_AGENT_CHAT_SCROLL_OFFSET', offset })
-                }
-                isActive={viewMode === 'agent-chat'}
-              />
-              {connectionErrorProps && (
-                <ErrorComponent error={connectionErrorProps} />
-              )}
-              {brainErrorProps && <ErrorComponent error={brainErrorProps} />}
-            </>
-          );
-        })()
       ) : viewMode === 'events' ? (
         <>
           <EventsView
             events={events}
-            totalTokens={current.context.totalTokens}
+            totalTokens={0}
             isActive={viewMode === 'events'}
             onModeChange={setEventsViewMode}
             onViewState={handleViewStateAtEvent}

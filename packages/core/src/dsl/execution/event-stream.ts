@@ -9,9 +9,6 @@ import type {
   State,
   JsonObject,
   RuntimeEnv,
-  AgentTool,
-  AgentConfig,
-  AgentToolWaitFor,
   SignalProvider,
   CurrentUser,
 } from '../types.js';
@@ -40,7 +37,6 @@ import type {
   Block,
   StepBlock,
   BrainBlock,
-  AgentBlock,
   GuardBlock,
   WaitBlock,
   MapBlock,
@@ -53,7 +49,7 @@ import type {
 } from '../definitions/run-params.js';
 
 import { Step } from '../builder/step.js';
-import { DEFAULT_ENV, DEFAULT_AGENT_SYSTEM_PROMPT } from './constants.js';
+import { DEFAULT_ENV } from './constants.js';
 import {
   resolveTemplate,
   buildTemplateContext,
@@ -83,8 +79,6 @@ export class BrainEventStream<
   private currentPage: GeneratedPage | undefined = undefined;
   private resume?: ResumeParams;
   private components?: Record<string, UIComponent<any>>;
-  private defaultTools?: Record<string, AgentTool<any>>;
-  private extraTools?: Record<string, AgentTool<any>>;
   private signalProvider?: SignalProvider;
   private memoryProvider?: MemoryProvider;
   private scopedMemory?: ScopedMemory;
@@ -106,8 +100,6 @@ export class BrainEventStream<
       blocks: Block<any, any, TOptions, TServices, any, any>[];
       services: TServices;
       components?: Record<string, UIComponent<any>>;
-      defaultTools?: Record<string, AgentTool<any>>;
-      extraTools?: Record<string, AgentTool<any>>;
       memoryProvider?: MemoryProvider;
       store?: Store<any>;
       storeProvider?: StoreProvider;
@@ -126,8 +118,6 @@ export class BrainEventStream<
       pages,
       env,
       components,
-      defaultTools,
-      extraTools,
       signalProvider,
       memoryProvider,
       store,
@@ -155,8 +145,6 @@ export class BrainEventStream<
     this.env = env ?? DEFAULT_ENV;
     this.resume = resume;
     this.components = components;
-    this.defaultTools = defaultTools;
-    this.extraTools = extraTools;
     this.signalProvider = signalProvider;
     this.memoryProvider = memoryProvider;
     this.store = store;
@@ -220,10 +208,9 @@ export class BrainEventStream<
 
       // For inner brains (no signalProvider), check for webhookResponse
       // The outer brain will have set this from the signal
-      if (!signalProvider && resume.webhookResponse && !resume.agentContext) {
+      if (!signalProvider && resume.webhookResponse) {
         this.currentResponse = resume.webhookResponse;
       }
-      // Agent webhook response is handled via agentContext (checked in executeAgent)
 
       // Restore page context if available (from a preceding UI step)
       if (resume.currentPage) {
@@ -289,7 +276,7 @@ export class BrainEventStream<
 
         if (this.signalProvider) {
           // Outer brain: consume only WEBHOOK signals at resume start
-          // Other signals (USER_MESSAGE, CONTROL) remain in queue for processing in step/agent loops
+          // Other signals (CONTROL) remain in queue for processing in step loops
           const signals = await this.signalProvider.getSignals('WEBHOOK');
           const webhookSignal = signals.find(
             (s) => s.type === 'WEBHOOK_RESPONSE'
@@ -298,10 +285,10 @@ export class BrainEventStream<
           if (webhookSignal && webhookSignal.type === 'WEBHOOK_RESPONSE') {
             webhookResponse = webhookSignal.response;
 
-            // Set currentResponse for step consumption (non-agent webhooks)
+            // Set currentResponse for step consumption
             this.currentResponse = webhookResponse;
 
-            // Store for propagation to inner brains and agent context
+            // Store for propagation to inner brains
             if (this.resume) {
               this.resume = { ...this.resume, webhookResponse };
             }
@@ -578,7 +565,7 @@ export class BrainEventStream<
           });
 
       // Context has been forwarded to the inner brain — clear so outer
-      // brain's later steps (e.g. an agent at step N+1) don't consume them.
+      // brain's later steps don't consume them.
       if (hasInnerResume) {
         this.resume = undefined;
       }
@@ -633,10 +620,6 @@ export class BrainEventStream<
         ...this.currentState,
         ...innerState,
       };
-      yield* this.completeStep(step, prevState);
-    } else if (block.type === 'agent') {
-      const prevState = this.currentState;
-      yield* this.executeAgent(step);
       yield* this.completeStep(step, prevState);
     } else {
       // Get previous state before action
@@ -720,634 +703,6 @@ export class BrainEventStream<
 
       // Reset currentPage after step consumes it (page is ephemeral)
       this.currentPage = undefined;
-    }
-  }
-
-  private async *executeAgent(
-    step: Step
-  ): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as AgentBlock<
-      any,
-      any,
-      TOptions,
-      TServices,
-      any,
-      any
-    >;
-    const prevState = this.currentState;
-
-    // Combine default tools and extra tools for injection into configFn
-    const allTools: Record<string, AgentTool<any>> = {
-      ...(this.defaultTools ?? {}),
-      ...(this.extraTools ?? {}),
-    };
-    const components = this.components ?? {};
-
-    // Get agent configuration - inject tools and components
-    const config = await block.configFn({
-      ...this.buildStepContext(step),
-      tools: allTools,
-      components,
-    });
-
-    // Reset currentPage after configFn consumes it (page is ephemeral)
-    this.currentPage = undefined;
-
-    // Merge tools: step tools override defaults + extras
-    const mergedTools: Record<string, AgentTool<any>> = {
-      ...allTools,
-      ...(config.tools ?? {}),
-    };
-
-    // Generate a 'done' terminal tool for every agent using the required outputSchema
-    const schema = config.outputSchema;
-    mergedTools['done'] = {
-      description: `Signal that the task is complete and provide the final result.
-
-PURPOSE: End agent execution and return structured output to the calling system.
-
-BEHAVIOR:
-- This is a TERMINAL tool - calling it immediately ends the agent
-- No further tools will execute after this
-- No further iterations will occur
-- The input you provide becomes the agent's final output
-
-WHEN TO CALL:
-- When you have completed the assigned task
-- When you have gathered all required information
-- When you have the final answer or result ready
-
-DO NOT CALL IF:
-- You still need to gather more information
-- You are waiting for user input (use waitForWebhook instead)
-- The task is not yet complete
-
-The output must conform to the provided schema.`,
-      inputSchema: schema,
-      terminal: true,
-    };
-
-    // Track conversation using SDK-native messages (preserves providerOptions like thoughtSignature)
-    let responseMessages: ResponseMessage[] | undefined;
-    // Initial messages for first call (will be converted by client)
-    let initialMessages: ToolMessage[];
-
-    // Check if we're resuming from a previous agent execution
-    const agentContext = this.resume?.agentContext;
-    const webhookResponse = this.resume?.webhookResponse;
-
-    // Use preserved stepId from agentContext when resuming, or step.id for fresh start
-    // This ensures all events for the same agent use the same stepId across resumes
-    const effectiveStepId = agentContext?.stepId ?? step.id;
-
-    // Resolve JSX templates for system prompt once (used in both fresh and loop paths)
-    const resolvedSystem = config.system
-      ? await resolveTemplate(config.system, this.templateContext)
-      : undefined;
-
-    if (agentContext) {
-      // Check if this is a webhook resume (has webhook response) or pause resume
-      if (
-        webhookResponse &&
-        agentContext.pendingToolCallId &&
-        agentContext.pendingToolName
-      ) {
-        // WEBHOOK RESUME: Agent was waiting for a webhook response
-
-        // Emit WEBHOOK_RESPONSE event to record the response
-        yield {
-          type: BRAIN_EVENTS.WEBHOOK_RESPONSE,
-          response: webhookResponse,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-
-        // Emit AGENT_TOOL_RESULT for the pending tool (webhook response injected as tool result)
-        yield {
-          type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
-          stepTitle: step.block.title,
-          stepId: effectiveStepId,
-          toolCallId: agentContext.pendingToolCallId,
-          toolName: agentContext.pendingToolName,
-          result: webhookResponse,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-
-        // Use restored responseMessages from the agent context (preserves providerOptions)
-        // Prepend the user message and append the webhook response
-        // Note: reconstructed messages don't include the placeholder (we don't emit events for it),
-        // so we just append the real webhook response here.
-        const userMessage: ResponseMessage = {
-          role: 'user',
-          content: agentContext.prompt,
-        };
-
-        if (this.client.createToolResultMessage) {
-          const toolResultMessage = this.client.createToolResultMessage(
-            agentContext.pendingToolCallId,
-            agentContext.pendingToolName,
-            webhookResponse
-          );
-
-          responseMessages = [
-            userMessage,
-            ...agentContext.responseMessages,
-            toolResultMessage,
-          ];
-
-          // Emit event for this tool result message (for reconstruction if there's another pause)
-          yield {
-            type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-            stepTitle: step.block.title,
-            stepId: effectiveStepId,
-            iteration: 0, // Special iteration for resumed webhook response
-            message: toolResultMessage,
-            options: this.options ?? ({} as TOptions),
-            brainRunId: this.brainRunId,
-          };
-        } else {
-          // Fallback if client doesn't support createToolResultMessage
-          responseMessages = [userMessage, ...agentContext.responseMessages];
-        }
-
-        // Set empty initial messages since user message is in responseMessages
-        initialMessages = [];
-      } else {
-        // PAUSE RESUME: Agent was paused mid-execution (no pending webhook)
-        // Restore conversation history and continue from where we left off
-
-        const userMessage: ResponseMessage = {
-          role: 'user',
-          content: agentContext.prompt,
-        };
-        responseMessages = [userMessage, ...agentContext.responseMessages];
-        initialMessages = [];
-
-        // No events to emit for pause resume - we just continue the conversation
-      }
-
-      // Clear resume so it's only used once
-      this.resume = undefined;
-    } else {
-      // Use "Begin." as default prompt if not provided, resolve JSX templates
-      const prompt = await resolveTemplate(
-        config.prompt ?? 'Begin.',
-        this.templateContext
-      );
-
-      // Emit agent start event (only for fresh starts)
-      yield {
-        type: BRAIN_EVENTS.AGENT_START,
-        stepTitle: step.block.title,
-        stepId: effectiveStepId,
-        prompt,
-        system: resolvedSystem,
-        tools: Object.keys(mergedTools),
-        options: this.options ?? ({} as TOptions),
-        brainRunId: this.brainRunId,
-      };
-
-      // Initialize messages for fresh start
-      initialMessages = [{ role: 'user', content: prompt }];
-    }
-
-    // Initialize token tracking
-    let totalTokens = 0;
-    let iteration = 0;
-    const maxIterations = config.maxIterations ?? 100;
-
-    // Main agent loop
-    while (true) {
-      iteration++;
-
-      // Check for ALL signals at start of iteration
-      if (this.signalProvider) {
-        const signals = await this.signalProvider.getSignals('ALL');
-        for (const signal of signals) {
-          if (signal.type === 'KILL') {
-            yield {
-              type: BRAIN_EVENTS.CANCELLED,
-              status: STATUS.CANCELLED,
-              brainTitle: this.title,
-              brainDescription: this.description,
-              brainRunId: this.brainRunId,
-              options: this.options,
-            };
-            return;
-          }
-          if (signal.type === 'PAUSE') {
-            yield {
-              type: BRAIN_EVENTS.PAUSED,
-              status: STATUS.PAUSED,
-              brainTitle: this.title,
-              brainDescription: this.description,
-              brainRunId: this.brainRunId,
-              options: this.options,
-            };
-            return;
-          }
-          if (signal.type === 'USER_MESSAGE') {
-            // Emit event for user message injection
-            yield {
-              type: BRAIN_EVENTS.AGENT_USER_MESSAGE,
-              stepTitle: step.block.title,
-              stepId: effectiveStepId,
-              content: signal.content,
-              options: this.options,
-              brainRunId: this.brainRunId,
-            };
-
-            // Inject as user message into conversation
-            const userMessage: ResponseMessage = {
-              role: 'user',
-              content: signal.content,
-            };
-            if (responseMessages) {
-              responseMessages = [...responseMessages, userMessage];
-            } else {
-              initialMessages = [
-                ...initialMessages,
-                { role: 'user', content: signal.content },
-              ];
-            }
-
-            // Emit raw response message event so it shows up in agent chat view
-            yield {
-              type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-              stepTitle: step.block.title,
-              stepId: effectiveStepId,
-              iteration,
-              message: userMessage,
-              options: this.options ?? ({} as TOptions),
-              brainRunId: this.brainRunId,
-            };
-          }
-        }
-      }
-
-      // Check max iterations limit BEFORE making the LLM call
-      if (iteration > maxIterations) {
-        yield {
-          type: BRAIN_EVENTS.AGENT_ITERATION_LIMIT,
-          stepTitle: step.block.title,
-          stepId: effectiveStepId,
-          iteration: iteration - 1, // Report the last completed iteration
-          maxIterations,
-          totalTokens,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-        throw new Error(
-          `Agent hit iteration limit (${maxIterations}) without producing required 'done' output`
-        );
-      }
-
-      // Check if client supports generateText
-      if (!this.client.generateText) {
-        throw new Error(
-          'Client does not support generateText. Use a client that implements generateText for agent steps.'
-        );
-      }
-
-      // Build tools object for the client (description and inputSchema only)
-      const toolsForClient: Record<
-        string,
-        { description: string; inputSchema: z.ZodSchema }
-      > = {};
-      for (const [name, toolDef] of Object.entries(mergedTools)) {
-        const tool = toolDef as AgentTool;
-        let description = tool.description;
-
-        // Enrich generatePage description with available component information
-        if (
-          name === 'generatePage' &&
-          components &&
-          Object.keys(components).length > 0
-        ) {
-          const componentList = Object.entries(components)
-            .map(([compName, comp]) => {
-              const desc = comp.description.split('\n')[0]; // First line only
-              return `- ${compName}: ${desc}`;
-            })
-            .join('\n');
-
-          description = `Generate a web page for displaying rich content or collecting user input.
-
-Sometimes you need more than simple notifications to communicate with users. This tool creates web pages that can display formatted content, dashboards, or forms to collect information.
-
-AVAILABLE COMPONENTS:
-${componentList}
-
-RETURNS: { url: string, webhook: { slug: string, identifier: string, token: string } | null }
-- url: The page URL
-- webhook: For forms (hasForm=true), contains slug, identifier, and token that must all be passed to waitForWebhook to pause execution until the user submits the form
-
-IMPORTANT: Users have no way to discover the page URL on their own. After generating a page, you must tell them the URL using whatever communication tools are available.`;
-        }
-
-        toolsForClient[name] = {
-          description,
-          inputSchema: tool.inputSchema,
-        };
-      }
-
-      // Prepend default system prompt to user's system prompt
-      const systemPrompt = resolvedSystem
-        ? `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${resolvedSystem}`
-        : DEFAULT_AGENT_SYSTEM_PROMPT;
-
-      const response = await this.client.generateText({
-        system: systemPrompt,
-        messages: initialMessages,
-        responseMessages,
-        tools: toolsForClient,
-        toolChoice: config.toolChoice ?? 'required',
-      });
-
-      // Update responseMessages for next iteration (preserves providerOptions)
-      responseMessages = response.responseMessages;
-
-      // Get the new assistant message (the last one added by generateText)
-      const newAssistantMessage = response.responseMessages?.at(-1);
-
-      // Emit event for the assistant message
-      if (newAssistantMessage) {
-        yield {
-          type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-          stepTitle: step.block.title,
-          stepId: effectiveStepId,
-          iteration,
-          message: newAssistantMessage,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-      }
-
-      // Track tokens
-      const tokensThisIteration = response.usage.totalTokens;
-      totalTokens += tokensThisIteration;
-
-      // Emit iteration event (after LLM call so we have token info)
-      yield {
-        type: BRAIN_EVENTS.AGENT_ITERATION,
-        stepTitle: step.block.title,
-        stepId: effectiveStepId,
-        iteration,
-        tokensThisIteration,
-        totalTokens,
-        options: this.options ?? ({} as TOptions),
-        brainRunId: this.brainRunId,
-      };
-
-      // Check max tokens limit
-      if (config.maxTokens && totalTokens > config.maxTokens) {
-        yield {
-          type: BRAIN_EVENTS.AGENT_TOKEN_LIMIT,
-          stepTitle: step.block.title,
-          stepId: effectiveStepId,
-          totalTokens,
-          maxTokens: config.maxTokens,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-        throw new Error(
-          `Agent hit token limit (${config.maxTokens}) without producing required 'done' output`
-        );
-      }
-
-      // Handle assistant text response (emit event and log)
-      if (response.text) {
-        // Log assistant messages to console as fallback (users shouldn't rely on this)
-        console.log(`[Assistant] ${response.text}`);
-
-        yield {
-          type: BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE,
-          stepTitle: step.block.title,
-          stepId: effectiveStepId,
-          content: response.text,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-      }
-
-      // If no tool calls, something went wrong — with toolChoice 'required',
-      // the LLM should always produce tool calls. If it didn't, the agent
-      // exited without calling the 'done' tool to produce required output.
-      if (!response.toolCalls || response.toolCalls.length === 0) {
-        throw new Error(
-          `Agent exited without calling the 'done' tool. The LLM returned no tool calls despite toolChoice being 'required'. This is unexpected — the agent must call 'done' to produce its output.`
-        );
-      }
-
-      // Track pending webhook if any tool returns waitFor
-      // We process ALL tool calls first, then pause for webhook at the end
-      let pendingWebhook: {
-        toolCallId: string;
-        toolName: string;
-        input: JsonObject;
-        webhooks: Array<{ slug: string; identifier: string }>;
-        timeout?: number;
-      } | null = null;
-
-      // Process tool calls
-      for (const toolCall of response.toolCalls) {
-        yield {
-          type: BRAIN_EVENTS.AGENT_TOOL_CALL,
-          stepTitle: step.block.title,
-          stepId: effectiveStepId,
-          toolName: toolCall.toolName,
-          toolCallId: toolCall.toolCallId,
-          input: toolCall.args as JsonObject,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-
-        const tool = mergedTools[toolCall.toolName];
-        if (!tool) {
-          throw new Error(`Unknown tool: ${toolCall.toolName}`);
-        }
-
-        // Check if this is a terminal tool
-        if (tool.terminal) {
-          yield {
-            type: BRAIN_EVENTS.AGENT_COMPLETE,
-            stepTitle: step.block.title,
-            stepId: effectiveStepId,
-            terminalToolName: toolCall.toolName,
-            result: toolCall.args as JsonObject,
-            totalIterations: iteration,
-            totalTokens,
-            options: this.options ?? ({} as TOptions),
-            brainRunId: this.brainRunId,
-          };
-
-          // Merge terminal result into state
-          if (toolCall.toolName === 'done') {
-            const parsed = config.outputSchema!.safeParse(toolCall.args);
-            if (!parsed.success) {
-              throw new Error(
-                `Agent output does not match outputSchema: ${parsed.error.message}`
-              );
-            }
-            // Spread result onto state
-            this.currentState = {
-              ...this.currentState,
-              ...parsed.data,
-            };
-          } else {
-            // Default behavior: spread into state root (for other terminal tools)
-            this.currentState = {
-              ...this.currentState,
-              ...(toolCall.args as JsonObject),
-            };
-          }
-          return;
-        }
-
-        if (tool.execute) {
-          const toolContext = {
-            state: this.currentState,
-            options: this.options ?? ({} as JsonObject),
-            client: this.client,
-            resources: this.resources,
-            response: this.currentResponse,
-            page: this.currentPage,
-            pages: this.pages!,
-            env: this.env,
-            components: this.components,
-            brainRunId: this.brainRunId,
-            stepId: effectiveStepId,
-            memory: this.scopedMemory,
-            store: this.store,
-            currentUser: this.currentUser,
-          };
-
-          const toolResult = await tool.execute(toolCall.args, toolContext);
-
-          // Check if tool returned waitFor
-          if (
-            toolResult &&
-            typeof toolResult === 'object' &&
-            'waitFor' in toolResult
-          ) {
-            const waitForResult = toolResult as AgentToolWaitFor;
-
-            // Normalize waitFor to array (supports single or multiple webhooks)
-            const webhooks = Array.isArray(waitForResult.waitFor)
-              ? waitForResult.waitFor
-              : [waitForResult.waitFor];
-
-            // Store webhook info - we'll emit the events after processing all tool calls
-            // This ensures all other tool results are processed before pausing
-            pendingWebhook = {
-              toolCallId: toolCall.toolCallId,
-              toolName: toolCall.toolName,
-              input: toolCall.args as JsonObject,
-              webhooks: webhooks.map((w) => ({
-                slug: w.slug,
-                identifier: w.identifier,
-                token: w.token,
-              })),
-              timeout: waitForResult.timeout,
-            };
-
-            // Emit tool result event for debugging/visibility (with pending status)
-            yield {
-              type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
-              stepTitle: step.block.title,
-              stepId: effectiveStepId,
-              toolName: toolCall.toolName,
-              toolCallId: toolCall.toolCallId,
-              result: {
-                status: 'waiting_for_webhook',
-                webhooks: pendingWebhook.webhooks,
-              },
-              options: this.options ?? ({} as TOptions),
-              brainRunId: this.brainRunId,
-            };
-
-            // Add placeholder to responseMessages locally so the conversation stays valid
-            // for any subsequent generateText calls in this execution.
-            // We DON'T emit an event for it - on resume, we reconstruct from events
-            // and append the real webhook response.
-            if (this.client.createToolResultMessage && responseMessages) {
-              const placeholderMessage = this.client.createToolResultMessage(
-                toolCall.toolCallId,
-                toolCall.toolName,
-                {
-                  status: 'waiting_for_webhook',
-                  webhooks: pendingWebhook.webhooks,
-                }
-              );
-              responseMessages = [...responseMessages, placeholderMessage];
-            }
-
-            // Continue processing other tool calls - don't return yet
-            continue;
-          }
-
-          // Emit tool result event for debugging/visibility
-          yield {
-            type: BRAIN_EVENTS.AGENT_TOOL_RESULT,
-            stepTitle: step.block.title,
-            stepId: effectiveStepId,
-            toolName: toolCall.toolName,
-            toolCallId: toolCall.toolCallId,
-            result: toolResult,
-            options: this.options ?? ({} as TOptions),
-            brainRunId: this.brainRunId,
-          };
-
-          // Create tool result message using SDK-native format (preserves providerOptions)
-          if (this.client.createToolResultMessage && responseMessages) {
-            const toolResultMessage = this.client.createToolResultMessage(
-              toolCall.toolCallId,
-              toolCall.toolName,
-              toolResult
-            );
-            responseMessages = [...responseMessages, toolResultMessage];
-
-            // Emit event for this tool result message
-            yield {
-              type: BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE,
-              stepTitle: step.block.title,
-              stepId: effectiveStepId,
-              iteration,
-              message: toolResultMessage,
-              options: this.options ?? ({} as TOptions),
-              brainRunId: this.brainRunId,
-            };
-          }
-        }
-      }
-
-      // After processing all tool calls, check if we need to pause for a webhook
-      if (pendingWebhook) {
-        // Emit AGENT_WEBHOOK event
-        yield {
-          type: BRAIN_EVENTS.AGENT_WEBHOOK,
-          stepTitle: step.block.title,
-          stepId: effectiveStepId,
-          toolCallId: pendingWebhook.toolCallId,
-          toolName: pendingWebhook.toolName,
-          input: pendingWebhook.input,
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-
-        // Emit WEBHOOK event with all webhooks (first response wins)
-        yield {
-          type: BRAIN_EVENTS.WEBHOOK,
-          waitFor: pendingWebhook.webhooks,
-          ...(pendingWebhook.timeout !== undefined && {
-            timeout: pendingWebhook.timeout,
-          }),
-          options: this.options ?? ({} as TOptions),
-          brainRunId: this.brainRunId,
-        };
-        return;
-      }
     }
   }
 

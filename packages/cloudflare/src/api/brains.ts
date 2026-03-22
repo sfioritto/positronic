@@ -207,7 +207,7 @@ brains.delete('/runs/:runId', async (context: Context) => {
   }
 });
 
-// Signal endpoint - queue KILL, PAUSE, USER_MESSAGE, RESUME, or WEBHOOK_RESPONSE signals
+// Signal endpoint - queue KILL, PAUSE, RESUME, or WEBHOOK_RESPONSE signals
 brains.post('/runs/:runId/signals', async (context: Context) => {
   const runId = context.req.param('runId');
   const body = await context.req.json<{
@@ -217,11 +217,7 @@ brains.post('/runs/:runId/signals', async (context: Context) => {
   }>();
 
   // Validate signal type
-  if (
-    !['KILL', 'PAUSE', 'USER_MESSAGE', 'RESUME', 'WEBHOOK_RESPONSE'].includes(
-      body.type
-    )
-  ) {
+  if (!['KILL', 'PAUSE', 'RESUME', 'WEBHOOK_RESPONSE'].includes(body.type)) {
     return context.json({ error: 'Invalid signal type' }, 400);
   }
 
@@ -235,17 +231,13 @@ brains.post('/runs/:runId/signals', async (context: Context) => {
   }
 
   // Validate control signals against current brain state using state machine definition
-  // USER_MESSAGE is a data signal that gets queued and processed during agent execution,
-  // so it doesn't need state validation - it can always be queued
-  if (body.type !== 'USER_MESSAGE') {
-    const validation = isSignalValid(
-      brainMachineDefinition,
-      run.status,
-      body.type
-    );
-    if (!validation.valid) {
-      return context.json({ error: validation.reason }, 409);
-    }
+  const validation = isSignalValid(
+    brainMachineDefinition,
+    run.status,
+    body.type
+  );
+  if (!validation.valid) {
+    return context.json({ error: validation.reason }, 409);
   }
 
   // Get BrainRunnerDO stub and queue the signal

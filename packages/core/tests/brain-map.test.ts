@@ -10,10 +10,7 @@ import {
 import {
   finalStateFromEvents,
   mockGenerateObject,
-  mockStreamText,
   mockClient,
-  dummyOutputSchema,
-  dummyStateKey,
 } from './brain-test-helpers.js';
 
 describe('.map()', () => {
@@ -422,74 +419,6 @@ describe('.map()', () => {
     expect(outerStepComplete).toBeDefined();
   });
 
-  // Helper: creates an agent client where odd calls return a non-terminal tool
-  // call and even calls return the terminal 'done' tool call. The non-terminal
-  // tool's execute function throws on the Nth invocation (controlled by caller).
-  function createAgentWithThrowingTool(
-    shouldThrow: (callCount: number) => boolean
-  ) {
-    const agentGenerateText =
-      jest.fn<NonNullable<ObjectGenerator['generateText']>>();
-    let agentCallCount = 0;
-    agentGenerateText.mockImplementation(async () => {
-      agentCallCount++;
-      if (agentCallCount % 2 === 1) {
-        return {
-          text: undefined,
-          toolCalls: [
-            {
-              toolCallId: `call-${agentCallCount}`,
-              toolName: 'crawl',
-              args: { url: 'http://example.com' },
-            },
-          ],
-          usage: { totalTokens: 50 },
-          responseMessages: [],
-        };
-      }
-      return {
-        text: undefined,
-        toolCalls: [
-          {
-            toolCallId: `call-${agentCallCount}`,
-            toolName: 'done',
-            args: { result: 'finished' },
-          },
-        ],
-        usage: { totalTokens: 50 },
-        responseMessages: [],
-      };
-    });
-
-    let crawlCallCount = 0;
-    const tools = {
-      crawl: {
-        description: 'Crawl a URL',
-        inputSchema: z.object({ url: z.string() }),
-        execute: async () => {
-          crawlCallCount++;
-          if (shouldThrow(crawlCallCount)) {
-            throw new Error('Service unavailable: 503');
-          }
-          return { content: 'page content' };
-        },
-      },
-      done: {
-        description: 'Done',
-        inputSchema: z.object({ result: z.string() }),
-        terminal: true,
-      },
-    };
-
-    const client: jest.Mocked<ObjectGenerator> = {
-      generateObject: mockGenerateObject,
-      generateText: agentGenerateText,
-      streamText: mockStreamText,
-    };
-
-    return { client, tools };
-  }
-
   // Helper: signal provider that PAUSEs on the Nth CONTROL signal check.
   function createPausingSignalProvider(pauseOnCall: number) {
     let controlSignalCallCount = 0;
@@ -530,61 +459,6 @@ describe('.map()', () => {
             error: () => ({ value: -1 }),
           })),
       clientOverride: undefined as any,
-    },
-    {
-      label: 'agent throws mid-execution',
-      makeInnerBrain: () => {
-        const { tools } = createAgentWithThrowingTool((n) => n === 2);
-        return brain<{}, { url: string }>('AgentInner').brain(
-          'Crawl page',
-          ({ state }) => ({
-            prompt: `Crawl ${state.url}`,
-            tools,
-            maxIterations: 2,
-            outputSchema: dummyOutputSchema,
-            stateKey: dummyStateKey,
-          })
-        );
-      },
-      makeOuterBrain: (innerBrain: any) =>
-        brain('AgentStackOuter')
-          .step('Init', () => ({
-            items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
-          }))
-          .map('Iterate', 'results' as const, ({ state }) => ({
-            run: innerBrain,
-            over: state.items,
-            initialState: (item: any) => ({ url: item.url }),
-            error: () => null,
-          })),
-      clientOverride: () => createAgentWithThrowingTool((n) => n === 2).client,
-    },
-    {
-      label: 'nested brain-inside-brain agent throws',
-      makeInnerBrain: () => {
-        const { tools } = createAgentWithThrowingTool((n) => n === 2);
-        return brain<{}, { url: string }>('NestedAgentInner')
-          .brain('Crawl page', ({ state }) => ({
-            prompt: `Crawl ${state.url}`,
-            tools,
-            maxIterations: 2,
-            outputSchema: dummyOutputSchema,
-            stateKey: dummyStateKey,
-          }))
-          .step('Verify', ({ state }) => state);
-      },
-      makeOuterBrain: (innerBrain: any) =>
-        brain('NestedAgentStackOuter')
-          .step('Init', () => ({
-            items: [{ url: 'a.com' }, { url: 'b.com' }, { url: 'c.com' }],
-          }))
-          .map('Iterate', 'results' as const, ({ state }) => ({
-            run: innerBrain,
-            over: state.items,
-            initialState: (item: any) => ({ url: item.url }),
-            error: () => null,
-          })),
-      clientOverride: () => createAgentWithThrowingTool((n) => n === 2).client,
     },
   ])(
     'should keep execution stack balanced when $label',

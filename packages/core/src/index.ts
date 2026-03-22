@@ -34,13 +34,9 @@ export type {
   CurrentUser,
   RuntimeEnv,
   Secrets,
-  AgentTool,
-  AgentConfig,
-  AgentConfigWithOutput,
-  AgentMessage,
-  AgentToolWaitFor,
+  Tool,
+  ToolWaitFor,
   StepContext,
-  ExtractTerminalInput,
   SignalType,
   BrainSignal,
   SignalProvider,
@@ -81,19 +77,7 @@ export type {
 } from './resources/resources.js';
 export { RESOURCE_TYPES } from './resources/resources.js';
 
-// Agent step event exports
 export type {
-  AgentStartEvent,
-  AgentIterationEvent,
-  AgentToolCallEvent,
-  AgentToolResultEvent,
-  AgentAssistantMessageEvent,
-  AgentCompleteEvent,
-  AgentTokenLimitEvent,
-  AgentIterationLimitEvent,
-  AgentWebhookEvent,
-  AgentRawResponseMessageEvent,
-  AgentUserMessageEvent,
   WebhookResponseEvent,
   BrainPausedEvent,
   IterateItemCompleteEvent,
@@ -179,7 +163,6 @@ export type {
   StepInfo,
   ExecutionState,
   CreateMachineOptions,
-  AgentContext,
   IterateContext,
   ExecutionNode,
 } from './dsl/brain-state-machine.js';

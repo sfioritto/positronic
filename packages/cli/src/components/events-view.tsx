@@ -38,12 +38,6 @@ function formatTimestamp(timestamp: Date): string {
   return mins > 0 ? `${hours}h ${mins}m ago` : `${hours}h ago`;
 }
 
-// Truncate text to a max length
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 3) + '...';
-}
-
 interface FormattedEvent {
   symbol: string;
   text: string;
@@ -108,70 +102,6 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `Webhook response received`,
         color: 'cyan',
       };
-    case BRAIN_EVENTS.AGENT_START:
-      return {
-        symbol: '[A]',
-        text: `Agent started: "${event.stepTitle}"`,
-        color: 'yellow',
-      };
-    case BRAIN_EVENTS.AGENT_ITERATION:
-      return {
-        symbol: '[#]',
-        text: `Agent iteration ${event.iteration}`,
-        color: 'gray',
-        tokens: event.tokensThisIteration,
-      };
-    case BRAIN_EVENTS.AGENT_TOOL_CALL:
-      return {
-        symbol: '[T]',
-        text: `Tool call: ${event.toolName}`,
-        color: 'white',
-      };
-    case BRAIN_EVENTS.AGENT_TOOL_RESULT:
-      return {
-        symbol: '[R]',
-        text: `Tool result: ${event.toolName}`,
-        color: 'white',
-      };
-    case BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE:
-      return {
-        symbol: '[M]',
-        text: `Assistant: ${truncate(event.content, 50)}`,
-        color: 'white',
-      };
-    case BRAIN_EVENTS.AGENT_COMPLETE:
-      return {
-        symbol: '[A]',
-        text: `Agent completed: "${event.terminalToolName}" (${event.totalIterations} iter)`,
-        color: 'green',
-        tokens: event.totalTokens,
-      };
-    case BRAIN_EVENTS.AGENT_TOKEN_LIMIT:
-      return {
-        symbol: '[!]',
-        text: `Token limit reached: ${event.totalTokens}/${event.maxTokens}`,
-        color: 'red',
-        tokens: event.totalTokens,
-      };
-    case BRAIN_EVENTS.AGENT_ITERATION_LIMIT:
-      return {
-        symbol: '[!]',
-        text: `Iteration limit reached: ${event.iteration}/${event.maxIterations}`,
-        color: 'red',
-        tokens: event.totalTokens,
-      };
-    case BRAIN_EVENTS.AGENT_WEBHOOK:
-      return {
-        symbol: '[W]',
-        text: `Agent webhook: ${event.toolName}`,
-        color: 'cyan',
-      };
-    case BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE:
-      return {
-        symbol: '[~]',
-        text: `Agent response (iteration ${event.iteration})`,
-        color: 'gray',
-      };
     case BRAIN_EVENTS.PAUSED:
       return {
         symbol: '[||]',
@@ -189,12 +119,6 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         symbol: '[i]',
         text: `Item ${event.processedCount}/${event.totalItems} complete: "${event.stepTitle}"`,
         color: 'green',
-      };
-    case BRAIN_EVENTS.AGENT_USER_MESSAGE:
-      return {
-        symbol: '[U]',
-        text: `User message: "${truncate(event.content, 50)}"`,
-        color: 'cyan',
       };
     case BRAIN_EVENTS.FILE_WRITE_START:
       return {

@@ -71,7 +71,7 @@ The project uses npm workspaces with the following packages:
 
 ### JSX Templates
 
-Templates in `.prompt()`, `.page()`, `.map()`, and `.brain()` steps can return JSX (`TemplateNode`) in addition to strings. In `.brain()` steps, both `system` and `prompt` fields in `AgentConfig` accept `string | TemplateChild` (JSX). The runner resolves JSX to a string via `resolveTemplate()` before emitting events or passing to the LLM client.
+Templates in `.prompt()`, `.page()`, and `.map()` steps can return JSX (`TemplateNode`) in addition to strings. The runner resolves JSX to a string via `resolveTemplate()` before emitting events or passing to the LLM client.
 
 - **JSX runtime**: `packages/core/src/jsx-runtime.ts` — exports `jsx`, `jsxs`, `Fragment` for the automatic JSX transform
 - **Rendering**: `packages/core/src/template/render.ts` — `renderTemplate()`, `resolveTemplate()`, `isTemplateNode()`
@@ -98,7 +98,7 @@ The `files` service provides framework-level file storage for brain steps. Avail
 
 **Built-in JSX components**: `File` and `Resource` are Symbols exported from `@positronic/core` (like `Fragment`). The template renderer resolves them via `TemplateContext.readFile`/`readResource`. Built once per execution via `buildTemplateContext()` in `packages/core/src/template/render.ts`.
 
-**Agent tools**: `readFile` and `writeFile` are standalone tools exported from `@positronic/core`. They access `context.files` in their execute function.
+**Tools**: `readFile` and `writeFile` are standalone tools exported from `@positronic/core`. They access `context.files` in their execute function.
 
 **Prompt attachments**: `.prompt()` config accepts `attachments: FileHandle[]`. The framework resolves handles to `Attachment` objects (name, mimeType, data) before calling the client. Vercel client maps to `FilePart` content blocks.
 

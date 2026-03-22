@@ -1,12 +1,6 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
-import type {
-  State,
-  JsonObject,
-  RuntimeEnv,
-  AgentTool,
-  AgentConfig,
-} from '../types.js';
+import type { State, JsonObject, RuntimeEnv } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
@@ -110,29 +104,6 @@ export type BrainBlock<
   options?: JsonObject | ((context: any) => JsonObject);
 };
 
-export type AgentBlock<
-  TStateIn,
-  TStateOut,
-  TOptions extends JsonObject = JsonObject,
-  TServices extends object = object,
-  TResponseIn extends JsonObject | undefined = undefined,
-  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>
-> = {
-  type: 'agent';
-  title: string;
-  configFn: (
-    params: {
-      state: TStateIn;
-      options: TOptions;
-      client: ObjectGenerator;
-      resources: Resources;
-      response: TResponseIn;
-      pages?: PagesService;
-      env: RuntimeEnv;
-    } & TServices
-  ) => AgentConfig<TTools> | Promise<AgentConfig<TTools>>;
-};
-
 export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
   type: 'guard';
   title: string;
@@ -181,7 +152,6 @@ export type Block<
 > =
   | StepBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn, TPageIn>
   | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
-  | AgentBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn>
   | GuardBlock<TStateIn, TOptions>
   | WaitBlock<TStateIn, TOptions, TServices, TPageIn>
   | MapBlock;

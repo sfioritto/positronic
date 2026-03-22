@@ -1,14 +1,7 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
 import type { IterateResult } from '../iterate-result.js';
-import type {
-  State,
-  JsonObject,
-  AgentTool,
-  AgentConfig,
-  AgentConfigWithOutput,
-  StepContext,
-} from '../types.js';
+import type { State, JsonObject, StepContext } from '../types.js';
 
 import type {
   WebhookRegistration,
@@ -26,7 +19,6 @@ import type {
   Block,
   StepBlock,
   BrainBlock,
-  AgentBlock,
   GuardBlock,
   WaitBlock,
   MapBlock,
@@ -61,8 +53,6 @@ export class Brain<
   private services: TServices = {} as TServices;
   public optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
-  private defaultTools?: Record<string, AgentTool<any>>;
-  private extraTools?: Record<string, AgentTool<any>>;
   private memoryProvider?: MemoryProvider;
   private storeSchema?: StoreSchema;
 
@@ -76,11 +66,6 @@ export class Brain<
         if (block.type === 'step') {
           return {
             type: 'step' as const,
-            title: block.title,
-          };
-        } else if (block.type === 'agent') {
-          return {
-            type: 'agent' as const,
             title: block.title,
           };
         } else if (block.type === 'guard') {
@@ -164,60 +149,6 @@ export class Brain<
   }
 
   /**
-   * Configure default tools for agent steps.
-   * These tools will be automatically available in all agent steps and can be
-   * extended or overridden in individual step configurations.
-   *
-   * @param tools - Record of default tool definitions
-   *
-   * @example
-   * ```typescript
-   * import { defaultTools } from '@positronic/core';
-   *
-   * const myBrain = brain('my-brain')
-   *   .withTools(defaultTools)
-   *   .brain('agent', ({ tools }) => ({
-   *     system: 'You are helpful',
-   *     prompt: 'Do something',
-   *     tools  // uses defaults
-   *   }));
-   * ```
-   */
-  withTools<TTools extends Record<string, AgentTool<any>>>(
-    tools: TTools
-  ): Brain<TOptions, TState, TServices> {
-    const next = this.nextBrain<TState>();
-    next.defaultTools = tools;
-    return next;
-  }
-
-  /**
-   * Add extra tools on top of whatever default tools are already configured.
-   * Unlike `withTools()` which replaces defaults, this merges additively.
-   *
-   * @param tools - Record of additional tool definitions
-   *
-   * @example
-   * ```typescript
-   * const myBrain = createBrain({ defaultTools })
-   *   ('my-brain')
-   *   .withExtraTools({ myCustomTool })
-   *   .brain('agent', ({ tools }) => ({
-   *     system: 'You are helpful',
-   *     prompt: 'Do something',
-   *     tools  // includes both defaults and myCustomTool
-   *   }));
-   * ```
-   */
-  withExtraTools<TTools extends Record<string, AgentTool<any>>>(
-    tools: TTools
-  ): Brain<TOptions, TState, TServices> {
-    const next = this.nextBrain<TState>();
-    next.extraTools = tools;
-    return next;
-  }
-
-  /**
    * Configure a memory provider for this brain.
    * When configured, steps receive a scoped memory instance in their context.
    *
@@ -231,9 +162,9 @@ export class Brain<
    *
    * const myBrain = brain('my-brain')
    *   .withMemory(memory)
-   *   .brain('agent', async ({ memory }) => {
+   *   .step('Remember', async ({ memory }) => {
    *     const prefs = await memory.search('user preferences');
-   *     return { system: `User preferences: ${prefs}`, prompt: 'Help me' };
+   *     return { preferences: prefs };
    *   });
    * ```
    */
@@ -351,7 +282,7 @@ export class Brain<
     return this.nextBrain<TState>();
   }
 
-  // Overload 1: Nested brain — spreads inner brain's final state onto outer state
+  // Nested brain — spreads inner brain's final state onto outer state
   brain<
     TInnerOptions extends JsonObject,
     TInnerState extends State,
@@ -369,77 +300,16 @@ export class Brain<
             context: StepContext<TState, TOptions> & TServices
           ) => TInnerOptions);
     }
-  ): Brain<TOptions, TNewState, TServices>;
-
-  // Overload 2: Agent config object WITH outputSchema (required)
-  brain<
-    TTools extends Record<string, AgentTool<any>>,
-    TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TSchema>
-  >(
-    title: string,
-    config: AgentConfigWithOutput<TTools, TSchema>
-  ): Brain<TOptions, TNewState, TServices>;
-
-  // Overload 3: Agent config function WITH outputSchema (required)
-  brain<
-    TTools extends Record<string, AgentTool<any>>,
-    TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TSchema>
-  >(
-    title: string,
-    configFn: (
-      params: StepContext<TState, TOptions> &
-        TServices & {
-          /** Default tools available for agent steps */
-          tools: Record<string, AgentTool<any>>;
-        }
-    ) =>
-      | AgentConfigWithOutput<TTools, TSchema>
-      | Promise<AgentConfigWithOutput<TTools, TSchema>>
-  ): Brain<TOptions, TNewState, TServices>;
-
-  // Implementation
-  brain(
-    title: string,
-    innerBrainOrConfig:
-      | Brain<any, any, any>
-      | AgentConfig<any>
-      | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>),
-    configOrUndefined?: { initialState?: any; options?: any }
-  ): any {
-    // Case 1: Nested brain instance
-    if (
-      innerBrainOrConfig &&
-      typeof innerBrainOrConfig === 'object' &&
-      'type' in innerBrainOrConfig &&
-      innerBrainOrConfig.type === 'brain'
-    ) {
-      const config = configOrUndefined ?? {};
-      const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
-        type: 'brain',
-        title,
-        innerBrain: innerBrainOrConfig,
-        initialState: config.initialState,
-        options: config.options,
-      };
-      this.blocks.push(nestedBlock);
-      return this.nextBrain<any>();
-    }
-
-    // Case 2 & 3: Agent config (object or function)
-    const configFn =
-      typeof innerBrainOrConfig === 'function'
-        ? innerBrainOrConfig
-        : () => innerBrainOrConfig as AgentConfig<any>;
-
-    const agentBlock: AgentBlock<TState, any, TOptions, TServices, any, any> = {
-      type: 'agent',
+  ): Brain<TOptions, TNewState, TServices> {
+    const nestedConfig = config ?? {};
+    const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
+      type: 'brain',
       title,
-      configFn: configFn as any,
+      innerBrain,
+      initialState: nestedConfig.initialState,
+      options: nestedConfig.options,
     };
-    this.blocks.push(agentBlock);
-
+    this.blocks.push(nestedBlock);
     return this.nextBrain<any>();
   }
 
@@ -637,8 +507,6 @@ export class Brain<
       optionsSchema: this.optionsSchema,
       services: { ...(params.services || {}), ...this.services } as TServices,
       components: this.components,
-      defaultTools: this.defaultTools,
-      extraTools: this.extraTools,
       memoryProvider: this.memoryProvider,
       store,
     });
@@ -657,8 +525,6 @@ export class Brain<
     target.services = this.services;
     target.optionsSchema = this.optionsSchema;
     target.components = this.components;
-    target.defaultTools = this.defaultTools;
-    target.extraTools = this.extraTools;
     target.memoryProvider = this.memoryProvider;
     target.storeSchema = this.storeSchema;
   }
@@ -733,38 +599,9 @@ export function brain<
   description?: string;
 }): Brain<TOptions, TState, TServices>;
 
-// Overload 3: Direct agent with config object WITH outputSchema (required)
-export function brain<
-  TTools extends Record<string, AgentTool<any>>,
-  TSchema extends z.ZodObject<any>,
-  TNewState extends State = z.infer<TSchema>
->(
-  title: string,
-  config: AgentConfigWithOutput<TTools, TSchema>
-): Brain<JsonObject, TNewState, object>;
-
-// Overload 4: Direct agent with config function WITH outputSchema (required)
-export function brain<
-  TTools extends Record<string, AgentTool<any>>,
-  TSchema extends z.ZodObject<any>,
-  TNewState extends State = z.infer<TSchema>
->(
-  title: string,
-  configFn: (
-    params: StepContext<object, JsonObject> & {
-      tools: Record<string, AgentTool<any>>;
-    }
-  ) =>
-    | AgentConfigWithOutput<TTools, TSchema>
-    | Promise<AgentConfigWithOutput<TTools, TSchema>>
-): Brain<JsonObject, TNewState, object>;
-
 // Implementation
 export function brain(
-  titleOrConfig: string | BrainConfig,
-  agentConfig?:
-    | AgentConfig<any>
-    | ((params: any) => AgentConfig<any> | Promise<AgentConfig<any>>)
+  titleOrConfig: string | BrainConfig
 ): Brain<any, any, any> {
   const title =
     typeof titleOrConfig === 'string' ? titleOrConfig : titleOrConfig.title;
@@ -773,12 +610,5 @@ export function brain(
 
   registerBrainName(title);
 
-  const newBrain = new Brain<any, any, any>(title, description);
-
-  // If agentConfig is provided, create a brain with a single 'main' agent step
-  if (agentConfig !== undefined) {
-    return newBrain.brain('main', agentConfig as any);
-  }
-
-  return newBrain;
+  return new Brain<any, any, any>(title, description);
 }

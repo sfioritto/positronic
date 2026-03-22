@@ -5,7 +5,6 @@ import type {
   SerializedWebhookRegistration,
   SerializedPageContext,
 } from '../webhook.js';
-import type { ResponseMessage } from '../../clients/types.js';
 
 export type SerializedError = {
   name: string;
@@ -102,117 +101,6 @@ export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
   timeout?: number;
 }
 
-// Agent Events
-export interface AgentStartEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_START;
-  stepTitle: string;
-  stepId: string;
-  prompt: string;
-  system?: string;
-  tools?: string[];
-}
-
-export interface AgentIterationEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_ITERATION;
-  stepTitle: string;
-  stepId: string;
-  iteration: number;
-  tokensThisIteration: number;
-  totalTokens: number;
-}
-
-export interface AgentToolCallEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_TOOL_CALL;
-  stepTitle: string;
-  stepId: string;
-  toolName: string;
-  toolCallId: string;
-  input: JsonObject;
-}
-
-export interface AgentToolResultEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_TOOL_RESULT;
-  stepTitle: string;
-  stepId: string;
-  toolName: string;
-  toolCallId: string;
-  result: unknown;
-}
-
-export interface AgentAssistantMessageEvent<
-  TOptions extends JsonObject = JsonObject
-> extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE;
-  stepTitle: string;
-  stepId: string;
-  content: string;
-}
-
-export interface AgentCompleteEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_COMPLETE;
-  stepTitle: string;
-  stepId: string;
-  terminalToolName: string;
-  result: JsonObject;
-  totalIterations: number;
-  totalTokens: number;
-}
-
-export interface AgentTokenLimitEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_TOKEN_LIMIT;
-  stepTitle: string;
-  stepId: string;
-  totalTokens: number;
-  maxTokens: number;
-}
-
-export interface AgentIterationLimitEvent<
-  TOptions extends JsonObject = JsonObject
-> extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_ITERATION_LIMIT;
-  stepTitle: string;
-  stepId: string;
-  iteration: number;
-  maxIterations: number;
-  totalTokens: number;
-}
-
-export interface AgentWebhookEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_WEBHOOK;
-  stepTitle: string;
-  stepId: string;
-  toolCallId: string;
-  toolName: string;
-  input: JsonObject;
-}
-
-export interface AgentRawResponseMessageEvent<
-  TOptions extends JsonObject = JsonObject
-> extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE;
-  stepTitle: string;
-  stepId: string;
-  iteration: number;
-  /** A single SDK-native message preserving provider metadata (e.g., Gemini's thoughtSignature) */
-  message: ResponseMessage;
-}
-
-export interface AgentUserMessageEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
-  type: typeof BRAIN_EVENTS.AGENT_USER_MESSAGE;
-  stepTitle: string;
-  stepId: string;
-  /** The user-injected message content */
-  content: string;
-}
-
 export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
   extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK_RESPONSE;
@@ -262,17 +150,6 @@ export type BrainEvent<TOptions extends JsonObject = JsonObject> =
   | StepCompletedEvent<TOptions>
   | WebhookEvent<TOptions>
   | WebhookResponseEvent<TOptions>
-  | AgentStartEvent<TOptions>
-  | AgentIterationEvent<TOptions>
-  | AgentToolCallEvent<TOptions>
-  | AgentToolResultEvent<TOptions>
-  | AgentAssistantMessageEvent<TOptions>
-  | AgentCompleteEvent<TOptions>
-  | AgentTokenLimitEvent<TOptions>
-  | AgentIterationLimitEvent<TOptions>
-  | AgentWebhookEvent<TOptions>
-  | AgentRawResponseMessageEvent<TOptions>
-  | AgentUserMessageEvent<TOptions>
   | IterateItemCompleteEvent<TOptions>
   | FileWriteStartEvent<TOptions>
   | FileWriteCompleteEvent<TOptions>;

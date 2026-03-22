@@ -155,28 +155,6 @@ describe('Positronic Spec', () => {
       expect(result).toBe(true);
     });
 
-    it('passes agent events spec test (AGENT_START, AGENT_ITERATION, AGENT_TOOL_CALL, AGENT_WEBHOOK)', async () => {
-      const result = await brains.watchAgentEvents(
-        createFetch(),
-        'agent-webhook-brain'
-      );
-      expect(result).toBe(true);
-    });
-
-    it('passes agent webhook resume spec test (full suspend/resume cycle)', async () => {
-      const result = await brains.agentWebhookResume(
-        createFetch(),
-        'agent-webhook-brain',
-        'loop-escalation',
-        {
-          escalationId: 'test-escalation-123',
-          approved: true,
-          note: 'Approved via spec test',
-        }
-      );
-      expect(result).toBe(true);
-    });
-
     it('passes POST /brains/runs/rerun test (destructive rerun)', async () => {
       const fetch = createFetch();
 
@@ -383,22 +361,6 @@ describe('Positronic Spec', () => {
       const result = await signals.kill(createFetch(), brainRunId!);
       expect(result).toBe(true);
     });
-
-    it('passes POST /brains/runs/:runId/signals USER_MESSAGE test', async () => {
-      // First create a brain run (needs an agent brain for this to work properly)
-      const brainRunId = await brains.run(createFetch(), 'basic-brain');
-      expect(brainRunId).toBeTruthy();
-
-      const result = await signals.sendMessage(
-        createFetch(),
-        brainRunId!,
-        'Hello from test'
-      );
-      expect(result).toBe(true);
-    });
-
-    // Note: sendMessageNoAgent test removed - USER_MESSAGE signals are now always queued
-    // regardless of agent state, and are simply ignored if no agent loop is active.
 
     it('passes POST /brains/runs/:runId/resume test', async () => {
       // Use delayed-brain which has a 1.5s delay - gives time for PAUSE to be processed
