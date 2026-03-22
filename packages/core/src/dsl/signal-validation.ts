@@ -8,7 +8,6 @@ const signalToEvent: Record<string, string> = {
   KILL: BRAIN_EVENTS.CANCELLED,
   PAUSE: BRAIN_EVENTS.PAUSED,
   RESUME: BRAIN_EVENTS.RESUMED,
-  USER_MESSAGE: BRAIN_EVENTS.AGENT_USER_MESSAGE,
   WEBHOOK_RESPONSE: BRAIN_EVENTS.WEBHOOK_RESPONSE,
 };
 
@@ -24,8 +23,6 @@ const statusToState: Record<string, string> = {
   [STATUS.COMPLETE]: 'complete',
   [STATUS.ERROR]: 'error',
   [STATUS.CANCELLED]: 'cancelled',
-  // Note: AGENT_LOOP status maps to 'agentLoop' state, but publicly shows as 'running'
-  // Since the public status is always 'running' for agent loops, this mapping is for running
 };
 
 /**

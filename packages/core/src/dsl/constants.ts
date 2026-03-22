@@ -13,18 +13,6 @@ export const BRAIN_EVENTS = {
   RESUMED: 'brain:resumed',
   WEBHOOK: 'brain:webhook',
   WEBHOOK_RESPONSE: 'brain:webhook_response',
-  // Agent step events
-  AGENT_START: 'agent:start',
-  AGENT_ITERATION: 'agent:iteration',
-  AGENT_TOOL_CALL: 'agent:tool_call',
-  AGENT_TOOL_RESULT: 'agent:tool_result',
-  AGENT_ASSISTANT_MESSAGE: 'agent:assistant_message',
-  AGENT_COMPLETE: 'agent:complete',
-  AGENT_TOKEN_LIMIT: 'agent:token_limit',
-  AGENT_ITERATION_LIMIT: 'agent:iteration_limit',
-  AGENT_WEBHOOK: 'agent:webhook',
-  AGENT_RAW_RESPONSE_MESSAGE: 'agent:raw_response_message',
-  AGENT_USER_MESSAGE: 'agent:user_message',
   // Iterate events (prompt/brain with `over`)
   ITERATE_ITEM_COMPLETE: 'iterate:item_complete',
   // File events
@@ -41,7 +29,4 @@ export const STATUS = {
   WAITING: 'waiting',
   PAUSED: 'paused',
   HALTED: 'halted',
-  // Internal status for tracking when execution is inside an agent loop.
-  // Publicly this maps to RUNNING for consumers.
-  AGENT_LOOP: 'agent_loop',
 } as const;

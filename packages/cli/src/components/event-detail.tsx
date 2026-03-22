@@ -20,11 +20,6 @@ function formatFullTimestamp(timestamp: Date): string {
   });
 }
 
-function formatValue(value: unknown): string {
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value, null, 2);
-}
-
 function getStatusIcon(status: string): string {
   switch (status) {
     case 'complete':
@@ -60,34 +55,12 @@ function getEventSymbol(event: BrainEvent): { symbol: string; color: string } {
       return { symbol: '[~]', color: 'cyan' };
     case BRAIN_EVENTS.WEBHOOK_RESPONSE:
       return { symbol: '[<]', color: 'cyan' };
-    case BRAIN_EVENTS.AGENT_START:
-      return { symbol: '[A]', color: 'yellow' };
-    case BRAIN_EVENTS.AGENT_ITERATION:
-      return { symbol: '[#]', color: 'gray' };
-    case BRAIN_EVENTS.AGENT_TOOL_CALL:
-      return { symbol: '[T]', color: 'white' };
-    case BRAIN_EVENTS.AGENT_TOOL_RESULT:
-      return { symbol: '[R]', color: 'white' };
-    case BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE:
-      return { symbol: '[M]', color: 'white' };
-    case BRAIN_EVENTS.AGENT_COMPLETE:
-      return { symbol: '[A]', color: 'green' };
-    case BRAIN_EVENTS.AGENT_TOKEN_LIMIT:
-      return { symbol: '[!]', color: 'red' };
-    case BRAIN_EVENTS.AGENT_ITERATION_LIMIT:
-      return { symbol: '[!]', color: 'red' };
-    case BRAIN_EVENTS.AGENT_WEBHOOK:
-      return { symbol: '[W]', color: 'cyan' };
-    case BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE:
-      return { symbol: '[~]', color: 'gray' };
     case BRAIN_EVENTS.PAUSED:
       return { symbol: '[||]', color: 'cyan' };
     case BRAIN_EVENTS.RESUMED:
       return { symbol: '[>]', color: 'green' };
     case BRAIN_EVENTS.ITERATE_ITEM_COMPLETE:
       return { symbol: '[i]', color: 'green' };
-    case BRAIN_EVENTS.AGENT_USER_MESSAGE:
-      return { symbol: '[U]', color: 'cyan' };
     case BRAIN_EVENTS.FILE_WRITE_START:
       return { symbol: '[↑]', color: 'blue' };
     case BRAIN_EVENTS.FILE_WRITE_COMPLETE:
@@ -99,26 +72,6 @@ function getEventSymbol(event: BrainEvent): { symbol: string; color: string } {
 
 function getEventDetailContent(event: BrainEvent): string {
   switch (event.type) {
-    case BRAIN_EVENTS.AGENT_TOOL_CALL:
-      return [
-        `Tool: ${event.toolName}`,
-        `Tool Call ID: ${event.toolCallId}`,
-        `Step: ${event.stepTitle}`,
-        '',
-        'Input:',
-        JSON.stringify(event.input, null, 2),
-      ].join('\n');
-
-    case BRAIN_EVENTS.AGENT_TOOL_RESULT:
-      return [
-        `Tool: ${event.toolName}`,
-        `Tool Call ID: ${event.toolCallId}`,
-        `Step: ${event.stepTitle}`,
-        '',
-        'Result:',
-        formatValue(event.result),
-      ].join('\n');
-
     case BRAIN_EVENTS.ERROR:
       return [
         `Brain: ${event.brainTitle}`,
@@ -130,25 +83,6 @@ function getEventDetailContent(event: BrainEvent): string {
         event.error.stack || '(no stack trace)',
       ].join('\n');
 
-    case BRAIN_EVENTS.AGENT_COMPLETE:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Terminal Tool: ${event.terminalToolName}`,
-        `Total Iterations: ${event.totalIterations}`,
-        `Total Tokens: ${event.totalTokens.toLocaleString()}`,
-        '',
-        'Result:',
-        JSON.stringify(event.result, null, 2),
-      ].join('\n');
-
-    case BRAIN_EVENTS.AGENT_ITERATION:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Iteration: ${event.iteration}`,
-        `Tokens This Iteration: ${event.tokensThisIteration.toLocaleString()}`,
-        `Total Tokens So Far: ${event.totalTokens.toLocaleString()}`,
-      ].join('\n');
-
     case BRAIN_EVENTS.STEP_COMPLETE:
       return [
         `Step: ${event.stepTitle}`,
@@ -156,21 +90,6 @@ function getEventDetailContent(event: BrainEvent): string {
         '',
         'State Patch:',
         JSON.stringify(event.patch, null, 2),
-      ].join('\n');
-
-    case BRAIN_EVENTS.AGENT_START:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Step ID: ${event.stepId}`,
-        '',
-        'Tools:',
-        ...(event.tools && event.tools.length > 0
-          ? event.tools.map((t) => `  • ${t}`)
-          : ['  (none)']),
-        '',
-        'Prompt:',
-        event.prompt,
-        ...(event.system ? ['', 'System Prompt:', event.system] : []),
       ].join('\n');
 
     case BRAIN_EVENTS.START:
@@ -185,35 +104,11 @@ function getEventDetailContent(event: BrainEvent): string {
         JSON.stringify(event.options, null, 2),
       ].join('\n');
 
-    case BRAIN_EVENTS.AGENT_TOKEN_LIMIT:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Total Tokens: ${event.totalTokens.toLocaleString()}`,
-        `Max Tokens: ${event.maxTokens.toLocaleString()}`,
-        '',
-        'Token limit exceeded. Agent stopped.',
-      ].join('\n');
-
-    case BRAIN_EVENTS.AGENT_ITERATION_LIMIT:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Iteration: ${event.iteration}`,
-        `Max Iterations: ${event.maxIterations}`,
-        `Total Tokens: ${event.totalTokens.toLocaleString()}`,
-        '',
-        'Iteration limit reached. Agent stopped.',
-      ].join('\n');
-
     case BRAIN_EVENTS.STEP_STATUS:
       return [
         'Steps:',
         ...event.steps.map((s) => `  ${getStatusIcon(s.status)} ${s.title}`),
       ].join('\n');
-
-    case BRAIN_EVENTS.AGENT_ASSISTANT_MESSAGE:
-      return [`Step: ${event.stepTitle}`, '', 'Message:', event.content].join(
-        '\n'
-      );
 
     case BRAIN_EVENTS.STEP_START:
       return [`Step: ${event.stepTitle}`, `Step ID: ${event.stepId}`].join(
@@ -246,24 +141,6 @@ function getEventDetailContent(event: BrainEvent): string {
         JSON.stringify(event.response, null, 2),
       ].join('\n');
 
-    case BRAIN_EVENTS.AGENT_WEBHOOK:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Tool: ${event.toolName}`,
-        `Tool Call ID: ${event.toolCallId}`,
-        '',
-        'Agent waiting for webhook response...',
-      ].join('\n');
-
-    case BRAIN_EVENTS.AGENT_RAW_RESPONSE_MESSAGE:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Iteration: ${event.iteration}`,
-        '',
-        'Raw Response Message:',
-        JSON.stringify(event.message, null, 2),
-      ].join('\n');
-
     case BRAIN_EVENTS.PAUSED:
       return [`Brain: ${event.brainTitle}`, '', 'Brain paused.'].join('\n');
 
@@ -282,15 +159,6 @@ function getEventDetailContent(event: BrainEvent): string {
         '',
         'Result:',
         JSON.stringify(event.result, null, 2),
-      ].join('\n');
-
-    case BRAIN_EVENTS.AGENT_USER_MESSAGE:
-      return [
-        `Step: ${event.stepTitle}`,
-        `Step ID: ${event.stepId}`,
-        '',
-        'Message:',
-        event.content,
       ].join('\n');
 
     case BRAIN_EVENTS.FILE_WRITE_START:

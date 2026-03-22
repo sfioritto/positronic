@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { AgentTool, StepContext } from '@positronic/core';
+import type { Tool, StepContext } from '@positronic/core';
 
 /**
  * Schema for the rememberFact tool input
@@ -39,7 +39,7 @@ const recallMemoriesSchema = z.object({
  *   }));
  * ```
  */
-export const rememberFact: AgentTool<typeof rememberFactSchema> = {
+export const rememberFact: Tool<typeof rememberFactSchema> = {
   description: `Store a fact or piece of information in long-term memory for future reference.
 
 Use this tool when:
@@ -88,7 +88,7 @@ The fact should be a clear, standalone statement that can be retrieved later.`,
  *   }));
  * ```
  */
-export const recallMemories: AgentTool<typeof recallMemoriesSchema> = {
+export const recallMemories: Tool<typeof recallMemoriesSchema> = {
   description: `Search long-term memory for relevant information.
 
 Use this tool to retrieve:

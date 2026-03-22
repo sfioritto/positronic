@@ -213,38 +213,6 @@ describe('signal validation', () => {
       });
     });
 
-    describe('USER_MESSAGE signal', () => {
-      // USER_MESSAGE requires agentLoop state, which maps to 'running' status
-      // but the transition is only defined on agentLoop state, not running state
-      it('rejects USER_MESSAGE from running state (non-agent)', () => {
-        // Regular running state doesn't have USER_MESSAGE transition
-        const result = isSignalValid(
-          brainMachineDefinition,
-          STATUS.RUNNING,
-          'USER_MESSAGE'
-        );
-        expect(result.valid).toBe(false);
-      });
-
-      it('rejects USER_MESSAGE from paused state', () => {
-        const result = isSignalValid(
-          brainMachineDefinition,
-          STATUS.PAUSED,
-          'USER_MESSAGE'
-        );
-        expect(result.valid).toBe(false);
-      });
-
-      it('rejects USER_MESSAGE from waiting state', () => {
-        const result = isSignalValid(
-          brainMachineDefinition,
-          STATUS.WAITING,
-          'USER_MESSAGE'
-        );
-        expect(result.valid).toBe(false);
-      });
-    });
-
     describe('error handling', () => {
       it('rejects unknown signal type', () => {
         const result = isSignalValid(

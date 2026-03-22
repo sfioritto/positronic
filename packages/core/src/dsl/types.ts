@@ -1,7 +1,5 @@
 import { z } from 'zod';
 import type { WebhookRegistration } from './webhook.js';
-import type { ToolChoice } from '../clients/types.js';
-import type { TemplateChild } from '../jsx-runtime.js';
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonArray = JsonValue[];
@@ -58,13 +56,13 @@ export type JsonPatch = {
   from?: string;
 }[];
 
-// Agent step types
+// Tool types
 
 /**
  * Return type for tools that need to suspend execution and wait for an external event.
  * Supports single webhook or array of webhooks (first response wins).
  */
-export interface AgentToolWaitFor {
+export interface ToolWaitFor {
   waitFor:
     | WebhookRegistration<z.ZodSchema>
     | WebhookRegistration<z.ZodSchema>[];
@@ -112,10 +110,10 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
 }
 
 /**
- * A tool definition for use in agent steps.
+ * A tool definition for use in LLM tool-calling workflows.
  * Compatible with Vercel AI SDK tool format, extended with Positronic-specific properties.
  */
-export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
+export interface Tool<TInput extends z.ZodSchema = z.ZodSchema> {
   /** Description of what this tool does, helps the LLM understand when to use it */
   description: string;
   /** Zod schema defining the input parameters for this tool */
@@ -130,97 +128,21 @@ export interface AgentTool<TInput extends z.ZodSchema = z.ZodSchema> {
   execute?(
     input: z.infer<TInput>,
     context: StepContext
-  ): Promise<unknown | AgentToolWaitFor> | unknown | AgentToolWaitFor;
+  ): Promise<unknown | ToolWaitFor> | unknown | ToolWaitFor;
   /**
-   * If true, calling this tool ends the agent.
-   * The tool's input becomes the agent result (merged into state).
+   * If true, calling this tool ends the workflow.
+   * The tool's input becomes the result (merged into state).
    */
   terminal?: boolean;
 }
-
-/**
- * AgentConfig with outputSchema required (not optional).
- * Used in overload signatures to enforce that outputSchema must be provided.
- */
-export type AgentConfigWithOutput<
-  TTools extends Record<string, AgentTool<any>>,
-  TSchema extends z.ZodObject<any>
-> = Omit<AgentConfig<TTools>, 'outputSchema'> & {
-  outputSchema: TSchema;
-};
-
-/**
- * Configuration for an agent step.
- */
-export interface AgentConfig<
-  TTools extends Record<string, AgentTool<any>> = Record<string, AgentTool<any>>
-> {
-  /** System prompt for the LLM. Supports JSX templates. */
-  system?: string | TemplateChild;
-  /** Initial user prompt to start the conversation. If omitted, uses "Begin.". Supports JSX templates. */
-  prompt?: string | TemplateChild;
-  /** Tools available to the LLM. Optional - merged with withTools defaults */
-  tools?: TTools;
-  /** Safety valve - exit if cumulative tokens exceed this limit */
-  maxTokens?: number;
-  /** Maximum number of agent loop iterations. Default: 100 */
-  maxIterations?: number;
-  /**
-   * Output schema for structured agent output.
-   * When provided, generates a terminal 'done' tool that validates output against the schema
-   * and spreads the result onto state.
-   */
-  outputSchema?: z.ZodObject<any>;
-  /**
-   * Tool choice configuration for LLM calls.
-   * - 'auto': Model chooses whether to call tools
-   * - 'required': Model must call a tool (default for agents)
-   * - 'none': Model cannot call tools
-   */
-  toolChoice?: ToolChoice;
-}
-
-/**
- * Represents a single message in the agent conversation.
- */
-export interface AgentMessage {
-  role: 'user' | 'assistant' | 'tool';
-  content: string;
-  /** For tool messages, the ID of the tool call this is responding to */
-  toolCallId?: string;
-  /** For tool messages, the name of the tool */
-  toolName?: string;
-}
-
-/**
- * Helper type to extract the terminal tool's input type from a tools object.
- * Used for typing the result that gets merged into state.
- */
-export type ExtractTerminalInput<
-  TTools extends Record<string, AgentTool<any>>
-> = {
-  [K in keyof TTools]: TTools[K] extends {
-    terminal: true;
-    inputSchema: infer S;
-  }
-    ? S extends z.ZodSchema
-      ? z.infer<S>
-      : never
-    : never;
-}[keyof TTools];
 
 // Signal types for brain interruption
 
 /**
  * Signal types that can be sent to a running brain.
- * Signals are processed in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME > USER_MESSAGE
+ * Signals are processed in priority order: KILL > PAUSE > WEBHOOK_RESPONSE > RESUME
  */
-export type SignalType =
-  | 'KILL'
-  | 'PAUSE'
-  | 'USER_MESSAGE'
-  | 'RESUME'
-  | 'WEBHOOK_RESPONSE';
+export type SignalType = 'KILL' | 'PAUSE' | 'RESUME' | 'WEBHOOK_RESPONSE';
 
 /**
  * A signal that can be injected into a running brain's execution.
@@ -228,7 +150,6 @@ export type SignalType =
 export type BrainSignal =
   | { type: 'KILL' }
   | { type: 'PAUSE' }
-  | { type: 'USER_MESSAGE'; content: string }
   | { type: 'RESUME' }
   | { type: 'WEBHOOK_RESPONSE'; response: JsonObject };
 
@@ -242,7 +163,7 @@ export interface SignalProvider {
    * Signals should be consumed (deleted) when returned.
    *
    * @param filter - 'CONTROL' returns only KILL/PAUSE, 'WEBHOOK' returns only WEBHOOK_RESPONSE, 'ALL' includes all signal types
-   * @returns Array of signals in priority order (KILL first, then PAUSE, then WEBHOOK_RESPONSE, then RESUME, then USER_MESSAGE)
+   * @returns Array of signals in priority order (KILL first, then PAUSE, then WEBHOOK_RESPONSE, then RESUME)
    */
   getSignals(filter: 'CONTROL' | 'WEBHOOK' | 'ALL'): Promise<BrainSignal[]>;
 }

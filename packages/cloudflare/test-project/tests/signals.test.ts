@@ -241,58 +241,6 @@ describe('Signal API Tests', () => {
       expect(body.signal.type).toBe('PAUSE');
       expect(body.signal.queuedAt).toBeGreaterThan(0);
     });
-
-    it('should return 202 and queue USER_MESSAGE signal', async () => {
-      const testEnv = env as TestEnv;
-
-      // Create a brain run
-      const createRequest = await createAuthenticatedRequest(
-        'http://example.com/brains/runs',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ brainTitle: 'basic-brain' }),
-        }
-      );
-      const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(
-        createRequest,
-        testEnv,
-        createContext
-      );
-      const { brainRunId } = await createResponse.json<{
-        brainRunId: string;
-      }>();
-      await waitOnExecutionContext(createContext);
-
-      // Send USER_MESSAGE signal
-      const signalRequest = await createAuthenticatedRequest(
-        `http://example.com/brains/runs/${brainRunId}/signals`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'USER_MESSAGE',
-            content: 'Hello from test!',
-          }),
-        }
-      );
-      const signalContext = createExecutionContext();
-      const signalResponse = await worker.fetch(
-        signalRequest,
-        testEnv,
-        signalContext
-      );
-      await waitOnExecutionContext(signalContext);
-
-      expect(signalResponse.status).toBe(202);
-      const body = await signalResponse.json<{
-        success: boolean;
-        signal: { type: string; queuedAt: number };
-      }>();
-      expect(body.success).toBe(true);
-      expect(body.signal.type).toBe('USER_MESSAGE');
-    });
   });
 
   describe('POST /brains/runs/:runId/resume', () => {
@@ -432,70 +380,6 @@ describe('Signal API Tests', () => {
       }>();
       expect(resumeBody.success).toBe(true);
       expect(resumeBody.action).toBe('resumed');
-    });
-
-    it('should allow queueing messages while brain is paused', async () => {
-      const testEnv = env as TestEnv;
-
-      // Create a delayed brain run
-      const createRequest = await createAuthenticatedRequest(
-        'http://example.com/brains/runs',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ brainTitle: 'delayed-brain' }),
-        }
-      );
-      const createContext = createExecutionContext();
-      const createResponse = await worker.fetch(
-        createRequest,
-        testEnv,
-        createContext
-      );
-      const { brainRunId } = await createResponse.json<{
-        brainRunId: string;
-      }>();
-      await waitOnExecutionContext(createContext);
-
-      // Send PAUSE signal
-      const pauseRequest = await createAuthenticatedRequest(
-        `http://example.com/brains/runs/${brainRunId}/signals`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'PAUSE' }),
-        }
-      );
-      const pauseContext = createExecutionContext();
-      await worker.fetch(pauseRequest, testEnv, pauseContext);
-      await waitOnExecutionContext(pauseContext);
-
-      // Wait for brain to pause
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Send USER_MESSAGE while paused - should succeed (queued for when brain resumes)
-      const msgRequest = await createAuthenticatedRequest(
-        `http://example.com/brains/runs/${brainRunId}/signals`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'USER_MESSAGE',
-            content: 'Message while paused',
-          }),
-        }
-      );
-      const msgContext = createExecutionContext();
-      const msgResponse = await worker.fetch(msgRequest, testEnv, msgContext);
-      await waitOnExecutionContext(msgContext);
-
-      expect(msgResponse.status).toBe(202);
-      const msgBody = await msgResponse.json<{
-        success: boolean;
-        signal: { type: string };
-      }>();
-      expect(msgBody.success).toBe(true);
-      expect(msgBody.signal.type).toBe('USER_MESSAGE');
     });
   });
 });

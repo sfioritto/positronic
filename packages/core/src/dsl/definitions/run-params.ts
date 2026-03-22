@@ -9,7 +9,6 @@ import type {
 import type { Resources } from '../../resources/resources.js';
 import type { PagesService } from '../pages.js';
 import type {
-  AgentContext,
   ExecutionStackEntry,
   IterateContext,
 } from '../brain-state-machine.js';
@@ -21,7 +20,6 @@ export interface ResumeParams {
   state: JsonObject;
   stepIndex: number;
   innerStack?: ExecutionStackEntry[];
-  agentContext?: AgentContext;
   iterateProgress?: Omit<IterateContext, 'stepId'>;
   currentPage?: SerializedPageContext;
   webhookResponse?: JsonObject;
