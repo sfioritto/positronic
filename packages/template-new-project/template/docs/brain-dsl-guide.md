@@ -529,49 +529,52 @@ expect(result.finalState.data).toEqual({ id: '123', name: 'Test' });
 - Services are not serialized - they're for side effects and external interactions
 - Each brain instance maintains its own service references
 
-### Tool Configuration with `withTools()`
+### Tool-Calling Prompt Loops
 
-The `withTools()` method registers tools that can be used by agent steps:
+Use `.prompt()` with a `loop` property to run an LLM with tools. The LLM calls tools iteratively until it calls the auto-generated `done` tool:
 
 ```typescript
 import { z } from 'zod';
+import { generatePage, waitForWebhook } from '@positronic/core';
 
-const brainWithTools = brain('Tool Brain')
-  .withTools({
-    fetchData: {
-      description: 'Fetch data from an external API',
-      inputSchema: z.object({
-        endpoint: z.string(),
-        params: z.record(z.string()).optional()
-      }),
-      execute: async ({ endpoint, params }) => {
-        const url = new URL(endpoint);
-        if (params) {
-          Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-        }
-        const response = await fetch(url);
-        return response.json();
-      }
-    },
-    saveToDatabase: {
-      description: 'Save data to the database',
-      inputSchema: z.object({
-        table: z.string(),
-        data: z.any()
-      }),
-      execute: async ({ table, data }) => {
-        // Database save logic
-        return { success: true, id: 'generated-id' };
-      }
-    }
-  })
-  .brain('Data Agent', {
+brain('Tool Brain')
+  .prompt('Fetch and Save', () => ({
     system: 'You can fetch and save data.',
-    prompt: 'Fetch user data and save the summary.',
-    // Tools defined with withTools() are automatically available
+    message: 'Fetch user data and save the summary.',
     outputSchema: z.object({ summary: z.string() }),
-  });
+    loop: {
+      tools: {
+        fetchData: {
+          description: 'Fetch data from an external API',
+          inputSchema: z.object({
+            endpoint: z.string(),
+            params: z.record(z.string()).optional()
+          }),
+          execute: async ({ endpoint, params }) => {
+            const url = new URL(endpoint);
+            if (params) {
+              Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+            }
+            const response = await fetch(url);
+            return response.json();
+          }
+        },
+        saveToDatabase: {
+          description: 'Save data to the database',
+          inputSchema: z.object({
+            table: z.string(),
+            data: z.any()
+          }),
+          execute: async ({ table, data }) => {
+            return { success: true, id: 'generated-id' };
+          }
+        }
+      },
+    },
+  }));
 ```
+
+Tools are explicit on each `.prompt()` — there's no global tool registration.
 
 ### Component Configuration with `withComponents()`
 
@@ -1332,138 +1335,133 @@ By default, results are stored as an `IterateResult` — a collection that wraps
 
 The key always comes from `stateKey`.
 
-## Agent Steps
+## Prompt Steps with Tool-Calling Loops
 
-For complex AI workflows that require tool use, use the `.brain()` method with an agent configuration. Agent `.brain()` calls require `outputSchema`:
+For complex AI workflows that require tool use, use `.prompt()` with a `loop` property. The LLM calls tools iteratively until it calls the auto-generated `done` tool with data matching the `outputSchema`:
 
 ```typescript
 brain('Research Assistant')
   .step('Initialize', () => ({
     query: 'What are the latest developments in AI?'
   }))
-  .brain('Research Agent', {
+  .prompt('Research', ({ state }) => ({
     system: 'You are a helpful research assistant with access to search tools.',
-    prompt: ({ query }) => `Research this topic: <%= '${query}' %>`,
-    tools: {
-      search: {
-        description: 'Search the web for information',
-        inputSchema: z.object({
-          query: z.string().describe('The search query')
-        }),
-        execute: async ({ query }) => {
-          // Implement search logic
-          const results = await searchWeb(query);
-          return { results };
-        }
-      },
-      summarize: {
-        description: 'Summarize a piece of text',
-        inputSchema: z.object({
-          text: z.string().describe('Text to summarize')
-        }),
-        execute: async ({ text }) => {
-          return { summary: text.slice(0, 100) + '...' };
-        }
-      }
-    },
+    message: `Research this topic: <%= '${state.query}' %>`,
     outputSchema: z.object({
       findings: z.array(z.string()),
       summary: z.string(),
     }),
-    maxTokens: 10000,
-  })
+    loop: {
+      tools: {
+        search: {
+          description: 'Search the web for information',
+          inputSchema: z.object({
+            query: z.string().describe('The search query')
+          }),
+          execute: async ({ query }) => {
+            const results = await searchWeb(query);
+            return { results };
+          }
+        },
+        summarize: {
+          description: 'Summarize a piece of text',
+          inputSchema: z.object({
+            text: z.string().describe('Text to summarize')
+          }),
+          execute: async ({ text }) => {
+            return { summary: text.slice(0, 100) + '...' };
+          }
+        }
+      },
+      maxTokens: 10000,
+    },
+  }))
   .step('Format Results', ({ state }) => ({
     ...state,
     researchResults: state.summary,
   }));
 ```
 
-### Agent Configuration Options
+### Prompt Config (with loop)
 
-- `system: string` - System prompt for the agent
-- `prompt: string | ((state) => string)` - User prompt (can be a function)
-- `tools: Record<string, ToolDefinition>` - Tools available to the agent
-- `outputSchema: ZodSchema` - **Required.** Structured output schema that generates a terminal `done` tool (see below). The result is spread directly onto state.
-- `maxTokens: number` - Maximum tokens for the agent response
-- `maxIterations: number` - Maximum agent loop iterations (default: 100)
+- `message: string | TemplateReturn` - The user prompt sent to the LLM
+- `system?: string | TemplateReturn` - System prompt (optional, works with or without loop)
+- `outputSchema: ZodSchema` - **Required.** Structured output schema. With `loop`, generates a terminal `done` tool. Without `loop`, used for single-shot structured output.
+- `loop.tools: Record<string, Tool>` - Tools available to the LLM
+- `loop.maxTokens?: number` - Maximum cumulative tokens across all iterations
+- `loop.maxIterations?: number` - Maximum loop iterations (default: 100)
+- `loop.toolChoice?: 'auto' | 'required' | 'none'` - Tool choice strategy (default: `'required'`)
+
+Without `loop`, `.prompt()` makes a single `generateObject()` call — no tools, no iteration.
 
 ### Tool Definition
 
 Each tool requires:
 - `description: string` - What the tool does
 - `inputSchema: ZodSchema` - Zod schema for the tool's input
-- `execute: (input, context) => Promise<any>` - Function to execute when the tool is called
-- `terminal?: boolean` - If true, calling this tool ends the agent loop
+- `execute?: (input, context) => Promise<any>` - Function to execute when the tool is called
+- `terminal?: boolean` - If true, calling this tool ends the loop
 
 ### Tool Webhooks (waitFor)
 
-Tools can pause agent execution and wait for external events by returning `{ waitFor: webhook(...) }` from their `execute` function. This is useful for human-in-the-loop workflows where the agent needs to wait for approval, external API callbacks, or other asynchronous events.
+Tools can pause execution and wait for external events by returning `{ waitFor: webhook(...) }` from their `execute` function:
 
 ```typescript
 import approvalWebhook from '../webhooks/approval.js';
 
 brain('Support Ticket Handler')
-  .brain('Handle Support Request', {
+  .prompt('Handle Request', ({ state }) => ({
     system: 'You are a support agent. Escalate complex issues for human review.',
-    prompt: ({ ticket }) => `Handle this support ticket: <%= '${ticket.description}' %>`,
-    tools: {
-      escalateToHuman: {
-        description: 'Escalate the ticket to a human reviewer for approval',
-        inputSchema: z.object({
-          summary: z.string().describe('Summary of the issue'),
-          recommendation: z.string().describe('Your recommended action'),
-        }),
-        execute: async ({ summary, recommendation }, context) => {
-          // Send notification to human reviewer (e.g., via Slack, email)
-          await notifyReviewer({ summary, recommendation, ticketId: context.state.ticketId });
-
-          // Return waitFor to pause until the webhook fires
-          return {
-            waitFor: approvalWebhook(context.state.ticketId),
-          };
-        },
-      },
-    },
+    message: `Handle this support ticket: <%= '${state.ticket.description}' %>`,
     outputSchema: z.object({
       resolution: z.string().describe('How the ticket was resolved'),
     }),
-  })
+    loop: {
+      tools: {
+        escalateToHuman: {
+          description: 'Escalate the ticket to a human reviewer for approval',
+          inputSchema: z.object({
+            summary: z.string().describe('Summary of the issue'),
+            recommendation: z.string().describe('Your recommended action'),
+          }),
+          execute: async ({ summary, recommendation }, context) => {
+            await notifyReviewer({ summary, recommendation, ticketId: context.state.ticketId });
+            return { waitFor: approvalWebhook(context.state.ticketId) };
+          },
+        },
+      },
+    },
+  }))
   .step('Process Result', ({ state }) => ({
     ...state,
-    // The webhook response is fed back to the agent as a tool result.
-    // The agent processes it and finishes (via the auto-generated done tool from outputSchema).
-    // This step only sees the final state after the agent completes.
     handled: true,
   }));
 ```
 
 Key points about tool `waitFor`:
-- Return `{ waitFor: webhook(...) }` to pause the agent and wait for an external event
-- The webhook response is fed back to the agent as a tool result — the agent continues its loop with this data
+- Return `{ waitFor: webhook(...) }` to pause and wait for an external event
+- The webhook response is fed back as a tool result — the loop continues with this data
 - You can wait for multiple webhooks (first response wins): `{ waitFor: [webhook1(...), webhook2(...)] }`
 - The `execute` function receives a `context` parameter with access to `state`, `options`, `env`, etc.
-- Use this pattern for approvals, external API callbacks, or any human-in-the-loop workflow
-- The built-in `waitForWebhook` tool defaults to a 1-hour timeout. Agents can customize via the `timeout` parameter (e.g., "30m", "24h", "7d"). If the timeout elapses, the brain is cancelled.
 
-### Agent Output Schema
+### Output Schema
 
-Use `outputSchema` to get structured, typed output from agent steps. This generates a terminal tool that the agent must call to complete, ensuring the output matches your schema:
+The `outputSchema` generates a terminal `done` tool that the LLM must call to complete. The result is spread directly onto state:
 
 ```typescript
 brain('Entity Extractor')
-  .brain('Extract Entities', {
+  .prompt('Extract Entities', () => ({
     system: 'You are an entity extraction assistant.',
-    prompt: 'Extract all people and organizations from the provided text.',
+    message: 'Extract all people and organizations from the provided text.',
     outputSchema: z.object({
       people: z.array(z.string()).describe('Names of people mentioned'),
       organizations: z.array(z.string()).describe('Organization names'),
       confidence: z.number().min(0).max(1).describe('Confidence score'),
     }),
-  })
+    loop: { tools: {} },
+  }))
   .step('Use Extracted Data', ({ state }) => {
     // TypeScript knows state has people, organizations, and confidence
-    console.log('Found ' + state.people.length + ' people');
-    console.log('Found ' + state.organizations.length + ' organizations');
     return {
       ...state,
       summary: 'Extracted ' + state.people.length + ' people and ' +
@@ -1472,10 +1470,10 @@ brain('Entity Extractor')
   });
 ```
 
-Key points about `outputSchema`:
-- The agent automatically gets a `done` tool that uses your schema
-- The schema result is spread directly onto state (e.g., `state.people`, `state.organizations`)
-- To namespace, wrap your schema in a parent key (e.g., `z.object({ entities: z.object({ ... }) })`)
+Key points:
+- The `done` tool is auto-generated from your `outputSchema`
+- If the LLM provides invalid output, the error is fed back so it can retry
+- The result is spread directly onto state (e.g., `state.people`, `state.organizations`)
 - Full TypeScript type inference flows to subsequent steps
 
 ## Environment and Pages Service

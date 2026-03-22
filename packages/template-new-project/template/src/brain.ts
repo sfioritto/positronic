@@ -1,8 +1,8 @@
-import { createBrain, defaultTools } from '@positronic/core';
+import { createBrain } from '@positronic/core';
 import { components } from './components/index.js';
 
 /**
- * Project-level brain function with pre-configured components and tools.
+ * Project-level brain function with pre-configured components.
  *
  * All brains in your project should import from this file:
  *
@@ -13,19 +13,32 @@ import { components } from './components/index.js';
  *   .step('Do something', ({ state }) => ({ ...state, done: true }));
  * ```
  *
- * Default tools available in agent steps:
- * - generatePage: Generate interactive UI pages
- * - consoleLog: Log messages for debugging
- * - done: Complete the agent and return a result
+ * ## Prompt steps with tool-calling loops
  *
- * Tool configuration:
- * - `withTools({ ... })` — replaces the default tools entirely
- * - `withExtraTools({ ... })` — adds tools alongside the defaults
- *
- * To add services (e.g., Slack, Gmail, database clients):
+ * Use `.prompt()` with a `loop` property to run an LLM with tools:
  *
  * ```typescript
- * import { createBrain, defaultTools } from '@positronic/core';
+ * import { generatePage, waitForWebhook } from '@positronic/core';
+ *
+ * export default brain('my-brain')
+ *   .prompt('Do Work', ({ state }) => ({
+ *     system: 'You are a helpful assistant',
+ *     message: `Help the user with: ${state.task}`,
+ *     outputSchema: z.object({ result: z.string() }),
+ *     loop: {
+ *       tools: { generatePage, waitForWebhook },
+ *     },
+ *   }));
+ * ```
+ *
+ * Without `loop`, `.prompt()` makes a single LLM call for structured output.
+ * With `loop`, the LLM calls tools iteratively until it calls the auto-generated
+ * 'done' tool with data matching the outputSchema.
+ *
+ * ## Adding services
+ *
+ * ```typescript
+ * import { createBrain } from '@positronic/core';
  * import { components } from './components/index.js';
  * import slack from './services/slack.js';
  * import gmail from './services/gmail.js';
@@ -33,7 +46,6 @@ import { components } from './components/index.js';
  * export const brain = createBrain({
  *   services: { slack, gmail },
  *   components,
- *   defaultTools,
  * });
  * ```
  *
@@ -47,28 +59,11 @@ import { components } from './components/index.js';
  *   });
  * ```
  *
- * You can also create agents directly with access to default tools:
- *
- * ```typescript
- * export default brain('my-agent', ({ slack, tools }) => ({
- *   system: 'You are a helpful assistant',
- *   prompt: 'Help the user with their request',
- *   tools: {
- *     ...tools, // includes generatePage, consoleLog, done
- *     notify: {
- *       description: 'Send a Slack notification',
- *       inputSchema: z.object({ message: z.string() }),
- *       execute: ({ message }) => slack.postMessage('#general', message),
- *     },
- *   },
- * }));
- * ```
- *
  * To add memory (long-term storage with semantic search):
  *
  * ```typescript
- * import { createBrain, defaultTools } from '@positronic/core';
- * import { createMem0Provider, createMem0Tools } from '@positronic/mem0';
+ * import { createBrain } from '@positronic/core';
+ * import { createMem0Provider } from '@positronic/mem0';
  * import { components } from './components/index.js';
  *
  * const memory = createMem0Provider({
@@ -77,12 +72,8 @@ import { components } from './components/index.js';
  *
  * export const brain = createBrain({
  *   components,
- *   defaultTools,
  *   memory, // All brains now have access to memory
  * });
- *
- * // Memory tools (rememberFact, recallMemories) can be added to agents:
- * const memoryTools = createMem0Tools();
  * ```
  *
  * Memory is automatically scoped to the current user (via currentUser.name)
@@ -92,5 +83,4 @@ import { components } from './components/index.js';
  */
 export const brain = createBrain({
   components,
-  defaultTools,
 });
