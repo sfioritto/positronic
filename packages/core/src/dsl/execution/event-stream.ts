@@ -29,6 +29,7 @@ import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
 import { createScopedMemory } from '../../memory/scoped-memory.js';
 import type { Store, StoreProvider } from '../../store/types.js';
 import type { FilesService } from '../../files/types.js';
+import { guessMimeType } from '../../files/mime.js';
 import { EventChannel } from './event-channel.js';
 import { wrapFilesWithEvents } from '../../files/event-wrapper.js';
 
@@ -40,6 +41,8 @@ import type {
   GuardBlock,
   WaitBlock,
   MapBlock,
+  PromptBlock,
+  PromptConfig,
 } from '../definitions/blocks.js';
 import type { GeneratedPage } from '../definitions/brain-types.js';
 import type {
@@ -493,6 +496,11 @@ export class BrainEventStream<
       }
     }
 
+    if (block.type === 'prompt') {
+      yield* this.executePrompt(step);
+      return;
+    }
+
     if (block.type === 'map') {
       yield* this.executeMap(step);
       return;
@@ -704,6 +712,57 @@ export class BrainEventStream<
       // Reset currentPage after step consumes it (page is ephemeral)
       this.currentPage = undefined;
     }
+  }
+
+  /**
+   * Execute a prompt step. Either single-shot (generateObject) or
+   * iterative tool-calling loop (generateText) when `loop` is present.
+   */
+  private async *executePrompt(
+    step: Step
+  ): AsyncGenerator<BrainEvent<TOptions>> {
+    const block = step.block as PromptBlock;
+    const prevState = clone(this.currentState);
+    const config: PromptConfig = await block.configFn(
+      this.buildStepContext(step)
+    );
+
+    const client = config.client
+      ? this.governor
+        ? this.governor(config.client)
+        : config.client
+      : this.client;
+
+    const prompt = await resolveTemplate(config.message, this.templateContext);
+
+    const system = config.system
+      ? await resolveTemplate(config.system, this.templateContext)
+      : undefined;
+
+    if (!config.loop) {
+      // Single-shot: call generateObject (same behavior as before)
+      const attachments = config.attachments
+        ? await Promise.all(
+            config.attachments.map(async (handle) => ({
+              name: handle.name,
+              mimeType: guessMimeType(handle.name),
+              data: await handle.readBytes(),
+            }))
+          )
+        : undefined;
+      const result = await client.generateObject({
+        schema: config.outputSchema,
+        prompt,
+        system,
+        attachments,
+      });
+      this.currentState = { ...this.currentState, ...result.object } as TState;
+      yield* this.completeStep(step, prevState);
+      return;
+    }
+
+    // Loop path: tool-calling iteration (Phase 3)
+    throw new Error(`Prompt loop not yet implemented in step "${block.title}"`);
   }
 
   /**

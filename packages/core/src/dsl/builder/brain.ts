@@ -24,6 +24,8 @@ import type {
   MapBlock,
   MapConfig,
   PageConfig,
+  PromptBlock,
+  PromptConfig,
   TemplateReturn,
 } from '../definitions/blocks.js';
 import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
@@ -81,6 +83,11 @@ export class Brain<
         } else if (block.type === 'map') {
           return {
             type: 'map' as const,
+            title: block.title,
+          };
+        } else if (block.type === 'prompt') {
+          return {
+            type: 'prompt' as const,
             title: block.title,
           };
         } else {
@@ -318,52 +325,14 @@ export class Brain<
     TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
-    configFn: (context: StepContext<TState, TOptions> & TServices) =>
-      | {
-          message: TemplateReturn;
-          outputSchema: TSchema;
-          client?: ObjectGenerator;
-          attachments?: FileHandle[];
-        }
-      | Promise<{
-          message: TemplateReturn;
-          outputSchema: TSchema;
-          client?: ObjectGenerator;
-          attachments?: FileHandle[];
-        }>
-  ): Brain<TOptions, TNewState, TServices> {
-    const action = async (
+    configFn: (
       context: StepContext<TState, TOptions> & TServices
-    ) => {
-      const config = await configFn(context);
-      const client = config.client ?? context.client;
-      const prompt = await resolveTemplate(
-        config.message,
-        buildTemplateContext(context.files, context.resources)
-      );
-      const attachments = config.attachments
-        ? await Promise.all(
-            config.attachments.map(async (handle) => ({
-              name: handle.name,
-              mimeType: guessMimeType(handle.name),
-              data: await handle.readBytes(),
-            }))
-          )
-        : undefined;
-      const result = await client.generateObject({
-        schema: config.outputSchema,
-        prompt,
-        attachments,
-      });
-      return {
-        ...context.state,
-        ...result.object,
-      };
-    };
-    const promptBlock: StepBlock<TState, any, TOptions, TServices, any, any> = {
-      type: 'step',
+    ) => PromptConfig<TSchema> | Promise<PromptConfig<TSchema>>
+  ): Brain<TOptions, TNewState, TServices> {
+    const promptBlock: PromptBlock = {
+      type: 'prompt',
       title,
-      action: action as any,
+      configFn: configFn as any,
     };
     this.blocks.push(promptBlock);
     return this.nextBrain<any>();
