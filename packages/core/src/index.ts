@@ -136,7 +136,6 @@ export type {
   MemorySearchOptions,
   MemoryAddOptions,
   MemoryProvider,
-  ScopedMemory,
 } from './memory/types.js';
 export { createScopedMemory } from './memory/scoped-memory.js';
 

@@ -6,16 +6,14 @@ import {
 } from '../src/helpers.js';
 import type {
   MemoryEntry,
-  ScopedMemory,
+  Memory,
   MemorySearchOptions,
   MemoryAddOptions,
   MemoryMessage,
 } from '@positronic/core';
 
-// Create a mock ScopedMemory for testing
-function createMockScopedMemory(
-  searchResult: MemoryEntry[] = []
-): ScopedMemory {
+// Create a mock Memory for testing
+function createMockMemory(searchResult: MemoryEntry[] = []): Memory {
   return {
     search: jest.fn(
       async (
@@ -90,15 +88,15 @@ describe('createMemorySystemPrompt', () => {
     const memories: MemoryEntry[] = [
       { id: '1', content: 'User prefers concise responses', score: 0.9 },
     ];
-    const mockScopedMemory = createMockScopedMemory(memories);
+    const mockMemory = createMockMemory(memories);
 
     const result = await createMemorySystemPrompt(
-      mockScopedMemory,
+      mockMemory,
       'You are a helpful assistant.',
       'user preferences'
     );
 
-    expect(mockScopedMemory.search).toHaveBeenCalledWith('user preferences', {
+    expect(mockMemory.search).toHaveBeenCalledWith('user preferences', {
       limit: undefined,
     });
     expect(result).toBe(
@@ -109,10 +107,10 @@ describe('createMemorySystemPrompt', () => {
   });
 
   it('should return base prompt when no memories found', async () => {
-    const mockScopedMemory = createMockScopedMemory([]);
+    const mockMemory = createMockMemory([]);
 
     const result = await createMemorySystemPrompt(
-      mockScopedMemory,
+      mockMemory,
       'You are a helpful assistant.',
       'user preferences'
     );
@@ -124,10 +122,10 @@ describe('createMemorySystemPrompt', () => {
     const memories: MemoryEntry[] = [
       { id: '1', content: 'User likes dark mode', score: 0.95 },
     ];
-    const mockScopedMemory = createMockScopedMemory(memories);
+    const mockMemory = createMockMemory(memories);
 
     const result = await createMemorySystemPrompt(
-      mockScopedMemory,
+      mockMemory,
       'Base prompt',
       'preferences',
       { memoriesHeader: '\n\nKnown facts:' }
@@ -139,13 +137,13 @@ describe('createMemorySystemPrompt', () => {
   });
 
   it('should pass limit to search', async () => {
-    const mockScopedMemory = createMockScopedMemory([]);
+    const mockMemory = createMockMemory([]);
 
-    await createMemorySystemPrompt(mockScopedMemory, 'Base', 'query', {
+    await createMemorySystemPrompt(mockMemory, 'Base', 'query', {
       limit: 5,
     });
 
-    expect(mockScopedMemory.search).toHaveBeenCalledWith('query', {
+    expect(mockMemory.search).toHaveBeenCalledWith('query', {
       limit: 5,
     });
   });
@@ -157,9 +155,9 @@ describe('getMemoryContext', () => {
       { id: '1', content: 'User prefers TypeScript', score: 0.9 },
       { id: '2', content: 'User works on React apps', score: 0.8 },
     ];
-    const mockScopedMemory = createMockScopedMemory(memories);
+    const mockMemory = createMockMemory(memories);
 
-    const result = await getMemoryContext(mockScopedMemory, 'user context');
+    const result = await getMemoryContext(mockMemory, 'user context');
 
     expect(result).toBe(
       '1. User prefers TypeScript\n' + '2. User works on React apps'
@@ -167,21 +165,21 @@ describe('getMemoryContext', () => {
   });
 
   it('should return empty string when no memories found', async () => {
-    const mockScopedMemory = createMockScopedMemory([]);
+    const mockMemory = createMockMemory([]);
 
-    const result = await getMemoryContext(mockScopedMemory, 'query');
+    const result = await getMemoryContext(mockMemory, 'query');
 
     expect(result).toBe('');
   });
 
   it('should pass options to search', async () => {
-    const mockScopedMemory = createMockScopedMemory([]);
+    const mockMemory = createMockMemory([]);
 
-    await getMemoryContext(mockScopedMemory, 'query', {
+    await getMemoryContext(mockMemory, 'query', {
       limit: 3,
     });
 
-    expect(mockScopedMemory.search).toHaveBeenCalledWith('query', {
+    expect(mockMemory.search).toHaveBeenCalledWith('query', {
       limit: 3,
     });
   });

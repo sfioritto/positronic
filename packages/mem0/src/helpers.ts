@@ -1,6 +1,6 @@
 import type {
   MemoryEntry,
-  ScopedMemory,
+  Memory,
   MemorySearchOptions,
 } from '@positronic/core';
 
@@ -109,7 +109,7 @@ export interface CreateMemorySystemPromptOptions extends MemorySearchOptions {
  * ```
  */
 export async function createMemorySystemPrompt(
-  memory: ScopedMemory,
+  memory: Memory,
   basePrompt: string,
   query: string,
   options: CreateMemorySystemPromptOptions = {}
@@ -158,7 +158,7 @@ export async function createMemorySystemPrompt(
  * ```
  */
 export async function getMemoryContext(
-  memory: ScopedMemory,
+  memory: Memory,
   query: string,
   options: MemorySearchOptions = {}
 ): Promise<string> {
