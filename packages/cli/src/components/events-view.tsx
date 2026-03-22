@@ -132,6 +132,68 @@ function formatEvent(event: BrainEvent): FormattedEvent {
         text: `Written: ${event.fileName}`,
         color: 'green',
       };
+    case BRAIN_EVENTS.PROMPT_START:
+      return {
+        symbol: '[P]',
+        text: `Prompt loop started: "${event.stepTitle}"`,
+        color: 'magenta',
+      };
+    case BRAIN_EVENTS.PROMPT_ITERATION:
+      return {
+        symbol: '[#]',
+        text: `Iteration ${event.iteration} (${event.totalTokens} tokens)`,
+        color: 'gray',
+      };
+    case BRAIN_EVENTS.PROMPT_TOOL_CALL:
+      return {
+        symbol: '[→]',
+        text: `Tool call: ${event.toolName}`,
+        color: 'yellow',
+      };
+    case BRAIN_EVENTS.PROMPT_TOOL_RESULT:
+      return {
+        symbol: '[←]',
+        text: `Tool result: ${event.toolName}`,
+        color: 'green',
+      };
+    case BRAIN_EVENTS.PROMPT_ASSISTANT_MESSAGE:
+      return {
+        symbol: '[M]',
+        text: `Assistant: ${event.text.slice(0, 80)}${
+          event.text.length > 80 ? '...' : ''
+        }`,
+        color: 'white',
+      };
+    case BRAIN_EVENTS.PROMPT_COMPLETE:
+      return {
+        symbol: '[P]',
+        text: `Prompt complete (${event.totalIterations} iterations, ${event.totalTokens} tokens)`,
+        color: 'green',
+      };
+    case BRAIN_EVENTS.PROMPT_TOKEN_LIMIT:
+      return {
+        symbol: '[!]',
+        text: `Token limit reached (${event.totalTokens}/${event.maxTokens})`,
+        color: 'red',
+      };
+    case BRAIN_EVENTS.PROMPT_ITERATION_LIMIT:
+      return {
+        symbol: '[!]',
+        text: `Iteration limit reached (${event.totalIterations}/${event.maxIterations})`,
+        color: 'red',
+      };
+    case BRAIN_EVENTS.PROMPT_RAW_RESPONSE_MESSAGE:
+      return {
+        symbol: '[~]',
+        text: `Raw response (iteration ${event.iteration})`,
+        color: 'gray',
+      };
+    case BRAIN_EVENTS.PROMPT_WEBHOOK:
+      return {
+        symbol: '[W]',
+        text: `Tool "${event.toolName}" waiting for webhook`,
+        color: 'cyan',
+      };
     default:
       return {
         symbol: '[?]',

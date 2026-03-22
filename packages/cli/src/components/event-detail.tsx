@@ -65,6 +65,26 @@ function getEventSymbol(event: BrainEvent): { symbol: string; color: string } {
       return { symbol: '[↑]', color: 'blue' };
     case BRAIN_EVENTS.FILE_WRITE_COMPLETE:
       return { symbol: '[✓]', color: 'green' };
+    case BRAIN_EVENTS.PROMPT_START:
+      return { symbol: '[P]', color: 'magenta' };
+    case BRAIN_EVENTS.PROMPT_ITERATION:
+      return { symbol: '[#]', color: 'gray' };
+    case BRAIN_EVENTS.PROMPT_TOOL_CALL:
+      return { symbol: '[→]', color: 'yellow' };
+    case BRAIN_EVENTS.PROMPT_TOOL_RESULT:
+      return { symbol: '[←]', color: 'green' };
+    case BRAIN_EVENTS.PROMPT_ASSISTANT_MESSAGE:
+      return { symbol: '[M]', color: 'white' };
+    case BRAIN_EVENTS.PROMPT_COMPLETE:
+      return { symbol: '[P]', color: 'green' };
+    case BRAIN_EVENTS.PROMPT_TOKEN_LIMIT:
+      return { symbol: '[!]', color: 'red' };
+    case BRAIN_EVENTS.PROMPT_ITERATION_LIMIT:
+      return { symbol: '[!]', color: 'red' };
+    case BRAIN_EVENTS.PROMPT_RAW_RESPONSE_MESSAGE:
+      return { symbol: '[~]', color: 'gray' };
+    case BRAIN_EVENTS.PROMPT_WEBHOOK:
+      return { symbol: '[W]', color: 'cyan' };
     default:
       return { symbol: '[?]', color: 'gray' };
   }
@@ -166,6 +186,101 @@ function getEventDetailContent(event: BrainEvent): string {
 
     case BRAIN_EVENTS.FILE_WRITE_COMPLETE:
       return [`File: ${event.fileName}`, `Step: ${event.stepTitle}`].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_START:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Step ID: ${event.stepId}`,
+        '',
+        `Prompt: ${event.prompt}`,
+        ...(event.system ? [`System: ${event.system}`] : []),
+        '',
+        `Tools: ${event.tools.join(', ')}`,
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_ITERATION:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Iteration: ${event.iteration}`,
+        `Tokens this iteration: ${event.tokensThisIteration}`,
+        `Total tokens: ${event.totalTokens}`,
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_TOOL_CALL:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Tool: ${event.toolName}`,
+        `Call ID: ${event.toolCallId}`,
+        `Iteration: ${event.iteration}`,
+        '',
+        'Input:',
+        JSON.stringify(event.input, null, 2),
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_TOOL_RESULT:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Tool: ${event.toolName}`,
+        `Call ID: ${event.toolCallId}`,
+        `Iteration: ${event.iteration}`,
+        ...(event.status ? [`Status: ${event.status}`] : []),
+        '',
+        'Result:',
+        JSON.stringify(event.result, null, 2),
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_ASSISTANT_MESSAGE:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Iteration: ${event.iteration}`,
+        '',
+        'Message:',
+        event.text,
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_COMPLETE:
+      return [
+        `Step: ${event.stepTitle}`,
+        ...(event.terminalTool ? [`Terminal tool: ${event.terminalTool}`] : []),
+        `Total iterations: ${event.totalIterations}`,
+        `Total tokens: ${event.totalTokens}`,
+        '',
+        'Result:',
+        JSON.stringify(event.result, null, 2),
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_TOKEN_LIMIT:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Total tokens: ${event.totalTokens}`,
+        `Max tokens: ${event.maxTokens}`,
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_ITERATION_LIMIT:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Total iterations: ${event.totalIterations}`,
+        `Max iterations: ${event.maxIterations}`,
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_RAW_RESPONSE_MESSAGE:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Iteration: ${event.iteration}`,
+        '',
+        'Raw Response:',
+        JSON.stringify(event.message, null, 2),
+      ].join('\n');
+
+    case BRAIN_EVENTS.PROMPT_WEBHOOK:
+      return [
+        `Step: ${event.stepTitle}`,
+        `Tool: ${event.toolName}`,
+        `Call ID: ${event.toolCallId}`,
+        '',
+        'Input:',
+        JSON.stringify(event.input, null, 2),
+      ].join('\n');
 
     default:
       // Show all fields for any event type
