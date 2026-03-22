@@ -187,8 +187,8 @@ describe('Brain.withStore', () => {
     let receivedLogger: any;
 
     const testBrain = brain('test-brain')
-      .withStore({ value: z.string() })
       .withServices<TestServices>({ logger: mockLogger })
+      .withStore({ value: z.string() })
       .step('Combined Step', ({ store, logger }) => {
         receivedStore = store;
         receivedLogger = logger;
