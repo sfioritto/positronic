@@ -85,7 +85,7 @@ The memory provider factory is passed to the runner via the `providers` bag — 
 
 ```typescript
 import { createMem0Provider } from '@positronic/mem0';
-import { createScopedMemory } from '@positronic/core';
+import { createMemory } from '@positronic/core';
 
 const provider = createMem0Provider({
   apiKey: process.env.MEM0_API_KEY!,
@@ -97,7 +97,7 @@ brain.run({
   currentUser: { name: 'user-123' },
   providers: {
     memory: (ctx) =>
-      createScopedMemory(provider, ctx.brainTitle, ctx.currentUser.name),
+      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
   },
 });
 ```
@@ -167,7 +167,7 @@ The Mem0 adapter automatically stores all prompt loop conversations to memory. T
 ### Setting Up the Adapter
 
 ```typescript
-import { createScopedMemory } from '@positronic/core';
+import { createMemory } from '@positronic/core';
 import { createMem0Adapter, createMem0Provider } from '@positronic/mem0';
 
 const provider = createMem0Provider({
@@ -187,7 +187,7 @@ await runner.run(myBrain, {
   currentUser: { name: 'user-123' },
   providers: {
     memory: (ctx) =>
-      createScopedMemory(provider, ctx.brainTitle, ctx.currentUser.name),
+      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
   },
 });
 ```
@@ -377,7 +377,7 @@ recallMemories({ query: 'preferences' });
 Here's a complete example of a personalized assistant that remembers user preferences:
 
 ```typescript
-import { brain, BrainRunner, createScopedMemory } from '@positronic/core';
+import { brain, BrainRunner, createMemory } from '@positronic/core';
 import {
   createMem0Provider,
   createMem0Tools,
@@ -442,7 +442,7 @@ const result = await runner.run(assistant, {
   },
   providers: {
     memory: (ctx) =>
-      createScopedMemory(provider, ctx.brainTitle, ctx.currentUser.name),
+      createMemory(provider, ctx.brainTitle, ctx.currentUser.name),
   },
 });
 ```
@@ -480,7 +480,7 @@ myBrain.run({
   currentUser: { name: 'user-123' },
   providers: {
     memory: (ctx) =>
-      createScopedMemory(customProvider, ctx.brainTitle, ctx.currentUser.name),
+      createMemory(customProvider, ctx.brainTitle, ctx.currentUser.name),
   },
 });
 ```

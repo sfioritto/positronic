@@ -137,7 +137,7 @@ export type {
   MemoryAddOptions,
   MemoryProvider,
 } from './memory/types.js';
-export { createScopedMemory } from './memory/scoped-memory.js';
+export { createMemory } from './memory/create-memory.js';
 
 // Service provider types
 export type {
