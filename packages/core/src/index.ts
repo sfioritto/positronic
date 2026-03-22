@@ -36,6 +36,7 @@ export type {
   Secrets,
   Tool,
   ToolWaitFor,
+  ToolContext,
   StepContext,
   SignalType,
   BrainSignal,

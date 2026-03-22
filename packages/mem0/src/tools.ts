@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Tool, StepContext } from '@positronic/core';
+import type { Tool, ToolContext } from '@positronic/core';
 
 /**
  * Schema for the rememberFact tool input
@@ -51,7 +51,7 @@ The fact should be a clear, standalone statement that can be retrieved later.`,
   inputSchema: rememberFactSchema,
   async execute(
     input: z.infer<typeof rememberFactSchema>,
-    context: StepContext
+    context: ToolContext
   ): Promise<{ remembered: boolean; fact: string }> {
     if (!context.memory) {
       return {
@@ -100,7 +100,7 @@ The query should describe what you're looking for. Results include relevance sco
   inputSchema: recallMemoriesSchema,
   async execute(
     input: z.infer<typeof recallMemoriesSchema>,
-    context: StepContext
+    context: ToolContext
   ): Promise<{
     found: number;
     memories: Array<{ content: string; relevance?: number }>;

@@ -262,8 +262,8 @@ describe('Brain.withMemory', () => {
     let receivedLogger: any;
 
     const testBrain = brain('test-brain')
-      .withMemory()
       .withServices<TestServices>({ logger: mockLogger })
+      .withMemory()
       .step('Combined Step', ({ memory, logger }) => {
         receivedMemory = memory;
         receivedLogger = logger;
@@ -288,13 +288,10 @@ describe('Brain.withMemory', () => {
 
     let receivedMemory: any = 'not-undefined';
 
-    const testBrain = brain('test-brain').step(
-      'No Memory Step',
-      ({ memory }) => {
-        receivedMemory = memory;
-        return { done: true };
-      }
-    );
+    const testBrain = brain('test-brain').step('No Memory Step', (ctx) => {
+      receivedMemory = (ctx as any).memory;
+      return { done: true };
+    });
 
     await collectEvents(
       testBrain.run({

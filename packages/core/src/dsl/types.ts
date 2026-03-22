@@ -101,12 +101,21 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
   stepId: string;
   /** The authenticated user running this brain */
   currentUser: CurrentUser;
-  /** Memory service — present at runtime when a memory provider is configured. Use withMemory() for non-optional typing in step callbacks. */
-  memory?: import('../memory/types.js').Memory;
-  /** Typed key-value store — present at runtime when a store schema is configured. Use withStore() for non-optional typing in step callbacks. */
-  store?: import('../store/types.js').Store<any>;
   /** File storage service for creating, reading, and managing files. Present when the backend provides it. */
   files?: import('../files/types.js').FilesService;
+}
+
+/**
+ * Context passed to tool execute functions.
+ * Extends StepContext with optional services that may or may not be available
+ * depending on whether the brain opted in (via withMemory/withStore).
+ * Tools should check for undefined before using these.
+ */
+export interface ToolContext extends StepContext {
+  /** Memory service — available when the brain calls withMemory() */
+  memory?: import('../memory/types.js').Memory;
+  /** Typed key-value store — available when the brain calls withStore() */
+  store?: import('../store/types.js').Store<any>;
 }
 
 /**
@@ -127,7 +136,7 @@ export interface Tool<TInput extends z.ZodSchema = z.ZodSchema> {
    */
   execute?(
     input: z.infer<TInput>,
-    context: StepContext
+    context: ToolContext
   ): Promise<unknown | ToolWaitFor> | unknown | ToolWaitFor;
   /**
    * If true, calling this tool ends the workflow.
