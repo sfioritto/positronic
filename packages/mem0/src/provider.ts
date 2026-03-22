@@ -11,7 +11,7 @@ import type {
 export interface Mem0Config {
   /** Mem0 API key */
   apiKey: string;
-  /** Base URL for the Mem0 API (defaults to https://api.mem0.ai/v1) */
+  /** Base URL for the Mem0 API (defaults to https://api.mem0.ai) */
   baseUrl?: string;
   /** Organization ID (optional) */
   orgId?: string;
@@ -44,19 +44,14 @@ interface Mem0SearchResult {
  *
  * const myBrain = brain('my-brain')
  *   .withMemory(memory)
- *   .brain('agent', async ({ memory }) => {
+ *   .prompt('Chat', async ({ memory }) => {
  *     const prefs = await memory.search('user preferences');
- *     return { system: `Preferences: ${prefs}`, prompt: 'Help' };
+ *     return { message: 'Help', outputSchema: z.object({ response: z.string() }) };
  *   });
  * ```
  */
 export function createMem0Provider(config: Mem0Config): MemoryProvider {
-  const {
-    apiKey,
-    baseUrl = 'https://api.mem0.ai/v1',
-    orgId,
-    projectId,
-  } = config;
+  const { apiKey, baseUrl = 'https://api.mem0.ai', orgId, projectId } = config;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -77,20 +72,25 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
       scope: MemoryScope,
       options?: { limit?: number }
     ): Promise<Memory[]> {
+      // Build filters for scoping (v2 API)
+      const filters: Record<string, unknown> = {};
+      if (scope.agentId) {
+        filters.agent_id = scope.agentId;
+      }
+      if (scope.userId) {
+        filters.user_id = scope.userId;
+      }
+
       const body: Record<string, unknown> = {
         query,
-        agent_id: scope.agentId,
+        filters,
       };
 
-      if (scope.userId) {
-        body.user_id = scope.userId;
-      }
-
       if (options?.limit) {
-        body.limit = options.limit;
+        body.top_k = options.limit;
       }
 
-      const response = await fetch(`${baseUrl}/memories/search/`, {
+      const response = await fetch(`${baseUrl}/v2/memories/search/`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
@@ -124,6 +124,7 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
           content: m.content,
         })),
         agent_id: scope.agentId,
+        version: 'v2',
       };
 
       if (scope.userId) {
@@ -134,7 +135,7 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
         body.metadata = options.metadata;
       }
 
-      const response = await fetch(`${baseUrl}/memories/`, {
+      const response = await fetch(`${baseUrl}/v1/memories/`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
