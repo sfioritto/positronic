@@ -1,6 +1,7 @@
 import {
   BrainRunner,
   type Resources,
+  type ObjectGenerator,
   STATUS,
   BRAIN_EVENTS,
   type RuntimeEnv,
@@ -691,22 +692,13 @@ export class BrainRunnerDO extends DurableObject<Env> {
     }
 
     const r2Resources = await this.loadResourcesFromR2();
-    let configuredRunner = brainRunner;
-
-    if (r2Resources) {
-      configuredRunner = brainRunner.withResources(r2Resources);
-    }
 
     const signalProvider = new CloudflareSignalProvider((filter) =>
       this.getAndConsumeSignals(filter)
     );
-    configuredRunner = configuredRunner
-      .withPages(pagesService)
-      .withFiles(filesService)
-      .withEnv(env)
-      .withSignalProvider(signalProvider)
-      .withGovernor((c) => rateGoverned(c))
-      .withStoreProvider(createR2Backend(this.env.RESOURCES_BUCKET));
+
+    const bucket = this.env.RESOURCES_BUCKET;
+    const storeBackend = createR2Backend(bucket);
 
     this.abortController = new AbortController();
 
@@ -720,16 +712,28 @@ export class BrainRunnerDO extends DurableObject<Env> {
       (time) => this.ctx.storage.setAlarm(time)
     );
 
-    const runner = configuredRunner.withAdapters([
-      sqliteAdapter,
-      this.eventStreamAdapter,
-      monitorAdapter,
-      scheduleAdapter,
-      webhookAdapter,
-      this.pageAdapter,
-      iterateItemAdapter,
-      timeoutAdapter,
-    ]);
+    const runner = new BrainRunner({
+      client: brainRunner.client,
+      adapters: [
+        sqliteAdapter,
+        this.eventStreamAdapter,
+        monitorAdapter,
+        scheduleAdapter,
+        webhookAdapter,
+        this.pageAdapter,
+        iterateItemAdapter,
+        timeoutAdapter,
+      ],
+      env,
+      resources: r2Resources ?? {},
+      signalProvider,
+      governor: (c: ObjectGenerator) => rateGoverned(c),
+      providers: {
+        files: () => filesService,
+        pages: () => pagesService,
+        store: (ctx) => storeBackend(ctx),
+      },
+    });
 
     return { brainToRun, runner };
   }

@@ -2,7 +2,7 @@ import type {
   MemoryProvider,
   MemoryScope,
   MemoryMessage,
-  Memory,
+  MemoryEntry,
 } from '@positronic/core';
 
 /**
@@ -71,7 +71,7 @@ export function createMem0Provider(config: Mem0Config): MemoryProvider {
       query: string,
       scope: MemoryScope,
       options?: { limit?: number }
-    ): Promise<Memory[]> {
+    ): Promise<MemoryEntry[]> {
       // Two-tier filter strategy:
       // - Mem0 treats user_id and agent_id as mutually exclusive scopes.
       //   A single record belongs to one or the other, never both.

@@ -405,7 +405,7 @@ describe('guard', () => {
     const { z } = await import('zod');
 
     const testBrain = brain('guard-options')
-      .withOptionsSchema(z.object({ threshold: z.number() }))
+      .withOptions(z.object({ threshold: z.number() }))
       .step('Init', () => ({ value: 5 }))
       .guard(
         ({ state, options }) => state.value > options.threshold,

@@ -3,7 +3,7 @@ import { jest } from '@jest/globals';
 import { brain, BRAIN_EVENTS } from '../src/index.js';
 import type { ObjectGenerator, BrainEvent } from '../src/index.js';
 
-describe('Brain withOptionsSchema', () => {
+describe('Brain withOptions', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
   mockGenerateObject.mockResolvedValue({ object: { result: 'test' } } as any);
 
@@ -33,7 +33,7 @@ describe('Brain withOptionsSchema', () => {
       });
 
       const myBrain = brain('test')
-        .withOptionsSchema(optionsSchema)
+        .withOptions(optionsSchema)
         .step('Process', ({ state, options }) => ({
           message: `${options.name} is ${options.age} years old`,
         }));
@@ -59,7 +59,7 @@ describe('Brain withOptionsSchema', () => {
       });
 
       const myBrain = brain('test')
-        .withOptionsSchema(optionsSchema)
+        .withOptions(optionsSchema)
         .step('Process', ({ options }) => ({ name: options.name }));
 
       await expect(async () => {
@@ -80,7 +80,7 @@ describe('Brain withOptionsSchema', () => {
       });
 
       const myBrain = brain('test')
-        .withOptionsSchema(optionsSchema)
+        .withOptions(optionsSchema)
         .step('Process', ({ options }) => ({
           message: `${options.name} has count ${options.count}`,
         }));
@@ -114,7 +114,7 @@ describe('Brain withOptionsSchema', () => {
           })
         );
       }).rejects.toThrow(
-        "Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options."
+        "Brain 'test' received options but no schema was defined. Use withOptions() to define a schema for options."
       );
     });
 
@@ -124,7 +124,7 @@ describe('Brain withOptionsSchema', () => {
       });
 
       const myBrain = brain('test')
-        .withOptionsSchema(schema)
+        .withOptions(schema)
         .step('Process', ({ state }) => state);
 
       await expect(async () => {
@@ -161,7 +161,7 @@ describe('Brain withOptionsSchema', () => {
       const schema = z.object({ flag: z.boolean() });
 
       const myBrain = brain('test')
-        .withOptionsSchema(schema)
+        .withOptions(schema)
         .step('Step1', ({ options }) => ({ enabled: options.flag }))
         .step('Step2', ({ state }) => ({ ...state, processed: true }));
 
@@ -174,7 +174,7 @@ describe('Brain withOptionsSchema', () => {
       const schema = z.object({ flag: z.boolean() });
 
       const myBrain = brain('test')
-        .withOptionsSchema(schema)
+        .withOptions(schema)
         .step('Step1', ({ options }) => ({ enabled: options.flag }))
         .step('Step2', ({ state }) => ({ ...state, processed: true }))
         .step('Step3', ({ state }) => ({ ...state, finalized: true }));
@@ -187,7 +187,7 @@ describe('Brain withOptionsSchema', () => {
       const services = { logger: console };
 
       const myBrain = brain('test')
-        .withOptionsSchema(schema)
+        .withOptions(schema)
         .withServices(services)
         .step('Log', ({ options, logger }) => {
           logger.log(options.apiKey);
@@ -212,7 +212,7 @@ describe('Brain withOptionsSchema', () => {
       });
 
       const myBrain = brain('test')
-        .withOptionsSchema(schema)
+        .withOptions(schema)
         .step('Process', ({ options }) => ({
           userName: options.user.name,
           theme: options.settings.theme,
@@ -243,7 +243,7 @@ describe('Brain withOptionsSchema', () => {
       });
 
       const myBrain = brain('test')
-        .withOptionsSchema(schema)
+        .withOptions(schema)
         .step('Process', ({ options }) => ({
           req: options.required,
           opt: options.optional,
@@ -267,7 +267,7 @@ describe('Brain withOptionsSchema', () => {
 
   describe('Breaking change: Type parameters no longer allow options', () => {
     it('should throw error when using type parameter approach with options', async () => {
-      // This pattern no longer works - must use withOptionsSchema
+      // This pattern no longer works - must use withOptions
       type MyOptions = {
         name: string;
         count: number;
@@ -289,7 +289,7 @@ describe('Brain withOptionsSchema', () => {
           })
         );
       }).rejects.toThrow(
-        "Brain 'test' received options but no schema was defined. Use withOptionsSchema() to define a schema for options."
+        "Brain 'test' received options but no schema was defined. Use withOptions() to define a schema for options."
       );
     });
   });

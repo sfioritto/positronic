@@ -175,7 +175,8 @@ describe('BrainRunner', () => {
     const runner = new BrainRunner({
       adapters: [],
       client: mockClient,
-    }).withResources(testResources);
+      resources: testResources,
+    });
 
     let textContent: string | undefined;
     let binaryContent: Buffer | undefined;
@@ -208,16 +209,13 @@ describe('BrainRunner', () => {
     };
 
     const runner = new BrainRunner({
-      adapters: [mockAdapter],
+      adapters: [mockAdapter, mockAdapter2, mockAdapter3],
       client: mockClient,
     });
 
-    // Chain additional adapters
-    const updatedRunner = runner.withAdapters([mockAdapter2, mockAdapter3]);
-
     const testBrain = brain('Test Brain').step('Step 1', () => ({ value: 1 }));
 
-    await updatedRunner.run(testBrain, { currentUser: { name: 'test-user' } });
+    await runner.run(testBrain, { currentUser: { name: 'test-user' } });
 
     // Verify all adapters received events
     expect(mockAdapter.dispatch).toHaveBeenCalledWith(
@@ -260,13 +258,11 @@ describe('BrainRunner', () => {
       object: { result: 'from new client' },
     });
 
-    const runner = new BrainRunner({
+    // Create runner with the new client directly
+    const updatedRunner = new BrainRunner({
       adapters: [],
-      client: originalClient,
+      client: newClient,
     });
-
-    // Replace the client
-    const updatedRunner = runner.withClient(newClient);
 
     // Define schema once to ensure same reference
     const testSchema = z.object({ result: z.string() });
@@ -559,7 +555,11 @@ describe('BrainRunner', () => {
     });
 
     // Resume with signal provider - webhook response comes from signal, not parameter
-    const runnerWithSignals = runner.withSignalProvider(signalProvider);
+    const runnerWithSignals = new BrainRunner({
+      adapters: [mockAdapter],
+      client: mockClient,
+      signalProvider,
+    });
     const finalState = await runnerWithSignals.resume(testBrain, {
       machine,
       brainRunId,

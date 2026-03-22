@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import { z } from 'zod';
-import type { Store, StoreProvider } from '../src/store/types.js';
+import type { Store } from '../src/store/types.js';
+import type { StoreProviderFactory } from '../src/dsl/definitions/providers.js';
 import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
@@ -17,58 +18,63 @@ const collectEvents = async <T>(
 };
 
 // In-memory store factory for testing — mimics key resolution like a real backend
-const createInMemoryStoreProvider = (): StoreProvider & {
+const createInMemoryStoreProvider = (): StoreProviderFactory & {
   data: Map<string, any>;
 } => {
   const data = new Map<string, any>();
 
-  const factory: StoreProvider & { data: Map<string, any> } = Object.assign(
-    ({ schema, brainTitle, currentUser }: Parameters<StoreProvider>[0]) => {
-      // Parse per-user keys from schema
-      const perUserKeys = new Set<string>();
-      for (const [key, value] of Object.entries(schema)) {
-        if (
-          value !== null &&
-          typeof value === 'object' &&
-          'perUser' in value &&
-          (value as any).perUser === true
-        ) {
-          perUserKeys.add(key);
-        }
-      }
-
-      function resolveKey(key: string): string {
-        if (perUserKeys.has(key)) {
-          if (!currentUser) {
-            throw new Error(
-              `Store key "${key}" is per-user but no currentUser was provided. ` +
-                `Per-user store keys require a currentUser in run params.`
-            );
+  const factory: StoreProviderFactory & { data: Map<string, any> } =
+    Object.assign(
+      ({
+        schema,
+        brainTitle,
+        currentUser,
+      }: Parameters<StoreProviderFactory>[0]) => {
+        // Parse per-user keys from schema
+        const perUserKeys = new Set<string>();
+        for (const [key, value] of Object.entries(schema)) {
+          if (
+            value !== null &&
+            typeof value === 'object' &&
+            'perUser' in value &&
+            (value as any).perUser === true
+          ) {
+            perUserKeys.add(key);
           }
-          return `store/${brainTitle}/user/${currentUser.name}/${key}`;
         }
-        return `store/${brainTitle}/${key}`;
-      }
 
-      const store: Store<any> = {
-        async get(key: string) {
-          return data.get(resolveKey(key));
-        },
-        async set(key: string, value: any) {
-          data.set(resolveKey(key), value);
-        },
-        async delete(key: string) {
-          data.delete(resolveKey(key));
-        },
-        async has(key: string) {
-          return data.has(resolveKey(key));
-        },
-      };
+        function resolveKey(key: string): string {
+          if (perUserKeys.has(key)) {
+            if (!currentUser) {
+              throw new Error(
+                `Store key "${key}" is per-user but no currentUser was provided. ` +
+                  `Per-user store keys require a currentUser in run params.`
+              );
+            }
+            return `store/${brainTitle}/user/${currentUser.name}/${key}`;
+          }
+          return `store/${brainTitle}/${key}`;
+        }
 
-      return store;
-    },
-    { data }
-  );
+        const store: Store<any> = {
+          async get(key: string) {
+            return data.get(resolveKey(key));
+          },
+          async set(key: string, value: any) {
+            data.set(resolveKey(key), value);
+          },
+          async delete(key: string) {
+            data.delete(resolveKey(key));
+          },
+          async has(key: string) {
+            return data.has(resolveKey(key));
+          },
+        };
+
+        return store;
+      },
+      { data }
+    );
 
   return factory;
 };
@@ -98,7 +104,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 
@@ -125,7 +131,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 
@@ -158,7 +164,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 
@@ -194,7 +200,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 
@@ -267,7 +273,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { name: 'user-42' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 
@@ -303,7 +309,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 
@@ -312,7 +318,7 @@ describe('Brain.withStore', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 
@@ -321,28 +327,25 @@ describe('Brain.withStore', () => {
     expect(storeFactory.data.get('store/brain-b/counter')).toBe(999);
   });
 
-  it('should work with store passed via createBrain', async () => {
-    const { createBrain } = await import('../src/dsl/create-brain.js');
+  it('should work with withStore on brain and store provider in providers bag', async () => {
     const storeFactory = createInMemoryStoreProvider();
     const mockClient = createMockClient();
 
-    const myBrain = createBrain({
-      store: { counter: z.number() },
-    });
-
     let receivedStore: any;
 
-    const testBrain = myBrain('test-brain').step('Test', ({ store }) => {
-      receivedStore = store;
-      return { done: true };
-    });
+    const testBrain = brain('test-brain')
+      .withStore({ counter: z.number() })
+      .step('Test', ({ store }) => {
+        receivedStore = store;
+        return { done: true };
+      });
 
     await collectEvents(
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
-        storeProvider: storeFactory,
+        providers: { store: storeFactory },
       })
     );
 

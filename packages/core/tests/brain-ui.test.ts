@@ -63,7 +63,7 @@ describe('UI steps', () => {
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      pages: mockPages as any,
+      providers: { pages: () => mockPages as any },
       env: { origin: 'https://example.com', secrets: {} },
     })) {
       events.push(event);
@@ -108,7 +108,7 @@ describe('UI steps', () => {
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      pages: mockPages as any,
+      providers: { pages: () => mockPages as any },
       env: { origin: 'https://example.com', secrets: {} },
       brainRunId: 'test-run',
       resume: {
@@ -158,7 +158,7 @@ describe('UI steps', () => {
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      pages: mockPages as any,
+      providers: { pages: () => mockPages as any },
       env: { origin: 'https://example.com', secrets: {} },
     })) {
       events.push(event);

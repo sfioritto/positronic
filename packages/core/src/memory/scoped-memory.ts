@@ -1,10 +1,10 @@
 import type {
   MemoryProvider,
-  ScopedMemory,
+  Memory,
   MemorySearchOptions,
   MemoryAddOptions,
   MemoryMessage,
-  Memory,
+  MemoryEntry,
 } from './types.js';
 
 /**
@@ -16,7 +16,7 @@ import type {
  * @param provider - The underlying memory provider
  * @param agentId - The agent/brain ID to scope memories to
  * @param userId - The user name to scope memories to (from currentUser.name)
- * @returns A ScopedMemory instance
+ * @returns A Memory instance
  *
  * @example
  * ```typescript
@@ -31,12 +31,12 @@ export function createScopedMemory(
   provider: MemoryProvider,
   agentId: string,
   userId: string
-): ScopedMemory {
+): Memory {
   return {
     async search(
       query: string,
       options?: MemorySearchOptions
-    ): Promise<Memory[]> {
+    ): Promise<MemoryEntry[]> {
       const scope = { agentId, userId };
       return provider.search(query, scope, { limit: options?.limit });
     },
