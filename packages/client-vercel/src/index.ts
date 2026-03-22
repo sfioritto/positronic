@@ -108,7 +108,7 @@ export class VercelClient implements ObjectGenerator {
             ...attachments.map((a) => ({
               type: 'file' as const,
               data: a.data,
-              mimeType: a.mimeType,
+              mediaType: a.mimeType,
             })),
           ],
         });

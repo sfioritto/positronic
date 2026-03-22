@@ -49,7 +49,8 @@ export function createFilesService(
           httpMetadata: { contentType },
         });
       } else if (content instanceof Response) {
-        await bucket.put(key, content.body, {
+        // R2's ReadableStream type differs from the standard lib's — cast through any
+        await bucket.put(key, content.body as any, {
           httpMetadata: { contentType },
         });
       } else if (isFileHandle(content)) {
@@ -60,8 +61,8 @@ export function createFilesService(
           httpMetadata: { contentType },
         });
       } else {
-        // ReadableStream
-        await bucket.put(key, content as ReadableStream, {
+        // ReadableStream — R2's type differs from standard lib's, cast through any
+        await bucket.put(key, content as any, {
           httpMetadata: { contentType },
         });
       }
