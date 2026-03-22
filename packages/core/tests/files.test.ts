@@ -184,7 +184,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
 
@@ -212,7 +212,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
 
@@ -247,7 +247,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
 
@@ -286,7 +286,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
   });
@@ -310,7 +310,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
   });
@@ -333,7 +333,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
   });
@@ -397,7 +397,7 @@ describe('files service', () => {
       outerBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
 
@@ -466,7 +466,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
   });
@@ -491,7 +491,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
 
@@ -536,7 +536,7 @@ describe('files service', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        files: filesService,
+        providers: { files: () => filesService },
       })
     );
 

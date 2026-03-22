@@ -15,10 +15,8 @@ import type {
 } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
-import type { PagesService } from './pages.js';
 import type { BrainCancelledEvent } from './definitions/events.js';
-import type { StoreProvider } from '../store/types.js';
-import type { FilesService } from '../files/types.js';
+import type { ServiceProviders } from './definitions/providers.js';
 import type { ResumeParams } from './definitions/run-params.js';
 
 /**
@@ -40,83 +38,19 @@ function createCancelledEvent<TOptions extends JsonObject>(
 
 export class BrainRunner {
   constructor(
-    private options: {
-      adapters: Adapter[];
+    private config: {
       client: ObjectGenerator;
-      resources?: Resources;
-      pages?: PagesService;
+      adapters: Adapter[];
       env?: RuntimeEnv;
+      resources?: Resources;
+      providers?: ServiceProviders;
       signalProvider?: SignalProvider;
       governor?: (client: ObjectGenerator) => ObjectGenerator;
-      storeProvider?: StoreProvider;
-      files?: FilesService;
     }
   ) {}
 
-  withAdapters(adapters: Adapter[]): BrainRunner {
-    const { adapters: existingAdapters } = this.options;
-    return new BrainRunner({
-      ...this.options,
-      adapters: [...existingAdapters, ...adapters],
-    });
-  }
-
-  withClient(client: ObjectGenerator): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      client,
-    });
-  }
-
-  withResources(resources: Resources): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      resources,
-    });
-  }
-
-  withPages(pages: PagesService): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      pages,
-    });
-  }
-
-  withEnv(env: RuntimeEnv): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      env,
-    });
-  }
-
-  withSignalProvider(signalProvider: SignalProvider): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      signalProvider,
-    });
-  }
-
-  withGovernor(
-    governor: (client: ObjectGenerator) => ObjectGenerator
-  ): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      governor,
-    });
-  }
-
-  withStoreProvider(storeProvider: StoreProvider): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      storeProvider,
-    });
-  }
-
-  withFiles(files: FilesService): BrainRunner {
-    return new BrainRunner({
-      ...this.options,
-      files,
-    });
+  get client(): ObjectGenerator {
+    return this.config.client;
   }
 
   /**
@@ -230,16 +164,14 @@ export class BrainRunner {
     }
   ): Promise<TState> {
     const {
-      adapters,
       client: rawClient,
-      resources,
-      pages,
+      adapters,
       env,
+      resources,
+      providers,
       signalProvider,
       governor,
-      storeProvider,
-      files,
-    } = this.options;
+    } = this.config;
     const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
     const {
@@ -269,12 +201,10 @@ export class BrainRunner {
           options,
           client,
           resources: resources ?? {},
-          pages,
-          files,
           env: resolvedEnv,
           signalProvider,
           governor,
-          storeProvider,
+          providers,
           currentUser,
         })
       : brain.run({
@@ -283,12 +213,10 @@ export class BrainRunner {
           client,
           brainRunId,
           resources: resources ?? {},
-          pages,
-          files,
           env: resolvedEnv,
           signalProvider,
           governor,
-          storeProvider,
+          providers,
           currentUser,
         });
 

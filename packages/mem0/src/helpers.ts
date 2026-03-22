@@ -1,5 +1,5 @@
 import type {
-  Memory,
+  MemoryEntry,
   ScopedMemory,
   MemorySearchOptions,
 } from '@positronic/core';
@@ -42,7 +42,7 @@ export interface FormatMemoriesOptions {
  * ```
  */
 export function formatMemories(
-  memories: Memory[],
+  memories: MemoryEntry[],
   options: FormatMemoriesOptions = {}
 ): string {
   const { header, includeScores = false, emptyText = '' } = options;

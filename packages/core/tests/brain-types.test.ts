@@ -16,7 +16,7 @@ describe('type inference', () => {
     });
 
     const innerBrain = brain('Inner Type Test')
-      .withOptionsSchema(optionsSchema)
+      .withOptions(optionsSchema)
       .step('Process features', ({ options }) => ({
         processedValue: options.features.includes('fast') ? 100 : 42,
         featureCount: options.features.length,
@@ -24,7 +24,7 @@ describe('type inference', () => {
 
     // Create a complex brain using multiple features
     const complexBrain = brain('Complex Type Test')
-      .withOptionsSchema(optionsSchema)
+      .withOptions(optionsSchema)
       .step('First step', ({ options }) => ({
         initialFeatures: options.features,
         value: 42,
@@ -170,14 +170,14 @@ describe('type inference', () => {
   it('should pass independent options to inner brain', async () => {
     // Inner brain has its own options schema, different from the parent
     const innerBrain = brain('Independent Options Inner')
-      .withOptionsSchema(z.object({ multiplier: z.number() }))
+      .withOptions(z.object({ multiplier: z.number() }))
       .step('Multiply', ({ state, options }) => ({
         result: (state as any).value * options.multiplier,
       }));
 
     // Outer brain has a completely different options schema
     const outerBrain = brain('Independent Options Outer')
-      .withOptionsSchema(z.object({ label: z.string() }))
+      .withOptions(z.object({ label: z.string() }))
       .step('Init', ({ options }) => ({
         value: 10,
         label: options.label,

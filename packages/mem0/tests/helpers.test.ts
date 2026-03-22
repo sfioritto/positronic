@@ -5,7 +5,7 @@ import {
   getMemoryContext,
 } from '../src/helpers.js';
 import type {
-  Memory,
+  MemoryEntry,
   ScopedMemory,
   MemorySearchOptions,
   MemoryAddOptions,
@@ -13,11 +13,15 @@ import type {
 } from '@positronic/core';
 
 // Create a mock ScopedMemory for testing
-function createMockScopedMemory(searchResult: Memory[] = []): ScopedMemory {
+function createMockScopedMemory(
+  searchResult: MemoryEntry[] = []
+): ScopedMemory {
   return {
     search: jest.fn(
-      async (query: string, options?: MemorySearchOptions): Promise<Memory[]> =>
-        searchResult
+      async (
+        query: string,
+        options?: MemorySearchOptions
+      ): Promise<MemoryEntry[]> => searchResult
     ),
     add: jest.fn(
       async (
@@ -29,7 +33,7 @@ function createMockScopedMemory(searchResult: Memory[] = []): ScopedMemory {
 }
 
 describe('formatMemories', () => {
-  const testMemories: Memory[] = [
+  const testMemories: MemoryEntry[] = [
     { id: '1', content: 'User prefers dark mode', score: 0.95 },
     { id: '2', content: 'User likes TypeScript', score: 0.85 },
     { id: '3', content: 'User works on web apps' },
@@ -76,14 +80,14 @@ describe('formatMemories', () => {
   });
 
   it('should handle undefined memories', () => {
-    const result = formatMemories(undefined as unknown as Memory[]);
+    const result = formatMemories(undefined as unknown as MemoryEntry[]);
     expect(result).toBe('');
   });
 });
 
 describe('createMemorySystemPrompt', () => {
   it('should append memories to base prompt', async () => {
-    const memories: Memory[] = [
+    const memories: MemoryEntry[] = [
       { id: '1', content: 'User prefers concise responses', score: 0.9 },
     ];
     const mockScopedMemory = createMockScopedMemory(memories);
@@ -117,7 +121,7 @@ describe('createMemorySystemPrompt', () => {
   });
 
   it('should use custom header when provided', async () => {
-    const memories: Memory[] = [
+    const memories: MemoryEntry[] = [
       { id: '1', content: 'User likes dark mode', score: 0.95 },
     ];
     const mockScopedMemory = createMockScopedMemory(memories);
@@ -149,7 +153,7 @@ describe('createMemorySystemPrompt', () => {
 
 describe('getMemoryContext', () => {
   it('should return formatted memories', async () => {
-    const memories: Memory[] = [
+    const memories: MemoryEntry[] = [
       { id: '1', content: 'User prefers TypeScript', score: 0.9 },
       { id: '2', content: 'User works on React apps', score: 0.8 },
     ];

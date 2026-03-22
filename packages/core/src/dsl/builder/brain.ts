@@ -9,9 +9,8 @@ import type {
   NormalizeToArray,
 } from '../webhook.js';
 import type { UIComponent } from '../../ui/types.js';
-import type { MemoryProvider } from '../../memory/types.js';
+import type { Memory } from '../../memory/types.js';
 import type { StoreSchema, InferStoreTypes, Store } from '../../store/types.js';
-import type { ScopedMemory } from '../../memory/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
@@ -56,7 +55,8 @@ export class Brain<
   private services: TServices = {} as TServices;
   public optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
-  private memoryProvider?: MemoryProvider;
+  private useMemory: boolean = false;
+  private memoryScope?: 'user' | 'brain';
   private storeSchema?: StoreSchema;
 
   constructor(public readonly title: string, private description?: string) {}
@@ -118,7 +118,7 @@ export class Brain<
     return nextBrain;
   }
 
-  withOptionsSchema<TSchema extends z.ZodSchema>(
+  withOptions<TSchema extends z.ZodSchema>(
     schema: TSchema
   ): Brain<z.infer<TSchema>, TState, TServices> {
     const nextBrain = new Brain<z.infer<TSchema>, TState, TServices>(
@@ -157,35 +157,34 @@ export class Brain<
   }
 
   /**
-   * Configure a memory provider for this brain.
-   * When configured, steps receive a scoped memory instance in their context.
+   * Opt this brain into memory. When configured, steps receive a `memory` instance
+   * in their context for searching and storing memories.
    *
-   * @param provider - The memory provider to use
+   * The memory provider implementation is supplied via the runner, not here.
+   *
+   * @param options - Optional scope configuration
    *
    * @example
    * ```typescript
-   * import { createMem0Provider } from '@positronic/mem0';
-   *
-   * const memory = createMem0Provider({ apiKey: process.env.MEM0_API_KEY });
-   *
    * const myBrain = brain('my-brain')
-   *   .withMemory(memory)
+   *   .withMemory()
    *   .step('Remember', async ({ memory }) => {
    *     const prefs = await memory.search('user preferences');
    *     return { preferences: prefs };
    *   });
    * ```
    */
-  withMemory(
-    provider: MemoryProvider
-  ): Brain<TOptions, TState, TServices & { memory: ScopedMemory }> {
+  withMemory(options?: {
+    scope?: 'user' | 'brain';
+  }): Brain<TOptions, TState, TServices & { memory: Memory }> {
     const nextBrain = new Brain<
       TOptions,
       TState,
-      TServices & { memory: ScopedMemory }
+      TServices & { memory: Memory }
     >(this.title, this.description).withBlocks(this.blocks as any);
     this.copyConfigTo(nextBrain);
-    nextBrain.memoryProvider = provider;
+    nextBrain.useMemory = true;
+    nextBrain.memoryScope = options?.scope;
     return nextBrain;
   }
 
@@ -461,15 +460,29 @@ export class Brain<
     params: InitialRunParams<TOptions> | ResumeRunParams<TOptions>
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const { title, description, blocks } = this;
+    const { providers } = params;
+    const brainRunId =
+      'resume' in params && params.resume
+        ? params.brainRunId
+        : (params as InitialRunParams<TOptions>).brainRunId ?? '';
 
-    // Build store if withStore() was called and a store provider is given
+    const providerCtx = {
+      brainTitle: title,
+      currentUser: params.currentUser,
+      brainRunId,
+    };
+
+    // Call providers to create scoped service instances
+    const files = providers?.files?.(providerCtx);
+    const pages = providers?.pages?.(providerCtx);
     const store =
-      this.storeSchema && params.storeProvider
-        ? params.storeProvider({
-            schema: this.storeSchema,
-            brainTitle: this.title,
-            currentUser: params.currentUser,
-          })
+      this.storeSchema && providers?.store
+        ? providers.store({ ...providerCtx, schema: this.storeSchema })
+        : undefined;
+    // Create memory if this brain opted in via withMemory()
+    const memory =
+      this.useMemory && providers?.memory
+        ? providers.memory({ ...providerCtx, scope: this.memoryScope })
         : undefined;
 
     const stream = new BrainEventStream({
@@ -481,8 +494,10 @@ export class Brain<
       optionsSchema: this.optionsSchema,
       services: { ...(params.services || {}), ...this.services } as TServices,
       components: this.components,
-      memoryProvider: this.memoryProvider,
+      files,
+      pages,
       store,
+      memory,
     });
 
     yield* stream.next();
@@ -499,7 +514,8 @@ export class Brain<
     target.services = this.services;
     target.optionsSchema = this.optionsSchema;
     target.components = this.components;
-    target.memoryProvider = this.memoryProvider;
+    target.useMemory = this.useMemory;
+    target.memoryScope = this.memoryScope;
     target.storeSchema = this.storeSchema;
   }
 

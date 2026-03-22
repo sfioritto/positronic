@@ -27,9 +27,9 @@ import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generatePage } from '../../ui/generate-page.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
-import type { MemoryProvider, ScopedMemory } from '../../memory/types.js';
-import { createScopedMemory } from '../../memory/scoped-memory.js';
-import type { Store, StoreProvider } from '../../store/types.js';
+import type { Memory } from '../../memory/types.js';
+import type { Store } from '../../store/types.js';
+import type { ServiceProviders } from '../definitions/providers.js';
 import type { FilesService } from '../../files/types.js';
 import { guessMimeType } from '../../files/mime.js';
 import { EventChannel } from './event-channel.js';
@@ -86,11 +86,10 @@ export class BrainEventStream<
   private resume?: ResumeParams;
   private components?: Record<string, UIComponent<any>>;
   private signalProvider?: SignalProvider;
-  private memoryProvider?: MemoryProvider;
-  private scopedMemory?: ScopedMemory;
+  private memory?: Memory;
   private store?: Store<any>;
-  private storeProvider?: StoreProvider;
   private files?: FilesService;
+  private providers?: ServiceProviders;
   private templateContext: TemplateContext;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private currentUser: CurrentUser;
@@ -106,9 +105,10 @@ export class BrainEventStream<
       blocks: Block<any, any, TOptions, TServices, any, any>[];
       services: TServices;
       components?: Record<string, UIComponent<any>>;
-      memoryProvider?: MemoryProvider;
+      files?: FilesService;
+      pages?: PagesService;
       store?: Store<any>;
-      storeProvider?: StoreProvider;
+      memory?: Memory;
       optionsSchema?: z.ZodSchema<any>;
     }
   ) {
@@ -125,10 +125,9 @@ export class BrainEventStream<
       env,
       components,
       signalProvider,
-      memoryProvider,
       store,
-      storeProvider,
       files,
+      memory,
       currentUser,
     } = params;
 
@@ -152,21 +151,12 @@ export class BrainEventStream<
     this.resume = resume;
     this.components = components;
     this.signalProvider = signalProvider;
-    this.memoryProvider = memoryProvider;
     this.store = store;
-    this.storeProvider = storeProvider;
     this.files = files;
+    this.memory = memory;
+    this.providers = params.providers;
     this.templateContext = buildTemplateContext(this.files, this.resources);
     this.optionsSchema = params.optionsSchema;
-
-    // Create scoped memory if provider is configured
-    if (memoryProvider) {
-      this.scopedMemory = createScopedMemory(
-        memoryProvider,
-        title,
-        this.currentUser.name
-      );
-    }
 
     // Initialize steps - track guard and wait blocks by index
     this.steps = [];
@@ -273,7 +263,7 @@ export class BrainEventStream<
           this.options = this.optionsSchema.parse(this.options) as TOptions;
         } else if (this.options && Object.keys(this.options).length > 0) {
           throw new Error(
-            `Brain '${brainTitle}' received options but no schema was defined. Use withOptionsSchema() to define a schema for options.`
+            `Brain '${brainTitle}' received options but no schema was defined. Use withOptions() to define a schema for options.`
           );
         }
       } else {
@@ -470,7 +460,7 @@ export class BrainEventStream<
       pages: this.pages,
       env: this.env,
       components: this.components,
-      memory: this.scopedMemory,
+      memory: this.memory,
       store: this.store,
       files: this.files,
       currentUser: this.currentUser,
@@ -553,13 +543,11 @@ export class BrainEventStream<
               innerStack: remainingStack?.length ? remainingStack : undefined,
             },
             options: innerOptions,
-            pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
             governor: this.governor,
             services: this.services as Record<string, any>,
-            storeProvider: this.storeProvider,
-            files: this.files,
+            providers: this.providers,
           })
         : brainBlock.innerBrain.run({
             resources: this.resources,
@@ -567,13 +555,11 @@ export class BrainEventStream<
             currentUser: this.currentUser,
             initialState,
             options: innerOptions,
-            pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
             governor: this.governor,
             services: this.services as Record<string, any>,
-            storeProvider: this.storeProvider,
-            files: this.files,
+            providers: this.providers,
           });
 
       // Context has been forwarded to the inner brain — clear so outer
@@ -1427,13 +1413,11 @@ The output must conform to the provided schema.`,
             currentUser: this.currentUser,
             initialState,
             options: mapInnerOptions,
-            pages: this.pages,
             env: this.env,
             brainRunId: this.brainRunId,
             governor: this.governor,
             services: this.services as Record<string, any>,
-            storeProvider: this.storeProvider,
-            files: this.files,
+            providers: this.providers,
           });
 
           let patches: any[] = [];

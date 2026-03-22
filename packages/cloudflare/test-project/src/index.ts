@@ -76,7 +76,7 @@ const optionsBrain = brain({
   title: 'options-brain',
   description: 'A brain that uses runtime options',
 })
-  .withOptionsSchema(
+  .withOptions(
     z.object({
       environment: z.string().default('development'),
       debug: z.string().optional(),
@@ -521,7 +521,7 @@ const iterateOptionsInnerBrain = brain<{}, { value: number; result: number }>({
   title: 'iterate-options-inner',
   description: 'Inner brain that multiplies value by multiplier from options',
 })
-  .withOptionsSchema(z.object({ multiplier: z.number() }))
+  .withOptions(z.object({ multiplier: z.number() }))
   .step('Multiply', ({ state, options }) => ({
     ...state,
     result: state.value * options.multiplier,
@@ -532,7 +532,7 @@ const iterateOptionsTestBrain = brain({
   title: 'iterate-options-test',
   description: 'Tests that options survive DO resume during iterate',
 })
-  .withOptionsSchema(
+  .withOptions(
     z.object({
       multiplier: z.number(),
     })

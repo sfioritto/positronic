@@ -7,15 +7,13 @@ import type {
   CurrentUser,
 } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
-import type { PagesService } from '../pages.js';
 import type {
   ExecutionStackEntry,
   IterateContext,
   PromptLoopContext,
 } from '../brain-state-machine.js';
 import type { SerializedPageContext } from '../webhook.js';
-import type { StoreProvider } from '../../store/types.js';
-import type { FilesService } from '../../files/types.js';
+import type { ServiceProviders } from './providers.js';
 
 export interface ResumeParams {
   state: JsonObject;
@@ -29,15 +27,13 @@ export interface ResumeParams {
 
 export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   client: ObjectGenerator;
+  currentUser: CurrentUser;
   resources?: Resources;
   options?: TOptions;
-  pages?: PagesService;
   env?: RuntimeEnv;
   signalProvider?: SignalProvider;
   governor?: (client: ObjectGenerator) => ObjectGenerator;
-  storeProvider?: StoreProvider;
-  files?: FilesService;
-  currentUser: CurrentUser;
+  providers?: ServiceProviders;
   services?: Record<string, any>;
 }
 

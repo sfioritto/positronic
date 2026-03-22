@@ -9,7 +9,7 @@
 /**
  * A single memory entry returned from search operations.
  */
-export interface Memory {
+export interface MemoryEntry {
   /** Unique identifier for this memory */
   id: string;
   /** The memory content */
@@ -74,7 +74,7 @@ export interface MemoryProvider {
     query: string,
     scope: MemoryScope,
     options?: { limit?: number }
-  ): Promise<Memory[]>;
+  ): Promise<MemoryEntry[]>;
 
   /**
    * Add memories from a conversation.
@@ -94,7 +94,7 @@ export interface MemoryProvider {
  * Scoped memory interface with agentId and userId pre-bound.
  * This is what brain steps receive - they don't need to pass agentId or userId.
  */
-export interface ScopedMemory {
+export interface Memory {
   /**
    * Search for relevant memories.
    *
@@ -102,7 +102,7 @@ export interface ScopedMemory {
    * @param options - Optional search options (limit)
    * @returns Array of matching memories
    */
-  search(query: string, options?: MemorySearchOptions): Promise<Memory[]>;
+  search(query: string, options?: MemorySearchOptions): Promise<MemoryEntry[]>;
 
   /**
    * Add memories from messages.
@@ -112,3 +112,8 @@ export interface ScopedMemory {
    */
   add(messages: MemoryMessage[], options?: MemoryAddOptions): Promise<void>;
 }
+
+/**
+ * @deprecated Use Memory instead.
+ */
+export type ScopedMemory = Memory;

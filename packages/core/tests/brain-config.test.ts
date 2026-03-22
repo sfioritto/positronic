@@ -12,7 +12,7 @@ describe('brain options', () => {
     });
 
     const testBrain = brain('Options Brain')
-      .withOptionsSchema(optionsSchema)
+      .withOptions(optionsSchema)
       .step('Simple step', ({ state, options }) => ({
         value: 1,
         passedOption: options.testOption,
@@ -242,7 +242,7 @@ describe('services support', () => {
     for await (const _ of parentBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      storeProvider: mockStoreProvider,
+      providers: { store: mockStoreProvider },
     })) {
     }
 

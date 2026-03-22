@@ -101,8 +101,8 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
   stepId: string;
   /** The authenticated user running this brain */
   currentUser: CurrentUser;
-  /** Scoped memory — present at runtime when a memory provider is configured. Use withMemory() for non-optional typing in step callbacks. */
-  memory?: import('../memory/types.js').ScopedMemory;
+  /** Memory service — present at runtime when a memory provider is configured. Use withMemory() for non-optional typing in step callbacks. */
+  memory?: import('../memory/types.js').Memory;
   /** Typed key-value store — present at runtime when a store schema is configured. Use withStore() for non-optional typing in step callbacks. */
   store?: import('../store/types.js').Store<any>;
   /** File storage service for creating, reading, and managing files. Present when the backend provides it. */

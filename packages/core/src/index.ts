@@ -129,6 +129,7 @@ export type {
 // Memory types and utilities
 export type {
   Memory,
+  MemoryEntry,
   MemoryMessage,
   MemoryScope,
   MemorySearchOptions,
@@ -137,6 +138,16 @@ export type {
   ScopedMemory,
 } from './memory/types.js';
 export { createScopedMemory } from './memory/scoped-memory.js';
+
+// Service provider types
+export type {
+  ProviderContext,
+  FilesProvider,
+  PagesProvider,
+  StoreProviderFactory,
+  MemoryProviderFactory,
+  ServiceProviders,
+} from './dsl/definitions/providers.js';
 
 // UI types (only UIComponent is public - used by gen-ui-components)
 export type { UIComponent } from './ui/types.js';

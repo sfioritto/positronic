@@ -1,26 +1,18 @@
 import { brain as coreBrain, Brain } from './builder/brain.js';
 import type { State, JsonObject } from './types.js';
 import type { UIComponent } from '../ui/types.js';
-import type { MemoryProvider, ScopedMemory } from '../memory/types.js';
-import type { StoreSchema, InferStoreTypes, Store } from '../store/types.js';
 
 /**
  * Configuration for creating a project-level brain function.
  */
 export interface CreateBrainConfig<
   TServices extends object = {},
-  TComponents extends Record<string, UIComponent<any>> = {},
-  TStoreSchema extends StoreSchema | undefined = undefined,
-  TMemory extends MemoryProvider | undefined = undefined
+  TComponents extends Record<string, UIComponent<any>> = {}
 > {
   /** Services available to all brains (e.g., slack, gmail, database clients) */
   services?: TServices;
   /** UI components for generative UI steps */
   components?: TComponents;
-  /** Memory provider for long-term memory storage */
-  memory?: TMemory;
-  /** Store field definitions for typed key-value storage */
-  store?: TStoreSchema;
 }
 
 /**
@@ -58,30 +50,15 @@ export interface CreateBrainConfig<
  */
 export function createBrain<
   TServices extends object = {},
-  TComponents extends Record<string, UIComponent<any>> = {},
-  TStoreSchema extends StoreSchema | undefined = undefined,
-  TMemory extends MemoryProvider | undefined = undefined
->(config: CreateBrainConfig<TServices, TComponents, TStoreSchema, TMemory>) {
-  const { services, components, memory, store } = config;
-
-  // Derive the store service type from the schema
-  type StoreService = TStoreSchema extends StoreSchema
-    ? { store: Store<InferStoreTypes<TStoreSchema>> }
-    : {};
-
-  // Derive the memory service type from the provider
-  type MemoryService = TMemory extends MemoryProvider
-    ? { memory: ScopedMemory }
-    : {};
-
-  // Combined services type
-  type AllServices = TServices & StoreService & MemoryService;
+  TComponents extends Record<string, UIComponent<any>> = {}
+>(config: CreateBrainConfig<TServices, TComponents>) {
+  const { services, components } = config;
 
   // Overload 1: Builder pattern with title string
   function brain<
     TOptions extends JsonObject = {},
     TState extends State = object
-  >(title: string): Brain<TOptions, TState, AllServices>;
+  >(title: string): Brain<TOptions, TState, TServices>;
 
   // Overload 2: Builder pattern with config object
   function brain<
@@ -90,7 +67,7 @@ export function createBrain<
   >(config: {
     title: string;
     description?: string;
-  }): Brain<TOptions, TState, AllServices>;
+  }): Brain<TOptions, TState, TServices>;
 
   // Implementation
   function brain(
@@ -100,14 +77,6 @@ export function createBrain<
 
     if (components) {
       base = base.withComponents(components) as any;
-    }
-
-    if (memory) {
-      base = base.withMemory(memory) as any;
-    }
-
-    if (store) {
-      base = base.withStore(store) as any;
     }
 
     if (services) {

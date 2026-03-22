@@ -2,12 +2,20 @@ import { jest } from '@jest/globals';
 import { createScopedMemory } from '../src/memory/scoped-memory.js';
 import type {
   MemoryProvider,
-  Memory,
+  MemoryEntry,
   MemoryMessage,
 } from '../src/memory/types.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
+import type { ProviderContext } from '../src/dsl/definitions/providers.js';
+
+function memoryProviders(provider: MemoryProvider) {
+  return {
+    memory: (ctx: ProviderContext) =>
+      createScopedMemory(provider, ctx.brainTitle, ctx.currentUser.name),
+  };
+}
 
 // Helper function to collect all events from a brain run
 const collectEvents = async <T>(
@@ -35,7 +43,7 @@ const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
 describe('createScopedMemory', () => {
   it('should bind agentId and userId to search calls', async () => {
     const mockProvider = createMockProvider();
-    const testMemories: Memory[] = [
+    const testMemories: MemoryEntry[] = [
       { id: '1', content: 'Test memory 1', score: 0.9 },
       { id: '2', content: 'Test memory 2', score: 0.8 },
     ];
@@ -127,7 +135,7 @@ describe('Brain.withMemory', () => {
     let receivedMemory: typeof mockProvider | undefined;
 
     const testBrain = brain('test-brain')
-      .withMemory(mockProvider)
+      .withMemory()
       .step('Test Step', ({ memory }) => {
         receivedMemory = memory as typeof mockProvider;
         return { done: true };
@@ -138,6 +146,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
+        providers: memoryProviders(mockProvider),
       })
     );
 
@@ -148,13 +157,13 @@ describe('Brain.withMemory', () => {
   it('should allow calling memory.search in step', async () => {
     const mockProvider = createMockProvider();
     const mockClient = createMockClient();
-    const testMemories: Memory[] = [
+    const testMemories: MemoryEntry[] = [
       { id: '1', content: 'User likes TypeScript', score: 0.95 },
     ];
     mockProvider.search.mockResolvedValue(testMemories);
 
     const testBrain = brain('test-brain')
-      .withMemory(mockProvider)
+      .withMemory()
       .step('Search Step', async ({ memory }) => {
         const memories = await memory!.search('user preferences');
         return { preferences: memories };
@@ -165,6 +174,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
+        providers: memoryProviders(mockProvider),
       })
     );
 
@@ -181,7 +191,7 @@ describe('Brain.withMemory', () => {
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain')
-      .withMemory(mockProvider)
+      .withMemory()
       .step('Add Step', async ({ memory }) => {
         await memory!.add([
           { role: 'assistant', content: 'User prefers dark mode' },
@@ -194,6 +204,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
+        providers: memoryProviders(mockProvider),
       })
     );
 
@@ -213,7 +224,7 @@ describe('Brain.withMemory', () => {
     let step2Memory: any;
 
     const testBrain = brain('test-brain')
-      .withMemory(mockProvider)
+      .withMemory()
       .step('Step 1', ({ memory }) => {
         step1Memory = memory;
         return { step: 1 };
@@ -228,6 +239,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
+        providers: memoryProviders(mockProvider),
       })
     );
 
@@ -250,7 +262,7 @@ describe('Brain.withMemory', () => {
     let receivedLogger: any;
 
     const testBrain = brain('test-brain')
-      .withMemory(mockProvider)
+      .withMemory()
       .withServices<TestServices>({ logger: mockLogger })
       .step('Combined Step', ({ memory, logger }) => {
         receivedMemory = memory;
@@ -263,6 +275,7 @@ describe('Brain.withMemory', () => {
         client: mockClient,
         currentUser: { name: 'test-user' },
         resources: {} as any,
+        providers: memoryProviders(mockProvider),
       })
     );
 

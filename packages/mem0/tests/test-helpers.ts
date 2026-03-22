@@ -1,5 +1,5 @@
 import type {
-  Memory,
+  MemoryEntry,
   MemoryProvider,
   MemoryScope,
   MemoryMessage,
@@ -26,7 +26,7 @@ export interface MockMemoryProvider extends MemoryProvider {
     options?: { limit?: number };
   }>;
   /** Pre-seed memories that will be returned from search */
-  seedMemories(memories: Memory[]): void;
+  seedMemories(memories: MemoryEntry[]): void;
   /** Reset all tracked calls and seeded memories */
   reset(): void;
 }
@@ -63,14 +63,14 @@ export function createMockProvider(): MockMemoryProvider {
     options?: { limit?: number };
   }> = [];
 
-  let seededMemories: Memory[] = [];
+  let seededMemories: MemoryEntry[] = [];
 
   return {
     async search(
       query: string,
       scope: MemoryScope,
       options?: { limit?: number }
-    ): Promise<Memory[]> {
+    ): Promise<MemoryEntry[]> {
       searchCalls.push({ query, scope, options });
       return seededMemories;
     },
@@ -85,7 +85,7 @@ export function createMockProvider(): MockMemoryProvider {
 
     getAddCalls: () => [...addCalls],
     getSearchCalls: () => [...searchCalls],
-    seedMemories: (memories: Memory[]) => {
+    seedMemories: (memories: MemoryEntry[]) => {
       seededMemories = memories;
     },
     reset: () => {
