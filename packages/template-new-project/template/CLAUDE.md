@@ -14,7 +14,7 @@ This is a Positronic project - an AI-powered framework for building and running 
   - **`/src/webhooks`** - Webhook definitions for external integrations (auto-discovered)
   - **`/src/runner.ts`** - The main entry point for running brains locally
   - **`/src/utils`** - Shared utilities (e.g., `bottleneck` for rate limiting)
-  - **`/src/services`** - Service implementations for external integrations
+  - **`/src/plugins`** - Plugin definitions for external integrations (see `/docs/plugin-guide.md`)
   - **`/src/components`** - Reusable UI/prompt components
 - **`/resources`** - Files and documents that brains can access via the resource system
 - **`/tests`** - Test files for brains (kept separate to avoid deployment issues)

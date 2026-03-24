@@ -28,7 +28,7 @@ Every Positronic project includes a `src/brain.ts` file. This file exports a cus
 ### Why Use a Project Brain?
 
 The project brain pattern provides a single place to:
-- Configure services that all brains can access
+- Configure plugins that all brains can access
 - Set up logging, monitoring, or analytics
 - Add authentication or API clients
 - Establish project-wide conventions
@@ -45,47 +45,54 @@ import { brain } from '../brain.js';
 import { brain } from '@positronic/core';
 ```
 
-### Configuring Services
+### Configuring Plugins
 
-To add project-wide services, modify the `src/brain.ts` file using `createBrain()`:
+To add project-wide plugins, modify the `src/brain.ts` file using `createBrain()`. Plugins are defined with `definePlugin` and passed to `createBrain({ plugins: [...] })`:
 
 ```typescript
-import { createBrain } from '@positronic/core';
+// src/plugins/logger.ts
+import { definePlugin } from '@positronic/core';
 
-// Define your services
-interface ProjectServices {
-  logger: {
-    info: (message: string) => void;
-    error: (message: string) => void;
-  };
-  database: {
-    get: (key: string) => Promise<any>;
-    set: (key: string, value: any) => Promise<void>;
-  };
-}
-
-// Export the project brain factory
-export const brain = createBrain({
-  services: {
-    logger: {
-      info: (msg) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),
-      error: (msg) => console.error(`[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`)
-    },
-    database: {
-      get: async (key) => {
-        // Your database implementation
-        return localStorage.getItem(key);
-      },
-      set: async (key, value) => {
-        // Your database implementation
-        localStorage.setItem(key, JSON.stringify(value));
-      }
-    }
-  }
+export const logger = definePlugin({
+  name: 'logger',
+  create: () => ({
+    info: (msg: string) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),
+    error: (msg: string) => console.error(`[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`),
+  }),
 });
 ```
 
-Now all brains automatically have access to these services:
+```typescript
+// src/plugins/database.ts
+import { definePlugin } from '@positronic/core';
+
+export const database = definePlugin({
+  name: 'database',
+  create: () => ({
+    get: async (key: string) => {
+      // Your database implementation
+      return localStorage.getItem(key);
+    },
+    set: async (key: string, value: any) => {
+      // Your database implementation
+      localStorage.setItem(key, JSON.stringify(value));
+    },
+  }),
+});
+```
+
+```typescript
+// src/brain.ts
+import { createBrain } from '@positronic/core';
+import { logger } from './plugins/logger.js';
+import { database } from './plugins/database.js';
+
+export const brain = createBrain({
+  plugins: [logger, database],
+});
+```
+
+Now all brains automatically have access to these plugins:
 
 ```typescript
 import { brain } from '../brain.js';
@@ -167,7 +174,7 @@ CLOUDFLARE_API_TOKEN=your-api-token
 
 ## Best Practices
 
-1. **Services**: Configure once in `src/brain.ts`, use everywhere
+1. **Plugins**: Configure once in `src/brain.ts`, use everywhere
 2. **Resources**: Use for content that non-developers should be able to edit
 3. **Secrets**: Never commit API keys; use environment variables
 4. **Organization**: Group related brains in folders as your project grows
@@ -179,14 +186,25 @@ CLOUDFLARE_API_TOKEN=your-api-token
 ### Logging and Monitoring
 
 ```typescript
-// In src/brain.ts
-interface ProjectServices {
-  metrics: {
-    track: (event: string, properties?: any) => void;
-    time: (label: string) => () => void;
-  };
-}
+// src/plugins/metrics.ts
+import { definePlugin } from '@positronic/core';
 
+export const metrics = definePlugin({
+  name: 'metrics',
+  create: () => ({
+    track: (event: string, properties?: any) => {
+      // Your analytics implementation
+      console.log('track', event, properties);
+    },
+    time: (label: string) => {
+      const start = Date.now();
+      return () => console.log(label, Date.now() - start, 'ms');
+    },
+  }),
+});
+```
+
+```typescript
 // In your brain
 export default brain('Analytics Brain')
   .step('Start Timer', ({ metrics }) => {
@@ -207,34 +225,32 @@ export default brain('Analytics Brain')
 ### API Integration
 
 ```typescript
-// In src/brain.ts
-interface ProjectServices {
-  api: {
-    get: (path: string) => Promise<any>;
-    post: (path: string, data: any) => Promise<any>;
-  };
-}
+// src/plugins/api.ts
+import { definePlugin } from '@positronic/core';
 
-// Configure with base URL and auth
-const api = {
-  get: async (path: string) => {
-    const response = await fetch(`https://api.example.com<%= '${path}' %>`, {
-      headers: { 'Authorization': `Bearer <%= '${process.env.API_KEY}' %>` }
-    });
-    return response.json();
-  },
-  post: async (path: string, data: any) => {
-    const response = await fetch(`https://api.example.com<%= '${path}' %>`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer <%= '${process.env.API_KEY}' %>`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  }
-};
+export const api = definePlugin({
+  name: 'api',
+  setup: (config: { baseUrl: string; apiKey: string }) => config,
+  create: ({ config }) => ({
+    get: async (path: string) => {
+      const response = await fetch(`<%= '${config!.baseUrl}${path}' %>`, {
+        headers: { 'Authorization': `Bearer <%= '${config!.apiKey}' %>` }
+      });
+      return response.json();
+    },
+    post: async (path: string, data: any) => {
+      const response = await fetch(`<%= '${config!.baseUrl}${path}' %>`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer <%= '${config!.apiKey}' %>`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+      return response.json();
+    },
+  }),
+});
 ```
 
 ## currentUser

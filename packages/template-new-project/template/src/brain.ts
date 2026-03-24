@@ -35,46 +35,38 @@ import { components } from './components/index.js';
  * With `loop`, the LLM calls tools iteratively until it calls the auto-generated
  * 'done' tool with data matching the outputSchema.
  *
- * ## Adding services
+ * ## Adding plugins
+ *
+ * Plugins provide services, tools, and event adapters to brains.
+ * Configure them in createBrain or per-brain with .withPlugin():
  *
  * ```typescript
  * import { createBrain } from '@positronic/core';
  * import { components } from './components/index.js';
- * import slack from './services/slack.js';
- * import gmail from './services/gmail.js';
+ * import { mem0 } from '@positronic/mem0';
  *
  * export const brain = createBrain({
- *   services: { slack, gmail },
+ *   plugins: [mem0.setup({ apiKey: process.env.MEM0_API_KEY! })],
  *   components,
  * });
  * ```
  *
- * Then services are available in all brain steps:
- *
- * ```typescript
- * export default brain('notify')
- *   .step('Send alert', ({ slack }) => {
- *     slack.postMessage('#alerts', 'Something happened!');
- *     return { notified: true };
- *   });
- * ```
- *
- * To add memory (long-term storage with semantic search),
- * call `.withMemory()` on individual brains that need it:
+ * Then plugin services are available in all brain steps under the plugin name:
  *
  * ```typescript
  * export default brain('my-brain')
- *   .withMemory()
- *   .step('Remember', async ({ memory }) => {
- *     const prefs = await memory.search('user preferences');
+ *   .step('Remember', async ({ mem0 }) => {
+ *     const prefs = await mem0.search('user preferences');
  *     return { preferences: prefs };
  *   });
  * ```
  *
- * The memory provider is configured on the runner, not in createBrain.
- * Memory is automatically scoped to the current user and brain name.
+ * Or declare multiple plugins upfront:
  *
- * See docs/memory-guide.md for full details.
+ * ```typescript
+ * brain({ title: 'my-brain', plugins: { slack, mem0 } })
+ *   .step('Go', ({ slack, mem0 }) => { ... });
+ * ```
  */
 export const brain = createBrain({
   components,
