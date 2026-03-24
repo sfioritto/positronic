@@ -83,6 +83,17 @@ export type PluginsFrom<T extends Record<string, ConfiguredPlugin>> = {
 };
 
 /**
+ * Extract plugin injections from an array of ConfiguredPlugin instances.
+ * Reuses PluginsFrom by mapping the array's union to a record keyed by plugin name.
+ *
+ * Used by createBrain() to propagate project-level plugin types to all brains.
+ */
+export type PluginsFromArray<T extends readonly ConfiguredPlugin[]> =
+  PluginsFrom<{
+    [K in T[number] as K['__plugin']['name']]: K;
+  }>;
+
+/**
  * A configured plugin that also has a .setup() method for per-brain configuration.
  * Returned by definePlugin() when a setup function is provided.
  */
