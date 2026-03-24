@@ -12,7 +12,7 @@ import type {
   SignalProvider,
   CurrentUser,
   ToolWaitFor,
-  ToolContext,
+  StepContext as StepContextType,
 } from '../types.js';
 import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
@@ -27,10 +27,9 @@ import type { PagesService } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generatePage } from '../../ui/generate-page.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
-import type { Memory } from '../../memory/types.js';
-import type { Store } from '../../store/types.js';
-import type { ServiceProviders } from '../definitions/providers.js';
+import type { Store, StoreProvider } from '../../store/types.js';
 import type { FilesService } from '../../files/types.js';
+import type { PluginAdapter, ConfiguredPlugin } from '../../plugins/types.js';
 import { guessMimeType } from '../../files/mime.js';
 import { EventChannel } from './event-channel.js';
 import { wrapFilesWithEvents } from '../../files/event-wrapper.js';
@@ -67,7 +66,7 @@ const clone = <T>(value: T): T => structuredClone(value);
 export class BrainEventStream<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
-  TServices extends object = object
+  TPlugins extends object = object
 > {
   private currentState: TState;
   private steps: Step[];
@@ -77,7 +76,6 @@ export class BrainEventStream<
   private description?: string;
   private client: ObjectGenerator;
   private options: TOptions;
-  private services: TServices;
   private resources: Resources;
   private pages?: PagesService;
   private env: RuntimeEnv;
@@ -86,10 +84,12 @@ export class BrainEventStream<
   private resume?: ResumeParams;
   private components?: Record<string, UIComponent<any>>;
   private signalProvider?: SignalProvider;
-  private memory?: Memory;
   private store?: Store<any>;
   private files?: FilesService;
-  private providers?: ServiceProviders;
+  private storeProvider?: StoreProvider;
+  private pluginInjections: Record<string, any>;
+  private pluginAdapters: PluginAdapter[];
+  private pluginConfigs: ConfiguredPlugin[];
   private templateContext: TemplateContext;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private currentUser: CurrentUser;
@@ -102,14 +102,15 @@ export class BrainEventStream<
     params: (InitialRunParams<TOptions> | ResumeRunParams<TOptions>) & {
       title: string;
       description?: string;
-      blocks: Block<any, any, TOptions, TServices, any, any>[];
-      services: TServices;
+      blocks: Block<any, any, TOptions, TPlugins, any, any>[];
       components?: Record<string, UIComponent<any>>;
       files?: FilesService;
       pages?: PagesService;
       store?: Store<any>;
-      memory?: Memory;
       optionsSchema?: z.ZodSchema<any>;
+      pluginInjections?: Record<string, any>;
+      pluginAdapters?: PluginAdapter[];
+      pluginConfigs?: ConfiguredPlugin[];
     }
   ) {
     const {
@@ -119,7 +120,6 @@ export class BrainEventStream<
       brainRunId: providedBrainRunId,
       options = {} as TOptions,
       client,
-      services,
       resources = {} as Resources,
       pages,
       env,
@@ -127,7 +127,6 @@ export class BrainEventStream<
       signalProvider,
       store,
       files,
-      memory,
       currentUser,
     } = params;
 
@@ -144,7 +143,6 @@ export class BrainEventStream<
     this.description = description;
     this.client = client;
     this.options = options;
-    this.services = services;
     this.resources = resources;
     this.pages = pages;
     this.env = env ?? DEFAULT_ENV;
@@ -153,8 +151,10 @@ export class BrainEventStream<
     this.signalProvider = signalProvider;
     this.store = store;
     this.files = files;
-    this.memory = memory;
-    this.providers = params.providers;
+    this.storeProvider = params.storeProvider;
+    this.pluginInjections = params.pluginInjections ?? {};
+    this.pluginAdapters = params.pluginAdapters ?? [];
+    this.pluginConfigs = params.pluginConfigs ?? [];
     this.templateContext = buildTemplateContext(this.files, this.resources);
     this.optionsSchema = params.optionsSchema;
 
@@ -231,6 +231,21 @@ export class BrainEventStream<
   }
 
   async *next(): AsyncGenerator<BrainEvent<TOptions>> {
+    for await (const event of this.generate()) {
+      // Plugin adapters dispatch here, inside the event stream.
+      // Platform adapters (SQLite, Monitor, webhooks) dispatch in BrainRunner
+      // after receiving the yielded event. Two separate paths because plugin
+      // adapters are created per brain run inside create() and scoped to the
+      // plugin's lifecycle, while platform adapters are runner-level concerns
+      // shared across all brain runs.
+      for (const adapter of this.pluginAdapters) {
+        await adapter.dispatch(event);
+      }
+      yield event;
+    }
+  }
+
+  private async *generate(): AsyncGenerator<BrainEvent<TOptions>> {
     const {
       steps,
       title: brainTitle,
@@ -449,7 +464,23 @@ export class BrainEventStream<
     };
   }
 
-  private buildStepContext(step: Step) {
+  /** Params forwarded to inner brain runs (nested .brain() and .map() steps). */
+  private get innerBrainParams() {
+    return {
+      resources: this.resources,
+      client: this.client,
+      currentUser: this.currentUser,
+      env: this.env,
+      brainRunId: this.brainRunId,
+      governor: this.governor,
+      files: this.files,
+      pages: this.pages,
+      storeProvider: this.storeProvider,
+      pluginConfigs: this.pluginConfigs,
+    };
+  }
+
+  private buildStepContext(step: Step): any {
     return {
       state: this.currentState,
       options: this.options ?? ({} as TOptions),
@@ -460,25 +491,24 @@ export class BrainEventStream<
       pages: this.pages,
       env: this.env,
       components: this.components,
-      memory: this.memory,
       store: this.store,
       files: this.files,
       currentUser: this.currentUser,
       brainRunId: this.brainRunId,
       stepId: step.id,
-      ...this.services,
+      ...this.pluginInjections,
     };
   }
 
   private async *executeStep(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
-    const block = step.block as Block<any, any, TOptions, TServices, any, any>;
+    const block = step.block as Block<any, any, TOptions, TPlugins, any, any>;
 
     if (block.type === 'step') {
       const stepBlock = block as StepBlock<
         any,
         any,
         TOptions,
-        TServices,
+        TPlugins,
         any,
         any
       >;
@@ -501,13 +531,7 @@ export class BrainEventStream<
     }
 
     if (block.type === 'brain') {
-      const brainBlock = block as BrainBlock<
-        any,
-        any,
-        any,
-        TOptions,
-        TServices
-      >;
+      const brainBlock = block as BrainBlock<any, any, any, TOptions, TPlugins>;
       const initialState = brainBlock.initialState
         ? typeof brainBlock.initialState === 'function'
           ? brainBlock.initialState(this.buildStepContext(step))
@@ -533,9 +557,7 @@ export class BrainEventStream<
       let innerBrainPaused = false;
       const innerRun = hasInnerResume
         ? brainBlock.innerBrain.run({
-            resources: this.resources,
-            client: this.client,
-            currentUser: this.currentUser,
+            ...this.innerBrainParams,
             resume: {
               ...this.resume,
               state: innerEntry!.state,
@@ -543,23 +565,11 @@ export class BrainEventStream<
               innerStack: remainingStack?.length ? remainingStack : undefined,
             },
             options: innerOptions,
-            env: this.env,
-            brainRunId: this.brainRunId,
-            governor: this.governor,
-            services: this.services as Record<string, any>,
-            providers: this.providers,
           })
         : brainBlock.innerBrain.run({
-            resources: this.resources,
-            client: this.client,
-            currentUser: this.currentUser,
+            ...this.innerBrainParams,
             initialState,
             options: innerOptions,
-            env: this.env,
-            brainRunId: this.brainRunId,
-            governor: this.governor,
-            services: this.services as Record<string, any>,
-            providers: this.providers,
           });
 
       // Context has been forwarded to the inner brain — clear so outer
@@ -626,7 +636,7 @@ export class BrainEventStream<
         any,
         any,
         TOptions,
-        TServices,
+        TPlugins,
         any,
         any
       >;
@@ -1188,7 +1198,7 @@ The output must conform to the provided schema.`,
         if (tool.execute) {
           toolResult = await tool.execute(
             args,
-            this.buildStepContext(step) as ToolContext
+            this.buildStepContext(step) as StepContextType
           );
 
           // Check for webhook suspension
@@ -1408,16 +1418,9 @@ The output must conform to the provided schema.`,
           const mapInnerOptions = config.options ?? {};
 
           const innerRun = config.run.run({
-            resources: this.resources,
-            client: this.client,
-            currentUser: this.currentUser,
+            ...this.innerBrainParams,
             initialState,
             options: mapInnerOptions,
-            env: this.env,
-            brainRunId: this.brainRunId,
-            governor: this.governor,
-            services: this.services as Record<string, any>,
-            providers: this.providers,
           });
 
           let patches: any[] = [];
@@ -1485,7 +1488,7 @@ The output must conform to the provided schema.`,
    */
   private async *executePageStep(
     step: Step,
-    stepBlock: StepBlock<any, any, TOptions, TServices, any, any>
+    stepBlock: StepBlock<any, any, TOptions, TPlugins, any, any>
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const prevState = this.currentState;
     const pageConfigFn = stepBlock.pageConfigFn!;

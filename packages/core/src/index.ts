@@ -36,7 +36,6 @@ export type {
   Secrets,
   Tool,
   ToolWaitFor,
-  ToolContext,
   StepContext,
   SignalType,
   BrainSignal,
@@ -127,7 +126,7 @@ export type {
   ZipBuilder,
 } from './files/types.js';
 
-// Memory types and utilities
+// Memory types (used by mem0 plugin package)
 export type {
   Memory,
   MemoryEntry,
@@ -137,16 +136,19 @@ export type {
   MemoryAddOptions,
   MemoryProvider,
 } from './memory/types.js';
-export { createMemory } from './memory/create-memory.js';
 
-// Service provider types
+// Plugin system
+export { definePlugin } from './plugins/index.js';
 export type {
-  ProviderContext,
-  FilesProvider,
-  PagesProvider,
-  StoreProviderFactory,
-  ServiceProviders,
-} from './dsl/definitions/providers.js';
+  CreateContext,
+  PluginAdapter,
+  PluginCreateReturn,
+  PluginDefinition,
+  PluginInjection,
+  PluginsFrom,
+  ConfiguredPlugin,
+  ConfiguredPluginWithSetup,
+} from './plugins/index.js';
 
 // UI types (only UIComponent is public - used by gen-ui-components)
 export type { UIComponent } from './ui/types.js';

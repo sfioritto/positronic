@@ -13,7 +13,10 @@ import type {
   PromptLoopContext,
 } from '../brain-state-machine.js';
 import type { SerializedPageContext } from '../webhook.js';
-import type { ServiceProviders } from './providers.js';
+import type { FilesService } from '../../files/types.js';
+import type { PagesService } from '../pages.js';
+import type { StoreProvider } from '../../store/types.js';
+import type { ConfiguredPlugin } from '../../plugins/types.js';
 
 export interface ResumeParams {
   state: JsonObject;
@@ -33,8 +36,14 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   env?: RuntimeEnv;
   signalProvider?: SignalProvider;
   governor?: (client: ObjectGenerator) => ObjectGenerator;
-  providers?: ServiceProviders;
-  services?: Record<string, any>;
+  /** Platform service: file storage */
+  files?: FilesService;
+  /** Platform service: page generation */
+  pages?: PagesService;
+  /** Platform service: typed key-value store factory */
+  storeProvider?: StoreProvider;
+  /** Plugin configs to resolve per brain run */
+  pluginConfigs?: ConfiguredPlugin[];
 }
 
 export interface InitialRunParams<TOptions extends JsonObject = JsonObject>

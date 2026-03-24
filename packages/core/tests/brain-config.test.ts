@@ -4,6 +4,7 @@ import { brain } from '../src/dsl/brain.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import { mockClient, testLogger } from './brain-test-helpers.js';
+import { definePlugin } from '../src/plugins/define-plugin.js';
 
 describe('brain options', () => {
   it('should pass options through to brain events', async () => {
@@ -110,19 +111,21 @@ describe('brain options', () => {
   });
 });
 
-describe('services support', () => {
-  it('should allow adding custom services to brains', async () => {
-    // Create a brain with services
-    const testBrain = brain('Services Test')
-      .withServices({
-        logger: testLogger,
-      })
-      .step('Use service', ({ state, logger }) => {
-        logger.log('Test service called');
-        return { serviceUsed: true };
+describe('plugin support', () => {
+  it('should allow adding plugins to brains', async () => {
+    const logMock = jest.fn();
+    const loggerPlugin = definePlugin({
+      name: 'logger',
+      create: () => ({ log: logMock }),
+    });
+
+    const testBrain = brain('Plugin Test')
+      .withPlugin(loggerPlugin)
+      .step('Use plugin', ({ state, logger }) => {
+        logger.log('Test plugin called');
+        return { pluginUsed: true };
       });
 
-    // Run the brain and collect events
     let finalState = {};
     for await (const event of testBrain.run({
       client: mockClient,
@@ -133,30 +136,32 @@ describe('services support', () => {
       }
     }
 
-    // Verify the service was called
-    expect(testLogger.log).toHaveBeenCalledWith('Test service called');
-
-    // Verify the state was updated
-    expect(finalState).toEqual({ serviceUsed: true });
+    expect(logMock).toHaveBeenCalledWith('Test plugin called');
+    expect(finalState).toEqual({ pluginUsed: true });
   });
 
-  it('should propagate services from parent to child brain', async () => {
+  it('should propagate plugins from parent to child brain', async () => {
     let childReceivedApi: string | undefined;
 
+    const apiPlugin = definePlugin({
+      name: 'api',
+      create: () => ({ url: 'parent-api-url' }),
+    });
+
     const childBrain = brain('Child Brain').step(
-      'Use parent service',
+      'Use parent plugin',
       (params: any) => {
-        childReceivedApi = params.api;
+        childReceivedApi = params.api?.url;
         return { childDone: true };
       }
     );
 
     const parentBrain = brain('Parent Brain')
-      .withServices({ api: 'parent-api-url' })
+      .withPlugin(apiPlugin)
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any);
 
-    for await (const _ of parentBrain.run({
+    for await (const event of parentBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
     })) {
@@ -165,54 +170,67 @@ describe('services support', () => {
     expect(childReceivedApi).toBe('parent-api-url');
   });
 
-  it('should allow child services to override parent services', async () => {
-    let childReceivedApi: string | undefined;
+  it('should allow child plugins to override parent plugins', async () => {
+    let childReceivedUrl: string | undefined;
+
+    const parentApiPlugin = definePlugin({
+      name: 'api',
+      setup: (config: { url: string }) => config,
+      create: ({ config }) => ({ url: config?.url ?? 'default' }),
+    });
 
     const childBrain = brain('Override Child')
-      .withServices({ api: 'child-api-url' })
-      .step('Use service', (params: any) => {
-        childReceivedApi = params.api;
+      .withPlugin(parentApiPlugin.setup({ url: 'child-api-url' }))
+      .step('Use plugin', (params: any) => {
+        childReceivedUrl = params.api?.url;
         return { childDone: true };
       });
 
     const parentBrain = brain('Override Parent')
-      .withServices({ api: 'parent-api-url' })
+      .withPlugin(parentApiPlugin.setup({ url: 'parent-api-url' }))
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain);
 
-    for await (const _ of parentBrain.run({
+    for await (const event of parentBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
     })) {
     }
 
-    // Child's own withServices() should win over parent's
-    expect(childReceivedApi).toBe('child-api-url');
+    // Child's own withPlugin() should win over parent's
+    expect(childReceivedUrl).toBe('child-api-url');
   });
 
-  it('should make parent services available to child without withServices', async () => {
+  it('should make parent plugins available to child without withPlugin', async () => {
     let childReceivedLogger: any;
 
-    const childBrain = brain('No Services Child').step(
-      'Check for service',
+    const logMock = jest.fn();
+    const loggerPlugin = definePlugin({
+      name: 'logger',
+      create: () => ({ log: logMock }),
+    });
+
+    const childBrain = brain('No Plugin Child').step(
+      'Check for plugin',
       (params: any) => {
         childReceivedLogger = params.logger;
         return { checked: true };
       }
     );
 
-    const parentBrain = brain('Provides Services Parent')
-      .withServices({ logger: testLogger })
+    const parentBrain = brain('Provides Plugin Parent')
+      .withPlugin(loggerPlugin)
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any);
 
-    for await (const _ of parentBrain.run({
+    for await (const event of parentBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
     })) {
     }
 
-    expect(childReceivedLogger).toBe(testLogger);
+    expect(childReceivedLogger).toBeDefined();
+    expect(childReceivedLogger.log).toBe(logMock);
   });
 
   it('should propagate storeProvider to nested brains', async () => {
@@ -239,10 +257,10 @@ describe('services support', () => {
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any);
 
-    for await (const _ of parentBrain.run({
+    for await (const event of parentBrain.run({
       client: mockClient,
       currentUser: { name: 'test-user' },
-      providers: { store: mockStoreProvider },
+      storeProvider: mockStoreProvider,
     })) {
     }
 

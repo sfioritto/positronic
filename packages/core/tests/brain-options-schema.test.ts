@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { jest } from '@jest/globals';
 import { brain, BRAIN_EVENTS } from '../src/index.js';
 import type { ObjectGenerator, BrainEvent } from '../src/index.js';
+import { definePlugin } from '../src/plugins/define-plugin.js';
 
 describe('Brain withOptions', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -182,13 +183,16 @@ describe('Brain withOptions', () => {
       expect(myBrain.optionsSchema).toBe(schema);
     });
 
-    it('should work with withServices', () => {
+    it('should work with withPlugin', () => {
       const schema = z.object({ apiKey: z.string() });
-      const services = { logger: console };
+      const loggerPlugin = definePlugin({
+        name: 'logger',
+        create: () => ({ log: console.log }),
+      });
 
       const myBrain = brain('test')
         .withOptions(schema)
-        .withServices(services)
+        .withPlugin(loggerPlugin)
         .step('Log', ({ options, logger }) => {
           logger.log(options.apiKey);
           return { logged: true };

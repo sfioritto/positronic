@@ -48,7 +48,6 @@ export interface BrainTestResult<TState> {
 export async function runBrainTest<
   TOptions extends object = object,
   TState extends object = object,
-  TServices extends object = object
 >(
   brain: any,
   params?: {
@@ -56,7 +55,6 @@ export async function runBrainTest<
     initialState?: Partial<TState>;
     resources?: any;
     options?: TOptions;
-    services?: TServices;
   }
 ): Promise<BrainTestResult<TState>> {
   const events: BrainEvent<any>[] = [];
@@ -72,8 +70,7 @@ export async function runBrainTest<
       options: params?.options,
     };
 
-    // If brain has services, we need to apply them first
-    const brainToRun = params?.services ? brain.withServices(params.services) : brain;
+    const brainToRun = brain;
 
     for await (const event of brainToRun.run(runOptions)) {
       events.push(event);

@@ -346,7 +346,7 @@ describe('brain integration with JSX templates', () => {
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test' },
-      providers: { files: () => files as any },
+      files: files as any,
       resources: resources as any,
     })) {
       // collect events
@@ -401,7 +401,7 @@ describe('brain integration with JSX templates', () => {
     for await (const event of testBrain.run({
       client: mockClient,
       currentUser: { name: 'test' },
-      providers: { files: () => files as any },
+      files: files as any,
     })) {
       // collect
     }

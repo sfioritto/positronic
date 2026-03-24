@@ -16,8 +16,10 @@ import type {
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { BrainCancelledEvent } from './definitions/events.js';
-import type { ServiceProviders } from './definitions/providers.js';
 import type { ResumeParams } from './definitions/run-params.js';
+import type { FilesService } from '../files/types.js';
+import type { PagesService } from './pages.js';
+import type { StoreProvider } from '../store/types.js';
 
 /**
  * Create a CANCELLED event for when the brain is aborted via signal.
@@ -43,9 +45,11 @@ export class BrainRunner {
       adapters: Adapter[];
       env?: RuntimeEnv;
       resources?: Resources;
-      providers?: ServiceProviders;
       signalProvider?: SignalProvider;
       governor?: (client: ObjectGenerator) => ObjectGenerator;
+      files?: FilesService;
+      pages?: PagesService;
+      storeProvider?: StoreProvider;
     }
   ) {}
 
@@ -168,9 +172,11 @@ export class BrainRunner {
       adapters,
       env,
       resources,
-      providers,
       signalProvider,
       governor,
+      files,
+      pages,
+      storeProvider,
     } = this.config;
     const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
@@ -204,8 +210,10 @@ export class BrainRunner {
           env: resolvedEnv,
           signalProvider,
           governor,
-          providers,
           currentUser,
+          files,
+          pages,
+          storeProvider,
         })
       : brain.run({
           initialState: initialState ?? ({} as TState),
@@ -216,8 +224,10 @@ export class BrainRunner {
           env: resolvedEnv,
           signalProvider,
           governor,
-          providers,
           currentUser,
+          files,
+          pages,
+          storeProvider,
         });
 
     try {

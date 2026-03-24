@@ -432,7 +432,7 @@ describe('nested brains', () => {
       client: mockClient,
       currentUser: { name: 'test-user' },
       resources: mockResources,
-      providers: { pages: () => mockPages as any },
+      pages: mockPages as any,
       env: mockEnv,
     })) {
     }

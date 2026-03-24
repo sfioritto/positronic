@@ -5,7 +5,7 @@ import type { Block } from '../definitions/blocks.js';
 export class Continuation<
   TOptions extends JsonObject,
   TState extends State,
-  TServices extends object,
+  TPlugins extends object,
   TResponse
 > {
   constructor(
@@ -13,17 +13,16 @@ export class Continuation<
     private createNextBrain: <TNewState extends State>() => Brain<
       TOptions,
       TNewState,
-      TServices
+      TPlugins
     >
   ) {}
 
   handle<TNewState extends State>(
     title: string,
     action: (
-      params: StepContext<TState, TOptions> &
-        TServices & { response: TResponse }
+      params: StepContext<TState, TOptions> & TPlugins & { response: TResponse }
     ) => TNewState | Promise<TNewState>
-  ): Brain<TOptions, TNewState, TServices> {
+  ): Brain<TOptions, TNewState, TPlugins> {
     this.addBlock({
       type: 'step',
       title,
@@ -35,7 +34,7 @@ export class Continuation<
   guard(
     predicate: (params: { state: TState; options: TOptions }) => boolean,
     title?: string
-  ): Continuation<TOptions, TState, TServices, TResponse> {
+  ): Continuation<TOptions, TState, TPlugins, TResponse> {
     this.addBlock({
       type: 'guard',
       title: title ?? 'Guard',
