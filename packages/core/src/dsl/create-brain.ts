@@ -1,64 +1,45 @@
 import { brain as coreBrain, Brain } from './builder/brain.js';
 import type { State, JsonObject } from './types.js';
 import type { UIComponent } from '../ui/types.js';
+import type { ConfiguredPlugin } from '../plugins/types.js';
 
 /**
  * Configuration for creating a project-level brain function.
  */
 export interface CreateBrainConfig<
-  TServices extends object = {},
   TComponents extends Record<string, UIComponent<any>> = {}
 > {
-  /** Services available to all brains (e.g., slack, gmail, database clients) */
-  services?: TServices;
+  /** Plugins available to all brains */
+  plugins?: ConfiguredPlugin[];
   /** UI components for generative UI steps */
   components?: TComponents;
 }
 
 /**
- * Creates a project-level brain function with pre-configured services and components.
- *
- * This is the recommended way to set up brains in a Positronic project. It provides:
- * - Type-safe access to services in all brain steps
- * - Automatic injection of components
+ * Creates a project-level brain function with pre-configured plugins and components.
  *
  * @example
  * ```typescript
- * // brain.ts - your project's brain configuration
  * import { createBrain } from '@positronic/core';
+ * import { mem0 } from '@positronic/mem0';
  * import { components } from './components/index.js';
- * import slack from './services/slack.js';
- * import gmail from './services/gmail.js';
  *
  * export const brain = createBrain({
- *   services: { slack, gmail },
+ *   plugins: [mem0.setup({ provider })],
  *   components,
  * });
  * ```
- *
- * @example
- * ```typescript
- * // brains/my-brain.ts - using the configured brain
- * import { brain } from '../brain.js';
- *
- * export default brain('my-workflow')
- *   .step('Init', ({ slack }) => {
- *     slack.postMessage('#general', 'Starting workflow');
- *     return { started: true };
- *   });
- * ```
  */
 export function createBrain<
-  TServices extends object = {},
   TComponents extends Record<string, UIComponent<any>> = {}
->(config: CreateBrainConfig<TServices, TComponents>) {
-  const { services, components } = config;
+>(config: CreateBrainConfig<TComponents>) {
+  const { plugins, components } = config;
 
   // Overload 1: Builder pattern with title string
   function brain<
     TOptions extends JsonObject = {},
     TState extends State = object
-  >(title: string): Brain<TOptions, TState, TServices>;
+  >(title: string): Brain<TOptions, TState, object>;
 
   // Overload 2: Builder pattern with config object
   function brain<
@@ -67,7 +48,7 @@ export function createBrain<
   >(config: {
     title: string;
     description?: string;
-  }): Brain<TOptions, TState, TServices>;
+  }): Brain<TOptions, TState, object>;
 
   // Implementation
   function brain(
@@ -79,8 +60,10 @@ export function createBrain<
       base = base.withComponents(components) as any;
     }
 
-    if (services) {
-      base = base.withServices(services) as any;
+    if (plugins) {
+      for (const plugin of plugins) {
+        base = base.withPlugin(plugin) as any;
+      }
     }
 
     return base as any;

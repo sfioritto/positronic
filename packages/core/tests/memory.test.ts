@@ -8,6 +8,7 @@ import type {
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
+import { definePlugin } from '../src/plugins/define-plugin.js';
 
 // Helper function to collect all events from a brain run
 const collectEvents = async <T>(
@@ -103,34 +104,8 @@ describe('createMemory()', () => {
   });
 });
 
-describe('Brain.withMemory', () => {
-  it('should inject memory into step context', async () => {
-    const mockProvider = createMockProvider();
-    const mockClient = createMockClient();
-
-    let receivedMemory: typeof mockProvider | undefined;
-
-    const testBrain = brain('test-brain')
-      .withMemory()
-      .step('Test Step', ({ memory }) => {
-        receivedMemory = memory as typeof mockProvider;
-        return { done: true };
-      });
-
-    const events = await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        resources: {} as any,
-        providers: { memory: mockProvider },
-      })
-    );
-
-    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
-    expect(receivedMemory).toBeDefined();
-  });
-
-  it('should allow calling memory.search in step', async () => {
+describe('memory via plugin system', () => {
+  it('should inject memory into step context via withPlugin', async () => {
     const mockProvider = createMockProvider();
     const mockClient = createMockClient();
     const testMemories: MemoryEntry[] = [
@@ -138,10 +113,24 @@ describe('Brain.withMemory', () => {
     ];
     mockProvider.search.mockResolvedValue(testMemories);
 
+    const memoryPlugin = definePlugin({
+      name: 'memory',
+      create: ({ brainTitle, currentUser }) => {
+        const memory = createMemory(mockProvider, brainTitle, currentUser.name);
+        return {
+          search: memory.search,
+          add: memory.add,
+        };
+      },
+    });
+
+    let receivedMemory: any;
+
     const testBrain = brain('test-brain')
-      .withMemory()
+      .withPlugin(memoryPlugin)
       .step('Search Step', async ({ memory }) => {
-        const memories = await memory!.search('user preferences');
+        receivedMemory = memory;
+        const memories = await memory.search('user preferences');
         return { preferences: memories };
       });
 
@@ -149,192 +138,17 @@ describe('Brain.withMemory', () => {
       testBrain.run({
         client: mockClient,
         currentUser: { name: 'test-user' },
-        resources: {} as any,
-        providers: { memory: mockProvider },
       })
     );
 
+    expect(receivedMemory).toBeDefined();
+    expect(receivedMemory.search).toBeDefined();
+    expect(receivedMemory.add).toBeDefined();
     expect(mockProvider.search).toHaveBeenCalledWith(
       'user preferences',
       { agentId: 'test-brain', userId: 'test-user' },
       { limit: undefined }
     );
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
-  });
-
-  it('should allow calling memory.add in step', async () => {
-    const mockProvider = createMockProvider();
-    const mockClient = createMockClient();
-
-    const testBrain = brain('test-brain')
-      .withMemory()
-      .step('Add Step', async ({ memory }) => {
-        await memory!.add([
-          { role: 'assistant', content: 'User prefers dark mode' },
-        ]);
-        return { saved: true };
-      });
-
-    await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        resources: {} as any,
-        providers: { memory: mockProvider },
-      })
-    );
-
-    expect(mockProvider.add).toHaveBeenCalledWith(
-      [{ role: 'assistant', content: 'User prefers dark mode' }],
-      { agentId: 'test-brain', userId: 'test-user' },
-      { metadata: undefined }
-    );
-  });
-
-  it('should preserve memory through step chain', async () => {
-    const mockProvider = createMockProvider();
-    const mockClient = createMockClient();
-    mockProvider.search.mockResolvedValue([]);
-
-    let step1Memory: any;
-    let step2Memory: any;
-
-    const testBrain = brain('test-brain')
-      .withMemory()
-      .step('Step 1', ({ memory }) => {
-        step1Memory = memory;
-        return { step: 1 };
-      })
-      .step('Step 2', ({ memory }) => {
-        step2Memory = memory;
-        return { step: 2 };
-      });
-
-    await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        resources: {} as any,
-        providers: { memory: mockProvider },
-      })
-    );
-
-    expect(step1Memory).toBeDefined();
-    expect(step2Memory).toBeDefined();
-    // Both steps should have the same scoped memory
-    expect(step1Memory).toBe(step2Memory);
-  });
-
-  it('should work with withServices', async () => {
-    const mockProvider = createMockProvider();
-    const mockClient = createMockClient();
-
-    interface TestServices {
-      logger: { log: (msg: string) => void };
-    }
-
-    const mockLogger = { log: jest.fn() };
-    let receivedMemory: any;
-    let receivedLogger: any;
-
-    const testBrain = brain('test-brain')
-      .withServices<TestServices>({ logger: mockLogger })
-      .withMemory()
-      .step('Combined Step', ({ memory, logger }) => {
-        receivedMemory = memory;
-        receivedLogger = logger;
-        return { done: true };
-      });
-
-    await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        resources: {} as any,
-        providers: { memory: mockProvider },
-      })
-    );
-
-    expect(receivedMemory).toBeDefined();
-    expect(receivedLogger).toBe(mockLogger);
-  });
-
-  it('should handle undefined memory gracefully when not configured', async () => {
-    const mockClient = createMockClient();
-
-    let receivedMemory: any = 'not-undefined';
-
-    const testBrain = brain('test-brain').step('No Memory Step', (ctx) => {
-      receivedMemory = (ctx as any).memory;
-      return { done: true };
-    });
-
-    await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        resources: {} as any,
-      })
-    );
-
-    expect(receivedMemory).toBeUndefined();
-  });
-
-  it('should scope to user only when scope is "user"', async () => {
-    const mockProvider = createMockProvider();
-    const mockClient = createMockClient();
-    mockProvider.search.mockResolvedValue([]);
-
-    const testBrain = brain('test-brain')
-      .withMemory({ scope: 'user' })
-      .step('Search', async ({ memory }) => {
-        await memory.search('query');
-        return { done: true };
-      });
-
-    await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        resources: {} as any,
-        providers: { memory: mockProvider },
-      })
-    );
-
-    // scope: 'user' → agentId should be empty, userId should be set
-    expect(mockProvider.search).toHaveBeenCalledWith(
-      'query',
-      { agentId: '', userId: 'test-user' },
-      { limit: undefined }
-    );
-  });
-
-  it('should scope to brain only when scope is "brain"', async () => {
-    const mockProvider = createMockProvider();
-    const mockClient = createMockClient();
-    mockProvider.search.mockResolvedValue([]);
-
-    const testBrain = brain('test-brain')
-      .withMemory({ scope: 'brain' })
-      .step('Search', async ({ memory }) => {
-        await memory.search('query');
-        return { done: true };
-      });
-
-    await collectEvents(
-      testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        resources: {} as any,
-        providers: { memory: mockProvider },
-      })
-    );
-
-    // scope: 'brain' → agentId should be set, userId should be empty
-    expect(mockProvider.search).toHaveBeenCalledWith(
-      'query',
-      { agentId: 'test-brain', userId: '' },
-      { limit: undefined }
-    );
   });
 });

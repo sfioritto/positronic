@@ -1,9 +1,8 @@
 import { jest } from '@jest/globals';
-import { brain, BrainRunner, type ObjectGenerator } from '@positronic/core';
-import { createMem0Adapter } from '../src/adapter.js';
-import { createMem0Tools, rememberFact, recallMemories } from '../src/tools.js';
+import { brain, BRAIN_EVENTS, type ObjectGenerator } from '@positronic/core';
 import { createMem0Provider } from '../src/provider.js';
-import { createMockProvider } from './test-helpers.js';
+import { mem0 } from '../src/plugin.js';
+import { createMockProvider, collectEvents } from './test-helpers.js';
 
 const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
 const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
@@ -11,39 +10,6 @@ const mockClient: jest.Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
   streamText: mockStreamText,
 };
-
-describe('Memory Tools Integration', () => {
-  describe('createMem0Tools', () => {
-    it('returns both tools', () => {
-      const tools = createMem0Tools();
-
-      expect(tools.rememberFact).toBe(rememberFact);
-      expect(tools.recallMemories).toBe(recallMemories);
-    });
-  });
-});
-
-describe('Mem0 Adapter Integration', () => {
-  it('does not call add when buffer is empty', async () => {
-    const provider = createMockProvider();
-    const adapter = createMem0Adapter({ provider });
-
-    // Simple step brain that doesn't have agent steps
-    const testBrain = brain('test-no-agent').step('Simple', () => ({
-      done: true,
-    }));
-
-    const runner = new BrainRunner({
-      adapters: [adapter],
-      client: mockClient,
-    });
-
-    await runner.run(testBrain, { currentUser: { name: 'test-user' } });
-
-    // No messages were generated, so nothing should be indexed
-    expect(provider.getAddCalls()).toHaveLength(0);
-  });
-});
 
 describe('Mem0 Provider Two-Tier Memory', () => {
   const mockFetch = jest.fn<typeof global.fetch>();
@@ -253,5 +219,137 @@ describe('Mem0 Provider Two-Tier Memory', () => {
       expect(headers['Authorization']).toBe('Token test-key');
       expect(headers['Content-Type']).toBe('application/json');
     });
+  });
+});
+
+describe('Mem0 Plugin', () => {
+  it('should inject search and add methods onto StepContext', async () => {
+    const provider = createMockProvider();
+    provider.seedMemories([
+      { id: '1', content: 'User likes dark mode', score: 0.95 },
+    ]);
+
+    const testBrain = brain('plugin-search-test')
+      .withPlugin(mem0.setup({ provider }))
+      .step('Search', async ({ mem0: m }) => {
+        const results = await m.search('preferences');
+        return { found: results.length };
+      });
+
+    const events = await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'alice' },
+      })
+    );
+
+    const searchCalls = provider.getSearchCalls();
+    expect(searchCalls).toHaveLength(1);
+    expect(searchCalls[0].scope).toEqual({
+      agentId: 'plugin-search-test',
+      userId: 'alice',
+    });
+
+    // Verify brain completed
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+  });
+
+  it('should scope memory to user when scope is "user"', async () => {
+    const provider = createMockProvider();
+
+    const testBrain = brain('user-scope-test')
+      .withPlugin(mem0.setup({ provider, scope: 'user' }))
+      .step('Add', async ({ mem0: m }) => {
+        await m.add([{ role: 'user', content: 'test' }]);
+        return { added: true };
+      });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'alice' },
+      })
+    );
+
+    const addCalls = provider.getAddCalls();
+    expect(addCalls).toHaveLength(1);
+    // scope: 'user' -> agentId is empty, userId is present
+    expect(addCalls[0].scope).toEqual({ agentId: '', userId: 'alice' });
+  });
+
+  it('should scope memory to brain when scope is "brain"', async () => {
+    const provider = createMockProvider();
+
+    const testBrain = brain('brain-scope-test')
+      .withPlugin(mem0.setup({ provider, scope: 'brain' }))
+      .step('Add', async ({ mem0: m }) => {
+        await m.add([{ role: 'user', content: 'test' }]);
+        return { added: true };
+      });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'alice' },
+      })
+    );
+
+    const addCalls = provider.getAddCalls();
+    expect(addCalls).toHaveLength(1);
+    // scope: 'brain' -> agentId is present, userId is empty
+    expect(addCalls[0].scope).toEqual({
+      agentId: 'brain-scope-test',
+      userId: '',
+    });
+  });
+
+  it('should expose tools that close over scoped memory', async () => {
+    const provider = createMockProvider();
+
+    const testBrain = brain('plugin-tools-test')
+      .withPlugin(mem0.setup({ provider }))
+      .step('Remember', async ({ mem0: m }) => {
+        const result = await m.tools.rememberFact.execute({
+          fact: 'User likes TypeScript',
+        });
+        return { result };
+      });
+
+    await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'alice' },
+      })
+    );
+
+    const addCalls = provider.getAddCalls();
+    expect(addCalls).toHaveLength(1);
+    expect(addCalls[0].messages).toEqual([
+      { role: 'assistant', content: 'User likes TypeScript' },
+    ]);
+    expect(addCalls[0].scope).toEqual({
+      agentId: 'plugin-tools-test',
+      userId: 'alice',
+    });
+  });
+
+  it('should dispatch events to plugin adapter', async () => {
+    const provider = createMockProvider();
+
+    const testBrain = brain('plugin-adapter-test')
+      .withPlugin(mem0.setup({ provider }))
+      .step('Do', () => ({ done: true }));
+
+    const events = await collectEvents(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'alice' },
+      })
+    );
+
+    // Adapter should have received COMPLETE event
+    // (but buffer is empty, so no add calls expected)
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+    expect(provider.getAddCalls()).toHaveLength(0);
   });
 });

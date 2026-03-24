@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '../../clients/types.js';
 import type { IterateResult } from '../iterate-result.js';
-import type { State, JsonObject, StepContext } from '../types.js';
+import type { State, JsonObject, StepContext, CurrentUser } from '../types.js';
 
 import type {
   WebhookRegistration,
@@ -9,8 +9,14 @@ import type {
   NormalizeToArray,
 } from '../webhook.js';
 import type { UIComponent } from '../../ui/types.js';
-import type { Memory } from '../../memory/types.js';
 import type { StoreSchema, InferStoreTypes, Store } from '../../store/types.js';
+import type {
+  ConfiguredPlugin,
+  PluginInjection,
+  PluginAdapter,
+  PluginCreateReturn,
+  PluginsFrom,
+} from '../../plugins/types.js';
 
 import type { BrainEvent } from '../definitions/events.js';
 import type { BrainStructure } from '../definitions/steps.js';
@@ -43,22 +49,55 @@ import type {
 import { Continuation } from './continuation.js';
 import { BrainEventStream } from '../execution/event-stream.js';
 import { parseDuration } from '../duration.js';
-import { createMemory } from '../../memory/create-memory.js';
+
+/**
+ * Merge parent and own plugin configs, call create() for each, separate adapters from injections.
+ */
+function resolvePlugins(
+  parentConfigs: ConfiguredPlugin[],
+  ownConfigs: ConfiguredPlugin[],
+  ctx: { brainTitle: string; currentUser: CurrentUser; brainRunId: string }
+) {
+  // Own configs override parent by plugin name
+  const merged = [
+    ...parentConfigs.filter(
+      (p) => !ownConfigs.some((own) => own.__plugin.name === p.__plugin.name)
+    ),
+    ...ownConfigs,
+  ];
+
+  const injections: Record<string, any> = {};
+  const adapters: PluginAdapter[] = [];
+
+  for (const configured of merged) {
+    const { __plugin: plugin, __config: config } = configured;
+    const { adapter, ...injection } = plugin.create({
+      config,
+      brainTitle: ctx.brainTitle,
+      currentUser: ctx.currentUser,
+      brainRunId: ctx.brainRunId,
+    });
+    injections[plugin.name] = injection;
+    if (adapter) {
+      adapters.push(adapter);
+    }
+  }
+
+  return { injections, adapters, configs: merged };
+}
 
 export class Brain<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
-  TServices extends object = object
+  TPlugins extends object = object
 > {
   declare readonly __optionsType: TOptions;
-  private blocks: Block<any, any, TOptions, TServices, any, any>[] = [];
+  private blocks: Block<any, any, TOptions, TPlugins, any, any>[] = [];
   public type: 'brain' = 'brain';
-  private services: TServices = {} as TServices;
   public optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
-  private useMemory: boolean = false;
-  private memoryScope?: 'user' | 'brain';
   private storeSchema?: StoreSchema;
+  private pluginConfigs: ConfiguredPlugin[] = [];
 
   constructor(public readonly title: string, private description?: string) {}
 
@@ -97,32 +136,18 @@ export class Brain<
           return {
             type: 'brain' as const,
             title: block.title,
-            innerBrain: (
-              block as BrainBlock<any, any, any, TOptions, TServices>
-            ).innerBrain.structure,
+            innerBrain: (block as BrainBlock<any, any, any, TOptions, TPlugins>)
+              .innerBrain.structure,
           };
         }
       }),
     };
   }
 
-  withServices<TNewServices extends object>(
-    services: TNewServices
-  ): Brain<TOptions, TState, TServices & TNewServices> {
-    const nextBrain = new Brain<TOptions, TState, TServices & TNewServices>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
-    this.copyConfigTo(nextBrain);
-    nextBrain.services = { ...this.services, ...services } as TServices &
-      TNewServices;
-    return nextBrain;
-  }
-
   withOptions<TSchema extends z.ZodSchema>(
     schema: TSchema
-  ): Brain<z.infer<TSchema>, TState, TServices> {
-    const nextBrain = new Brain<z.infer<TSchema>, TState, TServices>(
+  ): Brain<z.infer<TSchema>, TState, TPlugins> {
+    const nextBrain = new Brain<z.infer<TSchema>, TState, TPlugins>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -147,45 +172,13 @@ export class Brain<
    */
   withComponents(
     components: Record<string, UIComponent<any>>
-  ): Brain<TOptions, TState, TServices> {
-    const nextBrain = new Brain<TOptions, TState, TServices>(
+  ): Brain<TOptions, TState, TPlugins> {
+    const nextBrain = new Brain<TOptions, TState, TPlugins>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
     this.copyConfigTo(nextBrain);
     nextBrain.components = components;
-    return nextBrain;
-  }
-
-  /**
-   * Opt this brain into memory. When configured, steps receive a `memory` instance
-   * in their context for searching and storing memories.
-   *
-   * The memory provider implementation is supplied via the runner, not here.
-   *
-   * @param options - Optional scope configuration
-   *
-   * @example
-   * ```typescript
-   * const myBrain = brain('my-brain')
-   *   .withMemory()
-   *   .step('Remember', async ({ memory }) => {
-   *     const prefs = await memory.search('user preferences');
-   *     return { preferences: prefs };
-   *   });
-   * ```
-   */
-  withMemory(options?: {
-    scope?: 'user' | 'brain';
-  }): Brain<TOptions, TState, TServices & { memory: Memory }> {
-    const nextBrain = new Brain<
-      TOptions,
-      TState,
-      TServices & { memory: Memory }
-    >(this.title, this.description).withBlocks(this.blocks as any);
-    this.copyConfigTo(nextBrain);
-    nextBrain.useMemory = true;
-    nextBrain.memoryScope = options?.scope;
     return nextBrain;
   }
 
@@ -212,28 +205,56 @@ export class Brain<
    */
   withStore<T extends StoreSchema>(
     storeSchema: T
-  ): Brain<TOptions, TState, TServices & { store: Store<InferStoreTypes<T>> }> {
+  ): Brain<TOptions, TState, TPlugins & { store: Store<InferStoreTypes<T>> }> {
     const nextBrain = new Brain<
       TOptions,
       TState,
-      TServices & { store: Store<InferStoreTypes<T>> }
+      TPlugins & { store: Store<InferStoreTypes<T>> }
     >(this.title, this.description).withBlocks(this.blocks as any);
     this.copyConfigTo(nextBrain);
     nextBrain.storeSchema = storeSchema;
     return nextBrain;
   }
 
+  /**
+   * Add a plugin to this brain. The plugin's create() is called per brain run,
+   * and its return value is placed on StepContext under the plugin name.
+   *
+   * Replaces any existing plugin with the same name.
+   */
+  withPlugin<TName extends string, TConfig, TCreate extends PluginCreateReturn>(
+    plugin: ConfiguredPlugin<TName, TConfig, TCreate>
+  ): Brain<
+    TOptions,
+    TState,
+    TPlugins & { [K in TName]: PluginInjection<TCreate> }
+  > {
+    const nextBrain = new Brain<
+      TOptions,
+      TState,
+      TPlugins & { [K in TName]: PluginInjection<TCreate> }
+    >(this.title, this.description).withBlocks(this.blocks as any);
+    this.copyConfigTo(nextBrain);
+    nextBrain.pluginConfigs = [
+      ...this.pluginConfigs.filter(
+        (p) => p.__plugin.name !== plugin.__plugin.name
+      ),
+      plugin,
+    ];
+    return nextBrain;
+  }
+
   step<TNewState extends State>(
     title: string,
     action: (
-      params: StepContext<TState, TOptions> & TServices
+      params: StepContext<TState, TOptions> & TPlugins
     ) => TNewState | Promise<TNewState>
-  ): Brain<TOptions, TNewState, TServices> {
+  ): Brain<TOptions, TNewState, TPlugins> {
     const stepBlock: StepBlock<
       TState,
       TNewState,
       TOptions,
-      TServices,
+      TPlugins,
       any,
       any
     > = {
@@ -253,16 +274,16 @@ export class Brain<
   >(
     title: string,
     action: (
-      params: StepContext<TState, TOptions> & TServices
+      params: StepContext<TState, TOptions> & TPlugins
     ) => TWaitFor | Promise<TWaitFor>,
     options?: { timeout?: number | string }
   ): Continuation<
     TOptions,
     TState,
-    TServices,
+    TPlugins,
     ExtractWebhookResponses<NormalizeToArray<TWaitFor>>
   > {
-    const waitBlock: WaitBlock<TState, TOptions, TServices, any> = {
+    const waitBlock: WaitBlock<TState, TOptions, TPlugins, any> = {
       type: 'wait',
       title,
       action: action as any,
@@ -278,9 +299,9 @@ export class Brain<
   }
 
   guard(
-    predicate: (params: StepContext<TState, TOptions> & TServices) => boolean,
+    predicate: (params: StepContext<TState, TOptions> & TPlugins) => boolean,
     title?: string
-  ): Brain<TOptions, TState, TServices> {
+  ): Brain<TOptions, TState, TPlugins> {
     const guardBlock: GuardBlock<TState, TOptions> = {
       type: 'guard',
       title: title ?? 'Guard',
@@ -301,16 +322,16 @@ export class Brain<
     config?: {
       initialState?:
         | State
-        | ((context: StepContext<TState, TOptions> & TServices) => State);
+        | ((context: StepContext<TState, TOptions> & TPlugins) => State);
       options?:
         | TInnerOptions
         | ((
-            context: StepContext<TState, TOptions> & TServices
+            context: StepContext<TState, TOptions> & TPlugins
           ) => TInnerOptions);
     }
-  ): Brain<TOptions, TNewState, TServices> {
+  ): Brain<TOptions, TNewState, TPlugins> {
     const nestedConfig = config ?? {};
-    const nestedBlock: BrainBlock<TState, any, any, TOptions, TServices> = {
+    const nestedBlock: BrainBlock<TState, any, any, TOptions, TPlugins> = {
       type: 'brain',
       title,
       innerBrain,
@@ -327,9 +348,9 @@ export class Brain<
   >(
     title: string,
     configFn: (
-      context: StepContext<TState, TOptions> & TServices
+      context: StepContext<TState, TOptions> & TPlugins
     ) => PromptConfig<TSchema> | Promise<PromptConfig<TSchema>>
-  ): Brain<TOptions, TNewState, TServices> {
+  ): Brain<TOptions, TNewState, TPlugins> {
     const promptBlock: PromptBlock = {
       type: 'prompt',
       title,
@@ -351,14 +372,14 @@ export class Brain<
   >(
     title: string,
     stateKey: TStateKey & (string extends TStateKey ? never : unknown),
-    configFn: (context: StepContext<TState, TOptions> & TServices) => {
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       run: Brain<TInnerOptions, TInnerState, any>;
       over: TItems | Promise<TItems>;
       initialState: (item: TItems[number]) => State;
       error?: (item: TItems[number], error: Error) => TInnerState | null;
       options?: TInnerOptions;
     }
-  ): Brain<TOptions, TNewState, TServices>;
+  ): Brain<TOptions, TNewState, TPlugins>;
 
   // Overload 2: Prompt mode — run a prompt per item
   map<
@@ -371,7 +392,7 @@ export class Brain<
   >(
     title: string,
     stateKey: TStateKey & (string extends TStateKey ? never : unknown),
-    configFn: (context: StepContext<TState, TOptions> & TServices) => {
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       prompt: {
         message: (item: NoInfer<TItems[number]>) => TemplateReturn;
         system?:
@@ -384,14 +405,14 @@ export class Brain<
       over: TItems | Promise<TItems>;
       error?: (item: TItems[number], error: Error) => z.infer<TSchema> | null;
     }
-  ): Brain<TOptions, TNewState, TServices>;
+  ): Brain<TOptions, TNewState, TPlugins>;
 
   // Implementation
   map(
     title: string,
     stateKey: string,
     configFn: (context: any) => MapConfig | Promise<MapConfig>
-  ): Brain<TOptions, any, TServices> {
+  ): Brain<TOptions, any, TPlugins> {
     const mapBlock: MapBlock = {
       type: 'map',
       title,
@@ -408,7 +429,7 @@ export class Brain<
     TNewState extends State = TState & z.infer<TSchema>
   >(
     title: string,
-    configFn: (context: StepContext<TState, TOptions> & TServices) => {
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       prompt: TemplateReturn;
       formSchema: TSchema;
       onCreated?: (page: GeneratedPage<TSchema>) => void | Promise<void>;
@@ -416,38 +437,37 @@ export class Brain<
       ttl?: number;
       persist?: boolean;
     }
-  ): Brain<TOptions, TNewState, TServices>;
+  ): Brain<TOptions, TNewState, TPlugins>;
 
   // Overload 2: Without formSchema - returns Brain with unchanged state
   page(
     title: string,
-    configFn: (context: StepContext<TState, TOptions> & TServices) => {
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       prompt: TemplateReturn;
       onCreated?: (page: GeneratedPage) => void | Promise<void>;
       props?: Record<string, unknown>;
       ttl?: number;
       persist?: boolean;
     }
-  ): Brain<TOptions, TState, TServices>;
+  ): Brain<TOptions, TState, TPlugins>;
 
   // Implementation
   page(
     title: string,
     configFn: (context: any) => PageConfig | Promise<PageConfig>
   ): any {
-    const pageBlock: StepBlock<TState, TState, TOptions, TServices, any, any> =
-      {
-        type: 'step',
-        title,
-        isPageStep: true,
-        pageConfigFn: configFn,
-        action: async () => {
-          throw new Error(
-            `Page step "${title}" requires components to be configured via brain.withComponents(). ` +
-              `Page generation is handled by the runner, not the step action directly.`
-          );
-        },
-      };
+    const pageBlock: StepBlock<TState, TState, TOptions, TPlugins, any, any> = {
+      type: 'step',
+      title,
+      isPageStep: true,
+      pageConfigFn: configFn,
+      action: async () => {
+        throw new Error(
+          `Page step "${title}" requires components to be configured via brain.withComponents(). ` +
+            `Page generation is handled by the runner, not the step action directly.`
+        );
+      },
+    };
     this.blocks.push(pageBlock);
     return this.nextBrain<any>();
   }
@@ -461,38 +481,32 @@ export class Brain<
     params: InitialRunParams<TOptions> | ResumeRunParams<TOptions>
   ): AsyncGenerator<BrainEvent<TOptions>> {
     const { title, description, blocks } = this;
-    const { providers } = params;
     const brainRunId =
       'resume' in params && params.resume
         ? params.brainRunId
         : (params as InitialRunParams<TOptions>).brainRunId ?? '';
 
-    const providerCtx = {
+    // Platform services
+    const files = params.files;
+    const pages = params.pages;
+    const store =
+      this.storeSchema && params.storeProvider
+        ? params.storeProvider({
+            brainTitle: title,
+            currentUser: params.currentUser,
+            schema: this.storeSchema,
+          })
+        : undefined;
+
+    const {
+      injections: pluginInjections,
+      adapters: pluginAdapters,
+      configs: mergedPluginConfigs,
+    } = resolvePlugins(params.pluginConfigs ?? [], this.pluginConfigs, {
       brainTitle: title,
       currentUser: params.currentUser,
       brainRunId,
-    };
-
-    // Call providers to create scoped service instances
-    const files = providers?.files?.(providerCtx);
-    const pages = providers?.pages?.(providerCtx);
-    const store =
-      this.storeSchema && providers?.store
-        ? providers.store({ ...providerCtx, schema: this.storeSchema })
-        : undefined;
-    // Create memory if this brain opted in via withMemory()
-    // The framework handles scoping — users just pass a raw MemoryProvider.
-    // Default: scoped to both brain + user (per-brain-per-user).
-    // scope: 'user' → omit brainTitle so memories span all brains for this user.
-    // scope: 'brain' → omit userId so memories span all users for this brain.
-    const memory =
-      this.useMemory && providers?.memory
-        ? createMemory(
-            providers.memory,
-            this.memoryScope === 'user' ? '' : providerCtx.brainTitle,
-            this.memoryScope === 'brain' ? '' : providerCtx.currentUser.name
-          )
-        : undefined;
+    });
 
     const stream = new BrainEventStream({
       title,
@@ -501,39 +515,38 @@ export class Brain<
       ...params,
       options: (params.options || {}) as TOptions,
       optionsSchema: this.optionsSchema,
-      services: { ...(params.services || {}), ...this.services } as TServices,
       components: this.components,
       files,
       pages,
       store,
-      memory,
+      pluginInjections,
+      pluginAdapters,
+      pluginConfigs: mergedPluginConfigs,
     });
 
     yield* stream.next();
   }
 
   private withBlocks(
-    blocks: Block<any, any, TOptions, TServices, any, any>[]
+    blocks: Block<any, any, TOptions, TPlugins, any, any>[]
   ): this {
     this.blocks = blocks;
     return this;
   }
 
   private copyConfigTo(target: Brain<any, any, any>): void {
-    target.services = this.services;
     target.optionsSchema = this.optionsSchema;
     target.components = this.components;
-    target.useMemory = this.useMemory;
-    target.memoryScope = this.memoryScope;
     target.storeSchema = this.storeSchema;
+    target.pluginConfigs = this.pluginConfigs;
   }
 
   private nextBrain<TNewState extends State>(): Brain<
     TOptions,
     TNewState,
-    TServices
+    TPlugins
   > {
-    const nextBrain = new Brain<TOptions, TNewState, TServices>(
+    const nextBrain = new Brain<TOptions, TNewState, TPlugins>(
       this.title,
       this.description
     ).withBlocks(this.blocks as any);
@@ -544,15 +557,15 @@ export class Brain<
   private continuationCallbacks<TResponse>(): Continuation<
     TOptions,
     TState,
-    TServices,
+    TPlugins,
     TResponse
   > {
     const blocks = this.blocks;
     const self = this;
-    return new Continuation<TOptions, TState, TServices, TResponse>(
+    return new Continuation<TOptions, TState, TPlugins, TResponse>(
       (block) => blocks.push(block),
       <TNewState extends State>() => {
-        const next = new Brain<TOptions, TNewState, TServices>(
+        const next = new Brain<TOptions, TNewState, TPlugins>(
           self.title,
           self.description
         ).withBlocks(blocks as any);
@@ -584,30 +597,40 @@ function registerBrainName(title: string): void {
 // Overload 1: Builder pattern with title only
 export function brain<
   TOptions extends JsonObject = JsonObject,
-  TState extends State = object,
-  TServices extends object = object
->(title: string): Brain<TOptions, TState, TServices>;
+  TState extends State = object
+>(title: string): Brain<TOptions, TState, object>;
 
-// Overload 2: Builder pattern with config object (title + description)
+// Overload 2: Config object with optional plugins
 export function brain<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
-  TServices extends object = object
+  TPluginMap extends Record<string, ConfiguredPlugin> = {}
 >(config: {
   title: string;
   description?: string;
-}): Brain<TOptions, TState, TServices>;
+  plugins?: TPluginMap;
+}): Brain<TOptions, TState, PluginsFrom<TPluginMap>>;
 
 // Implementation
 export function brain(
-  titleOrConfig: string | BrainConfig
+  titleOrConfig:
+    | string
+    | (BrainConfig & { plugins?: Record<string, ConfiguredPlugin> })
 ): Brain<any, any, any> {
-  const title =
-    typeof titleOrConfig === 'string' ? titleOrConfig : titleOrConfig.title;
-  const description =
-    typeof titleOrConfig === 'string' ? undefined : titleOrConfig.description;
+  const isString = typeof titleOrConfig === 'string';
+  const title = isString ? titleOrConfig : titleOrConfig.title;
+  const description = isString ? undefined : titleOrConfig.description;
+  const plugins = isString ? undefined : titleOrConfig.plugins;
 
   registerBrainName(title);
 
-  return new Brain<any, any, any>(title, description);
+  let b = new Brain<any, any, any>(title, description);
+
+  if (plugins) {
+    for (const plugin of Object.values(plugins)) {
+      b = b.withPlugin(plugin);
+    }
+  }
+
+  return b;
 }

@@ -15,7 +15,7 @@ export type StepAction<
   TStateIn,
   TStateOut,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object,
+  TPlugins extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
   TResponseOut extends JsonObject | undefined = undefined,
   TPageIn extends GeneratedPage | undefined = undefined
@@ -29,7 +29,7 @@ export type StepAction<
     page: TPageIn;
     pages?: PagesService;
     env: RuntimeEnv;
-  } & TServices
+  } & TPlugins
 ) =>
   | TStateOut
   | Promise<TStateOut>
@@ -40,7 +40,7 @@ export type StepBlock<
   TStateIn,
   TStateOut,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object,
+  TPlugins extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
   TPageIn extends GeneratedPage | undefined = undefined
 > = {
@@ -50,7 +50,7 @@ export type StepBlock<
     TStateIn,
     TStateOut,
     TOptions,
-    TServices,
+    TPlugins,
     TResponseIn,
     JsonObject | undefined,
     TPageIn
@@ -66,7 +66,7 @@ export type StepBlock<
 export type WaitBlock<
   TState,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object,
+  TPlugins extends object = object,
   TPage extends GeneratedPage | undefined = undefined
 > = {
   type: 'wait';
@@ -81,7 +81,7 @@ export type WaitBlock<
       page: TPage;
       pages?: PagesService;
       env: RuntimeEnv;
-    } & TServices
+    } & TPlugins
   ) =>
     | WebhookRegistration<any>
     | readonly WebhookRegistration<any>[]
@@ -95,7 +95,7 @@ export type BrainBlock<
   TInnerState extends State,
   TNewState,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object,
+  TPlugins extends object = object,
   TInnerBrain = any
 > = {
   type: 'brain';
@@ -172,13 +172,13 @@ export type Block<
   TStateIn,
   TStateOut,
   TOptions extends JsonObject = JsonObject,
-  TServices extends object = object,
+  TPlugins extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
   TPageIn extends GeneratedPage | undefined = undefined
 > =
-  | StepBlock<TStateIn, TStateOut, TOptions, TServices, TResponseIn, TPageIn>
-  | BrainBlock<TStateIn, any, TStateOut, TOptions, TServices>
+  | StepBlock<TStateIn, TStateOut, TOptions, TPlugins, TResponseIn, TPageIn>
+  | BrainBlock<TStateIn, any, TStateOut, TOptions, TPlugins>
   | GuardBlock<TStateIn, TOptions>
-  | WaitBlock<TStateIn, TOptions, TServices, TPageIn>
+  | WaitBlock<TStateIn, TOptions, TPlugins, TPageIn>
   | MapBlock
   | PromptBlock;

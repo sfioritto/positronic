@@ -728,11 +728,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
       resources: r2Resources ?? {},
       signalProvider,
       governor: (c: ObjectGenerator) => rateGoverned(c),
-      providers: {
-        files: () => filesService,
-        pages: () => pagesService,
-        store: (ctx) => storeBackend(ctx),
-      },
+      files: filesService,
+      pages: pagesService,
+      storeProvider: storeBackend,
     });
 
     return { brainToRun, runner };
