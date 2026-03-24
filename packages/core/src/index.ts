@@ -146,6 +146,7 @@ export type {
   PluginDefinition,
   PluginInjection,
   PluginsFrom,
+  PluginsFromArray,
   ConfiguredPlugin,
   ConfiguredPluginWithSetup,
 } from './plugins/index.js';

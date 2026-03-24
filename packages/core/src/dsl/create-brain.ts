@@ -1,22 +1,26 @@
 import { brain as coreBrain, Brain } from './builder/brain.js';
 import type { State, JsonObject } from './types.js';
 import type { UIComponent } from '../ui/types.js';
-import type { ConfiguredPlugin } from '../plugins/types.js';
+import type { ConfiguredPlugin, PluginsFromArray } from '../plugins/types.js';
 
 /**
  * Configuration for creating a project-level brain function.
  */
 export interface CreateBrainConfig<
+  TPlugins extends readonly ConfiguredPlugin[] = readonly ConfiguredPlugin[],
   TComponents extends Record<string, UIComponent<any>> = {}
 > {
   /** Plugins available to all brains */
-  plugins?: ConfiguredPlugin[];
+  plugins?: TPlugins;
   /** UI components for generative UI steps */
   components?: TComponents;
 }
 
 /**
  * Creates a project-level brain function with pre-configured plugins and components.
+ *
+ * Plugin types are inferred from the array and propagated to all brains
+ * created by the returned factory function.
  *
  * @example
  * ```typescript
@@ -31,15 +35,16 @@ export interface CreateBrainConfig<
  * ```
  */
 export function createBrain<
+  const TPlugins extends readonly ConfiguredPlugin[] = readonly [],
   TComponents extends Record<string, UIComponent<any>> = {}
->(config: CreateBrainConfig<TComponents>) {
+>(config: { plugins?: TPlugins; components?: TComponents }) {
   const { plugins, components } = config;
 
   // Overload 1: Builder pattern with title string
   function brain<
     TOptions extends JsonObject = {},
     TState extends State = object
-  >(title: string): Brain<TOptions, TState, object>;
+  >(title: string): Brain<TOptions, TState, PluginsFromArray<TPlugins>>;
 
   // Overload 2: Builder pattern with config object
   function brain<
@@ -48,7 +53,7 @@ export function createBrain<
   >(config: {
     title: string;
     description?: string;
-  }): Brain<TOptions, TState, object>;
+  }): Brain<TOptions, TState, PluginsFromArray<TPlugins>>;
 
   // Implementation
   function brain(
