@@ -12,7 +12,7 @@ When editing files in `template/`, you MUST escape these patterns:
 - `${foo}` must be written as `<%= '${foo}' %>`
 - `<%= foo %>` must be written as `<%= '\<%= foo %\>' %>`
 
-This applies to ALL files — code examples in markdown, inline HTML, comments, etc. The only exceptions are files marked as binary in the `prepare` hook of `index.js` (currently `docs/*.md` files).
+This applies to ALL files — code examples in markdown, inline HTML, comments, etc. There are no exceptions.
 
 ## Part 1: The `@positronic/template-new-project`
 
@@ -66,7 +66,7 @@ This asynchronous function runs after the user has answered the prompts but befo
 This function runs after `caz` has gathered all the template files but before they are rendered and written to disk. It allows for final manipulation of the file list.
 
 *   **Renaming System Files**: It renames `_gitignore` to `.gitignore` and `_env` to `.env`. This is a common pattern to prevent the template's own `.gitignore` or `.env` from affecting the template repository itself.
-*   **Marking Files as Binary**: It iterates through the files and marks any markdown files in the `docs/` directory as binary. This tells `caz`'s rendering engine to skip them, preventing it from trying to inject template variables into the documentation.
+*   **Note**: No files are currently marked as binary. All files in `template/` are processed by the caz rendering engine, including markdown files in `docs/`. Any `${...}` or `<%= ... %>` syntax in those files will be interpreted as template variables and must be escaped.
 
 ### The Template Files (`template/` directory)
 
@@ -198,28 +198,4 @@ The codebase reveals two ways to handle this, depending on your goal.
 
     If a file should be copied verbatim with no processing whatsoever, the solution is to instruct `caz` to treat it as a binary file. The renderer explicitly skips binary files.
 
-    The `@positronic/template-new-project` template already does this for its documentation files as a preventative measure. You can add a similar rule in the `prepare` hook within `index.js`:
-
-    ```javascript
-    // in index.js
-    prepare: async ctx => {
-      // ... existing prepare logic ...
-
-      // Add a rule to treat all .sh files as binary
-      ctx.files.forEach(file => {
-        if (file.path.endsWith('.sh')) {
-          // This is a made-up property for the example, but it would
-          // need to be supported by caz's `isBinary` check.
-          // A more robust way is to check the file contents.
-          // The key insight is that the prepare hook is where you would
-          // manipulate files before rendering.
-          // The current template shows a real example for .md files:
-          if (file.path.startsWith('docs/') && file.path.endsWith('.md')) {
-            file.binary = true; // This is a conceptual flag.
-                                // The actual implementation is in caz's `isBinary` check.
-          }
-        }
-      });
-    }
-    ```
-    This tells the `render` step to ignore the file completely, ensuring it is copied as-is.
+    The template does NOT currently mark any files as binary. To add binary marking, you would set `file.binary = true` in the `prepare` hook of `index.js`. However, this approach is untested — the preferred method is to escape template syntax in the file content.

@@ -175,7 +175,7 @@ const mainBrain = brain('Main Process')
   });
 ```
 
-The inner brain's final state is spread directly onto the outer state (e.g., `state.result` will be `20`). `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...services }`. To namespace, design the inner brain to return its results under a single key.
+The inner brain's final state is spread directly onto the outer state (e.g., `state.result` will be `20`). `initialState` is optional (defaults to `{}`) and can be a static object or a function receiving `{ state, options, ...plugins }`. To namespace, design the inner brain to return its results under a single key.
 
 ## Guard Clauses
 
@@ -223,7 +223,7 @@ Each step receives these parameters:
 - `options` - Runtime options passed to the brain
 - `pages` - Pages service for HTML page management
 - `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
-- Custom services (if configured with `.withServices()` or `createBrain()`)
+- Custom plugin-provided values (if configured with `.withPlugin()` or `createBrain()`)
 
 > **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.page()` with `formSchema`, the response is spread directly onto state. See [Page Steps](#page-steps) and [Webhooks](#webhooks) for details.
 
@@ -288,7 +288,7 @@ px brain run my-brain -o "webhook=https://example.com/api?key=value"
 
 Options are passed as simple key=value pairs and are available as strings in your brain.
 
-#### Options vs Services vs Initial State
+#### Options vs Plugins vs Initial State
 
 Understanding when to use each:
 
@@ -297,8 +297,8 @@ Understanding when to use each:
   - Don't change during execution
   - Examples: `slackChannel`, `apiEndpoint`, `debugMode`
 
-- **Services**: External dependencies and side effects (clients, loggers, databases)
-  - Configure once with `.withServices()`
+- **Plugins**: External dependencies and side effects (clients, loggers, databases)
+  - Configure once with `.withPlugin()` or `createBrain()`
   - Available in all steps
   - Not serializable
   - Examples: `slackClient`, `database`, `logger`
@@ -321,10 +321,8 @@ const notificationSchema = z.object({
 
 const notificationBrain = brain('Smart Notifier')
   .withOptions(notificationSchema)
-  .withServices({ 
-    slack: slackClient,
-    email: emailClient 
-  })
+  .withPlugin(slack)
+  .withPlugin(email)
   .step('Process Alert', ({ state, options }) => ({
     ...state,
     formattedMessage: options.includeDetails === 'true'
@@ -367,20 +365,16 @@ expect(mockSlack.post).toHaveBeenCalledWith('#test-channel', expect.any(String))
 expect(mockEmail.send).toHaveBeenCalled(); // High priority triggers email
 ```
 
-### Service Injection
+### Plugin Injection
 
-The `withServices` method provides dependency injection for your brains, making external services available throughout the workflow while maintaining testability.
+The `withPlugin` method provides dependency injection for your brains, making plugin-provided values available throughout the workflow while maintaining testability.
 
 #### Basic Usage
 
 ```typescript
-interface MyServices {
-  logger: Logger;
-  database: Database;
-}
-
-const brainWithServices = brain('Service Brain')
-  .withServices<MyServices>({ logger, database })
+const brainWithPlugins = brain('Plugin Brain')
+  .withPlugin(logger)
+  .withPlugin(database)
   .step('Log and Save', async ({ state, logger, database }) => {
     logger.info('Processing state');
     await database.save(state);
@@ -388,9 +382,9 @@ const brainWithServices = brain('Service Brain')
   });
 ```
 
-#### Where Services Are Available
+#### Where Plugin Values Are Available
 
-Services are destructured alongside other parameters in:
+Plugin-provided values are destructured alongside other parameters in:
 
 1. **Step Actions**:
 ```typescript
@@ -420,29 +414,11 @@ Services are destructured alongside other parameters in:
 #### Real-World Example
 
 ```typescript
-// Define service interfaces
-interface Services {
-  api: {
-    fetchData: (id: string) => Promise<Data>;
-    submitResult: (result: any) => Promise<void>;
-  };
-  cache: {
-    get: (key: string) => Promise<any>;
-    set: (key: string, value: any) => Promise<void>;
-  };
-  metrics: {
-    track: (event: string, properties?: any) => void;
-    time: (label: string) => () => void;
-  };
-}
-
-// Create a brain with multiple services
+// Create a brain with multiple plugins
 const analysisBrain = brain('Data Analysis')
-  .withServices<Services>({
-    api: apiClient,
-    cache: redisClient,
-    metrics: analyticsClient
-  })
+  .withPlugin(api)
+  .withPlugin(cache)
+  .withPlugin(metrics)
   .step('Start Timing', ({ metrics }) => {
     const endTimer = metrics.time('analysis_duration');
     return { startTime: Date.now(), endTimer };
@@ -485,9 +461,9 @@ const analysisBrain = brain('Data Analysis')
   });
 ```
 
-#### Testing with Services
+#### Testing with Plugins
 
-Services make testing easier by allowing you to inject mocks:
+Plugins make testing easier by allowing you to inject mocks:
 
 ```typescript
 // In your test file
@@ -504,7 +480,8 @@ const mockDatabase = {
 };
 
 const testBrain = brain('Test Brain')
-  .withServices({ logger: mockLogger, database: mockDatabase })
+  .withPlugin(mockLoggerPlugin)
+  .withPlugin(mockDatabasePlugin)
   .step('Do Something', async ({ logger, database }) => {
     logger.info('Fetching data');
     const data = await database.find('123');
@@ -516,7 +493,7 @@ const result = await runBrainTest(testBrain, {
   client: createMockClient()
 });
 
-// Verify service calls
+// Verify plugin calls
 expect(mockLogger.info).toHaveBeenCalledWith('Fetching data');
 expect(mockDatabase.find).toHaveBeenCalledWith('123');
 expect(result.finalState.data).toEqual({ id: '123', name: 'Test' });
@@ -524,10 +501,10 @@ expect(result.finalState.data).toEqual({ id: '123', name: 'Test' });
 
 #### Important Notes
 
-- Call `withServices` before defining any steps
-- Services are typed - TypeScript knows exactly which services are available
-- Services are not serialized - they're for side effects and external interactions
-- Each brain instance maintains its own service references
+- Call `withPlugin` before defining any steps
+- Plugin-provided values are typed - TypeScript knows exactly which values are available
+- Plugin values are not serialized - they're for side effects and external interactions
+- Each brain instance maintains its own plugin references
 
 ### Tool-Calling Prompt Loops
 
@@ -700,7 +677,7 @@ You can declare store fields at the project level so all brains share the same s
 ```typescript
 // src/brain.ts
 export const brain = createBrain({
-  services: { slack },
+  plugins: [slack],
   store: {
     processedCount: z.number(),
     userSettings: { type: z.object({ notifications: z.boolean() }), perUser: true },
@@ -731,10 +708,7 @@ import { createBrain } from '@positronic/core';
 import { z } from 'zod';
 
 export const brain = createBrain({
-  services: {
-    logger: console,
-    api: apiClient
-  },
+  plugins: [logger, api],
   tools: {
     search: {
       description: 'Search the web',
@@ -755,7 +729,7 @@ export const brain = createBrain({
 });
 ```
 
-All brains created with this factory will have access to the configured services, tools, components, and store.
+All brains created with this factory will have access to the configured plugins, tools, components, and store.
 
 #### Typing Initial State and Options
 
@@ -1280,7 +1254,7 @@ Note: The `stateKey` is now the 2nd argument to `.map()`: `.map('title', 'stateK
 
 **Common options** (both modes):
 
-- `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, services, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, services, or any other context field. Can be async.
+- `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, plugin-provided values, or any other context field. Can be async.
 - `error: (item, error) => Result | null` - Optional fallback when an item fails. Return `null` to skip the item entirely.
 
 **Brain mode** (use `run`):
@@ -1294,9 +1268,9 @@ Note: The `stateKey` is now the 2nd argument to `.map()`: `.map('title', 'stateK
 - `prompt.outputSchema: ZodSchema` - Zod schema for the LLM output.
 - `client?: ObjectGenerator` - Optional per-step LLM client override.
 
-#### Accessing options and services in `over`
+#### Accessing options and plugins in `over`
 
-Since `over` receives the full step context, you can use options or services to determine which items to iterate over:
+Since `over` receives the full step context, you can use options or plugin-provided values to determine which items to iterate over:
 
 ```typescript
 const processItemBrain = brain('Process Single')
@@ -1772,25 +1746,13 @@ import { brain } from '../brain.js';
 import { BrainRunner } from '@positronic/core';
 import { z } from 'zod';
 
-// Define services
-interface Services {
-  logger: Logger;
-  analytics: {
-    track: (event: string, properties?: any) => void;
-  };
-}
-
 // Create brain with all features
 const completeBrain = brain({
   title: 'Complete Example',
   description: 'Demonstrates all Brain DSL features',
 })
-  .withServices<Services>({
-    logger: console,
-    analytics: {
-      track: (event, props) => console.log('Track:', event, props)
-    }
-  })
+  .withPlugin(logger)
+  .withPlugin(analytics)
   .step('Initialize', ({ logger, analytics }) => {
     logger.log('Starting workflow');
     analytics.track('brain_started');

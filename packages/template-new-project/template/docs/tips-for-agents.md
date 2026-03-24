@@ -541,38 +541,35 @@ brain('reader')
 
 The `.page()` step automatically suspends, waits for the form submission, and merges the response onto state. Use `.prompt()` loops for tasks that genuinely need LLM decision-making with tools (research, multi-step reasoning, human-in-the-loop via webhooks), not for data display.
 
-## Service Organization
+## Plugin Organization
 
-When implementing services for the project brain, keep service implementations in the `src/services/` directory to stay organized and reusable:
+When implementing plugins for the project brain, keep plugin implementations in the `src/plugins/` directory to stay organized and reusable:
 
 ```
-src/services/
-├── gmail.js         # Gmail API integration
-├── slack.js         # Slack notifications
-├── database.js      # Database client
-└── analytics.js     # Analytics tracking
+src/plugins/
+├── gmail.ts         # Gmail API integration
+├── slack.ts         # Slack notifications
+├── database.ts      # Database client
+└── analytics.ts     # Analytics tracking
 ```
 
 Then in your `src/brain.ts`:
 
 ```typescript
 import { createBrain } from '@positronic/core';
-import gmail from './services/gmail.js';
-import slack from './services/slack.js';
-import database from './services/database.js';
-import analytics from './services/analytics.js';
+import { gmail } from './plugins/gmail.js';
+import { slack } from './plugins/slack.js';
+import { database } from './plugins/database.js';
+import { analytics } from './plugins/analytics.js';
 
 export const brain = createBrain({
-  services: {
-    gmail,
-    slack,
-    database,
-    analytics
-  }
+  plugins: [gmail, slack, database, analytics],
 });
 ```
 
-This keeps your service implementations separate from your brain logic and makes them easier to test and maintain.
+Each plugin is defined with `definePlugin` from `@positronic/core`. See `/docs/plugin-guide.md` for how to create plugins with typed config, tools, and adapters.
+
+This keeps your plugin implementations separate from your brain logic and makes them easier to test and maintain.
 
 ## Rate Limiting with bottleneck
 
