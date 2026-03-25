@@ -13,6 +13,8 @@ import type { ResourceLoader } from '../src/resources/resource-loader.js';
 import { createWebhook } from '../src/index.js';
 import { z } from 'zod';
 import { MockSignalProvider } from './mock-signal-provider.js';
+import { createBrain } from '../src/dsl/create-brain.js';
+import { definePlugin } from '../src/plugins/define-plugin.js';
 
 describe('BrainRunner', () => {
   const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
@@ -585,5 +587,47 @@ describe('BrainRunner', () => {
       (call) => call[0].type === BRAIN_EVENTS.COMPLETE
     );
     expect(completeEvents.length).toBe(1);
+  });
+
+  it('should dispatch events to plugin adapters via BrainRunner', async () => {
+    const pluginDispatchMock = jest.fn<(event: any) => void>();
+
+    const testPlugin = definePlugin({
+      name: 'testPlugin',
+      setup: (config: { key: string }) => config,
+      create: ({ config }) => ({
+        getValue: () => config.key,
+        adapter: {
+          dispatch: pluginDispatchMock,
+        },
+      }),
+    });
+
+    const brainFactory = createBrain({
+      plugins: [testPlugin.setup({ key: 'test-value' })],
+    });
+
+    const testBrain = brainFactory('Plugin Adapter via Runner').step(
+      'Use plugin',
+      ({ testPlugin: tp }) => ({
+        value: tp.getValue(),
+      })
+    );
+
+    const runner = new BrainRunner({
+      adapters: [mockAdapter],
+      client: mockClient,
+    });
+
+    await runner.run(testBrain, { currentUser: { name: 'test-user' } });
+
+    expect(pluginDispatchMock.mock.calls.length).toBeGreaterThan(0);
+
+    const pluginEventTypes = pluginDispatchMock.mock.calls.map(
+      (call: any[]) => call[0].type
+    );
+    expect(pluginEventTypes).toContain(BRAIN_EVENTS.START);
+    expect(pluginEventTypes).toContain(BRAIN_EVENTS.STEP_COMPLETE);
+    expect(pluginEventTypes).toContain(BRAIN_EVENTS.COMPLETE);
   });
 });

@@ -38,23 +38,20 @@ import { google } from '@ai-sdk/google';
  *
  * ## Memory
  *
- * To add memory (automatic conversation indexing with Mem0):
+ * To add semantic memory via Mem0, use the mem0 plugin in your
+ * src/brain.ts file:
  *
  * ```typescript
- * import { createMem0Provider, createMem0Adapter } from '@positronic/mem0';
+ * import { createBrain } from '@positronic/core';
+ * import { mem0 } from '@positronic/mem0';
  *
- * const provider = createMem0Provider({
- *   apiKey: process.env.MEM0_API_KEY!,
- * });
- *
- * const memoryAdapter = createMem0Adapter({ provider });
- *
- * export const runner = new BrainRunner({
- *   adapters: [memoryAdapter],
- *   client: new VercelClient(google('gemini-3-pro-preview')),
- *   resources: {},
+ * export const brain = createBrain({
+ *   plugins: [mem0.setup({ apiKey: process.env.MEM0_API_KEY! })],
  * });
  * ```
+ *
+ * Then use `mem0.search()` and `mem0.add()` in brain steps, or pass
+ * `mem0.tools` to a prompt loop for LLM-driven memory.
  *
  * See docs/memory-guide.md for more details.
  */

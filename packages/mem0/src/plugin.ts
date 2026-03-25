@@ -1,37 +1,118 @@
 import { z } from 'zod';
 import { definePlugin } from '@positronic/core';
-import { BRAIN_EVENTS } from '@positronic/core';
-import { createMem0Provider } from './provider.js';
 
 import type { MemoryProvider } from '@positronic/core';
 
+type Mem0ApiConfig = {
+  /** Mem0 API key */
+  apiKey: string;
+  /** Base URL for the Mem0 API (defaults to https://api.mem0.ai) */
+  baseUrl?: string;
+  /** Organization ID (optional) */
+  orgId?: string;
+  /** Project ID (optional) */
+  projectId?: string;
+};
+
 export type Mem0PluginConfig =
-  | {
-      /** Mem0 API key */
-      apiKey: string;
-      /** Base URL for the Mem0 API (defaults to https://api.mem0.ai) */
-      baseUrl?: string;
-      /** Organization ID (optional) */
-      orgId?: string;
-      /** Project ID (optional) */
-      projectId?: string;
-      /** Memory scope. Default: per-brain-per-user. 'user' = cross-brain. 'brain' = cross-user. */
-      scope?: 'user' | 'brain';
-      /** Whether the adapter should auto-index conversations on COMPLETE */
-      autoIndex?: boolean;
-    }
+  | Mem0ApiConfig
   | {
       /** Custom provider (for testing or alternative backends) */
       provider: MemoryProvider;
-      scope?: 'user' | 'brain';
-      autoIndex?: boolean;
     };
+
+interface Mem0SearchResult {
+  id: string;
+  memory: string;
+  score?: number;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Build a MemoryProvider that makes direct Mem0 API calls.
+ *
+ * Mem0 ignores agent_id when user_id is present, so we encode both into
+ * a composite user_id: "userName/brainTitle". This gives strict per-brain
+ * per-user isolation without relying on agent_id.
+ */
+function createMem0Provider(config: Mem0ApiConfig): MemoryProvider {
+  const { apiKey, baseUrl = 'https://api.mem0.ai', orgId, projectId } = config;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Token ${apiKey}`,
+  };
+
+  if (orgId) headers['Mem0-Org-Id'] = orgId;
+  if (projectId) headers['Mem0-Project-Id'] = projectId;
+
+  function compositeUserId(scope: { agentId: string; userId?: string }) {
+    return scope.userId && scope.agentId
+      ? `${scope.userId}/${scope.agentId}`
+      : scope.userId || scope.agentId;
+  }
+
+  return {
+    async search(query, scope, options) {
+      const body: Record<string, unknown> = {
+        query,
+        filters: { user_id: compositeUserId(scope) },
+      };
+      if (options?.limit) body.top_k = options.limit;
+
+      const response = await fetch(`${baseUrl}/v2/memories/search/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Mem0 search failed (${response.status}): ${errorText}`
+        );
+      }
+
+      const raw = await response.json();
+      const results: Mem0SearchResult[] = Array.isArray(raw)
+        ? raw
+        : raw.memories ?? [];
+      return results.map((result) => ({
+        id: result.id,
+        content: result.memory,
+        score: result.score,
+        metadata: result.metadata,
+      }));
+    },
+
+    async add(messages, scope, options) {
+      const body: Record<string, unknown> = {
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        user_id: compositeUserId(scope),
+      };
+      if (options?.metadata) body.metadata = options.metadata;
+
+      const response = await fetch(`${baseUrl}/v1/memories/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Mem0 add failed (${response.status}): ${errorText}`);
+      }
+
+      await response.json();
+    },
+  };
+}
 
 /**
  * Mem0 plugin for Positronic.
  *
- * Provides scoped memory search/add, tools for LLM tool-calling, and an adapter
- * that auto-indexes conversations.
+ * Provides strictly scoped semantic memory (per-brain AND per-user) via
+ * search/add methods and LLM tools (rememberFact, recallMemories).
  *
  * @example
  * ```typescript
@@ -52,23 +133,16 @@ export const mem0 = definePlugin({
   setup: (config: Mem0PluginConfig) => config,
 
   create: ({ config, brainTitle, currentUser }) => {
-    const { scope, autoIndex = true } = config!;
     const provider =
-      'provider' in config!
-        ? config!.provider
-        : createMem0Provider({
-            apiKey: (config as any).apiKey,
-            baseUrl: (config as any).baseUrl,
-            orgId: (config as any).orgId,
-            projectId: (config as any).projectId,
-          });
+      'provider' in config
+        ? config.provider
+        : createMem0Provider(config as Mem0ApiConfig);
 
-    // Scoping logic
-    const agentId = scope === 'user' ? '' : brainTitle;
-    const userId = scope === 'brain' ? '' : currentUser.name;
-    const memoryScope = { agentId, userId };
+    const memoryScope = {
+      agentId: brainTitle,
+      userId: currentUser.name,
+    };
 
-    // Scoped memory methods
     async function search(query: string, options?: { limit?: number }) {
       return provider.search(query, memoryScope, { limit: options?.limit });
     }
@@ -84,12 +158,6 @@ export const mem0 = definePlugin({
         metadata: options?.metadata,
       });
     }
-
-    // Conversation buffer for auto-indexing
-    const buffer: Array<{
-      role: 'user' | 'assistant' | 'system';
-      content: string;
-    }> = [];
 
     return {
       search,
@@ -146,27 +214,6 @@ The query should describe what you're looking for. Results include relevance sco
               })),
             };
           },
-        },
-      },
-
-      adapter: {
-        dispatch(event: any) {
-          if (!autoIndex) return;
-
-          if (event.type === BRAIN_EVENTS.COMPLETE) {
-            if (buffer.length > 0) {
-              provider.add([...buffer], memoryScope).then(() => {
-                buffer.length = 0;
-              });
-            }
-          }
-
-          if (
-            event.type === BRAIN_EVENTS.ERROR ||
-            event.type === BRAIN_EVENTS.CANCELLED
-          ) {
-            buffer.length = 0;
-          }
         },
       },
     };
