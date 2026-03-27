@@ -2,6 +2,7 @@ import {
   Fragment,
   File,
   Resource,
+  Form,
   type TemplateNode,
   type TemplateChild,
   type FunctionComponent,
@@ -69,6 +70,12 @@ async function renderNode(
   if (typeof node.type === 'string') {
     throw new Error(
       `HTML elements (<${node.type}>) cannot be used in prompt templates. Use the html property in .page() instead.`
+    );
+  }
+
+  if (node.type === (Form as any)) {
+    throw new Error(
+      '<Form> cannot be used in prompt templates. Use the html property in .page() instead.'
     );
   }
 
