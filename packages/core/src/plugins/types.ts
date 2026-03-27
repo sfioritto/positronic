@@ -1,5 +1,6 @@
 import type { CurrentUser } from '../dsl/types.js';
 import type { Adapter } from '../adapters/types.js';
+import type { WebhookFunction } from '../dsl/webhook.js';
 
 /**
  * Context passed to a plugin's `create` function.
@@ -30,6 +31,7 @@ export interface PluginAdapter {
 export type PluginCreateReturn = {
   tools?: Record<string, any>;
   adapter?: PluginAdapter;
+  webhooks?: Record<string, WebhookFunction<any>>;
   [key: string]: any;
 };
 
@@ -44,6 +46,8 @@ export interface PluginDefinition<
   name: TName;
   setup?: (config: TConfig) => TConfig;
   create: (ctx: CreateContext<TConfig>) => TCreate;
+  /** Static webhook declarations — discovered at startup for manifest registration */
+  webhooks?: Record<string, WebhookFunction<any>>;
 }
 
 /**

@@ -74,5 +74,8 @@ export function createBrain<
     return base as any;
   }
 
+  // Expose plugins array so the generated index.ts can collect plugin webhooks
+  (brain as any).plugins = plugins ?? [];
+
   return brain;
 }
