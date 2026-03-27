@@ -175,19 +175,17 @@ import { Form } from '@positronic/core';
 **Key details:**
 
 - `Form` is imported from `@positronic/core` — it's a Symbol-based built-in component (like `Fragment`, `File`, `Resource`). The framework injects the form action URL into it during rendering.
-- The `html` property accepts `TemplateChild` — that's what JSX expressions produce. You can pass JSX directly, a string, or a function component.
+- The `html` property accepts JSX directly, a string, or a function component.
 - The page title comes from the step title. The framework wraps the html body in a full HTML document automatically.
 
 ### Extracting Page JSX into Separate Files
 
-For complex pages, extract the JSX into a separate `.tsx` file. The function should return `TemplateChild`:
+For complex pages, extract the JSX into a separate `.tsx` file. Don't annotate the return type — let TypeScript infer it from the JSX:
 
 ```tsx
 // brains/my-brain/pages/review-page.tsx
 import { Form } from '@positronic/core';
-import type { TemplateChild } from '@positronic/core';
-
-export function ReviewPage({ items }: { items: { id: string; name: string }[] }): TemplateChild {
+export function ReviewPage({ items }: { items: { id: string; name: string }[] }) {
   return (
     <Form>
       {items.map(item => (
