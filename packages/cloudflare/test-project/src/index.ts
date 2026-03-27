@@ -1,4 +1,4 @@
-import { brain } from '@positronic/core';
+import { brain, collectPluginWebhooks } from '@positronic/core';
 import { z } from 'zod';
 import app from '../../src/api';
 import {
@@ -678,9 +678,12 @@ const manifest = new PositronicManifest({
   manifest: brainManifest,
 });
 
+// No plugins in test-project, but kept in sync with template pattern
+const pluginWebhooks = collectPluginWebhooks([]);
+
 setManifest(manifest);
 setBrainRunner(runner);
-setWebhookManifest(webhookManifest);
+setWebhookManifest({ ...webhookManifest, ...pluginWebhooks });
 
 export default {
   fetch: app.fetch,
