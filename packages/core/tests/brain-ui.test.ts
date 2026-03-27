@@ -1,6 +1,8 @@
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
+import { Fragment, Page, Form } from '../src/jsx-runtime.js';
+import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import {
@@ -9,6 +11,14 @@ import {
   mockGenerateObject,
   mockClient,
 } from './brain-test-helpers.js';
+
+function node(
+  type: any,
+  props: Record<string, unknown>,
+  ...children: TemplateChild[]
+): TemplateNode {
+  return { type, props, children };
+}
 
 describe('UI steps', () => {
   // Mock components for UI generation
@@ -181,5 +191,231 @@ describe('UI steps', () => {
 
     const finalState = finalStateFromEvents(events);
     expect(finalState.done).toBe(true);
+  });
+});
+
+describe('Custom HTML pages (.page() with html)', () => {
+  const mockPages = {
+    create: jest.fn<any>().mockResolvedValue({
+      slug: 'custom-page',
+      url: 'https://example.com/pages/custom-page',
+      brainRunId: 'test-run',
+      persist: false,
+      createdAt: new Date().toISOString(),
+    }),
+    get: jest.fn(),
+    exists: jest.fn(),
+    update: jest.fn(),
+  };
+
+  beforeEach(() => {
+    mockPages.create.mockClear();
+  });
+
+  it('should suspend at WEBHOOK when html + formSchema provided', async () => {
+    const testBrain = brain('HTML Form Test')
+      .step('Init', () => ({ items: ['a', 'b'] }))
+      .page('Review', ({ state }) => ({
+        html: node(
+          Page,
+          { title: 'Review' },
+          node(
+            Form,
+            {},
+            ...state.items.map((item: string) =>
+              node(
+                'label',
+                {},
+                node('input', {
+                  type: 'checkbox',
+                  name: 'selected',
+                  value: item,
+                }),
+                item
+              )
+            ),
+            node('button', { type: 'submit' }, 'Submit')
+          )
+        ),
+        formSchema: z.object({ selected: z.array(z.string()) }),
+      }));
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      pages: mockPages as any,
+      env: { origin: 'https://example.com', secrets: {} },
+    })) {
+      events.push(event);
+    }
+
+    // Should emit WEBHOOK event (form page suspends)
+    const webhookEvent = events.find((e) => e.type === BRAIN_EVENTS.WEBHOOK);
+    expect(webhookEvent).toBeDefined();
+
+    // Only the Init step should have completed before WEBHOOK
+    const webhookIndex = events.indexOf(webhookEvent!);
+    const stepCompletesBeforeWebhook = events
+      .slice(0, webhookIndex)
+      .filter((e) => e.type === BRAIN_EVENTS.STEP_COMPLETE);
+    expect(stepCompletesBeforeWebhook).toHaveLength(1);
+    expect((stepCompletesBeforeWebhook[0] as any).stepTitle).toBe('Init');
+
+    // pages.create should have been called with HTML containing the form
+    expect(mockPages.create).toHaveBeenCalled();
+    const html = mockPages.create.mock.calls[0][0] as string;
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('<form');
+    expect(html).toContain('action=');
+    expect(html).toContain('method="POST"');
+  });
+
+  it('should NOT require components for html pages', async () => {
+    // No withComponents() call — should still work for html pages
+    const testBrain = brain('No Components HTML Test').page('Simple', () => ({
+      html: node(Page, { title: 'Hello' }, node('p', {}, 'World')),
+    }));
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      pages: mockPages as any,
+      env: { origin: 'https://example.com', secrets: {} },
+    })) {
+      events.push(event);
+    }
+
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+    const html = mockPages.create.mock.calls[0][0] as string;
+    expect(html).toContain('<p>World</p>');
+  });
+
+  it('should complete immediately for html page without formSchema', async () => {
+    const testBrain = brain('Read-only HTML Test')
+      .step('Init', () => ({ data: 'hello' }))
+      .page('Dashboard', ({ state }) => ({
+        html: node(Page, { title: 'Dashboard' }, node('h1', {}, state.data)),
+      }))
+      .step('After', ({ state }) => ({ ...state, done: true }));
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      pages: mockPages as any,
+      env: { origin: 'https://example.com', secrets: {} },
+    })) {
+      events.push(event);
+    }
+
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+    expect(events.some((e) => e.type === BRAIN_EVENTS.WEBHOOK)).toBe(false);
+
+    const finalState = finalStateFromEvents(events);
+    expect(finalState.done).toBe(true);
+
+    const html = mockPages.create.mock.calls[0][0] as string;
+    expect(html).toContain('<h1>hello</h1>');
+  });
+
+  it('should merge form response onto state on resume', async () => {
+    const testBrain = brain('HTML Resume Test')
+      .step('Init', () => ({ items: ['a', 'b'] }))
+      .page('Review', ({ state }) => ({
+        html: node(Form, {}, node('input', { type: 'text', name: 'answer' })),
+        formSchema: z.object({ answer: z.string() }),
+      }))
+      .step('After', ({ state }) => ({ ...state, processed: true }));
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      pages: mockPages as any,
+      env: { origin: 'https://example.com', secrets: {} },
+      brainRunId: 'test-run',
+      resume: {
+        state: { items: ['a', 'b'] },
+        stepIndex: 1,
+        webhookResponse: { answer: 'hello' },
+      },
+    })) {
+      events.push(event);
+    }
+
+    let finalState: any = { items: ['a', 'b'] };
+    for (const event of events) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [(event as any).patch]);
+      }
+    }
+
+    expect(finalState.answer).toBe('hello');
+    expect(finalState.processed).toBe(true);
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+  });
+
+  it('should call onCreated callback for html pages', async () => {
+    const onCreated = jest.fn();
+
+    const testBrain = brain('HTML onCreated Test').page('Page', () => ({
+      html: node(Page, { title: 'Test' }, 'content'),
+      onCreated,
+    }));
+
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      pages: mockPages as any,
+      env: { origin: 'https://example.com', secrets: {} },
+    })) {
+      // collect
+    }
+
+    expect(onCreated).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://example.com/pages/custom-page' })
+    );
+  });
+
+  it('should throw when neither prompt nor html is provided', async () => {
+    const testBrain = brain('Missing Config Test').page(
+      'Bad',
+      () => ({} as any)
+    );
+
+    await expect(async () => {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        pages: mockPages as any,
+        env: { origin: 'https://example.com', secrets: {} },
+      })) {
+        // consume
+      }
+    }).rejects.toThrow("requires either 'prompt' or 'html'");
+  });
+
+  it('should throw when both prompt and html are provided', async () => {
+    const testBrain = brain('Both Config Test').page(
+      'Bad',
+      () =>
+        ({
+          prompt: 'Generate a page',
+          html: node('div', {}, 'content'),
+        } as any)
+    );
+
+    await expect(async () => {
+      for await (const event of testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        pages: mockPages as any,
+        env: { origin: 'https://example.com', secrets: {} },
+      })) {
+        // consume
+      }
+    }).rejects.toThrow("cannot have both 'prompt' and 'html'");
   });
 });

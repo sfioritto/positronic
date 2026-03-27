@@ -60,6 +60,7 @@ import {
   buildTemplateContext,
   type TemplateContext,
 } from '../../template/render.js';
+import { renderHtml } from '../../template/render-html.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -1505,7 +1506,83 @@ The output must conform to the provided schema.`,
       return;
     }
 
-    // Validate required configuration
+    // Validate: exactly one of prompt or html must be present
+    if (!pageConfig.prompt && !pageConfig.html) {
+      throw new Error(
+        `Page step "${stepBlock.title}" requires either 'prompt' or 'html'`
+      );
+    }
+    if (pageConfig.prompt && pageConfig.html) {
+      throw new Error(
+        `Page step "${stepBlock.title}" cannot have both 'prompt' and 'html'`
+      );
+    }
+
+    // Custom HTML path — skip LLM generation, render JSX directly
+    if (pageConfig.html) {
+      if (!this.pages) {
+        throw new Error(
+          `Page step "${stepBlock.title}" requires pages service to be configured`
+        );
+      }
+
+      const pageCreateOptions = {
+        persist: pageConfig.persist ?? (pageConfig.ttl ? true : false),
+        ttl: pageConfig.ttl,
+      };
+
+      if (pageConfig.formSchema) {
+        const webhookIdentifier = `${this.brainRunId}-${step.id}`;
+        const formToken = crypto.randomUUID();
+        const formAction = `${
+          this.env.origin
+        }/webhooks/system/page-form?identifier=${encodeURIComponent(
+          webhookIdentifier
+        )}&token=${encodeURIComponent(formToken)}`;
+
+        const html = renderHtml(pageConfig.html, { formAction });
+        const page = await this.pages.create(html, pageCreateOptions);
+
+        const webhook: WebhookRegistration = {
+          slug: 'page-form',
+          identifier: webhookIdentifier,
+          schema: pageConfig.formSchema,
+          token: formToken,
+        };
+
+        this.currentPage = { url: page.url, webhook };
+
+        if (pageConfig.onCreated) {
+          await pageConfig.onCreated(this.currentPage);
+        }
+
+        yield {
+          type: BRAIN_EVENTS.WEBHOOK,
+          waitFor: [
+            {
+              slug: webhook.slug,
+              identifier: webhook.identifier,
+              token: webhook.token,
+            },
+          ],
+          options: this.options,
+          brainRunId: this.brainRunId,
+        };
+        this.currentPage = undefined;
+      } else {
+        const html = renderHtml(pageConfig.html);
+        const page = await this.pages.create(html, pageCreateOptions);
+
+        if (pageConfig.onCreated) {
+          await pageConfig.onCreated({ url: page.url });
+        }
+
+        yield* this.completeStep(step, prevState, { url: page.url });
+      }
+      return;
+    }
+
+    // LLM-generated page path — validate required configuration
     if (!this.components) {
       throw new Error(
         `Page step "${stepBlock.title}" requires components to be configured via brain.withComponents()`

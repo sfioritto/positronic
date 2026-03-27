@@ -112,7 +112,8 @@ export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
 };
 
 export type PageConfig = {
-  prompt: TemplateReturn;
+  prompt?: TemplateReturn;
+  html?: TemplateChild;
   formSchema?: z.ZodObject<any>;
   onCreated?: (page: GeneratedPage) => void | Promise<void>;
   props?: Record<string, unknown>;
