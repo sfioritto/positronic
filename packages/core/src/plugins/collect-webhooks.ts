@@ -1,11 +1,9 @@
-import type { ConfiguredPlugin, WebhookFunction } from '@positronic/core';
+import type { ConfiguredPlugin } from './types.js';
+import type { WebhookFunction } from '../dsl/webhook.js';
 
 /**
  * Collect webhook declarations from all plugins.
- * Returns a manifest-compatible record mapping slug → WebhookFunction.
- *
- * Used by the generated index.ts to merge plugin webhooks into the
- * webhook manifest alongside file-based webhooks.
+ * Returns a manifest-compatible record mapping slug -> WebhookFunction.
  */
 export function collectPluginWebhooks(
   plugins: readonly ConfiguredPlugin[]

@@ -25,7 +25,7 @@ const manifest = new PositronicManifest({
 });
 
 // Merge file-based webhooks with plugin-declared webhooks
-const pluginWebhooks = collectPluginWebhooks((brainFactory as any).plugins ?? []);
+const pluginWebhooks = collectPluginWebhooks(brainFactory.plugins);
 
 setManifest(manifest);
 setBrainRunner(runner);
