@@ -193,6 +193,66 @@ it('should use customer data to generate personalized content', async () => {
 });
 ```
 
+### Testing Brains with Plugins
+
+Brains that use plugins (gmail, slack, ntfy, etc.) need mock plugins in tests. **Don't use the project brain wrapper** (`src/brain.ts`) in tests — it has real plugins that need API keys. Instead, use the core `brain()` directly and attach mock plugins:
+
+```typescript
+import { brain, definePlugin } from '@positronic/core';
+import { createMockClient, runBrainTest } from './test-utils.js';
+
+// Create mock plugins that match what the brain expects
+const mockGmail = definePlugin({
+  name: 'gmail',
+  create: () => ({
+    getAccounts: () => [{ name: 'test-account', refreshToken: 'test-token' }],
+    searchThreads: jest.fn().mockResolvedValue([
+      { threadId: 'thread-1' },
+    ]),
+    getThreadDetails: jest.fn().mockResolvedValue({
+      threadId: 'thread-1',
+      subject: 'Test Email',
+      from: 'sender@example.com',
+      body: 'Email body content',
+    }),
+    archiveMessages: jest.fn().mockResolvedValue(undefined),
+  }),
+});
+
+const mockNtfy = definePlugin({
+  name: 'ntfy',
+  create: () => ({
+    send: jest.fn().mockResolvedValue(undefined),
+  }),
+});
+
+// Build the brain directly with mock plugins
+const testBrain = brain('email-processor')
+  .withPlugin(mockGmail)
+  .withPlugin(mockNtfy)
+  .step('Fetch emails', async ({ gmail }) => {
+    const accounts = gmail.getAccounts();
+    const threads = await gmail.searchThreads(accounts[0].refreshToken, 'label:inbox');
+    return { threads };
+  })
+  .step('Notify', async ({ state, ntfy }) => {
+    await ntfy.send(`Found <%= '${state.threads.length}' %> emails`);
+    return state;
+  });
+
+it('should fetch emails and notify', async () => {
+  const mockClient = createMockClient();
+  const result = await runBrainTest(testBrain, { client: mockClient });
+
+  expect(result.completed).toBe(true);
+  expect(result.finalState.threads).toHaveLength(1);
+});
+```
+
+The `name` in `definePlugin` must match what the brain accesses on the step context — `gmail`, `slack`, `ntfy`, etc. The `create()` function returns an object with the same methods the real plugin provides, but backed by mocks.
+
+**Testing brains defined in separate files:** If you're testing an existing brain from `src/brains/`, you can't easily swap its plugins because they come from the project's `createBrain()` call. Instead, re-define the brain's steps in the test with mock plugins (copy the step chain, not the imports). Or restructure so the brain logic is a function that accepts a brain builder.
+
 ## Best Practices
 
 1. **Test Behavior, Not Implementation**
