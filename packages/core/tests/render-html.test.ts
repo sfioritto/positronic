@@ -157,14 +157,6 @@ describe('renderHtml', () => {
       expect(html).toContain('</html>');
     });
 
-    it('includes CSS when provided', () => {
-      const html = wrapHtmlDocument('content', {
-        title: 'Styled',
-        css: 'body { color: red; }',
-      });
-      expect(html).toContain('<style>body { color: red; }</style>');
-    });
-
     it('renders without title', () => {
       const html = wrapHtmlDocument('content');
       expect(html).toContain('<!DOCTYPE html>');

@@ -51,7 +51,7 @@ export {
   buildTemplateContext,
 } from './template/render.js';
 export type { TemplateContext } from './template/render.js';
-export { renderHtml, wrapHtmlDocument } from './template/render-html.js';
+export { renderHtml } from './template/render-html.js';
 export type { RenderHtmlContext } from './template/render-html.js';
 export { applyPatches } from './dsl/json-patch.js';
 export { IterateResult } from './dsl/iterate-result.js';

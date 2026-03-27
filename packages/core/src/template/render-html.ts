@@ -177,17 +177,15 @@ export function renderHtml(
 
 export function wrapHtmlDocument(
   body: string,
-  options?: { title?: string; css?: string }
+  options?: { title?: string }
 ): string {
   const title = options?.title;
-  const css = options?.css;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 ${title ? `<title>${escapeHtml(title)}</title>` : ''}
-${css ? `<style>${css}</style>` : ''}
 </head>
 <body>
 ${body}
