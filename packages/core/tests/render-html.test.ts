@@ -1,6 +1,6 @@
-import { Fragment, File, Resource, Page, Form } from '../src/jsx-runtime.js';
+import { Fragment, File, Resource, Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
-import { renderHtml } from '../src/template/render-html.js';
+import { renderHtml, wrapHtmlDocument } from '../src/template/render-html.js';
 import { renderTemplate } from '../src/template/render.js';
 
 function node(
@@ -147,10 +147,9 @@ describe('renderHtml', () => {
     });
   });
 
-  describe('Page component', () => {
-    it('wraps content in HTML document', () => {
-      const tree = node(Page, { title: 'Test' }, node('h1', {}, 'Hello'));
-      const html = renderHtml(tree);
+  describe('wrapHtmlDocument', () => {
+    it('wraps body in HTML document', () => {
+      const html = wrapHtmlDocument('<h1>Hello</h1>', { title: 'Test' });
       expect(html).toContain('<!DOCTYPE html>');
       expect(html).toContain('<title>Test</title>');
       expect(html).toContain('<h1>Hello</h1>');
@@ -159,18 +158,15 @@ describe('renderHtml', () => {
     });
 
     it('includes CSS when provided', () => {
-      const tree = node(
-        Page,
-        { title: 'Styled', css: 'body { color: red; }' },
-        'content'
-      );
-      const html = renderHtml(tree);
+      const html = wrapHtmlDocument('content', {
+        title: 'Styled',
+        css: 'body { color: red; }',
+      });
       expect(html).toContain('<style>body { color: red; }</style>');
     });
 
     it('renders without title', () => {
-      const tree = node(Page, {}, 'content');
-      const html = renderHtml(tree);
+      const html = wrapHtmlDocument('content');
       expect(html).toContain('<!DOCTYPE html>');
       expect(html).not.toContain('<title>');
     });

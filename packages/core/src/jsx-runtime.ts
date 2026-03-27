@@ -7,14 +7,12 @@ import type { JSX as ReactJSX } from 'react';
 export const Fragment = Symbol.for('positronic.fragment');
 export const File = Symbol.for('positronic.file');
 export const Resource = Symbol.for('positronic.resource');
-export const Page = Symbol.for('positronic.page');
 export const Form = Symbol.for('positronic.form');
 
 type BuiltinComponent =
   | typeof Fragment
   | typeof File
   | typeof Resource
-  | typeof Page
   | typeof Form;
 
 export type FunctionComponent = (

@@ -1,7 +1,7 @@
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
-import { Fragment, Page, Form } from '../src/jsx-runtime.js';
+import { Fragment, Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
@@ -217,25 +217,21 @@ describe('Custom HTML pages (.page() with html)', () => {
       .step('Init', () => ({ items: ['a', 'b'] }))
       .page('Review', ({ state }) => ({
         html: node(
-          Page,
-          { title: 'Review' },
-          node(
-            Form,
-            {},
-            ...state.items.map((item: string) =>
-              node(
-                'label',
-                {},
-                node('input', {
-                  type: 'checkbox',
-                  name: 'selected',
-                  value: item,
-                }),
-                item
-              )
-            ),
-            node('button', { type: 'submit' }, 'Submit')
-          )
+          Form,
+          {},
+          ...state.items.map((item: string) =>
+            node(
+              'label',
+              {},
+              node('input', {
+                type: 'checkbox',
+                name: 'selected',
+                value: item,
+              }),
+              item
+            )
+          ),
+          node('button', { type: 'submit' }, 'Submit')
         ),
         formSchema: z.object({ selected: z.array(z.string()) }),
       }));
@@ -274,7 +270,7 @@ describe('Custom HTML pages (.page() with html)', () => {
   it('should NOT require components for html pages', async () => {
     // No withComponents() call — should still work for html pages
     const testBrain = brain('No Components HTML Test').page('Simple', () => ({
-      html: node(Page, { title: 'Hello' }, node('p', {}, 'World')),
+      html: node('p', {}, 'World'),
     }));
 
     const events: BrainEvent<any>[] = [];
@@ -296,7 +292,7 @@ describe('Custom HTML pages (.page() with html)', () => {
     const testBrain = brain('Read-only HTML Test')
       .step('Init', () => ({ data: 'hello' }))
       .page('Dashboard', ({ state }) => ({
-        html: node(Page, { title: 'Dashboard' }, node('h1', {}, state.data)),
+        html: node('h1', {}, state.data),
       }))
       .step('After', ({ state }) => ({ ...state, done: true }));
 
@@ -361,7 +357,7 @@ describe('Custom HTML pages (.page() with html)', () => {
     const onCreated = jest.fn();
 
     const testBrain = brain('HTML onCreated Test').page('Page', () => ({
-      html: node(Page, { title: 'Test' }, 'content'),
+      html: 'content',
       onCreated,
     }));
 

@@ -43,7 +43,7 @@ export type {
 } from './dsl/types.js';
 export type { TemplateReturn } from './dsl/definitions/blocks.js';
 export type { TemplateNode, TemplateChild } from './jsx-runtime.js';
-export { Fragment, File, Resource, Page, Form } from './jsx-runtime.js';
+export { Fragment, File, Resource, Form } from './jsx-runtime.js';
 export {
   renderTemplate,
   isTemplateNode,
@@ -51,7 +51,7 @@ export {
   buildTemplateContext,
 } from './template/render.js';
 export type { TemplateContext } from './template/render.js';
-export { renderHtml } from './template/render-html.js';
+export { renderHtml, wrapHtmlDocument } from './template/render-html.js';
 export type { RenderHtmlContext } from './template/render-html.js';
 export { applyPatches } from './dsl/json-patch.js';
 export { IterateResult } from './dsl/iterate-result.js';
@@ -71,11 +71,7 @@ export type {
   WebhookRegistration,
   WebhookTriggerConfig,
 } from './dsl/webhook.js';
-export type {
-  PagesService,
-  Page as PageRecord,
-  PageCreateOptions,
-} from './dsl/pages.js';
+export type { PagesService, Page, PageCreateOptions } from './dsl/pages.js';
 export type {
   Manifest as ResourceManifest,
   Entry as ResourceEntry,

@@ -60,7 +60,7 @@ import {
   buildTemplateContext,
   type TemplateContext,
 } from '../../template/render.js';
-import { renderHtml } from '../../template/render-html.js';
+import { renderHtml, wrapHtmlDocument } from '../../template/render-html.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -1545,10 +1545,14 @@ The output must conform to the provided schema.`,
     const formInfo = hasForm ? this.buildFormAction(step) : undefined;
 
     if (pageConfig.html) {
-      html = renderHtml(
+      const body = renderHtml(
         pageConfig.html,
         formInfo ? { formAction: formInfo.formAction } : {}
       );
+      html = wrapHtmlDocument(body, {
+        title: stepBlock.title,
+        css: pageConfig.css,
+      });
     } else {
       // LLM-generated page
       if (!this.components) {
