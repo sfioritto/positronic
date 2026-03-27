@@ -1598,6 +1598,23 @@ This works because the positronic JSX runtime handles function components — it
 
 **HTML elements work in page JSX.** `<div>`, `<input>`, `<label>`, `<table>`, `<style>`, etc. are all valid. This is specific to the `html` property on `.page()`. Prompt JSX (`.prompt()`, `.map()`) only supports `<>` (Fragment), `<File>`, `<Resource>`, and function components.
 
+#### No JavaScript in Custom Pages
+
+Custom HTML pages are static — `<script>` tags are blocked by Content Security Policy. This prevents XSS when user data is interpolated into page content.
+
+Form submission doesn't need JS — native HTML forms work. Unchecked checkboxes don't submit, and the framework's `parseFormData` handles duplicate field names as arrays.
+
+For interactive UI (tabs, toggles), use `<details>`/`<summary>`:
+
+```tsx
+{categories.map(cat => (
+  <details open={cat === firstCategory}>
+    <summary>{cat.label} ({cat.count})</summary>
+    <ItemList items={cat.items} />
+  </details>
+))}
+```
+
 ## Page Steps
 
 Page steps allow brains to generate dynamic user interfaces using AI. When `formSchema` is provided, `.page()` generates a page, auto-suspends the brain, and spreads the form response directly onto state. Use the optional `onCreated` callback for side effects (Slack messages, emails) that need access to the generated page URL.

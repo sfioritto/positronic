@@ -219,6 +219,25 @@ This works because the positronic JSX runtime handles function components — it
 
 See `/docs/brain-dsl-guide.md` for full examples.
 
+### No JavaScript in Custom Pages
+
+Custom HTML pages are static — inline `<script>` tags are blocked by a Content Security Policy (`script-src 'none'`). This prevents XSS when user data is interpolated into page content.
+
+**Form submission doesn't need JS.** Native HTML forms work. Unchecked checkboxes don't submit — only checked ones do. The framework's `parseFormData` handles duplicate field names as arrays automatically.
+
+**For interactive UI (tabs, toggles, show/hide), use `<details>`/`<summary>` instead of JavaScript:**
+
+```tsx
+{categories.map(cat => (
+  <details open={cat === firstCategory}>
+    <summary>{cat.label} ({cat.count})</summary>
+    <ThreadList emails={cat.emails} />
+  </details>
+))}
+```
+
+This gives collapsible sections that work without JS. Style with CSS for a polished look.
+
 ## Development Workflow
 
 1. Define your brain in `/src/brains`
