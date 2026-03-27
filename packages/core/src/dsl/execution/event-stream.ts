@@ -1483,11 +1483,7 @@ The output must conform to the provided schema.`,
     yield* this.completeStep(step, prevState);
   }
 
-  private buildFormAction(step: Step): {
-    formAction: string;
-    webhookIdentifier: string;
-    formToken: string;
-  } {
+  private buildFormAction(step: Step, formSchema: z.ZodObject<any>) {
     const webhookIdentifier = `${this.brainRunId}-${step.id}`;
     const formToken = crypto.randomUUID();
     const formAction = `${
@@ -1495,7 +1491,7 @@ The output must conform to the provided schema.`,
     }/webhooks/system/page-form?identifier=${encodeURIComponent(
       webhookIdentifier
     )}&token=${encodeURIComponent(formToken)}`;
-    return { formAction, webhookIdentifier, formToken };
+    return { formAction, webhookIdentifier, formToken, formSchema };
   }
 
   private async *executePageStep(
@@ -1538,7 +1534,7 @@ The output must conform to the provided schema.`,
     // Step 1: Produce the HTML string
     let html: string;
     const formInfo = pageConfig.formSchema
-      ? this.buildFormAction(step)
+      ? this.buildFormAction(step, pageConfig.formSchema)
       : undefined;
 
     if (pageConfig.html) {
@@ -1611,7 +1607,7 @@ The output must conform to the provided schema.`,
       const webhook: WebhookRegistration = {
         slug: 'page-form',
         identifier: formInfo.webhookIdentifier,
-        schema: pageConfig.formSchema!,
+        schema: formInfo.formSchema,
         token: formInfo.formToken,
       };
 

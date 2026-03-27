@@ -1513,86 +1513,46 @@ The created page object contains:
 - `url: string` - Public URL to access the page
 - `webhook: WebhookConfig` - Webhook configuration for handling form submissions
 
-### Custom Pages with Forms (CSRF Token)
+### Custom HTML Pages
 
-When building custom HTML pages with forms, you must include a CSRF token to prevent unauthorized submissions. The `.page()` step handles this automatically, but custom pages require manual setup. This applies whether you submit to the built-in `page-form` endpoint or to a custom webhook.
+When you need full control over the page HTML (instead of having the LLM generate it), use `.page()` with the `html` property. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically — same as LLM-generated pages.
 
-The token is always passed as a **query parameter** on the form's action URL (`?token=xyz`), not as a hidden form field.
+Rename your brain file to `.tsx` and use JSX to build the page:
 
-#### Using a Custom Webhook
-
-If your page submits to a custom webhook (e.g., `/webhooks/archive`), include the token in the action URL and pass it as the second argument when creating the webhook registration:
-
-```typescript
-import { generateFormToken } from '@positronic/core';
-import archiveWebhook from '../webhooks/archive.js';
+```tsx
+import { z } from 'zod';
+import { Form } from '@positronic/core';
 
 brain('Archive Workflow')
-  .step('Create Page', async ({ state, pages, env }) => {
-    const formToken = generateFormToken();
-
-    const html = `<html>
-      <body>
-        <form method="POST" action="<%= '${env.origin}' %>/webhooks/archive?token=<%= '${formToken}' %>">
-          <input type="text" name="name" placeholder="Your name">
-          <button type="submit">Submit</button>
-        </form>
-      </body>
-    </html>`;
-
-    await pages.create('my-page', html);
-    return { ...state, formToken };
+  .step('Fetch data', async ({ state }) => {
+    return { ...state, items: await fetchItems() };
   })
-  .wait('Wait for submission', ({ state }) => archiveWebhook(state.sessionId, state.formToken), { timeout: '24h' })
-  .handle('Process', ({ state, response }) => ({
-    ...state,
-    name: response.name,
-  }));
+  .page('Review', ({ state }) => ({
+    html: (
+      <Form>
+        {state.items.map(item => (
+          <label>
+            <input type="checkbox" name="selectedIds" value={item.id} />
+            {item.name}
+          </label>
+        ))}
+        <button type="submit">Confirm</button>
+      </Form>
+    ),
+    formSchema: z.object({ selectedIds: z.array(z.string()) }),
+    onCreated: async (page) => {
+      // Notify user — page.url is the public URL
+    },
+  }))
+  .step('Process', ({ state }) => {
+    // state.selectedIds comes from the form submission
+    return { ...state, processed: true };
+  });
 ```
 
-#### Using the System `page-form` Endpoint
+The `<Form>` component is a built-in — the framework automatically injects the form action URL (including CSRF token) during rendering. The page is wrapped in a full HTML document with the step title as `<title>`.
 
-If your page submits to the built-in `page-form` endpoint, include the token in the action URL and in the webhook registration object:
-
-```typescript
-import { generateFormToken } from '@positronic/core';
-
-brain('Custom Form')
-  .step('Create Form Page', async ({ state, pages, env }) => {
-    const formToken = generateFormToken();
-    const webhookIdentifier = `custom-form-<%= '${Date.now()}' %>`;
-    const formAction = `<%= '${env.origin}' %>/webhooks/system/page-form?identifier=<%= '${encodeURIComponent(webhookIdentifier)}' %>&token=<%= '${formToken}' %>`;
-
-    const page = await pages.create('my-form', `<html>
-      <body>
-        <form method="POST" action="<%= '${formAction}' %>">
-          <input type="text" name="name" placeholder="Your name">
-          <button type="submit">Submit</button>
-        </form>
-      </body>
-    </html>`);
-
-    return {
-      ...state,
-      pageUrl: page.url,
-      webhook: { slug: 'page-form', identifier: webhookIdentifier, token: formToken },
-    };
-  })
-  .wait('Wait for form', ({ state }) => state.webhook)
-  .handle('Process', ({ state, response }) => ({
-    ...state,
-    name: response.name,
-  }));
-```
-
-#### Summary
-
-The three required pieces for any custom page with a form:
-1. Call `generateFormToken()` to get a token
-2. Include the token as a **query parameter** on the form's action URL (e.g., `action="<%= '${webhookUrl}' %>?token=<%= '${formToken}' %>"`)
-3. Include the `token` in your webhook registration — either as the second argument to a custom webhook function (e.g., `myWebhook(identifier, token)`) or in the registration object for `page-form`
-
-Without a token, the server will reject the form submission.
+You can use any HTML elements in the JSX (`<div>`, `<input>`, `<table>`, etc.) and include `<style>` tags for custom CSS. Read-only pages (no `formSchema`) work too — they complete immediately without suspending.
 
 ## Page Steps
 
