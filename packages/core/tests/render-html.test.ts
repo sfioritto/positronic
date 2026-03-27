@@ -154,6 +154,7 @@ describe('renderHtml', () => {
       expect(html).toContain('<title>Test</title>');
       expect(html).toContain('<h1>Hello</h1>');
       expect(html).toContain('<meta charset="UTF-8">');
+      expect(html).toContain("script-src 'none'");
       expect(html).toContain('</html>');
     });
 
