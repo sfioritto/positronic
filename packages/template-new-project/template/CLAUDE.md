@@ -213,6 +213,10 @@ import { ReviewPage } from './pages/review-page.js';
 
 This works because the positronic JSX runtime handles function components — it calls them with their props and renders the result. The `.tsx` file must use `jsxImportSource: "@positronic/core"` (inherited from the project tsconfig).
 
+**Important:** Do NOT annotate the return type on page components. JSX produces `TemplateNode` (which is `JSX.Element`). Writing `: TemplateChild` or `: ReactNode` will cause type errors — these are different types. Let TypeScript infer the return type.
+
+**HTML elements work in page JSX.** You can use `<div>`, `<input>`, `<label>`, `<table>`, `<style>`, etc. — any standard HTML element. This is specific to the `html` property on `.page()`. Prompt JSX (in `.prompt()`, `.map()`) only supports `<>` (Fragment), `<File>`, `<Resource>`, and function components — HTML elements will throw an error there.
+
 See `/docs/brain-dsl-guide.md` for full examples.
 
 ## Development Workflow

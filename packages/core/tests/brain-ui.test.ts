@@ -354,7 +354,7 @@ describe('Custom HTML pages (.page() with html)', () => {
   });
 
   it('should call onCreated callback for html pages', async () => {
-    const onCreated = jest.fn();
+    const onCreated = jest.fn<(page: any) => void>();
 
     const testBrain = brain('HTML onCreated Test').page('Page', () => ({
       html: 'content',

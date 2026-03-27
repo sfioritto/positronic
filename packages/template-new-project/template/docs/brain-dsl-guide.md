@@ -1594,6 +1594,10 @@ brain('Archive Workflow')
 
 This works because the positronic JSX runtime handles function components — it calls them with their props and renders the result. The `.tsx` file inherits `jsxImportSource: "@positronic/core"` from the project tsconfig.
 
+**Important:** Do NOT annotate the return type on page components. JSX produces `TemplateNode` (which is `JSX.Element`). Writing `: TemplateChild` or `: ReactNode` will cause type errors. Let TypeScript infer.
+
+**HTML elements work in page JSX.** `<div>`, `<input>`, `<label>`, `<table>`, `<style>`, etc. are all valid. This is specific to the `html` property on `.page()`. Prompt JSX (`.prompt()`, `.map()`) only supports `<>` (Fragment), `<File>`, `<Resource>`, and function components.
+
 ## Page Steps
 
 Page steps allow brains to generate dynamic user interfaces using AI. When `formSchema` is provided, `.page()` generates a page, auto-suspends the brain, and spreads the form response directly onto state. Use the optional `onCreated` callback for side effects (Slack messages, emails) that need access to the generated page URL.

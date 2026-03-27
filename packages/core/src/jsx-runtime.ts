@@ -7,13 +7,16 @@ import type { JSX as ReactJSX } from 'react';
 export const Fragment = Symbol.for('positronic.fragment');
 export const File = Symbol.for('positronic.file');
 export const Resource = Symbol.for('positronic.resource');
-export const Form = Symbol.for('positronic.form');
 
-type BuiltinComponent =
-  | typeof Fragment
-  | typeof File
-  | typeof Resource
-  | typeof Form;
+// Form is a symbol at runtime, but typed as a callable so TypeScript
+// accepts <Form> in JSX. The renderer catches it by identity check
+// before the function component fallback.
+interface FormComponent {
+  (props: Record<string, unknown>): TemplateNode;
+}
+export const Form: FormComponent = Symbol.for('positronic.form') as any;
+
+type BuiltinComponent = typeof Fragment | typeof File | typeof Resource;
 
 export type FunctionComponent = (
   props: Record<string, unknown>
@@ -52,11 +55,21 @@ export function jsx(
 // Called by the automatic JSX transform for elements with multiple children
 export const jsxs = jsx;
 
+// Replace React's children type with TemplateChild for all HTML elements
+type WithTemplateChildren<T> = Omit<T, 'children'> & {
+  children?: TemplateChild;
+};
+
+type PositronicIntrinsicElements = {
+  [K in keyof ReactJSX.IntrinsicElements]: WithTemplateChildren<
+    ReactJSX.IntrinsicElements[K]
+  >;
+};
+
 export namespace JSX {
   export type Element = TemplateNode;
 
-  // HTML intrinsic elements — borrowed from @types/react
-  export interface IntrinsicElements extends ReactJSX.IntrinsicElements {}
+  export interface IntrinsicElements extends PositronicIntrinsicElements {}
 
   export interface ElementChildrenAttribute {
     children: {};
