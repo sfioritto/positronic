@@ -1487,6 +1487,21 @@ The output must conform to the provided schema.`,
    * Execute a page generation step.
    * Generates UI components, renders to HTML, creates page, and sets up webhook.
    */
+  private buildFormAction(step: Step): {
+    formAction: string;
+    webhookIdentifier: string;
+    formToken: string;
+  } {
+    const webhookIdentifier = `${this.brainRunId}-${step.id}`;
+    const formToken = crypto.randomUUID();
+    const formAction = `${
+      this.env.origin
+    }/webhooks/system/page-form?identifier=${encodeURIComponent(
+      webhookIdentifier
+    )}&token=${encodeURIComponent(formToken)}`;
+    return { formAction, webhookIdentifier, formToken };
+  }
+
   private async *executePageStep(
     step: Step,
     stepBlock: StepBlock<any, any, TOptions, TPlugins, any, any>
@@ -1518,147 +1533,88 @@ The output must conform to the provided schema.`,
       );
     }
 
-    // Custom HTML path — skip LLM generation, render JSX directly
-    if (pageConfig.html) {
-      if (!this.pages) {
-        throw new Error(
-          `Page step "${stepBlock.title}" requires pages service to be configured`
-        );
-      }
-
-      const pageCreateOptions = {
-        persist: pageConfig.persist ?? (pageConfig.ttl ? true : false),
-        ttl: pageConfig.ttl,
-      };
-
-      if (pageConfig.formSchema) {
-        const webhookIdentifier = `${this.brainRunId}-${step.id}`;
-        const formToken = crypto.randomUUID();
-        const formAction = `${
-          this.env.origin
-        }/webhooks/system/page-form?identifier=${encodeURIComponent(
-          webhookIdentifier
-        )}&token=${encodeURIComponent(formToken)}`;
-
-        const html = renderHtml(pageConfig.html, { formAction });
-        const page = await this.pages.create(html, pageCreateOptions);
-
-        const webhook: WebhookRegistration = {
-          slug: 'page-form',
-          identifier: webhookIdentifier,
-          schema: pageConfig.formSchema,
-          token: formToken,
-        };
-
-        this.currentPage = { url: page.url, webhook };
-
-        if (pageConfig.onCreated) {
-          await pageConfig.onCreated(this.currentPage);
-        }
-
-        yield {
-          type: BRAIN_EVENTS.WEBHOOK,
-          waitFor: [
-            {
-              slug: webhook.slug,
-              identifier: webhook.identifier,
-              token: webhook.token,
-            },
-          ],
-          options: this.options,
-          brainRunId: this.brainRunId,
-        };
-        this.currentPage = undefined;
-      } else {
-        const html = renderHtml(pageConfig.html);
-        const page = await this.pages.create(html, pageCreateOptions);
-
-        if (pageConfig.onCreated) {
-          await pageConfig.onCreated({ url: page.url });
-        }
-
-        yield* this.completeStep(step, prevState, { url: page.url });
-      }
-      return;
-    }
-
-    // LLM-generated page path — validate required configuration
-    if (!this.components) {
-      throw new Error(
-        `Page step "${stepBlock.title}" requires components to be configured via brain.withComponents()`
-      );
-    }
     if (!this.pages) {
       throw new Error(
         `Page step "${stepBlock.title}" requires pages service to be configured`
       );
     }
 
-    const prompt = await resolveTemplate(
-      pageConfig.prompt,
-      this.templateContext
-    );
-    const data = (pageConfig.props ?? {}) as Record<string, unknown>;
+    // Step 1: Produce the HTML string
+    let html: string;
+    const hasForm = !!pageConfig.formSchema;
+    const formInfo = hasForm ? this.buildFormAction(step) : undefined;
 
-    const uiResult = await generatePage({
-      client: this.client,
-      prompt,
-      components: this.components,
-      schema: pageConfig.formSchema,
-      data,
-    });
-
-    if (!uiResult.rootId) {
-      const placementCount = uiResult.placements.length;
-      const placementInfo = uiResult.placements
-        .map((p) => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
-        .join(', ');
-
-      if (placementCount === 0) {
+    if (pageConfig.html) {
+      html = renderHtml(
+        pageConfig.html,
+        formInfo ? { formAction: formInfo.formAction } : {}
+      );
+    } else {
+      // LLM-generated page
+      if (!this.components) {
         throw new Error(
-          `Page generation failed for step "${stepBlock.title}" - no components were placed. ` +
-            `The LLM may not have called any component tools. ` +
-            `LLM response text: ${uiResult.text ?? '(none)'}`
-        );
-      } else {
-        throw new Error(
-          `Page generation failed for step "${stepBlock.title}" - no root component found. ` +
-            `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
-            `The first component should be placed without a parentId to serve as the root.`
+          `Page step "${stepBlock.title}" requires components to be configured via brain.withComponents()`
         );
       }
+
+      const prompt = await resolveTemplate(
+        pageConfig.prompt,
+        this.templateContext
+      );
+      const data = (pageConfig.props ?? {}) as Record<string, unknown>;
+
+      const uiResult = await generatePage({
+        client: this.client,
+        prompt,
+        components: this.components,
+        schema: pageConfig.formSchema,
+        data,
+      });
+
+      if (!uiResult.rootId) {
+        const placementCount = uiResult.placements.length;
+        const placementInfo = uiResult.placements
+          .map((p) => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
+          .join(', ');
+
+        if (placementCount === 0) {
+          throw new Error(
+            `Page generation failed for step "${stepBlock.title}" - no components were placed. ` +
+              `The LLM may not have called any component tools. ` +
+              `LLM response text: ${uiResult.text ?? '(none)'}`
+          );
+        } else {
+          throw new Error(
+            `Page generation failed for step "${stepBlock.title}" - no root component found. ` +
+              `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
+              `The first component should be placed without a parentId to serve as the root.`
+          );
+        }
+      }
+
+      html = generatePageHtml({
+        placements: uiResult.placements,
+        rootId: uiResult.rootId,
+        data,
+        title: stepBlock.title,
+        formAction: formInfo?.formAction,
+      });
     }
 
+    // Step 2: Create page and handle form/read-only branching (shared by both paths)
     const pageCreateOptions = {
       persist: pageConfig.persist ?? (pageConfig.ttl ? true : false),
       ttl: pageConfig.ttl,
     };
 
-    if (pageConfig.formSchema) {
-      // Form page: create webhook, CSRF token, suspend for submission
-      const webhookIdentifier = `${this.brainRunId}-${step.id}`;
-      const formToken = crypto.randomUUID();
-      const formAction = `${
-        this.env.origin
-      }/webhooks/system/page-form?identifier=${encodeURIComponent(
-        webhookIdentifier
-      )}&token=${encodeURIComponent(formToken)}`;
+    const page = await this.pages.create(html, pageCreateOptions);
 
-      const html = generatePageHtml({
-        placements: uiResult.placements,
-        rootId: uiResult.rootId,
-        data,
-        title: stepBlock.title,
-        formAction,
-      });
-
-      const page = await this.pages.create(html, pageCreateOptions);
-
+    if (hasForm) {
       const webhook: WebhookRegistration = {
         slug: 'page-form',
-        identifier: webhookIdentifier,
-        schema: pageConfig.formSchema,
-        token: formToken,
+        identifier: formInfo!.webhookIdentifier,
+        schema: pageConfig.formSchema!,
+        token: formInfo!.formToken,
       };
 
       this.currentPage = { url: page.url, webhook };
@@ -1667,7 +1623,6 @@ The output must conform to the provided schema.`,
         await pageConfig.onCreated(this.currentPage);
       }
 
-      // Suspend — step completes on resume (see resume path above)
       yield {
         type: BRAIN_EVENTS.WEBHOOK,
         waitFor: [
@@ -1682,16 +1637,6 @@ The output must conform to the provided schema.`,
       };
       this.currentPage = undefined;
     } else {
-      // Read-only page: no form, no webhook
-      const html = generatePageHtml({
-        placements: uiResult.placements,
-        rootId: uiResult.rootId,
-        data,
-        title: stepBlock.title,
-      });
-
-      const page = await this.pages.create(html, pageCreateOptions);
-
       if (pageConfig.onCreated) {
         await pageConfig.onCreated({ url: page.url });
       }
