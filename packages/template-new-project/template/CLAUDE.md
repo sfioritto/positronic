@@ -147,6 +147,8 @@ The handler return type determines behavior:
 For pages with forms, use `.page()` with the `html` property instead of `prompt`. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically:
 
 ```tsx
+import { Form } from '@positronic/core';
+
 .page('Review items', ({ state }) => ({
   html: (
     <Form>
@@ -170,7 +172,50 @@ For pages with forms, use `.page()` with the `html` property instead of `prompt`
 })
 ```
 
-The `<Form>` component is a built-in that the framework injects the form action URL into. The page title comes from the step title. See `/docs/brain-dsl-guide.md` for full examples.
+**Key details:**
+
+- `Form` is imported from `@positronic/core` — it's a Symbol-based built-in component (like `Fragment`, `File`, `Resource`). The framework injects the form action URL into it during rendering.
+- The `html` property accepts `TemplateChild` — that's what JSX expressions produce. You can pass JSX directly, a string, or a function component.
+- The page title comes from the step title. The framework wraps the html body in a full HTML document automatically.
+
+### Extracting Page JSX into Separate Files
+
+For complex pages, extract the JSX into a separate `.tsx` file. The function should return `TemplateChild`:
+
+```tsx
+// brains/my-brain/pages/review-page.tsx
+import { Form } from '@positronic/core';
+import type { TemplateChild } from '@positronic/core';
+
+export function ReviewPage({ items }: { items: { id: string; name: string }[] }): TemplateChild {
+  return (
+    <Form>
+      {items.map(item => (
+        <label>
+          <input type="checkbox" name="selectedIds" value={item.id} />
+          {item.name}
+        </label>
+      ))}
+      <button type="submit">Confirm</button>
+    </Form>
+  );
+}
+```
+
+Then use it in the brain:
+
+```tsx
+import { ReviewPage } from './pages/review-page.js';
+
+.page('Review items', ({ state }) => ({
+  html: <ReviewPage items={state.items} />,
+  formSchema: z.object({ selectedIds: z.array(z.string()) }),
+}))
+```
+
+This works because the positronic JSX runtime handles function components — it calls them with their props and renders the result. The `.tsx` file must use `jsxImportSource: "@positronic/core"` (inherited from the project tsconfig).
+
+See `/docs/brain-dsl-guide.md` for full examples.
 
 ## Development Workflow
 
