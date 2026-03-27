@@ -1550,9 +1550,51 @@ brain('Archive Workflow')
   });
 ```
 
-The `<Form>` component is a built-in — the framework automatically injects the form action URL (including CSRF token) during rendering. The page is wrapped in a full HTML document with the step title as `<title>`.
+**Key details:**
 
-You can use any HTML elements in the JSX (`<div>`, `<input>`, `<table>`, etc.) and include `<style>` tags for custom CSS. Read-only pages (no `formSchema`) work too — they complete immediately without suspending.
+- **`Form`** is imported from `@positronic/core`. It's a Symbol-based built-in component (like `Fragment`, `File`, `Resource`). The framework injects the form action URL (including CSRF token) during rendering.
+- **`html`** accepts `TemplateChild` — the type that JSX expressions produce. You can pass JSX directly, a string, or a function component that returns `TemplateChild`.
+- The page is wrapped in a full HTML document with the step title as `<title>`.
+- You can use any HTML elements (`<div>`, `<input>`, `<table>`, etc.) and include `<style>` tags for custom CSS.
+- Read-only pages (no `formSchema`) work too — they complete immediately without suspending.
+
+#### Extracting Page JSX into Separate Files
+
+For complex pages, extract the JSX into a separate `.tsx` file:
+
+```tsx
+// brains/my-brain/pages/review-page.tsx
+import { Form } from '@positronic/core';
+import type { TemplateChild } from '@positronic/core';
+
+export function ReviewPage({ items }: { items: { id: string; name: string }[] }): TemplateChild {
+  return (
+    <Form>
+      {items.map(item => (
+        <label>
+          <input type="checkbox" name="selectedIds" value={item.id} />
+          {item.name}
+        </label>
+      ))}
+      <button type="submit">Confirm</button>
+    </Form>
+  );
+}
+```
+
+Then use it in the brain:
+
+```tsx
+import { ReviewPage } from './pages/review-page.js';
+
+brain('Archive Workflow')
+  .page('Review', ({ state }) => ({
+    html: <ReviewPage items={state.items} />,
+    formSchema: z.object({ selectedIds: z.array(z.string()) }),
+  }))
+```
+
+This works because the positronic JSX runtime handles function components — it calls them with their props and renders the result. The `.tsx` file inherits `jsxImportSource: "@positronic/core"` from the project tsconfig.
 
 ## Page Steps
 
