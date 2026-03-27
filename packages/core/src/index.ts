@@ -145,6 +145,7 @@ export type {
 
 // Plugin system
 export { definePlugin } from './plugins/index.js';
+export { collectPluginWebhooks } from './plugins/collect-webhooks.js';
 export type {
   CreateContext,
   PluginAdapter,
