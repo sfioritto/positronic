@@ -10,7 +10,7 @@ A typical Positronic project has the following structure:
 ├── src/
 │   ├── brain.ts         # Project brain wrapper
 │   ├── brains/          # Brain definitions
-│   ├── webhooks/        # Webhook definitions
+│   ├── plugins/         # Plugin definitions (webhooks, tools, services)
 │   ├── runner.ts        # Local runner for development
 │   ├── services/        # Service implementations
 │   ├── utils/           # Shared utilities
