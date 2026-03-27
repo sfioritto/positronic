@@ -39,6 +39,7 @@ import {
   resolveTemplate,
   buildTemplateContext,
 } from '../../template/render.js';
+import type { TemplateChild } from '../../jsx-runtime.js';
 import type { FileHandle } from '../../files/types.js';
 import { guessMimeType } from '../../files/mime.js';
 import type {
@@ -446,6 +447,32 @@ export class Brain<
       prompt: TemplateReturn;
       onCreated?: (page: GeneratedPage) => void | Promise<void>;
       props?: Record<string, unknown>;
+      ttl?: number;
+      persist?: boolean;
+    }
+  ): Brain<TOptions, TState, TPlugins>;
+
+  // Overload 3: Custom HTML with formSchema
+  page<
+    TSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & z.infer<TSchema>
+  >(
+    title: string,
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
+      html: TemplateChild;
+      formSchema: TSchema;
+      onCreated?: (page: GeneratedPage<TSchema>) => void | Promise<void>;
+      ttl?: number;
+      persist?: boolean;
+    }
+  ): Brain<TOptions, TNewState, TPlugins>;
+
+  // Overload 4: Custom HTML without formSchema
+  page(
+    title: string,
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
+      html: TemplateChild;
+      onCreated?: (page: GeneratedPage) => void | Promise<void>;
       ttl?: number;
       persist?: boolean;
     }
