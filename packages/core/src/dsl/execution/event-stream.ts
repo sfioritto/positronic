@@ -1483,10 +1483,6 @@ The output must conform to the provided schema.`,
     yield* this.completeStep(step, prevState);
   }
 
-  /**
-   * Execute a page generation step.
-   * Generates UI components, renders to HTML, creates page, and sets up webhook.
-   */
   private buildFormAction(step: Step): {
     formAction: string;
     webhookIdentifier: string;
@@ -1541,18 +1537,16 @@ The output must conform to the provided schema.`,
 
     // Step 1: Produce the HTML string
     let html: string;
-    const hasForm = !!pageConfig.formSchema;
-    const formInfo = hasForm ? this.buildFormAction(step) : undefined;
+    const formInfo = pageConfig.formSchema
+      ? this.buildFormAction(step)
+      : undefined;
 
     if (pageConfig.html) {
       const body = renderHtml(
         pageConfig.html,
         formInfo ? { formAction: formInfo.formAction } : {}
       );
-      html = wrapHtmlDocument(body, {
-        title: stepBlock.title,
-        css: pageConfig.css,
-      });
+      html = wrapHtmlDocument(body, { title: stepBlock.title });
     } else {
       // LLM-generated page
       if (!this.components) {
@@ -1613,12 +1607,12 @@ The output must conform to the provided schema.`,
 
     const page = await this.pages.create(html, pageCreateOptions);
 
-    if (hasForm) {
+    if (formInfo) {
       const webhook: WebhookRegistration = {
         slug: 'page-form',
-        identifier: formInfo!.webhookIdentifier,
+        identifier: formInfo.webhookIdentifier,
         schema: pageConfig.formSchema!,
-        token: formInfo!.formToken,
+        token: formInfo.formToken,
       };
 
       this.currentPage = { url: page.url, webhook };

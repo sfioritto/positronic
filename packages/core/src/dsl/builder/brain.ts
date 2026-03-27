@@ -462,7 +462,6 @@ export class Brain<
       html: TemplateChild;
       formSchema: TSchema;
       onCreated?: (page: GeneratedPage<TSchema>) => void | Promise<void>;
-      css?: string;
       ttl?: number;
       persist?: boolean;
     }
@@ -474,7 +473,6 @@ export class Brain<
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       html: TemplateChild;
       onCreated?: (page: GeneratedPage) => void | Promise<void>;
-      css?: string;
       ttl?: number;
       persist?: boolean;
     }
