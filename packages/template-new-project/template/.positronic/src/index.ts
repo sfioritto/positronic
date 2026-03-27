@@ -3,7 +3,6 @@ import {
   setManifest,
   setBrainRunner,
   setWebhookManifest,
-  collectPluginWebhooks,
   BrainRunnerDO,
   MonitorDO,
   ScheduleDO,
@@ -11,6 +10,7 @@ import {
   AuthDO,
   PositronicManifest,
 } from "@positronic/cloudflare";
+import { collectPluginWebhooks } from "@positronic/core";
 // Import the generated manifests - NOTE the .js extension for runtime compatibility
 // @ts-expect-error - _manifest.js is generated during template processing
 import { manifest as brainManifest } from "./_manifest.js";
