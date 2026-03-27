@@ -2,7 +2,6 @@ import {
   Fragment,
   File,
   Resource,
-  Page,
   Form,
   type TemplateNode,
   type TemplateChild,
@@ -131,24 +130,6 @@ function renderNode(node: TemplateChild, context: RenderHtmlContext): string {
     throw new Error(`<${name}> elements are not supported in HTML pages.`);
   }
 
-  if (templateNode.type === Page) {
-    const title = templateNode.props.title as string | undefined;
-    const css = templateNode.props.css as string | undefined;
-    const body = renderChildren(templateNode.children, context);
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-${title ? `<title>${escapeHtml(title)}</title>` : ''}
-${css ? `<style>${css}</style>` : ''}
-</head>
-<body>
-${body}
-</body>
-</html>`;
-  }
-
   if (templateNode.type === Form) {
     const { children: _, ...restProps } = templateNode.props;
     const formProps = { ...restProps, method: 'POST' } as Record<
@@ -192,4 +173,24 @@ export function renderHtml(
   context: RenderHtmlContext = {}
 ): string {
   return renderNode(node, context);
+}
+
+export function wrapHtmlDocument(
+  body: string,
+  options?: { title?: string; css?: string }
+): string {
+  const title = options?.title;
+  const css = options?.css;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+${title ? `<title>${escapeHtml(title)}</title>` : ''}
+${css ? `<style>${css}</style>` : ''}
+</head>
+<body>
+${body}
+</body>
+</html>`;
 }

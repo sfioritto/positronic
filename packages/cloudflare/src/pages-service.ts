@@ -1,6 +1,6 @@
 import type {
   PagesService,
-  PageRecord as Page,
+  Page,
   PageCreateOptions,
   RuntimeEnv,
 } from '@positronic/core';
