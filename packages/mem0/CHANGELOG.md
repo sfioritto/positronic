@@ -1,5 +1,12 @@
 # @positronic/mem0
 
+## 0.0.78
+
+### Patch Changes
+
+- Updated dependencies
+  - @positronic/core@0.0.78
+
 ## 0.0.77
 
 ### Patch Changes

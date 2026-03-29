@@ -1,5 +1,24 @@
 # @positronic/cli
 
+## 0.0.78
+
+### Patch Changes
+
+- - **Plugin system**: Replace services/providers with a composable plugin architecture for extending brains
+  - **Prompt loop**: Replace agent system with `.prompt()` + `loop` property for LLM-driven iteration
+  - **Files service**: Framework-level file storage (R2-backed) with per-user scoping, zip builder, and mid-step events
+  - **JSX templates**: Full JSX support in `.prompt()`, `.page()`, and `.map()` steps with whitespace preservation
+  - **HTML JSX pages**: `.page()` accepts custom HTML via JSX — skip LLM generation for hand-crafted pages with CSP headers
+  - **`.map()` method**: Replace iterate overloads with cleaner `.map()` API including prompt mode
+  - **DSL improvements**: Unified StepContext for all callbacks, continuation pattern, removed stateKey (results spread onto state), decoupled inner brain options
+  - **CLI simplification**: Eliminated command class middlemen — handlers render components directly in cli.ts
+  - **Webhook triggers**: Start new brain runs from incoming webhooks, plugin-declared webhook handlers
+  - **Bug fixes**: JSX type bugs (Form callable type, IntrinsicElements), iterateContext clearing during DO replay, prompt loop responseMessages accumulation, nested brain event depth tracking
+- Updated dependencies
+  - @positronic/core@0.0.78
+  - @positronic/spec@0.0.78
+  - @positronic/template-new-project@0.0.78
+
 ## 0.0.77
 
 ### Patch Changes
