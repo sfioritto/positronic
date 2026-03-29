@@ -383,6 +383,85 @@ describe('brain creation', () => {
     expect(finalState).toEqual({ derived: true });
   });
 
+  it('should use brain-level client for prompt steps', async () => {
+    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: jest
+        .fn<ObjectGenerator['generateObject']>()
+        .mockResolvedValue({ object: { result: 'from brain client' } }),
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
+    };
+
+    const testBrain = brain({
+      title: 'Brain Level Client Test',
+      client: brainLevelClient,
+    }).prompt('Analyze', () => ({
+      message: 'analyze this',
+      outputSchema: z.object({ result: z.string() }),
+    }));
+
+    const events = [];
+    let finalState: any = {};
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
+      events.push(event);
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    // Brain-level client was used, not the runner's default
+    expect(brainLevelClient.generateObject).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'analyze this' })
+    );
+    expect(mockClient.generateObject).not.toHaveBeenCalled();
+    expect(finalState).toEqual({ result: 'from brain client' });
+  });
+
+  it('should let step-level client override brain-level client in prompt', async () => {
+    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: jest
+        .fn<ObjectGenerator['generateObject']>()
+        .mockResolvedValue({ object: { result: 'from brain' } }),
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
+    };
+
+    const stepLevelClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: jest
+        .fn<ObjectGenerator['generateObject']>()
+        .mockResolvedValue({ object: { result: 'from step' } }),
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
+    };
+
+    const testBrain = brain({
+      title: 'Step Override Brain Client',
+      client: brainLevelClient,
+    }).prompt('Analyze', () => ({
+      message: 'analyze this',
+      outputSchema: z.object({ result: z.string() }),
+      client: stepLevelClient,
+    }));
+
+    const events = [];
+    let finalState: any = {};
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
+      events.push(event);
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [event.patch]);
+      }
+    }
+
+    // Step-level wins over brain-level
+    expect(stepLevelClient.generateObject).toHaveBeenCalled();
+    expect(brainLevelClient.generateObject).not.toHaveBeenCalled();
+    expect(mockClient.generateObject).not.toHaveBeenCalled();
+    expect(finalState).toEqual({ result: 'from step' });
+  });
+
   it('should use the provided brainRunId for the initial run if supplied', async () => {
     const testBrain = brain('Brain with Provided ID');
     const providedId = 'my-custom-run-id-123';

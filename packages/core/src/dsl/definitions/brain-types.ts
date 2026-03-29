@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ObjectGenerator } from '../../clients/types.js';
 import type { WebhookRegistration } from '../webhook.js';
 
 /**
@@ -25,4 +26,6 @@ export type GeneratedPage<TSchema extends z.ZodSchema = z.ZodSchema> = {
  * Configuration for creating a brain - either a simple string title
  * or an object with title and optional description.
  */
-export type BrainConfig = string | { title: string; description?: string };
+export type BrainConfig =
+  | string
+  | { title: string; description?: string; client?: ObjectGenerator };

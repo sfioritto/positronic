@@ -1,4 +1,5 @@
 import { brain as coreBrain, Brain } from './builder/brain.js';
+import type { ObjectGenerator } from '../clients/types.js';
 import type { State, JsonObject } from './types.js';
 import type { UIComponent } from '../ui/types.js';
 import type { ConfiguredPlugin, PluginsFromArray } from '../plugins/types.js';
@@ -53,11 +54,14 @@ export function createBrain<
   >(config: {
     title: string;
     description?: string;
+    client?: ObjectGenerator;
   }): Brain<TOptions, TState, PluginsFromArray<TPlugins>>;
 
   // Implementation
   function brain(
-    titleOrConfig: string | { title: string; description?: string }
+    titleOrConfig:
+      | string
+      | { title: string; description?: string; client?: ObjectGenerator }
   ): any {
     let base = coreBrain(titleOrConfig as any);
 

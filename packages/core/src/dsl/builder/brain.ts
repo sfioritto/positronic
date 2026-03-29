@@ -99,8 +99,15 @@ export class Brain<
   private components?: Record<string, UIComponent<any>>;
   private storeSchema?: StoreSchema;
   private pluginConfigs: ConfiguredPlugin[] = [];
+  private brainClient?: ObjectGenerator;
 
-  constructor(public readonly title: string, private description?: string) {}
+  constructor(
+    public readonly title: string,
+    private description?: string,
+    brainClient?: ObjectGenerator
+  ) {
+    this.brainClient = brainClient;
+  }
 
   get structure(): BrainStructure {
     return {
@@ -543,6 +550,7 @@ export class Brain<
       options: (params.options || {}) as TOptions,
       optionsSchema: this.optionsSchema,
       components: this.components,
+      brainClient: this.brainClient,
       files,
       pages,
       store,
@@ -566,6 +574,7 @@ export class Brain<
     target.components = this.components;
     target.storeSchema = this.storeSchema;
     target.pluginConfigs = this.pluginConfigs;
+    target.brainClient = this.brainClient;
   }
 
   private nextBrain<TNewState extends State>(): Brain<
@@ -635,6 +644,7 @@ export function brain<
 >(config: {
   title: string;
   description?: string;
+  client?: ObjectGenerator;
   plugins?: TPluginMap;
 }): Brain<TOptions, TState, PluginsFrom<TPluginMap>>;
 
@@ -642,22 +652,28 @@ export function brain<
 export function brain(
   titleOrConfig:
     | string
-    | (BrainConfig & { plugins?: Record<string, ConfiguredPlugin> })
+    | {
+        title: string;
+        description?: string;
+        client?: ObjectGenerator;
+        plugins?: Record<string, ConfiguredPlugin>;
+      }
 ): Brain<any, any, any> {
   const isString = typeof titleOrConfig === 'string';
   const title = isString ? titleOrConfig : titleOrConfig.title;
   const description = isString ? undefined : titleOrConfig.description;
+  const client = isString ? undefined : titleOrConfig.client;
   const plugins = isString ? undefined : titleOrConfig.plugins;
 
   registerBrainName(title);
 
-  let b = new Brain<any, any, any>(title, description);
+  let newBrain = new Brain<any, any, any>(title, description, client);
 
   if (plugins) {
     for (const plugin of Object.values(plugins)) {
-      b = b.withPlugin(plugin);
+      newBrain = newBrain.withPlugin(plugin);
     }
   }
 
-  return b;
+  return newBrain;
 }

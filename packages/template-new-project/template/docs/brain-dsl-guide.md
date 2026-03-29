@@ -159,6 +159,26 @@ brain('Multi-Model Brain')
 
 When deployed to Cloudflare, rate limiting is applied automatically to all clients — including per-step overrides — through the Governor system. Brain authors don't need to worry about rate limiting.
 
+If most or all steps in a brain use the same non-default client, set it once at the brain level instead of repeating it on every step:
+
+```typescript
+const fastModel = createAnthropicClient({ model: 'claude-haiku-4-5-20251001' });
+
+brain({ title: 'Fast Processor', client: fastModel })
+  .prompt('Categorize', () => ({
+    message: 'Categorize this item',
+    outputSchema: z.object({ category: z.string() }),
+    // Uses fastModel — no need to pass client here
+  }))
+  .prompt('Summarize', () => ({
+    message: 'Summarize this item',
+    outputSchema: z.object({ summary: z.string() }),
+    // Also uses fastModel
+  }));
+```
+
+The resolution order is: **step-level client > brain-level client > runner default**. A step can still override the brain-level client by passing its own `client` option. Inner brains (from `.brain()` or `.map()` brain mode) do **not** inherit the parent brain's client — they use the runner default unless they set their own.
+
 ### 3. Nested Brains
 
 Compose complex workflows from smaller brains:
@@ -1255,7 +1275,7 @@ Note: The `stateKey` is now the 2nd argument to `.map()`: `.map('title', 'stateK
 **Common options** (both modes):
 
 - `over: (context) => T[] | Promise<T[]>` - Function returning the array to iterate over. Receives the full step context (`{ state, options, client, resources, ... }`) — the same context object that step actions receive. Most commonly you'll destructure just `{ state }`, but you can access options, plugin-provided values, or any other context field. Can be async.
-- `error: (item, error) => Result | null` - Optional fallback when an item fails. Return `null` to skip the item entirely.
+- `error: (item, error) => Result | null` - Optional error handler. Return a value for a fallback result, or `null` to skip the item. **By default** (no `error` callback), failed items are logged via `console.error` and skipped. To make errors fatal, re-throw: `error: (item, err) => { throw err; }`.
 
 **Brain mode** (use `run`):
 

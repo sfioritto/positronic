@@ -76,6 +76,7 @@ export class BrainEventStream<
   private title: string;
   private description?: string;
   private client: ObjectGenerator;
+  private brainClient?: ObjectGenerator;
   private options: TOptions;
   private resources: Resources;
   private pages?: PagesService;
@@ -105,6 +106,7 @@ export class BrainEventStream<
       description?: string;
       blocks: Block<any, any, TOptions, TPlugins, any, any>[];
       components?: Record<string, UIComponent<any>>;
+      brainClient?: ObjectGenerator;
       files?: FilesService;
       pages?: PagesService;
       store?: Store<any>;
@@ -133,6 +135,7 @@ export class BrainEventStream<
 
     // Store governor for per-step client resolution
     this.governor = (params as any).governor;
+    this.brainClient = params.brainClient;
     this.currentUser = currentUser;
 
     // Check if this is a resume run or fresh start
@@ -728,10 +731,11 @@ export class BrainEventStream<
       this.buildStepContext(step)
     );
 
-    const client = config.client
+    const rawClient = config.client ?? this.brainClient;
+    const client = rawClient
       ? this.governor
-        ? this.governor(config.client)
-        : config.client
+        ? this.governor(rawClient)
+        : rawClient
       : this.client;
 
     const prompt = await resolveTemplate(config.message, this.templateContext);
@@ -1386,10 +1390,11 @@ The output must conform to the provided schema.`,
                   this.templateContext
                 )
             : undefined;
-          const client = config.client
+          const rawClient = config.client ?? this.brainClient;
+          const client = rawClient
             ? this.governor
-              ? this.governor(config.client)
-              : config.client
+              ? this.governor(rawClient)
+              : rawClient
             : this.client;
 
           if (config.prompt.loop) {
@@ -1447,11 +1452,21 @@ The output must conform to the provided schema.`,
           result = [item, innerState];
         }
       } catch (error) {
+        // Webhook-in-map is a programming mistake — always re-throw
+        if (
+          error instanceof Error &&
+          error.message.includes('Webhook/wait inside .map()')
+        ) {
+          throw error;
+        }
+
         if (config.error) {
           const fallback = config.error(item, error as Error);
           result = fallback !== null ? [item, fallback] : undefined;
         } else {
-          throw error;
+          // Default: log and skip
+          console.error(`[map] Item ${i} in "${block.title}" failed:`, error);
+          result = undefined;
         }
       }
 
