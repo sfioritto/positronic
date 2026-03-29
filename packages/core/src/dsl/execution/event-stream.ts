@@ -1327,7 +1327,8 @@ The output must conform to the provided schema.`,
   private async *executeMap(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as MapBlock;
     const prevState = this.currentState;
-    const config = await block.configFn(this.buildStepContext(step));
+    const stepContext = this.buildStepContext(step);
+    const config = await block.configFn(stepContext);
     const items = await config.over;
     const totalItems = items.length;
 
@@ -1376,13 +1377,13 @@ The output must conform to the provided schema.`,
       try {
         if (config.prompt) {
           const prompt = await resolveTemplate(
-            config.prompt.message(item),
+            config.prompt.message(item, stepContext),
             this.templateContext
           );
           const itemSystem = config.prompt.system
             ? typeof config.prompt.system === 'function'
               ? await resolveTemplate(
-                  config.prompt.system(item),
+                  config.prompt.system(item, stepContext),
                   this.templateContext
                 )
               : await resolveTemplate(

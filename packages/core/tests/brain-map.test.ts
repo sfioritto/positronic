@@ -850,6 +850,75 @@ describe('.map()', () => {
 
     expect(error?.message).toBe('Fatal item error');
   });
+
+  it('should pass step context as second argument to prompt message function', async () => {
+    mockGenerateObject.mockResolvedValueOnce({
+      object: { result: 'ok' },
+    });
+
+    let capturedContext: any = undefined;
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ id: 1 }],
+        prefix: 'hello',
+      }))
+      .map('WithContext', 'results' as const, ({ state }) => ({
+        prompt: {
+          message: (item: { id: number }, context: any) => {
+            capturedContext = context;
+            return `${context.state.prefix}-${item.id}`;
+          },
+          outputSchema: z.object({ result: z.string() }),
+        },
+        over: state.items,
+      }));
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    expect(capturedContext).toBeDefined();
+    expect(capturedContext.state.prefix).toBe('hello');
+    expect(capturedContext.state.items).toEqual([{ id: 1 }]);
+    expect(capturedContext.client).toBeDefined();
+    expect(finalState.results).toHaveLength(1);
+    expect(finalState.results[0]).toEqual([{ id: 1 }, { result: 'ok' }]);
+  });
+
+  it('should pass step context as second argument to prompt system function', async () => {
+    mockGenerateObject.mockResolvedValueOnce({
+      object: { result: 'ok' },
+    });
+
+    let capturedSystemContext: any = undefined;
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ id: 1 }],
+        role: 'assistant',
+      }))
+      .map('WithSystemContext', 'results' as const, ({ state }) => ({
+        prompt: {
+          message: (item: { id: number }) => `Process ${item.id}`,
+          system: (item: { id: number }, context: any) => {
+            capturedSystemContext = context;
+            return `You are a ${context.state.role}`;
+          },
+          outputSchema: z.object({ result: z.string() }),
+        },
+        over: state.items,
+      }));
+
+    await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    expect(capturedSystemContext).toBeDefined();
+    expect(capturedSystemContext.state.role).toBe('assistant');
+  });
 });
 
 describe('IterateResult', () => {

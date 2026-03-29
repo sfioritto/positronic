@@ -153,8 +153,8 @@ export type MapConfig = {
   options?: any;
   // Prompt mode
   prompt?: {
-    message: (item: any) => TemplateReturn;
-    system?: TemplateReturn | ((item: any) => TemplateReturn);
+    message: (item: any, context?: any) => TemplateReturn;
+    system?: TemplateReturn | ((item: any, context?: any) => TemplateReturn);
     outputSchema: z.ZodObject<any>;
     loop?: PromptLoopConfig;
   };

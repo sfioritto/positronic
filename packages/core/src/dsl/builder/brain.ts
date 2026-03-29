@@ -402,10 +402,16 @@ export class Brain<
     stateKey: TStateKey & (string extends TStateKey ? never : unknown),
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       prompt: {
-        message: (item: NoInfer<TItems[number]>) => TemplateReturn;
+        message: (
+          item: NoInfer<TItems[number]>,
+          context?: StepContext<TState, TOptions> & TPlugins
+        ) => TemplateReturn;
         system?:
           | TemplateReturn
-          | ((item: NoInfer<TItems[number]>) => TemplateReturn);
+          | ((
+              item: NoInfer<TItems[number]>,
+              context?: StepContext<TState, TOptions> & TPlugins
+            ) => TemplateReturn);
         outputSchema: TSchema;
         loop?: PromptLoopConfig;
       };
