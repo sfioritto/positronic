@@ -623,6 +623,82 @@ describe('.map()', () => {
     ]);
   });
 
+  it('should use brain-level client for prompt steps', async () => {
+    const brainMockGenerateObject =
+      jest.fn<ObjectGenerator['generateObject']>();
+    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: brainMockGenerateObject,
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
+    };
+
+    brainMockGenerateObject.mockResolvedValue({
+      object: { summary: 'from brain client' },
+    });
+
+    const testBrain = brain({ title: 'BrainClient', client: brainLevelClient })
+      .step('Init', () => ({ items: ['a'] }))
+      .map('Summarize', 'summaries' as const, ({ state }) => ({
+        prompt: {
+          message: (item: string) => `Summarize: ${item}`,
+          outputSchema: z.object({ summary: z.string() }),
+        },
+        over: state.items,
+      }));
+
+    const { finalState } = await runWithStateMachine(testBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Brain-level client was used, not the runner's default
+    expect(brainMockGenerateObject).toHaveBeenCalledTimes(1);
+    expect(mockGenerateObject).not.toHaveBeenCalled();
+    expect(finalState.summaries[0]).toEqual([
+      'a',
+      { summary: 'from brain client' },
+    ]);
+  });
+
+  it('should let step-level client override brain-level client', async () => {
+    const brainMockGenerateObject =
+      jest.fn<ObjectGenerator['generateObject']>();
+    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: brainMockGenerateObject,
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
+    };
+
+    const stepMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+    const stepLevelClient: jest.Mocked<ObjectGenerator> = {
+      generateObject: stepMockGenerateObject,
+      streamText: jest.fn<ObjectGenerator['streamText']>(),
+    };
+
+    stepMockGenerateObject.mockResolvedValue({
+      object: { summary: 'from step client' },
+    });
+
+    const testBrain = brain({ title: 'StepOverride', client: brainLevelClient })
+      .step('Init', () => ({ items: ['a'] }))
+      .map('Summarize', 'summaries' as const, ({ state }) => ({
+        prompt: {
+          message: (item: string) => `Summarize: ${item}`,
+          outputSchema: z.object({ summary: z.string() }),
+        },
+        client: stepLevelClient,
+        over: state.items,
+      }));
+
+    const { finalState } = await runWithStateMachine(testBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Step-level client wins over brain-level
+    expect(stepMockGenerateObject).toHaveBeenCalledTimes(1);
+    expect(brainMockGenerateObject).not.toHaveBeenCalled();
+    expect(mockGenerateObject).not.toHaveBeenCalled();
+  });
+
   it('should work in brain mode when the parent brain runs as a child via .brain()', async () => {
     const processBrain = brain<{}, { value: number }>('MapChild').step(
       'Double',
@@ -655,6 +731,124 @@ describe('.map()', () => {
     });
 
     expect(finalState.total).toBe(12);
+  });
+
+  it('should log and skip failed items by default (brain mode)', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    let callCount = 0;
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => {
+        callCount++;
+        if (callCount === 2) throw new Error('Item 2 failed');
+        return { value: state.value * 2 };
+      }
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .map('Iterate', 'results' as const, ({ state }) => ({
+        run: innerBrain,
+        over: state.items,
+        initialState: (item) => ({ value: item.n }),
+      }));
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    })) {
+      events.push(event);
+    }
+
+    const itemEvents = events.filter(
+      (e) => e.type === BRAIN_EVENTS.ITERATE_ITEM_COMPLETE
+    ) as any[];
+    expect(itemEvents).toHaveLength(3);
+    expect(itemEvents[0].result).toEqual({ value: 2 });
+    expect(itemEvents[1].result).toBeUndefined(); // skipped
+    expect(itemEvents[2].result).toEqual({ value: 6 });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[map] Item 1 in "Iterate" failed:'),
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should log and skip failed items by default (prompt mode)', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    mockGenerateObject
+      .mockResolvedValueOnce({ object: { summary: 'Good' } })
+      .mockRejectedValueOnce(new Error('LLM error'))
+      .mockResolvedValueOnce({ object: { summary: 'Also good' } });
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: ['a', 'b', 'c'] }))
+      .map('Summarize', 'summaries' as const, ({ state }) => ({
+        prompt: {
+          message: (item: string) => `Summarize: ${item}`,
+          outputSchema: z.object({ summary: z.string() }),
+        },
+        over: state.items,
+      }));
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // Only 2 items in results (item b was skipped)
+    expect(finalState.summaries).toHaveLength(2);
+    expect(finalState.summaries[0]).toEqual(['a', { summary: 'Good' }]);
+    expect(finalState.summaries[1]).toEqual(['c', { summary: 'Also good' }]);
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[map] Item 1 in "Summarize" failed:'),
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should propagate error when custom handler re-throws', async () => {
+    let callCount = 0;
+    const innerBrain = brain<{}, { value: number }>('Inner').step(
+      'Process',
+      ({ state }) => {
+        callCount++;
+        if (callCount === 2) throw new Error('Fatal item error');
+        return { value: state.value };
+      }
+    );
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({ items: [{ n: 1 }, { n: 2 }, { n: 3 }] }))
+      .map('Iterate', 'results' as const, ({ state }) => ({
+        run: innerBrain,
+        over: state.items,
+        initialState: (item) => ({ value: item.n }),
+        error: (item, err) => {
+          throw err;
+        },
+      }));
+
+    let error: Error | undefined;
+    try {
+      for await (const event of outerBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })) {
+        // consume events
+      }
+    } catch (e) {
+      error = e as Error;
+    }
+
+    expect(error?.message).toBe('Fatal item error');
   });
 });
 

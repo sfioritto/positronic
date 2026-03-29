@@ -47,7 +47,7 @@ Added a second overload to `.map()` with flat prompt config:
   },
   over: ({ state }) => state.crawledResults,
   outputKey: 'validations' as const,
-  error: () => null,
+  error: () => null, // Optional — default behavior is log + skip
 })
 ```
 

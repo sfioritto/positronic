@@ -44,7 +44,7 @@ Single `.map()` method on Brain builder, single `MapBlock` type, single `execute
   run: innerBrain,
   initialState: (item) => ({ value: item.body }),
   outputKey: 'results' as const,
-  error?: (item, error) => fallbackOrNull,
+  error?: (item, error) => fallbackOrNull, // Optional — default: log + skip
 })
 ```
 
