@@ -62,7 +62,7 @@ import {
 } from '../../template/render.js';
 import { renderHtml, wrapHtmlDocument } from '../../template/render-html.js';
 
-const clone = <T>(value: T): T => structuredClone(value);
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 export class BrainEventStream<
   TOptions extends JsonObject = JsonObject,

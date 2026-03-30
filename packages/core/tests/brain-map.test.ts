@@ -9,6 +9,7 @@ import {
 } from '../src/dsl/brain-state-machine.js';
 import {
   finalStateFromEvents,
+  runWithStateMachine,
   mockGenerateObject,
   mockClient,
 } from './brain-test-helpers.js';
@@ -981,5 +982,85 @@ describe('IterateResult', () => {
       'beta:test summary',
       'gamma:test summary',
     ]);
+  });
+
+  it('should not inflate IterateResult when followed by prompt steps', async () => {
+    // Regression: prompt steps use structuredClone for prevState, but
+    // fast-json-patch's _generate calls toJSON() on IterateResult (producing
+    // a flat array) while the structuredClone'd version is { data: [...] }.
+    // This mismatch generates spurious REPLACE + ADD patches. The state machine
+    // applies the patch twice (execution stack + currentState), and the REPLACE
+    // value is a reference to IterateResult's internal data array, so the ADDs
+    // mutate it through the shared reference — tripling the length per prompt step.
+    const innerBrain = brain<{}, { value: number }>('Doubler').step(
+      'Double',
+      ({ state }) => ({ value: state.value * 2 })
+    );
+
+    mockGenerateObject.mockResolvedValue({
+      object: { summary: 'test summary' },
+    } as any);
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ n: 1 }, { n: 2 }, { n: 3 }],
+      }))
+      .map('Process', 'results' as const, ({ state }) => ({
+        run: innerBrain,
+        over: state.items,
+        initialState: (item) => ({ value: item.n }),
+      }))
+      .prompt('Summarize', () => ({
+        message: 'Summarize the results',
+        outputSchema: z.object({ summary: z.string() }),
+      }));
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // With the bug, results.length would be 9 (3 * 3^1) instead of 3
+    expect(finalState.results).toHaveLength(3);
+    expect(finalState.summary).toBe('test summary');
+  });
+
+  it('should not compound IterateResult inflation across multiple prompt steps', async () => {
+    const innerBrain = brain<{}, { value: number }>('Doubler').step(
+      'Double',
+      ({ state }) => ({ value: state.value * 2 })
+    );
+
+    mockGenerateObject
+      .mockResolvedValueOnce({ object: { first: 'a' } } as any)
+      .mockResolvedValueOnce({ object: { second: 'b' } } as any);
+
+    const outerBrain = brain('Outer')
+      .step('Init', () => ({
+        items: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }],
+      }))
+      .map('Process', 'results' as const, ({ state }) => ({
+        run: innerBrain,
+        over: state.items,
+        initialState: (item) => ({ value: item.n }),
+      }))
+      .prompt('First prompt', () => ({
+        message: 'First',
+        outputSchema: z.object({ first: z.string() }),
+      }))
+      .prompt('Second prompt', () => ({
+        message: 'Second',
+        outputSchema: z.object({ second: z.string() }),
+      }));
+
+    const { finalState } = await runWithStateMachine(outerBrain, {
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+    });
+
+    // With the bug, results.length would be 36 (4 * 3^2) instead of 4
+    expect(finalState.results).toHaveLength(4);
+    expect(finalState.first).toBe('a');
+    expect(finalState.second).toBe('b');
   });
 });
