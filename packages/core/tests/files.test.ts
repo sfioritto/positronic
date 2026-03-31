@@ -3,7 +3,7 @@ import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
 import type {
-  FilesService,
+  Files,
   FileHandle,
   FileInput,
   FileOptions,
@@ -22,9 +22,9 @@ const collectEvents = async <T>(
   return events;
 };
 
-function createInMemoryFilesService(
+function createInMemoryFiles(
   origin: string = 'http://localhost:8787'
-): FilesService & { storage: Map<string, string | Uint8Array> } {
+): Files & { storage: Map<string, string | Uint8Array> } {
   const storage = new Map<string, string | Uint8Array>();
 
   function resolveKey(name: string, options?: FileOptions): string {
@@ -107,7 +107,7 @@ function createInMemoryFilesService(
     return handle;
   }
 
-  const service: FilesService & { storage: Map<string, string | Uint8Array> } =
+  const service: Files & { storage: Map<string, string | Uint8Array> } =
     {
       storage,
       open(name: string, options?: FileOptions) {
@@ -170,10 +170,10 @@ const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
 
 describe('files service', () => {
   it('should inject files into step context', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
-    let receivedFiles: FilesService | undefined;
+    let receivedFiles: Files | undefined;
 
     const testBrain = brain('test-brain').step('Check files', ({ files }) => {
       receivedFiles = files;
@@ -194,7 +194,7 @@ describe('files service', () => {
   });
 
   it('should write and read text files', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -228,7 +228,7 @@ describe('files service', () => {
   });
 
   it('should write binary content', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -257,7 +257,7 @@ describe('files service', () => {
   });
 
   it('should compute url from origin', async () => {
-    const filesService = createInMemoryFilesService(
+    const filesService = createInMemoryFiles(
       'https://myapp.workers.dev'
     );
 
@@ -268,7 +268,7 @@ describe('files service', () => {
   });
 
   it('should handle file existence check', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -292,7 +292,7 @@ describe('files service', () => {
   });
 
   it('should delete files', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -316,7 +316,7 @@ describe('files service', () => {
   });
 
   it('should list files', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -339,7 +339,7 @@ describe('files service', () => {
   });
 
   it('should scope files by scope option', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
 
     // Write to different scopes
     await filesService.write('shared.txt', 'brain scope');
@@ -363,7 +363,7 @@ describe('files service', () => {
   });
 
   it('should copy content between files', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
 
     const source = filesService.open('source.txt');
     await source.write('original content');
@@ -376,7 +376,7 @@ describe('files service', () => {
   });
 
   it('should propagate files to inner brains and inner writes work', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const innerBrain = brain('inner-brain').step(
@@ -407,7 +407,7 @@ describe('files service', () => {
   });
 
   it('should use convenience write method', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
 
     const ref = await filesService.write('quick.txt', 'fast write');
     expect(ref.name).toBe('quick.txt');
@@ -417,7 +417,7 @@ describe('files service', () => {
   });
 
   it('should create a zip builder synchronously', () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const zip = filesService.zip('bundle.zip');
     expect(zip).toBeDefined();
     expect(zip.write).toBeDefined();
@@ -425,7 +425,7 @@ describe('files service', () => {
   });
 
   it('should add entries to zip and finalize', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const zip = filesService.zip('bundle.zip');
 
     await zip.write('file1.txt', 'hello');
@@ -436,7 +436,7 @@ describe('files service', () => {
   });
 
   it('should add file handle to zip', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
 
     await filesService.write('source.txt', 'source content');
     const sourceHandle = filesService.open('source.txt');
@@ -449,7 +449,7 @@ describe('files service', () => {
   });
 
   it('should use zip in a brain step', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -472,7 +472,7 @@ describe('files service', () => {
   });
 
   it('should emit file events mid-step for writes and handle writes', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -518,7 +518,7 @@ describe('files service', () => {
   });
 
   it('should emit events for zip write and finalize operations', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     const mockClient = createMockClient();
 
     const testBrain = brain('test-brain').step(
@@ -557,7 +557,7 @@ describe('files service', () => {
 
 describe('file agent tools', () => {
   it('readFile tool reads via context.files', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
     await filesService.write('data.txt', 'tool read content');
 
     const context = { files: filesService } as any;
@@ -569,7 +569,7 @@ describe('file agent tools', () => {
   });
 
   it('writeFile tool writes via context.files', async () => {
-    const filesService = createInMemoryFilesService();
+    const filesService = createInMemoryFiles();
 
     const context = { files: filesService } as any;
     const result = (await writeFile.execute!(

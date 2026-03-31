@@ -19,7 +19,7 @@ import { TimeoutAdapter } from './timeout-adapter.js';
 import { PageAdapter } from './page-adapter.js';
 import { EventLoader } from './event-loader.js';
 import { createPagesService } from './pages-service.js';
-import { createFilesService } from './files-service.js';
+import { createFiles } from './files-service.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
 import type { GovernorDO } from './governor-do.js';
@@ -677,7 +677,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       monitorDOStub,
       env
     );
-    const filesService = createFilesService(
+    const files = createFiles(
       this.env.RESOURCES_BUCKET,
       brainTitle,
       brainRunId,
@@ -728,7 +728,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       resources: r2Resources ?? {},
       signalProvider,
       governor: (c: ObjectGenerator) => rateGoverned(c),
-      files: filesService,
+      files: files,
       pages: pagesService,
       storeProvider: storeBackend,
     });

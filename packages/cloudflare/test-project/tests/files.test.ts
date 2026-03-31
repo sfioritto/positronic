@@ -1,22 +1,22 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
-import { createFilesService } from '../../src/files-service.js';
-import type { FilesService } from '@positronic/core';
+import { createFiles } from '../../src/files-service.js';
+import type { Files } from '@positronic/core';
 import { unzipSync } from 'fflate';
 
 interface TestEnv {
   TEST_RESOURCES_BUCKET: R2Bucket;
 }
 
-describe('createFilesService', () => {
+describe('createFiles', () => {
   const testEnv = env as TestEnv;
 
   function createService(
     brainTitle = 'test-brain',
     brainRunId = 'run-123',
     currentUser = { name: 'test-user' }
-  ): FilesService {
-    return createFilesService(
+  ): Files {
+    return createFiles(
       testEnv.TEST_RESOURCES_BUCKET,
       brainTitle,
       brainRunId,

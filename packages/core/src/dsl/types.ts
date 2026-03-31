@@ -101,10 +101,8 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
   stepId: string;
   /** The authenticated user running this brain */
   currentUser: CurrentUser;
-  /** File storage service for creating, reading, and managing files. Present when the backend provides it. */
-  files?: import('../files/types.js').FilesService;
-  /** Typed key-value store — available when the brain calls withStore() */
-  store?: import('../store/types.js').Store<any>;
+  /** File storage for creating, reading, and managing files */
+  files: import('../files/types.js').Files;
 }
 
 /**

@@ -13,7 +13,7 @@ import type {
   PromptLoopContext,
 } from '../brain-state-machine.js';
 import type { SerializedPageContext } from '../webhook.js';
-import type { FilesService } from '../../files/types.js';
+import type { Files } from '../../files/types.js';
 import type { PagesService } from '../pages.js';
 import type { StoreProvider } from '../../store/types.js';
 import type { ConfiguredPlugin } from '../../plugins/types.js';
@@ -37,7 +37,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   signalProvider?: SignalProvider;
   governor?: (client: ObjectGenerator) => ObjectGenerator;
   /** Platform service: file storage */
-  files?: FilesService;
+  files?: Files;
   /** Platform service: page generation */
   pages?: PagesService;
   /** Platform service: typed key-value store factory */

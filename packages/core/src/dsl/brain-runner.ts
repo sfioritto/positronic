@@ -17,7 +17,7 @@ import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
 import type { BrainCancelledEvent } from './definitions/events.js';
 import type { ResumeParams } from './definitions/run-params.js';
-import type { FilesService } from '../files/types.js';
+import type { Files } from '../files/types.js';
 import type { PagesService } from './pages.js';
 import type { StoreProvider } from '../store/types.js';
 
@@ -47,7 +47,7 @@ export class BrainRunner {
       resources?: Resources;
       signalProvider?: SignalProvider;
       governor?: (client: ObjectGenerator) => ObjectGenerator;
-      files?: FilesService;
+      files?: Files;
       pages?: PagesService;
       storeProvider?: StoreProvider;
     }

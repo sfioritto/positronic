@@ -28,7 +28,7 @@ import type { UIComponent } from '../../ui/types.js';
 import { generatePage } from '../../ui/generate-page.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
 import type { Store, StoreProvider } from '../../store/types.js';
-import type { FilesService } from '../../files/types.js';
+import type { Files } from '../../files/types.js';
 import type { PluginAdapter, ConfiguredPlugin } from '../../plugins/types.js';
 import { guessMimeType } from '../../files/mime.js';
 import { EventChannel } from './event-channel.js';
@@ -87,7 +87,7 @@ export class BrainEventStream<
   private components?: Record<string, UIComponent<any>>;
   private signalProvider?: SignalProvider;
   private store?: Store<any>;
-  private files?: FilesService;
+  private files?: Files;
   private storeProvider?: StoreProvider;
   private pluginInjections: Record<string, any>;
   private pluginAdapters: PluginAdapter[];
@@ -107,7 +107,7 @@ export class BrainEventStream<
       blocks: Block<any, any, TOptions, TPlugins, any, any>[];
       components?: Record<string, UIComponent<any>>;
       brainClient?: ObjectGenerator;
-      files?: FilesService;
+      files?: Files;
       pages?: PagesService;
       store?: Store<any>;
       optionsSchema?: z.ZodSchema<any>;

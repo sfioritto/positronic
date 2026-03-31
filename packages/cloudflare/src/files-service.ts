@@ -1,5 +1,5 @@
 import type {
-  FilesService,
+  Files,
   FileHandle,
   FileInput,
   FileOptions,
@@ -13,13 +13,13 @@ import { guessContentType } from './content-type.js';
 import { createR2ZipBuilder } from './zip-builder.js';
 import { isFileHandle } from './file-utils.js';
 
-export function createFilesService(
+export function createFiles(
   bucket: R2Bucket,
   brainTitle: string,
   brainRunId: string,
   currentUser: CurrentUser,
   env: RuntimeEnv
-): FilesService {
+): Files {
   function resolveKey(name: string, options?: FileOptions): string {
     const scope = options?.scope ?? 'brain';
     const userName = currentUser.name;
