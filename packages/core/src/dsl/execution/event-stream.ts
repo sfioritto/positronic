@@ -1617,7 +1617,9 @@ The output must conform to the provided schema.`,
       ttl: pageConfig.ttl,
     };
 
-    const page = await this.pages.create(html, pageCreateOptions);
+    const page = pageConfig.slug
+      ? await this.pages.create(pageConfig.slug, html, pageCreateOptions)
+      : await this.pages.create(html, pageCreateOptions);
 
     if (formInfo) {
       const webhook: WebhookRegistration = {
