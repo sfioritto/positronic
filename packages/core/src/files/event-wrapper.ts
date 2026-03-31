@@ -1,5 +1,5 @@
 import type {
-  FilesService,
+  Files,
   FileHandle,
   FileInput,
   FileOptions,
@@ -94,14 +94,14 @@ function wrapZipBuilder(
 }
 
 /**
- * Wraps a FilesService to push events onto a channel during write operations.
+ * Wraps a Files to push events onto a channel during write operations.
  * The wrapper is transparent — same interface, brain authors see no change.
  */
 export function wrapFilesWithEvents(
-  files: FilesService,
+  files: Files,
   channel: EventSink,
   ctx: EventContext
-): FilesService {
+): Files {
   return {
     open(name: string, options?: FileOptions): FileHandle {
       return wrapFileHandle(files.open(name, options), channel, ctx);

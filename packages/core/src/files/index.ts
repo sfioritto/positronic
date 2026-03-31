@@ -3,6 +3,6 @@ export type {
   FileOptions,
   FileRef,
   FileHandle,
-  FilesService,
+  Files,
   ZipBuilder,
 } from './types.js';

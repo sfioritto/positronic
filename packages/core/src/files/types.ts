@@ -83,7 +83,7 @@ export interface ZipBuilder {
  *
  * Files are always scoped per-user. Default scope is 'brain' (persists across runs).
  */
-export interface FilesService {
+export interface Files {
   /**
    * Get a lazy file handle. No I/O — returns immediately.
    * Use methods on the handle to read, write, or check existence.
