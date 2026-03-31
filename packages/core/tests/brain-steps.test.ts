@@ -137,6 +137,69 @@ describe('step creation', () => {
   });
 });
 
+describe('state isolation', () => {
+  it('should not mutate the initialState object passed to run()', async () => {
+    const initialState = { value: 1, nested: { count: 0 } };
+    const original = JSON.parse(JSON.stringify(initialState));
+
+    const testBrain = brain('Initial State Isolation').step(
+      'Mutate step',
+      ({ state }) => ({ value: 99, nested: { count: 42 } })
+    );
+
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      initialState,
+    })) {
+      // consume all events
+    }
+
+    expect(initialState).toEqual(original);
+  });
+
+  it('should isolate prevState in prompt steps even if configFn mutates state', async () => {
+    // executePrompt clones currentState into prevState BEFORE calling configFn.
+    // If it didn't, a configFn that mutates the state object it receives would
+    // corrupt prevState, causing createPatch to produce an empty diff.
+    const { mockGenerateObject } = await import('./brain-test-helpers.js');
+    const { z } = await import('zod');
+
+    mockGenerateObject.mockResolvedValueOnce({ object: { result: 'hello' } });
+
+    const testBrain = brain('Prompt PrevState Isolation').prompt(
+      'Prompt step',
+      ({ state }) => {
+        // Mutate state in-place before returning the prompt config —
+        // this simulates a configFn that reads then mutates state as a side-effect.
+        (state as any).value = 99;
+        return {
+          message: 'test prompt',
+          outputSchema: z.object({ result: z.string() }),
+          stateKey: 'result' as const,
+        };
+      }
+    );
+
+    const patches: any[] = [];
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      initialState: { value: 1 },
+    })) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        patches.push(...event.patch);
+      }
+    }
+
+    // The patch must include an op for /value changing from 1 → 99,
+    // proving prevState captured the pre-mutation value of 1.
+    const valuePatch = patches.find((p) => p.path === '/value');
+    expect(valuePatch).toBeDefined();
+    expect(valuePatch.value).toBe(99);
+  });
+});
+
 describe('brain structure', () => {
   it('should expose brain structure with steps', () => {
     const testBrain = brain({
