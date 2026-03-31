@@ -93,8 +93,6 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
   pages: import('./pages.js').Pages;
   /** Runtime environment (origin, secrets) */
   env: RuntimeEnv;
-  /** UI components available for generatePage */
-  components?: Record<string, import('../ui/types.js').UIComponent<any>>;
   /** Current brain run ID (for creating unique webhook identifiers) */
   brainRunId: string;
   /** Current step ID (for creating unique webhook identifiers) */
