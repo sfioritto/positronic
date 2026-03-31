@@ -90,7 +90,7 @@ export interface StepContext<TState = object, TOptions = JsonObject> {
   /** Resource loader for accessing brain resources */
   resources: import('../resources/resources.js').Resources;
   /** Page service for creating pages */
-  pages: import('./pages.js').PagesService;
+  pages: import('./pages.js').Pages;
   /** Runtime environment (origin, secrets) */
   env: RuntimeEnv;
   /** UI components available for generatePage */

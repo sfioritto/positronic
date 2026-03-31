@@ -23,7 +23,7 @@ import type {
   SerializedWebhookRegistration,
   SerializedPageContext,
 } from '../webhook.js';
-import type { PagesService } from '../pages.js';
+import type { Pages } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generatePage } from '../../ui/generate-page.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
@@ -79,7 +79,7 @@ export class BrainEventStream<
   private brainClient?: ObjectGenerator;
   private options: TOptions;
   private resources: Resources;
-  private pages?: PagesService;
+  private pages?: Pages;
   private env: RuntimeEnv;
   private currentResponse: JsonObject | undefined = undefined;
   private currentPage: GeneratedPage | undefined = undefined;
@@ -108,7 +108,7 @@ export class BrainEventStream<
       components?: Record<string, UIComponent<any>>;
       brainClient?: ObjectGenerator;
       files?: Files;
-      pages?: PagesService;
+      pages?: Pages;
       store?: Store<any>;
       optionsSchema?: z.ZodSchema<any>;
       pluginInjections?: Record<string, any>;

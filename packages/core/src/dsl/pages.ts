@@ -29,7 +29,7 @@ export interface PageCreateOptions {
  * By default, pages are cleaned up when the brain run completes.
  * Use `persist: true` to keep pages across brain runs (e.g., for shared todo lists).
  */
-export interface PagesService {
+export interface Pages {
   /**
    * Create a page with auto-generated unique slug.
    * Use this when each brain run should have its own page.

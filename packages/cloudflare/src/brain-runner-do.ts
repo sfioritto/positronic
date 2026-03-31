@@ -18,7 +18,7 @@ import { WebhookAdapter } from './webhook-adapter.js';
 import { TimeoutAdapter } from './timeout-adapter.js';
 import { PageAdapter } from './page-adapter.js';
 import { EventLoader } from './event-loader.js';
-import { createPagesService } from './pages-service.js';
+import { createPages } from './pages-service.js';
 import { createFiles } from './files-service.js';
 import type { MonitorDO } from './monitor-do.js';
 import type { ScheduleDO } from './schedule-do.js';
@@ -671,7 +671,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     );
 
     const env = await this.buildRuntimeEnv();
-    const pagesService = createPagesService(
+    const pages = createPages(
       brainRunId,
       this.env.RESOURCES_BUCKET,
       monitorDOStub,
@@ -729,7 +729,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       signalProvider,
       governor: (c: ObjectGenerator) => rateGoverned(c),
       files: files,
-      pages: pagesService,
+      pages: pages,
       storeProvider: storeBackend,
     });
 

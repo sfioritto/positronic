@@ -71,7 +71,7 @@ export type {
   WebhookRegistration,
   WebhookTriggerConfig,
 } from './dsl/webhook.js';
-export type { PagesService, Page, PageCreateOptions } from './dsl/pages.js';
+export type { Pages, Page, PageCreateOptions } from './dsl/pages.js';
 export type {
   Manifest as ResourceManifest,
   Entry as ResourceEntry,

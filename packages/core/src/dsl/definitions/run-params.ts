@@ -14,7 +14,7 @@ import type {
 } from '../brain-state-machine.js';
 import type { SerializedPageContext } from '../webhook.js';
 import type { Files } from '../../files/types.js';
-import type { PagesService } from '../pages.js';
+import type { Pages } from '../pages.js';
 import type { StoreProvider } from '../../store/types.js';
 import type { ConfiguredPlugin } from '../../plugins/types.js';
 
@@ -39,7 +39,7 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   /** Platform service: file storage */
   files?: Files;
   /** Platform service: page generation */
-  pages?: PagesService;
+  pages?: Pages;
   /** Platform service: typed key-value store factory */
   storeProvider?: StoreProvider;
   /** Plugin configs to resolve per brain run */
