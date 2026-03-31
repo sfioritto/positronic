@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ObjectGenerator, ToolChoice } from '../../clients/types.js';
 import type { State, JsonObject, RuntimeEnv, Tool } from '../types.js';
 import type { Resources } from '../../resources/resources.js';
-import type { PagesService } from '../pages.js';
+import type { Pages } from '../pages.js';
 import type { GeneratedPage } from './brain-types.js';
 import type { WebhookRegistration } from '../webhook.js';
 import type { TemplateChild } from '../../jsx-runtime.js';
@@ -27,7 +27,7 @@ export type StepAction<
     resources: Resources;
     response: TResponseIn;
     page: TPageIn;
-    pages?: PagesService;
+    pages?: Pages;
     env: RuntimeEnv;
   } & TPlugins
 ) =>
@@ -79,7 +79,7 @@ export type WaitBlock<
       client: ObjectGenerator;
       resources: Resources;
       page: TPage;
-      pages?: PagesService;
+      pages?: Pages;
       env: RuntimeEnv;
     } & TPlugins
   ) =>

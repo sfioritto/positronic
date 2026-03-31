@@ -1,5 +1,5 @@
 import type {
-  PagesService,
+  Pages,
   Page,
   PageCreateOptions,
   RuntimeEnv,
@@ -18,19 +18,19 @@ function generateUniqueSlug(brainRunId: string): string {
 }
 
 /**
- * Creates a PagesService implementation that works directly with R2 and MonitorDO.
+ * Creates a Pages implementation that works directly with R2 and MonitorDO.
  *
  * @param brainRunId - The current brain run ID (used for page registration/cleanup)
  * @param bucket - The R2 bucket for storing pages
  * @param monitorStub - The MonitorDO stub for page registration
  * @param env - The runtime environment containing the origin URL
  */
-export function createPagesService(
+export function createPages(
   brainRunId: string,
   bucket: R2Bucket,
   monitorStub: DurableObjectStub<MonitorDO>,
   env: RuntimeEnv
-): PagesService {
+): Pages {
   // Implementation function that handles both overloads
   async function createPage(
     slugOrHtml: string,
@@ -90,7 +90,7 @@ export function createPagesService(
   }
 
   return {
-    create: createPage as PagesService['create'],
+    create: createPage as Pages['create'],
 
     async get(slug: string): Promise<string | null> {
       const key = `pages/${slug}.html`;
