@@ -1,8 +1,7 @@
 import { createBrain } from '@positronic/core';
-import { components } from './components/index.js';
 
 /**
- * Project-level brain function with pre-configured components.
+ * Project-level brain function with pre-configured plugins.
  *
  * All brains in your project should import from this file:
  *
@@ -18,7 +17,7 @@ import { components } from './components/index.js';
  * Use `.prompt()` with a `loop` property to run an LLM with tools:
  *
  * ```typescript
- * import { generatePage, waitForWebhook } from '@positronic/core';
+ * import { waitForWebhook } from '@positronic/core';
  *
  * export default brain('my-brain')
  *   .prompt('Do Work', ({ state }) => ({
@@ -26,7 +25,7 @@ import { components } from './components/index.js';
  *     message: `Help the user with: <%= '${state.task}' %>`,
  *     outputSchema: z.object({ result: z.string() }),
  *     loop: {
- *       tools: { generatePage, waitForWebhook },
+ *       tools: { waitForWebhook },
  *     },
  *   }));
  * ```
@@ -42,12 +41,10 @@ import { components } from './components/index.js';
  *
  * ```typescript
  * import { createBrain } from '@positronic/core';
- * import { components } from './components/index.js';
  * import { mem0 } from '@positronic/mem0';
  *
  * export const brain = createBrain({
  *   plugins: [mem0.setup({ apiKey: process.env.MEM0_API_KEY! })],
- *   components,
  * });
  * ```
  *
@@ -60,14 +57,5 @@ import { components } from './components/index.js';
  *     return { preferences: prefs };
  *   });
  * ```
- *
- * Or declare multiple plugins upfront:
- *
- * ```typescript
- * brain({ title: 'my-brain', plugins: { slack, mem0 } })
- *   .step('Go', ({ slack, mem0 }) => { ... });
- * ```
  */
-export const brain = createBrain({
-  components,
-});
+export const brain = createBrain({});

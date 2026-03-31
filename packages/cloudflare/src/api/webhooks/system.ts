@@ -1,7 +1,27 @@
 import { Hono, type Context } from 'hono';
-import { parseFormData } from '@positronic/core';
 import type { Bindings } from '../types.js';
 import { queueWebhookAndWakeUp } from './coordination.js';
+
+function parseFormData(formData: FormData): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.endsWith('[]')) {
+      const baseKey = key.slice(0, -2);
+      if (!result[baseKey]) {
+        result[baseKey] = [];
+      }
+      (result[baseKey] as unknown[]).push(value);
+    } else if (result[key] !== undefined) {
+      if (!Array.isArray(result[key])) {
+        result[key] = [result[key]];
+      }
+      (result[key] as unknown[]).push(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 const system = new Hono<{ Bindings: Bindings }>();
 

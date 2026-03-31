@@ -101,7 +101,6 @@ export type {
 export {
   createTool,
   defaultTools,
-  generatePage,
   waitForWebhook,
   print,
   consoleLog,
@@ -153,13 +152,6 @@ export type {
   ConfiguredPlugin,
   ConfiguredPluginWithSetup,
 } from './plugins/index.js';
-
-// UI types (only UIComponent is public - used by gen-ui-components)
-export type { UIComponent } from './ui/types.js';
-
-// UI utilities
-export { generateFormToken } from './ui/generate-page-html.js';
-export { parseFormData } from './ui/parse-form-data.js';
 
 // Webhook token validation
 export { validateWebhookToken } from './validate-webhook-token.js';

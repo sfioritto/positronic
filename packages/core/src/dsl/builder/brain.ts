@@ -8,7 +8,6 @@ import type {
   ExtractWebhookResponses,
   NormalizeToArray,
 } from '../webhook.js';
-import type { UIComponent } from '../../ui/types.js';
 import type { StoreSchema, InferStoreTypes, Store } from '../../store/types.js';
 import type {
   ConfiguredPlugin,
@@ -96,7 +95,6 @@ export class Brain<
   private blocks: Block<any, any, TOptions, TPlugins, any, any>[] = [];
   public type: 'brain' = 'brain';
   public optionsSchema?: z.ZodSchema<any>;
-  private components?: Record<string, UIComponent<any>>;
   private storeSchema?: StoreSchema;
   private pluginConfigs: ConfiguredPlugin[] = [];
   private brainClient?: ObjectGenerator;
@@ -161,32 +159,6 @@ export class Brain<
     ).withBlocks(this.blocks as any);
     this.copyConfigTo(nextBrain);
     nextBrain.optionsSchema = schema;
-    return nextBrain;
-  }
-
-  /**
-   * Configure UI components for page generation steps.
-   *
-   * @param components - Record of component definitions
-   *
-   * @example
-   * ```typescript
-   * import { components } from '@positronic/gen-ui-components';
-   *
-   * const myBrain = brain('my-brain')
-   *   .withComponents(components)
-   *   .page('Show Form', ({ state }) => ({ prompt: `Create a form for ${state.userName}` }));
-   * ```
-   */
-  withComponents(
-    components: Record<string, UIComponent<any>>
-  ): Brain<TOptions, TState, TPlugins> {
-    const nextBrain = new Brain<TOptions, TState, TPlugins>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
-    this.copyConfigTo(nextBrain);
-    nextBrain.components = components;
     return nextBrain;
   }
 
@@ -503,8 +475,7 @@ export class Brain<
       pageConfigFn: configFn,
       action: async () => {
         throw new Error(
-          `Page step "${title}" requires components to be configured via brain.withComponents(). ` +
-            `Page generation is handled by the runner, not the step action directly.`
+          `Page step "${title}" - page generation is handled by the runner, not the step action directly.`
         );
       },
     };
@@ -555,7 +526,6 @@ export class Brain<
       ...params,
       options: (params.options || {}) as TOptions,
       optionsSchema: this.optionsSchema,
-      components: this.components,
       brainClient: this.brainClient,
       files,
       pages,
@@ -577,7 +547,6 @@ export class Brain<
 
   private copyConfigTo(target: Brain<any, any, any>): void {
     target.optionsSchema = this.optionsSchema;
-    target.components = this.components;
     target.storeSchema = this.storeSchema;
     target.pluginConfigs = this.pluginConfigs;
     target.brainClient = this.brainClient;

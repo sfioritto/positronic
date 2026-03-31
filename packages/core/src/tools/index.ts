@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import type { Tool, ToolWaitFor, StepContext } from '../dsl/types.js';
 import type { WebhookRegistration } from '../dsl/webhook.js';
-import { generatePage as generatePageCore } from '../ui/generate-page.js';
-import { generatePageHtml } from '../ui/generate-page-html.js';
 import { parseDuration } from '../dsl/duration.js';
 
 /**
@@ -37,156 +35,6 @@ export function createTool<T extends z.ZodSchema>(config: {
 }): Tool<T> {
   return config;
 }
-
-const generatePageInputSchema = z.object({
-  prompt: z
-    .string()
-    .describe(
-      'Natural language instructions describing the UI to generate. ' +
-        'Include: (1) the purpose of the page, (2) what information to display from the data parameter, ' +
-        '(3) what input fields are needed if collecting data, (4) labels and placeholders for fields, ' +
-        '(5) any specific layout preferences. Example: "Create a form to collect user feedback with ' +
-        'fields for rating (1-5 scale), comments (text area), and email. Show the product name at the top."'
-    ),
-  hasForm: z
-    .boolean()
-    .optional()
-    .describe(
-      'Whether to include a form that can be submitted. Defaults to true. ' +
-        'Set to true when: collecting user input, approval workflows, any interactive data entry. ' +
-        'Set to false when: displaying read-only information, confirmation pages, dashboards. ' +
-        'When true, the tool returns webhook info that must be used with waitForWebhook to receive the submission.'
-    ),
-  persist: z
-    .boolean()
-    .optional()
-    .describe(
-      'Whether to keep the page after the brain run completes. Defaults to false. ' +
-        'Set to false (default): Page is automatically cleaned up when the brain run finishes. Use for one-time forms, approvals, or temporary displays. ' +
-        'Set to true: Page survives brain completion and remains accessible. Use for shared dashboards, permanent reference pages, or pages that need to outlive the workflow.'
-    ),
-  data: z
-    .record(z.unknown())
-    .optional()
-    .describe(
-      'Structured data for template bindings ({{path.to.value}} syntax). ' +
-        'Pass the objects/arrays you want to display. The UI generator infers the shape ' +
-        'and creates bindings to render all items. Example: { articles: [...], user: { name: "..." } }'
-    ),
-});
-
-/**
- * Generate UI tool - creates an interactive UI page.
- *
- * This tool:
- * 1. Uses an LLM to generate a UI page based on your prompt
- * 2. Creates an HTML page with the generated components
- * 3. Returns the page URL and webhook info (if hasForm is true)
- *
- * IMPORTANT: This tool does NOT pause execution. After generating a page with a form,
- * you must call waitForWebhook to pause and wait for the form submission.
- * Before calling waitForWebhook, ensure the user knows the page URL.
- *
- * Requires components and pages to be configured via createBrain or withComponents().
- *
- * The description is enriched at runtime with available component information.
- */
-export const generatePage: Tool<typeof generatePageInputSchema> = {
-  description: `Generate a web page for displaying rich content or collecting user input.
-
-Sometimes you need more than simple notifications to communicate with users. This tool creates web pages that can display formatted content, dashboards, or forms to collect information.
-
-Pass structured data via the 'data' parameter to populate the page with dynamic content. The page generator uses {{path.to.value}} template bindings to render your data.
-
-RETURNS: { url: string, webhook: { slug: string, identifier: string, token: string } | null }
-- url: The page URL
-- webhook: For forms (hasForm=true), contains slug, identifier, and token that must be passed to waitForWebhook to pause execution until the user submits the form
-
-IMPORTANT: Users have no way to discover the page URL on their own. After generating a page, you must tell them the URL using whatever communication tools are available.`,
-  inputSchema: generatePageInputSchema,
-  async execute(
-    input,
-    context
-  ): Promise<{
-    url: string;
-    webhook: { slug: string; identifier: string; token: string } | null;
-  }> {
-    const { components, pages, client, state, env, brainRunId, stepId } =
-      context;
-    const hasForm = input.hasForm ?? true;
-
-    if (!components || Object.keys(components).length === 0) {
-      throw new Error(
-        'generatePage requires components to be configured. ' +
-          'Use createBrain({ components }) or brain.withComponents() to register UI components.'
-      );
-    }
-
-    const uiResult = await generatePageCore({
-      client,
-      prompt: input.prompt,
-      components,
-      data: (input.data ?? {}) as Record<string, unknown>,
-    });
-
-    if (!uiResult.rootId) {
-      const placementCount = uiResult.placements.length;
-      if (placementCount === 0) {
-        throw new Error(
-          `Page generation failed - no components were generated. ` +
-            `The LLM may not have understood the prompt. Try being more specific.`
-        );
-      } else {
-        throw new Error(
-          `Page generation failed - no root component found. ` +
-            `${placementCount} component(s) were placed but all have a parentId.`
-        );
-      }
-    }
-
-    // Create webhook info only if hasForm is true
-    let webhookInfo: {
-      slug: string;
-      identifier: string;
-      token: string;
-    } | null = null;
-    let formAction: string | undefined;
-    let formToken: string | undefined;
-
-    if (hasForm) {
-      const webhookIdentifier = `${brainRunId}-${stepId}-generatepage-${Date.now()}`;
-      formToken = crypto.randomUUID();
-      formAction = `${
-        env.origin
-      }/webhooks/system/page-form?identifier=${encodeURIComponent(
-        webhookIdentifier
-      )}&token=${encodeURIComponent(formToken)}`;
-      webhookInfo = {
-        slug: 'page-form',
-        identifier: webhookIdentifier,
-        token: formToken,
-      };
-    }
-
-    // Generate HTML page
-    const html = generatePageHtml({
-      placements: uiResult.placements,
-      rootId: uiResult.rootId,
-      data: (input.data ?? {}) as Record<string, unknown>,
-      title: hasForm ? 'Generated Form' : 'Generated Page',
-      formAction,
-    });
-
-    // Create the page
-    const page = await pages.create(html, { persist: input.persist });
-
-    // Return URL and webhook info (no waitFor - does not pause)
-    return {
-      url: page.url,
-      webhook: webhookInfo,
-    };
-  },
-};
 
 const waitForWebhookInputSchema = z.object({
   slug: z
@@ -388,7 +236,6 @@ export const writeFile = createTool({
  * ```
  */
 export const defaultTools = {
-  generatePage,
   waitForWebhook,
   print,
   consoleLog,

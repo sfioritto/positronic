@@ -5,7 +5,6 @@ import resources from './resources.js';
 import webhooks from './webhooks/index.js';
 import pages from './pages.js';
 import secrets from './secrets.js';
-import bundle from './bundle.js';
 import users from './users.js';
 import store from './store.js';
 import files from './files.js';
@@ -53,11 +52,6 @@ app.use('*', async (c, next) => {
     return next();
   }
 
-  // Skip auth for bundle (needed to render pages)
-  if (c.req.method === 'GET' && c.req.path.startsWith('/bundle/')) {
-    return next();
-  }
-
   // Skip auth for files (download URLs are public)
   if (c.req.method === 'GET' && c.req.path.startsWith('/files/')) {
     return next();
@@ -86,7 +80,6 @@ app.route('/resources', resources);
 app.route('/webhooks', webhooks);
 app.route('/pages', pages);
 app.route('/secrets', secrets);
-app.route('/bundle', bundle);
 app.route('/users', users);
 app.route('/store', store);
 app.route('/files', files);

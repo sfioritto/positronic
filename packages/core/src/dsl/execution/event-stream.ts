@@ -24,9 +24,6 @@ import type {
   SerializedPageContext,
 } from '../webhook.js';
 import type { Pages } from '../pages.js';
-import type { UIComponent } from '../../ui/types.js';
-import { generatePage } from '../../ui/generate-page.js';
-import { generatePageHtml } from '../../ui/generate-page-html.js';
 import type { Store, StoreProvider } from '../../store/types.js';
 import type { Files } from '../../files/types.js';
 import type { PluginAdapter, ConfiguredPlugin } from '../../plugins/types.js';
@@ -84,7 +81,6 @@ export class BrainEventStream<
   private currentResponse: JsonObject | undefined = undefined;
   private currentPage: GeneratedPage | undefined = undefined;
   private resume?: ResumeParams;
-  private components?: Record<string, UIComponent<any>>;
   private signalProvider?: SignalProvider;
   private store?: Store<any>;
   private files?: Files;
@@ -105,7 +101,6 @@ export class BrainEventStream<
       title: string;
       description?: string;
       blocks: Block<any, any, TOptions, TPlugins, any, any>[];
-      components?: Record<string, UIComponent<any>>;
       brainClient?: ObjectGenerator;
       files?: Files;
       pages?: Pages;
@@ -126,7 +121,6 @@ export class BrainEventStream<
       resources = {} as Resources,
       pages,
       env,
-      components,
       signalProvider,
       store,
       files,
@@ -151,7 +145,6 @@ export class BrainEventStream<
     this.pages = pages;
     this.env = env ?? DEFAULT_ENV;
     this.resume = resume;
-    this.components = components;
     this.signalProvider = signalProvider;
     this.store = store;
     this.files = files;
@@ -494,7 +487,6 @@ export class BrainEventStream<
       page: this.currentPage,
       pages: this.pages,
       env: this.env,
-      components: this.components,
       store: this.store,
       files: this.files,
       currentUser: this.currentUser,
@@ -836,27 +828,6 @@ export class BrainEventStream<
       toolDefs[name] = {
         description: tool.description,
         inputSchema: tool.inputSchema,
-      };
-    }
-
-    // Enrich generatePage description with available components so the outer
-    // LLM (which reads tool descriptions to decide how to call them) knows what
-    // UI components exist. This only matters in the prompt loop — it's the only
-    // path where an LLM reads tool descriptions. Direct tool.execute() calls
-    // (e.g., from a regular step) don't need this because they don't go through
-    // LLM tool selection.
-    if (toolDefs['generatePage'] && this.components) {
-      const componentList = Object.entries(this.components)
-        .map(([name, comp]) => `- ${name}: ${comp.description.split('\n')[0]}`)
-        .join('\n');
-      toolDefs['generatePage'] = {
-        ...toolDefs['generatePage'],
-        description:
-          toolDefs['generatePage'].description +
-          `\n\nAvailable UI Components:\n${componentList}` +
-          `\n\nIMPORTANT: When generating a page with a form (hasForm=true), the page generator` +
-          ` automatically creates a Form component. You do NOT need to include Form in your prompt.` +
-          ` Just describe the form fields you need and the page generator handles the rest.`,
       };
     }
 
@@ -1559,56 +1530,16 @@ The output must conform to the provided schema.`,
         formInfo ? { formAction: formInfo.formAction } : {}
       );
       html = wrapHtmlDocument(body, { title: stepBlock.title });
-    } else {
-      // LLM-generated page
-      if (!this.components) {
-        throw new Error(
-          `Page step "${stepBlock.title}" requires components to be configured via brain.withComponents()`
-        );
-      }
-
-      const prompt = await resolveTemplate(
-        pageConfig.prompt,
-        this.templateContext
+    } else if (pageConfig.prompt) {
+      // LLM-generated page - requires Surface integration (not yet implemented)
+      throw new Error(
+        `Page step "${stepBlock.title}" uses prompt-based generation which requires Surface integration. ` +
+          `Use the 'html' property for custom HTML pages instead.`
       );
-      const data = (pageConfig.props ?? {}) as Record<string, unknown>;
-
-      const uiResult = await generatePage({
-        client: this.client,
-        prompt,
-        components: this.components,
-        schema: pageConfig.formSchema,
-        data,
-      });
-
-      if (!uiResult.rootId) {
-        const placementCount = uiResult.placements.length;
-        const placementInfo = uiResult.placements
-          .map((p) => `${p.component}(parentId: ${p.parentId ?? 'null'})`)
-          .join(', ');
-
-        if (placementCount === 0) {
-          throw new Error(
-            `Page generation failed for step "${stepBlock.title}" - no components were placed. ` +
-              `The LLM may not have called any component tools. ` +
-              `LLM response text: ${uiResult.text ?? '(none)'}`
-          );
-        } else {
-          throw new Error(
-            `Page generation failed for step "${stepBlock.title}" - no root component found. ` +
-              `${placementCount} component(s) were placed but all have a parentId: [${placementInfo}]. ` +
-              `The first component should be placed without a parentId to serve as the root.`
-          );
-        }
-      }
-
-      html = generatePageHtml({
-        placements: uiResult.placements,
-        rootId: uiResult.rootId,
-        data,
-        title: stepBlock.title,
-        formAction: formInfo?.formAction,
-      });
+    } else {
+      throw new Error(
+        `Page step "${stepBlock.title}" must specify either 'html' or 'prompt'.`
+      );
     }
 
     // Step 2: Create page and handle form/read-only branching (shared by both paths)

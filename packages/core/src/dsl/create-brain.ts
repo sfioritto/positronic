@@ -1,20 +1,16 @@
 import { brain as coreBrain, Brain } from './builder/brain.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { State, JsonObject } from './types.js';
-import type { UIComponent } from '../ui/types.js';
 import type { ConfiguredPlugin, PluginsFromArray } from '../plugins/types.js';
 
 /**
  * Configuration for creating a project-level brain function.
  */
 export interface CreateBrainConfig<
-  TPlugins extends readonly ConfiguredPlugin[] = readonly ConfiguredPlugin[],
-  TComponents extends Record<string, UIComponent<any>> = {}
+  TPlugins extends readonly ConfiguredPlugin[] = readonly ConfiguredPlugin[]
 > {
   /** Plugins available to all brains */
   plugins?: TPlugins;
-  /** UI components for generative UI steps */
-  components?: TComponents;
 }
 
 /**
@@ -36,10 +32,9 @@ export interface CreateBrainConfig<
  * ```
  */
 export function createBrain<
-  const TPlugins extends readonly ConfiguredPlugin[] = readonly [],
-  TComponents extends Record<string, UIComponent<any>> = {}
->(config: { plugins?: TPlugins; components?: TComponents }) {
-  const { plugins, components } = config;
+  const TPlugins extends readonly ConfiguredPlugin[] = readonly []
+>(config: { plugins?: TPlugins }) {
+  const { plugins } = config;
 
   // Overload 1: Builder pattern with title string
   function brain<
@@ -64,10 +59,6 @@ export function createBrain<
       | { title: string; description?: string; client?: ObjectGenerator }
   ): any {
     let base = coreBrain(titleOrConfig as any);
-
-    if (components) {
-      base = base.withComponents(components) as any;
-    }
 
     if (plugins) {
       for (const plugin of plugins) {

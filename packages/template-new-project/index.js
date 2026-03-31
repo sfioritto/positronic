@@ -56,7 +56,6 @@ module.exports = {
     let coreVersion = '^0.0.78';
     let cloudflareVersion = '^0.0.78';
     let clientVercelVersion = '^0.0.78';
-    let genUIComponentsVersion = '^0.0.78';
 
     // Map backend selection to package names
     const backendPackageMap = {
@@ -100,11 +99,6 @@ module.exports = {
         clientVercelVersion = `file:${clientVercelPath}`;
       }
 
-      const genUIComponentsPath = path.resolve(devRootPath, 'packages', 'gen-ui-components');
-      if (existsSync(genUIComponentsPath)) {
-        genUIComponentsVersion = `file:${genUIComponentsPath}`;
-        console.log(`  - Mapping @positronic/gen-ui-components to ${genUIComponentsVersion}`);
-      }
     }
 
     ctx.answers.positronicCoreVersion = coreVersion;
@@ -113,8 +107,6 @@ module.exports = {
     }
 
     ctx.answers.positronicClientVercelVersion = clientVercelVersion;
-    ctx.answers.positronicGenUIComponentsVersion = genUIComponentsVersion;
-
     if (ctx.answers.install) {
       const pm = ctx.answers.pm;
       if (!pm) {
