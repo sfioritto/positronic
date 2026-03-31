@@ -117,6 +117,7 @@ export type PageConfig = {
   formSchema?: z.ZodObject<any>;
   onCreated?: (page: GeneratedPage) => void | Promise<void>;
   props?: Record<string, unknown>;
+  slug?: string;
   ttl?: number;
   persist?: boolean;
 };
