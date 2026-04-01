@@ -6,7 +6,6 @@ export { secrets } from './secrets.js';
 export { webhooks } from './webhooks.js';
 export { signals } from './signals.js';
 export { pages } from './pages.js';
-export { bundle } from './bundle.js';
 export { users } from './users.js';
 export { auth } from './auth.js';
 export { scoping } from './scoping.js';
