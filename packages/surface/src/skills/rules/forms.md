@@ -1,14 +1,5 @@
 # Forms & Inputs
 
-## Contents
-
-- Forms use FieldGroup + Field
-- InputGroup requires InputGroupInput/InputGroupTextarea
-- Buttons inside inputs use InputGroup + InputGroupAddon
-- Option sets (2–7 choices) use ToggleGroup
-- FieldSet + FieldLegend for grouping related fields
-- Field validation and disabled states
-
 ---
 
 ## Forms use FieldGroup + Field
@@ -34,69 +25,10 @@ Use `Field orientation="horizontal"` for settings pages. Use `FieldLabel classNa
 
 - Simple text input → `Input`
 - Dropdown with predefined options → `Select`
-- Searchable dropdown → `Combobox`
-- Native HTML select (no JS) → `native-select`
 - Boolean toggle → `Switch` (for settings) or `Checkbox` (for forms)
 - Single choice from few options → `RadioGroup`
 - Toggle between 2–5 options → `ToggleGroup` + `ToggleGroupItem`
-- OTP/verification code → `InputOTP`
 - Multi-line text → `Textarea`
-
----
-
-## InputGroup requires InputGroupInput/InputGroupTextarea
-
-Never use raw `Input` or `Textarea` inside an `InputGroup`.
-
-**Incorrect:**
-
-```tsx
-<InputGroup>
-  <Input placeholder="Search..." />
-</InputGroup>
-```
-
-**Correct:**
-
-```tsx
-import { InputGroup, InputGroupInput } from "@/components/ui/input-group"
-
-<InputGroup>
-  <InputGroupInput placeholder="Search..." />
-</InputGroup>
-```
-
----
-
-## Buttons inside inputs use InputGroup + InputGroupAddon
-
-Never place a `Button` directly inside or adjacent to an `Input` with custom positioning.
-
-**Incorrect:**
-
-```tsx
-<div className="relative">
-  <Input placeholder="Search..." className="pr-10" />
-  <Button className="absolute right-0 top-0" size="icon">
-    <SearchIcon />
-  </Button>
-</div>
-```
-
-**Correct:**
-
-```tsx
-import { InputGroup, InputGroupInput, InputGroupAddon } from "@/components/ui/input-group"
-
-<InputGroup>
-  <InputGroupInput placeholder="Search..." />
-  <InputGroupAddon>
-    <Button size="icon">
-      <SearchIcon data-icon="inline-start" />
-    </Button>
-  </InputGroupAddon>
-</InputGroup>
-```
 
 ---
 
@@ -125,29 +57,12 @@ const [selected, setSelected] = useState("daily")
 **Correct:**
 
 ```tsx
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-
-<ToggleGroup spacing={2}>
+<ToggleGroup type="single" defaultValue="daily" spacing={2}>
   <ToggleGroupItem value="daily">Daily</ToggleGroupItem>
   <ToggleGroupItem value="weekly">Weekly</ToggleGroupItem>
   <ToggleGroupItem value="monthly">Monthly</ToggleGroupItem>
 </ToggleGroup>
 ```
-
-Combine with `Field` for labelled toggle groups:
-
-```tsx
-<Field orientation="horizontal">
-  <FieldTitle id="theme-label">Theme</FieldTitle>
-  <ToggleGroup aria-labelledby="theme-label" spacing={2}>
-    <ToggleGroupItem value="light">Light</ToggleGroupItem>
-    <ToggleGroupItem value="dark">Dark</ToggleGroupItem>
-    <ToggleGroupItem value="system">System</ToggleGroupItem>
-  </ToggleGroup>
-</Field>
-```
-
-> **Note:** `defaultValue` and `type`/`multiple` props differ between base and radix. See [base-vs-radix.md](./base-vs-radix.md#togglegroup).
 
 ---
 
@@ -162,7 +77,9 @@ Use `FieldSet` + `FieldLegend` for related checkboxes, radios, or switches — n
   <FieldGroup className="gap-3">
     <Field orientation="horizontal">
       <Checkbox id="dark" />
-      <FieldLabel htmlFor="dark" className="font-normal">Dark mode</FieldLabel>
+      <FieldLabel htmlFor="dark" className="font-normal">
+        Dark mode
+      </FieldLabel>
     </Field>
   </FieldGroup>
 </FieldSet>
@@ -188,5 +105,3 @@ Both attributes are needed — `data-invalid`/`data-disabled` styles the field (
   <Input id="email" disabled />
 </Field>
 ```
-
-Works for all controls: `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroupItem`, `Switch`, `Slider`, `NativeSelect`, `InputOTP`.

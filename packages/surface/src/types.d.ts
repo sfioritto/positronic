@@ -8,3 +8,8 @@ declare module '*.mdx' {
   const Component: ComponentType<Record<string, unknown>>;
   export default Component;
 }
+
+declare module 'turndown-plugin-gfm' {
+  import type TurndownService from 'turndown';
+  export function gfm(service: TurndownService): void;
+}

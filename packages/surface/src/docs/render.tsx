@@ -1,12 +1,16 @@
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 import SystemPrompt from './system-prompt.mdx';
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
 });
+
+// GFM plugin adds proper table support
+turndown.use(gfm);
 
 turndown.addRule('fencedCodeBlock', {
   filter: (node) =>
