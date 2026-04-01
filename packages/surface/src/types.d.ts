@@ -1,0 +1,10 @@
+declare module '*.md' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.mdx' {
+  import type { ComponentType } from 'react';
+  const Component: ComponentType<Record<string, unknown>>;
+  export default Component;
+}

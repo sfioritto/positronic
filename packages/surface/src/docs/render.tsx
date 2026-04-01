@@ -1,13 +1,13 @@
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import TurndownService from 'turndown';
-import { run } from '@mdx-js/mdx';
-import * as jsxRuntime from 'react/jsx-runtime';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const dir = dirname(fileURLToPath(import.meta.url));
+import DesignSystem from './design-system.mdx';
+import SHADCN_SKILL from '../skills/SKILL.md';
+import SHADCN_RULES_STYLING from '../skills/rules/styling.md';
+import SHADCN_RULES_COMPOSITION from '../skills/rules/composition.md';
+import SHADCN_RULES_FORMS from '../skills/rules/forms.md';
+import SHADCN_RULES_ICONS from '../skills/rules/icons.md';
+import SHADCN_CUSTOMIZATION from '../skills/customization.md';
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
@@ -28,22 +28,20 @@ turndown.addRule('fencedCodeBlock', {
   },
 });
 
-async function loadMdxModule(filename: string) {
-  const source = readFileSync(join(dir, filename), 'utf-8');
-  const { default: Component } = await run(source, {
-    ...jsxRuntime,
-    baseUrl: import.meta.url,
-  });
-  return Component;
-}
+const ALL_SKILL_DOCS = [
+  SHADCN_SKILL,
+  SHADCN_RULES_STYLING,
+  SHADCN_RULES_COMPOSITION,
+  SHADCN_RULES_FORMS,
+  SHADCN_RULES_ICONS,
+  SHADCN_CUSTOMIZATION,
+].join('\n\n---\n\n');
 
 /**
  * Render the design system MDX doc to markdown.
- * The __IMPORT_PATH__ placeholder is replaced with the given importPath.
  */
-export async function renderDesignSystem(importPath: string) {
-  const DesignSystem = await loadMdxModule('design-system.js');
-  const html = renderToStaticMarkup(React.createElement(DesignSystem));
+export function renderDesignSystem(importPath: string) {
+  const html = renderToStaticMarkup(React.createElement(DesignSystem, {}));
   const markdown = turndown.turndown(html);
   return markdown.replaceAll('__IMPORT_PATH__', importPath);
 }
@@ -51,11 +49,7 @@ export async function renderDesignSystem(importPath: string) {
 /**
  * Render the full system prompt: design system doc + skill docs.
  */
-export async function renderSystemPrompt(params: {
-  importPath: string;
-  skillDocs?: string;
-}) {
-  const designSystem = await renderDesignSystem(params.importPath);
-  if (!params.skillDocs) return designSystem;
-  return `${designSystem}\n\n---\n\n${params.skillDocs}`;
+export function renderSystemPrompt(params: { importPath: string }) {
+  const designSystem = renderDesignSystem(params.importPath);
+  return `${designSystem}\n\n---\n\n${ALL_SKILL_DOCS}`;
 }
