@@ -1,0 +1,116 @@
+# Surface Design System
+
+You are generating a React component using shadcn/ui components and Tailwind CSS.
+The component receives a typed `data` prop — use it to display dynamic content.
+
+## Available Components
+
+### Layout
+
+- **Card** (Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction)
+- **Tabs** (Tabs, TabsList, TabsTrigger, TabsContent)
+- **Accordion** (Accordion, AccordionItem, AccordionTrigger, AccordionContent)
+- **Separator**
+
+### Data Display
+
+- **Table** (Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCaption, TableFooter)
+- **Badge** — Status indicators, tags, labels
+- **Avatar** (Avatar, AvatarImage, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarBadge)
+- **Progress** — Visual progress indicator (0-100)
+- **Skeleton** — Loading placeholders
+- **Empty** (Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia)
+
+### Forms
+
+- **Button** — Variants: default, destructive, outline, secondary, ghost, link. Sizes: default, sm, lg, icon
+- **Input** — Text input fields
+- **Label** — Form field labels
+- **Textarea** — Multi-line text input
+- **Select** (Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem)
+- **Checkbox** — Boolean toggle
+- **RadioGroup** (RadioGroup, RadioGroupItem) — Single selection from options
+- **Switch** — Binary toggle
+- **Slider** — Range input
+- **Toggle** — Pressable toggle button
+- **ToggleGroup** (ToggleGroup, ToggleGroupItem) — Toggle between 2-5 options
+- **Field** (FieldGroup, Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend) — Form layout
+
+### Feedback
+
+- **Alert** (Alert, AlertTitle, AlertDescription, AlertAction) — Inline messages. Variants: default, destructive
+- **Dialog** (Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter)
+- **Tooltip** (Tooltip, TooltipTrigger, TooltipContent)
+- **Toaster** — Toast notifications (from sonner)
+- **Spinner** — Loading indicator
+
+## Critical Rules
+
+### Styling
+
+- Use semantic colors: `bg-primary`, `text-muted-foreground` — never raw values like `bg-blue-500`
+- Use built-in variants before custom styles: `variant="outline"`, `size="sm"`
+- Use `className` for layout (margins, width), not for overriding component colors
+- Use `gap-*` not `space-y-*`. Use `flex flex-col gap-4` instead of `space-y-4`
+- Use `size-*` when width and height are equal: `size-10` not `w-10 h-10`
+- Use `cn()` for conditional classes
+- No manual `dark:` color overrides — semantic tokens handle light/dark
+
+### Forms
+
+- Use `FieldGroup` + `Field` for form layout, not raw divs
+- `ToggleGroup` for option sets (2-7 choices), not manually styled buttons
+- `FieldSet` + `FieldLegend` for grouping related checkboxes/radios
+
+### Component Composition
+
+- Items always inside their Group: `SelectItem` inside `SelectGroup`
+- Dialog always needs a `DialogTitle` (use `className="sr-only"` if hidden)
+- Use full Card composition: `CardHeader`/`CardTitle`/`CardContent`/`CardFooter`
+- `TabsTrigger` must be inside `TabsList`
+- `Avatar` always needs `AvatarFallback`
+- Use `Alert` for callouts, `Empty` for empty states, `Skeleton` for loading, `Badge` for status
+
+### Icons
+
+- Icons in Button use `data-icon`
+- No sizing classes on icons inside components — components handle icon sizing via CSS
+
+## Component Import
+
+All components are available from `__IMPORT_PATH__`:
+
+```tsx
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Badge,
+} from '__IMPORT_PATH__';
+```
+
+Icons are available from `lucide-react`:
+
+```tsx
+import { ArrowRight, Check, X, MoreHorizontal } from 'lucide-react';
+```
+
+## Component Structure
+
+Your component must:
+
+1. Accept a `data` prop with the provided TypeScript interface
+2. Export a default function component
+3. Return a single root element
+
+```tsx
+interface Props {
+  data: DataType;
+}
+
+export default function Page({ data }: Props) {
+  return <div className="container mx-auto p-6">{/* Your UI here */}</div>;
+}
+```
