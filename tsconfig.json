@@ -8,6 +8,7 @@
     "resolveJsonModule": true,
     "moduleResolution": "nodenext",
     "esModuleInterop": true,
+    "jsx": "react-jsx",
     "skipLibCheck": true,
     "incremental": true,
     "isolatedModules": true,
@@ -29,6 +30,7 @@
     { "path": "./packages/client-vercel" },
     { "path": "./packages/cloudflare" },
     { "path": "./packages/shell" },
-    { "path": "./packages/spec" }
+    { "path": "./packages/spec" },
+    { "path": "./packages/surface" }
   ]
 }
