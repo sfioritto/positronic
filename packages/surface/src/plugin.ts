@@ -1,6 +1,6 @@
 import { definePlugin } from '@positronic/core';
 import type { ObjectGenerator } from '@positronic/core';
-import { renderSystemPrompt } from './docs/render.js';
+import systemPromptTemplate from './system-prompt.md';
 
 export type SurfaceConfig = {
   /** LLM client for UI generation (typically a fast/cheap model) */
@@ -31,7 +31,8 @@ export const surface = definePlugin({
   setup: (config: SurfaceConfig) => config,
 
   create: ({ config }) => {
-    const systemPrompt = renderSystemPrompt(
+    const systemPrompt = systemPromptTemplate.replaceAll(
+      '__IMPORT_PATH__',
       config.importPath ?? '@positronic/surface'
     );
 
