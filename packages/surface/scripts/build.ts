@@ -15,6 +15,8 @@ await build({
   sourcemap: true,
   packages: 'external',
   jsx: 'automatic',
-  loader: { '.md': 'text' },
-  plugins: [mdx()],
+  plugins: [
+    mdx({ mdExtensions: ['.md'], format: 'md' }),
+    mdx({ mdxExtensions: ['.mdx'] }),
+  ],
 });
