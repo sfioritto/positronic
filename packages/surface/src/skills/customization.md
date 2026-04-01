@@ -1,19 +1,6 @@
-# Customization & Theming
+# Theming & CSS Variables
 
-Components reference semantic CSS variable tokens. Change the variables to change every component.
-
-## Contents
-
-- How it works (CSS variables → Tailwind utilities → components)
-- Color variables and OKLCH format
-- Dark mode setup
-- Changing the theme (presets, CSS variables)
-- Adding custom colors (Tailwind v3 and v4)
-- Border radius
-- Customizing components (variants, className, wrappers)
-- Checking for updates
-
----
+Components reference semantic CSS variable tokens. Use these tokens instead of raw color values.
 
 ## How It Works
 
@@ -39,91 +26,8 @@ Every color follows the `name` / `name-foreground` convention. The base variable
 | `--border`                                   | Default border color             |
 | `--input`                                    | Form input borders               |
 | `--ring`                                     | Focus ring color                 |
-| `--chart-1` through `--chart-5`              | Chart/data visualization         |
-| `--sidebar-*`                                | Sidebar-specific colors          |
-| `--surface` / `--surface-foreground`         | Secondary surface                |
 
-Colors use OKLCH: `--primary: oklch(0.205 0 0)` where values are lightness (0–1), chroma (0 = gray), and hue (0–360).
-
----
-
-## Dark Mode
-
-Class-based toggle via `.dark` on the root element. In Next.js, use `next-themes`:
-
-```tsx
-import { ThemeProvider } from "next-themes"
-
-<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-  {children}
-</ThemeProvider>
-```
-
----
-
-## Changing the Theme
-
-```bash
-# Apply a preset code from ui.shadcn.com.
-npx shadcn@latest init --preset a2r6bw --force
-
-# Switch to a named preset.
-npx shadcn@latest init --preset radix-nova --force
-npx shadcn@latest init --reinstall  # update existing components to match
-
-# Use a custom theme URL.
-npx shadcn@latest init --preset "https://ui.shadcn.com/init?base=radix&style=nova&theme=blue&..." --force
-```
-
-Or edit CSS variables directly in `globals.css`.
-
----
-
-## Adding Custom Colors
-
-Add variables to the file at `tailwindCssFile` from `npx shadcn@latest info` (typically `globals.css`). Never create a new CSS file for this.
-
-```css
-/* 1. Define in the global CSS file. */
-:root {
-  --warning: oklch(0.84 0.16 84);
-  --warning-foreground: oklch(0.28 0.07 46);
-}
-.dark {
-  --warning: oklch(0.41 0.11 46);
-  --warning-foreground: oklch(0.99 0.02 95);
-}
-```
-
-```css
-/* 2a. Register with Tailwind v4 (@theme inline). */
-@theme inline {
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-}
-```
-
-When `tailwindVersion` is `"v3"` (check via `npx shadcn@latest info`), register in `tailwind.config.js` instead:
-
-```js
-// 2b. Register with Tailwind v3 (tailwind.config.js).
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        warning: "oklch(var(--warning) / <alpha-value>)",
-        "warning-foreground":
-          "oklch(var(--warning-foreground) / <alpha-value>)",
-      },
-    },
-  },
-}
-```
-
-```tsx
-// 3. Use in components.
-<div className="bg-warning text-warning-foreground">Warning</div>
-```
+Colors use OKLCH: `--primary: oklch(0.205 0 0)` where values are lightness (0-1), chroma (0 = gray), and hue (0-360).
 
 ---
 
@@ -135,17 +39,19 @@ module.exports = {
 
 ## Customizing Components
 
-See also: [rules/styling.md](./rules/styling.md) for Incorrect/Correct examples.
-
 Prefer these approaches in order:
 
 ### 1. Built-in variants
 
 ```tsx
-<Button variant="outline" size="sm">Click</Button>
+<Button variant="outline" size="sm">
+  Click
+</Button>
 ```
 
 ### 2. Tailwind classes via `className`
+
+Use `className` for layout (margins, width, positioning), not for overriding colors.
 
 ```tsx
 <Card className="max-w-md mx-auto">...</Card>
@@ -156,47 +62,30 @@ Prefer these approaches in order:
 Edit the component source to add a variant via `cva`:
 
 ```tsx
-// components/ui/button.tsx
+// components/button.tsx
 warning: "bg-warning text-warning-foreground hover:bg-warning/90",
 ```
 
 ### 4. Wrapper components
 
-Compose shadcn/ui primitives into higher-level components:
+Compose primitives into higher-level components:
 
 ```tsx
 export function ConfirmDialog({ title, description, onConfirm, children }) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Confirm</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  )
+    <Dialog>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline">Cancel</Button>
+          <Button onClick={onConfirm}>Confirm</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 ```
-
----
-
-## Checking for Updates
-
-```bash
-npx shadcn@latest add button --diff
-```
-
-To preview exactly what would change before updating, use `--dry-run` and `--diff`:
-
-```bash
-npx shadcn@latest add button --dry-run        # see all affected files
-npx shadcn@latest add button --diff button.tsx # see the diff for a specific file
-```
-
-See [Updating Components in SKILL.md](./SKILL.md#updating-components) for the full smart merge workflow.

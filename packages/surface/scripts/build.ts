@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
 import mdx from '@mdx-js/esbuild';
+import remarkGfm from 'remark-gfm';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { writeFileSync } from 'fs';
@@ -9,8 +10,8 @@ const srcDir = join(dir, '..', 'src');
 const distDir = join(dir, '..', 'dist');
 
 const mdxPlugins = [
-  mdx({ mdExtensions: ['.md'], format: 'md' }),
-  mdx({ mdxExtensions: ['.mdx'] }),
+  mdx({ mdExtensions: ['.md'], format: 'md', remarkPlugins: [remarkGfm] }),
+  mdx({ mdxExtensions: ['.mdx'], remarkPlugins: [remarkGfm] }),
 ];
 
 // Step 1: Build the render module (MDX → React components → HTML → markdown)
