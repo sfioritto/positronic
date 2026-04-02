@@ -23,8 +23,7 @@
     "tsc": "tsc --project tsconfig.json",
     "build:js": "npx tsx scripts/build.ts",
     "build": "npm run build:js && npm run tsc",
-    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules",
-    "test": ""
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
     "@positronic/core": "^0.0.78",
