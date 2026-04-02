@@ -105,6 +105,7 @@ export async function generate(params: {
       description: string;
       inputSchema: z.ZodSchema;
       execute: (args: any) => Promise<unknown>;
+      toModelOutput?: (params: { output: unknown }) => unknown;
     }
   > = {
     write_component: {
@@ -167,19 +168,27 @@ export async function generate(params: {
           screenshots.push(png);
         }
 
-        // Return base64 image for the LLM to see
+        // Return base64 image data — toModelOutput converts it to visual content
         const base64 = btoa(String.fromCharCode(...png));
         return {
-          status: 'success',
-          message: 'Screenshot captured. Review the rendered component above.',
-          image: {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: 'image/png',
-              data: base64,
-            },
-          },
+          type: 'image',
+          data: base64,
+        };
+      },
+      toModelOutput({ output }: { output: unknown }) {
+        const result = output as { type: string; data?: string };
+        if (result.type === 'image' && result.data) {
+          return {
+            type: 'content',
+            value: [
+              { type: 'text', text: 'Screenshot of the rendered component:' },
+              { type: 'media', data: result.data, mediaType: 'image/png' },
+            ],
+          };
+        }
+        return {
+          type: 'content',
+          value: [{ type: 'text', text: JSON.stringify(output) }],
         };
       },
     },

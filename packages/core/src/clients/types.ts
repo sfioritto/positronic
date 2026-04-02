@@ -200,6 +200,8 @@ export interface ObjectGenerator {
         description: string;
         inputSchema: z.ZodSchema;
         execute?: (args: unknown) => Promise<unknown> | unknown;
+        /** Convert tool output to multi-modal content the LLM can see (e.g., images) */
+        toModelOutput?: (params: { output: unknown }) => unknown;
       }
     >;
     /** Maximum number of LLM iterations (default: 10) */
