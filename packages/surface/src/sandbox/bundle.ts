@@ -11,18 +11,27 @@ export interface BundleResult {
  * The component must already be written to the sandbox (via typeCheck).
  * esbuild resolves imports against the pre-installed node_modules and
  * surface components.
+ *
+ * @param mode - 'inline' bundles everything (for final HTML output).
+ *               'external-react' externalizes react/react-dom (for JSDOM testing).
  */
-export async function bundle(sandbox: {
-  exec: (command: string) => Promise<{
-    success: boolean;
-    stdout: string;
-    stderr: string;
-    exitCode: number;
-  }>;
-  readFile: (path: string) => Promise<{ content: string }>;
-}): Promise<BundleResult> {
+export async function bundle(
+  sandbox: {
+    exec: (command: string) => Promise<{
+      success: boolean;
+      stdout: string;
+      stderr: string;
+      exitCode: number;
+    }>;
+    readFile: (path: string) => Promise<{ content: string }>;
+  },
+  mode: 'inline' | 'external-react' = 'external-react'
+): Promise<BundleResult> {
+  const externals =
+    mode === 'external-react' ? ' --external:react --external:react-dom' : '';
+
   const result = await sandbox.exec(
-    'esbuild /workspace/component.tsx --bundle --format=esm --jsx=automatic --outfile=/workspace/component.bundle.js --loader:.tsx=tsx'
+    `esbuild /workspace/component.tsx --bundle --format=esm --jsx=automatic${externals} --outfile=/workspace/component.bundle.js --loader:.tsx=tsx`
   );
 
   if (!result.success) {
