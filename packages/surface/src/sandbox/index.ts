@@ -31,6 +31,8 @@ export interface SurfaceSandbox {
     formSchema?: string
   ): Promise<TypeCheckResult>;
 
+  typeCheckData(json: string, dataShape: string): Promise<TypeCheckResult>;
+
   bundle(mode?: 'inline' | 'external-react'): Promise<BundleResult>;
 
   validateForm(formSchema: string): Promise<FormValidationResult>;
@@ -48,6 +50,25 @@ export function createSurfaceSandbox(sandbox: SandboxInstance): SurfaceSandbox {
   return {
     typeCheck: (source, dataShape, formSchema) =>
       typeCheck(sandbox, source, dataShape, formSchema),
+
+    async typeCheckData(json: string, dataShape: string) {
+      await sandbox.writeFile('/workspace/types.ts', dataShape);
+      await sandbox.writeFile(
+        '/workspace/data-check.ts',
+        `import type { Data } from './types';\nconst data: Data = ${json};`
+      );
+      const result = await sandbox.exec(
+        'npx tsc --noEmit --strict /workspace/data-check.ts'
+      );
+      if (result.success) {
+        return { success: true };
+      }
+      const errors = [result.stdout, result.stderr]
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+      return { success: false, errors };
+    },
 
     bundle: (mode) => bundle(sandbox, mode),
 

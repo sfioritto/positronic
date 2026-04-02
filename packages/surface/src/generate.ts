@@ -54,6 +54,27 @@ export async function generate(params: {
   const startTime = Date.now();
   const toolCallLog: ToolCallLog[] = [];
 
+  function truncateBase64(obj: unknown): unknown {
+    if (obj === null || obj === undefined || typeof obj !== 'object') {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(truncateBase64);
+    }
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (typeof value === 'string' && value.length > 200) {
+        // Check if it looks like base64 (alphanumeric, +, /, =)
+        if (/^[A-Za-z0-9+/=]+$/.test(value.slice(0, 100))) {
+          result[key] = `[base64 ${value.length} chars]`;
+          continue;
+        }
+      }
+      result[key] = truncateBase64(value);
+    }
+    return result;
+  }
+
   function wrapExecute(
     toolName: string,
     fn: (args: any) => Promise<unknown>
@@ -68,7 +89,7 @@ export async function generate(params: {
             toolName === 'write_component'
               ? { source: '...' + String((args as any).source).slice(-100) }
               : args,
-          result,
+          result: truncateBase64(result),
           durationMs: Date.now() - start,
         });
       }
@@ -76,22 +97,73 @@ export async function generate(params: {
     };
   }
 
-  // Step 1: Generate fake data from inputSchema using the LLM
-  const fakeDataResult = await client.generateObject({
-    schema: z.object({
-      json: z
-        .string()
-        .describe('A valid JSON string matching the TypeScript interface'),
-    }),
-    schemaName: 'fakeData',
-    prompt: `Generate realistic fake/sample data as a JSON string that conforms to this TypeScript interface. Make it look like real production data (realistic names, plausible numbers, multiple items in arrays, etc.), not test placeholders.\n\nInterface:\n${inputSchema}\n\nReturn a single JSON object that could be assigned to a variable of type Data. Include 3-5 items in any arrays.`,
+  // Step 1: Generate fake data using an LLM agent loop with type-checking
+  let fakeData: Record<string, unknown> = {};
+  let fakeDataJson: string | null = null;
+
+  await client.streamText({
+    prompt: `Generate realistic fake/sample data as JSON that conforms to this TypeScript interface. Make it look like real production data (realistic names, plausible numbers, multiple items in arrays, etc.), not test placeholders. Include 3-5 items in any arrays.
+
+Interface:
+${inputSchema}
+
+Instructions:
+1. Write JSON data using write_data — it will be type-checked against the interface
+2. Fix any type errors and rewrite
+3. Call submit_data when the data type-checks successfully`,
+    tools: {
+      write_data: {
+        description:
+          'Write JSON data and type-check it against the Data interface. Returns type errors if any.',
+        inputSchema: z.object({
+          json: z
+            .string()
+            .describe('A JSON object matching the Data interface'),
+        }),
+        async execute({ json }: any) {
+          fakeDataJson = json;
+          const result = await sandbox.typeCheckData(json, inputSchema);
+          if (result.success) {
+            return {
+              status: 'success',
+              message:
+                'Data type-checks successfully. Call submit_data to finish.',
+            };
+          }
+          return {
+            status: 'error',
+            message: 'Type errors found. Fix them and try again.',
+            errors: result.errors,
+          };
+        },
+      },
+      submit_data: {
+        description:
+          'Submit the current data as final. Only call after write_data succeeds.',
+        inputSchema: z.object({}),
+        async execute() {
+          if (!fakeDataJson) {
+            return {
+              status: 'error',
+              message: 'No data written yet. Call write_data first.',
+            };
+          }
+          try {
+            fakeData = JSON.parse(fakeDataJson);
+          } catch {
+            return {
+              status: 'error',
+              message:
+                'JSON parse failed. Fix the JSON and call write_data again.',
+            };
+          }
+          return { status: 'success', message: 'Data submitted.' };
+        },
+      },
+    },
+    maxSteps: 10,
+    toolChoice: 'auto',
   });
-  let fakeData: Record<string, unknown>;
-  try {
-    fakeData = JSON.parse(fakeDataResult.object.json);
-  } catch {
-    fakeData = {};
-  }
 
   // Track state across tool calls
   let lastSource: string | null = null;
