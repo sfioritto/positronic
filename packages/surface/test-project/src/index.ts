@@ -1,7 +1,5 @@
 import { getSandbox, type Sandbox as SandboxDO } from '@cloudflare/sandbox';
-import { typeCheck } from '../../src/sandbox/type-check.js';
-import { bundle } from '../../src/sandbox/bundle.js';
-import { validateForm } from '../../src/sandbox/validate-form.js';
+import { createSurfaceSandbox } from '../../src/sandbox/index.js';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
@@ -12,12 +10,13 @@ type Env = {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const sandbox = getSandbox(env.SANDBOX, 'test-sandbox');
+    const rawSandbox = getSandbox(env.SANDBOX, 'test-sandbox');
+    const sandbox = createSurfaceSandbox(rawSandbox);
 
     // Basic sandbox connectivity test
     if (url.pathname === '/sandbox/hello') {
-      await sandbox.writeFile('/workspace/hello.txt', 'Hello from sandbox!');
-      const file = await sandbox.readFile('/workspace/hello.txt');
+      await rawSandbox.writeFile('/workspace/hello.txt', 'Hello from sandbox!');
+      const file = await rawSandbox.readFile('/workspace/hello.txt');
       return Response.json({ content: file.content });
     }
 
@@ -48,7 +47,7 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      const result = await typeCheck(sandbox, source, dataShape);
+      const result = await sandbox.typeCheck(source, dataShape);
       return Response.json(result);
     }
 
@@ -79,7 +78,7 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      const result = await typeCheck(sandbox, source, dataShape);
+      const result = await sandbox.typeCheck(source, dataShape);
       return Response.json(result);
     }
 
@@ -101,7 +100,7 @@ export default function Page({ data }: Props) {
   return <Button variant="nonexistent">{data.title}</Button>;
 }`;
 
-      const result = await typeCheck(sandbox, source, dataShape);
+      const result = await sandbox.typeCheck(source, dataShape);
       return Response.json(result);
     }
 
@@ -133,10 +132,10 @@ export default function Page({ data }: Props) {
 }`;
 
       // Write the files first (typeCheck does this)
-      await typeCheck(sandbox, source, dataShape);
+      await sandbox.typeCheck(source, dataShape);
 
       // Then bundle
-      const result = await bundle(sandbox);
+      const result = await sandbox.bundle();
       if (result.success) {
         return Response.json({
           success: true,
@@ -175,9 +174,9 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      await typeCheck(sandbox, source, dataShape, formSchemaSource);
-      await bundle(sandbox);
-      const result = await validateForm(sandbox, formSchemaSource);
+      await sandbox.typeCheck(source, dataShape, formSchemaSource);
+      await sandbox.bundle();
+      const result = await sandbox.validateForm(formSchemaSource);
       return Response.json(result);
     }
 
@@ -210,9 +209,9 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      await typeCheck(sandbox, source, dataShape, formSchemaSource);
-      await bundle(sandbox);
-      const result = await validateForm(sandbox, formSchemaSource);
+      await sandbox.typeCheck(source, dataShape, formSchemaSource);
+      await sandbox.bundle();
+      const result = await sandbox.validateForm(formSchemaSource);
       return Response.json(result);
     }
 
