@@ -25,7 +25,7 @@ export interface SurfaceSandbox {
     formSchema?: string
   ): Promise<TypeCheckResult>;
 
-  bundle(): Promise<BundleResult>;
+  bundle(mode?: 'inline' | 'external-react'): Promise<BundleResult>;
 
   validateForm(formSchema: string): Promise<FormValidationResult>;
 }
@@ -41,7 +41,7 @@ export function createSurfaceSandbox(sandbox: SandboxInstance): SurfaceSandbox {
     typeCheck: (source, dataShape, formSchema) =>
       typeCheck(sandbox, source, dataShape, formSchema),
 
-    bundle: () => bundle(sandbox),
+    bundle: (mode) => bundle(sandbox, mode),
 
     validateForm: (formSchema) => validateForm(sandbox, formSchema),
   };

@@ -27,7 +27,7 @@ COPY <<'EOF' /workspace/package.json
     "react-hook-form": "^7.54.0",
     "@hookform/resolvers": "^5.0.0",
     "zod": "^3.24.1",
-    "jsdom": "^26.0.0",
+    "jsdom": "^29.0.0",
     "@testing-library/react": "^16.0.0"
   }
 }

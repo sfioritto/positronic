@@ -30,12 +30,11 @@ export async function validateForm(
   },
   formSchemaSource: string
 ): Promise<FormValidationResult> {
-  // Write the form schema as .mjs so Node can import it directly
-  // Strip any TypeScript-only syntax (import type, etc.)
-  const jsSchema = formSchemaSource
-    .replace(/import type .*?;?\n/g, '')
-    .replace(/: z\.infer<.*?>/g, '');
-  await sandbox.writeFile('/workspace/form-schema.mjs', jsSchema);
+  // Write form schema as .ts, then use esbuild to strip types to .mjs
+  await sandbox.writeFile('/workspace/form-schema.ts', formSchemaSource);
+  await sandbox.exec(
+    'esbuild /workspace/form-schema.ts --format=esm --outfile=/workspace/form-schema.mjs'
+  );
 
   const testScript = `
 import { createRequire } from 'module';
