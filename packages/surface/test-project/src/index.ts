@@ -358,6 +358,104 @@ export default function Page({ data }: Props) {
       });
     }
 
+    // HN Reader test — realistic page with form
+    if (url.pathname === '/sandbox/hn-reader') {
+      if (
+        !rawEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
+        !rawEnv.CLOUDFLARE_ACCOUNT_ID ||
+        !rawEnv.CLOUDFLARE_API_TOKEN
+      ) {
+        return Response.json({ error: 'Missing env vars' }, { status: 500 });
+      }
+
+      const model = google('gemini-2.5-flash', {
+        apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
+      });
+      const client = new VercelClient(
+        model,
+        rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
+      );
+
+      const systemPrompt = systemPromptRaw.replaceAll(
+        '__IMPORT_PATH__',
+        '@surface/components'
+      );
+
+      // This mirrors what .page() would pass to generate() for the HN reader brain
+      const inputSchema = `export interface Data {
+  recommended: Array<{
+    id: string;
+    title: string;
+    url: string;
+    score: number;
+    commentCount: number;
+  }>;
+  remaining: Array<{
+    id: string;
+    title: string;
+    url: string;
+    score: number;
+    commentCount: number;
+  }>;
+}`;
+
+      const outputSchema = `import { z } from 'zod';
+export const formSchema = z.object({
+  readArticleIds: z.array(z.string()).describe('Array of article IDs marked as read'),
+});`;
+
+      const prompt = `Create a reading list page for Hacker News articles.
+
+Show TWO sections:
+
+**Recommended For You** (top section)
+- Show the recommended articles with a subtle highlight or accent to distinguish them
+
+**All Articles** (below recommendations)
+- Show the remaining articles
+
+For each article show:
+- Title as a clickable link to the article URL
+- Points count (e.g., "142 points")
+- Comment count with link to HN comments (https://news.ycombinator.com/item?id={id})
+- A checkbox to mark as "read"
+
+Include a "Mark Selected as Read" submit button at the bottom.
+Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
+
+      const result = await generate({
+        client,
+        sandbox,
+        systemPrompt,
+        accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
+        apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
+        prompt,
+        inputSchema,
+        outputSchema,
+        debug: true,
+      });
+
+      const screenshotBase64 = result.screenshots?.map((png) =>
+        btoa(String.fromCharCode(...png))
+      );
+
+      return Response.json({
+        success: true,
+        html: result.html,
+        htmlSize: result.html.length,
+        screenshots: screenshotBase64,
+        log: result.log
+          ? {
+              userPrompt: result.log.userPrompt,
+              systemPromptLength: result.log.systemPrompt.length,
+              fakeData: result.log.fakeData,
+              toolCalls: result.log.toolCalls,
+              totalDurationMs: result.log.totalDurationMs,
+            }
+          : undefined,
+      });
+    }
+
     return new Response(
       'Surface sandbox test worker.\n\nEndpoints:\n' +
         '  /sandbox/hello - basic connectivity\n' +
@@ -368,7 +466,8 @@ export default function Page({ data }: Props) {
         '  /sandbox/form/valid - form with all fields\n' +
         '  /sandbox/form/missing-field - form missing a required field\n' +
         '  /sandbox/preview - build HTML and screenshot\n' +
-        '  /sandbox/generate - full LLM generation loop\n'
+        '  /sandbox/generate - full LLM generation loop\n' +
+        '  /sandbox/hn-reader - HN reader test (form + 50 articles)\n'
     );
   },
 };
