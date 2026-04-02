@@ -4,8 +4,8 @@ EXPOSE 8080
 
 WORKDIR /workspace
 
-# Install TypeScript, esbuild, and testing tools
-RUN npm install -g typescript esbuild
+# Install TypeScript, esbuild, and Tailwind CSS
+RUN npm install -g typescript esbuild tailwindcss @tailwindcss/cli
 
 # Create package.json with all runtime dependencies
 COPY <<'EOF' /workspace/package.json
@@ -27,6 +27,7 @@ COPY <<'EOF' /workspace/package.json
     "react-hook-form": "^7.54.0",
     "@hookform/resolvers": "^5.0.0",
     "zod": "^3.24.1",
+    "tailwindcss": "^4.2.0",
     "jsdom": "^29.0.0",
     "@testing-library/react": "^16.0.0"
   }
@@ -81,6 +82,7 @@ COPY <<'EOF' /workspace/tsconfig.json
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
@@ -91,4 +93,18 @@ COPY <<'EOF' /workspace/tsconfig.json
   },
   "include": ["*.tsx", "*.ts", "surface/**/*.tsx", "surface/**/*.ts"]
 }
+EOF
+
+# Tailwind CSS input file
+COPY <<'EOF' /workspace/tailwind.css
+@import "tailwindcss";
+EOF
+
+# Mount script that renders the component with data from __POSITRONIC_DATA__
+COPY <<'EOF' /workspace/mount.tsx
+import { createRoot } from 'react-dom/client';
+import Page from './component.tsx';
+
+const data = (window as any).__POSITRONIC_DATA__ || {};
+createRoot(document.getElementById('root')!).render(<Page data={data} />);
 EOF
