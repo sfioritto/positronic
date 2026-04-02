@@ -1,16 +1,19 @@
 import { getSandbox, type Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import { createSurfaceSandbox } from '../../src/sandbox/index.js';
+import { screenshot } from '../../src/screenshot.js';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
 type Env = {
   SANDBOX: DurableObjectNamespace<SandboxDO>;
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_API_TOKEN?: string;
 };
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, rawEnv: Env): Promise<Response> {
     const url = new URL(request.url);
-    const rawSandbox = getSandbox(env.SANDBOX, 'test-sandbox');
+    const rawSandbox = getSandbox(rawEnv.SANDBOX, 'test-sandbox');
     const sandbox = createSurfaceSandbox(rawSandbox);
 
     // Basic sandbox connectivity test
@@ -215,6 +218,64 @@ export default function Page({ data }: Props) {
       return Response.json(result);
     }
 
+    // Build self-contained HTML and screenshot it
+    if (url.pathname === '/sandbox/preview') {
+      const dataShape = `export interface Data {
+  name: string;
+  count: number;
+}`;
+
+      const source = `import { Card, CardHeader, CardTitle, CardContent, Badge } from '@surface/components';
+import type { Data } from './types';
+
+interface Props {
+  data: Data;
+}
+
+export default function Page({ data }: Props) {
+  return (
+    <div className="p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{data.name}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Badge>{data.count} items</Badge>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}`;
+
+      // Type-check
+      const tcResult = await sandbox.typeCheck(source, dataShape);
+      if (!tcResult.success) return Response.json(tcResult);
+
+      // Build self-contained HTML
+      const htmlResult = await sandbox.buildHtml({
+        name: 'Test Dashboard',
+        count: 42,
+      });
+      if (!htmlResult.success) return Response.json(htmlResult);
+
+      // If CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are available, screenshot
+      if (rawEnv.CLOUDFLARE_ACCOUNT_ID && rawEnv.CLOUDFLARE_API_TOKEN) {
+        const png = await screenshot({
+          html: htmlResult.html!,
+          accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
+          apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
+        });
+        return new Response(png, {
+          headers: { 'Content-Type': 'image/png' },
+        });
+      }
+
+      // No browser rendering credentials — just return the HTML
+      return new Response(htmlResult.html, {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
     return new Response(
       'Surface sandbox test worker.\n\nEndpoints:\n' +
         '  /sandbox/hello - basic connectivity\n' +
@@ -223,7 +284,8 @@ export default function Page({ data }: Props) {
         '  /sandbox/typecheck/wrong-prop - wrong prop variant\n' +
         '  /sandbox/bundle - bundle a component with shadcn imports\n' +
         '  /sandbox/form/valid - form with all fields\n' +
-        '  /sandbox/form/missing-field - form missing a required field\n'
+        '  /sandbox/form/missing-field - form missing a required field\n' +
+        '  /sandbox/preview - build HTML and screenshot\n'
     );
   },
 };
