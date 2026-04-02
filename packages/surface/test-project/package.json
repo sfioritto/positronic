@@ -9,6 +9,13 @@
     "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@ai-sdk/google": "^2.0.0",
+    "@positronic/client-vercel": "file:../../../packages/client-vercel",
+    "@positronic/core": "file:../../../packages/core",
+    "ai": "^6.0.0",
+    "zod": "^3.24.1"
+  },
   "devDependencies": {
     "@cloudflare/containers": "^0.2.2",
     "@cloudflare/sandbox": "^0.8.4",
