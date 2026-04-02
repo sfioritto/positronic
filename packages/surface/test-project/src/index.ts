@@ -1,6 +1,7 @@
 import { getSandbox, type Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import { typeCheck } from '../../src/sandbox/type-check.js';
 import { bundle } from '../../src/sandbox/bundle.js';
+import { validateForm } from '../../src/sandbox/validate-form.js';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
@@ -147,13 +148,83 @@ export default function Page({ data }: Props) {
       return Response.json(result);
     }
 
+    // Validate a form with all required fields
+    if (url.pathname === '/sandbox/form/valid') {
+      const dataShape = `export interface Data {}`;
+
+      const formSchemaSource = `import { z } from 'zod';
+export const formSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+});`;
+
+      const source = `import React from 'react';
+import type { Data } from './types';
+
+interface Props {
+  data: Data;
+}
+
+export default function Page({ data }: Props) {
+  return (
+    <form>
+      <input name="name" type="text" defaultValue="" />
+      <input name="email" type="email" defaultValue="" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}`;
+
+      await typeCheck(sandbox, source, dataShape, formSchemaSource);
+      await bundle(sandbox);
+      const result = await validateForm(sandbox, formSchemaSource);
+      return Response.json(result);
+    }
+
+    // Validate a form missing a required field
+    if (url.pathname === '/sandbox/form/missing-field') {
+      const dataShape = `export interface Data {}`;
+
+      const formSchemaSource = `import { z } from 'zod';
+export const formSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  phone: z.string(),
+});`;
+
+      // Missing the phone field
+      const source = `import React from 'react';
+import type { Data } from './types';
+
+interface Props {
+  data: Data;
+}
+
+export default function Page({ data }: Props) {
+  return (
+    <form>
+      <input name="name" type="text" defaultValue="" />
+      <input name="email" type="email" defaultValue="" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}`;
+
+      await typeCheck(sandbox, source, dataShape, formSchemaSource);
+      await bundle(sandbox);
+      const result = await validateForm(sandbox, formSchemaSource);
+      return Response.json(result);
+    }
+
     return new Response(
       'Surface sandbox test worker.\n\nEndpoints:\n' +
         '  /sandbox/hello - basic connectivity\n' +
         '  /sandbox/typecheck/valid - valid component\n' +
         '  /sandbox/typecheck/invalid - component with type error\n' +
         '  /sandbox/typecheck/wrong-prop - wrong prop variant\n' +
-        '  /sandbox/bundle - bundle a component with shadcn imports\n'
+        '  /sandbox/bundle - bundle a component with shadcn imports\n' +
+        '  /sandbox/form/valid - form with all fields\n' +
+        '  /sandbox/form/missing-field - form missing a required field\n'
     );
   },
 };
