@@ -39,6 +39,37 @@ RUN npm install
 COPY src/components/ /workspace/surface/components/
 COPY src/lib/ /workspace/surface/lib/
 
+# Barrel export so generated components can import from '@surface/components'
+COPY <<'EOF' /workspace/surface/components/index.ts
+export * from './accordion.js';
+export * from './alert.js';
+export * from './avatar.js';
+export * from './badge.js';
+export * from './button.js';
+export * from './card.js';
+export * from './checkbox.js';
+export * from './dialog.js';
+export * from './empty.js';
+export * from './field.js';
+export * from './input.js';
+export * from './label.js';
+export * from './progress.js';
+export * from './radio-group.js';
+export * from './select.js';
+export * from './separator.js';
+export * from './skeleton.js';
+export * from './slider.js';
+export * from './sonner.js';
+export * from './spinner.js';
+export * from './switch.js';
+export * from './table.js';
+export * from './tabs.js';
+export * from './textarea.js';
+export * from './toggle.js';
+export * from './toggle-group.js';
+export * from './tooltip.js';
+EOF
+
 # Pre-configured tsconfig for type-checking generated components
 COPY <<'EOF' /workspace/tsconfig.json
 {
