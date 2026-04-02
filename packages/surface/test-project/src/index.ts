@@ -1,6 +1,9 @@
 import { getSandbox, type Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import { createSurfaceSandbox } from '../../src/sandbox/index.js';
 import { screenshot } from '../../src/screenshot.js';
+import { generate } from '../../src/generate.js';
+import { VercelClient } from '@positronic/client-vercel';
+import { google } from '@ai-sdk/google';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
@@ -8,6 +11,7 @@ type Env = {
   SANDBOX: DurableObjectNamespace<SandboxDO>;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
+  GOOGLE_GENERATIVE_AI_API_KEY?: string;
 };
 
 export default {
@@ -276,6 +280,71 @@ export default function Page({ data }: Props) {
       });
     }
 
+    // Full generation loop with LLM
+    if (url.pathname === '/sandbox/generate') {
+      if (
+        !rawEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
+        !rawEnv.CLOUDFLARE_ACCOUNT_ID ||
+        !rawEnv.CLOUDFLARE_API_TOKEN
+      ) {
+        return Response.json(
+          {
+            error:
+              'Missing GOOGLE_GENERATIVE_AI_API_KEY, CLOUDFLARE_ACCOUNT_ID, or CLOUDFLARE_API_TOKEN in .dev.vars',
+          },
+          { status: 500 }
+        );
+      }
+
+      const model = google('gemini-2.5-flash', {
+        apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
+      });
+      const client = new VercelClient(
+        model,
+        rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
+      );
+
+      const inputSchema = `export interface Data {
+  title: string;
+  metrics: {
+    totalUsers: number;
+    activeUsers: number;
+    revenue: number;
+  };
+  recentUsers: Array<{
+    name: string;
+    email: string;
+    status: 'active' | 'inactive';
+  }>;
+}`;
+
+      // Use the pre-built system prompt from the surface package
+      const systemPromptModule = await import('../../dist/index.js');
+      const systemPrompt = systemPromptModule.default || '';
+
+      const result = await generate({
+        client,
+        sandbox,
+        systemPrompt:
+          typeof systemPrompt === 'string'
+            ? systemPrompt
+            : 'You are a UI component generator.',
+        accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
+        apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
+        prompt:
+          "Create a dashboard page showing key metrics at the top in cards, and a table of recent users below.\n\nIMPORTANT: Import all components from '@surface/components' — NOT from '@/components/ui/...'",
+        inputSchema,
+        debug: true,
+      });
+
+      return new Response(result.html, {
+        headers: {
+          'Content-Type': 'text/html',
+          'X-Screenshots-Count': String(result.screenshots?.length ?? 0),
+        },
+      });
+    }
+
     return new Response(
       'Surface sandbox test worker.\n\nEndpoints:\n' +
         '  /sandbox/hello - basic connectivity\n' +
@@ -285,7 +354,8 @@ export default function Page({ data }: Props) {
         '  /sandbox/bundle - bundle a component with shadcn imports\n' +
         '  /sandbox/form/valid - form with all fields\n' +
         '  /sandbox/form/missing-field - form missing a required field\n' +
-        '  /sandbox/preview - build HTML and screenshot\n'
+        '  /sandbox/preview - build HTML and screenshot\n' +
+        '  /sandbox/generate - full LLM generation loop\n'
     );
   },
 };
