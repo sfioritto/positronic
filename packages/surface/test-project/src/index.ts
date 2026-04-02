@@ -456,6 +456,147 @@ Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
       });
     }
 
+    // Email digest test — complex multi-section page with enrichment tuples
+    if (url.pathname === '/sandbox/email-digest') {
+      if (
+        !rawEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
+        !rawEnv.CLOUDFLARE_ACCOUNT_ID ||
+        !rawEnv.CLOUDFLARE_API_TOKEN
+      ) {
+        return Response.json({ error: 'Missing env vars' }, { status: 500 });
+      }
+
+      const model = google('gemini-2.5-flash', {
+        apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
+      });
+      const client = new VercelClient(
+        model,
+        rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
+      );
+
+      const systemPrompt = systemPromptRaw.replaceAll(
+        '__IMPORT_PATH__',
+        '@surface/components'
+      );
+
+      // This mirrors the state shape at the .page() step of the email-digest brain.
+      // IterateResult<Thread, T> serializes as [Thread, T][] tuples via toJSON().
+      const inputSchema = `
+interface Thread {
+  threadId: string;
+  subject: string;
+  from: string;
+  snippet: string;
+  date: string;
+  messageCount: number;
+}
+
+type EmailCategory =
+  | 'children' | 'amazon' | 'billing' | 'receipts'
+  | 'investments' | 'kickstarter' | 'newsletters' | 'marketing'
+  | 'notifications' | 'npm' | 'securityAlerts' | 'confirmationCodes'
+  | 'reminders' | 'financialNotifications' | 'shipping';
+
+export interface Data {
+  /** All categorized emails from the inbox */
+  emails: Array<{
+    thread: Thread;
+    category: EmailCategory;
+  }>;
+
+  /** Enriched data as [thread, enrichment] tuples (from IterateResult.toJSON()) */
+  childrenEnriched: Array<[Thread, { summary: string; actionItem: string | null }]>;
+  billingEnriched: Array<[Thread, { description: string; amount: string; dueDate: string | null }]>;
+  receiptsEnriched: Array<[Thread, { merchant: string; amount: string; items: string[] }]>;
+  newslettersEnriched: Array<[Thread, { summary: string; keyTopics: string[] }]>;
+  financialEnriched: Array<[Thread, { description: string; amount: string; direction: 'credit' | 'debit' }]>;
+  shippingEnriched: Array<[Thread, { carrier: string; trackingStatus: string; estimatedDelivery: string | null }]>;
+
+  /** LLM-generated text summaries for notification categories */
+  npmSummary: string;
+  securityAlertsSummary: string;
+  confirmationCodesSummary: string;
+  remindersSummary: string;
+  financialSummary: string;
+
+  /** Shipping summary as enrichment tuples */
+  shippingSummary: Array<[Thread, { summary: string }]>;
+}`;
+
+      const outputSchema = `import { z } from 'zod';
+export const formSchema = z.object({
+  threadIds: z.array(z.string()).describe('Thread IDs the user wants to keep in inbox (not archive)'),
+});`;
+
+      const prompt = `Create an email digest page that summarizes a user's inbox.
+
+The page should have these sections, each with a colored header/accent:
+
+**Priority: Children** (red accent)
+- Show each enriched children email with its summary and action item (if any)
+- Action items should be visually prominent (bold, icon, or badge)
+
+**Billing & Receipts** (green accent)
+- Two subsections side by side or stacked
+- Billing: show description, amount, and due date for each
+- Receipts: show merchant, amount, and purchased items
+
+**Newsletters** (indigo accent)
+- Show summary and key topics as tags/badges for each newsletter
+
+**Financial Activity** (cyan accent)
+- Show each transaction with amount, description, and credit/debit indicator
+- Credits should be green, debits red
+
+**Shipping** (orange accent)
+- Show carrier, tracking status, and estimated delivery for each package
+
+**Notifications Summary** (purple accent, collapsed/compact)
+- Show the text summaries for npm, security alerts, confirmation codes, reminders, and financial notifications
+- These are pre-summarized strings, so just display them in a clean readable format
+
+**Thread Management**
+- Each email thread across ALL sections should have a checkbox
+- The checkbox name should be "threadIds" with the thread's threadId as value
+- Checked = keep in inbox, unchecked = archive
+- Include a "Archive Unchecked" submit button at the bottom
+
+Make the overall layout clean and scannable. Use cards to group sections.
+The page should feel like a morning email briefing — scannable in 30 seconds.`;
+
+      const result = await generate({
+        client,
+        sandbox,
+        systemPrompt,
+        accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
+        apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
+        prompt,
+        inputSchema,
+        outputSchema,
+        debug: true,
+      });
+
+      const screenshotBase64 = result.screenshots?.map((png) =>
+        btoa(String.fromCharCode(...png))
+      );
+
+      return Response.json({
+        success: true,
+        html: result.html,
+        htmlSize: result.html.length,
+        screenshots: screenshotBase64,
+        log: result.log
+          ? {
+              userPrompt: result.log.userPrompt,
+              systemPromptLength: result.log.systemPrompt.length,
+              fakeData: result.log.fakeData,
+              toolCalls: result.log.toolCalls,
+              totalDurationMs: result.log.totalDurationMs,
+            }
+          : undefined,
+      });
+    }
+
     return new Response(
       'Surface sandbox test worker.\n\nEndpoints:\n' +
         '  /sandbox/hello - basic connectivity\n' +
@@ -467,7 +608,8 @@ Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
         '  /sandbox/form/missing-field - form missing a required field\n' +
         '  /sandbox/preview - build HTML and screenshot\n' +
         '  /sandbox/generate - full LLM generation loop\n' +
-        '  /sandbox/hn-reader - HN reader test (form + 50 articles)\n'
+        '  /sandbox/hn-reader - HN reader test (form + 50 articles)\n' +
+        '  /sandbox/email-digest - email digest with enrichment tuples\n'
     );
   },
 };
