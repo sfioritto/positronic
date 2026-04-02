@@ -376,6 +376,7 @@ export class VercelClient implements ObjectGenerator {
         description: string;
         inputSchema: z.ZodSchema;
         execute?: (args: unknown) => Promise<unknown> | unknown;
+        toModelOutput?: (params: { output: unknown }) => unknown;
       }
     > = {};
     for (const [name, tool] of Object.entries(tools)) {
@@ -383,6 +384,7 @@ export class VercelClient implements ObjectGenerator {
         description: tool.description,
         inputSchema: tool.inputSchema,
         execute: tool.execute,
+        toModelOutput: tool.toModelOutput,
       };
     }
 
