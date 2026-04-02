@@ -78,11 +78,20 @@ export async function generate(params: {
 
   // Step 1: Generate fake data from inputSchema using the LLM
   const fakeDataResult = await client.generateObject({
-    schema: z.object({ data: z.record(z.unknown()) }),
+    schema: z.object({
+      json: z
+        .string()
+        .describe('A valid JSON string matching the TypeScript interface'),
+    }),
     schemaName: 'fakeData',
-    prompt: `Generate realistic fake/sample data that conforms to this TypeScript interface. Make the data look like real production data (realistic names, plausible numbers, etc.), not test data.\n\nInterface:\n${inputSchema}`,
+    prompt: `Generate realistic fake/sample data as a JSON string that conforms to this TypeScript interface. Make it look like real production data (realistic names, plausible numbers, multiple items in arrays, etc.), not test placeholders.\n\nInterface:\n${inputSchema}\n\nReturn a single JSON object that could be assigned to a variable of type Data. Include 3-5 items in any arrays.`,
   });
-  const fakeData = fakeDataResult.object.data;
+  let fakeData: Record<string, unknown>;
+  try {
+    fakeData = JSON.parse(fakeDataResult.object.json);
+  } catch {
+    fakeData = {};
+  }
 
   // Track state across tool calls
   let lastSource: string | null = null;
