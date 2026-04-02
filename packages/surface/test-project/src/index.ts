@@ -4,6 +4,7 @@ import { screenshot } from '../../src/screenshot.js';
 import { generate } from '../../src/generate.js';
 import { VercelClient } from '@positronic/client-vercel';
 import { google } from '@ai-sdk/google';
+import systemPromptRaw from '../../src/system-prompt.md';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
@@ -318,30 +319,42 @@ export default function Page({ data }: Props) {
   }>;
 }`;
 
-      // Use the pre-built system prompt from the surface package
-      const systemPromptModule = await import('../../dist/index.js');
-      const systemPrompt = systemPromptModule.default || '';
+      const systemPrompt = systemPromptRaw.replaceAll(
+        '__IMPORT_PATH__',
+        '@surface/components'
+      );
 
       const result = await generate({
         client,
         sandbox,
-        systemPrompt:
-          typeof systemPrompt === 'string'
-            ? systemPrompt
-            : 'You are a UI component generator.',
+        systemPrompt,
         accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
         apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
         prompt:
-          "Create a dashboard page showing key metrics at the top in cards, and a table of recent users below.\n\nIMPORTANT: Import all components from '@surface/components' — NOT from '@/components/ui/...'",
+          'Create a dashboard page showing key metrics at the top in cards, and a table of recent users below.',
         inputSchema,
         debug: true,
       });
 
-      return new Response(result.html, {
-        headers: {
-          'Content-Type': 'text/html',
-          'X-Screenshots-Count': String(result.screenshots?.length ?? 0),
-        },
+      // Return JSON with the full log and HTML
+      const screenshotBase64 = result.screenshots?.map((png) =>
+        btoa(String.fromCharCode(...png))
+      );
+
+      return Response.json({
+        success: true,
+        html: result.html,
+        htmlSize: result.html.length,
+        screenshots: screenshotBase64,
+        log: result.log
+          ? {
+              userPrompt: result.log.userPrompt,
+              systemPromptLength: result.log.systemPrompt.length,
+              fakeData: result.log.fakeData,
+              toolCalls: result.log.toolCalls,
+              totalDurationMs: result.log.totalDurationMs,
+            }
+          : undefined,
       });
     }
 
