@@ -22,6 +22,9 @@ export async function screenshot(params: {
       body: JSON.stringify({
         html,
         viewport: viewport ?? { width: 1280, height: 720 },
+        gotoOptions: {
+          waitUntil: 'networkidle0',
+        },
       }),
     }
   );
