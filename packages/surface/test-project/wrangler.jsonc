@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "surface-test",
   "main": "src/index.ts",
+  "rules": [{ "type": "Text", "globs": ["**/*.md"] }],
   "compatibility_date": "2025-04-04",
   "compatibility_flags": [
     "nodejs_compat",

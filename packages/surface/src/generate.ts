@@ -3,9 +3,23 @@ import type { ObjectGenerator } from '@positronic/core';
 import type { SurfaceSandbox } from './sandbox/index.js';
 import { screenshot } from './screenshot.js';
 
+export interface ToolCallLog {
+  tool: string;
+  args: unknown;
+  result: unknown;
+  durationMs: number;
+}
+
 export interface GenerateResult {
   html: string;
   screenshots?: Uint8Array[];
+  log?: {
+    systemPrompt: string;
+    userPrompt: string;
+    fakeData: Record<string, unknown>;
+    toolCalls: ToolCallLog[];
+    totalDurationMs: number;
+  };
 }
 
 /**
@@ -36,6 +50,31 @@ export async function generate(params: {
     outputSchema,
     debug,
   } = params;
+
+  const startTime = Date.now();
+  const toolCallLog: ToolCallLog[] = [];
+
+  function wrapExecute(
+    toolName: string,
+    fn: (args: any) => Promise<unknown>
+  ): (args: any) => Promise<unknown> {
+    return async (args) => {
+      const start = Date.now();
+      const result = await fn(args);
+      if (debug) {
+        toolCallLog.push({
+          tool: toolName,
+          args:
+            toolName === 'write_component'
+              ? { source: '...' + String((args as any).source).slice(-100) }
+              : args,
+          result,
+          durationMs: Date.now() - start,
+        });
+      }
+      return result;
+    };
+  }
 
   // Step 1: Generate fake data from inputSchema using the LLM
   const fakeDataResult = await client.generateObject({
@@ -194,6 +233,11 @@ export async function generate(params: {
     };
   }
 
+  // Wrap all tool execute functions with logging
+  for (const [name, tool] of Object.entries(tools)) {
+    tool.execute = wrapExecute(name, tool.execute);
+  }
+
   // Step 3: Build the user prompt with schema context
   let userPrompt = prompt;
   userPrompt += `\n\nIMPORTANT: Import all components from '@surface/components'. Do NOT use '@/components/ui/...' paths.`;
@@ -227,5 +271,14 @@ export async function generate(params: {
   return {
     html: htmlResult.html!,
     screenshots: debug ? screenshots : undefined,
+    log: debug
+      ? {
+          systemPrompt,
+          userPrompt,
+          fakeData: fakeData as Record<string, unknown>,
+          toolCalls: toolCallLog,
+          totalDurationMs: Date.now() - startTime,
+        }
+      : undefined,
   };
 }
