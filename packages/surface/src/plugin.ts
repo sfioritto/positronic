@@ -1,6 +1,5 @@
 import { definePlugin } from '@positronic/core';
 import type { ObjectGenerator } from '@positronic/core';
-import { createSurfaceSandbox } from './sandbox/index.js';
 import { generate, type GenerateResult } from './generate.js';
 import systemPromptTemplate from './system-prompt.gen.js';
 
@@ -50,20 +49,16 @@ export const surface = definePlugin({
         prompt: string;
         inputSchema: string;
         outputSchema?: string;
-        debug?: boolean;
       }): Promise<GenerateResult> => {
-        const sandbox = createSurfaceSandbox(config.sandbox);
-
         return generate({
           client: config.client,
-          sandbox,
+          sandbox: config.sandbox,
           systemPrompt,
           accountId: config.accountId,
           apiToken: config.apiToken,
           prompt: params.prompt,
           inputSchema: params.inputSchema,
           outputSchema: params.outputSchema,
-          debug: params.debug,
         });
       },
     };

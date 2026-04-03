@@ -1,0 +1,241 @@
+export interface TypeCheckResult {
+  success: boolean;
+  errors?: string;
+}
+
+export interface BundleResult {
+  success: boolean;
+  js?: string;
+  errors?: string;
+}
+
+export interface FormValidationResult {
+  success: boolean;
+  errors?: string;
+}
+
+export interface BuildHtmlResult {
+  success: boolean;
+  html?: string;
+  errors?: string;
+}
+
+export type SandboxInstance = {
+  writeFile: (path: string, content: string) => Promise<unknown>;
+  readFile: (path: string) => Promise<{ content: string }>;
+  exec: (
+    command: string,
+    options?: { timeout?: number }
+  ) => Promise<{
+    success: boolean;
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  }>;
+};
+
+function parseErrors(result: { stdout: string; stderr: string }) {
+  return [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+}
+
+export async function typeCheck(
+  sandbox: SandboxInstance,
+  source: string,
+  dataShape: string,
+  formSchema?: string
+): Promise<TypeCheckResult> {
+  await sandbox.writeFile('/workspace/types.ts', dataShape);
+
+  if (formSchema) {
+    await sandbox.writeFile('/workspace/form-schema.ts', formSchema);
+  }
+
+  await sandbox.writeFile('/workspace/component.tsx', source);
+
+  const result = await sandbox.exec('npx tsc --noEmit');
+
+  if (result.success) {
+    return { success: true };
+  }
+
+  return { success: false, errors: parseErrors(result) };
+}
+
+export async function typeCheckData(
+  sandbox: SandboxInstance,
+  json: string,
+  dataShape: string
+): Promise<TypeCheckResult> {
+  await sandbox.writeFile('/workspace/types.ts', dataShape);
+  await sandbox.writeFile(
+    '/workspace/data-check.ts',
+    `import type { Data } from './types';\nconst data: Data = ${json};`
+  );
+  const result = await sandbox.exec(
+    'npx tsc --noEmit --strict /workspace/data-check.ts'
+  );
+  if (result.success) {
+    return { success: true };
+  }
+  return { success: false, errors: parseErrors(result) };
+}
+
+export async function bundle(
+  sandbox: SandboxInstance,
+  mode: 'inline' | 'external-react' = 'external-react'
+): Promise<BundleResult> {
+  const externals =
+    mode === 'external-react' ? ' --external:react --external:react-dom' : '';
+
+  const result = await sandbox.exec(
+    `esbuild /workspace/component.tsx --bundle --format=esm --jsx=automatic${externals} --outfile=/workspace/component.bundle.js --loader:.tsx=tsx`
+  );
+
+  if (!result.success) {
+    return { success: false, errors: parseErrors(result) };
+  }
+
+  const file = await sandbox.readFile('/workspace/component.bundle.js');
+  return { success: true, js: file.content };
+}
+
+export async function validateForm(
+  sandbox: SandboxInstance,
+  formSchemaSource: string
+): Promise<FormValidationResult> {
+  // Write form schema as .ts, then use esbuild to strip types to .mjs
+  await sandbox.writeFile('/workspace/form-schema.ts', formSchemaSource);
+  await sandbox.exec(
+    'esbuild /workspace/form-schema.ts --format=esm --outfile=/workspace/form-schema.mjs'
+  );
+
+  const testScript = `
+import { createRequire } from 'module';
+import { JSDOM } from 'jsdom';
+import { formSchema } from './form-schema.mjs';
+
+// Set up JSDOM globals before importing React
+const dom = new JSDOM('<!DOCTYPE html><html><body><div id="root"></div></body></html>', {
+  url: 'http://localhost',
+  pretendToBeVisual: true,
+});
+globalThis.window = dom.window;
+globalThis.document = dom.window.document;
+globalThis.navigator = dom.window.navigator;
+globalThis.HTMLElement = dom.window.HTMLElement;
+globalThis.HTMLFormElement = dom.window.HTMLFormElement;
+
+const React = await import('react');
+const { createRoot } = await import('react-dom/client');
+const { act } = await import('react');
+
+// Import the bundled component (esbuild output, plain JS)
+const { default: Page } = await import('./component.bundle.js');
+
+// Generate fake data from schema shape
+function generateFakeData(schema) {
+  const shape = schema.shape;
+  const data = {};
+  for (const [key, fieldSchema] of Object.entries(shape)) {
+    const typeName = fieldSchema._def?.typeName;
+    if (typeName === 'ZodString') data[key] = 'test-' + key;
+    else if (typeName === 'ZodNumber') data[key] = 42;
+    else if (typeName === 'ZodBoolean') data[key] = true;
+    else if (typeName === 'ZodEnum') data[key] = fieldSchema._def.values[0];
+    else data[key] = 'test-' + key;
+  }
+  return data;
+}
+
+const fakeData = generateFakeData(formSchema);
+
+// Render the component
+const root = document.getElementById('root');
+const reactRoot = createRoot(root);
+await act(() => {
+  reactRoot.render(React.createElement(Page, { data: {} }));
+});
+
+// Find all form inputs
+const schemaKeys = Object.keys(formSchema.shape);
+const inputs = root.querySelectorAll('input[name], select[name], textarea[name]');
+const inputNames = Array.from(inputs).map(el => el.getAttribute('name'));
+
+const missingFields = schemaKeys.filter(key => !inputNames.includes(key));
+
+const result = { success: true, errors: [] };
+
+if (missingFields.length > 0) {
+  result.success = false;
+  result.errors.push('Missing form fields for schema keys: ' + missingFields.join(', '));
+}
+
+console.log(JSON.stringify(result));
+process.exit(result.success ? 0 : 1);
+`;
+
+  await sandbox.writeFile('/workspace/test-form.mjs', testScript);
+
+  const result = await sandbox.exec(
+    'node --experimental-vm-modules /workspace/test-form.mjs',
+    { timeout: 30000 }
+  );
+
+  if (result.success) {
+    return { success: true };
+  }
+
+  // Try to parse structured output from stdout
+  const stdout = result.stdout.trim();
+  try {
+    const parsed = JSON.parse(stdout);
+    return {
+      success: false,
+      errors: parsed.errors?.join('\n') || 'Form validation failed',
+    };
+  } catch {
+    return { success: false, errors: parseErrors(result) };
+  }
+}
+
+export async function buildHtml(
+  sandbox: SandboxInstance,
+  data: Record<string, unknown>
+): Promise<BuildHtmlResult> {
+  const bundleResult = await sandbox.exec(
+    'esbuild /workspace/mount.tsx --bundle --format=iife --jsx=automatic --outfile=/workspace/page.bundle.js --loader:.tsx=tsx'
+  );
+
+  if (!bundleResult.success) {
+    return { success: false, errors: parseErrors(bundleResult) };
+  }
+
+  const cssResult = await sandbox.exec(
+    'npx @tailwindcss/cli -i /workspace/tailwind.css -o /workspace/page.css --content "/workspace/component.tsx,/workspace/surface/components/*.tsx" --minify'
+  );
+
+  if (!cssResult.success) {
+    return { success: false, errors: parseErrors(cssResult) };
+  }
+
+  const [jsFile, cssFile] = await Promise.all([
+    sandbox.readFile('/workspace/page.bundle.js'),
+    sandbox.readFile('/workspace/page.css'),
+  ]);
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>${cssFile.content}</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>window.__POSITRONIC_DATA__ = ${JSON.stringify(data)};</script>
+  <script>${jsFile.content}</script>
+</body>
+</html>`;
+
+  return { success: true, html };
+}

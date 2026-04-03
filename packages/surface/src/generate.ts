@@ -1,25 +1,17 @@
 import { z } from 'zod';
 import type { ObjectGenerator } from '@positronic/core';
-import type { SurfaceSandbox } from './sandbox/index.js';
+import type { SandboxInstance } from './sandbox.js';
+import {
+  typeCheck,
+  typeCheckData,
+  bundle,
+  validateForm,
+  buildHtml,
+} from './sandbox.js';
 import { screenshot } from './screenshot.js';
-
-export interface ToolCallLog {
-  tool: string;
-  args: unknown;
-  result: unknown;
-  durationMs: number;
-}
 
 export interface GenerateResult {
   html: string;
-  screenshots?: Uint8Array[];
-  log?: {
-    systemPrompt: string;
-    userPrompt: string;
-    fakeData: Record<string, unknown>;
-    toolCalls: ToolCallLog[];
-    totalDurationMs: number;
-  };
 }
 
 /**
@@ -30,14 +22,13 @@ export interface GenerateResult {
  */
 export async function generate(params: {
   client: ObjectGenerator;
-  sandbox: SurfaceSandbox;
+  sandbox: SandboxInstance;
   systemPrompt: string;
   accountId: string;
   apiToken: string;
   prompt: string;
   inputSchema: string;
   outputSchema?: string;
-  debug?: boolean;
 }): Promise<GenerateResult> {
   const {
     client,
@@ -48,54 +39,7 @@ export async function generate(params: {
     prompt,
     inputSchema,
     outputSchema,
-    debug,
   } = params;
-
-  const startTime = Date.now();
-  const toolCallLog: ToolCallLog[] = [];
-
-  function truncateBase64(obj: unknown): unknown {
-    if (obj === null || obj === undefined || typeof obj !== 'object') {
-      return obj;
-    }
-    if (Array.isArray(obj)) {
-      return obj.map(truncateBase64);
-    }
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      if (typeof value === 'string' && value.length > 200) {
-        // Check if it looks like base64 (alphanumeric, +, /, =)
-        if (/^[A-Za-z0-9+/=]+$/.test(value.slice(0, 100))) {
-          result[key] = `[base64 ${value.length} chars]`;
-          continue;
-        }
-      }
-      result[key] = truncateBase64(value);
-    }
-    return result;
-  }
-
-  function wrapExecute(
-    toolName: string,
-    fn: (args: any) => Promise<unknown>
-  ): (args: any) => Promise<unknown> {
-    return async (args) => {
-      const start = Date.now();
-      const result = await fn(args);
-      if (debug) {
-        toolCallLog.push({
-          tool: toolName,
-          args:
-            toolName === 'write_component'
-              ? { source: '...' + String((args as any).source).slice(-100) }
-              : args,
-          result: truncateBase64(result),
-          durationMs: Date.now() - start,
-        });
-      }
-      return result;
-    };
-  }
 
   // Step 1: Generate fake data using an LLM agent loop with type-checking
   let fakeData: Record<string, unknown> = {};
@@ -122,7 +66,7 @@ Instructions:
         }),
         async execute({ json }: any) {
           fakeDataJson = json;
-          const result = await sandbox.typeCheckData(json, inputSchema);
+          const result = await typeCheckData(sandbox, json, inputSchema);
           if (result.success) {
             return {
               status: 'success',
@@ -168,7 +112,6 @@ Instructions:
   // Track state across tool calls
   let lastSource: string | null = null;
   let submitted = false;
-  const screenshots: Uint8Array[] = [];
 
   // Step 2: Define tools
   const tools: Record<
@@ -190,7 +133,8 @@ Instructions:
       }),
       async execute({ source }: { source: string }) {
         lastSource = source;
-        const result = await sandbox.typeCheck(
+        const result = await typeCheck(
+          sandbox,
           source,
           inputSchema,
           outputSchema
@@ -221,7 +165,7 @@ Instructions:
           };
         }
 
-        const htmlResult = await sandbox.buildHtml(fakeData);
+        const htmlResult = await buildHtml(sandbox, fakeData);
         if (!htmlResult.success) {
           return {
             status: 'error',
@@ -235,10 +179,6 @@ Instructions:
           accountId,
           apiToken,
         });
-
-        if (debug) {
-          screenshots.push(png);
-        }
 
         // Return base64 image data — toModelOutput converts it to visual content
         const base64 = btoa(String.fromCharCode(...png));
@@ -297,7 +237,7 @@ Instructions:
         }
 
         // Bundle with external React for JSDOM testing
-        const bundleResult = await sandbox.bundle('external-react');
+        const bundleResult = await bundle(sandbox, 'external-react');
         if (!bundleResult.success) {
           return {
             status: 'error',
@@ -306,7 +246,7 @@ Instructions:
           };
         }
 
-        const result = await sandbox.validateForm(outputSchema);
+        const result = await validateForm(sandbox, outputSchema);
         if (result.success) {
           return {
             status: 'success',
@@ -321,11 +261,6 @@ Instructions:
         };
       },
     };
-  }
-
-  // Wrap all tool execute functions with logging
-  for (const [name, tool] of Object.entries(tools)) {
-    tool.execute = wrapExecute(name, tool.execute);
   }
 
   // Step 3: Build the user prompt with schema context
@@ -353,22 +288,10 @@ Instructions:
   }
 
   // If not submitted, use the last written component as fallback
-  const htmlResult = await sandbox.buildHtml(fakeData);
+  const htmlResult = await buildHtml(sandbox, fakeData);
   if (!htmlResult.success) {
     throw new Error(`Failed to build final HTML: ${htmlResult.errors}`);
   }
 
-  return {
-    html: htmlResult.html!,
-    screenshots: debug ? screenshots : undefined,
-    log: debug
-      ? {
-          systemPrompt,
-          userPrompt,
-          fakeData: fakeData as Record<string, unknown>,
-          toolCalls: toolCallLog,
-          totalDurationMs: Date.now() - startTime,
-        }
-      : undefined,
-  };
+  return { html: htmlResult.html! };
 }
