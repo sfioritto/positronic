@@ -573,55 +573,6 @@ brain('Tool Brain')
 
 Tools are explicit on each `.prompt()` — there's no global tool registration.
 
-### Component Configuration with `withComponents()`
-
-The `withComponents()` method registers custom UI components for use in `.page()` steps:
-
-```typescript
-const brainWithComponents = brain('Custom UI Brain')
-  .withComponents({
-    CustomCard: {
-      description: 'A styled card component for displaying content',
-      props: z.object({
-        title: z.string(),
-        content: z.string(),
-        variant: z.enum(['default', 'highlighted', 'warning']).default('default')
-      }),
-      render: (props) => `
-        <div class="card card-<%= '${props.variant}' %>">
-          <h3><%= '${props.title}' %></h3>
-          <p><%= '${props.content}' %></p>
-        </div>
-      `
-    },
-    DataTable: {
-      description: 'A table for displaying structured data',
-      props: z.object({
-        headers: z.array(z.string()),
-        rows: z.array(z.array(z.string()))
-      }),
-      render: (props) => {
-        // Build table HTML from headers and rows
-        const headerRow = props.headers.map(h => '<th>' + h + '</th>').join('');
-        const bodyRows = props.rows.map(row =>
-          '<tr>' + row.map(cell => '<td>' + cell + '</td>').join('') + '</tr>'
-        ).join('');
-        return '<table><thead><tr>' + headerRow + '</tr></thead><tbody>' + bodyRows + '</tbody></table>';
-      }
-    }
-  })
-  .page('Dashboard', ({ state }) => ({
-    prompt: `
-      Create a dashboard using CustomCard components to display:
-      - User name: <%= '${state.userName}' %>
-      - Account status: <%= '${state.status}' %>
-      Use DataTable to show recent activity.
-    `,
-    formSchema: z.object({
-      acknowledged: z.boolean()
-    }),
-  }));
-```
 
 ### Typed Store with `withStore()`
 
@@ -1533,9 +1484,9 @@ The created page object contains:
 - `url: string` - Public URL to access the page
 - `webhook: WebhookConfig` - Webhook configuration for handling form submissions
 
-### Custom HTML Pages
+### Page Steps
 
-When you need full control over the page HTML (instead of having the LLM generate it), use `.page()` with the `html` property. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically — same as LLM-generated pages.
+Page steps create HTML pages with optional forms. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically. When `formSchema` is provided, the brain auto-suspends and spreads the form response directly onto state.
 
 Rename your brain file to `.tsx` and use JSX to build the page:
 
@@ -1635,115 +1586,36 @@ For interactive UI (tabs, toggles), use `<details>`/`<summary>`:
 ))}
 ```
 
-## Page Steps
-
-Page steps allow brains to generate dynamic user interfaces using AI. When `formSchema` is provided, `.page()` generates a page, auto-suspends the brain, and spreads the form response directly onto state. Use the optional `onCreated` callback for side effects (Slack messages, emails) that need access to the generated page URL.
-
-### Basic Page Step
-
-```typescript
-import { z } from 'zod';
-
-brain('Feedback Collector')
-  .step('Initialize', ({ state }) => ({
-    ...state,
-    userName: 'John Doe',
-  }))
-  // Generate the form, onCreated users, auto-suspend, auto-merge response
-  .page('Collect Feedback', ({ state, slack }) => ({
-    prompt: `
-      Create a feedback form for <%= '${state.userName}' %>.
-      Include fields for rating (1-5) and comments.
-    `,
-    formSchema: z.object({
-      rating: z.number().min(1).max(5),
-      comments: z.string(),
-    }),
-    onCreated: async (page) => {
-      await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
-    },
-  }))
-  // No .handle() needed — form data spreads onto state
-  .step('Process Feedback', ({ state }) => ({
-    ...state,
-    feedbackReceived: true,
-    // state.rating and state.comments are typed
-  }));
-```
-
 ### How Page Steps Work
 
-1. **Prompt**: The `prompt` value describes the desired UI
-2. **AI Generation**: The AI creates a component tree based on the prompt
-3. **onCreated**: The optional `onCreated` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
-4. **Auto-Suspend**: The brain automatically suspends and waits for the form submission
-5. **Auto-Spread**: The form data is automatically spread onto state (`{ ...state, ...formData }`)
+1. **HTML**: The `html` property provides the page content (JSX, string, or function component)
+2. **onCreated**: The optional `onCreated` callback runs with a `page` object containing `url`. Use it to notify users (Slack, email, etc.)
+3. **Auto-Suspend**: With `formSchema`, the brain automatically suspends and waits for the form submission
+4. **Auto-Spread**: The form data is automatically spread onto state (`{ ...state, ...formData }`)
 
 ### The `page` Object
 
 The `page` object is available inside the `onCreated` callback:
-- `page.url` - URL where users can access the form
-- `page.webhook` - Pre-configured webhook for form submissions
-
-### Prompt Best Practices
-
-Be specific about layout and content:
-
-```typescript
-.page('Contact Form', ({ state }) => ({
-  prompt: `
-    Create a contact form with:
-    - Header: "Get in Touch"
-    - Name field (required)
-    - Email field (required, pre-filled with "<%= '${state.email}' %>")
-    - Message textarea (required)
-    - Submit button labeled "Send Message"
-
-    Use a clean, centered single-column layout.
-  `,
-  formSchema: z.object({
-    name: z.string(),
-    email: z.string().email(),
-    message: z.string(),
-  }),
-}))
-```
-
-### Data Bindings
-
-Use `{{path}}` syntax to bind props to runtime data:
-
-```typescript
-.page('Order Summary', ({ state }) => ({
-  prompt: `
-    Create an order summary showing:
-    - List of items from {{cart.items}}
-    - Total: {{cart.total}}
-    - Shipping address input
-    - Confirm button
-  `,
-  formSchema: z.object({
-    shippingAddress: z.string(),
-  }),
-}))
-```
+- `page.url` - URL where users can access the page
 
 ### Multi-Step Forms
 
 Chain page steps for multi-page workflows:
 
-```typescript
+```tsx
 brain('User Onboarding')
   .step('Start', () => ({ userData: {} }))
 
   // Step 1: Personal info
   .page('Personal Info', ({ notify }) => ({
-    prompt: `
-      Create a form for personal information:
-      - First name, Last name
-      - Date of birth
-      - Next button
-    `,
+    html: (
+      <Form>
+        <label>First name <input name="firstName" required /></label>
+        <label>Last name <input name="lastName" required /></label>
+        <label>Date of birth <input name="dob" type="date" required /></label>
+        <button type="submit">Next</button>
+      </Form>
+    ),
     formSchema: z.object({
       firstName: z.string(),
       lastName: z.string(),
@@ -1753,16 +1625,22 @@ brain('User Onboarding')
       await notify(`Step 1: <%= '${page.url}' %>`);
     },
   }))
-  // No .handle() needed — form data spreads onto state
 
   // Step 2: Preferences
   .page('Preferences', ({ state, notify }) => ({
-    prompt: `
-      Create preferences form for <%= '${state.firstName}' %>:
-      - Newsletter subscription checkbox
-      - Contact preference (email/phone/sms)
-      - Complete button
-    `,
+    html: (
+      <Form>
+        <h2>Preferences for {state.firstName}</h2>
+        <label><input type="checkbox" name="newsletter" /> Subscribe to newsletter</label>
+        <fieldset>
+          <legend>Contact preference</legend>
+          <label><input type="radio" name="contactMethod" value="email" /> Email</label>
+          <label><input type="radio" name="contactMethod" value="phone" /> Phone</label>
+          <label><input type="radio" name="contactMethod" value="sms" /> SMS</label>
+        </fieldset>
+        <button type="submit">Complete</button>
+      </Form>
+    ),
     formSchema: z.object({
       newsletter: z.boolean(),
       contactMethod: z.enum(['email', 'phone', 'sms']),
@@ -1771,14 +1649,10 @@ brain('User Onboarding')
       await notify(`Step 2: <%= '${page.url}' %>`);
     },
   }))
-  // No .handle() needed — form data spreads onto state
   .step('Complete', ({ state }) => ({
     ...state,
     onboardingComplete: true,
   }));
-```
-
-For more details on page steps, see the full Page Step Guide in the main Positronic documentation.
 
 ## Complete Example
 
