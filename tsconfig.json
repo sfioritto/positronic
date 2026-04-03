@@ -21,7 +21,8 @@
   },
   "exclude": [
     "packages/template-new-project",
-    "packages/cloudflare/test-project"
+    "packages/cloudflare/test-project",
+    "packages/surface/test-project"
   ],
   "references": [
     { "path": "./packages/core" },

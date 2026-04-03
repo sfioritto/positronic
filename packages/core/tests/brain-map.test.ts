@@ -735,7 +735,9 @@ describe('.map()', () => {
   });
 
   it('should log and skip failed items by default (brain mode)', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     let callCount = 0;
     const innerBrain = brain<{}, { value: number }>('Inner').step(
@@ -780,7 +782,9 @@ describe('.map()', () => {
   });
 
   it('should log and skip failed items by default (prompt mode)', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     mockGenerateObject
       .mockResolvedValueOnce({ object: { summary: 'Good' } })
