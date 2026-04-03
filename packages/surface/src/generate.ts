@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ObjectGenerator } from '@positronic/core';
+import type { ObjectGenerator, JsonValue } from '@positronic/core';
 import type { SandboxInstance } from './sandbox.js';
 import {
   typeCheck,
@@ -10,8 +10,17 @@ import {
 } from './sandbox.js';
 import { screenshot } from './screenshot.js';
 
+export interface GenerateDebugLog {
+  fakeDataConversation: JsonValue[];
+  componentConversation: JsonValue[];
+  fakeData: Record<string, unknown>;
+  totalDurationMs: number;
+}
+
 export interface GenerateResult {
   html: string;
+  log?: GenerateDebugLog;
+  screenshots?: Uint8Array[];
 }
 
 /**
@@ -29,6 +38,7 @@ export async function generate(params: {
   prompt: string;
   inputSchema: string;
   outputSchema?: string;
+  debug?: boolean;
 }): Promise<GenerateResult> {
   const {
     client,
@@ -39,13 +49,17 @@ export async function generate(params: {
     prompt,
     inputSchema,
     outputSchema,
+    debug,
   } = params;
+
+  const startTime = Date.now();
+  const screenshots: Uint8Array[] = [];
 
   // Step 1: Generate fake data using an LLM agent loop with type-checking
   let fakeData: Record<string, unknown> = {};
   let fakeDataJson: string | null = null;
 
-  await client.streamText({
+  const fakeDataResult = await client.streamText({
     prompt: `Generate realistic fake/sample data as JSON that conforms to this TypeScript interface. Make it look like real production data (realistic names, plausible numbers, multiple items in arrays, etc.), not test placeholders. Include 3-5 items in any arrays.
 
 Interface:
@@ -180,6 +194,8 @@ Instructions:
           apiToken,
         });
 
+        if (debug) screenshots.push(png);
+
         // Return base64 image data — toModelOutput converts it to visual content
         const base64 = btoa(String.fromCharCode(...png));
         return {
@@ -274,7 +290,7 @@ Instructions:
   userPrompt += `\n\nInstructions:\n1. Write the component using write_component\n2. Preview it to see how it looks\n3. Iterate until satisfied\n4. Call submit when done`;
 
   // Step 4: Run the generation loop
-  await client.streamText({
+  const componentResult = await client.streamText({
     system: systemPrompt,
     prompt: userPrompt,
     tools,
@@ -293,5 +309,32 @@ Instructions:
     throw new Error(`Failed to build final HTML: ${htmlResult.errors}`);
   }
 
-  return { html: htmlResult.html! };
+  const result: GenerateResult = { html: htmlResult.html! };
+
+  if (debug) {
+    result.screenshots = screenshots;
+    result.log = {
+      fakeDataConversation: truncateImages(fakeDataResult.responseMessages),
+      componentConversation: truncateImages(componentResult.responseMessages),
+      fakeData,
+      totalDurationMs: Date.now() - startTime,
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Walk a responseMessages array and replace base64 image data with a placeholder.
+ * This keeps the log readable while preserving conversation structure.
+ */
+function truncateImages(messages: JsonValue[]): JsonValue[] {
+  return JSON.parse(JSON.stringify(messages), (key, value) => {
+    if (key === 'data' && typeof value === 'string' && value.length > 1000) {
+      return `[truncated ${Math.round(
+        value.length / 1024
+      )}kb — see screenshots array]`;
+    }
+    return value;
+  });
 }

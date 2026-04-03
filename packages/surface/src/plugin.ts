@@ -49,6 +49,7 @@ export const surface = definePlugin({
         prompt: string;
         inputSchema: string;
         outputSchema?: string;
+        debug?: boolean;
       }): Promise<GenerateResult> => {
         return generate({
           client: config.client,
@@ -59,6 +60,7 @@ export const surface = definePlugin({
           prompt: params.prompt,
           inputSchema: params.inputSchema,
           outputSchema: params.outputSchema,
+          debug: params.debug,
         });
       },
     };

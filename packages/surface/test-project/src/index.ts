@@ -1,12 +1,26 @@
 import { getSandbox, type Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import { createSurfaceSandbox } from '../../src/sandbox/index.js';
 import { screenshot } from '../../src/screenshot.js';
-import { generate } from '../../src/generate.js';
+import { generate, type GenerateResult } from '../../src/generate.js';
 import { VercelClient } from '@positronic/client-vercel';
 import { google } from '@ai-sdk/google';
 import systemPromptRaw from '../../src/system-prompt.md';
 
 export { Sandbox } from '@cloudflare/sandbox';
+
+function formatGenerateResponse(result: GenerateResult): Response {
+  const screenshotBase64 = result.screenshots?.map((png) =>
+    btoa(String.fromCharCode(...png))
+  );
+
+  return Response.json({
+    success: true,
+    html: result.html,
+    htmlSize: result.html.length,
+    screenshots: screenshotBase64,
+    log: result.log,
+  });
+}
 
 type Env = {
   SANDBOX: DurableObjectNamespace<SandboxDO>;
@@ -336,26 +350,7 @@ export default function Page({ data }: Props) {
         debug: true,
       });
 
-      // Return JSON with the full log and HTML
-      const screenshotBase64 = result.screenshots?.map((png) =>
-        btoa(String.fromCharCode(...png))
-      );
-
-      return Response.json({
-        success: true,
-        html: result.html,
-        htmlSize: result.html.length,
-        screenshots: screenshotBase64,
-        log: result.log
-          ? {
-              userPrompt: result.log.userPrompt,
-              systemPromptLength: result.log.systemPrompt.length,
-              fakeData: result.log.fakeData,
-              toolCalls: result.log.toolCalls,
-              totalDurationMs: result.log.totalDurationMs,
-            }
-          : undefined,
-      });
+      return formatGenerateResponse(result);
     }
 
     // HN Reader test — realistic page with form
@@ -435,25 +430,7 @@ Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
         debug: true,
       });
 
-      const screenshotBase64 = result.screenshots?.map((png) =>
-        btoa(String.fromCharCode(...png))
-      );
-
-      return Response.json({
-        success: true,
-        html: result.html,
-        htmlSize: result.html.length,
-        screenshots: screenshotBase64,
-        log: result.log
-          ? {
-              userPrompt: result.log.userPrompt,
-              systemPromptLength: result.log.systemPrompt.length,
-              fakeData: result.log.fakeData,
-              toolCalls: result.log.toolCalls,
-              totalDurationMs: result.log.totalDurationMs,
-            }
-          : undefined,
-      });
+      return formatGenerateResponse(result);
     }
 
     // Email digest test — complex multi-section page with enrichment tuples
@@ -576,25 +553,7 @@ The page should feel like a morning email briefing — scannable in 30 seconds.`
         debug: true,
       });
 
-      const screenshotBase64 = result.screenshots?.map((png) =>
-        btoa(String.fromCharCode(...png))
-      );
-
-      return Response.json({
-        success: true,
-        html: result.html,
-        htmlSize: result.html.length,
-        screenshots: screenshotBase64,
-        log: result.log
-          ? {
-              userPrompt: result.log.userPrompt,
-              systemPromptLength: result.log.systemPrompt.length,
-              fakeData: result.log.fakeData,
-              toolCalls: result.log.toolCalls,
-              totalDurationMs: result.log.totalDurationMs,
-            }
-          : undefined,
-      });
+      return formatGenerateResponse(result);
     }
 
     return new Response(

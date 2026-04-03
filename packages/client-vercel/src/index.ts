@@ -6,6 +6,7 @@ import type {
   ResponseMessage,
   ToolChoice,
   Attachment,
+  JsonValue,
 } from '@positronic/core';
 import {
   generateText,
@@ -288,6 +289,7 @@ export class VercelClient implements ObjectGenerator {
     }>;
     text?: string;
     usage: { totalTokens: number };
+    responseMessages: JsonValue[];
     responseHeaders?: Record<string, string>;
   }> {
     const {
@@ -372,10 +374,11 @@ export class VercelClient implements ObjectGenerator {
       stopWhen: stepCountIs(maxSteps),
     });
 
-    const [steps, text, usage] = await Promise.all([
+    const [steps, text, usage, response] = await Promise.all([
       stream.steps,
       stream.text,
       stream.totalUsage,
+      stream.response,
     ]);
 
     const allToolCalls: Array<{
@@ -405,6 +408,11 @@ export class VercelClient implements ObjectGenerator {
       usage: {
         totalTokens: usage?.totalTokens ?? 0,
       },
+      // Vercel ModelMessage[] is mostly plain JSON. DataContent in image/file parts is typed as
+      // string | Uint8Array | ArrayBuffer | Buffer, but in practice we only send base64 strings
+      // through tool results, so the messages stay JSON-serializable. If binary buffers ever
+      // appear here, truncateImages (in surface/generate.ts) will throw during its JSON round-trip.
+      responseMessages: [...modelMessages, ...response.messages] as JsonValue[],
       responseHeaders: steps[steps.length - 1]?.response?.headers,
     };
   }

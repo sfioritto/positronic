@@ -41,6 +41,7 @@ export type {
   SignalType,
   BrainSignal,
   SignalProvider,
+  JsonValue,
 } from './dsl/types.js';
 export type { TemplateReturn } from './dsl/definitions/blocks.js';
 export type { TemplateNode, TemplateChild } from './jsx-runtime.js';

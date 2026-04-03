@@ -4,6 +4,7 @@ import type {
   ToolMessage,
   ResponseMessage,
   ToolChoice,
+  JsonValue,
 } from '@positronic/core';
 import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from 'llm-polyglot';
@@ -266,6 +267,7 @@ export class AnthropicClient implements ObjectGenerator {
     }>;
     text?: string;
     usage: { totalTokens: number };
+    responseMessages: JsonValue[];
   }> {
     const {
       system,
@@ -396,6 +398,8 @@ export class AnthropicClient implements ObjectGenerator {
       toolCalls: allToolCalls,
       text: finalText,
       usage: { totalTokens },
+      // Anthropic MessageParam[] is plain JSON (strings, objects, arrays) — safe to treat as JsonValue[].
+      responseMessages: anthropicMessages as unknown as JsonValue[],
     };
   }
 }

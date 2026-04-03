@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { JsonValue } from '../dsl/types.js';
 
 /**
  * Tool choice configuration for LLM calls.
@@ -229,6 +230,8 @@ export interface ObjectGenerator {
     text?: string;
     /** Token usage across all steps */
     usage: { totalTokens: number };
+    /** Full conversation messages (input + response) as JSON-serializable data. */
+    responseMessages: JsonValue[];
     /** Raw response headers from the provider, used for rate limit tracking. */
     responseHeaders?: Record<string, string>;
   }>;
