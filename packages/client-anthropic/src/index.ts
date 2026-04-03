@@ -1,5 +1,6 @@
 import type {
   ObjectGenerator,
+  StreamTool,
   ToolMessage,
   ResponseMessage,
   ToolChoice,
@@ -253,14 +254,7 @@ export class AnthropicClient implements ObjectGenerator {
     system?: string;
     prompt: string;
     messages?: ToolMessage[];
-    tools: Record<
-      string,
-      {
-        description: string;
-        inputSchema: z.ZodSchema;
-        execute?: (args: unknown) => Promise<unknown> | unknown;
-      }
-    >;
+    tools: Record<string, StreamTool>;
     maxSteps?: number;
     toolChoice?: ToolChoice;
   }): Promise<{

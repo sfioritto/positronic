@@ -60,6 +60,18 @@ export type ToolMessage = {
 export type ResponseMessage = unknown;
 
 /**
+ * Tool definition for multi-step streaming workflows (streamText).
+ * Includes execute function and optional model output transform.
+ */
+export interface StreamTool {
+  description: string;
+  inputSchema: z.ZodSchema;
+  execute?: (args: unknown) => Promise<unknown> | unknown;
+  /** Convert tool output to multi-modal content the LLM can see (e.g., images) */
+  toModelOutput?: (params: { output: unknown }) => unknown;
+}
+
+/**
  * Interface for AI model interactions, focused on generating structured objects
  * and potentially other types of content in the future.
  */
@@ -194,16 +206,7 @@ export interface ObjectGenerator {
     /** Conversation messages (optional, for context) */
     messages?: ToolMessage[];
     /** Available tools for the LLM to call */
-    tools: Record<
-      string,
-      {
-        description: string;
-        inputSchema: z.ZodSchema;
-        execute?: (args: unknown) => Promise<unknown> | unknown;
-        /** Convert tool output to multi-modal content the LLM can see (e.g., images) */
-        toModelOutput?: (params: { output: unknown }) => unknown;
-      }
-    >;
+    tools: Record<string, StreamTool>;
     /** Maximum number of LLM iterations (default: 10) */
     maxSteps?: number;
     /**
