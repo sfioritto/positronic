@@ -22,6 +22,7 @@ export type {
 } from './dsl/brain.js';
 export type {
   ObjectGenerator,
+  StreamTool,
   Message,
   ToolMessage,
   ToolCall,

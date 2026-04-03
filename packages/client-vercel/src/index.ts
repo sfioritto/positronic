@@ -1,5 +1,6 @@
 import type {
   ObjectGenerator,
+  StreamTool,
   Message,
   ToolMessage,
   ResponseMessage,
@@ -275,14 +276,7 @@ export class VercelClient implements ObjectGenerator {
     system?: string;
     prompt: string;
     messages?: ToolMessage[];
-    tools: Record<
-      string,
-      {
-        description: string;
-        inputSchema: z.ZodSchema;
-        execute?: (args: unknown) => Promise<unknown> | unknown;
-      }
-    >;
+    tools: Record<string, StreamTool>;
     maxSteps?: number;
     toolChoice?: ToolChoice;
   }): Promise<{
@@ -369,29 +363,10 @@ export class VercelClient implements ObjectGenerator {
     // Add the initial prompt
     modelMessages.push({ role: 'user', content: prompt });
 
-    // Convert tools to Vercel AI SDK format (with execute functions)
-    const aiTools: Record<
-      string,
-      {
-        description: string;
-        inputSchema: z.ZodSchema;
-        execute?: (args: unknown) => Promise<unknown> | unknown;
-        toModelOutput?: (params: { output: unknown }) => unknown;
-      }
-    > = {};
-    for (const [name, tool] of Object.entries(tools)) {
-      aiTools[name] = {
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        execute: tool.execute,
-        toModelOutput: tool.toModelOutput,
-      };
-    }
-
     const stream = vercelStreamText({
       model: this.model,
       messages: modelMessages,
-      tools: aiTools,
+      tools: tools as any,
       toolChoice,
       maxRetries: 0,
       stopWhen: stepCountIs(maxSteps),
