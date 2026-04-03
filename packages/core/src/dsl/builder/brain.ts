@@ -409,35 +409,7 @@ export class Brain<
     return this.nextBrain<any>();
   }
 
-  // Overload 1: With formSchema - auto-merges response onto state
-  page<
-    TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TSchema>
-  >(
-    title: string,
-    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
-      prompt: TemplateReturn;
-      formSchema: TSchema;
-      onCreated?: (page: GeneratedPage<TSchema>) => void | Promise<void>;
-      props?: Record<string, unknown>;
-      ttl?: number;
-      persist?: boolean;
-    }
-  ): Brain<TOptions, TNewState, TPlugins>;
-
-  // Overload 2: Without formSchema - returns Brain with unchanged state
-  page(
-    title: string,
-    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
-      prompt: TemplateReturn;
-      onCreated?: (page: GeneratedPage) => void | Promise<void>;
-      props?: Record<string, unknown>;
-      ttl?: number;
-      persist?: boolean;
-    }
-  ): Brain<TOptions, TState, TPlugins>;
-
-  // Overload 3: Custom HTML with formSchema
+  // Overload 1: Custom HTML with formSchema
   page<
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & z.infer<TSchema>
@@ -452,7 +424,7 @@ export class Brain<
     }
   ): Brain<TOptions, TNewState, TPlugins>;
 
-  // Overload 4: Custom HTML without formSchema
+  // Overload 2: Custom HTML without formSchema
   page(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {

@@ -1500,18 +1500,6 @@ The output must conform to the provided schema.`,
       return;
     }
 
-    // Validate: exactly one of prompt or html must be present
-    if (!pageConfig.prompt && !pageConfig.html) {
-      throw new Error(
-        `Page step "${stepBlock.title}" requires either 'prompt' or 'html'`
-      );
-    }
-    if (pageConfig.prompt && pageConfig.html) {
-      throw new Error(
-        `Page step "${stepBlock.title}" cannot have both 'prompt' and 'html'`
-      );
-    }
-
     if (!this.pages) {
       throw new Error(
         `Page step "${stepBlock.title}" requires pages service to be configured`
@@ -1519,28 +1507,15 @@ The output must conform to the provided schema.`,
     }
 
     // Step 1: Produce the HTML string
-    let html: string;
     const formInfo = pageConfig.formSchema
       ? this.buildFormAction(step, pageConfig.formSchema)
       : undefined;
 
-    if (pageConfig.html) {
-      const body = renderHtml(
-        pageConfig.html,
-        formInfo ? { formAction: formInfo.formAction } : {}
-      );
-      html = wrapHtmlDocument(body, { title: stepBlock.title });
-    } else if (pageConfig.prompt) {
-      // LLM-generated page - requires Surface integration (not yet implemented)
-      throw new Error(
-        `Page step "${stepBlock.title}" uses prompt-based generation which requires Surface integration. ` +
-          `Use the 'html' property for custom HTML pages instead.`
-      );
-    } else {
-      throw new Error(
-        `Page step "${stepBlock.title}" must specify either 'html' or 'prompt'.`
-      );
-    }
+    const body = renderHtml(
+      pageConfig.html,
+      formInfo ? { formAction: formInfo.formAction } : {}
+    );
+    const html = wrapHtmlDocument(body, { title: stepBlock.title });
 
     // Step 2: Create page and handle form/read-only branching (shared by both paths)
     const pageCreateOptions = {

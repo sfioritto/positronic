@@ -466,26 +466,28 @@ brain('validation-example')
 
 Most generated brains should not have try-catch blocks. Only use them when the error state is meaningful to subsequent steps in the workflow.
 
-## Page Steps for Form Generation
+## Page Steps for Forms
 
-When you need to collect user input, use the `.page()` method with `formSchema`. The brain auto-suspends after generating the page, then auto-merges the form response directly onto state. Use the `onCreated` callback for side effects.
+When you need to collect user input, use the `.page()` method with `html` and `formSchema`. The brain auto-suspends after creating the page, then auto-merges the form response directly onto state. Use the `onCreated` callback for side effects.
 
-```typescript
+```tsx
 import { z } from 'zod';
+import { Form } from '@positronic/core';
 
 brain('feedback-collector')
   .step('Initialize', ({ state }) => ({
     ...state,
     userName: 'John',
   }))
-  // Generate the form, onCreated, auto-suspend, auto-merge response
   .page('Collect Feedback', ({ state, slack }) => ({
-    prompt: <%= '\`' %>
-      Create a feedback form for <%= '${state.userName}' %>:
-      - Rating (1-5)
-      - Comments textarea
-      - Submit button
-    <%= '\`' %>,
+    html: (
+      <Form>
+        <h2>Feedback for {state.userName}</h2>
+        <label>Rating (1-5) <input name="rating" type="number" min="1" max="5" required /></label>
+        <label>Comments <textarea name="comments" required /></label>
+        <button type="submit">Submit</button>
+      </Form>
+    ),
     formSchema: z.object({
       rating: z.number().min(1).max(5),
       comments: z.string(),
@@ -510,36 +512,6 @@ Key points:
 - You control how users are notified (Slack, email, etc.) inside `onCreated`
 
 See `/docs/brain-dsl-guide.md` for more page step examples.
-
-### Use `.page()` for Data Display, Not `generatePage` in Loops
-
-When a brain needs to display data and collect user input, prefer `.page()` steps over calling the `generatePage` tool inside a `.prompt()` loop. The `.page()` step passes data via `props` — the page generation LLM never sees the actual data, only its shape. This is more reliable and keeps data out of the LLM context.
-
-```typescript
-// ❌ DON'T DO THIS - LLM fetches data then passes it to generatePage
-brain('reader')
-  .prompt('Show Articles', () => ({
-    message: 'Fetch articles and create a page showing them',
-    outputSchema: z.object({ articlesShown: z.number() }),
-    loop: { tools: { fetchArticles, generatePage, waitForWebhook } },
-  }))
-
-// ✅ DO THIS - fetch data in a step, display with .page()
-brain('reader')
-  .step('Fetch Articles', async () => {
-    const articles = await fetchArticles();
-    return { articles };
-  })
-  .page('Show Articles', ({ state }) => ({
-    prompt: 'Create a reading list with checkboxes to mark articles as read',
-    props: { articles: state.articles },
-    formSchema: z.object({
-      readArticleIds: z.array(z.string()),
-    }),
-  }))
-```
-
-The `.page()` step automatically suspends, waits for the form submission, and merges the response onto state. Use `.prompt()` loops for tasks that genuinely need LLM decision-making with tools (research, multi-step reasoning, human-in-the-loop via webhooks), not for data display.
 
 ## Plugin Organization
 

@@ -142,9 +142,9 @@ The handler return type determines behavior:
 - `{ type: 'ignore' }` — acknowledges receipt, takes no action
 - `{ type: 'verification', challenge }` — handles webhook verification challenges
 
-### Custom HTML Pages
+### Page Steps
 
-For pages with forms, use `.page()` with the `html` property instead of `prompt`. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically:
+Use `.page()` with the `html` property to create pages. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically:
 
 ```tsx
 import { Form } from '@positronic/core';
