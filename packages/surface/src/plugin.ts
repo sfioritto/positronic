@@ -2,7 +2,7 @@ import { definePlugin } from '@positronic/core';
 import type { ObjectGenerator } from '@positronic/core';
 import { createSurfaceSandbox } from './sandbox/index.js';
 import { generate, type GenerateResult } from './generate.js';
-import systemPromptTemplate from './system-prompt.md';
+import systemPromptTemplate from './system-prompt.gen.js';
 
 export type SurfaceConfig = {
   /** LLM client for UI generation (typically a fast/cheap model) */
