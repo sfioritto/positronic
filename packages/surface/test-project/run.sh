@@ -25,15 +25,19 @@ if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
 fi
 
 # Write HTML
-echo "$RESPONSE" | jq -r '.html' > "${DIR}/page.html"
-echo "Wrote ${DIR}/page.html ($(wc -c < "${DIR}/page.html" | tr -d ' ') bytes)"
+if echo "$RESPONSE" | jq -e '.html' > /dev/null 2>&1; then
+  echo "$RESPONSE" | jq -r '.html' > "${DIR}/page.html"
+  echo "Wrote ${DIR}/page.html ($(wc -c < "${DIR}/page.html" | tr -d ' ') bytes)"
+fi
 
 # Write log
-echo "$RESPONSE" | jq '.log' > "${DIR}/log.json"
-echo "Wrote ${DIR}/log.json"
+if echo "$RESPONSE" | jq -e '.log' > /dev/null 2>&1; then
+  echo "$RESPONSE" | jq '.log' > "${DIR}/log.json"
+  echo "Wrote ${DIR}/log.json"
+fi
 
 # Write screenshots
-COUNT=$(echo "$RESPONSE" | jq '.screenshots | length')
+COUNT=$(echo "$RESPONSE" | jq '.screenshots // [] | length')
 for i in $(seq 0 $((COUNT - 1))); do
   echo "$RESPONSE" | jq -r ".screenshots[$i]" | base64 -d > "${DIR}/screenshot-${i}.png"
   echo "Wrote ${DIR}/screenshot-${i}.png"
