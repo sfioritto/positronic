@@ -25,6 +25,9 @@ export async function screenshot(params: {
         gotoOptions: {
           waitUntil: 'networkidle0',
         },
+        screenshotOptions: {
+          fullPage: true,
+        },
       }),
     }
   );

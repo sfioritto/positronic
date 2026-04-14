@@ -15,10 +15,16 @@ import systemPromptRaw from '../../src/system-prompt.md';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 function formatGenerateResponse(result: GenerateResult): Response {
-  const screenshotBase64 = result.screenshots?.map((png) =>
-    btoa(String.fromCharCode(...png))
-  );
+  const screenshotBase64 = result.screenshots?.map(uint8ToBase64);
 
   return Response.json({
     success: true,

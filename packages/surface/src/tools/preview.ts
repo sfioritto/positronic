@@ -36,7 +36,12 @@ export function previewTool(
       }
 
       // Return base64 image data — toModelOutput converts it to visual content
-      const base64 = btoa(String.fromCharCode(...png));
+      // Build string in a loop to avoid call stack overflow from spread on large arrays
+      let binary = '';
+      for (let i = 0; i < png.length; i++) {
+        binary += String.fromCharCode(png[i]);
+      }
+      const base64 = btoa(binary);
       return {
         type: 'image',
         data: base64,
