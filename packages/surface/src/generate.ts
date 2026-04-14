@@ -3,6 +3,7 @@ import type { SandboxInstance } from './sandbox.js';
 import { buildHtml } from './sandbox.js';
 import { generateFakeData } from './lib/generate-fake-data.js';
 import { writeComponentTool } from './tools/write-component.js';
+
 import { previewTool } from './tools/preview.js';
 import { submitTool } from './tools/submit.js';
 import { validateFormTool } from './tools/validate-form.js';
@@ -57,26 +58,17 @@ export async function generate(params: {
     await generateFakeData(client, sandbox, inputSchema);
 
   // Step 2: Define tools
-  const ctx: { componentSourceCode: string | null } = {
-    componentSourceCode: null,
-  };
-
   const tools: Record<string, StreamTool> = {
-    write_component: writeComponentTool(
-      ctx,
-      sandbox,
-      inputSchema,
-      outputSchema
-    ),
-    preview: previewTool(ctx, sandbox, fakeData, accountId, apiToken, {
+    write_component: writeComponentTool(sandbox, inputSchema, outputSchema),
+    preview: previewTool(sandbox, fakeData, accountId, apiToken, {
       debug,
       screenshots,
     }),
-    submit: submitTool(ctx),
+    submit: submitTool(),
   };
 
   if (outputSchema) {
-    tools.validate_form = validateFormTool(ctx, sandbox, outputSchema);
+    tools.validate_form = validateFormTool(sandbox, outputSchema);
   }
 
   // Step 3: Build the user prompt with schema context
@@ -101,10 +93,11 @@ After writing the component, use validate_form to verify the form fields match t
     : ''
 }
 Instructions:
-1. Write the component using write_component
-2. Preview it to see how it looks
-3. Iterate until satisfied
-4. Call submit when done`;
+1. Write the component using write_component — it will be type-checked automatically
+2. Fix any type errors and call write_component again
+3. Preview it to see how it looks
+4. Iterate until satisfied
+5. Call submit when done`;
 
   // Step 4: Run the generation loop
   const componentResult = await client.streamText({
@@ -116,10 +109,6 @@ Instructions:
   });
 
   // Step 5: Build final HTML
-  if (!ctx.componentSourceCode) {
-    throw new Error('Generation loop completed without writing any component');
-  }
-
   const htmlResult = await buildHtml(sandbox, fakeData);
   if (!htmlResult.success) {
     throw new Error(`Failed to build final HTML: ${htmlResult.errors}`);

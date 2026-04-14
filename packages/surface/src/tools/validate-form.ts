@@ -4,22 +4,14 @@ import type { SandboxInstance } from '../sandbox.js';
 import { bundle, validateForm } from '../sandbox.js';
 
 export function validateFormTool(
-  ctx: { componentSourceCode: string | null },
   sandbox: SandboxInstance,
   outputSchema: string
 ): StreamTool {
   return {
     description:
-      'Validate that the form in the component has inputs for all required fields in the output schema. The component must be written first via write_component.',
+      'Validate that the form in the component has inputs for all required fields in the output schema.',
     inputSchema: z.object({}),
     async execute() {
-      if (!ctx.componentSourceCode) {
-        return {
-          status: 'error',
-          message: 'No component written yet. Call write_component first.',
-        };
-      }
-
       // Bundle with external React for JSDOM testing
       const bundleResult = await bundle(sandbox, 'external-react');
       if (!bundleResult.success) {

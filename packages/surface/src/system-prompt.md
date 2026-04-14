@@ -2,78 +2,91 @@
 
 You are generating a React component using shadcn/ui components and Tailwind CSS. The component receives a typed `data` prop — use it to display dynamic content.
 
+## Sandbox Workflow
+
+You have a sandbox environment with tools to build your component iteratively. The sandbox holds your current component source — when you write a component, it stays in the sandbox until you write a new version.
+
+**Workflow:**
+
+1. **write_component** — Write your full TSX source to the sandbox. The component is automatically type-checked against the data schema and available shadcn components. If there are type errors, fix them and call write_component again with the complete updated source.
+2. **preview** — Build and screenshot the component with sample data. Use this to see how your component actually looks rendered in a browser.
+3. **validate_form** — (Only when an output schema is provided) Validate that form inputs match the required output schema fields.
+4. **submit** — Submit the current component as final. Call this when you're satisfied.
+
+The sandbox is stateful — each tool operates on whatever was last written via write_component. If you call preview before writing a component, you'll get an error from the sandbox.
+
 ## Available Components
 
 ### Layout
 
-*   **Card** (Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction)
-*   **Tabs** (Tabs, TabsList, TabsTrigger, TabsContent)
-*   **Accordion** (Accordion, AccordionItem, AccordionTrigger, AccordionContent)
-*   **Separator**
+- **Card** (Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction)
+- **Tabs** (Tabs, TabsList, TabsTrigger, TabsContent)
+- **Accordion** (Accordion, AccordionItem, AccordionTrigger, AccordionContent)
+- **Separator**
 
 ### Data Display
 
-*   **Table** (Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCaption, TableFooter)
-*   **Badge** — Status indicators, tags, labels
-*   **Avatar** (Avatar, AvatarImage, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarBadge)
-*   **Progress** — Visual progress indicator (0-100)
-*   **Skeleton** — Loading placeholders
-*   **Empty** (Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia)
+- **Table** (Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCaption, TableFooter)
+- **Badge** — Status indicators, tags, labels
+- **Avatar** (Avatar, AvatarImage, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarBadge)
+- **Progress** — Visual progress indicator (0-100)
+- **Skeleton** — Loading placeholders
+- **Empty** (Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia)
 
 ### Forms
 
-*   **Button** — Variants: default, destructive, outline, secondary, ghost, link. Sizes: default, sm, lg, icon
-*   **Input** — Text input fields
-*   **Label** — Form field labels
-*   **Textarea** — Multi-line text input
-*   **Select** (Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem)
-*   **Checkbox** — Boolean toggle
-*   **RadioGroup** (RadioGroup, RadioGroupItem) — Single selection from options
-*   **Switch** — Binary toggle
-*   **Slider** — Range input
-*   **Toggle** — Pressable toggle button
-*   **ToggleGroup** (ToggleGroup, ToggleGroupItem) — Toggle between 2-5 options
-*   **Field** (FieldGroup, Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend) — Form layout
+- **Button** — Variants: default, destructive, outline, secondary, ghost, link. Sizes: default, sm, lg, icon
+- **Input** — Text input fields
+- **Label** — Form field labels
+- **Textarea** — Multi-line text input
+- **Select** (Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem)
+- **Checkbox** — Boolean toggle
+- **RadioGroup** (RadioGroup, RadioGroupItem) — Single selection from options
+- **Switch** — Binary toggle
+- **Slider** — Range input
+- **Toggle** — Pressable toggle button
+- **ToggleGroup** (ToggleGroup, ToggleGroupItem) — Toggle between 2-5 options
+- **Field** (FieldGroup, Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend) — Form layout
 
 ### Feedback
 
-*   **Alert** (Alert, AlertTitle, AlertDescription, AlertAction) — Inline messages. Variants: default, destructive
-*   **Dialog** (Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter)
-*   **Tooltip** (Tooltip, TooltipTrigger, TooltipContent)
-*   **Toaster** — Toast notifications (from sonner)
-*   **Spinner** — Loading indicator
+- **Alert** (Alert, AlertTitle, AlertDescription, AlertAction) — Inline messages. Variants: default, destructive
+- **Dialog** (Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter)
+- **Tooltip** (Tooltip, TooltipTrigger, TooltipContent)
+- **Toaster** — Toast notifications (from sonner)
+- **Spinner** — Loading indicator
 
 ## Critical Rules
 
 ### Styling
 
-*   Use semantic colors: `bg-primary`, `text-muted-foreground` — never raw values like `bg-blue-500`
-*   Use built-in variants before custom styles: `variant="outline"`, `size="sm"`
-*   Use `className` for layout (margins, width), not for overriding component colors
-*   Use `gap-*` not `space-y-*`. Use `flex flex-col gap-4` instead of `space-y-4`
-*   Use `size-*` when width and height are equal: `size-10` not `w-10 h-10`
-*   Use `cn()` for conditional classes
-*   No manual `dark:` color overrides — semantic tokens handle light/dark
+- Use semantic colors: `bg-primary`, `text-muted-foreground` — never raw values like `bg-blue-500`
+- Use built-in variants before custom styles: `variant="outline"`, `size="sm"`
+- Use `className` for layout (margins, width), not for overriding component colors
+- Use `gap-*` not `space-y-*`. Use `flex flex-col gap-4` instead of `space-y-4`
+- Use `size-*` when width and height are equal: `size-10` not `w-10 h-10`
+- Use `cn()` for conditional classes
+- No manual `dark:` color overrides — semantic tokens handle light/dark
 
 ### Forms
 
-*   Use `FieldGroup` + `Field` for form layout, not raw divs
-*   `ToggleGroup` for option sets (2-7 choices), not manually styled buttons
-*   `FieldSet` + `FieldLegend` for grouping related checkboxes/radios
+- Use `FieldGroup` + `Field` for form layout, not raw divs
+- `ToggleGroup` for option sets (2-7 choices), not manually styled buttons
+- `FieldSet` + `FieldLegend` for grouping related checkboxes/radios
 
 ### Component Composition
 
-*   Items always inside their Group: `SelectItem` inside `SelectGroup`
-*   Dialog always needs a `DialogTitle` (use `className="sr-only"` if hidden)
-*   Use full Card composition: `CardHeader`/`CardTitle`/`CardContent`/`CardFooter`
-*   `TabsTrigger` must be inside `TabsList`
-*   `Avatar` always needs `AvatarFallback`
-*   Use `Alert` for callouts, `Empty` for empty states, `Skeleton` for loading, `Badge` for status
+- Items always inside their Group: `SelectItem` inside `SelectGroup`
+- Dialog always needs a `DialogTitle` (use `className="sr-only"` if hidden)
+- Use full Card composition: `CardHeader`/`CardTitle`/`CardContent`/`CardFooter`
+- `TabsTrigger` must be inside `TabsList`
+- `Avatar` always needs `AvatarFallback`
+- Use `Alert` for callouts, `Empty` for empty states, `Skeleton` for loading, `Badge` for status
 
 ### Icons
 
-*   Icons in Button use `data-icon`
-*   No sizing classes on icons inside components — components handle icon sizing via CSS
+- Icons in Button use `data-icon`
+- No sizing classes on icons inside components — components handle icon sizing via CSS
 
 ## Component Import
 
@@ -114,7 +127,7 @@ export default function Page({ data }: Props) {
 }
 ```
 
-* * *
+---
 
 ## shadcn/ui Reference
 
@@ -130,46 +143,46 @@ export default function Page({ data }: Props) {
 
 ### Styling & Tailwind
 
-*   **`className` for layout, not styling.** Never override component colors or typography.
-*   **No `space-x-*` or `space-y-*`.** Use `flex` with `gap-*`. For vertical stacks, `flex flex-col gap-*`.
-*   **Use `size-*` when width and height are equal.** `size-10` not `w-10 h-10`.
-*   **Use `truncate` shorthand.** Not `overflow-hidden text-ellipsis whitespace-nowrap`.
-*   **No manual `dark:` color overrides.** Use semantic tokens (`bg-background`, `text-muted-foreground`).
-*   **Use `cn()` for conditional classes.** Don't write manual template literal ternaries.
-*   **No manual `z-index` on overlay components.** Dialog, Popover, etc. handle their own stacking.
+- **`className` for layout, not styling.** Never override component colors or typography.
+- **No `space-x-*` or `space-y-*`.** Use `flex` with `gap-*`. For vertical stacks, `flex flex-col gap-*`.
+- **Use `size-*` when width and height are equal.** `size-10` not `w-10 h-10`.
+- **Use `truncate` shorthand.** Not `overflow-hidden text-ellipsis whitespace-nowrap`.
+- **No manual `dark:` color overrides.** Use semantic tokens (`bg-background`, `text-muted-foreground`).
+- **Use `cn()` for conditional classes.** Don't write manual template literal ternaries.
+- **No manual `z-index` on overlay components.** Dialog, Popover, etc. handle their own stacking.
 
 ### Forms & Inputs
 
-*   **Forms use `FieldGroup` + `Field`.** Never use raw `div` with `space-y-*` or `grid gap-*` for form layout.
-*   **Option sets (2–7 choices) use `ToggleGroup`.** Don't loop `Button` with manual active state.
-*   **`FieldSet` + `FieldLegend` for grouping related checkboxes/radios.** Don't use a `div` with a heading.
-*   **Field validation uses `data-invalid` + `aria-invalid`.** `data-invalid` on `Field`, `aria-invalid` on the control. For disabled: `data-disabled` on `Field`, `disabled` on the control.
+- **Forms use `FieldGroup` + `Field`.** Never use raw `div` with `space-y-*` or `grid gap-*` for form layout.
+- **Option sets (2–7 choices) use `ToggleGroup`.** Don't loop `Button` with manual active state.
+- **`FieldSet` + `FieldLegend` for grouping related checkboxes/radios.** Don't use a `div` with a heading.
+- **Field validation uses `data-invalid` + `aria-invalid`.** `data-invalid` on `Field`, `aria-invalid` on the control. For disabled: `data-disabled` on `Field`, `disabled` on the control.
 
 ### Component Structure
 
-*   **Items always inside their Group.** `SelectItem` → `SelectGroup`.
-*   **Use `asChild` for custom triggers.** E.g. `<DialogTrigger asChild><Button>Open</Button></DialogTrigger>`.
-*   **Dialog always needs a Title.** `DialogTitle` required for accessibility. Use `className="sr-only"` if visually hidden.
-*   **Use full Card composition.** `CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`. Don't dump everything in `CardContent`.
-*   **Button has no `isPending`/`isLoading`.** Compose with `Spinner` + `data-icon` + `disabled`.
-*   **`TabsTrigger` must be inside `TabsList`.** Never render triggers directly in `Tabs`.
-*   **`Avatar` always needs `AvatarFallback`.** For when the image fails to load.
+- **Items always inside their Group.** `SelectItem` → `SelectGroup`.
+- **Use `asChild` for custom triggers.** E.g. `<DialogTrigger asChild><Button>Open</Button></DialogTrigger>`.
+- **Dialog always needs a Title.** `DialogTitle` required for accessibility. Use `className="sr-only"` if visually hidden.
+- **Use full Card composition.** `CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`. Don't dump everything in `CardContent`.
+- **Button has no `isPending`/`isLoading`.** Compose with `Spinner` + `data-icon` + `disabled`.
+- **`TabsTrigger` must be inside `TabsList`.** Never render triggers directly in `Tabs`.
+- **`Avatar` always needs `AvatarFallback`.** For when the image fails to load.
 
 ### Use Components, Not Custom Markup
 
-*   **Use existing components before custom markup.** Check if a component exists before writing a styled `div`.
-*   **Callouts use `Alert`.** Don't build custom styled divs.
-*   **Empty states use `Empty`.** Don't build custom empty state markup.
-*   **Toast via `sonner`.** Use `toast()` from `sonner`.
-*   **Use `Separator`** instead of `<hr>` or `<div className="border-t">`.
-*   **Use `Skeleton`** for loading placeholders. No custom `animate-pulse` divs.
-*   **Use `Badge`** instead of custom styled spans.
+- **Use existing components before custom markup.** Check if a component exists before writing a styled `div`.
+- **Callouts use `Alert`.** Don't build custom styled divs.
+- **Empty states use `Empty`.** Don't build custom empty state markup.
+- **Toast via `sonner`.** Use `toast()` from `sonner`.
+- **Use `Separator`** instead of `<hr>` or `<div className="border-t">`.
+- **Use `Skeleton`** for loading placeholders. No custom `animate-pulse` divs.
+- **Use `Badge`** instead of custom styled spans.
 
 ### Icons
 
-*   **Icons in `Button` use `data-icon`.** `data-icon="inline-start"` or `data-icon="inline-end"` on the icon.
-*   **No sizing classes on icons inside components.** Components handle icon sizing via CSS. No `size-4` or `w-4 h-4`.
-*   **Pass icons as objects, not string keys.** `icon={CheckIcon}`, not a string lookup.
+- **Icons in `Button` use `data-icon`.** `data-icon="inline-start"` or `data-icon="inline-end"` on the icon.
+- **No sizing classes on icons inside components.** Components handle icon sizing via CSS. No `size-4` or `w-4 h-4`.
+- **Pass icons as objects, not string keys.** `icon={CheckIcon}`, not a string lookup.
 
 ## Key Patterns
 
@@ -210,23 +223,23 @@ export default function Page({ data }: Props) {
 
 ## Component Selection
 
-| Need | Use |
-| --- | --- |
-| Button/action | `Button` with appropriate variant |
-| Form inputs | `Input`, `Select`, `Switch`, `Checkbox`, `RadioGroup`, `Textarea`, `Slider` |
-| Toggle between 2–5 options | `ToggleGroup` + `ToggleGroupItem` |
-| Data display | `Table`, `Card`, `Badge`, `Avatar` |
-| Feedback | `Alert`, `Progress`, `Skeleton`, `Spinner` |
-| Overlays | `Dialog` (modal) |
-| Layout | `Card`, `Separator`, `Accordion`, `Tabs` |
-| Empty states | `Empty` |
-| Tooltips | `Tooltip` |
+| Need                       | Use                                                                         |
+| -------------------------- | --------------------------------------------------------------------------- |
+| Button/action              | `Button` with appropriate variant                                           |
+| Form inputs                | `Input`, `Select`, `Switch`, `Checkbox`, `RadioGroup`, `Textarea`, `Slider` |
+| Toggle between 2–5 options | `ToggleGroup` + `ToggleGroupItem`                                           |
+| Data display               | `Table`, `Card`, `Badge`, `Avatar`                                          |
+| Feedback                   | `Alert`, `Progress`, `Skeleton`, `Spinner`                                  |
+| Overlays                   | `Dialog` (modal)                                                            |
+| Layout                     | `Card`, `Separator`, `Accordion`, `Tabs`                                    |
+| Empty states               | `Empty`                                                                     |
+| Tooltips                   | `Tooltip`                                                                   |
 
 ## Styling Rules
 
 # Styling Rules
 
-* * *
+---
 
 ## Semantic colors
 
@@ -246,7 +259,7 @@ export default function Page({ data }: Props) {
 </div>
 ```
 
-* * *
+---
 
 ## No raw color values for status/state indicators
 
@@ -270,7 +283,7 @@ For positive, negative, or status indicators, use Badge variants, semantic token
 
 If you need a success/positive color that doesn't exist as a semantic token, use a Badge variant.
 
-* * *
+---
 
 ## Built-in variants first
 
@@ -288,7 +301,7 @@ If you need a success/positive color that doesn't exist as a semantic token, use
 <Button variant="outline">Click me</Button>
 ```
 
-* * *
+---
 
 ## className for layout only
 
@@ -316,7 +329,7 @@ To customize a component's appearance, prefer these approaches in order:
 2.  **Semantic color tokens** — `bg-primary`, `text-muted-foreground`.
 3.  **CSS variables** — use the semantic CSS variable tokens.
 
-* * *
+---
 
 ## No space-x-\_ / space-y-\_
 
@@ -330,25 +343,25 @@ Use `gap-*` instead. `space-y-4` → `flex flex-col gap-4`. `space-x-2` → `fle
 </div>
 ```
 
-* * *
+---
 
 ## Prefer size-\_ over w-\_ h-\* when equal
 
 `size-10` not `w-10 h-10`. Applies to icons, avatars, skeletons, etc.
 
-* * *
+---
 
 ## Prefer truncate shorthand
 
 `truncate` not `overflow-hidden text-ellipsis whitespace-nowrap`.
 
-* * *
+---
 
 ## No manual dark: color overrides
 
 Use semantic tokens — they handle light/dark via CSS variables. `bg-background text-foreground` not `bg-white dark:bg-gray-950`.
 
-* * *
+---
 
 ## Use cn() for conditional classes
 
@@ -366,7 +379,7 @@ Use the `cn()` utility from the project for conditional or merged class names. D
 <div className={cn("flex items-center", isActive ? "bg-primary text-primary-foreground" : "bg-muted")}>
 ```
 
-* * *
+---
 
 ## No manual z-index on overlay components
 
@@ -376,7 +389,7 @@ Use the `cn()` utility from the project for conditional or merged class names. D
 
 # Component Composition
 
-* * *
+---
 
 ## Items always inside their Group component
 
@@ -402,7 +415,7 @@ Never render items directly inside the content container.
 </SelectContent>
 ```
 
-* * *
+---
 
 ## Callouts use Alert
 
@@ -413,7 +426,7 @@ Never render items directly inside the content container.
 </Alert>
 ```
 
-* * *
+---
 
 ## Toast notifications use sonner
 
@@ -427,7 +440,7 @@ toast('File deleted.', {
 });
 ```
 
-* * *
+---
 
 ## Empty states use Empty component
 
@@ -446,7 +459,7 @@ toast('File deleted.', {
 </Empty>
 ```
 
-* * *
+---
 
 ## Dialog always needs a Title
 
@@ -462,7 +475,7 @@ toast('File deleted.', {
 </DialogContent>
 ```
 
-* * *
+---
 
 ## Card structure
 
@@ -481,7 +494,7 @@ Use full composition — don't dump everything into `CardContent`:
 </Card>
 ```
 
-* * *
+---
 
 ## Button has no isPending or isLoading prop
 
@@ -494,7 +507,7 @@ Compose with `Spinner` + `data-icon` + `disabled`:
 </Button>
 ```
 
-* * *
+---
 
 ## TabsTrigger must be inside TabsList
 
@@ -510,7 +523,7 @@ Never render `TabsTrigger` directly inside `Tabs` — always wrap in `TabsList`:
 </Tabs>
 ```
 
-* * *
+---
 
 ## Avatar always needs AvatarFallback
 
@@ -523,21 +536,21 @@ Always include `AvatarFallback` for when the image fails to load:
 </Avatar>
 ```
 
-* * *
+---
 
 ## Use existing components instead of custom markup
 
-| Instead of | Use |
-| --- | --- |
-| `<hr>` or `<div className="border-t">` | `<Separator />` |
+| Instead of                                         | Use                                  |
+| -------------------------------------------------- | ------------------------------------ |
+| `<hr>` or `<div className="border-t">`             | `<Separator />`                      |
 | `<div className="animate-pulse">` with styled divs | `<Skeleton className="h-4 w-3/4" />` |
-| `<span className="rounded-full bg-green-100 ...">` | `<Badge variant="secondary">` |
+| `<span className="rounded-full bg-green-100 ...">` | `<Badge variant="secondary">`        |
 
 ## Form Rules
 
 # Forms & Inputs
 
-* * *
+---
 
 ## Forms use FieldGroup + Field
 
@@ -560,14 +573,14 @@ Use `Field orientation="horizontal"` for settings pages. Use `FieldLabel classNa
 
 **Choosing form controls:**
 
-*   Simple text input → `Input`
-*   Dropdown with predefined options → `Select`
-*   Boolean toggle → `Switch` (for settings) or `Checkbox` (for forms)
-*   Single choice from few options → `RadioGroup`
-*   Toggle between 2–5 options → `ToggleGroup` + `ToggleGroupItem`
-*   Multi-line text → `Textarea`
+- Simple text input → `Input`
+- Dropdown with predefined options → `Select`
+- Boolean toggle → `Switch` (for settings) or `Checkbox` (for forms)
+- Single choice from few options → `RadioGroup`
+- Toggle between 2–5 options → `ToggleGroup` + `ToggleGroupItem`
+- Multi-line text → `Textarea`
 
-* * *
+---
 
 ## Option sets (2–7 choices) use ToggleGroup
 
@@ -601,7 +614,7 @@ const [selected, setSelected] = useState("daily")
 </ToggleGroup>
 ```
 
-* * *
+---
 
 ## FieldSet + FieldLegend for grouping related fields
 
@@ -622,7 +635,7 @@ Use `FieldSet` + `FieldLegend` for related checkboxes, radios, or switches — n
 </FieldSet>
 ```
 
-* * *
+---
 
 ## Field validation and disabled states
 
@@ -649,7 +662,7 @@ Both attributes are needed — `data-invalid`/`data-disabled` styles the field (
 
 Icons are imported from `lucide-react`.
 
-* * *
+---
 
 ## Icons in Button use data-icon attribute
 
@@ -678,7 +691,7 @@ Add `data-icon="inline-start"` (prefix) or `data-icon="inline-end"` (suffix) to 
 </Button>
 ```
 
-* * *
+---
 
 ## No sizing classes on icons inside components
 
@@ -702,7 +715,7 @@ Components handle icon sizing via CSS. Don't add `size-4`, `w-4 h-4`, or other s
 </Button>
 ```
 
-* * *
+---
 
 ## Pass icons as component objects, not string keys
 
@@ -748,34 +761,34 @@ Components reference semantic CSS variable tokens. Use these tokens instead of r
 2.  Tailwind maps them to utilities: `bg-primary`, `text-muted-foreground`, etc.
 3.  Components use these utilities — changing a variable changes all components that reference it.
 
-* * *
+---
 
 ## Color Variables
 
 Every color follows the `name` / `name-foreground` convention. The base variable is for backgrounds, `-foreground` is for text/icons on that background.
 
-| Variable | Purpose |
-| --- | --- |
-| `--background` / `--foreground` | Page background and default text |
-| `--card` / `--card-foreground` | Card surfaces |
-| `--primary` / `--primary-foreground` | Primary buttons and actions |
-| `--secondary` / `--secondary-foreground` | Secondary actions |
-| `--muted` / `--muted-foreground` | Muted/disabled states |
-| `--accent` / `--accent-foreground` | Hover and accent states |
-| `--destructive` / `--destructive-foreground` | Error and destructive actions |
-| `--border` | Default border color |
-| `--input` | Form input borders |
-| `--ring` | Focus ring color |
+| Variable                                     | Purpose                          |
+| -------------------------------------------- | -------------------------------- |
+| `--background` / `--foreground`              | Page background and default text |
+| `--card` / `--card-foreground`               | Card surfaces                    |
+| `--primary` / `--primary-foreground`         | Primary buttons and actions      |
+| `--secondary` / `--secondary-foreground`     | Secondary actions                |
+| `--muted` / `--muted-foreground`             | Muted/disabled states            |
+| `--accent` / `--accent-foreground`           | Hover and accent states          |
+| `--destructive` / `--destructive-foreground` | Error and destructive actions    |
+| `--border`                                   | Default border color             |
+| `--input`                                    | Form input borders               |
+| `--ring`                                     | Focus ring color                 |
 
 Colors use OKLCH: `--primary: oklch(0.205 0 0)` where values are lightness (0-1), chroma (0 = gray), and hue (0-360).
 
-* * *
+---
 
 ## Border Radius
 
 `--radius` controls border radius globally. Components derive values from it (`rounded-lg` = `var(--radius)`, `rounded-md` = `calc(var(--radius) - 2px)`).
 
-* * *
+---
 
 ## Customizing Components
 

@@ -5,7 +5,6 @@ import { buildHtml } from '../sandbox.js';
 import { screenshot } from '../screenshot.js';
 
 export function previewTool(
-  ctx: { componentSourceCode: string | null },
   sandbox: SandboxInstance,
   fakeData: Record<string, unknown>,
   accountId: string,
@@ -14,16 +13,9 @@ export function previewTool(
 ): StreamTool {
   return {
     description:
-      'Build and screenshot the current component with sample data. Use this to see what your component looks like rendered in a browser. The component must be written first via write_component.',
+      'Build and screenshot the component currently in the sandbox with sample data. Use this to see what your component looks like rendered in a browser.',
     inputSchema: z.object({}),
     async execute() {
-      if (!ctx.componentSourceCode) {
-        return {
-          status: 'error',
-          message: 'No component written yet. Call write_component first.',
-        };
-      }
-
       const htmlResult = await buildHtml(sandbox, fakeData);
       if (!htmlResult.success) {
         return {
