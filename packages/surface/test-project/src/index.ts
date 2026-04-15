@@ -256,6 +256,50 @@ export default function Page({ data }: Props) {
       return Response.json(result);
     }
 
+    // Validate a form using shadcn Checkbox with name attributes (Radix hidden input)
+    if (url.pathname === '/sandbox/form/checkbox-array') {
+      const dataShape = `export interface Data {
+  items: Array<{ id: string; label: string }>;
+}`;
+
+      const formSchemaSource = `import { z } from 'zod';
+export const formSchema = z.object({
+  selectedIds: z.array(z.string()),
+});`;
+
+      const source = `import { Checkbox } from '@surface/components';
+import type { Data } from './types';
+
+interface Props {
+  data: Data;
+}
+
+export default function Page({ data }: Props) {
+  return (
+    <form>
+      {data.items.map((item) => (
+        <label key={item.id}>
+          <Checkbox name="selectedIds" value={item.id} />
+          {item.label}
+        </label>
+      ))}
+      <button type="submit">Submit</button>
+    </form>
+  );
+}`;
+
+      await typeCheck(sandbox, source, dataShape, formSchemaSource);
+      await bundle(sandbox, 'external-react');
+      const result = await validateForm(sandbox, formSchemaSource, {
+        items: [
+          { id: 'a', label: 'Item A' },
+          { id: 'b', label: 'Item B' },
+          { id: 'c', label: 'Item C' },
+        ],
+      });
+      return Response.json(result);
+    }
+
     // Build self-contained HTML and screenshot it
     if (url.pathname === '/sandbox/preview') {
       const dataShape = `export interface Data {
@@ -584,6 +628,7 @@ The page should feel like a morning email briefing — scannable in 30 seconds.`
         '  /sandbox/bundle - bundle a component with shadcn imports\n' +
         '  /sandbox/form/valid - form with all fields\n' +
         '  /sandbox/form/missing-field - form missing a required field\n' +
+        '  /sandbox/form/checkbox-array - shadcn Checkbox with name attrs (Radix hidden input test)\n' +
         '  /sandbox/preview - build HTML and screenshot\n' +
         '  /sandbox/generate - full LLM generation loop\n' +
         '  /sandbox/hn-reader - HN reader test (form + 50 articles)\n' +

@@ -125,6 +125,14 @@ globalThis.navigator = dom.window.navigator;
 globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.HTMLFormElement = dom.window.HTMLFormElement;
 
+// Polyfill APIs that JSDOM lacks but Radix components need
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
 const React = await import('react');
 const { createRoot } = await import('react-dom/client');
 const { act } = await import('react');
@@ -145,7 +153,10 @@ await act(() => {
 // Find all form inputs
 const schemaKeys = Object.keys(formSchema.shape);
 const inputs = root.querySelectorAll('input[name], select[name], textarea[name]');
-const inputNames = Array.from(inputs).map(el => el.getAttribute('name'));
+const inputNames = Array.from(inputs).map(el => {
+  const name = el.getAttribute('name') || '';
+  return name.endsWith('[]') ? name.slice(0, -2) : name;
+});
 
 const missingFields = schemaKeys.filter(key => !inputNames.includes(key));
 

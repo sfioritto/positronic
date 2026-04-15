@@ -637,6 +637,49 @@ Use `FieldSet` + `FieldLegend` for related checkboxes, radios, or switches — n
 
 ---
 
+## Form schema binding
+
+When an output schema is provided, every key in the schema **must** have a corresponding form input with a matching `name` attribute. This is how the framework collects form data — it reads `name` attributes from the DOM.
+
+**Rules:**
+
+- Every schema key needs an `<input>`, `<select>`, or `<textarea>` with `name={key}`.
+- For **array fields** (e.g., `z.array(z.string())`), render multiple inputs with the **same `name`**. Each checked/selected input contributes one value to the array.
+- shadcn components like `Input`, `Select`, `Checkbox`, and `Switch` all forward `name` to the underlying HTML element — use them normally.
+- Do NOT manage form state with `useState` alone — native `name` attributes are required for submission.
+
+**Example — checkbox array for `readArticleIds: z.array(z.string())`:**
+
+```tsx
+{
+  data.articles.map((article) => (
+    <Field key={article.id} orientation="horizontal">
+      <Checkbox name="readArticleIds" value={article.id} />
+      <FieldLabel htmlFor={article.id} className="font-normal">
+        {article.title}
+      </FieldLabel>
+    </Field>
+  ));
+}
+```
+
+**Example — simple text fields for `name: z.string(), email: z.string()`:**
+
+```tsx
+<FieldGroup>
+  <Field>
+    <FieldLabel htmlFor="name">Name</FieldLabel>
+    <Input id="name" name="name" />
+  </Field>
+  <Field>
+    <FieldLabel htmlFor="email">Email</FieldLabel>
+    <Input id="email" name="email" type="email" />
+  </Field>
+</FieldGroup>
+```
+
+---
+
 ## Field validation and disabled states
 
 Both attributes are needed — `data-invalid`/`data-disabled` styles the field (label, description), while `aria-invalid`/`disabled` styles the control.
