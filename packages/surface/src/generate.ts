@@ -59,7 +59,7 @@ export async function generate(params: {
 
   // Step 2: Define tools
   const validator = outputSchema
-    ? validateFormTool(sandbox, outputSchema)
+    ? validateFormTool(sandbox, outputSchema, fakeData)
     : undefined;
 
   const tools: Record<string, StreamTool> = {

@@ -5,7 +5,8 @@ import { bundle, validateForm } from '../sandbox.js';
 
 export function validateFormTool(
   sandbox: SandboxInstance,
-  outputSchema: string
+  outputSchema: string,
+  fakeData: Record<string, unknown>
 ): StreamTool {
   return {
     description:
@@ -22,7 +23,7 @@ export function validateFormTool(
         };
       }
 
-      const result = await validateForm(sandbox, outputSchema);
+      const result = await validateForm(sandbox, outputSchema, fakeData);
       if (result.success) {
         return {
           status: 'success',

@@ -210,7 +210,10 @@ export default function Page({ data }: Props) {
 
       await typeCheck(sandbox, source, dataShape, formSchemaSource);
       await bundle(sandbox);
-      const result = await validateForm(sandbox, formSchemaSource);
+      const result = await validateForm(sandbox, formSchemaSource, {
+        name: 'Alice Johnson',
+        email: 'alice@example.com',
+      });
       return Response.json(result);
     }
 
@@ -245,7 +248,11 @@ export default function Page({ data }: Props) {
 
       await typeCheck(sandbox, source, dataShape, formSchemaSource);
       await bundle(sandbox);
-      const result = await validateForm(sandbox, formSchemaSource);
+      const result = await validateForm(sandbox, formSchemaSource, {
+        name: 'Alice Johnson',
+        email: 'alice@example.com',
+        phone: '555-0123',
+      });
       return Response.json(result);
     }
 

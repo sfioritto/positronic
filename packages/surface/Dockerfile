@@ -91,7 +91,7 @@ COPY <<'EOF' /workspace/tsconfig.json
       "@surface/*": ["/workspace/surface/*"]
     }
   },
-  "include": ["*.tsx", "*.ts", "surface/**/*.tsx", "surface/**/*.ts"]
+  "include": ["component.tsx", "types.ts", "form-schema.ts", "mount.tsx", "surface/components/**/*", "surface/lib/utils.ts"]
 }
 EOF
 

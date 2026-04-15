@@ -1,4 +1,5 @@
 import type { ObjectGenerator, Message } from '../src/clients/types.js';
+import type { JsonValue } from '../src/dsl/types.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import type { Adapter } from '../src/adapters/types.js';
@@ -43,6 +44,7 @@ export class MockObjectGenerator implements ObjectGenerator {
     }>;
     text?: string;
     usage: { totalTokens: number };
+    responseMessages: JsonValue[];
   }> {
     throw new Error('streamText not implemented in mock');
   }
