@@ -58,17 +58,21 @@ export async function generate(params: {
     await generateFakeData(client, sandbox, inputSchema);
 
   // Step 2: Define tools
+  const validator = outputSchema
+    ? validateFormTool(sandbox, outputSchema)
+    : undefined;
+
   const tools: Record<string, StreamTool> = {
     write_component: writeComponentTool(sandbox, inputSchema, outputSchema),
     preview: previewTool(sandbox, fakeData, accountId, apiToken, {
       debug,
       screenshots,
     }),
-    submit: submitTool(),
+    submit: submitTool(validator),
   };
 
-  if (outputSchema) {
-    tools.validate_form = validateFormTool(sandbox, outputSchema);
+  if (validator) {
+    tools.validate_form = validator;
   }
 
   // Step 3: Build the user prompt with schema context
