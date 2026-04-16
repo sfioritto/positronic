@@ -131,6 +131,9 @@ globalThis.ResizeObserver = class ResizeObserver {
   unobserve() {}
   disconnect() {}
 };
+globalThis.getComputedStyle = dom.window.getComputedStyle;
+globalThis.requestAnimationFrame = dom.window.requestAnimationFrame;
+globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const React = await import('react');

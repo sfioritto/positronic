@@ -39,7 +39,7 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
       RESULT_TYPE=$(echo "$line" | jq -r '.result.type // empty')
       if [ "$TOOL" = "preview" ] && [ "$RESULT_TYPE" = "image" ]; then
         # Extract screenshot from preview tool result
-        SIDX=$(ls "${DIR}"/screenshot-*.png 2>/dev/null | wc -l | tr -d ' ')
+        SIDX=$(find "${DIR}" -maxdepth 1 -name 'screenshot-*.png' | wc -l | tr -d ' ')
         echo "$line" | jq -r '.result.data' | base64 -d > "${DIR}/screenshot-${SIDX}.png"
         echo "[preview] Wrote ${DIR}/screenshot-${SIDX}.png ($(wc -c < "${DIR}/screenshot-${SIDX}.png" | tr -d ' ') bytes)"
       else

@@ -64,7 +64,7 @@ export async function generate(params: {
   const { fakeData, responseMessages: fakeDataMessages } =
     await generateFakeData(client, sandbox, inputSchema);
 
-  onProgress?.({ type: 'fake_data_done', data: fakeData });
+  await onProgress?.({ type: 'fake_data_done', data: fakeData });
 
   // Step 2: Define tools
   const validator = outputSchema
@@ -96,9 +96,9 @@ export async function generate(params: {
     tools[name] = {
       ...tool,
       async execute(input: unknown) {
-        onProgress?.({ type: 'tool_start', tool: name });
+        await onProgress?.({ type: 'tool_start', tool: name });
         const result = await original(input);
-        onProgress?.({ type: 'tool_result', tool: name, result });
+        await onProgress?.({ type: 'tool_result', tool: name, result });
         return result;
       },
     };
