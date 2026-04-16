@@ -179,7 +179,7 @@ export function buildCli(options: CliOptions) {
         'history <brain>',
         'List recent runs of a specific brain\n',
         (yargsHistory) => {
-          yargsHistory
+          let y = yargsHistory
             .positional('brain', {
               describe: 'Brain identifier (title, filename, or search term)',
               type: 'string',
@@ -195,16 +195,12 @@ export function buildCli(options: CliOptions) {
               'List recent runs for my-brain'
             );
           if (!prefix) {
-            yargsHistory.example(
-              `$0 ${p}history "My Brain Title"`,
-              'Search by title'
-            );
+            y = y.example(`$0 ${p}history "My Brain Title"`, 'Search by title');
           }
-          yargsHistory.example(
+          return y.example(
             `$0 ${p}history my-brain --limit=20`,
             'List more recent runs'
           );
-          return yargsHistory;
         },
         (argv) => {
           render(
