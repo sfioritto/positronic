@@ -21,6 +21,11 @@ export interface GenerateResult {
   screenshots?: Uint8Array[];
 }
 
+export type ProgressEvent =
+  | { type: 'fake_data_done'; data: Record<string, unknown> }
+  | { type: 'tool_start'; tool: string }
+  | { type: 'tool_result'; tool: string; result: unknown };
+
 /**
  * Generate a self-contained HTML page using an LLM + sandbox loop.
  *
@@ -37,6 +42,7 @@ export async function generate(params: {
   inputSchema: string;
   outputSchema?: string;
   debug?: boolean;
+  onProgress?: (event: ProgressEvent) => void | Promise<void>;
 }): Promise<GenerateResult> {
   const {
     client,
@@ -48,6 +54,7 @@ export async function generate(params: {
     inputSchema,
     outputSchema,
     debug,
+    onProgress,
   } = params;
 
   const startTime = Date.now();
@@ -57,12 +64,14 @@ export async function generate(params: {
   const { fakeData, responseMessages: fakeDataMessages } =
     await generateFakeData(client, sandbox, inputSchema);
 
+  onProgress?.({ type: 'fake_data_done', data: fakeData });
+
   // Step 2: Define tools
   const validator = outputSchema
     ? validateFormTool(sandbox, outputSchema, fakeData)
     : undefined;
 
-  const tools: Record<string, StreamTool> = {
+  const rawTools: Record<string, StreamTool> = {
     write_component: writeComponentTool(sandbox, inputSchema, outputSchema),
     preview: previewTool(sandbox, fakeData, accountId, apiToken, {
       debug,
@@ -72,7 +81,27 @@ export async function generate(params: {
   };
 
   if (validator) {
-    tools.validate_form = validator;
+    rawTools.validate_form = validator;
+  }
+
+  // Wrap tools to emit progress events (tools without execute are pass-through —
+  // the Vercel AI SDK uses missing execute as a loop termination signal)
+  const tools: Record<string, StreamTool> = {};
+  for (const [name, tool] of Object.entries(rawTools)) {
+    if (!tool.execute) {
+      tools[name] = tool;
+      continue;
+    }
+    const original = tool.execute;
+    tools[name] = {
+      ...tool,
+      async execute(input: unknown) {
+        onProgress?.({ type: 'tool_start', tool: name });
+        const result = await original(input);
+        onProgress?.({ type: 'tool_result', tool: name, result });
+        return result;
+      },
+    };
   }
 
   // Step 3: Build the user prompt with schema context

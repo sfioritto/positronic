@@ -8,7 +8,7 @@ import {
   type SandboxInstance,
 } from '../../src/sandbox.js';
 import { screenshot } from '../../src/screenshot.js';
-import { generate, type GenerateResult } from '../../src/generate.js';
+import { generate, type ProgressEvent } from '../../src/generate.js';
 import { VercelClient } from '@positronic/client-vercel';
 import { google } from '@ai-sdk/google';
 import systemPromptRaw from '../../src/system-prompt.md';
@@ -23,15 +23,41 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function formatGenerateResponse(result: GenerateResult): Response {
-  const screenshotBase64 = result.screenshots?.map(uint8ToBase64);
+function streamGenerate(
+  generateParams: Parameters<typeof generate>[0]
+): Response {
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
 
-  return Response.json({
-    success: true,
-    html: result.html,
-    htmlSize: result.html.length,
-    screenshots: screenshotBase64,
-    log: result.log,
+  const send = async (event: Record<string, unknown>) => {
+    await writer.write(encoder.encode(JSON.stringify(event) + '\n'));
+  };
+
+  const onProgress = (event: ProgressEvent) => {
+    send(event);
+  };
+
+  (async () => {
+    try {
+      const result = await generate({ ...generateParams, onProgress });
+      const screenshotBase64 = result.screenshots?.map(uint8ToBase64);
+      await send({
+        type: 'complete',
+        html: result.html,
+        htmlSize: result.html.length,
+        screenshots: screenshotBase64,
+        log: result.log,
+      });
+    } catch (err) {
+      await send({ type: 'error', message: String(err) });
+    } finally {
+      writer.close();
+    }
+  })();
+
+  return new Response(readable, {
+    headers: { 'Content-Type': 'application/x-ndjson' },
   });
 }
 
@@ -41,6 +67,30 @@ type Env = {
   CLOUDFLARE_API_TOKEN?: string;
   GOOGLE_GENERATIVE_AI_API_KEY?: string;
 };
+
+function getGenerateContext(rawEnv: Env) {
+  if (
+    !rawEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
+    !rawEnv.CLOUDFLARE_ACCOUNT_ID ||
+    !rawEnv.CLOUDFLARE_API_TOKEN
+  ) {
+    return null;
+  }
+  const model = google('gemini-3.1-flash-lite-preview', {
+    apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
+  });
+  const client = new VercelClient(model, rawEnv.GOOGLE_GENERATIVE_AI_API_KEY);
+  const systemPrompt = systemPromptRaw.replaceAll(
+    '__IMPORT_PATH__',
+    '@surface/components'
+  );
+  return {
+    client,
+    systemPrompt,
+    accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
+    apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
+  };
+}
 
 export default {
   async fetch(request: Request, rawEnv: Env): Promise<Response> {
@@ -360,11 +410,8 @@ export default function Page({ data }: Props) {
 
     // Full generation loop with LLM
     if (url.pathname === '/sandbox/generate') {
-      if (
-        !rawEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
-        !rawEnv.CLOUDFLARE_ACCOUNT_ID ||
-        !rawEnv.CLOUDFLARE_API_TOKEN
-      ) {
+      const ctx = getGenerateContext(rawEnv);
+      if (!ctx) {
         return Response.json(
           {
             error:
@@ -373,14 +420,6 @@ export default function Page({ data }: Props) {
           { status: 500 }
         );
       }
-
-      const model = google('gemini-2.5-flash', {
-        apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
-      });
-      const client = new VercelClient(
-        model,
-        rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
-      );
 
       const inputSchema = `export interface Data {
   title: string;
@@ -396,48 +435,22 @@ export default function Page({ data }: Props) {
   }>;
 }`;
 
-      const systemPrompt = systemPromptRaw.replaceAll(
-        '__IMPORT_PATH__',
-        '@surface/components'
-      );
-
-      const result = await generate({
-        client,
+      return streamGenerate({
+        ...ctx,
         sandbox,
-        systemPrompt,
-        accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
-        apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
         prompt:
           'Create a dashboard page showing key metrics at the top in cards, and a table of recent users below.',
         inputSchema,
         debug: true,
       });
-
-      return formatGenerateResponse(result);
     }
 
     // HN Reader test — realistic page with form
     if (url.pathname === '/sandbox/hn-reader') {
-      if (
-        !rawEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
-        !rawEnv.CLOUDFLARE_ACCOUNT_ID ||
-        !rawEnv.CLOUDFLARE_API_TOKEN
-      ) {
+      const ctx = getGenerateContext(rawEnv);
+      if (!ctx) {
         return Response.json({ error: 'Missing env vars' }, { status: 500 });
       }
-
-      const model = google('gemini-2.5-flash', {
-        apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
-      });
-      const client = new VercelClient(
-        model,
-        rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
-      );
-
-      const systemPrompt = systemPromptRaw.replaceAll(
-        '__IMPORT_PATH__',
-        '@surface/components'
-      );
 
       // This mirrors what .page() would pass to generate() for the HN reader brain
       const inputSchema = `export interface Data {
@@ -481,43 +494,22 @@ For each article show:
 Include a "Mark Selected as Read" submit button at the bottom.
 Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
 
-      const result = await generate({
-        client,
+      return streamGenerate({
+        ...ctx,
         sandbox,
-        systemPrompt,
-        accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
-        apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
         prompt,
         inputSchema,
         outputSchema,
         debug: true,
       });
-
-      return formatGenerateResponse(result);
     }
 
     // Email digest test — complex multi-section page with enrichment tuples
     if (url.pathname === '/sandbox/email-digest') {
-      if (
-        !rawEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
-        !rawEnv.CLOUDFLARE_ACCOUNT_ID ||
-        !rawEnv.CLOUDFLARE_API_TOKEN
-      ) {
+      const ctx = getGenerateContext(rawEnv);
+      if (!ctx) {
         return Response.json({ error: 'Missing env vars' }, { status: 500 });
       }
-
-      const model = google('gemini-2.5-flash', {
-        apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
-      });
-      const client = new VercelClient(
-        model,
-        rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
-      );
-
-      const systemPrompt = systemPromptRaw.replaceAll(
-        '__IMPORT_PATH__',
-        '@surface/components'
-      );
 
       // This mirrors the state shape at the .page() step of the email-digest brain.
       // IterateResult<Thread, T> serializes as [Thread, T][] tuples via toJSON().
@@ -604,19 +596,14 @@ The page should have these sections, each with a colored header/accent:
 Make the overall layout clean and scannable. Use cards to group sections.
 The page should feel like a morning email briefing — scannable in 30 seconds.`;
 
-      const result = await generate({
-        client,
+      return streamGenerate({
+        ...ctx,
         sandbox,
-        systemPrompt,
-        accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
-        apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
         prompt,
         inputSchema,
         outputSchema,
         debug: true,
       });
-
-      return formatGenerateResponse(result);
     }
 
     return new Response(

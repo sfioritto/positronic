@@ -15,35 +15,75 @@ DIR="output/${ENDPOINT}"
 
 mkdir -p "$DIR"
 
-echo "Fetching ${URL} ..."
-RESPONSE=$(curl -s --max-time 300 "$URL")
+echo "Fetching ${URL} (streaming) ..."
 
-# Check for error
-if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-  echo "Error: $(echo "$RESPONSE" | jq -r '.error')"
-  exit 1
-fi
+# Stream NDJSON — each line is a JSON event
+curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
+  # Skip empty lines
+  [ -z "$line" ] && continue
 
-# Write HTML
-if echo "$RESPONSE" | jq -e '.html' > /dev/null 2>&1; then
-  echo "$RESPONSE" | jq -r '.html' > "${DIR}/page.html"
-  echo "Wrote ${DIR}/page.html ($(wc -c < "${DIR}/page.html" | tr -d ' ') bytes)"
-fi
+  TYPE=$(echo "$line" | jq -r '.type // empty')
 
-# Write log
-if echo "$RESPONSE" | jq -e '.log' > /dev/null 2>&1; then
-  echo "$RESPONSE" | jq '.log' > "${DIR}/log.json"
-  echo "Wrote ${DIR}/log.json"
-fi
-
-# Write screenshots
-COUNT=$(echo "$RESPONSE" | jq '.screenshots // [] | length')
-for i in $(seq 0 $((COUNT - 1))); do
-  echo "$RESPONSE" | jq -r ".screenshots[$i]" | base64 -d > "${DIR}/screenshot-${i}.png"
-  echo "Wrote ${DIR}/screenshot-${i}.png"
+  case "$TYPE" in
+    fake_data_done)
+      echo "[fake_data] Generated fake data"
+      echo "$line" | jq '.data' > "${DIR}/fake-data.json"
+      echo "  Wrote ${DIR}/fake-data.json"
+      ;;
+    tool_start)
+      TOOL=$(echo "$line" | jq -r '.tool')
+      echo "[${TOOL}] Starting..."
+      ;;
+    tool_result)
+      TOOL=$(echo "$line" | jq -r '.tool')
+      RESULT_TYPE=$(echo "$line" | jq -r '.result.type // empty')
+      if [ "$TOOL" = "preview" ] && [ "$RESULT_TYPE" = "image" ]; then
+        # Extract screenshot from preview tool result
+        SIDX=$(ls "${DIR}"/screenshot-*.png 2>/dev/null | wc -l | tr -d ' ')
+        echo "$line" | jq -r '.result.data' | base64 -d > "${DIR}/screenshot-${SIDX}.png"
+        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}.png ($(wc -c < "${DIR}/screenshot-${SIDX}.png" | tr -d ' ') bytes)"
+      else
+        STATUS=$(echo "$line" | jq -r '.result.status // .result.type // "ok"')
+        MSG=$(echo "$line" | jq -r '.result.message // empty')
+        if [ -n "$MSG" ]; then
+          echo "[${TOOL}] ${STATUS}: ${MSG}"
+        else
+          echo "[${TOOL}] ${STATUS}"
+        fi
+      fi
+      # Append to incremental log
+      echo "$line" >> "${DIR}/log.ndjson"
+      ;;
+    complete)
+      echo ""
+      echo "=== Generation complete ==="
+      echo "$line" | jq -r '.html' > "${DIR}/page.html"
+      echo "Wrote ${DIR}/page.html ($(wc -c < "${DIR}/page.html" | tr -d ' ') bytes)"
+      # Write the final log
+      echo "$line" | jq '{log: .log, htmlSize: .htmlSize}' > "${DIR}/log.json"
+      echo "Wrote ${DIR}/log.json"
+      # Write any final screenshots that came with the complete event
+      COUNT=$(echo "$line" | jq '.screenshots // [] | length')
+      if [ "$COUNT" -gt 0 ]; then
+        for i in $(seq 0 $((COUNT - 1))); do
+          echo "$line" | jq -r ".screenshots[$i]" | base64 -d > "${DIR}/screenshot-final-${i}.png"
+          echo "Wrote ${DIR}/screenshot-final-${i}.png"
+        done
+      fi
+      TOTAL=$(echo "$line" | jq '.log.totalDurationMs // "N/A"')
+      echo ""
+      echo "Done. Total duration: ${TOTAL}ms"
+      ;;
+    error)
+      MSG=$(echo "$line" | jq -r '.message')
+      echo ""
+      echo "ERROR: ${MSG}"
+      ;;
+    *)
+      # Unknown event type — dump it
+      echo "[unknown] $line"
+      ;;
+  esac
 done
 
-# Summary
-echo ""
-echo "Done. Total duration: $(echo "$RESPONSE" | jq '.log.totalDurationMs // "N/A"')ms"
 echo "Output: ${DIR}/"
