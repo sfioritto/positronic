@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
-import { padRight, truncate, formatDate } from '../lib/format.js';
+import { padRight, truncate, formatDate, formatSize } from '../lib/format.js';
 
 interface Page {
   slug: string;
@@ -18,13 +18,6 @@ interface PagesResponse {
   pages: Page[];
   count: number;
 }
-
-// Helper to format file size
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
 
 export const PagesList = () => {
   const { data, loading, error } = useApiGet<PagesResponse>('/pages');

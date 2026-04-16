@@ -3,6 +3,7 @@ import { Text, Box } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { BrainResolver } from './brain-resolver.js';
+import { Field } from './field.js';
 
 // Types for brain structure from API
 interface BrainStep {
@@ -31,19 +32,6 @@ interface Schedule {
 interface SchedulesResponse {
   schedules: Schedule[];
 }
-
-// Component to display a labeled field
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
-  <Box>
-    <Box width={14}>
-      <Text dimColor>{label}:</Text>
-    </Box>
-    <Box flexGrow={1}>{children}</Box>
-  </Box>
-);
 
 // Recursive component for rendering step tree
 interface StepTreeProps {

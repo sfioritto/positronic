@@ -158,6 +158,309 @@ export function buildCli(options: CliOptions) {
     );
   }
 
+  type Argv = ReturnType<typeof yargs>;
+
+  function registerBrainCommands(
+    yargsInstance: Argv,
+    { prefix, topLevelRunAlias }: { prefix: string; topLevelRunAlias: boolean }
+  ): Argv {
+    const p = prefix ? `${prefix} ` : '';
+
+    yargsInstance
+      .command(
+        'list',
+        'List all brains in the active project\n',
+        () => {},
+        () => {
+          render(React.createElement(BrainList));
+        }
+      )
+      .command(
+        'history <brain>',
+        'List recent runs of a specific brain\n',
+        (yargsHistory) => {
+          yargsHistory
+            .positional('brain', {
+              describe: 'Brain identifier (title, filename, or search term)',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('limit', {
+              describe: 'Maximum number of runs to show',
+              type: 'number',
+              default: 10,
+            })
+            .example(
+              `$0 ${p}history my-brain`,
+              'List recent runs for my-brain'
+            );
+          if (!prefix) {
+            yargsHistory.example(
+              `$0 ${p}history "My Brain Title"`,
+              'Search by title'
+            );
+          }
+          yargsHistory.example(
+            `$0 ${p}history my-brain --limit=20`,
+            'List more recent runs'
+          );
+          return yargsHistory;
+        },
+        (argv) => {
+          render(
+            React.createElement(BrainResolver, {
+              identifier: argv.brain,
+              children: (resolvedBrainTitle: string) =>
+                React.createElement(BrainHistory, {
+                  brainName: resolvedBrainTitle,
+                  limit: argv.limit,
+                }),
+            })
+          );
+        }
+      )
+      .command(
+        'show [brain]',
+        'Show information about a brain or a specific run\n',
+        (yargsShow) => {
+          return yargsShow
+            .positional('brain', {
+              describe: 'Brain identifier to show info for',
+              type: 'string',
+            })
+            .option('run-id', {
+              describe: 'ID of a specific brain run to show',
+              type: 'string',
+              alias: 'id',
+            })
+            .option('steps', {
+              describe: 'Show the step structure of the brain',
+              type: 'boolean',
+              default: false,
+            })
+            .check((argv) => {
+              if (!argv.brain && !argv.runId) {
+                throw new Error(
+                  'You must provide either a brain identifier or a --run-id.'
+                );
+              }
+              return true;
+            })
+            .example(`$0 ${p}show my-brain`, 'Show info about my-brain')
+            .example(
+              `$0 ${p}show my-brain --steps`,
+              'Show my-brain with step structure'
+            )
+            .example(
+              `$0 ${p}show --run-id abc123`,
+              'Show details for a specific run'
+            );
+        },
+        (argv) => {
+          if (argv.runId) {
+            render(
+              React.createElement(RunShow, { runId: argv.runId as string })
+            );
+          } else if (argv.brain) {
+            render(
+              React.createElement(BrainShow, {
+                identifier: argv.brain,
+                showSteps: argv.steps || false,
+              })
+            );
+          } else {
+            render(
+              React.createElement(ErrorComponent, {
+                error: {
+                  title: 'Missing Argument',
+                  message:
+                    'You must provide either a brain identifier or a run ID.',
+                  details:
+                    'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
+                },
+              })
+            );
+          }
+        }
+      )
+      .command(
+        ['rerun <run-id>', 'rr <run-id>'],
+        'Rerun an existing brain run from a specific step\n',
+        (yargsRerun) => {
+          return yargsRerun
+            .positional('run-id', {
+              describe: 'ID of the brain run to rerun',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('starts-at', {
+              describe: 'Step number to start execution from (1-indexed)',
+              type: 'number',
+              demandOption: true,
+            })
+            .alias('starts-at', 's')
+            .example(`$0 ${p}rerun abc123 --starts-at=3`, 'Rerun from step 3');
+        },
+        (argv) => {
+          render(
+            React.createElement(BrainRerun, {
+              runId: argv.runId as string,
+              startsAt: argv.startsAt as number,
+            })
+          );
+        }
+      )
+      .command(
+        topLevelRunAlias ? ['run <brain>', 'r <brain>'] : 'run <brain>',
+        'Run a brain and optionally watch its execution\n',
+        (yargsRun) => {
+          return yargsRun
+            .positional('brain', {
+              describe: 'Brain identifier (title, filename, or search term)',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('watch', {
+              describe: 'Watch the brain run immediately after starting',
+              type: 'boolean',
+              alias: 'w',
+              default: false,
+            })
+            .option('options', {
+              describe: 'Options to pass to the brain (key=value format)',
+              type: 'array',
+              alias: 'o',
+              string: true,
+              coerce: parseKeyValueOptions,
+            })
+            .option('state', {
+              describe:
+                'Initial state values (key=value format, with type coercion)',
+              type: 'array',
+              alias: 's',
+              string: true,
+              coerce: parseStateValues,
+            })
+            .option('state-json', {
+              describe: 'Initial state as a JSON string',
+              type: 'string',
+            })
+            .check((argv) => {
+              if (argv.state && argv.stateJson) {
+                throw new Error(
+                  'Cannot use both --state/-s and --state-json at the same time.'
+                );
+              }
+              return true;
+            })
+            .example(`$0 ${p}run my-brain`, 'Run a brain by filename')
+            .example(`$0 ${p}run "Email Digest"`, 'Run a brain by title')
+            .example(
+              `$0 ${p}run email`,
+              'Fuzzy search for brains matching "email"'
+            )
+            .example(
+              `$0 ${p}run my-brain --watch`,
+              'Run a brain and watch its execution'
+            )
+            .example(
+              `$0 ${p}run my-brain -o channel=#general -o debug=true`,
+              'Run a brain with options'
+            )
+            .example(
+              `$0 ${p}run my-brain -s count=0 -s name=sean`,
+              'Run a brain with initial state'
+            )
+            .example(
+              `$0 ${p}run my-brain --state-json '{"items": [], "config": {"debug": true}}'`,
+              'Run a brain with initial state from JSON'
+            );
+        },
+        (argv) => {
+          let initialState: Record<string, unknown> | undefined;
+          if (argv.stateJson) {
+            try {
+              initialState = JSON.parse(argv.stateJson as string);
+            } catch {
+              console.error(`Invalid JSON for --state-json: ${argv.stateJson}`);
+              process.exit(1);
+            }
+          } else if (argv.state) {
+            initialState = argv.state as Record<string, unknown>;
+          }
+          render(
+            React.createElement(BrainRun, {
+              identifier: argv.brain,
+              watch: argv.watch,
+              options: argv.options as Record<string, string> | undefined,
+              initialState,
+            })
+          );
+        }
+      )
+      .command(
+        'watch <identifier>',
+        'Watch a brain run by brain name or run ID\n',
+        (yargsWatch) => {
+          return yargsWatch
+            .positional('identifier', {
+              describe: 'Brain name or run ID to watch',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('events', {
+              describe: 'Start in events view instead of progress view',
+              type: 'boolean',
+              alias: 'e',
+              default: false,
+            })
+            .example(
+              `$0 ${p}watch my-brain`,
+              "Watch the latest run of the brain named 'my-brain'"
+            )
+            .example(
+              `$0 ${p}watch abc123def`,
+              'Watch a specific brain run by its ID'
+            )
+            .example(
+              `$0 ${p}watch my-brain --events`,
+              'Watch with events log view'
+            );
+        },
+        (argv) => {
+          render(
+            React.createElement(WatchResolver, {
+              identifier: argv.identifier,
+              startWithEvents: argv.events,
+            })
+          );
+        }
+      )
+      .command(
+        'top [brain]',
+        'View live status of all running brains\n',
+        (yargsTop) => {
+          return yargsTop
+            .positional('brain', {
+              describe: 'Filter to brains matching this name',
+              type: 'string',
+            })
+            .example(`$0 ${p}top`, 'View all running brains')
+            .example(
+              `$0 ${p}top my-brain`,
+              'View running brains matching "my-brain"'
+            );
+        },
+        (argv) => {
+          render(
+            React.createElement(TopNavigator, { brainFilter: argv.brain })
+          );
+        }
+      );
+
+    return yargsInstance;
+  }
+
   // Get version from package.json
   let version = 'TEST'; // Default version for test environment where package.json path differs
   try {
@@ -402,543 +705,17 @@ export function buildCli(options: CliOptions) {
     );
   }
 
-  // --- List Brains Command ---
-  cli = cli.command(
-    'list',
-    'List all brains in the active project\n',
-    () => {},
-    () => {
-      render(React.createElement(BrainList));
-    }
-  );
+  // --- Brain Commands (top-level shortcuts) ---
+  registerBrainCommands(cli, { prefix: '', topLevelRunAlias: true });
 
-  // --- Brain History Command ---
-  cli = cli.command(
-    'history <brain>',
-    'List recent runs of a specific brain\n',
-    (yargsHistory) => {
-      return yargsHistory
-        .positional('brain', {
-          describe: 'Brain identifier (title, filename, or search term)',
-          type: 'string',
-          demandOption: true,
-        })
-        .option('limit', {
-          describe: 'Maximum number of runs to show',
-          type: 'number',
-          default: 10,
-        })
-        .example('$0 history my-brain', 'List recent runs for my-brain')
-        .example('$0 history "My Brain Title"', 'Search by title')
-        .example('$0 history my-brain --limit=20', 'List more recent runs');
-    },
-    (argv) => {
-      render(
-        React.createElement(BrainResolver, {
-          identifier: argv.brain,
-          children: (resolvedBrainTitle: string) =>
-            React.createElement(BrainHistory, {
-              brainName: resolvedBrainTitle,
-              limit: argv.limit,
-            }),
-        })
-      );
-    }
-  );
-
-  // --- Show Brain/Run Command ---
-  cli = cli.command(
-    'show [brain]',
-    'Show information about a brain or a specific run\n',
-    (yargsShow) => {
-      return yargsShow
-        .positional('brain', {
-          describe: 'Brain identifier to show info for',
-          type: 'string',
-        })
-        .option('run-id', {
-          describe: 'ID of a specific brain run to show',
-          type: 'string',
-          alias: 'id',
-        })
-        .option('steps', {
-          describe: 'Show the step structure of the brain',
-          type: 'boolean',
-          default: false,
-        })
-        .check((argv) => {
-          if (!argv.brain && !argv.runId) {
-            throw new Error(
-              'You must provide either a brain identifier or a --run-id.'
-            );
-          }
-          return true;
-        })
-        .example('$0 show my-brain', 'Show info about my-brain')
-        .example(
-          '$0 show my-brain --steps',
-          'Show my-brain with step structure'
-        )
-        .example('$0 show --run-id abc123', 'Show details for a specific run');
-    },
-    (argv) => {
-      if (argv.runId) {
-        render(React.createElement(RunShow, { runId: argv.runId as string }));
-      } else if (argv.brain) {
-        render(
-          React.createElement(BrainShow, {
-            identifier: argv.brain,
-            showSteps: argv.steps || false,
-          })
-        );
-      } else {
-        render(
-          React.createElement(ErrorComponent, {
-            error: {
-              title: 'Missing Argument',
-              message:
-                'You must provide either a brain identifier or a run ID.',
-              details:
-                'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
-            },
-          })
-        );
-      }
-    }
-  );
-
-  // --- Rerun Brain Command ---
-  cli = cli.command(
-    ['rerun <run-id>', 'rr <run-id>'],
-    'Rerun an existing brain run from a specific step\n',
-    (yargsRerun) => {
-      return yargsRerun
-        .positional('run-id', {
-          describe: 'ID of the brain run to rerun',
-          type: 'string',
-          demandOption: true,
-        })
-        .option('starts-at', {
-          describe: 'Step number to start execution from (1-indexed)',
-          type: 'number',
-          demandOption: true,
-        })
-        .alias('starts-at', 's')
-        .example('$0 rerun abc123 --starts-at=3', 'Rerun from step 3');
-    },
-    (argv) => {
-      render(
-        React.createElement(BrainRerun, {
-          runId: argv.runId as string,
-          startsAt: argv.startsAt as number,
-        })
-      );
-    }
-  );
-
-  // --- Run Brain Command ---
-  cli = cli.command(
-    ['run <brain>', 'r <brain>'],
-    'Run a brain and optionally watch its execution\n',
-    (yargsRun) => {
-      return yargsRun
-        .positional('brain', {
-          describe: 'Brain identifier (title, filename, or search term)',
-          type: 'string',
-          demandOption: true,
-        })
-        .option('watch', {
-          describe: 'Watch the brain run immediately after starting',
-          type: 'boolean',
-          alias: 'w',
-          default: false,
-        })
-        .option('options', {
-          describe: 'Options to pass to the brain (key=value format)',
-          type: 'array',
-          alias: 'o',
-          string: true,
-          coerce: parseKeyValueOptions,
-        })
-        .option('state', {
-          describe:
-            'Initial state values (key=value format, with type coercion)',
-          type: 'array',
-          alias: 's',
-          string: true,
-          coerce: parseStateValues,
-        })
-        .option('state-json', {
-          describe: 'Initial state as a JSON string',
-          type: 'string',
-        })
-        .check((argv) => {
-          if (argv.state && argv.stateJson) {
-            throw new Error(
-              'Cannot use both --state/-s and --state-json at the same time.'
-            );
-          }
-          return true;
-        })
-        .example('$0 run my-brain', 'Run a brain by filename')
-        .example('$0 run "Email Digest"', 'Run a brain by title')
-        .example('$0 run email', 'Fuzzy search for brains matching "email"')
-        .example(
-          '$0 run my-brain --watch',
-          'Run a brain and watch its execution'
-        )
-        .example(
-          '$0 run my-brain -o channel=#general -o debug=true',
-          'Run a brain with options'
-        )
-        .example(
-          '$0 run my-brain -s count=0 -s name=sean',
-          'Run a brain with initial state'
-        )
-        .example(
-          '$0 run my-brain --state-json \'{"items": [], "config": {"debug": true}}\'',
-          'Run a brain with initial state from JSON'
-        );
-    },
-    (argv) => {
-      let initialState: Record<string, unknown> | undefined;
-      if (argv.stateJson) {
-        try {
-          initialState = JSON.parse(argv.stateJson as string);
-        } catch {
-          console.error(`Invalid JSON for --state-json: ${argv.stateJson}`);
-          process.exit(1);
-        }
-      } else if (argv.state) {
-        initialState = argv.state as Record<string, unknown>;
-      }
-      render(
-        React.createElement(BrainRun, {
-          identifier: argv.brain,
-          watch: argv.watch,
-          options: argv.options as Record<string, string> | undefined,
-          initialState,
-        })
-      );
-    }
-  );
-
-  // --- Watch Brain Run Command ---
-  cli = cli.command(
-    'watch <identifier>',
-    'Watch a brain run by brain name or run ID\n',
-    (yargsWatch) => {
-      return yargsWatch
-        .positional('identifier', {
-          describe: 'Brain name or run ID to watch',
-          type: 'string',
-          demandOption: true,
-        })
-        .option('events', {
-          describe: 'Start in events view instead of progress view',
-          type: 'boolean',
-          alias: 'e',
-          default: false,
-        })
-        .example(
-          '$0 watch my-brain',
-          "Watch the latest run of the brain named 'my-brain'"
-        )
-        .example('$0 watch abc123def', 'Watch a specific brain run by its ID')
-        .example('$0 watch my-brain --events', 'Watch with events log view');
-    },
-    (argv) => {
-      render(
-        React.createElement(WatchResolver, {
-          identifier: argv.identifier,
-          startWithEvents: argv.events,
-        })
-      );
-    }
-  );
-
-  // --- Top Command (view running brains) ---
-  cli = cli.command(
-    'top [brain]',
-    'View live status of all running brains\n',
-    (yargsTop) => {
-      return yargsTop
-        .positional('brain', {
-          describe: 'Filter to brains matching this name',
-          type: 'string',
-        })
-        .example('$0 top', 'View all running brains')
-        .example('$0 top my-brain', 'View running brains matching "my-brain"');
-    },
-    (argv) => {
-      render(React.createElement(TopNavigator, { brainFilter: argv.brain }));
-    }
-  );
-
-  // --- Brain Commands ---
+  // --- Brain Commands (under `brain` subcommand) ---
   cli = cli.command('brain', 'Manage your brains\n', (yargsBrain) => {
+    registerBrainCommands(yargsBrain, {
+      prefix: 'brain',
+      topLevelRunAlias: false,
+    });
+
     yargsBrain
-      .command(
-        'list',
-        'List all brains in the active project\n',
-        () => {},
-        () => {
-          render(React.createElement(BrainList));
-        }
-      )
-      .command(
-        'history <brain>',
-        'List recent runs of a specific brain\n',
-        (yargsHistory) => {
-          return yargsHistory
-            .positional('brain', {
-              describe: 'Brain identifier (title, filename, or search term)',
-              type: 'string',
-              demandOption: true,
-            })
-            .option('limit', {
-              describe: 'Maximum number of runs to show',
-              type: 'number',
-              default: 10,
-            })
-            .example(
-              '$0 brain history my-brain',
-              'List recent runs for my-brain'
-            )
-            .example(
-              '$0 brain history my-brain --limit=20',
-              'List more recent runs'
-            );
-        },
-        (argv) => {
-          render(
-            React.createElement(BrainResolver, {
-              identifier: argv.brain,
-              children: (resolvedBrainTitle: string) =>
-                React.createElement(BrainHistory, {
-                  brainName: resolvedBrainTitle,
-                  limit: argv.limit,
-                }),
-            })
-          );
-        }
-      )
-      .command(
-        'show [brain]',
-        'Show information about a brain or a specific run\n',
-        (yargsShow) => {
-          return yargsShow
-            .positional('brain', {
-              describe: 'Brain identifier to show info for',
-              type: 'string',
-            })
-            .option('run-id', {
-              describe: 'ID of a specific brain run to show',
-              type: 'string',
-              alias: 'id',
-            })
-            .option('steps', {
-              describe: 'Show the step structure of the brain',
-              type: 'boolean',
-              default: false,
-            })
-            .check((argv) => {
-              if (!argv.brain && !argv.runId) {
-                throw new Error(
-                  'You must provide either a brain identifier or a --run-id.'
-                );
-              }
-              return true;
-            })
-            .example('$0 brain show my-brain', 'Show info about my-brain')
-            .example(
-              '$0 brain show my-brain --steps',
-              'Show my-brain with step structure'
-            )
-            .example(
-              '$0 brain show --run-id abc123',
-              'Show details for a specific run'
-            );
-        },
-        (argv) => {
-          if (argv.runId) {
-            render(
-              React.createElement(RunShow, { runId: argv.runId as string })
-            );
-          } else if (argv.brain) {
-            render(
-              React.createElement(BrainShow, {
-                identifier: argv.brain,
-                showSteps: argv.steps || false,
-              })
-            );
-          } else {
-            render(
-              React.createElement(ErrorComponent, {
-                error: {
-                  title: 'Missing Argument',
-                  message:
-                    'You must provide either a brain identifier or a run ID.',
-                  details:
-                    'Use: show <brain> to show brain info, or show --run-id <id> to show run info.',
-                },
-              })
-            );
-          }
-        }
-      )
-      .command(
-        ['rerun <run-id>', 'rr <run-id>'],
-        'Rerun an existing brain run from a specific step\n',
-        (yargsRerun) => {
-          return yargsRerun
-            .positional('run-id', {
-              describe: 'ID of the brain run to rerun',
-              type: 'string',
-              demandOption: true,
-            })
-            .option('starts-at', {
-              describe: 'Step number to start execution from (1-indexed)',
-              type: 'number',
-              demandOption: true,
-            })
-            .alias('starts-at', 's')
-            .example(
-              '$0 brain rerun abc123 --starts-at=3',
-              'Rerun from step 3'
-            );
-        },
-        (argv) => {
-          render(
-            React.createElement(BrainRerun, {
-              runId: argv.runId as string,
-              startsAt: argv.startsAt as number,
-            })
-          );
-        }
-      )
-      .command(
-        'run <brain>',
-        'Run a brain and optionally watch its execution\n',
-        (yargsRun) => {
-          return yargsRun
-            .positional('brain', {
-              describe: 'Brain identifier (title, filename, or search term)',
-              type: 'string',
-              demandOption: true,
-            })
-            .option('watch', {
-              describe: 'Watch the brain run immediately after starting',
-              type: 'boolean',
-              alias: 'w',
-              default: false,
-            })
-            .option('options', {
-              describe: 'Options to pass to the brain (key=value format)',
-              type: 'array',
-              alias: 'o',
-              string: true,
-              coerce: parseKeyValueOptions,
-            })
-            .option('state', {
-              describe:
-                'Initial state values (key=value format, with type coercion)',
-              type: 'array',
-              alias: 's',
-              string: true,
-              coerce: parseStateValues,
-            })
-            .option('state-json', {
-              describe: 'Initial state as a JSON string',
-              type: 'string',
-            })
-            .check((argv) => {
-              if (argv.state && argv.stateJson) {
-                throw new Error(
-                  'Cannot use both --state/-s and --state-json at the same time.'
-                );
-              }
-              return true;
-            })
-            .example('$0 brain run my-brain', 'Run a brain by filename')
-            .example('$0 brain run "Email Digest"', 'Run a brain by title')
-            .example(
-              '$0 brain run email',
-              'Fuzzy search for brains matching "email"'
-            )
-            .example(
-              '$0 brain run my-brain --watch',
-              'Run a brain and watch its execution'
-            )
-            .example(
-              '$0 brain run my-brain -o channel=#general -o debug=true',
-              'Run a brain with options'
-            )
-            .example(
-              '$0 brain run my-brain -s count=0 -s name=sean',
-              'Run a brain with initial state'
-            );
-        },
-        (argv) => {
-          let initialState: Record<string, unknown> | undefined;
-          if (argv.stateJson) {
-            try {
-              initialState = JSON.parse(argv.stateJson as string);
-            } catch {
-              console.error(`Invalid JSON for --state-json: ${argv.stateJson}`);
-              process.exit(1);
-            }
-          } else if (argv.state) {
-            initialState = argv.state as Record<string, unknown>;
-          }
-          render(
-            React.createElement(BrainRun, {
-              identifier: argv.brain,
-              watch: argv.watch,
-              options: argv.options as Record<string, string> | undefined,
-              initialState,
-            })
-          );
-        }
-      )
-      .command(
-        'watch <identifier>',
-        'Watch a brain run by brain name or run ID\n',
-        (yargsWatch) => {
-          return yargsWatch
-            .positional('identifier', {
-              describe: 'Brain name or run ID to watch',
-              type: 'string',
-              demandOption: true,
-            })
-            .option('events', {
-              describe: 'Start in events view instead of progress view',
-              type: 'boolean',
-              alias: 'e',
-              default: false,
-            })
-            .example(
-              '$0 brain watch my-brain',
-              "Watch the latest run of the brain named 'my-brain'"
-            )
-            .example(
-              '$0 brain watch abc123def',
-              'Watch a specific brain run by its ID'
-            )
-            .example(
-              '$0 brain watch my-brain --events',
-              'Watch with events log view'
-            );
-        },
-        (argv) => {
-          render(
-            React.createElement(WatchResolver, {
-              identifier: argv.identifier,
-              startWithEvents: argv.events,
-            })
-          );
-        }
-      )
       .command(
         'kill <run-id>',
         'Kill a running brain\n',
@@ -970,27 +747,6 @@ export function buildCli(options: CliOptions) {
               runId: argv.runId as string,
               force: argv.force,
             })
-          );
-        }
-      )
-      .command(
-        'top [brain]',
-        'View live status of all running brains\n',
-        (yargsTop) => {
-          return yargsTop
-            .positional('brain', {
-              describe: 'Filter to brains matching this name',
-              type: 'string',
-            })
-            .example('$0 brain top', 'View all running brains')
-            .example(
-              '$0 brain top my-brain',
-              'View running brains matching "my-brain"'
-            );
-        },
-        (argv) => {
-          render(
-            React.createElement(TopNavigator, { brainFilter: argv.brain })
           );
         }
       )

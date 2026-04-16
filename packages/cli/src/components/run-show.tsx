@@ -4,6 +4,7 @@ import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { STATUS } from '@positronic/core';
 import { formatDate, formatDuration, getStatusColor } from '../lib/format.js';
+import { Field } from './field.js';
 
 interface SerializedError {
   name: string;
@@ -27,19 +28,6 @@ interface BrainRun {
 interface RunShowProps {
   runId: string;
 }
-
-// Component to display a labeled field
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
-  <Box>
-    <Box width={14}>
-      <Text dimColor>{label}:</Text>
-    </Box>
-    <Box flexGrow={1}>{children}</Box>
-  </Box>
-);
 
 export const RunShow = ({ runId }: RunShowProps) => {
   const { data, loading, error } = useApiGet<BrainRun>(
