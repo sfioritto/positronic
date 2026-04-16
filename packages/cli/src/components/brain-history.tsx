@@ -3,6 +3,14 @@ import { Text, Box } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { STATUS } from '@positronic/core';
+import {
+  padRight,
+  truncate,
+  formatDate,
+  formatRelativeTime,
+  formatDuration,
+  getStatusColor,
+} from '../lib/format.js';
 
 interface BrainHistoryProps {
   brainName: string;
@@ -25,70 +33,6 @@ interface BrainRun {
 interface BrainHistoryResponse {
   runs: BrainRun[];
 }
-
-// Helper to format dates
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
-
-// Helper to format relative time
-const formatRelativeTime = (timestamp: number): string => {
-  const now = Date.now();
-  const diffMs = now - timestamp;
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) {
-    return 'just now';
-  } else if (diffMins < 60) {
-    return `${diffMins} min ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hr ago`;
-  } else {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  }
-};
-
-// Helper to format duration
-const formatDuration = (startMs: number, endMs: number): string => {
-  const durationMs = endMs - startMs;
-  const seconds = Math.floor(durationMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-
-  if (seconds < 60) {
-    return `${seconds}s`;
-  } else {
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-};
-
-// Helper to get status color
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case STATUS.COMPLETE:
-      return 'green';
-    case STATUS.ERROR:
-      return 'red';
-    case STATUS.RUNNING:
-      return 'yellow';
-    default:
-      return 'gray';
-  }
-};
-
-// Helper to pad text to column width
-const padRight = (text: string, width: number): string => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
-};
-
-// Helper to truncate text
-const truncate = (text: string, maxWidth: number): string => {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-};
 
 export const BrainHistory = ({ brainName, limit }: BrainHistoryProps) => {
   const url = `/brains/${encodeURIComponent(brainName)}/history?limit=${limit}`;

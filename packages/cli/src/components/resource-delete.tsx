@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useStdin, useApp } from 'ink';
+import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
 import { generateTypes } from '../commands/helpers.js';
+import { useTypeYesConfirm } from '../hooks/useTypeYesConfirm.js';
 
 interface ApiResourceEntry {
   key: string;
@@ -31,12 +32,8 @@ export const ResourceDelete = ({
   projectRootPath,
   force = false,
 }: ResourceDeleteProps) => {
-  const [confirmed, setConfirmed] = useState(force); // Auto-confirm if force is true
   const [deleted, setDeleted] = useState(false);
-  const [input, setInput] = useState('');
   const [isLocalResource, setIsLocalResource] = useState<boolean | null>(null);
-  const { stdin, setRawMode } = useStdin();
-  const { exit } = useApp();
 
   const {
     data: resourcesData,
@@ -44,6 +41,7 @@ export const ResourceDelete = ({
     error: listError,
   } = useApiGet<ResourcesResponse>('/resources');
   const { execute: deleteResource, loading, error } = useApiDelete('resource');
+  const { confirmed, input } = useTypeYesConfirm(force);
 
   // Check if the resource is local
   useEffect(() => {
@@ -58,39 +56,6 @@ export const ResourceDelete = ({
       }
     }
   }, [resourcesData, resourceKey]);
-
-  useEffect(() => {
-    if (stdin && !confirmed && !deleted && !force) {
-      setRawMode(true);
-
-      const handleData = (data: Buffer) => {
-        const char = data.toString();
-
-        if (char === '\r' || char === '\n') {
-          if (input.toLowerCase() === 'yes') {
-            setConfirmed(true);
-          } else {
-            exit();
-          }
-        } else if (char === '\u0003') {
-          // Ctrl+C
-          exit();
-        } else if (char === '\u007F' || char === '\b') {
-          // Backspace
-          setInput((prev) => prev.slice(0, -1));
-        } else {
-          setInput((prev) => prev + char);
-        }
-      };
-
-      stdin.on('data', handleData);
-
-      return () => {
-        stdin.off('data', handleData);
-        setRawMode(false);
-      };
-    }
-  }, [stdin, setRawMode, confirmed, deleted, input, exit, force]);
 
   useEffect(() => {
     if (confirmed && !loading && !error && !deleted) {

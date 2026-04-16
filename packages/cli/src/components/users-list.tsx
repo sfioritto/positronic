@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
+import { padRight, truncate, formatDate } from '../lib/format.js';
 
 interface User {
   name: string;
@@ -12,20 +13,6 @@ interface UsersResponse {
   users: User[];
   count: number;
 }
-
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
-
-const truncate = (text: string, maxWidth: number): string => {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-};
-
-const padRight = (text: string, width: number): string => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
-};
 
 export const UsersList = () => {
   const { data, loading, error } = useApiGet<UsersResponse>('/users');

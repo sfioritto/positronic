@@ -3,6 +3,7 @@ import { Text, Box, useInput, useApp } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
 import { BrainInfo } from './brain-show.js';
+import { padRight } from '../lib/format.js';
 import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 
 interface Brain {
@@ -15,11 +16,6 @@ interface BrainsResponse {
   brains: Brain[];
   count: number;
 }
-
-// Helper to pad text to column width
-const padRight = (text: string, width: number): string => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
-};
 
 // Helper to wrap text to multiple lines
 const wrapText = (text: string, maxWidth: number): string[] => {

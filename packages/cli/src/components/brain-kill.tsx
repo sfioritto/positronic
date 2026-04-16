@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Text, useStdin, useApp } from 'ink';
+import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete } from '../hooks/useApi.js';
+import { useTypeYesConfirm } from '../hooks/useTypeYesConfirm.js';
 
 interface BrainKillProps {
   runId: string;
@@ -9,55 +10,11 @@ interface BrainKillProps {
 }
 
 export const BrainKill = ({ runId, force }: BrainKillProps) => {
-  const [confirmed, setConfirmed] = useState(force);
   const [killed, setKilled] = useState(false);
-  const [input, setInput] = useState('');
-  const inputRef = useRef(''); // Track input in ref to avoid stale closure
-  const { stdin, setRawMode } = useStdin();
-  const { exit } = useApp();
   const isKilling = useRef(false);
 
   const { execute: killBrain, loading, error } = useApiDelete('brain');
-
-  useEffect(() => {
-    if (stdin && !confirmed && !killed) {
-      setRawMode(true);
-
-      const handleData = (data: Buffer) => {
-        const chars = data.toString();
-
-        // Process each character in the buffer (stdin may send multiple at once)
-        for (const char of chars) {
-          if (char === '\r' || char === '\n') {
-            if (inputRef.current.toLowerCase() === 'yes') {
-              setConfirmed(true);
-            } else {
-              exit();
-            }
-            return; // Stop processing after Enter
-          } else if (char === '\u0003') {
-            // Ctrl+C
-            exit();
-            return;
-          } else if (char === '\u007F' || char === '\b') {
-            // Backspace
-            inputRef.current = inputRef.current.slice(0, -1);
-            setInput(inputRef.current);
-          } else {
-            inputRef.current = inputRef.current + char;
-            setInput(inputRef.current);
-          }
-        }
-      };
-
-      stdin.on('data', handleData);
-
-      return () => {
-        stdin.off('data', handleData);
-        setRawMode(false);
-      };
-    }
-  }, [stdin, setRawMode, confirmed, killed, exit]);
+  const { confirmed, input } = useTypeYesConfirm(force);
 
   useEffect(() => {
     if (confirmed && !killed && !isKilling.current) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
+import { padRight, truncate } from '../lib/format.js';
 
 interface ProjectListProps {
   projectConfig: ProjectConfigManager;
@@ -80,12 +81,3 @@ export const ProjectList = ({ projectConfig }: ProjectListProps) => {
     </Box>
   );
 };
-
-function padRight(text: string, width: number): string {
-  return text + ' '.repeat(Math.max(0, width - text.length));
-}
-
-function truncate(text: string, maxWidth: number): string {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-}

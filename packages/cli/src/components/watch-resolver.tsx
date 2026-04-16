@@ -13,7 +13,8 @@ import { useMachine } from 'react-robot';
 import { Watch } from './watch.js';
 import { ErrorComponent } from './error.js';
 import { SelectList } from './select-list.js';
-import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
+import { apiClient } from '../commands/helpers.js';
+import { handleNetworkError } from '../hooks/useApi.js';
 
 // Types
 interface Brain {
@@ -60,24 +61,6 @@ interface ResolverContext {
   runSearchResult: BrainRun | null;
   activeRunsResult: ActiveRunsResponse['runs'] | null;
 }
-
-// Helper to get connection error message
-const getConnectionError = () => {
-  if (isApiLocalDevMode()) {
-    return {
-      title: 'Connection Error',
-      message: 'Error connecting to the local development server.',
-      details:
-        "Please ensure the server is running ('positronic server' or 'px s').",
-    };
-  }
-  return {
-    title: 'Connection Error',
-    message: 'Error connecting to the remote project server.',
-    details:
-      'Please check your network connection and verify the project URL is correct.',
-  };
-};
 
 // Async functions for invoke states
 const searchBrains = async (ctx: ResolverContext) => {
@@ -141,18 +124,6 @@ const fetchActiveRuns = async (ctx: ResolverContext) => {
     message: `Failed to get active runs for brain "${ctx.resolvedBrainTitle}".`,
     details: `Server returned ${response.status}: ${errorText}`,
   };
-};
-
-// Error handler for network errors
-const handleNetworkError = (err: unknown): ErrorInfo => {
-  // If it's already an ErrorInfo object (thrown from our async functions)
-  if (err && typeof err === 'object' && 'title' in err && 'message' in err) {
-    return err as ErrorInfo;
-  }
-  // Network/connection error
-  const baseError = getConnectionError();
-  const message = err instanceof Error ? err.message : String(err);
-  return { ...baseError, details: `${baseError.details} ${message}` };
 };
 
 // Reducers

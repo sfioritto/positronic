@@ -2,6 +2,12 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
+import {
+  padRight,
+  truncate,
+  formatDate,
+  formatNextRunTime,
+} from '../lib/format.js';
 
 interface ScheduleListProps {
   brainFilter?: string;
@@ -22,44 +28,6 @@ interface SchedulesResponse {
   schedules: Schedule[];
   count: number;
 }
-
-// Helper to format dates consistently
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
-
-// Helper to format relative time
-const formatRelativeTime = (date: Date): string => {
-  const now = new Date();
-  const diffMs = date.getTime() - now.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMs < 0) {
-    return '(overdue)';
-  } else if (diffMins < 1) {
-    return '< 1 min';
-  } else if (diffMins < 60) {
-    return `${diffMins} min`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hr`;
-  } else {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'}`;
-  }
-};
-
-// Helper to truncate text to fit column width
-const truncate = (text: string, maxWidth: number): string => {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-};
-
-// Helper to pad text to column width
-const padRight = (text: string, width: number): string => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
-};
 
 export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
   const { data, loading, error } =
@@ -230,7 +198,7 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
               <Text> </Text>
               <Text color={isOverdue ? 'red' : undefined}>
                 {padRight(
-                  nextRunDate ? formatRelativeTime(nextRunDate) : 'N/A',
+                  nextRunDate ? formatNextRunTime(nextRunDate) : 'N/A',
                   columns.nextRun.width
                 )}
               </Text>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, Box } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
+import { padRight, formatDate, formatRelativeTime } from '../lib/format.js';
 
 interface ScheduleRunsProps {
   scheduleId?: string;
@@ -22,31 +23,6 @@ interface ScheduleRunsResponse {
   runs: ScheduledRun[];
   count: number;
 }
-
-// Helper to format dates
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
-
-// Helper to format relative time
-const formatRelativeTime = (timestamp: number): string => {
-  const now = Date.now();
-  const diffMs = now - timestamp;
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) {
-    return 'just now';
-  } else if (diffMins < 60) {
-    return `${diffMins} min ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hr ago`;
-  } else {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  }
-};
 
 export const ScheduleRuns = ({
   scheduleId,
@@ -158,9 +134,4 @@ export const ScheduleRuns = ({
       </Box>
     </Box>
   );
-};
-
-// Helper to pad text to column width
-const padRight = (text: string, width: number): string => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
+import { padRight, truncate, formatDate } from '../lib/format.js';
 
 interface Secret {
   name: string;
@@ -13,23 +14,6 @@ interface SecretsResponse {
   secrets: Secret[];
   count: number;
 }
-
-// Helper to truncate text to fit column width
-const truncate = (text: string, maxWidth: number): string => {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-};
-
-// Helper to pad text to column width
-const padRight = (text: string, width: number): string => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
-};
-
-// Helper to format dates consistently
-const formatDate = (dateStr: string): string => {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
 
 export const SecretsList = () => {
   const { data, loading, error } = useApiGet<SecretsResponse>('/secrets');
