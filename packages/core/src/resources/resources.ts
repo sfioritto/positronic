@@ -34,6 +34,30 @@ export function createResources<M extends Manifest>(
   loader: ResourceLoader,
   initialManifest: M
 ) {
+  function makeResource(entry: Entry, label: string): Resource {
+    const { key, type } = entry;
+    return {
+      load: () =>
+        type === 'text' ? loader.load(key, 'text') : loader.load(key, 'binary'),
+      loadText: () => {
+        if (type !== 'text') {
+          throw new Error(
+            `Resource "${label}" is of type "${type}", but was accessed with loadText().`
+          );
+        }
+        return loader.load(key, 'text');
+      },
+      loadBinary: () => {
+        if (type !== 'binary') {
+          throw new Error(
+            `Resource "${label}" is of type "${type}", but was accessed with loadBinary().`
+          );
+        }
+        return loader.load(key, 'binary');
+      },
+    };
+  }
+
   // Helper function to find a resource entry by path in the manifest
   function findResourceByPath(manifest: Manifest, path: string): Entry | null {
     const parts = path.split('/');
@@ -132,30 +156,7 @@ export function createResources<M extends Manifest>(
           const manifestEntry = manifestNode[prop];
 
           if (isResourceEntry(manifestEntry)) {
-            const { key, type } = manifestEntry;
-            const apiObject: Resource = {
-              load: () =>
-                manifestEntry.type === 'text'
-                  ? loader.load(key, 'text')
-                  : loader.load(key, 'binary'),
-              loadText: () => {
-                if (type !== 'text') {
-                  throw new Error(
-                    `Resource "${prop}" is of type "${type}", but was accessed with loadText().`
-                  );
-                }
-                return loader.load(key, 'text');
-              },
-              loadBinary: () => {
-                if (type !== 'binary') {
-                  throw new Error(
-                    `Resource "${prop}" is of type "${type}", but was accessed with loadBinary().`
-                  );
-                }
-                return loader.load(key, 'binary');
-              },
-            };
-            return apiObject;
+            return makeResource(manifestEntry, prop);
           } else {
             // manifestEntry is a nested Manifest
             const nestedResources = createProxiedResources(
@@ -182,31 +183,7 @@ export function createResources<M extends Manifest>(
 
         if (matches.length === 1) {
           // Single match - return it
-          const manifestEntry = manifestNode[matches[0]] as Entry;
-          const { key, type } = manifestEntry;
-          const apiObject: Resource = {
-            load: () =>
-              type === 'text'
-                ? loader.load(key, 'text')
-                : loader.load(key, 'binary'),
-            loadText: () => {
-              if (type !== 'text') {
-                throw new Error(
-                  `Resource "${matches[0]}" is of type "${type}", but was accessed with loadText().`
-                );
-              }
-              return loader.load(key, 'text');
-            },
-            loadBinary: () => {
-              if (type !== 'binary') {
-                throw new Error(
-                  `Resource "${matches[0]}" is of type "${type}", but was accessed with loadBinary().`
-                );
-              }
-              return loader.load(key, 'binary');
-            },
-          };
-          return apiObject;
+          return makeResource(manifestNode[matches[0]] as Entry, matches[0]);
         }
 
         // Multiple matches - throw helpful error

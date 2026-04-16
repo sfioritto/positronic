@@ -1,8 +1,5 @@
 export const BRAIN_EVENTS = {
   START: 'brain:start',
-  // RESTART is deprecated - use START for all brain starts (fresh or resume)
-  // Kept temporarily for backwards compatibility during transition
-  RESTART: 'brain:restart',
   STEP_START: 'step:start',
   STEP_COMPLETE: 'step:complete',
   STEP_STATUS: 'step:status',

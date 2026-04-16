@@ -91,6 +91,18 @@ type ExtractSchema<T> = T extends { schema: infer S }
     : never
   : never;
 
+/** Normalize one or many registrations and strip Zod schemas for serialization. */
+export function serializeWebhookRegistrations(
+  registrations: WebhookRegistration | readonly WebhookRegistration[]
+): SerializedWebhookRegistration[] {
+  const arr = Array.isArray(registrations) ? registrations : [registrations];
+  return arr.map((r) => ({
+    slug: r.slug,
+    identifier: r.identifier,
+    token: r.token,
+  }));
+}
+
 // Helper to normalize a single WebhookRegistration into a tuple for ExtractWebhookResponses
 export type NormalizeToArray<T> = T extends readonly any[] ? T : readonly [T];
 

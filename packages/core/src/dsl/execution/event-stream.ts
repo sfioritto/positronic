@@ -18,10 +18,10 @@ import { STATUS, BRAIN_EVENTS } from '../constants.js';
 import { createPatch, applyPatches } from '../json-patch.js';
 import { IterateResult } from '../iterate-result.js';
 import type { Resources } from '../../resources/resources.js';
-import type {
-  WebhookRegistration,
-  SerializedWebhookRegistration,
-  SerializedPageContext,
+import {
+  type WebhookRegistration,
+  type SerializedPageContext,
+  serializeWebhookRegistrations,
 } from '../webhook.js';
 import type { Pages } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
@@ -337,31 +337,19 @@ export class BrainEventStream<
       // Process each step
       while (this.currentStepIndex < steps.length) {
         // Check for CONTROL signals before each step
-        if (this.signalProvider) {
-          const signals = await this.signalProvider.getSignals('CONTROL');
-          for (const signal of signals) {
-            if (signal.type === 'KILL') {
-              yield {
-                type: BRAIN_EVENTS.CANCELLED,
-                status: STATUS.CANCELLED,
-                brainTitle,
-                brainDescription,
-                brainRunId,
-                options,
-              };
-              return;
-            }
-            if (signal.type === 'PAUSE') {
-              yield {
-                type: BRAIN_EVENTS.PAUSED,
-                status: STATUS.PAUSED,
-                brainTitle,
-                brainDescription,
-                brainRunId,
-                options,
-              };
-              return;
-            }
+        {
+          const sentinel = yield* this.checkControlSignals();
+          if (sentinel === 'cancel') return;
+          if (sentinel === 'pause') {
+            yield {
+              type: BRAIN_EVENTS.PAUSED,
+              status: STATUS.PAUSED,
+              brainTitle,
+              brainDescription,
+              brainRunId,
+              options,
+            };
+            return;
           }
         }
 
@@ -647,11 +635,7 @@ export class BrainEventStream<
 
       // Resolve per-step client: if the step has an override, apply governor to it;
       // otherwise use the default (already-governed) client
-      const stepClient = stepBlock.client
-        ? this.governor
-          ? this.governor(stepBlock.client)
-          : stepBlock.client
-        : this.client;
+      const stepClient = this.resolveClient(stepBlock.client);
 
       // Event channel lets file operations (and potentially other services)
       // emit events mid-step. The race loop yields them as they arrive.
@@ -731,12 +715,7 @@ export class BrainEventStream<
       this.buildStepContext(step)
     );
 
-    const rawClient = config.client ?? this.brainClient;
-    const client = rawClient
-      ? this.governor
-        ? this.governor(rawClient)
-        : rawClient
-      : this.client;
+    const client = this.resolveClient(config.client ?? this.brainClient);
 
     const prompt = await resolveTemplate(config.message, this.templateContext);
 
@@ -968,33 +947,23 @@ The output must conform to the provided schema.`,
       }
 
       // Check signals
-      if (this.signalProvider) {
-        const signals = await this.signalProvider.getSignals('CONTROL');
-        for (const signal of signals) {
-          if (signal.type === 'KILL') {
-            this.stopped = true;
-            yield {
-              type: BRAIN_EVENTS.CANCELLED,
-              status: STATUS.CANCELLED,
-              brainTitle: this.title,
-              brainDescription: this.description,
-              brainRunId: this.brainRunId,
-              options: this.options ?? ({} as TOptions),
-            };
-            return;
-          }
-          if (signal.type === 'PAUSE') {
-            this.stopped = true;
-            yield {
-              type: BRAIN_EVENTS.PAUSED,
-              status: STATUS.PAUSED,
-              brainTitle: this.title,
-              brainDescription: this.description,
-              brainRunId: this.brainRunId,
-              options: this.options ?? ({} as TOptions),
-            };
-            return;
-          }
+      {
+        const sentinel = yield* this.checkControlSignals();
+        if (sentinel === 'cancel') {
+          this.stopped = true;
+          return;
+        }
+        if (sentinel === 'pause') {
+          this.stopped = true;
+          yield {
+            type: BRAIN_EVENTS.PAUSED,
+            status: STATUS.PAUSED,
+            brainTitle: this.title,
+            brainDescription: this.description,
+            brainRunId: this.brainRunId,
+            options: this.options ?? ({} as TOptions),
+          };
+          return;
         }
       }
 
@@ -1280,16 +1249,8 @@ The output must conform to the provided schema.`,
       // After all tool calls: if pending webhook, suspend
       if (pendingWebhook) {
         const { waitFor: toolWaitFor } = pendingWebhook;
-        const webhooks = Array.isArray(toolWaitFor.waitFor)
-          ? toolWaitFor.waitFor
-          : [toolWaitFor.waitFor];
-
-        const serializedWaitFor: SerializedWebhookRegistration[] = webhooks.map(
-          (registration: WebhookRegistration) => ({
-            slug: registration.slug,
-            identifier: registration.identifier,
-            token: registration.token,
-          })
+        const serializedWaitFor = serializeWebhookRegistrations(
+          toolWaitFor.waitFor
         );
 
         // Emit prompt-level webhook event
@@ -1349,25 +1310,15 @@ The output must conform to the provided schema.`,
 
     for (let i = startIndex; i < totalItems; i++) {
       // Check signals before each item
-      if (this.signalProvider) {
-        const signals = await this.signalProvider.getSignals('CONTROL');
-        for (const signal of signals) {
-          if (signal.type === 'KILL') {
-            this.stopped = true;
-            yield {
-              type: BRAIN_EVENTS.CANCELLED,
-              status: STATUS.CANCELLED,
-              brainTitle: this.title,
-              brainDescription: this.description,
-              brainRunId: this.brainRunId,
-              options: this.options ?? ({} as TOptions),
-            };
-            return;
-          }
-          if (signal.type === 'PAUSE') {
-            this.stopped = true;
-            return;
-          }
+      {
+        const sentinel = yield* this.checkControlSignals();
+        if (sentinel === 'cancel') {
+          this.stopped = true;
+          return;
+        }
+        if (sentinel === 'pause') {
+          this.stopped = true;
+          return;
         }
       }
 
@@ -1391,12 +1342,7 @@ The output must conform to the provided schema.`,
                   this.templateContext
                 )
             : undefined;
-          const rawClient = config.client ?? this.brainClient;
-          const client = rawClient
-            ? this.governor
-              ? this.governor(rawClient)
-              : rawClient
-            : this.client;
+          const client = this.resolveClient(config.client ?? this.brainClient);
 
           if (config.prompt.loop) {
             // Prompt + loop mode: run tool-calling loop per item
@@ -1686,17 +1632,8 @@ The output must conform to the provided schema.`,
 
     yield this.stepStatusEvent();
 
-    // Normalize result to array (handle single webhook case)
-    const webhooks = Array.isArray(result) ? result : [result];
-
-    // Serialize webhooks (strip Zod schemas)
-    const serializedWaitFor: SerializedWebhookRegistration[] = webhooks.map(
-      (registration: WebhookRegistration) => ({
-        slug: registration.slug,
-        identifier: registration.identifier,
-        token: registration.token,
-      })
-    );
+    // Normalize and serialize webhooks (strip Zod schemas)
+    const serializedWaitFor = serializeWebhookRegistrations(result);
 
     // Emit WEBHOOK event
     yield {
@@ -1801,6 +1738,48 @@ The output must conform to the provided schema.`,
     }
 
     return result;
+  }
+
+  /**
+   * Poll CONTROL signals. Yields a CANCELLED event for a KILL signal and
+   * returns 'cancel'; returns 'pause' for a PAUSE signal (no event yielded —
+   * callers differ on whether to emit PAUSED); returns null when there are no
+   * actionable signals. The caller is responsible for setting this.stopped,
+   * since each call site has different requirements.
+   */
+  private async *checkControlSignals(): AsyncGenerator<
+    BrainEvent<TOptions>,
+    'cancel' | 'pause' | null
+  > {
+    if (!this.signalProvider) return null;
+    const signals = await this.signalProvider.getSignals('CONTROL');
+    for (const signal of signals) {
+      if (signal.type === 'KILL') {
+        yield {
+          type: BRAIN_EVENTS.CANCELLED,
+          status: STATUS.CANCELLED,
+          brainTitle: this.title,
+          brainDescription: this.description,
+          brainRunId: this.brainRunId,
+          options: this.options ?? ({} as TOptions),
+        };
+        return 'cancel';
+      }
+      if (signal.type === 'PAUSE') {
+        return 'pause';
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Resolve the effective LLM client for a step. If an override is provided,
+   * pass it through the governor (if any); otherwise fall back to the default
+   * client for this brain run.
+   */
+  private resolveClient(override?: ObjectGenerator): ObjectGenerator {
+    if (!override) return this.client;
+    return this.governor ? this.governor(override) : override;
   }
 
   private *completeStep(
