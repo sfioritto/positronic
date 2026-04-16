@@ -108,3 +108,9 @@ import Page from './component.tsx';
 const data = (window as any).__POSITRONIC_DATA__ || {};
 createRoot(document.getElementById('root')!).render(<Page data={data} />);
 EOF
+
+# Form validation script — renders the component in JSDOM and checks that
+# all output schema fields have corresponding form inputs.
+# Reads input data from /workspace/test-data.json and form schema from
+# /workspace/form-schema.mjs (both written at runtime by validateForm).
+COPY src/scripts/test-form.mjs /workspace/test-form.mjs

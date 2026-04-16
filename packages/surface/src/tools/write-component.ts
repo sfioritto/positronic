@@ -18,12 +18,7 @@ export function writeComponentTool(
     }),
     async execute({ source }: any) {
       await sandbox.writeFile('/workspace/component.tsx', source);
-      const result = await typeCheck(
-        sandbox,
-        source,
-        inputSchema,
-        outputSchema
-      );
+      const result = await typeCheck(sandbox, inputSchema, outputSchema);
       if (result.success) {
         return {
           status: 'success',

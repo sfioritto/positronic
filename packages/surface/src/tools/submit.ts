@@ -1,15 +1,28 @@
 import { z } from 'zod';
 import type { StreamTool } from '@positronic/core';
+import type { SandboxInstance } from '../sandbox.js';
+import { validateForm } from '../sandbox.js';
 
-export function submitTool(validator?: StreamTool): StreamTool {
+export function submitTool(
+  sandbox: SandboxInstance,
+  outputSchema?: string,
+  fakeData?: Record<string, unknown>
+): StreamTool {
   return {
     description:
-      'Submit the current component as the final version. Call this when you are satisfied with the component after previewing it.',
+      'Submit the current component as the final version. If the component includes a form, it will be validated against the output schema first.',
     inputSchema: z.object({}),
     async execute() {
-      if (validator) {
-        const result = (await validator.execute!({})) as { status: string };
-        if (result.status === 'error') return result;
+      if (outputSchema && fakeData) {
+        const result = await validateForm(sandbox, outputSchema, fakeData);
+        if (!result.success) {
+          return {
+            status: 'error',
+            message:
+              'Form validation failed. Fix the form fields and try again.',
+            errors: result.errors,
+          };
+        }
       }
       return { status: 'success', message: 'Component submitted.' };
     },

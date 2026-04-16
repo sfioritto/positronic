@@ -6,7 +6,6 @@ import { writeComponentTool } from './tools/write-component.js';
 
 import { previewTool } from './tools/preview.js';
 import { submitTool } from './tools/submit.js';
-import { validateFormTool } from './tools/validate-form.js';
 
 interface GenerateDebugLog {
   fakeDataConversation: JsonValue[];
@@ -67,22 +66,14 @@ export async function generate(params: {
   await onProgress?.({ type: 'fake_data_done', data: fakeData });
 
   // Step 2: Define tools
-  const validator = outputSchema
-    ? validateFormTool(sandbox, outputSchema, fakeData)
-    : undefined;
-
   const rawTools: Record<string, StreamTool> = {
     write_component: writeComponentTool(sandbox, inputSchema, outputSchema),
     preview: previewTool(sandbox, fakeData, accountId, apiToken, {
       debug,
       screenshots,
     }),
-    submit: submitTool(validator),
+    submit: submitTool(sandbox, outputSchema, fakeData),
   };
-
-  if (validator) {
-    rawTools.validate_form = validator;
-  }
 
   // Wrap tools to emit progress events (tools without execute are pass-through —
   // the Vercel AI SDK uses missing execute as a loop termination signal)
@@ -120,8 +111,6 @@ The component must include a form that submits data matching this schema:
 \`\`\`typescript
 ${outputSchema}
 \`\`\`
-
-After writing the component, use validate_form to verify the form fields match the schema.
 `
     : ''
 }
@@ -130,7 +119,7 @@ Instructions:
 2. Fix any type errors and call write_component again
 3. Preview it to see how it looks
 4. Iterate until satisfied
-5. Call submit when done`;
+5. Call submit when done — it will validate form fields against the schema if applicable`;
 
   // Step 4: Run the generation loop
   const componentResult = await client.streamText({

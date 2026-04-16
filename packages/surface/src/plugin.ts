@@ -1,13 +1,18 @@
 import { definePlugin } from '@positronic/core';
 import type { ObjectGenerator } from '@positronic/core';
-import { generate, type GenerateResult } from './generate.js';
+import {
+  generate,
+  type GenerateResult,
+  type ProgressEvent,
+} from './generate.js';
+import type { SandboxInstance } from './sandbox.js';
 import systemPromptTemplate from './system-prompt.gen.js';
 
 export type SurfaceConfig = {
   /** LLM client for UI generation (typically a fast/cheap model) */
   client: ObjectGenerator;
   /** Cloudflare Sandbox DO namespace binding */
-  sandbox: any;
+  sandbox: SandboxInstance;
   /** Cloudflare account ID for Browser Rendering API */
   accountId: string;
   /** Cloudflare API token with Browser Rendering permissions */
@@ -50,6 +55,7 @@ export const surface = definePlugin({
         inputSchema: string;
         outputSchema?: string;
         debug?: boolean;
+        onProgress?: (event: ProgressEvent) => void | Promise<void>;
       }): Promise<GenerateResult> => {
         return generate({
           client: config.client,
@@ -57,10 +63,7 @@ export const surface = definePlugin({
           systemPrompt,
           accountId: config.accountId,
           apiToken: config.apiToken,
-          prompt: params.prompt,
-          inputSchema: params.inputSchema,
-          outputSchema: params.outputSchema,
-          debug: params.debug,
+          ...params,
         });
       },
     };
