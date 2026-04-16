@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { ResourceEntry } from '@positronic/core';
+import { formatSize } from '../lib/format.js';
 
 interface ApiResourceEntry extends ResourceEntry {
   size: number;
@@ -186,11 +187,3 @@ const TreeView = ({
     </Box>
   );
 };
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}

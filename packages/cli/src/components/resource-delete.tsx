@@ -3,7 +3,7 @@ import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
 import { generateTypes } from '../commands/helpers.js';
-import { useTypeYesConfirm } from '../hooks/useTypeYesConfirm.js';
+import { useConfirm } from '../hooks/useConfirm.js';
 
 interface ApiResourceEntry {
   key: string;
@@ -41,7 +41,7 @@ export const ResourceDelete = ({
     error: listError,
   } = useApiGet<ResourcesResponse>('/resources');
   const { execute: deleteResource, loading, error } = useApiDelete('resource');
-  const { confirmed, input } = useTypeYesConfirm(force);
+  const { confirmed, input } = useConfirm({ mode: 'type-yes', force });
 
   // Check if the resource is local
   useEffect(() => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
-import { useYesNoConfirm } from '../hooks/useYesNoConfirm.js';
+import { useConfirm } from '../hooks/useConfirm.js';
 
 interface UsersKeysRemoveProps {
   userName: string;
@@ -33,7 +33,11 @@ export const UsersKeysRemove = ({
   const [deleted, setDeleted] = useState(false);
   const [deletionStarted, setDeletionStarted] = useState(false);
 
-  const { confirmed } = useYesNoConfirm(force, deleting || deleted);
+  const { confirmed } = useConfirm({
+    mode: 'y/n',
+    force,
+    acting: deleting || deleted,
+  });
 
   const handleDelete = useCallback(async () => {
     if (deletionStarted) return;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete } from '../hooks/useApi.js';
-import { useTypeYesConfirm } from '../hooks/useTypeYesConfirm.js';
+import { useConfirm } from '../hooks/useConfirm.js';
 
 interface ScheduleDeleteProps {
   scheduleId: string;
@@ -14,7 +14,7 @@ export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
   const isDeleting = useRef(false);
 
   const { execute: deleteSchedule, loading, error } = useApiDelete('schedule');
-  const { confirmed, input } = useTypeYesConfirm(force);
+  const { confirmed, input } = useConfirm({ mode: 'type-yes', force });
 
   useEffect(() => {
     if (confirmed && !deleted && !isDeleting.current) {

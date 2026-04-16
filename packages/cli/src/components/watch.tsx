@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Text, Box, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { EventSource } from 'eventsource';
@@ -8,10 +8,11 @@ import {
   STATUS,
   reconstructBrainTree,
   createBrainExecutionMachine,
+  createBrainMachine,
   sendEvent,
 } from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
-import { useBrainMachine } from '../hooks/useBrainMachine.js';
+import { useMachine } from 'react-robot';
 import {
   getApiBaseUrl,
   isApiLocalDevMode,
@@ -252,7 +253,8 @@ export const Watch = ({
 
   // Use state machine to track brain execution state
   // Machine is recreated when runId changes, giving us fresh context
-  const [current, send] = useBrainMachine(runId);
+  const machine = useMemo(() => createBrainMachine(), [runId]);
+  const [current, send] = useMachine(machine);
 
   // Keep a ref to the latest send function to avoid stale closure issues
   // When runId changes, useMachine updates send asynchronously, but our EventSource

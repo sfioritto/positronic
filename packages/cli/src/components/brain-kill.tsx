@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete } from '../hooks/useApi.js';
-import { useTypeYesConfirm } from '../hooks/useTypeYesConfirm.js';
+import { useConfirm } from '../hooks/useConfirm.js';
 
 interface BrainKillProps {
   runId: string;
@@ -14,7 +14,7 @@ export const BrainKill = ({ runId, force }: BrainKillProps) => {
   const isKilling = useRef(false);
 
   const { execute: killBrain, loading, error } = useApiDelete('brain');
-  const { confirmed, input } = useTypeYesConfirm(force);
+  const { confirmed, input } = useConfirm({ mode: 'type-yes', force });
 
   useEffect(() => {
     if (confirmed && !killed && !isKilling.current) {
