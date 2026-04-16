@@ -197,3 +197,35 @@ No separate `.step()` needed — the plugin is on the page step context, call `g
 **Generated projects** — When `px project new` scaffolds a Cloudflare project, the template includes the surface plugin pre-wired. Non-Cloudflare projects don't get it. Hosted service mode would work for any backend.
 
 **Why this matters for the product vision** — The user wants surface to be both open source (self-host on Cloudflare) and a paid product (hosted API). The plugin pattern supports both: same DSL, same brain code, different setup config. The framework has zero knowledge of surface — it's just a plugin that happens to generate HTML.
+
+### 2026-04-16: Reversing "remove prompt from .page()" — generation is first-class
+
+We initially removed `prompt` from `.page()` (2026-04-02) to keep the DSL simple and push generation into explicit `context.surface.generate()` calls. After using it, that decision doesn't hold up. Page generation is the primary use case for `.page()` — making users manually call surface in every page configFn is ceremony that should be framework-handled.
+
+**The new API:**
+
+```typescript
+.page('Dashboard', ({ state: { metrics, alerts } }) => ({
+  message: `Show a metrics dashboard with KPIs and alert banner`,
+  data: { metrics, alerts },
+  formSchema: z.object({ selectedMetrics: z.array(z.string()) }),
+}))
+```
+
+Key design decisions:
+
+1. **`message` not `prompt`** — Consistent with `.prompt()` and `.map()` which use `message` for the LLM instruction. The old API used `prompt` which was inconsistent.
+
+2. **`data` not `props`** — The brain author wraps their state fields in an object: `data: { emails }`. The field names carry semantic signal for fake data generation. Surface never sees the real values — only the inferred TypeScript interface. The old `props` name was ambiguous (React props? function params?).
+
+3. **`system` optional** — Appended to the user prompt as additional context, doesn't replace surface's 845-line system prompt. For domain-specific guidance like "use conservative colors for financial data."
+
+4. **Runtime inference, not Zod input schema** — We considered requiring a Zod schema for `inputSchema` (consistent with `outputSchema` on `.prompt()`). Decided against it — the brain author already has the data, requiring them to also define its schema is redundant. We infer the TypeScript interface string from the runtime values. Field names are the semantic signal. Edge case: empty arrays produce `unknown[]` — docs should guide users to include at least one item.
+
+5. **`formSchema` stays, not `outputSchema`** — The field controls form/webhook/auto-merge behavior, not just output shape. Keeping the name distinct from `.prompt()`'s `outputSchema` is intentional — it does more.
+
+**Under the hood:** `executePageStep` detects `message` vs `html`, looks up `this.pluginInjections.surface?.generate`, converts data → TS interface string, formSchema → TS interface string, calls generate, swaps fake data with real data, stores the page. Core never imports from surface — the coupling is a runtime convention (plugin named "surface" with a `generate` method).
+
+**Form action for generated pages:** Tricky because React renders forms at runtime (the HTML from surface is a JS bundle + `<div id="root">`). Can't string-replace `<form>` tags. Solution: inject `window.__POSITRONIC_FORM_CONFIG__` with a MutationObserver script that sets form action/method and adds hidden CSRF input once the form mounts.
+
+**Cloudflare auto-wiring:** `prepareRunner()` checks for sandbox + browser rendering bindings in env. If present, auto-wires the surface plugin as a default. Brain-level `withPlugin(surface.setup(...))` overrides it. Zero-config for standard Cloudflare deployments.
