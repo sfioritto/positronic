@@ -182,7 +182,6 @@ export type {
 export type {
   BrainStateMachine,
   BrainExecutionContext,
-  BrainStackEntry,
   BrainEntry,
   ExecutionStackEntry,
   RunningBrain,
@@ -191,5 +190,4 @@ export type {
   CreateMachineOptions,
   IterateContext,
   PromptLoopContext,
-  ExecutionNode,
 } from './dsl/brain-state-machine.js';

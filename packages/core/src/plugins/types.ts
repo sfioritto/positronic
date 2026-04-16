@@ -15,12 +15,9 @@ export interface CreateContext<TConfig = undefined> {
 
 /**
  * A plugin adapter that receives brain events.
- * Optional `resume` method receives historical events on brain resume
- * for rebuilding internal state without side effects.
  */
 export interface PluginAdapter {
   dispatch(event: any): void | Promise<void>;
-  resume?(events: any[]): void;
 }
 
 /**

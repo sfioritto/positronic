@@ -14,24 +14,6 @@ import type { ResponseMessage } from '../clients/types.js';
 // ============================================================================
 
 /**
- * ExecutionNode tracks state + position at a single nesting level.
- * Forms a tree structure for nested brains.
- */
-export interface ExecutionNode {
-  state: JsonObject; // State at this brain level
-  stepIndex: number; // Current step index at this level (0-based)
-  innerNode?: ExecutionNode; // Child node if mid-inner-brain
-}
-
-export interface BrainStackEntry {
-  brainRunId: string;
-  brainTitle: string;
-  brainDescription?: string;
-  parentStepId: string | null;
-  steps: StepInfo[];
-}
-
-/**
  * Flat brain entry for the normalized brains map.
  * This is the source of truth - rootBrain tree is computed from this.
  */
@@ -48,7 +30,6 @@ export interface BrainEntry {
 
 /**
  * Execution state entry for the execution stack.
- * Replaces the ExecutionNode tree with a flat stack.
  */
 export interface ExecutionStackEntry {
   state: JsonObject;
