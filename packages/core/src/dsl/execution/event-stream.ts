@@ -337,19 +337,31 @@ export class BrainEventStream<
       // Process each step
       while (this.currentStepIndex < steps.length) {
         // Check for CONTROL signals before each step
-        {
-          const sentinel = yield* this.checkControlSignals();
-          if (sentinel === 'cancel') return;
-          if (sentinel === 'pause') {
-            yield {
-              type: BRAIN_EVENTS.PAUSED,
-              status: STATUS.PAUSED,
-              brainTitle,
-              brainDescription,
-              brainRunId,
-              options,
-            };
-            return;
+        if (this.signalProvider) {
+          const signals = await this.signalProvider.getSignals('CONTROL');
+          for (const signal of signals) {
+            if (signal.type === 'KILL') {
+              yield {
+                type: BRAIN_EVENTS.CANCELLED,
+                status: STATUS.CANCELLED,
+                brainTitle,
+                brainDescription,
+                brainRunId,
+                options,
+              };
+              return;
+            }
+            if (signal.type === 'PAUSE') {
+              yield {
+                type: BRAIN_EVENTS.PAUSED,
+                status: STATUS.PAUSED,
+                brainTitle,
+                brainDescription,
+                brainRunId,
+                options,
+              };
+              return;
+            }
           }
         }
 
@@ -947,23 +959,33 @@ The output must conform to the provided schema.`,
       }
 
       // Check signals
-      {
-        const sentinel = yield* this.checkControlSignals();
-        if (sentinel === 'cancel') {
-          this.stopped = true;
-          return;
-        }
-        if (sentinel === 'pause') {
-          this.stopped = true;
-          yield {
-            type: BRAIN_EVENTS.PAUSED,
-            status: STATUS.PAUSED,
-            brainTitle: this.title,
-            brainDescription: this.description,
-            brainRunId: this.brainRunId,
-            options: this.options ?? ({} as TOptions),
-          };
-          return;
+      if (this.signalProvider) {
+        const signals = await this.signalProvider.getSignals('CONTROL');
+        for (const signal of signals) {
+          if (signal.type === 'KILL') {
+            this.stopped = true;
+            yield {
+              type: BRAIN_EVENTS.CANCELLED,
+              status: STATUS.CANCELLED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+          if (signal.type === 'PAUSE') {
+            this.stopped = true;
+            yield {
+              type: BRAIN_EVENTS.PAUSED,
+              status: STATUS.PAUSED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
         }
       }
 
@@ -1310,15 +1332,25 @@ The output must conform to the provided schema.`,
 
     for (let i = startIndex; i < totalItems; i++) {
       // Check signals before each item
-      {
-        const sentinel = yield* this.checkControlSignals();
-        if (sentinel === 'cancel') {
-          this.stopped = true;
-          return;
-        }
-        if (sentinel === 'pause') {
-          this.stopped = true;
-          return;
+      if (this.signalProvider) {
+        const signals = await this.signalProvider.getSignals('CONTROL');
+        for (const signal of signals) {
+          if (signal.type === 'KILL') {
+            this.stopped = true;
+            yield {
+              type: BRAIN_EVENTS.CANCELLED,
+              status: STATUS.CANCELLED,
+              brainTitle: this.title,
+              brainDescription: this.description,
+              brainRunId: this.brainRunId,
+              options: this.options ?? ({} as TOptions),
+            };
+            return;
+          }
+          if (signal.type === 'PAUSE') {
+            this.stopped = true;
+            return;
+          }
         }
       }
 
@@ -1738,38 +1770,6 @@ The output must conform to the provided schema.`,
     }
 
     return result;
-  }
-
-  /**
-   * Poll CONTROL signals. Yields a CANCELLED event for a KILL signal and
-   * returns 'cancel'; returns 'pause' for a PAUSE signal (no event yielded —
-   * callers differ on whether to emit PAUSED); returns null when there are no
-   * actionable signals. The caller is responsible for setting this.stopped,
-   * since each call site has different requirements.
-   */
-  private async *checkControlSignals(): AsyncGenerator<
-    BrainEvent<TOptions>,
-    'cancel' | 'pause' | null
-  > {
-    if (!this.signalProvider) return null;
-    const signals = await this.signalProvider.getSignals('CONTROL');
-    for (const signal of signals) {
-      if (signal.type === 'KILL') {
-        yield {
-          type: BRAIN_EVENTS.CANCELLED,
-          status: STATUS.CANCELLED,
-          brainTitle: this.title,
-          brainDescription: this.description,
-          brainRunId: this.brainRunId,
-          options: this.options ?? ({} as TOptions),
-        };
-        return 'cancel';
-      }
-      if (signal.type === 'PAUSE') {
-        return 'pause';
-      }
-    }
-    return null;
   }
 
   /**
