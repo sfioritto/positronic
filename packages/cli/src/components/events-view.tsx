@@ -3,9 +3,17 @@ import { Text, Box, useStdout, useInput } from 'ink';
 import type { BrainEvent } from '@positronic/core';
 import { BRAIN_EVENTS } from '@positronic/core';
 import { EventDetail } from './event-detail.js';
-import type { StoredEvent, EventsViewMode } from './types.js';
 
-export type { StoredEvent, EventsViewMode };
+/**
+ * A stored event with its timestamp.
+ * Used for displaying events in the CLI.
+ */
+export interface StoredEvent {
+  timestamp: Date;
+  event: BrainEvent;
+}
+
+export type EventsViewMode = 'auto' | 'navigating' | 'detail';
 
 interface EventsViewProps {
   events: StoredEvent[];

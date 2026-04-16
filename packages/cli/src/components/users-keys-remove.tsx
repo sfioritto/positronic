@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
+import { useYesNoConfirm } from '../hooks/useYesNoConfirm.js';
 
 interface UsersKeysRemoveProps {
   userName: string;
@@ -19,7 +20,6 @@ export const UsersKeysRemove = ({
   fingerprint,
   force,
 }: UsersKeysRemoveProps) => {
-  const { exit } = useApp();
   const {
     data: user,
     loading: loadingUser,
@@ -30,9 +30,10 @@ export const UsersKeysRemove = ({
     error: deleteError,
     execute,
   } = useApiDelete('key');
-  const [confirmed, setConfirmed] = useState(force);
   const [deleted, setDeleted] = useState(false);
   const [deletionStarted, setDeletionStarted] = useState(false);
+
+  const { confirmed } = useYesNoConfirm(force, deleting || deleted);
 
   const handleDelete = useCallback(async () => {
     if (deletionStarted) return;
@@ -52,16 +53,6 @@ export const UsersKeysRemove = ({
       handleDelete();
     }
   }, [confirmed, user, deleted, deletionStarted, handleDelete]);
-
-  useInput((input, key) => {
-    if (!confirmed && !deleting && !deleted) {
-      if (input.toLowerCase() === 'y') {
-        setConfirmed(true);
-      } else if (input.toLowerCase() === 'n' || key.escape) {
-        exit();
-      }
-    }
-  });
 
   if (userError) {
     return <ErrorComponent error={userError} />;

@@ -32,6 +32,7 @@ import {
 } from './watch-keyboard.js';
 import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 import { useWatchReducer, type PreviousView } from './watch-machine.js';
+import { getStatusColor } from '../lib/format.js';
 
 type JsonObject = { [key: string]: unknown };
 
@@ -75,24 +76,6 @@ const getStatusChar = (status: StepInfo['status']): string => {
       return '○';
     default:
       return '?';
-  }
-};
-
-// Get status color
-const getStatusColor = (status: StepInfo['status']): string => {
-  switch (status) {
-    case STATUS.COMPLETE:
-      return 'green';
-    case STATUS.HALTED:
-      return 'gray';
-    case STATUS.ERROR:
-      return 'red';
-    case STATUS.RUNNING:
-      return 'yellow';
-    case STATUS.PENDING:
-      return 'gray';
-    default:
-      return 'white';
   }
 };
 

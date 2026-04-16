@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
+import { padRight, truncate, formatDate } from '../lib/format.js';
 
 interface Page {
   slug: string;
@@ -18,28 +19,11 @@ interface PagesResponse {
   count: number;
 }
 
-// Helper to format dates consistently
-const formatDate = (isoString: string): string => {
-  const date = new Date(isoString);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
-
 // Helper to format file size
 const formatSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-// Helper to truncate text to fit column width
-const truncate = (text: string, maxWidth: number): string => {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-};
-
-// Helper to pad text to column width
-const padRight = (text: string, width: number): string => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
 };
 
 export const PagesList = () => {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Text, useStdin, useApp } from 'ink';
+import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete } from '../hooks/useApi.js';
+import { useTypeYesConfirm } from '../hooks/useTypeYesConfirm.js';
 
 interface ScheduleDeleteProps {
   scheduleId: string;
@@ -9,47 +10,11 @@ interface ScheduleDeleteProps {
 }
 
 export const ScheduleDelete = ({ scheduleId, force }: ScheduleDeleteProps) => {
-  const [confirmed, setConfirmed] = useState(force);
   const [deleted, setDeleted] = useState(false);
-  const [input, setInput] = useState('');
-  const { stdin, setRawMode } = useStdin();
-  const { exit } = useApp();
   const isDeleting = useRef(false);
 
   const { execute: deleteSchedule, loading, error } = useApiDelete('schedule');
-
-  useEffect(() => {
-    if (stdin && !confirmed && !deleted) {
-      setRawMode(true);
-
-      const handleData = (data: Buffer) => {
-        const char = data.toString();
-
-        if (char === '\r' || char === '\n') {
-          if (input.toLowerCase() === 'yes') {
-            setConfirmed(true);
-          } else {
-            exit();
-          }
-        } else if (char === '\u0003') {
-          // Ctrl+C
-          exit();
-        } else if (char === '\u007F' || char === '\b') {
-          // Backspace
-          setInput((prev) => prev.slice(0, -1));
-        } else {
-          setInput((prev) => prev + char);
-        }
-      };
-
-      stdin.on('data', handleData);
-
-      return () => {
-        stdin.off('data', handleData);
-        setRawMode(false);
-      };
-    }
-  }, [stdin, setRawMode, confirmed, deleted, input, exit]);
+  const { confirmed, input } = useTypeYesConfirm(force);
 
   useEffect(() => {
     if (confirmed && !deleted && !isDeleting.current) {

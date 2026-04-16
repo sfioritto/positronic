@@ -3,6 +3,7 @@ import { Text, Box } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
 import { STATUS } from '@positronic/core';
+import { formatDate, formatDuration, getStatusColor } from '../lib/format.js';
 
 interface SerializedError {
   name: string;
@@ -26,46 +27,6 @@ interface BrainRun {
 interface RunShowProps {
   runId: string;
 }
-
-// Helper to format dates
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-};
-
-// Helper to format duration
-const formatDuration = (startMs: number, endMs: number): string => {
-  const durationMs = endMs - startMs;
-  const seconds = Math.floor(durationMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
-  } else if (minutes > 0) {
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
-  } else {
-    return `${seconds}s`;
-  }
-};
-
-// Helper to get status color
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case STATUS.COMPLETE:
-      return 'green';
-    case STATUS.ERROR:
-      return 'red';
-    case STATUS.RUNNING:
-      return 'yellow';
-    case STATUS.CANCELLED:
-      return 'gray';
-    default:
-      return 'white';
-  }
-};
 
 // Component to display a labeled field
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({

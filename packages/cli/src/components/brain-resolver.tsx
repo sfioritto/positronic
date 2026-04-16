@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { SelectList } from './select-list.js';
-import { apiClient, isApiLocalDevMode } from '../commands/helpers.js';
+import { apiClient } from '../commands/helpers.js';
+import { getConnectionErrorMessage } from '../hooks/useApi.js';
 
 interface Brain {
   title: string;
@@ -38,24 +39,6 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
     message: string;
     details?: string;
   } | null>(null);
-
-  const getConnectionError = useCallback(() => {
-    if (isApiLocalDevMode()) {
-      return {
-        title: 'Connection Error',
-        message: 'Error connecting to the local development server.',
-        details:
-          "Please ensure the server is running ('positronic server' or 'px s').",
-      };
-    } else {
-      return {
-        title: 'Connection Error',
-        message: 'Error connecting to the remote project server.',
-        details:
-          'Please check your network connection and verify the project URL is correct.',
-      };
-    }
-  }, []);
 
   // Initial search
   useEffect(() => {
@@ -95,7 +78,7 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
           setPhase('disambiguating');
         }
       } catch (err: any) {
-        const baseError = getConnectionError();
+        const baseError = getConnectionErrorMessage();
         setError({
           ...baseError,
           details: `${baseError.details} ${err.message}`,
@@ -105,7 +88,7 @@ export const BrainResolver = ({ identifier, children }: BrainResolverProps) => {
     };
 
     searchBrains();
-  }, [identifier, getConnectionError]);
+  }, [identifier]);
 
   // Render based on phase
   if (phase === 'searching') {

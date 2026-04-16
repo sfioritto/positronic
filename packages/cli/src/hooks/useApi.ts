@@ -25,7 +25,7 @@ const ROOT_ACCESS_REQUIRED_ERROR: ErrorObject = {
     'You are authenticated as a regular user. This command can only be run with a root key.',
 };
 
-function getConnectionErrorMessage(): ErrorObject {
+export function getConnectionErrorMessage(): ErrorObject {
   if (isApiLocalDevMode()) {
     return {
       title: 'Connection Error',
@@ -41,6 +41,15 @@ function getConnectionErrorMessage(): ErrorObject {
         'Please check your network connection and verify the project URL is correct.',
     };
   }
+}
+
+export function handleNetworkError(err: unknown): ErrorObject {
+  if (err && typeof err === 'object' && 'title' in err && 'message' in err) {
+    return err as ErrorObject;
+  }
+  const baseError = getConnectionErrorMessage();
+  const message = err instanceof Error ? err.message : String(err);
+  return { ...baseError, details: `${baseError.details} ${message}` };
 }
 
 /**

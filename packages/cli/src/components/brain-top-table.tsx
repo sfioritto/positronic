@@ -1,6 +1,12 @@
 import React from 'react';
 import { Text, Box } from 'ink';
-import { STATUS } from '@positronic/core';
+import {
+  padRight,
+  truncate,
+  formatRelativeTime,
+  formatDuration,
+  getStatusColor,
+} from '../lib/format.js';
 
 interface RunningBrain {
   brainRunId: string;
@@ -22,74 +28,6 @@ interface BrainTopTableProps {
   brainFilter?: string;
   footer?: string;
 }
-
-// Helper to format relative time
-const formatRelativeTime = (timestamp: number) => {
-  const now = Date.now();
-  const diffMs = now - timestamp;
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffSecs < 60) {
-    return 'just now';
-  } else if (diffMins < 60) {
-    return `${diffMins} min ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hr ago`;
-  } else {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  }
-};
-
-// Helper to format live duration
-const formatDuration = (startedAt: number) => {
-  const durationMs = Date.now() - startedAt;
-  const totalSeconds = Math.floor(durationMs / 1000);
-  const seconds = totalSeconds % 60;
-  const minutes = Math.floor(totalSeconds / 60) % 60;
-  const hours = Math.floor(totalSeconds / 3600);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  } else {
-    return `${seconds}s`;
-  }
-};
-
-// Helper to get status color
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case STATUS.COMPLETE:
-      return 'green';
-    case STATUS.ERROR:
-      return 'red';
-    case STATUS.RUNNING:
-      return 'yellow';
-    case STATUS.CANCELLED:
-      return 'gray';
-    case STATUS.PAUSED:
-      return 'cyan';
-    case STATUS.WAITING:
-      return 'magenta';
-    default:
-      return 'white';
-  }
-};
-
-// Helper to pad text to column width
-const padRight = (text: string, width: number) => {
-  return text + ' '.repeat(Math.max(0, width - text.length));
-};
-
-// Helper to truncate text
-const truncate = (text: string, maxWidth: number) => {
-  if (text.length <= maxWidth) return text;
-  return text.substring(0, maxWidth - 3) + '...';
-};
 
 // Column definitions
 const columns = {
