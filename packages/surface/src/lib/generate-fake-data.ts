@@ -20,7 +20,18 @@ export async function generateFakeData(
   let fakeDataJson: string | null = null;
 
   const result = await client.streamText({
-    prompt: `Generate realistic fake/sample data as JSON that conforms to this TypeScript interface. Make it look like real production data (realistic names, plausible numbers, multiple items in arrays, etc.), not test placeholders. Include 3-5 items in any arrays.
+    prompt: `Generate realistic fake/sample data as JSON that conforms to this TypeScript interface. Make it look like real production data (realistic names, plausible numbers, rich array contents) — NOT test placeholders.
+
+Array sizing (IMPORTANT):
+- Include AT LEAST 6 items in any top-level or list-shaped array, unless the schema or field name clearly implies a smaller count (e.g. a single-choice tuple, a fixed-shape pair, a field literally named "top3" or "selected").
+- Aim for 6-10 items in the primary list(s) on the page. Do not stop at 3 — a 3-item list looks sparse and gives the generated UI too little to work with.
+- For nested arrays (e.g. accomplishments inside each developer, comments inside each thread), include 2-4 items per inner list so the layout has real content to render.
+
+Content quality:
+- Real-looking names, organizations, dates, URLs, product names.
+- Vary string lengths — some short, some medium, some long — so the layout gets stress-tested for wrapping, truncation, and alignment.
+- Plausible numeric values (not all "42" / "100").
+- If the schema references PRs, tickets, emails, or similar records, use realistic IDs, subjects, and bodies with actual content.
 
 Interface:
 ${inputSchema}
