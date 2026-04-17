@@ -53,18 +53,20 @@ export const surface = definePlugin({
     return {
       generate: async (params: {
         prompt: string;
+        system?: string;
         inputSchema: ZodObject<any>;
         outputSchema?: ZodObject<any>;
         debug?: boolean;
         onProgress?: (event: ProgressEvent) => void | Promise<void>;
       }): Promise<GenerateResult> => {
+        const { system, ...rest } = params;
         return generate({
           client: config.client,
           sandbox: config.sandbox,
-          systemPrompt,
+          systemPrompt: system ? `${systemPrompt}\n\n${system}` : systemPrompt,
           accountId: config.accountId,
           apiToken: config.apiToken,
-          ...params,
+          ...rest,
         });
       },
     };
