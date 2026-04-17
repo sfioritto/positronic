@@ -12,6 +12,7 @@ import { screenshot } from '../../src/screenshot.js';
 import { generate, type ProgressEvent } from '../../src/generate.js';
 import { VercelClient } from '@positronic/client-vercel';
 import { google } from '@ai-sdk/google';
+import { z } from 'zod';
 import systemPromptRaw from '../../src/system-prompt.md';
 
 export { Sandbox } from '@cloudflare/sandbox';
@@ -35,18 +36,21 @@ function streamGenerate(
     await writer.write(encoder.encode(JSON.stringify(event) + '\n'));
   };
 
+  let fakeData: Record<string, unknown> = {};
   const onProgress = (event: ProgressEvent) => {
+    if (event.type === 'fake_data_done') fakeData = event.data;
     send(event);
   };
 
   (async () => {
     try {
       const result = await generate({ ...generateParams, onProgress });
+      const html = result.render({ data: fakeData });
       const screenshotBase64 = result.screenshots?.map(uint8ToBase64);
       await send({
         type: 'complete',
-        html: result.html,
-        htmlSize: result.html.length,
+        html,
+        htmlSize: html.length,
         screenshots: screenshotBase64,
         log: result.log,
       });
@@ -455,27 +459,23 @@ export default function Page({ data }: Props) {
       }
 
       // This mirrors what .page() would pass to generate() for the HN reader brain
-      const inputSchema = `export interface Data {
-  recommended: Array<{
-    id: string;
-    title: string;
-    url: string;
-    score: number;
-    commentCount: number;
-  }>;
-  remaining: Array<{
-    id: string;
-    title: string;
-    url: string;
-    score: number;
-    commentCount: number;
-  }>;
-}`;
+      const article = z.object({
+        id: z.string(),
+        title: z.string(),
+        url: z.string(),
+        score: z.number(),
+        commentCount: z.number(),
+      });
+      const inputSchema = z.object({
+        recommended: z.array(article),
+        remaining: z.array(article),
+      });
 
-      const outputSchema = `import { z } from 'zod';
-export const formSchema = z.object({
-  readArticleIds: z.array(z.string()).describe('Array of article IDs marked as read'),
-});`;
+      const outputSchema = z.object({
+        readArticleIds: z
+          .array(z.string())
+          .describe('Array of article IDs marked as read'),
+      });
 
       const prompt = `Create a reading list page for Hacker News articles.
 
@@ -515,52 +515,82 @@ Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
 
       // This mirrors the state shape at the .page() step of the email-digest brain.
       // IterateResult<Thread, T> serializes as [Thread, T][] tuples via toJSON().
-      const inputSchema = `
-interface Thread {
-  threadId: string;
-  subject: string;
-  from: string;
-  snippet: string;
-  date: string;
-  messageCount: number;
-}
+      const thread = z.object({
+        threadId: z.string(),
+        subject: z.string(),
+        from: z.string(),
+        snippet: z.string(),
+        date: z.string(),
+        messageCount: z.number(),
+      });
+      const emailCategory = z.enum([
+        'children',
+        'amazon',
+        'billing',
+        'receipts',
+        'investments',
+        'kickstarter',
+        'newsletters',
+        'marketing',
+        'notifications',
+        'npm',
+        'securityAlerts',
+        'confirmationCodes',
+        'reminders',
+        'financialNotifications',
+        'shipping',
+      ]);
+      const enriched = <T extends z.ZodTypeAny>(schema: T) =>
+        z.array(z.tuple([thread, schema]));
+      const inputSchema = z.object({
+        emails: z.array(z.object({ thread, category: emailCategory })),
+        childrenEnriched: enriched(
+          z.object({ summary: z.string(), actionItem: z.string().nullable() })
+        ),
+        billingEnriched: enriched(
+          z.object({
+            description: z.string(),
+            amount: z.string(),
+            dueDate: z.string().nullable(),
+          })
+        ),
+        receiptsEnriched: enriched(
+          z.object({
+            merchant: z.string(),
+            amount: z.string(),
+            items: z.array(z.string()),
+          })
+        ),
+        newslettersEnriched: enriched(
+          z.object({ summary: z.string(), keyTopics: z.array(z.string()) })
+        ),
+        financialEnriched: enriched(
+          z.object({
+            description: z.string(),
+            amount: z.string(),
+            direction: z.enum(['credit', 'debit']),
+          })
+        ),
+        shippingEnriched: enriched(
+          z.object({
+            carrier: z.string(),
+            trackingStatus: z.string(),
+            estimatedDelivery: z.string().nullable(),
+          })
+        ),
+        npmSummary: z.string(),
+        securityAlertsSummary: z.string(),
+        confirmationCodesSummary: z.string(),
+        remindersSummary: z.string(),
+        financialSummary: z.string(),
+        shippingSummary: enriched(z.object({ summary: z.string() })),
+      });
 
-type EmailCategory =
-  | 'children' | 'amazon' | 'billing' | 'receipts'
-  | 'investments' | 'kickstarter' | 'newsletters' | 'marketing'
-  | 'notifications' | 'npm' | 'securityAlerts' | 'confirmationCodes'
-  | 'reminders' | 'financialNotifications' | 'shipping';
-
-export interface Data {
-  /** All categorized emails from the inbox */
-  emails: Array<{
-    thread: Thread;
-    category: EmailCategory;
-  }>;
-
-  /** Enriched data as [thread, enrichment] tuples (from IterateResult.toJSON()) */
-  childrenEnriched: Array<[Thread, { summary: string; actionItem: string | null }]>;
-  billingEnriched: Array<[Thread, { description: string; amount: string; dueDate: string | null }]>;
-  receiptsEnriched: Array<[Thread, { merchant: string; amount: string; items: string[] }]>;
-  newslettersEnriched: Array<[Thread, { summary: string; keyTopics: string[] }]>;
-  financialEnriched: Array<[Thread, { description: string; amount: string; direction: 'credit' | 'debit' }]>;
-  shippingEnriched: Array<[Thread, { carrier: string; trackingStatus: string; estimatedDelivery: string | null }]>;
-
-  /** LLM-generated text summaries for notification categories */
-  npmSummary: string;
-  securityAlertsSummary: string;
-  confirmationCodesSummary: string;
-  remindersSummary: string;
-  financialSummary: string;
-
-  /** Shipping summary as enrichment tuples */
-  shippingSummary: Array<[Thread, { summary: string }]>;
-}`;
-
-      const outputSchema = `import { z } from 'zod';
-export const formSchema = z.object({
-  threadIds: z.array(z.string()).describe('Thread IDs the user wants to keep in inbox (not archive)'),
-});`;
+      const outputSchema = z.object({
+        threadIds: z
+          .array(z.string())
+          .describe('Thread IDs the user wants to keep in inbox (not archive)'),
+      });
 
       const prompt = `Create an email digest page that summarizes a user's inbox.
 
