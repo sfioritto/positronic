@@ -511,6 +511,38 @@ Key points:
 - Form data is spread directly onto state (e.g., `state.rating`, `state.comments`)
 - You control how users are notified (Slack, email, etc.) inside `onCreated`
 
+### When to use generated pages vs custom HTML
+
+**Use generated pages** (`message` + `inputSchema` + `data`) when:
+- You want a professional-looking page without writing React/HTML
+- The page displays data from brain state (emails, metrics, reports)
+- You want the AI to handle layout, styling, and component selection
+
+**Use custom HTML** (`html`) when:
+- You need precise control over the page layout
+- The page is simple (a few fields, a single form)
+- You don't want the latency of AI generation
+
+```typescript
+// Generated — AI creates a polished dashboard
+.page('Dashboard', ({ state: { metrics } }) => ({
+  message: 'Show a metrics dashboard with KPIs and trend charts',
+  inputSchema: z.object({ metrics: z.array(z.object({ name: z.string(), value: z.number() })) }),
+  data: { metrics },
+}))
+
+// Custom HTML — simple form, full control
+.page('Settings', ({ state }) => ({
+  html: (
+    <Form>
+      <label>Theme <select name="theme"><option>light</option><option>dark</option></select></label>
+      <button type="submit">Save</button>
+    </Form>
+  ),
+  formSchema: z.object({ theme: z.string() }),
+}))
+```
+
 See `/docs/brain-dsl-guide.md` for more page step examples.
 
 ## Plugin Organization

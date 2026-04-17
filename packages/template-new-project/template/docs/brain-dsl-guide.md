@@ -1586,9 +1586,85 @@ For interactive UI (tabs, toggles), use `<details>`/`<summary>`:
 ))}
 ```
 
+### AI-Generated Pages
+
+Instead of writing HTML by hand, use `message` + `inputSchema` + `data` to have an AI generate the page. The framework calls the surface plugin to produce a full React page with shadcn components and Tailwind styling.
+
+```typescript
+import { z } from 'zod';
+
+brain('Email Digest')
+  .step('Fetch', async () => {
+    const emails = await fetchEmails();
+    return { emails };
+  })
+  .page('Review Emails', ({ state: { emails } }) => ({
+    message: 'Show an email digest grouped by category with checkboxes to deselect threads',
+    inputSchema: z.object({
+      emails: z.array(z.object({
+        id: z.string(),
+        subject: z.string(),
+        from: z.string(),
+        category: z.enum(['important', 'newsletter', 'notification']),
+      })),
+    }),
+    data: { emails },
+    formSchema: z.object({
+      deselectedThreadIds: z.array(z.string()),
+    }),
+    onCreated: async (page) => {
+      // Notify user — page.url is the public URL
+    },
+  }))
+  .step('Process', ({ state }) => {
+    // state.deselectedThreadIds comes from the form submission
+    return { ...state, filtered: true };
+  });
+```
+
+**Key details:**
+
+- **`message`** describes what the page should look like. Same type as `.prompt()` and `.map()` — supports strings, JSX, and async functions.
+- **`inputSchema`** is a Zod schema describing the data shape. TypeScript enforces that `data` matches this schema at compile time, and the framework validates at runtime.
+- **`data`** is the actual data the page displays. Wrap state fields in an object — field names carry semantic signal for the AI (e.g., `{ emails }` tells it to generate email-shaped UI).
+- **`system`** (optional) adds extra instructions appended to the generation prompt. Use for domain-specific guidance like "use conservative colors for financial data."
+- **`formSchema`** works identically to custom HTML pages — auto-suspend, auto-merge onto state.
+- The surface plugin never sees your real data — only the schema shape. Real data is injected locally after generation.
+
+**Requires the surface plugin.** Generated pages need the surface plugin configured. If deployed to Cloudflare with sandbox bindings, it's auto-wired. Otherwise, add it explicitly:
+
+```typescript
+import { surface } from '@positronic/surface';
+
+const brain = createBrain({
+  plugins: [surface.setup({
+    client: model,
+    sandbox: env.SANDBOX,
+    accountId: env.CLOUDFLARE_ACCOUNT_ID,
+    apiToken: env.CLOUDFLARE_API_TOKEN,
+  })],
+});
+```
+
+**Read-only generated pages** (no form) work too:
+
+```typescript
+.page('Dashboard', ({ state: { metrics } }) => ({
+  message: 'Display a metrics dashboard with KPIs and trend charts',
+  inputSchema: z.object({
+    metrics: z.array(z.object({
+      name: z.string(),
+      value: z.number(),
+      trend: z.enum(['up', 'down', 'flat']),
+    })),
+  }),
+  data: { metrics },
+}))
+```
+
 ### How Page Steps Work
 
-1. **HTML**: The `html` property provides the page content (JSX, string, or function component)
+1. **HTML or Generation**: Provide `html` for custom pages, or `message` + `inputSchema` + `data` for AI-generated pages
 2. **onCreated**: The optional `onCreated` callback runs with a `page` object containing `url`. Use it to notify users (Slack, email, etc.)
 3. **Auto-Suspend**: With `formSchema`, the brain automatically suspends and waits for the form submission
 4. **Auto-Spread**: The form data is automatically spread onto state (`{ ...state, ...formData }`)

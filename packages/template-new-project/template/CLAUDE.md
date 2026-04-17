@@ -178,6 +178,31 @@ import { Form } from '@positronic/core';
 - The `html` property accepts JSX directly, a string, or a function component.
 - The page title comes from the step title. The framework wraps the html body in a full HTML document automatically.
 
+### AI-Generated Pages
+
+Instead of writing HTML, use `message` + `inputSchema` + `data` to have the AI generate the page with React and shadcn components:
+
+```typescript
+.page('Review Emails', ({ state: { emails } }) => ({
+  message: 'Show an email digest with checkboxes to deselect threads',
+  inputSchema: z.object({
+    emails: z.array(z.object({
+      id: z.string(),
+      subject: z.string(),
+      from: z.string(),
+    })),
+  }),
+  data: { emails },
+  formSchema: z.object({ deselectedIds: z.array(z.string()) }),
+}))
+```
+
+- `inputSchema` defines the data shape (TypeScript enforces `data` matches at compile time)
+- `data` wraps state fields — field names guide the AI's fake data generation and UI design
+- The surface plugin never sees real data — only the schema shape
+- Requires the surface plugin (auto-wired on Cloudflare with sandbox bindings)
+- See `/docs/brain-dsl-guide.md` for full generated page documentation
+
 ### Extracting Page JSX into Separate Files
 
 For complex pages, extract the JSX into a separate `.tsx` file. Don't annotate the return type — let TypeScript infer it from the JSX:
