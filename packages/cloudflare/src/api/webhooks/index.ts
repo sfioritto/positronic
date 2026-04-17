@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { getWebhookManifest, startBrainRun } from '../../brain-runner-do.js';
 import type { Bindings } from '../types.js';
+import { param } from '../param.js';
 import { queueWebhookAndWakeUp } from './coordination.js';
 import system from './system.js';
 
@@ -28,7 +29,7 @@ webhooks.get('/', async (context: Context) => {
 
 // Receive incoming webhook from external service (user-defined webhooks)
 webhooks.post('/:slug', async (context: Context) => {
-  const slug = context.req.param('slug');
+  const slug = param(context, 'slug');
   const webhookManifest = getWebhookManifest();
   const webhook = webhookManifest[slug];
 

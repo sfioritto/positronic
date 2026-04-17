@@ -4,6 +4,7 @@ import Fuse from 'fuse.js';
 import { isSignalValid, brainMachineDefinition } from '@positronic/core';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { getManifest, startBrainRun } from '../brain-runner-do.js';
+import { param } from './param.js';
 import type {
   Bindings,
   CreateBrainRunRequest,
@@ -296,7 +297,7 @@ brains.post('/runs/:runId/resume', async (context: Context) => {
 });
 
 brains.get('/:identifier/history', async (context: Context) => {
-  const identifier = context.req.param('identifier');
+  const identifier = param(context, 'identifier');
   const limit = Number(context.req.query('limit') || '10');
 
   const result = resolveBrain(context, identifier);
@@ -311,7 +312,7 @@ brains.get('/:identifier/history', async (context: Context) => {
 });
 
 brains.get('/:identifier/active-runs', async (context: Context) => {
-  const identifier = context.req.param('identifier');
+  const identifier = param(context, 'identifier');
 
   const result = resolveBrain(context, identifier);
   if (!('brain' in result)) return result;
@@ -577,7 +578,7 @@ brains.delete('/schedules/:scheduleId', async (context: Context) => {
 });
 
 brains.get('/:identifier', async (context: Context) => {
-  const identifier = context.req.param('identifier');
+  const identifier = param(context, 'identifier');
 
   const result = resolveBrain(context, identifier);
   if (!('brain' in result)) return result;

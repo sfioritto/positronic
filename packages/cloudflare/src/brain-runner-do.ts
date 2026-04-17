@@ -28,6 +28,7 @@ import { setGovernorBinding, rateGoverned } from './governor-client-wrapper.js';
 import { CloudflareR2Loader } from './r2-loader.js';
 import { createR2Backend } from './create-r2-store.js';
 import { createResources, type ResourceManifest } from '@positronic/core';
+import type { ConfiguredPlugin } from '@positronic/core';
 import { getOrigin } from './origin.js';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
@@ -62,6 +63,11 @@ export async function startBrainRun(
 let brainRunner: BrainRunner | null = null;
 export function setBrainRunner(runner: BrainRunner) {
   brainRunner = runner;
+}
+
+let platformPluginConfigs: ConfiguredPlugin[] = [];
+export function setPlatformPlugins(configs: ConfiguredPlugin[]) {
+  platformPluginConfigs = configs;
 }
 
 let webhookManifest: Record<string, any> = {};
@@ -712,6 +718,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
       (time) => this.ctx.storage.setAlarm(time)
     );
 
+    // Include platform-level plugin configs (e.g., surface auto-wiring)
+    const pluginConfigs: ConfiguredPlugin[] = [...platformPluginConfigs];
+
     const runner = new BrainRunner({
       client: brainRunner.client,
       adapters: [
@@ -731,6 +740,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       files: files,
       pages: pages,
       storeProvider: storeBackend,
+      pluginConfigs,
     });
 
     return { brainToRun, runner };

@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { requireRoot } from './auth-middleware.js';
+import { param } from './param.js';
 import type { Bindings } from './types.js';
 
 const store = new Hono<{ Bindings: Bindings }>();
@@ -73,8 +74,8 @@ store.get('/:brainTitle/shared/:key', async (context: Context) => {
   }
 
   const bucket = context.env.RESOURCES_BUCKET;
-  const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
-  const key = decodeURIComponent(context.req.param('key'));
+  const brainTitle = decodeURIComponent(param(context, 'brainTitle'));
+  const key = decodeURIComponent(param(context, 'key'));
 
   const r2Key = `store/${brainTitle}/${key}.json`;
   const object = await bucket.get(r2Key);
@@ -101,8 +102,8 @@ store.get('/:brainTitle/user/:key', async (context: Context) => {
   }
 
   const bucket = context.env.RESOURCES_BUCKET;
-  const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
-  const key = decodeURIComponent(context.req.param('key'));
+  const brainTitle = decodeURIComponent(param(context, 'brainTitle'));
+  const key = decodeURIComponent(param(context, 'key'));
 
   // For root users, they could be looking at any user's key
   // But for non-root, it's always their own
@@ -131,8 +132,8 @@ store.delete('/:brainTitle/shared/:key', async (context: Context) => {
   }
 
   const bucket = context.env.RESOURCES_BUCKET;
-  const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
-  const key = decodeURIComponent(context.req.param('key'));
+  const brainTitle = decodeURIComponent(param(context, 'brainTitle'));
+  const key = decodeURIComponent(param(context, 'key'));
 
   const r2Key = `store/${brainTitle}/${key}.json`;
   await bucket.delete(r2Key);
@@ -149,8 +150,8 @@ store.delete('/:brainTitle/user/:key', async (context: Context) => {
   }
 
   const bucket = context.env.RESOURCES_BUCKET;
-  const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
-  const key = decodeURIComponent(context.req.param('key'));
+  const brainTitle = decodeURIComponent(param(context, 'brainTitle'));
+  const key = decodeURIComponent(param(context, 'key'));
 
   const targetUserName = userName!;
   const r2Key = `store/${brainTitle}/user/${targetUserName}/${key}.json`;
@@ -162,7 +163,7 @@ store.delete('/:brainTitle/user/:key', async (context: Context) => {
 // GET /store/:brainTitle - List keys for a brain
 store.get('/:brainTitle', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
-  const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
+  const brainTitle = decodeURIComponent(param(context, 'brainTitle'));
   const userName = scopeUserName(context);
   const rootUser = isRoot(context);
 
@@ -210,7 +211,7 @@ store.get('/:brainTitle', async (context: Context) => {
 // DELETE /store/:brainTitle - Clear all accessible keys for a brain
 store.delete('/:brainTitle', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
-  const brainTitle = decodeURIComponent(context.req.param('brainTitle'));
+  const brainTitle = decodeURIComponent(param(context, 'brainTitle'));
   const userName = scopeUserName(context);
   const rootUser = isRoot(context);
 

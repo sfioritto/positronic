@@ -20,6 +20,7 @@ import type { ResumeParams } from './definitions/run-params.js';
 import type { Files } from '../files/types.js';
 import type { Pages } from './pages.js';
 import type { StoreProvider } from '../store/types.js';
+import type { ConfiguredPlugin } from '../plugins/types.js';
 
 /**
  * Create a CANCELLED event for when the brain is aborted via signal.
@@ -50,6 +51,7 @@ export class BrainRunner {
       files?: Files;
       pages?: Pages;
       storeProvider?: StoreProvider;
+      pluginConfigs?: ConfiguredPlugin[];
     }
   ) {}
 
@@ -177,6 +179,7 @@ export class BrainRunner {
       files,
       pages,
       storeProvider,
+      pluginConfigs,
     } = this.config;
     const client = governor ? governor(rawClient) : rawClient;
     const resolvedEnv = env ?? DEFAULT_ENV;
@@ -214,6 +217,7 @@ export class BrainRunner {
           files,
           pages,
           storeProvider,
+          pluginConfigs,
         })
       : brain.run({
           initialState: initialState ?? ({} as TState),
@@ -228,6 +232,7 @@ export class BrainRunner {
           files,
           pages,
           storeProvider,
+          pluginConfigs,
         });
 
     try {

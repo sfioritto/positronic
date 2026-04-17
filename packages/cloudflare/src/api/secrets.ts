@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { Bindings } from './types.js';
 import { requireRoot } from './auth-middleware.js';
+import { param } from './param.js';
 
 type CloudflareSecretResponse = {
   result: Array<{
@@ -204,7 +205,7 @@ secrets.delete('/:name', async (context: Context) => {
     );
   }
 
-  const name = decodeURIComponent(context.req.param('name'));
+  const name = decodeURIComponent(param(context, 'name'));
 
   // Block deleting ROOT_PUBLIC_KEY via API - must be managed in Cloudflare dashboard
   if (name === PROTECTED_SECRET) {
@@ -264,7 +265,7 @@ secrets.get('/:name/exists', async (context: Context) => {
     );
   }
 
-  const name = decodeURIComponent(context.req.param('name'));
+  const name = decodeURIComponent(param(context, 'name'));
 
   try {
     // List all secrets and check if the name exists

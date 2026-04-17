@@ -3,6 +3,7 @@ export {
   setBrainRunner,
   setManifest,
   setWebhookManifest,
+  setPlatformPlugins,
 } from './brain-runner-do.js';
 export { MonitorDO } from './monitor-do.js';
 export { ScheduleDO } from './schedule-do.js';

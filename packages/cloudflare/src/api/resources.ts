@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { AwsClient } from 'aws4fetch';
 import { type ResourceEntry, RESOURCE_TYPES } from '@positronic/core';
+import { param } from './param.js';
 import type { Bindings } from './types.js';
 
 // Override ResourceEntry to make path optional for resources that aren't in version control
@@ -124,10 +125,8 @@ resources.post('/', async (context: Context) => {
 // Delete a single resource by key
 resources.delete('/:key', async (context: Context) => {
   const bucket = context.env.RESOURCES_BUCKET;
-  const key = context.req.param('key');
-
   // URL decode the key since it might contain slashes
-  const decodedKey = decodeURIComponent(key);
+  const decodedKey = decodeURIComponent(param(context, 'key'));
 
   try {
     // Delete the resource - R2 delete is idempotent, so it's safe to delete non-existent resources
