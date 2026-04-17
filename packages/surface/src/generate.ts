@@ -35,6 +35,7 @@ export type ProgressEvent =
  */
 export async function generate(params: {
   client: ObjectGenerator;
+  reviewClient: ObjectGenerator;
   sandbox: SandboxInstance;
   systemPrompt: string;
   accountId: string;
@@ -47,6 +48,7 @@ export async function generate(params: {
 }): Promise<GenerateResult> {
   const {
     client,
+    reviewClient,
     sandbox,
     systemPrompt,
     accountId,
@@ -69,7 +71,7 @@ export async function generate(params: {
 
   const startTime = Date.now();
   const screenshots: Uint8Array[] = [];
-  const previewState = { count: 0 };
+  const reviewState = { approved: false };
 
   // Step 1: Generate fake data using an LLM agent loop with type-checking
   const { fakeData, responseMessages: fakeDataMessages } =
@@ -80,12 +82,21 @@ export async function generate(params: {
   // Step 2: Define tools
   const rawTools: Record<string, StreamTool> = {
     write_component: writeComponentTool(sandbox, inputSchemaTs),
-    preview: previewTool(sandbox, fakeData, accountId, apiToken, {
-      debug,
-      screenshots,
-      previewState,
-    }),
-    submit: submitTool(sandbox, outputFieldNames, fakeData, previewState),
+    preview: previewTool(
+      sandbox,
+      fakeData,
+      accountId,
+      apiToken,
+      {
+        client: reviewClient,
+        userPrompt: prompt,
+        inputSchemaTs,
+        outputSchemaTs,
+      },
+      reviewState,
+      { debug, screenshots }
+    ),
+    submit: submitTool(sandbox, outputFieldNames, fakeData, reviewState),
   };
 
   // Wrap tools to emit progress events (tools without execute are pass-through —

@@ -1,23 +1,59 @@
 import { z } from 'zod';
-import type { StreamTool } from '@positronic/core';
+import type { ObjectGenerator, StreamTool } from '@positronic/core';
 import type { SandboxInstance } from '../sandbox.js';
 import { buildBundle, makeRender } from '../sandbox.js';
 import { screenshot } from '../screenshot.js';
+
+export interface ReviewState {
+  approved: boolean;
+}
+
+const REVIEW_SYSTEM = `You are a strict UI quality reviewer for a code-generation system.
+
+Another LLM just generated a React component and rendered it to the screenshot you are about to see. Your job is to decide whether the rendered layout is good enough to ship.
+
+Rules:
+- You are the quality gate, not a cheerleader. Do not approve work that "kind of works but looks weird".
+- If in doubt, approve. Only fail on issues that would make a human designer re-open the file.
+- Be specific. Vague feedback like "spacing could be improved" is useless. Describe the defect concretely: where it is, what's wrong, what it looks like.
+- Do not suggest code fixes. Describe the visual problem only; the generator will figure out how to fix it.
+- Do not comment on copy/content unless it is obviously broken (e.g. placeholder "Lorem ipsum" left in).
+
+Specifically watch for:
+1. Text clipping or bad wrapping — content cut off at an edge, or wrapped to 1–5 characters per line.
+2. Lopsided columns — one column squeezed thin while a sibling takes excessive width.
+3. Isolated controls — checkboxes/buttons stranded in whitespace far from related content.
+4. Broken alignment — labels not aligned with their controls, rows not aligned to a common edge.
+5. Vertical rhythm — unexplained large gaps, or elements overlapping.
+6. Overall polish — does it look like something a human designer would actually ship?`;
+
+const ReviewVerdict = z.object({
+  approved: z.boolean(),
+  issues: z.array(z.string()),
+});
+
+type ReviewResult = z.infer<typeof ReviewVerdict>;
 
 export function previewTool(
   sandbox: SandboxInstance,
   fakeData: Record<string, unknown>,
   accountId: string,
   apiToken: string,
+  reviewConfig: {
+    client: ObjectGenerator;
+    userPrompt: string;
+    inputSchemaTs: string;
+    outputSchemaTs?: string;
+  },
+  reviewState: ReviewState,
   options?: {
     debug?: boolean;
     screenshots?: Uint8Array[];
-    previewState?: { count: number };
   }
 ): StreamTool {
   return {
     description:
-      'Build and screenshot the component currently in the sandbox with sample data. Use this to see what your component looks like rendered in a browser.',
+      'Build and screenshot the component currently in the sandbox with sample data, then have it reviewed by an independent quality reviewer. Returns the screenshot plus the reviewer verdict. You cannot submit until the reviewer approves.',
     inputSchema: z.object({}),
     async execute() {
       const bundleResult = await buildBundle(sandbox);
@@ -41,45 +77,83 @@ export function previewTool(
         options.screenshots.push(png);
       }
 
-      if (options?.previewState) {
-        options.previewState.count += 1;
-      }
+      const reviewPrompt = `The user asked for the following component:
 
-      // Return base64 image data — toModelOutput converts it to visual content
-      // Build string in a loop to avoid call stack overflow from spread on large arrays
+<user_request>
+${reviewConfig.userPrompt}
+</user_request>
+
+The component receives a \`data\` prop shaped like:
+\`\`\`typescript
+${reviewConfig.inputSchemaTs}
+\`\`\`
+${
+  reviewConfig.outputSchemaTs
+    ? `
+It should include a form that submits data shaped like:
+\`\`\`typescript
+${reviewConfig.outputSchemaTs}
+\`\`\`
+`
+    : ''
+}
+Review the attached screenshot. Approve only if the layout is clean and production-quality.`;
+
+      const { object: verdict } = await reviewConfig.client.generateObject({
+        schema: ReviewVerdict,
+        schemaName: 'ReviewVerdict',
+        system: REVIEW_SYSTEM,
+        prompt: reviewPrompt,
+        attachments: [
+          { name: 'screenshot.png', mimeType: 'image/png', data: png },
+        ],
+      });
+
+      reviewState.approved = verdict.approved;
+
       let binary = '';
       for (let i = 0; i < png.length; i++) {
         binary += String.fromCharCode(png[i]);
       }
       const base64 = btoa(binary);
+
       return {
-        type: 'image',
-        data: base64,
+        type: 'preview',
+        image: base64,
+        verdict,
       };
     },
     toModelOutput({ output }: { output: unknown }) {
-      const result = output as { type: string; data?: string };
-      if (result.type === 'image' && result.data) {
+      const result = output as
+        | { type: 'preview'; image: string; verdict: ReviewResult }
+        | { status: 'error'; message: string; errors?: unknown };
+
+      if ('status' in result && result.status === 'error') {
+        return {
+          type: 'content',
+          value: [{ type: 'text', text: JSON.stringify(result) }],
+        };
+      }
+
+      if ('type' in result && result.type === 'preview') {
+        const { verdict, image } = result;
+        const reviewText = verdict.approved
+          ? `REVIEW: APPROVED. The reviewer confirms the layout is production-quality. You may call submit.`
+          : `REVIEW: NEEDS WORK. The reviewer flagged these issues:
+
+${verdict.issues.map((i) => `- ${i}`).join('\n')}
+
+Call write_component to fix these issues, then preview again. Do NOT call submit — it will be refused until the reviewer approves.`;
+
         return {
           type: 'content',
           value: [
-            {
-              type: 'text',
-              text: `Screenshot of the rendered component. Critically review it before doing anything else — do NOT submit unless the layout is genuinely polished. Check for:
-
-1. **Text clipping or bad wrapping.** Is any content cut off at the right/left edge? Is text wrapping to 1–5 characters per line? That means a parent is too narrow.
-2. **Lopsided columns.** Is one column squeezed thin while a neighbor takes excessive width? This usually means a flex child has \`w-full\` or \`flex-auto\` that it shouldn't.
-3. **Isolated controls.** Are checkboxes/buttons sitting alone in large empty space far from the content they belong to? That means the row layout is broken.
-4. **Alignment.** Are labels aligned with their controls? Are rows in a list aligned to the same left edge?
-5. **Vertical rhythm.** Are there unexplained large gaps between sibling elements? Is anything overlapping?
-6. **Overall polish.** Does it look like something a human designer would actually ship? If your honest answer is "it kind of works but looks weird," it is NOT ready — call write_component again and fix it.
-
-If you spot ANY of the above, call write_component again with a corrected version. Only call submit when the rendered layout is clean and production-quality.`,
-            },
-            { type: 'media', data: result.data, mediaType: 'image/png' },
+            { type: 'text', text: reviewText },
+            { type: 'media', data: image, mediaType: 'image/png' },
           ],
         };
       }
+
       return {
         type: 'content',
         value: [{ type: 'text', text: JSON.stringify(output) }],

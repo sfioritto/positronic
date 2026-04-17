@@ -12,6 +12,12 @@ import systemPromptTemplate from './system-prompt.gen.js';
 export type SurfaceConfig = {
   /** LLM client for UI generation (typically a fast/cheap model) */
   client: ObjectGenerator;
+  /**
+   * LLM client for reviewing rendered screenshots. Should be a different
+   * model than `client` so the reviewer does not share the generator's blind
+   * spots. Falls back to `client` if not provided.
+   */
+  reviewClient?: ObjectGenerator;
   /** Cloudflare Sandbox DO namespace binding */
   sandbox: SandboxInstance;
   /** Cloudflare account ID for Browser Rendering API */
@@ -62,6 +68,7 @@ export const surface = definePlugin({
         const { system, ...rest } = params;
         return generate({
           client: config.client,
+          reviewClient: config.reviewClient ?? config.client,
           sandbox: config.sandbox,
           systemPrompt: system ? `${systemPrompt}\n\n${system}` : systemPrompt,
           accountId: config.accountId,
