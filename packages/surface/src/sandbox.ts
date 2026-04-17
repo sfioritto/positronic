@@ -14,11 +14,27 @@ export interface FormValidationResult {
   errors?: string;
 }
 
-export interface BuildHtmlResult {
+export interface PageBundle {
+  js: string;
+  css: string;
+}
+
+export interface BuildBundleResult {
   success: boolean;
-  html?: string;
+  bundle?: PageBundle;
   errors?: string;
 }
+
+export type FormConfig = {
+  action: string;
+  method: string;
+  token?: string;
+};
+
+export type RenderPage = (params: {
+  data: unknown;
+  formConfig?: FormConfig;
+}) => string;
 
 export type SandboxInstance = {
   writeFile: (path: string, content: string) => Promise<unknown>;
@@ -133,10 +149,9 @@ export async function validateForm(
   }
 }
 
-export async function buildHtml(
-  sandbox: SandboxInstance,
-  data: Record<string, unknown>
-): Promise<BuildHtmlResult> {
+export async function buildBundle(
+  sandbox: SandboxInstance
+): Promise<BuildBundleResult> {
   const bundleResult = await sandbox.exec(
     'esbuild /workspace/mount.tsx --bundle --format=iife --jsx=automatic --outfile=/workspace/page.bundle.js --loader:.tsx=tsx'
   );
@@ -158,19 +173,38 @@ export async function buildHtml(
     sandbox.readFile('/workspace/page.css'),
   ]);
 
-  const html = `<!DOCTYPE html>
+  return {
+    success: true,
+    bundle: { js: jsFile.content, css: cssFile.content },
+  };
+}
+
+// Escape `<` in JSON so `</script>` inside a string value can't close the inline script tag.
+function safeInlineJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+export function makeRender(bundle: PageBundle): RenderPage {
+  return ({ data, formConfig }) => {
+    const formScript = formConfig
+      ? `<script>window.__POSITRONIC_FORM_CONFIG__ = ${safeInlineJson(
+          formConfig
+        )};</script>`
+      : '';
+
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>${cssFile.content}</style>
+  <style>${bundle.css}</style>
 </head>
 <body>
   <div id="root"></div>
-  <script>window.__POSITRONIC_DATA__ = ${JSON.stringify(data)};</script>
-  <script>${jsFile.content}</script>
+  <script>window.__POSITRONIC_DATA__ = ${safeInlineJson(data)};</script>
+  ${formScript}
+  <script>${bundle.js}</script>
 </body>
 </html>`;
-
-  return { success: true, html };
+  };
 }

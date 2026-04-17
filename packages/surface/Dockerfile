@@ -52,6 +52,7 @@ export * from './checkbox.js';
 export * from './dialog.js';
 export * from './empty.js';
 export * from './field.js';
+export * from './form.js';
 export * from './input.js';
 export * from './label.js';
 export * from './progress.js';
@@ -100,7 +101,8 @@ COPY <<'EOF' /workspace/tailwind.css
 @import "tailwindcss";
 EOF
 
-# Mount script that renders the component with data from __POSITRONIC_DATA__
+# Mount script that renders the component with data from __POSITRONIC_DATA__.
+# The <Form> component reads __POSITRONIC_FORM_CONFIG__ directly for action/method/token.
 COPY <<'EOF' /workspace/mount.tsx
 import { createRoot } from 'react-dom/client';
 import Page from './component.tsx';

@@ -4,7 +4,8 @@ import {
   typeCheckData,
   bundle,
   validateForm,
-  buildHtml,
+  buildBundle,
+  makeRender,
   type SandboxInstance,
 } from '../../src/sandbox.js';
 import { screenshot } from '../../src/screenshot.js';
@@ -384,16 +385,17 @@ export default function Page({ data }: Props) {
       if (!tcResult.success) return Response.json(tcResult);
 
       // Build self-contained HTML
-      const htmlResult = await buildHtml(sandbox, {
-        name: 'Test Dashboard',
-        count: 42,
+      const bundleResult = await buildBundle(sandbox);
+      if (!bundleResult.success) return Response.json(bundleResult);
+
+      const html = makeRender(bundleResult.bundle!)({
+        data: { name: 'Test Dashboard', count: 42 },
       });
-      if (!htmlResult.success) return Response.json(htmlResult);
 
       // If CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are available, screenshot
       if (rawEnv.CLOUDFLARE_ACCOUNT_ID && rawEnv.CLOUDFLARE_API_TOKEN) {
         const png = await screenshot({
-          html: htmlResult.html!,
+          html,
           accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
           apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
         });
@@ -403,7 +405,7 @@ export default function Page({ data }: Props) {
       }
 
       // No browser rendering credentials — just return the HTML
-      return new Response(htmlResult.html, {
+      return new Response(html, {
         headers: { 'Content-Type': 'text/html' },
       });
     }

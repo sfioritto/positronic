@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { StreamTool } from '@positronic/core';
 import type { SandboxInstance } from '../sandbox.js';
-import { buildHtml } from '../sandbox.js';
+import { buildBundle, makeRender } from '../sandbox.js';
 import { screenshot } from '../screenshot.js';
 
 export function previewTool(
@@ -16,17 +16,19 @@ export function previewTool(
       'Build and screenshot the component currently in the sandbox with sample data. Use this to see what your component looks like rendered in a browser.',
     inputSchema: z.object({}),
     async execute() {
-      const htmlResult = await buildHtml(sandbox, fakeData);
-      if (!htmlResult.success) {
+      const bundleResult = await buildBundle(sandbox);
+      if (!bundleResult.success) {
         return {
           status: 'error',
           message: 'Failed to build HTML.',
-          errors: htmlResult.errors,
+          errors: bundleResult.errors,
         };
       }
 
+      const html = makeRender(bundleResult.bundle!)({ data: fakeData });
+
       const png = await screenshot({
-        html: htmlResult.html!,
+        html,
         accountId,
         apiToken,
       });
