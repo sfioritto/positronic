@@ -35,6 +35,7 @@ The sandbox is stateful — each tool operates on whatever was last written via 
 
 ### Forms
 
+- **Form** — Top-level wrapper for submittable forms. Only render when an output schema is provided. Wires `action`, `method`, and CSRF token automatically — never use a raw `<form>` or set `action`/`method`/`onSubmit`.
 - **Button** — Variants: default, destructive, outline, secondary, ghost, link. Sizes: default, sm, lg, icon
 - **Input** — Text input fields
 - **Label** — Form field labels
@@ -666,16 +667,19 @@ When an output schema is provided, every key in the schema **must** have a corre
 **Example — simple text fields for `name: z.string(), email: z.string()`:**
 
 ```tsx
-<FieldGroup>
-  <Field>
-    <FieldLabel htmlFor="name">Name</FieldLabel>
-    <Input id="name" name="name" />
-  </Field>
-  <Field>
-    <FieldLabel htmlFor="email">Email</FieldLabel>
-    <Input id="email" name="email" type="email" />
-  </Field>
-</FieldGroup>
+<Form>
+  <FieldGroup>
+    <Field>
+      <FieldLabel htmlFor="name">Name</FieldLabel>
+      <Input id="name" name="name" />
+    </Field>
+    <Field>
+      <FieldLabel htmlFor="email">Email</FieldLabel>
+      <Input id="email" name="email" type="email" />
+    </Field>
+  </FieldGroup>
+  <Button type="submit">Submit</Button>
+</Form>
 ```
 
 ---
