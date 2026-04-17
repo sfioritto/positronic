@@ -179,12 +179,24 @@ EOF
 
 # Mount script that renders the component with data from __POSITRONIC_DATA__.
 # The <Form> component reads __POSITRONIC_FORM_CONFIG__ directly for action/method/token.
+# After React finishes mounting we flip `document.body.dataset.rendered = 'true'`
+# so the screenshot service can wait on `body[data-rendered]` before capturing.
+# Without this, Browser Rendering's networkidle0 fires while React is still
+# hydrating and fullPage measures document.scrollHeight at its pre-mount value,
+# clipping tall pages to the viewport size.
 COPY <<'EOF' /workspace/mount.tsx
 import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import Page from './component.tsx';
 
 const data = (window as any).__POSITRONIC_DATA__ || {};
-createRoot(document.getElementById('root')!).render(<Page data={data} />);
+const root = createRoot(document.getElementById('root')!);
+flushSync(() => {
+  root.render(<Page data={data} />);
+});
+requestAnimationFrame(() => {
+  document.body.dataset.rendered = 'true';
+});
 EOF
 
 # Form validation script — renders the component in JSDOM and checks that

@@ -25,6 +25,12 @@ export async function screenshot(params: {
         gotoOptions: {
           waitUntil: 'networkidle0',
         },
+        // Wait until mount.tsx has flipped body[data-rendered] after React
+        // finishes rendering. Without this, fullPage measures the viewport-
+        // sized document before React expands it and clips the capture.
+        waitForSelector: {
+          selector: 'body[data-rendered="true"]',
+        },
         screenshotOptions: {
           fullPage: true,
         },
