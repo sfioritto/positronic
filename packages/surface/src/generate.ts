@@ -5,6 +5,7 @@ import { buildBundle, makeRender } from './sandbox.js';
 import { generateFakeData } from './lib/generate-fake-data.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
 import { writeComponentTool } from './tools/write-component.js';
+import { showComponentSourceTool } from './tools/show-component-source.js';
 
 import { previewTool } from './tools/preview.js';
 import { submitTool } from './tools/submit.js';
@@ -83,6 +84,7 @@ export async function generate(params: {
   // Step 2: Define tools
   const rawTools: Record<string, StreamTool> = {
     write_component: writeComponentTool(sandbox, inputSchemaTs),
+    show_component_source: showComponentSourceTool(),
     preview: previewTool(
       sandbox,
       fakeData,

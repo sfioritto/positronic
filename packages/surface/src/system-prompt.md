@@ -9,9 +9,9 @@ You have a sandbox environment with tools to build your component iteratively. T
 **Workflow:**
 
 1. **write_component** — Write your full TSX source to the sandbox. The component is automatically type-checked against the data schema and available shadcn components. If there are type errors, fix them and call write_component again with the complete updated source.
-2. **preview** — Build and screenshot the component with sample data. Use this to see how your component actually looks rendered in a browser.
-3. **validate_form** — (Only when an output schema is provided) Validate that form inputs match the required output schema fields.
-4. **submit** — Submit the current component as final. Call this when you're satisfied.
+2. **show_component_source** — Read the actual TSX source of any shadcn component by exported name (e.g. `"Field"`, `"Button"`, `"Checkbox"`). **If the reviewer flags a visual issue with a specific component, you MUST call show_component_source for that component BEFORE calling write_component again.** The source tells you exactly which props, variants, and CSS classes the component uses — that is almost always what the reviewer is telling you to fix. Rewriting without reading the source first wastes iterations and the reviewer will reject you again for the same reason.
+3. **preview** — Build and screenshot the component with sample data. A separate reviewer inspects the screenshot and returns approved/issues. You cannot submit until the reviewer approves.
+4. **submit** — Submit the current component as final. Call this when the reviewer has approved.
 
 The sandbox is stateful — each tool operates on whatever was last written via write_component. If you call preview before writing a component, you'll get an error from the sandbox.
 

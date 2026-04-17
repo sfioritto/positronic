@@ -22,9 +22,9 @@
   "scripts": {
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist/src",
-    "prebuild": "node -e \"const fs=require('fs'),p=require('path'),d=p.dirname(require.resolve('./package.json'));const md=fs.readFileSync(p.join(d,'src/system-prompt.md'),'utf8');fs.writeFileSync(p.join(d,'src/system-prompt.gen.ts'),'export default '+JSON.stringify(md)+';\\n')\"",
+    "prebuild": "node -e \"const fs=require('fs'),p=require('path'),d=p.dirname(require.resolve('./package.json'));const md=fs.readFileSync(p.join(d,'src/system-prompt.md'),'utf8');fs.writeFileSync(p.join(d,'src/system-prompt.gen.ts'),'export default '+JSON.stringify(md)+';\\n')\" && node scripts/gen-component-sources.mjs",
     "build": "npm run prebuild && npm run tsc && npm run swc",
-    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules src/system-prompt.gen.ts"
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules src/system-prompt.gen.ts src/component-sources.gen.ts"
   },
   "dependencies": {
     "@positronic/core": "^0.0.78",
