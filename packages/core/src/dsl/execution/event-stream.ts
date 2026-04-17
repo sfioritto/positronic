@@ -39,6 +39,7 @@ import type {
   GuardBlock,
   WaitBlock,
   MapBlock,
+  PageConfig,
   PromptBlock,
   PromptConfig,
   PromptLoopConfig,
@@ -1484,16 +1485,25 @@ The output must conform to the provided schema.`,
       );
     }
 
-    // Step 1: Produce the HTML string
+    // Build form info once — shared between HTML generation and webhook registration
     const formInfo = pageConfig.formSchema
       ? this.buildFormAction(step, pageConfig.formSchema)
       : undefined;
 
-    const body = renderHtml(
-      pageConfig.html,
-      formInfo ? { formAction: formInfo.formAction } : {}
-    );
-    const html = wrapHtmlDocument(body, { title: stepBlock.title });
+    // Step 1: Produce the HTML string
+    let html: string;
+
+    if (pageConfig.message) {
+      // Generation path — call surface plugin
+      html = await this.generatePageHtml(stepBlock, pageConfig, formInfo);
+    } else {
+      // Custom HTML path
+      const body = renderHtml(
+        pageConfig.html,
+        formInfo ? { formAction: formInfo.formAction } : {}
+      );
+      html = wrapHtmlDocument(body, { title: stepBlock.title });
+    }
 
     // Step 2: Create page and handle form/read-only branching (shared by both paths)
     const pageCreateOptions = {
@@ -1539,6 +1549,95 @@ The output must conform to the provided schema.`,
 
       yield* this.completeStep(step, prevState, { url: page.url });
     }
+  }
+
+  /**
+   * Generate page HTML via the surface plugin.
+   * Resolves the message template, calls surface.generate(), then replaces
+   * fake data with real data and injects form config if needed.
+   */
+  private async generatePageHtml(
+    stepBlock: StepBlock<any, any, TOptions, TPlugins, any, any>,
+    pageConfig: PageConfig,
+    formInfo?: ReturnType<typeof this.buildFormAction>
+  ): Promise<string> {
+    const surfacePlugin = this.pluginInjections.surface;
+    if (!surfacePlugin?.generate) {
+      throw new Error(
+        `Page step "${stepBlock.title}" uses message-based generation but no surface plugin is configured. ` +
+          `Add the surface plugin to your brain: brain({ plugins: { surface: surface.setup({ ... }) } })`
+      );
+    }
+
+    // Validate data against inputSchema at runtime (fail fast on shape mismatch)
+    if (pageConfig.inputSchema && pageConfig.data) {
+      try {
+        pageConfig.inputSchema.parse(pageConfig.data);
+      } catch (e: any) {
+        throw new Error(
+          `Page step "${stepBlock.title}": data does not match inputSchema — ${e.message}`
+        );
+      }
+    }
+
+    // Resolve templates
+    const prompt = await resolveTemplate(
+      pageConfig.message!,
+      this.templateContext
+    );
+    const systemAddendum = pageConfig.system
+      ? await resolveTemplate(pageConfig.system, this.templateContext)
+      : undefined;
+
+    const fullPrompt = systemAddendum
+      ? `${prompt}\n\nAdditional instructions:\n${systemAddendum}`
+      : prompt;
+
+    // Call surface.generate() — surface only sees the schema, never real data
+    const result = await surfacePlugin.generate({
+      prompt: fullPrompt,
+      inputSchema: pageConfig.inputSchema!,
+      outputSchema: pageConfig.formSchema,
+    });
+
+    // Replace fake data with real data locally (real data never leaves the caller).
+    // Match the full script tag to avoid breaking on semicolons in JSON string values.
+    // Escape '<' in JSON to prevent </script> injection in inline scripts.
+    let html = result.html;
+    if (pageConfig.data) {
+      const safeJson = JSON.stringify(pageConfig.data).replace(/</g, '\\u003c');
+      html = html.replace(
+        /<script>window\.__POSITRONIC_DATA__[\s\S]*?<\/script>/,
+        `<script>window.__POSITRONIC_DATA__ = ${safeJson};</script>`
+      );
+    }
+
+    // Inject form config for generated pages (React renders forms at runtime)
+    if (formInfo) {
+      const formScript = `<script>
+window.__POSITRONIC_FORM_CONFIG__ = ${JSON.stringify({
+        action: formInfo.formAction,
+        method: 'POST',
+        token: formInfo.formToken,
+      })};
+new MutationObserver(function(mutations, observer) {
+  var form = document.querySelector('form');
+  if (form) {
+    form.action = window.__POSITRONIC_FORM_CONFIG__.action;
+    form.method = window.__POSITRONIC_FORM_CONFIG__.method;
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = '__token';
+    input.value = window.__POSITRONIC_FORM_CONFIG__.token;
+    form.appendChild(input);
+    observer.disconnect();
+  }
+}).observe(document.body, { childList: true, subtree: true });
+</script>`;
+      html = html.replace('</body>', `${formScript}\n</body>`);
+    }
+
+    return html;
   }
 
   private async *executeWait(
