@@ -37,11 +37,16 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
     tool_result)
       TOOL=$(echo "$line" | jq -r '.tool')
       RESULT_TYPE=$(echo "$line" | jq -r '.result.type // empty')
-      if [ "$TOOL" = "preview" ] && [ "$RESULT_TYPE" = "image" ]; then
-        # Extract screenshot from preview tool result
-        SIDX=$(find "${DIR}" -maxdepth 1 -name 'screenshot-*.png' | wc -l | tr -d ' ')
-        echo "$line" | jq -r '.result.data' | base64 -d > "${DIR}/screenshot-${SIDX}.png"
-        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}.png ($(wc -c < "${DIR}/screenshot-${SIDX}.png" | tr -d ' ') bytes)"
+      if [ "$TOOL" = "preview" ] && [ "$RESULT_TYPE" = "preview" ]; then
+        # Extract screenshot + verdict from preview tool result
+        SIDX=$(find "${DIR}" -maxdepth 1 -name 'screenshot-*.png' ! -name 'screenshot-final-*' | wc -l | tr -d ' ')
+        echo "$line" | jq -r '.result.image' | base64 -d > "${DIR}/screenshot-${SIDX}.png"
+        APPROVED=$(echo "$line" | jq -r '.result.verdict.approved')
+        ISSUE_COUNT=$(echo "$line" | jq -r '.result.verdict.issues | length')
+        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}.png (approved=${APPROVED}, ${ISSUE_COUNT} issues)"
+        if [ "$APPROVED" = "false" ] && [ "$ISSUE_COUNT" -gt 0 ]; then
+          echo "$line" | jq -r '.result.verdict.issues[] | "  - " + .'
+        fi
       else
         STATUS=$(echo "$line" | jq -r '.result.status // .result.type // "ok"')
         MSG=$(echo "$line" | jq -r '.result.message // empty')
