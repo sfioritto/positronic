@@ -1,7 +1,7 @@
 import type { ObjectGenerator, JsonValue, StreamTool } from '@positronic/core';
 import type { ZodObject } from 'zod';
-import type { SandboxInstance } from './sandbox.js';
-import { buildHtml } from './sandbox.js';
+import type { SandboxInstance, RenderPage } from './sandbox.js';
+import { buildBundle, makeRender } from './sandbox.js';
 import { generateFakeData } from './lib/generate-fake-data.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
 import { writeComponentTool } from './tools/write-component.js';
@@ -17,7 +17,7 @@ interface GenerateDebugLog {
 }
 
 export interface GenerateResult {
-  html: string;
+  render: RenderPage;
   log?: GenerateDebugLog;
   screenshots?: Uint8Array[];
 }
@@ -141,13 +141,14 @@ Instructions:
     toolChoice: 'auto',
   });
 
-  // Step 5: Build final HTML
-  const htmlResult = await buildHtml(sandbox, fakeData);
-  if (!htmlResult.success) {
-    throw new Error(`Failed to build final HTML: ${htmlResult.errors}`);
+  // Step 5: Build the bundle once; return a render closure so the caller
+  // can interpolate real data and form config without seeing it here.
+  const bundleResult = await buildBundle(sandbox);
+  if (!bundleResult.success) {
+    throw new Error(`Failed to build final bundle: ${bundleResult.errors}`);
   }
 
-  const result: GenerateResult = { html: htmlResult.html! };
+  const result: GenerateResult = { render: makeRender(bundleResult.bundle!) };
 
   if (debug) {
     result.screenshots = screenshots;
