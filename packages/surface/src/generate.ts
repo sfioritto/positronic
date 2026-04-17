@@ -35,7 +35,8 @@ export type ProgressEvent =
  */
 export async function generate(params: {
   client: ObjectGenerator;
-  reviewClient: ObjectGenerator;
+  /** Reviewer LLM for preview quality gate. Defaults to `client`. */
+  reviewClient?: ObjectGenerator;
   sandbox: SandboxInstance;
   systemPrompt: string;
   accountId: string;
@@ -88,7 +89,7 @@ export async function generate(params: {
       accountId,
       apiToken,
       {
-        client: reviewClient,
+        client: reviewClient ?? client,
         userPrompt: prompt,
         inputSchemaTs,
         outputSchemaTs,
