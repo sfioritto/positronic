@@ -5,7 +5,7 @@ import { validateForm } from '../sandbox.js';
 
 export function submitTool(
   sandbox: SandboxInstance,
-  outputSchema?: string,
+  outputFieldNames?: string[],
   fakeData?: Record<string, unknown>
 ): StreamTool {
   return {
@@ -13,8 +13,8 @@ export function submitTool(
       'Submit the current component as the final version. If the component includes a form, it will be validated against the output schema first.',
     inputSchema: z.object({}),
     async execute() {
-      if (outputSchema && fakeData) {
-        const result = await validateForm(sandbox, outputSchema, fakeData);
+      if (outputFieldNames && fakeData) {
+        const result = await validateForm(sandbox, outputFieldNames, fakeData);
         if (!result.success) {
           return {
             status: 'error',

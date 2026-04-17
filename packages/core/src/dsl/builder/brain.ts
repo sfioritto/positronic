@@ -409,7 +409,42 @@ export class Brain<
     return this.nextBrain<any>();
   }
 
-  // Overload 1: Custom HTML with formSchema
+  // Overload 1: Generated page with formSchema (auto-merge response onto state)
+  page<
+    TInputSchema extends z.ZodObject<any>,
+    TFormSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & z.infer<TFormSchema>
+  >(
+    title: string,
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
+      message: TemplateReturn;
+      inputSchema: TInputSchema;
+      data: z.infer<TInputSchema>;
+      formSchema: TFormSchema;
+      system?: TemplateReturn;
+      onCreated?: (page: GeneratedPage<TFormSchema>) => void | Promise<void>;
+      slug?: string;
+      ttl?: number;
+      persist?: boolean;
+    }
+  ): Brain<TOptions, TNewState, TPlugins>;
+
+  // Overload 2: Generated page without formSchema (read-only)
+  page<TInputSchema extends z.ZodObject<any>>(
+    title: string,
+    configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
+      message: TemplateReturn;
+      inputSchema: TInputSchema;
+      data: z.infer<TInputSchema>;
+      system?: TemplateReturn;
+      onCreated?: (page: GeneratedPage) => void | Promise<void>;
+      slug?: string;
+      ttl?: number;
+      persist?: boolean;
+    }
+  ): Brain<TOptions, TState, TPlugins>;
+
+  // Overload 3: Custom HTML with formSchema
   page<
     TSchema extends z.ZodObject<any>,
     TNewState extends State = TState & z.infer<TSchema>
@@ -424,7 +459,7 @@ export class Brain<
     }
   ): Brain<TOptions, TNewState, TPlugins>;
 
-  // Overload 2: Custom HTML without formSchema
+  // Overload 4: Custom HTML without formSchema
   page(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {

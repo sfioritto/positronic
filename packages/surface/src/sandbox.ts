@@ -40,14 +40,9 @@ function parseErrors(result: { stdout: string; stderr: string }) {
 
 export async function typeCheck(
   sandbox: SandboxInstance,
-  dataShape: string,
-  formSchema?: string
+  dataShape: string
 ): Promise<TypeCheckResult> {
   await sandbox.writeFile('/workspace/types.ts', dataShape);
-
-  if (formSchema) {
-    await sandbox.writeFile('/workspace/form-schema.ts', formSchema);
-  }
 
   const result = await sandbox.exec('npx tsc --noEmit');
 
@@ -98,7 +93,7 @@ export async function bundle(
 
 export async function validateForm(
   sandbox: SandboxInstance,
-  formSchemaSource: string,
+  fieldNames: string[],
   data: Record<string, unknown>
 ): Promise<FormValidationResult> {
   // Bundle component with external React for JSDOM testing
@@ -107,14 +102,14 @@ export async function validateForm(
     return { success: false, errors: bundleResult.errors };
   }
 
-  // Write form schema as .ts, then use esbuild to strip types to .mjs
-  await sandbox.writeFile('/workspace/form-schema.ts', formSchemaSource);
-  await sandbox.exec(
-    'esbuild /workspace/form-schema.ts --format=esm --outfile=/workspace/form-schema.mjs'
-  );
-
-  // Write input data for the pre-baked test-form.mjs script (see Dockerfile)
-  await sandbox.writeFile('/workspace/test-data.json', JSON.stringify(data));
+  // Write input data and field names for the pre-baked test-form.mjs script (see Dockerfile)
+  await Promise.all([
+    sandbox.writeFile('/workspace/test-data.json', JSON.stringify(data)),
+    sandbox.writeFile(
+      '/workspace/field-names.json',
+      JSON.stringify(fieldNames)
+    ),
+  ]);
 
   const result = await sandbox.exec(
     'node --experimental-vm-modules /workspace/test-form.mjs',

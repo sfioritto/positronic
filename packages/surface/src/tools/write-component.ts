@@ -5,8 +5,7 @@ import { typeCheck } from '../sandbox.js';
 
 export function writeComponentTool(
   sandbox: SandboxInstance,
-  inputSchema: string,
-  outputSchema?: string
+  inputSchema: string
 ): StreamTool {
   return {
     description:
@@ -18,7 +17,7 @@ export function writeComponentTool(
     }),
     async execute({ source }: any) {
       await sandbox.writeFile('/workspace/component.tsx', source);
-      const result = await typeCheck(sandbox, inputSchema, outputSchema);
+      const result = await typeCheck(sandbox, inputSchema);
       if (result.success) {
         return {
           status: 'success',

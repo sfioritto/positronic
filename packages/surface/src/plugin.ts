@@ -1,5 +1,6 @@
 import { definePlugin } from '@positronic/core';
 import type { ObjectGenerator } from '@positronic/core';
+import type { ZodObject } from 'zod';
 import {
   generate,
   type GenerateResult,
@@ -52,8 +53,8 @@ export const surface = definePlugin({
     return {
       generate: async (params: {
         prompt: string;
-        inputSchema: string;
-        outputSchema?: string;
+        inputSchema: ZodObject<any>;
+        outputSchema?: ZodObject<any>;
         debug?: boolean;
         onProgress?: (event: ProgressEvent) => void | Promise<void>;
       }): Promise<GenerateResult> => {

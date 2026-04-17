@@ -1,7 +1,9 @@
 import type { ObjectGenerator, JsonValue, StreamTool } from '@positronic/core';
+import type { ZodObject } from 'zod';
 import type { SandboxInstance } from './sandbox.js';
 import { buildHtml } from './sandbox.js';
 import { generateFakeData } from './lib/generate-fake-data.js';
+import { zodToTypescript } from './lib/zod-to-typescript.js';
 import { writeComponentTool } from './tools/write-component.js';
 
 import { previewTool } from './tools/preview.js';
@@ -38,8 +40,8 @@ export async function generate(params: {
   accountId: string;
   apiToken: string;
   prompt: string;
-  inputSchema: string;
-  outputSchema?: string;
+  inputSchema: ZodObject<any>;
+  outputSchema?: ZodObject<any>;
   debug?: boolean;
   onProgress?: (event: ProgressEvent) => void | Promise<void>;
 }): Promise<GenerateResult> {
@@ -56,23 +58,32 @@ export async function generate(params: {
     onProgress,
   } = params;
 
+  // Convert Zod schemas to TypeScript strings at the boundary
+  const inputSchemaTs = zodToTypescript(inputSchema, 'Data');
+  const outputSchemaTs = outputSchema
+    ? zodToTypescript(outputSchema, 'FormData')
+    : undefined;
+  const outputFieldNames = outputSchema
+    ? Object.keys(outputSchema.shape)
+    : undefined;
+
   const startTime = Date.now();
   const screenshots: Uint8Array[] = [];
 
   // Step 1: Generate fake data using an LLM agent loop with type-checking
   const { fakeData, responseMessages: fakeDataMessages } =
-    await generateFakeData(client, sandbox, inputSchema);
+    await generateFakeData(client, sandbox, inputSchemaTs);
 
   await onProgress?.({ type: 'fake_data_done', data: fakeData });
 
   // Step 2: Define tools
   const rawTools: Record<string, StreamTool> = {
-    write_component: writeComponentTool(sandbox, inputSchema, outputSchema),
+    write_component: writeComponentTool(sandbox, inputSchemaTs),
     preview: previewTool(sandbox, fakeData, accountId, apiToken, {
       debug,
       screenshots,
     }),
-    submit: submitTool(sandbox, outputSchema, fakeData),
+    submit: submitTool(sandbox, outputFieldNames, fakeData),
   };
 
   // Wrap tools to emit progress events (tools without execute are pass-through —
@@ -102,14 +113,14 @@ IMPORTANT: Import all components from '@surface/components'. Do NOT use '@/compo
 
 The component receives a \`data\` prop with this TypeScript interface:
 \`\`\`typescript
-${inputSchema}
+${inputSchemaTs}
 \`\`\`
 ${
-  outputSchema
+  outputSchemaTs
     ? `
 The component must include a form that submits data matching this schema:
 \`\`\`typescript
-${outputSchema}
+${outputSchemaTs}
 \`\`\`
 `
     : ''

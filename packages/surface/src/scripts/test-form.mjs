@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { formSchema } from './form-schema.mjs';
 
 // Set up JSDOM globals before importing React
 const dom = new JSDOM(
@@ -34,8 +33,11 @@ const { act } = await import('react');
 // Import the bundled component (esbuild output, plain JS)
 const { default: Page } = await import('./component.bundle.js');
 
-// Input data written by the host
+// Input data and field names written by the host
 const inputData = JSON.parse(readFileSync('/workspace/test-data.json', 'utf8'));
+const fieldNames = JSON.parse(
+  readFileSync('/workspace/field-names.json', 'utf8')
+);
 
 // Render the component
 const root = document.getElementById('root');
@@ -45,7 +47,6 @@ await act(() => {
 });
 
 // Find all form inputs
-const schemaKeys = Object.keys(formSchema.shape);
 const inputs = root.querySelectorAll(
   'input[name], select[name], textarea[name]'
 );
@@ -54,7 +55,7 @@ const inputNames = Array.from(inputs).map((el) => {
   return name.endsWith('[]') ? name.slice(0, -2) : name;
 });
 
-const missingFields = schemaKeys.filter((key) => !inputNames.includes(key));
+const missingFields = fieldNames.filter((key) => !inputNames.includes(key));
 
 const result = { success: true, errors: [] };
 
