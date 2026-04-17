@@ -79,8 +79,13 @@ export async function typeCheckData(
     '/workspace/data-check.ts',
     `import type { Data } from './types';\nconst data: Data = ${json};`
   );
+  // --ignoreConfig silences TS5112: newer typescript refuses to run when
+  // a file is specified on the command line AND a tsconfig.json exists in
+  // any ancestor directory (/workspace/tsconfig.json, baked into the image).
+  // data-check.ts only imports './types' — it doesn't need the tsconfig's
+  // paths config, so ignoring the config is safe here.
   const result = await sandbox.exec(
-    'npx tsc --noEmit --strict /workspace/data-check.ts'
+    'npx tsc --noEmit --strict --ignoreConfig /workspace/data-check.ts'
   );
   if (result.success) {
     return { success: true };

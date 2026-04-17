@@ -65,7 +65,6 @@ async function generateOneVariant(
   responseMessages: JsonValue[];
 }> {
   let fakeData: Record<string, unknown> | null = null;
-  let fakeDataJson: string | null = null;
 
   const result = await client.streamText({
     prompt: `Generate realistic fake/sample data as JSON that conforms to this TypeScript interface.
@@ -78,71 +77,67 @@ ${VARIANT_SPECS[variant]}
 ${COMMON_GUIDANCE}
 
 Instructions:
-1. Write JSON data using write_data — it will be type-checked against the interface.
-2. Fix any type errors and rewrite.
-3. Call submit_data when the data type-checks successfully.`,
+1. Call submit_data with your JSON. It will be type-checked against the interface.
+2. If submit_data returns type errors, call submit_data again with corrected JSON. Repeat until it returns success.
+3. Once submit_data returns success, you are done — do not call any more tools.`,
     tools: {
-      write_data: {
+      submit_data: {
         description:
-          'Write JSON data and type-check it against the Data interface. Returns type errors if any.',
+          'Submit JSON fake data for the Data interface. The tool type-checks the JSON against the schema: on success the data is stored as final; on failure it returns type errors so you can correct the JSON and call submit_data again. This is the ONLY tool — there is no separate write step.',
         inputSchema: z.object({
           json: z
             .string()
             .describe('A JSON object matching the Data interface'),
         }),
         async execute({ json }: any) {
-          fakeDataJson = json;
+          let parsed: Record<string, unknown>;
+          try {
+            parsed = JSON.parse(json);
+          } catch (err) {
+            return {
+              status: 'error',
+              message: `JSON parse failed: ${
+                (err as Error).message
+              }. Fix the JSON and call submit_data again.`,
+            };
+          }
           const typeCheckResult = await typeCheckData(
             sandbox,
             json,
             inputSchema
           );
-          if (typeCheckResult.success) {
+          if (!typeCheckResult.success) {
             return {
-              status: 'success',
+              status: 'error',
               message:
-                'Data type-checks successfully. Call submit_data to finish.',
+                'Type errors found. Fix them and call submit_data again.',
+              errors: typeCheckResult.errors,
             };
           }
+          fakeData = parsed;
           return {
-            status: 'error',
-            message: 'Type errors found. Fix them and try again.',
-            errors: typeCheckResult.errors,
+            status: 'success',
+            message: 'Data submitted and type-checks successfully.',
           };
         },
       },
-      submit_data: {
-        description:
-          'Submit the current data as final. Only call after write_data succeeds.',
-        inputSchema: z.object({}),
-        async execute() {
-          if (!fakeDataJson) {
-            return {
-              status: 'error',
-              message: 'No data written yet. Call write_data first.',
-            };
-          }
-          try {
-            fakeData = JSON.parse(fakeDataJson);
-          } catch {
-            return {
-              status: 'error',
-              message:
-                'JSON parse failed. Fix the JSON and call write_data again.',
-            };
-          }
-          return { status: 'success', message: 'Data submitted.' };
-        },
-      },
     },
-    maxSteps: 10,
+    maxSteps: 15,
     toolChoice: 'auto',
   });
 
   if (fakeData === null) {
-    throw new Error(
-      `Fake-data generation for variant "${variant}" did not converge — the model exited without calling submit_data successfully. Check the input schema and the model's maxSteps budget.`
+    const err = new Error(
+      `Fake-data generation for variant "${variant}" did not converge — submit_data never succeeded within maxSteps. Check the input schema and the model's budget.`
     );
+    // Attach the full LLM conversation so callers can surface it for
+    // debugging (otherwise the failure is opaque — we have no way to see
+    // what the model tried).
+    (
+      err as Error & { responseMessages?: JsonValue[]; variant?: string }
+    ).responseMessages = result.responseMessages;
+    (err as Error & { variant?: string }).variant = variant;
+    throw err;
   }
 
   return { fakeData, responseMessages: result.responseMessages };
