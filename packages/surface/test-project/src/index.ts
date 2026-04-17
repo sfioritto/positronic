@@ -456,7 +456,7 @@ export default function Page({ data }: Props) {
         ...ctx,
         sandbox,
         prompt:
-          'Create a dashboard page showing key metrics at the top in cards, and a table of recent users below.',
+          'Create a dashboard page showing key metrics at the top and a list of recent users below. Pick the layout primitives that fit — you do not have to use cards.',
         inputSchema,
         debug: true,
       });
@@ -636,8 +636,7 @@ The page should have these sections, each with a colored header/accent:
 - Checked = keep in inbox, unchecked = archive
 - Include a "Archive Unchecked" submit button at the bottom
 
-Make the overall layout clean and scannable. Use cards to group sections.
-The page should feel like a morning email briefing — scannable in 30 seconds.`;
+Make the overall layout clean and scannable. Pick whichever layout primitives fit the content — typography and whitespace, separators, plain containers, or cards where they genuinely help. The page should feel like a morning email briefing — scannable in 30 seconds, not an enterprise dashboard.`;
 
       return streamGenerate({
         ...ctx,
@@ -645,6 +644,92 @@ The page should feel like a morning email briefing — scannable in 30 seconds.`
         prompt,
         inputSchema,
         outputSchema,
+        debug: true,
+      });
+    }
+
+    // Weekly dev summary — read-only page rendering GitHub PR activity
+    // summaries for each developer on the team. Mirrors the state shape at
+    // the page-generation step of the `weekly-dev-summary` brain in
+    // seans-bots. Uses iterate tuples like email-digest.
+    if (url.pathname === '/sandbox/dev-summary') {
+      const ctx = getGenerateContext(rawEnv);
+      if (!ctx) {
+        return Response.json({ error: 'Missing env vars' }, { status: 500 });
+      }
+
+      const developerInput = z.object({
+        name: z.string(),
+        meta: z.object({
+          totalPRs: z.number(),
+          prsReviewed: z.number(),
+          prComments: z.number(),
+        }),
+      });
+
+      const developerResult = z.object({
+        summary: z
+          .string()
+          .describe('One sentence about what they focused on this period'),
+        accomplishments: z.array(
+          z.object({
+            text: z
+              .string()
+              .describe('Complete sentence explaining what was done and why'),
+            relatedPRs: z.array(
+              z.object({
+                repo: z.string(),
+                number: z.number(),
+              })
+            ),
+          })
+        ),
+      });
+
+      const inputSchema = z.object({
+        org: z
+          .string()
+          .describe('GitHub organization slug (used to build PR URLs)'),
+        weekStart: z.string().describe('ISO date of period start'),
+        weekEnd: z.string().describe('ISO date of period end'),
+        periodLabel: z
+          .string()
+          .describe('Human-readable label, e.g. "last week"'),
+        developerSummaries: z
+          .array(z.tuple([developerInput, developerResult]))
+          .describe(
+            'One tuple per developer: [input data, generated summary result]'
+          ),
+      });
+
+      const prompt = `Create a weekly developer activity summary page for a software team.
+
+The page shows each developer's work across a reporting period. Data comes in as tuples pairing each developer's stats with a generated summary.
+
+**Header**
+- Clear title like "Weekly Dev Summary" or "Developer Activity"
+- Display the date range prominently (format weekStart and weekEnd as readable dates, e.g. "Oct 14 – Oct 20, 2024")
+- Show the periodLabel somewhere for context (e.g. as a subtle subtitle or badge)
+
+**Per-Developer Section** (one section per tuple in developerSummaries — skip any where result.summary is an empty string)
+Each section should include:
+- Developer name as a prominent heading
+- Three small stat signals: totalPRs merged, prsReviewed, prComments — compact and visually grouped (badges, inline metadata, or a small stat row; your call)
+- The summary sentence (result.summary), set apart visually — consider italic, muted color, or a quote-style treatment
+- An accomplishments list — each list item shows the accomplishment text followed by small pill-shaped PR links. Each related PR renders as "#{number}" and links to https://github.com/{org}/{repo}/pull/{number}. If an accomplishment has no relatedPRs, just show the text.
+
+How you visually separate developers from each other is up to you — a Separator with typographic hierarchy, a subtle background alternation, bordered cards if that genuinely fits, or just spacing. Pick what best reads as an editorial digest rather than an enterprise dashboard. Do not reflexively wrap each developer in a bordered Card; a stack of seven identical bordered boxes is usually the wrong choice for this kind of report.
+
+**Empty State**
+If developerSummaries is empty OR every entry has an empty result.summary, show a clean empty state that says something like "No developer activity this period." (Pick a component that fits — Empty, a simple centered text block, whatever reads well.)
+
+The overall feel should be that of a scannable internal team digest — think Notion or Linear's weekly summary emails. Quiet, professional, strong typography hierarchy, generous whitespace. This is a read-only report, NOT a dashboard with charts and NOT a marketing page. No buttons, no forms — just content.`;
+
+      return streamGenerate({
+        ...ctx,
+        sandbox,
+        prompt,
+        inputSchema,
         debug: true,
       });
     }
@@ -662,7 +747,8 @@ The page should feel like a morning email briefing — scannable in 30 seconds.`
         '  /sandbox/preview - build HTML and screenshot\n' +
         '  /sandbox/generate - full LLM generation loop\n' +
         '  /sandbox/hn-reader - HN reader test (form + 50 articles)\n' +
-        '  /sandbox/email-digest - email digest with enrichment tuples\n'
+        '  /sandbox/email-digest - email digest with enrichment tuples\n' +
+        '  /sandbox/dev-summary - weekly developer activity summary (read-only)\n'
     );
   },
 };

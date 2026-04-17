@@ -32,7 +32,14 @@ Judge overall visual polish. Fail on issues that would make a human designer re-
 3. Isolated controls — checkboxes/buttons stranded in whitespace far from related content.
 4. Broken alignment — labels not aligned with their controls, rows not aligned to a common edge.
 5. Vertical rhythm — unexplained large gaps, or elements overlapping.
-6. Overall polish — does it look like something a human designer would actually ship?
+6. Layout-primitive appropriateness — are the chosen layout elements a good fit for the content? Examples of mismatches worth flagging:
+   - A stack of many identical bordered Cards for a read-only list of similar items when a typographic list with Separators would read better.
+   - Dense dashboard-style metric cards for editorial or report-like content.
+   - Heavy container chrome (borders, shadows) on content that would feel lighter with just whitespace + hierarchy.
+   - A \`Table\` used for content that isn't truly row/column tabular.
+   - Cards nested inside cards for no visual reason.
+   Do not flag card use itself as wrong — flag mismatches where the chosen primitive is fighting the content. If the content genuinely benefits from the container, approve it.
+7. Overall polish — does it look like something a human designer would actually ship?
 
 Rules that apply to both passes:
 - You are the quality gate, not a cheerleader. Do not approve work that "kind of works but looks weird".

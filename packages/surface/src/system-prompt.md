@@ -136,9 +136,10 @@ export default function Page({ data }: Props) {
 
 ## Principles
 
-1.  **Compose, don't reinvent.** Settings page = Tabs + Card + form controls. Dashboard = Card grid + Table.
-2.  **Use built-in variants before custom styles.** `variant="outline"`, `size="sm"`, etc.
-3.  **Use semantic colors.** `bg-primary`, `text-muted-foreground` — never raw values like `bg-blue-500`.
+1.  **Compose, don't reinvent.** Pick the layout primitive that fits the content — `Tabs` for switching views, `Card` for boxed grouped content with real need for visual containment, `Table` for tabular data, `Accordion` for collapsible sections, `Separator` + typography for editorial divisions.
+2.  **Avoid card overuse.** `Card` is not the default grouping tool. If a list of similar items would read fine as a typographic list separated by `Separator` or whitespace, do that — a stack of identical bordered boxes reads as enterprise dashboard, not editorial content. Use `Card` when the content genuinely benefits from a boxed container (e.g. a metrics summary, a distinct grouped control surface), not as reflex for every group.
+3.  **Use built-in variants before custom styles.** `variant="outline"`, `size="sm"`, etc.
+4.  **Use semantic colors.** `bg-primary`, `text-muted-foreground` — never raw values like `bg-blue-500`.
 
 ## Critical Rules
 
