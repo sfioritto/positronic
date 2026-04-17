@@ -1552,9 +1552,8 @@ The output must conform to the provided schema.`,
   }
 
   /**
-   * Generate page HTML via the surface plugin.
-   * Resolves the message template, calls surface.generate(), then replaces
-   * fake data with real data and injects form config if needed.
+   * Generate page HTML via the surface plugin. Surface returns a render closure;
+   * we invoke it here with real data and form config so neither ever leaves core.
    */
   private async generatePageHtml(
     stepBlock: StepBlock<any, any, TOptions, TPlugins, any, any>,
@@ -1580,64 +1579,31 @@ The output must conform to the provided schema.`,
       }
     }
 
-    // Resolve templates
     const prompt = await resolveTemplate(
       pageConfig.message!,
       this.templateContext
     );
-    const systemAddendum = pageConfig.system
+    const system = pageConfig.system
       ? await resolveTemplate(pageConfig.system, this.templateContext)
       : undefined;
 
-    const fullPrompt = systemAddendum
-      ? `${prompt}\n\nAdditional instructions:\n${systemAddendum}`
-      : prompt;
-
-    // Call surface.generate() — surface only sees the schema, never real data
     const result = await surfacePlugin.generate({
-      prompt: fullPrompt,
+      prompt,
+      system,
       inputSchema: pageConfig.inputSchema!,
       outputSchema: pageConfig.formSchema,
     });
 
-    // Replace fake data with real data locally (real data never leaves the caller).
-    // Match the full script tag to avoid breaking on semicolons in JSON string values.
-    // Escape '<' in JSON to prevent </script> injection in inline scripts.
-    let html = result.html;
-    if (pageConfig.data) {
-      const safeJson = JSON.stringify(pageConfig.data).replace(/</g, '\\u003c');
-      html = html.replace(
-        /<script>window\.__POSITRONIC_DATA__[\s\S]*?<\/script>/,
-        `<script>window.__POSITRONIC_DATA__ = ${safeJson};</script>`
-      );
-    }
-
-    // Inject form config for generated pages (React renders forms at runtime)
-    if (formInfo) {
-      const formScript = `<script>
-window.__POSITRONIC_FORM_CONFIG__ = ${JSON.stringify({
-        action: formInfo.formAction,
-        method: 'POST',
-        token: formInfo.formToken,
-      })};
-new MutationObserver(function(mutations, observer) {
-  var form = document.querySelector('form');
-  if (form) {
-    form.action = window.__POSITRONIC_FORM_CONFIG__.action;
-    form.method = window.__POSITRONIC_FORM_CONFIG__.method;
-    var input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = '__token';
-    input.value = window.__POSITRONIC_FORM_CONFIG__.token;
-    form.appendChild(input);
-    observer.disconnect();
-  }
-}).observe(document.body, { childList: true, subtree: true });
-</script>`;
-      html = html.replace('</body>', `${formScript}\n</body>`);
-    }
-
-    return html;
+    return result.render({
+      data: pageConfig.data,
+      formConfig: formInfo
+        ? {
+            action: formInfo.formAction,
+            method: 'POST',
+            token: formInfo.formToken,
+          }
+        : undefined,
+    });
   }
 
   private async *executeWait(
