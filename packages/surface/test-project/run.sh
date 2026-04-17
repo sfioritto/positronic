@@ -41,12 +41,16 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
       TOOL=$(echo "$line" | jq -r '.tool')
       RESULT_TYPE=$(echo "$line" | jq -r '.result.type // empty')
       if [ "$TOOL" = "preview" ] && [ "$RESULT_TYPE" = "preview" ]; then
-        # Extract screenshot + verdict from preview tool result
-        SIDX=$(find "${DIR}" -maxdepth 1 -name 'screenshot-*.png' ! -name 'screenshot-final-*' | wc -l | tr -d ' ')
-        echo "$line" | jq -r '.result.image' | base64 -d > "${DIR}/screenshot-${SIDX}.png"
+        # Extract three screenshots (mobile/tablet/desktop) + verdict from
+        # preview tool result. Each preview iteration writes three files
+        # named screenshot-${iteration}-{mobile,tablet,desktop}.png.
+        SIDX=$(find "${DIR}" -maxdepth 1 -name 'screenshot-*-desktop.png' ! -name 'screenshot-final-*' | wc -l | tr -d ' ')
+        echo "$line" | jq -r '.result.images.mobile'  | base64 -d > "${DIR}/screenshot-${SIDX}-mobile.png"
+        echo "$line" | jq -r '.result.images.tablet'  | base64 -d > "${DIR}/screenshot-${SIDX}-tablet.png"
+        echo "$line" | jq -r '.result.images.desktop' | base64 -d > "${DIR}/screenshot-${SIDX}-desktop.png"
         APPROVED=$(echo "$line" | jq -r '.result.verdict.approved')
         ISSUE_COUNT=$(echo "$line" | jq -r '.result.verdict.issues | length')
-        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}.png (approved=${APPROVED}, ${ISSUE_COUNT} issues)"
+        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}-{mobile,tablet,desktop}.png (approved=${APPROVED}, ${ISSUE_COUNT} issues)"
         if [ "$APPROVED" = "false" ] && [ "$ISSUE_COUNT" -gt 0 ]; then
           echo "$line" | jq -r '.result.verdict.issues[] | "  - " + .'
         fi
@@ -70,12 +74,15 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
       # Write the final log
       echo "$line" | jq '{log: .log, htmlSize: .htmlSize}' > "${DIR}/log.json"
       echo "Wrote ${DIR}/log.json"
-      # Write any final screenshots that came with the complete event
+      # Write any final screenshots that came with the complete event.
+      # Each entry is { mobile, tablet, desktop } base64 strings.
       COUNT=$(echo "$line" | jq '.screenshots // [] | length')
       if [ "$COUNT" -gt 0 ]; then
         for i in $(seq 0 $((COUNT - 1))); do
-          echo "$line" | jq -r ".screenshots[$i]" | base64 -d > "${DIR}/screenshot-final-${i}.png"
-          echo "Wrote ${DIR}/screenshot-final-${i}.png"
+          echo "$line" | jq -r ".screenshots[$i].mobile"  | base64 -d > "${DIR}/screenshot-final-${i}-mobile.png"
+          echo "$line" | jq -r ".screenshots[$i].tablet"  | base64 -d > "${DIR}/screenshot-final-${i}-tablet.png"
+          echo "$line" | jq -r ".screenshots[$i].desktop" | base64 -d > "${DIR}/screenshot-final-${i}-desktop.png"
+          echo "Wrote ${DIR}/screenshot-final-${i}-{mobile,tablet,desktop}.png"
         done
       fi
       TOTAL=$(echo "$line" | jq '.log.totalDurationMs // "N/A"')
@@ -86,6 +93,13 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
       MSG=$(echo "$line" | jq -r '.message')
       echo ""
       echo "ERROR: ${MSG}"
+      # If the error includes diagnostic responseMessages (e.g. from a
+      # failed fake-data variant), save the full LLM conversation to disk.
+      HAS_MESSAGES=$(echo "$line" | jq 'has("responseMessages")')
+      if [ "$HAS_MESSAGES" = "true" ]; then
+        echo "$line" | jq '{variant: .variant, responseMessages: .responseMessages}' > "${DIR}/fake-data-error.json"
+        echo "Saved diagnostic conversation to ${DIR}/fake-data-error.json"
+      fi
       ;;
     *)
       # Unknown event type — dump it

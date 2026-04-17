@@ -51,7 +51,13 @@ function streamGenerate(
     try {
       const result = await generate({ ...generateParams, onProgress });
       const html = result.render({ data: previewData });
-      const screenshotBase64 = result.screenshots?.map(uint8ToBase64);
+      // result.screenshots is an array of { mobile, tablet, desktop } PNGs,
+      // one entry per preview call. Base64-encode each viewport.
+      const screenshotBase64 = result.screenshots?.map((shots) => ({
+        mobile: uint8ToBase64(shots.mobile),
+        tablet: uint8ToBase64(shots.tablet),
+        desktop: uint8ToBase64(shots.desktop),
+      }));
       await send({
         type: 'complete',
         html,
@@ -60,7 +66,21 @@ function streamGenerate(
         log: result.log,
       });
     } catch (err) {
-      await send({ type: 'error', message: String(err) });
+      const payload: Record<string, unknown> = {
+        type: 'error',
+        message: err instanceof Error ? err.message : String(err),
+      };
+      // Surface diagnostic data attached to fake-data convergence failures
+      // so run.sh can save the LLM conversation to disk.
+      const errWithExtras = err as {
+        responseMessages?: unknown;
+        variant?: unknown;
+      };
+      if (errWithExtras?.responseMessages) {
+        payload.responseMessages = errWithExtras.responseMessages;
+        payload.variant = errWithExtras.variant;
+      }
+      await send(payload);
     } finally {
       writer.close();
     }
