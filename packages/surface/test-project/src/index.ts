@@ -81,16 +81,27 @@ function getGenerateContext(rawEnv: Env) {
   ) {
     return null;
   }
-  const model = google('gemini-3.1-flash-lite-preview', {
+  const generatorModel = google('gemini-3.1-flash-lite-preview', {
     apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
   });
-  const client = new VercelClient(model, rawEnv.GOOGLE_GENERATIVE_AI_API_KEY);
+  const reviewerModel = google('gemini-3-flash-preview', {
+    apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
+  });
+  const client = new VercelClient(
+    generatorModel,
+    rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
+  );
+  const reviewClient = new VercelClient(
+    reviewerModel,
+    rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
+  );
   const systemPrompt = systemPromptRaw.replaceAll(
     '__IMPORT_PATH__',
     '@surface/components'
   );
   return {
     client,
+    reviewClient,
     systemPrompt,
     accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
     apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
