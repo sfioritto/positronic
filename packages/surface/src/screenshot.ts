@@ -47,3 +47,48 @@ export async function screenshot(params: {
 
   return new Uint8Array(await response.arrayBuffer());
 }
+
+export type Viewport = 'mobile' | 'tablet' | 'desktop';
+
+export const VIEWPORTS: readonly Viewport[] = ['mobile', 'tablet', 'desktop'];
+
+/**
+ * Viewport dimensions used for multi-device screenshot capture. Widths match
+ * common device breakpoints; heights are only relevant before fullPage
+ * expands the capture, so we pick standard portrait values.
+ */
+export const VIEWPORT_DIMENSIONS: Record<
+  Viewport,
+  { width: number; height: number }
+> = {
+  mobile: { width: 375, height: 812 },
+  tablet: { width: 768, height: 1024 },
+  desktop: { width: 1280, height: 800 },
+};
+
+/**
+ * Take the same page at all three viewports in parallel. Returns a keyed
+ * object mapping viewport name to PNG bytes. Used by the preview tool so
+ * the reviewer can evaluate responsive layout breakage, not just desktop.
+ */
+export async function screenshotAllViewports(params: {
+  html: string;
+  accountId: string;
+  apiToken: string;
+}): Promise<Record<Viewport, Uint8Array>> {
+  const { html, accountId, apiToken } = params;
+
+  const entries = await Promise.all(
+    VIEWPORTS.map(async (viewport) => {
+      const png = await screenshot({
+        html,
+        accountId,
+        apiToken,
+        viewport: VIEWPORT_DIMENSIONS[viewport],
+      });
+      return [viewport, png] as const;
+    })
+  );
+
+  return Object.fromEntries(entries) as Record<Viewport, Uint8Array>;
+}

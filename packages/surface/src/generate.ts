@@ -7,6 +7,7 @@ import {
   type FakeDatasets,
 } from './lib/generate-fake-datasets.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
+import type { Viewport } from './screenshot.js';
 import { writeComponentTool } from './tools/write-component.js';
 import { showComponentSourceTool } from './tools/show-component-source.js';
 
@@ -20,10 +21,13 @@ interface GenerateDebugLog {
   totalDurationMs: number;
 }
 
+export type PreviewScreenshots = Record<Viewport, Uint8Array>;
+
 export interface GenerateResult {
   render: RenderPage;
   log?: GenerateDebugLog;
-  screenshots?: Uint8Array[];
+  /** One entry per preview call, each containing mobile/tablet/desktop PNGs. */
+  screenshots?: PreviewScreenshots[];
 }
 
 export type ProgressEvent =
@@ -75,7 +79,7 @@ export async function generate(params: {
     : undefined;
 
   const startTime = Date.now();
-  const screenshots: Uint8Array[] = [];
+  const screenshots: PreviewScreenshots[] = [];
   const reviewState = { approved: false };
 
   // Step 1: Generate four fake-data variants (empty / sparse / typical / large)

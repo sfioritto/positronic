@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { ObjectGenerator, StreamTool } from '@positronic/core';
 import type { SandboxInstance } from '../sandbox.js';
 import { buildBundle, makeRender } from '../sandbox.js';
-import { screenshot } from '../screenshot.js';
+import {
+  screenshotAllViewports,
+  VIEWPORTS,
+  VIEWPORT_DIMENSIONS,
+  type Viewport,
+} from '../screenshot.js';
 
 export interface ReviewState {
   approved: boolean;
@@ -10,12 +15,14 @@ export interface ReviewState {
 
 const REVIEW_SYSTEM = `You are a strict UI quality reviewer for a code-generation system.
 
-Another LLM just generated a React component and rendered it to the screenshot you are about to see. Your job is to decide whether the rendered layout (a) satisfies every explicit visual requirement in the user's prompt AND (b) looks polished enough to ship.
+Another LLM just generated a React component and rendered it. You will see THREE screenshots of the same page — the mobile viewport (${VIEWPORT_DIMENSIONS.mobile.width}px wide), the tablet viewport (${VIEWPORT_DIMENSIONS.tablet.width}px wide), and the desktop viewport (${VIEWPORT_DIMENSIONS.desktop.width}px wide). They are attached in that order.
+
+Your job is to decide whether the layout (a) satisfies every explicit visual requirement in the user's prompt AND (b) looks polished across ALL three viewports.
 
 You evaluate in two passes. BOTH must pass for approved=true.
 
 PASS 1 — Explicit-requirements check (blocking):
-First, enumerate every concrete visual requirement the user asked for in their prompt. Then for each requirement, judge from the screenshot whether it is fulfilled. If ANY requirement is unfulfilled, set approved=false and include it in the issues list — regardless of how polished the rest looks. Do not trade overall polish against an unmet explicit requirement.
+Enumerate every concrete visual requirement the user asked for in their prompt. For each, judge from the screenshots whether it is fulfilled. If ANY requirement is unfulfilled in any viewport, set approved=false and include it in the issues list — regardless of how polished the rest looks. Do not trade overall polish against an unmet explicit requirement.
 
 Examples of requirements to extract and check:
 - "Show the recommended articles with a subtle highlight or accent" → the Recommended section must have a visible color accent, tint, or distinguishing border (not merely a different label).
@@ -25,21 +32,27 @@ Examples of requirements to extract and check:
 
 If the prompt uses words like "subtle", "clear", "prominent", "distinguishable", "accent", "highlight", "badge", "separator" — those are explicit requirements. Check each one.
 
-PASS 2 — Polish critique (only if Pass 1 had zero failures):
-Judge overall visual polish. Fail on issues that would make a human designer re-open the file. Specifically watch for:
-1. Text clipping or bad wrapping — content cut off at an edge, or wrapped to 1–5 characters per line.
-2. Lopsided columns — one column squeezed thin while a sibling takes excessive width.
-3. Isolated controls — checkboxes/buttons stranded in whitespace far from related content.
-4. Broken alignment — labels not aligned with their controls, rows not aligned to a common edge.
-5. Vertical rhythm — unexplained large gaps, or elements overlapping.
-6. Layout-primitive appropriateness — are the chosen layout elements a good fit for the content? Examples of mismatches worth flagging:
+PASS 2 — Polish critique across all viewports (only if Pass 1 had zero failures):
+Judge visual polish at EACH viewport. The same design often succeeds at one width and breaks at another — a design that only works at desktop is not production-quality. Flag any issue present in any viewport and name which viewport(s) it affects.
+
+Specifically watch for:
+1. Responsive breakage — content that looks fine on desktop but clips, cramps, stacks awkwardly, or hides itself on mobile/tablet. This is often the highest-impact class of defect.
+2. Text clipping or bad wrapping at any viewport — content cut off at an edge, or wrapped to 1–5 characters per line.
+3. Lopsided columns — one column squeezed thin while a sibling takes excessive width. Common cause of mobile breakage.
+4. Isolated controls — checkboxes/buttons stranded in whitespace far from related content (especially at wide viewports where excessive whitespace appears).
+5. Broken alignment — labels not aligned with their controls, rows not aligned to a common edge.
+6. Vertical rhythm — unexplained large gaps, or elements overlapping.
+7. Layout-primitive appropriateness — are the chosen layout elements a good fit for the content? Examples of mismatches worth flagging:
    - A stack of many identical bordered Cards for a read-only list of similar items when a typographic list with Separators would read better.
    - Dense dashboard-style metric cards for editorial or report-like content.
    - Heavy container chrome (borders, shadows) on content that would feel lighter with just whitespace + hierarchy.
    - A \`Table\` used for content that isn't truly row/column tabular.
    - Cards nested inside cards for no visual reason.
-   Do not flag card use itself as wrong — flag mismatches where the chosen primitive is fighting the content. If the content genuinely benefits from the container, approve it.
-7. Overall polish — does it look like something a human designer would actually ship?
+   - A multi-column desktop layout that stacks unhelpfully on mobile because the columns never collapse.
+   Do not flag card use itself as wrong — flag mismatches where the chosen primitive is fighting the content.
+8. Overall polish — does it look like something a human designer would actually ship, on every viewport?
+
+When you write issues, mention the viewport when the problem is viewport-specific (e.g. "Mobile: the three-column stat row wraps awkwardly, making each stat label land alone on its own line"). If an issue affects all viewports, just describe it without the viewport prefix.
 
 Rules that apply to both passes:
 - You are the quality gate, not a cheerleader. Do not approve work that "kind of works but looks weird".
@@ -55,6 +68,14 @@ const ReviewVerdict = z.object({
 
 type ReviewResult = z.infer<typeof ReviewVerdict>;
 
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 export function previewTool(
   sandbox: SandboxInstance,
   fakeData: Record<string, unknown>,
@@ -69,12 +90,12 @@ export function previewTool(
   reviewState: ReviewState,
   options?: {
     debug?: boolean;
-    screenshots?: Uint8Array[];
+    screenshots?: Array<Record<Viewport, Uint8Array>>;
   }
 ): StreamTool {
   return {
     description:
-      'Build and screenshot the component currently in the sandbox with sample data, then have it reviewed by an independent quality reviewer. Returns the screenshot plus the reviewer verdict. You cannot submit until the reviewer approves.',
+      'Build and screenshot the component currently in the sandbox with sample data at mobile, tablet, and desktop viewports, then have all three reviewed by an independent quality reviewer. Returns the screenshots plus the reviewer verdict. You cannot submit until the reviewer approves.',
     inputSchema: z.object({}),
     async execute() {
       const bundleResult = await buildBundle(sandbox);
@@ -88,14 +109,14 @@ export function previewTool(
 
       const html = makeRender(bundleResult.bundle!)({ data: fakeData });
 
-      const png = await screenshot({
+      const shots = await screenshotAllViewports({
         html,
         accountId,
         apiToken,
       });
 
       if (options?.debug && options.screenshots) {
-        options.screenshots.push(png);
+        options.screenshots.push(shots);
       }
 
       const reviewPrompt = `The user asked for the following component:
@@ -118,35 +139,45 @@ ${reviewConfig.outputSchemaTs}
 `
     : ''
 }
-Review the attached screenshot. Approve only if the layout is clean and production-quality.`;
+Attached: three screenshots of the same page at mobile (${
+        VIEWPORT_DIMENSIONS.mobile.width
+      }px), tablet (${VIEWPORT_DIMENSIONS.tablet.width}px), and desktop (${
+        VIEWPORT_DIMENSIONS.desktop.width
+      }px) viewports, in that order. Approve only if the layout satisfies the user's requirements AND is polished across ALL three viewports.`;
 
       const { object: verdict } = await reviewConfig.client.generateObject({
         schema: ReviewVerdict,
         schemaName: 'ReviewVerdict',
         system: REVIEW_SYSTEM,
         prompt: reviewPrompt,
-        attachments: [
-          { name: 'screenshot.png', mimeType: 'image/png', data: png },
-        ],
+        attachments: VIEWPORTS.map((viewport) => ({
+          name: `screenshot-${viewport}.png`,
+          mimeType: 'image/png',
+          data: shots[viewport],
+        })),
       });
 
       reviewState.approved = verdict.approved;
 
-      let binary = '';
-      for (let i = 0; i < png.length; i++) {
-        binary += String.fromCharCode(png[i]);
-      }
-      const base64 = btoa(binary);
+      const images: Record<Viewport, string> = {
+        mobile: uint8ToBase64(shots.mobile),
+        tablet: uint8ToBase64(shots.tablet),
+        desktop: uint8ToBase64(shots.desktop),
+      };
 
       return {
         type: 'preview',
-        image: base64,
+        images,
         verdict,
       };
     },
     toModelOutput({ output }: { output: unknown }) {
       const result = output as
-        | { type: 'preview'; image: string; verdict: ReviewResult }
+        | {
+            type: 'preview';
+            images: Record<Viewport, string>;
+            verdict: ReviewResult;
+          }
         | { status: 'error'; message: string; errors?: unknown };
 
       if ('status' in result && result.status === 'error') {
@@ -157,20 +188,48 @@ Review the attached screenshot. Approve only if the layout is clean and producti
       }
 
       if ('type' in result && result.type === 'preview') {
-        const { verdict, image } = result;
+        const { verdict, images } = result;
         const reviewText = verdict.approved
-          ? `REVIEW: APPROVED. The reviewer confirms the layout is production-quality. You may call submit.`
-          : `REVIEW: NEEDS WORK. The reviewer flagged these issues:
+          ? `REVIEW: APPROVED across mobile, tablet, and desktop viewports. The reviewer confirms the layout is production-quality. You may call submit.`
+          : `REVIEW: NEEDS WORK. The reviewer flagged these issues (evaluated across mobile, tablet, and desktop viewports):
 
 ${verdict.issues.map((i) => `- ${i}`).join('\n')}
 
-Before rewriting: if any issue above names a specific component (e.g. "Button is rendering as plain text", "Checkbox looks wrong"), you MUST call show_component_source for that component first to see how it is actually implemented. Only after reading the source should you call write_component. Do NOT call submit — it will be refused until the reviewer approves.`;
+Before rewriting: if any issue above names a specific component (e.g. "Button is rendering as plain text", "Checkbox looks wrong"), you MUST call show_component_source for that component first to see how it is actually implemented. Only after reading the source should you call write_component. Do NOT call submit — it will be refused until the reviewer approves.
+
+The three screenshots are attached in order: mobile, tablet, desktop. Look at each before deciding what to change.`;
 
         return {
           type: 'content',
           value: [
             { type: 'text', text: reviewText },
-            { type: 'media', data: image, mediaType: 'image/png' },
+            {
+              type: 'text',
+              text: `Mobile (${VIEWPORT_DIMENSIONS.mobile.width}px wide):`,
+            },
+            {
+              type: 'media',
+              data: images.mobile,
+              mediaType: 'image/png',
+            },
+            {
+              type: 'text',
+              text: `Tablet (${VIEWPORT_DIMENSIONS.tablet.width}px wide):`,
+            },
+            {
+              type: 'media',
+              data: images.tablet,
+              mediaType: 'image/png',
+            },
+            {
+              type: 'text',
+              text: `Desktop (${VIEWPORT_DIMENSIONS.desktop.width}px wide):`,
+            },
+            {
+              type: 'media',
+              data: images.desktop,
+              mediaType: 'image/png',
+            },
           ],
         };
       }
