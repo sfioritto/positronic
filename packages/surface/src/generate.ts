@@ -2,7 +2,10 @@ import type { ObjectGenerator, JsonValue, StreamTool } from '@positronic/core';
 import type { ZodObject } from 'zod';
 import type { SandboxInstance, RenderPage } from './sandbox.js';
 import { buildBundle, makeRender } from './sandbox.js';
-import { generateFakeData } from './lib/generate-fake-data.js';
+import {
+  generateFakeDatasets,
+  type FakeDatasets,
+} from './lib/generate-fake-datasets.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
 import { writeComponentTool } from './tools/write-component.js';
 import { showComponentSourceTool } from './tools/show-component-source.js';
@@ -13,7 +16,7 @@ import { submitTool } from './tools/submit.js';
 interface GenerateDebugLog {
   fakeDataConversation: JsonValue[];
   componentConversation: JsonValue[];
-  fakeData: Record<string, unknown>;
+  datasets: FakeDatasets;
   totalDurationMs: number;
 }
 
@@ -24,7 +27,7 @@ export interface GenerateResult {
 }
 
 export type ProgressEvent =
-  | { type: 'fake_data_done'; data: Record<string, unknown> }
+  | { type: 'fake_data_done'; datasets: FakeDatasets }
   | { type: 'tool_start'; tool: string }
   | { type: 'tool_result'; tool: string; result: unknown };
 
@@ -75,11 +78,16 @@ export async function generate(params: {
   const screenshots: Uint8Array[] = [];
   const reviewState = { approved: false };
 
-  // Step 1: Generate fake data using an LLM agent loop with type-checking
-  const { fakeData, responseMessages: fakeDataMessages } =
-    await generateFakeData(client, sandbox, inputSchemaTs);
+  // Step 1: Generate four fake-data variants (empty / sparse / typical / large)
+  // in sequence, each type-checked against the input schema. Preview uses
+  // `typical` for the generator's feedback loop; other variants are kept for
+  // future multi-data-size review passes.
+  const { datasets, responseMessages: fakeDataMessages } =
+    await generateFakeDatasets(client, sandbox, inputSchemaTs);
 
-  await onProgress?.({ type: 'fake_data_done', data: fakeData });
+  await onProgress?.({ type: 'fake_data_done', datasets });
+
+  const previewData = datasets.typical;
 
   // Step 2: Define tools
   const rawTools: Record<string, StreamTool> = {
@@ -87,7 +95,7 @@ export async function generate(params: {
     show_component_source: showComponentSourceTool(),
     preview: previewTool(
       sandbox,
-      fakeData,
+      previewData,
       accountId,
       apiToken,
       {
@@ -99,7 +107,7 @@ export async function generate(params: {
       reviewState,
       { debug, screenshots }
     ),
-    submit: submitTool(sandbox, outputFieldNames, fakeData, reviewState),
+    submit: submitTool(sandbox, outputFieldNames, previewData, reviewState),
   };
 
   // Wrap tools to emit progress events (tools without execute are pass-through —
@@ -171,7 +179,7 @@ Instructions:
     result.log = {
       fakeDataConversation: truncateImages(fakeDataMessages),
       componentConversation: truncateImages(componentResult.responseMessages),
-      fakeData,
+      datasets,
       totalDurationMs: Date.now() - startTime,
     };
   }

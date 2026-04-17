@@ -36,16 +36,21 @@ function streamGenerate(
     await writer.write(encoder.encode(JSON.stringify(event) + '\n'));
   };
 
-  let fakeData: Record<string, unknown> = {};
+  let previewData: Record<string, unknown> = {};
   const onProgress = (event: ProgressEvent) => {
-    if (event.type === 'fake_data_done') fakeData = event.data;
+    if (event.type === 'fake_data_done') {
+      // The generator renders against `typical` during its feedback loop;
+      // mirror that for the final render so the caller sees what the
+      // generator saw.
+      previewData = event.datasets.typical;
+    }
     send(event);
   };
 
   (async () => {
     try {
       const result = await generate({ ...generateParams, onProgress });
-      const html = result.render({ data: fakeData });
+      const html = result.render({ data: previewData });
       const screenshotBase64 = result.screenshots?.map(uint8ToBase64);
       await send({
         type: 'complete',
