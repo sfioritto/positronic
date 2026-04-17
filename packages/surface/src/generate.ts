@@ -69,6 +69,7 @@ export async function generate(params: {
 
   const startTime = Date.now();
   const screenshots: Uint8Array[] = [];
+  const previewState = { count: 0 };
 
   // Step 1: Generate fake data using an LLM agent loop with type-checking
   const { fakeData, responseMessages: fakeDataMessages } =
@@ -82,8 +83,9 @@ export async function generate(params: {
     preview: previewTool(sandbox, fakeData, accountId, apiToken, {
       debug,
       screenshots,
+      previewState,
     }),
-    submit: submitTool(sandbox, outputFieldNames, fakeData),
+    submit: submitTool(sandbox, outputFieldNames, fakeData, previewState),
   };
 
   // Wrap tools to emit progress events (tools without execute are pass-through —

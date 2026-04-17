@@ -81,7 +81,7 @@ function getGenerateContext(rawEnv: Env) {
   ) {
     return null;
   }
-  const model = google('gemini-3.1-pro-preview', {
+  const model = google('gemini-3.1-flash-lite-preview', {
     apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
   });
   const client = new VercelClient(model, rawEnv.GOOGLE_GENERATIVE_AI_API_KEY);
