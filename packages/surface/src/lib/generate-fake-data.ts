@@ -26,6 +26,13 @@
 import { z, type ZodType } from 'zod';
 import type { ObjectGenerator } from '@positronic/core';
 import { zodToTypescript } from './zod-to-typescript.js';
+import { bottleneck } from './bottleneck.js';
+
+// Throttle rate for the fan-out walk. Cloudflare Workers cap simultaneous
+// outbound connections per invocation, and the fake-data walk on deep schemas
+// (company-os, etc.) can fan out to hundreds of parallel generateObject calls.
+// At ~3s per call, 2 rps keeps average concurrency in the single-digits.
+const FAKE_DATA_RPS = 2;
 
 function isScalar(schema: unknown): boolean {
   if (schema instanceof z.ZodObject) return false;
@@ -85,18 +92,25 @@ ${schemaTs}
   // subrequests against the model immediately. (Unhandled-rejection protection
   // is a separate concern handled by trackChild below.)
   const controller = new AbortController();
+  // One bottleneck per walk throttles the rate at which generateObject calls
+  // are released. Keeps burst concurrency below the Worker's outbound-connection
+  // cap and below the model's RPM limit.
+  const limit = bottleneck({ rps: FAKE_DATA_RPS });
   try {
     const data = await generate({
       client,
       schema,
       systemPrompt,
       controller,
+      limit,
     });
     return schema.parse(data);
   } finally {
     controller.abort();
   }
 }
+
+type Limiter = <T>(fn: () => Promise<T>) => Promise<T>;
 
 /**
  * Wrap a child promise so its first rejection aborts all siblings sharing the
@@ -118,12 +132,14 @@ async function generate<InputSchema extends ZodType>({
   schema,
   systemPrompt,
   controller,
+  limit,
   path = '',
 }: {
   client: ObjectGenerator;
   schema: InputSchema;
   systemPrompt: string;
   controller: AbortController;
+  limit: Limiter;
   path?: string;
 }): Promise<z.infer<InputSchema>> {
   // Unwrap nullable/optional wrappers on non-scalar types (e.g. a nullable
@@ -135,6 +151,7 @@ async function generate<InputSchema extends ZodType>({
       schema: schema.unwrap() as ZodType,
       systemPrompt,
       controller,
+      limit,
       path,
     }) as Promise<z.infer<InputSchema>>;
   }
@@ -159,6 +176,7 @@ async function generate<InputSchema extends ZodType>({
               schema: schema.element as ZodType,
               systemPrompt,
               controller,
+              limit,
               path: `${path}[${i}]`,
             }),
             controller
@@ -176,6 +194,7 @@ async function generate<InputSchema extends ZodType>({
         schema,
         systemPrompt,
         controller,
+        limit,
         path,
         count,
       }) as Promise<z.infer<InputSchema>>;
@@ -183,7 +202,14 @@ async function generate<InputSchema extends ZodType>({
   }
 
   if (isGenerable(schema))
-    return generateWhole({ client, schema, systemPrompt, controller, path });
+    return generateWhole({
+      client,
+      schema,
+      systemPrompt,
+      controller,
+      limit,
+      path,
+    });
 
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape as Record<string, ZodType>;
@@ -196,6 +222,7 @@ async function generate<InputSchema extends ZodType>({
               schema: subSchema,
               systemPrompt,
               controller,
+              limit,
               path: path ? `${path}.${key}` : key,
             });
             return [key, value] as const;
@@ -215,6 +242,7 @@ async function generateWhole<S extends ZodType>({
   schema,
   systemPrompt,
   controller,
+  limit,
   path,
   count,
 }: {
@@ -222,6 +250,7 @@ async function generateWhole<S extends ZodType>({
   schema: S;
   systemPrompt: string;
   controller: AbortController;
+  limit: Limiter;
   path: string;
   count?: number;
 }): Promise<z.infer<S>> {
@@ -236,12 +265,14 @@ async function generateWhole<S extends ZodType>({
   if (count !== undefined) promptLines.push(`Produce exactly ${count} items.`);
 
   try {
-    const { object } = await client.generateObject({
-      schema: wrapped,
-      system: systemPrompt,
-      prompt: promptLines.join('\n'),
-      abortSignal: controller.signal,
-    });
+    const { object } = await limit(() =>
+      client.generateObject({
+        schema: wrapped,
+        system: systemPrompt,
+        prompt: promptLines.join('\n'),
+        abortSignal: controller.signal,
+      })
+    );
 
     return (
       isObject ? object : (object as { value: unknown }).value
