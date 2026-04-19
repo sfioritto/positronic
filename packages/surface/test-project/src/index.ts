@@ -39,10 +39,9 @@ function streamGenerate(
   let previewData: Record<string, unknown> = {};
   const onProgress = (event: ProgressEvent) => {
     if (event.type === 'fake_data_done') {
-      // The generator renders against `typical` during its feedback loop;
-      // mirror that for the final render so the caller sees what the
-      // generator saw.
-      previewData = event.datasets.typical;
+      // Mirror the generator's dataset for the final render so the caller
+      // sees the same shape the component was designed against.
+      previewData = event.data;
     }
     send(event);
   };
@@ -463,19 +462,23 @@ export default function Page({ data }: Props) {
         );
       }
 
-      const inputSchema = `export interface Data {
-  title: string;
-  metrics: {
-    totalUsers: number;
-    activeUsers: number;
-    revenue: number;
-  };
-  recentUsers: Array<{
-    name: string;
-    email: string;
-    status: 'active' | 'inactive';
-  }>;
-}`;
+      const inputSchema = z.object({
+        title: z.string(),
+        metrics: z.object({
+          totalUsers: z.number(),
+          activeUsers: z.number(),
+          revenue: z.number(),
+        }),
+        recentUsers: z
+          .array(
+            z.object({
+              name: z.string(),
+              email: z.string(),
+              status: z.enum(['active', 'inactive']),
+            })
+          )
+          .meta({ count: 8 }),
+      });
 
       return streamGenerate({
         ...ctx,
@@ -503,8 +506,8 @@ export default function Page({ data }: Props) {
         commentCount: z.number(),
       });
       const inputSchema = z.object({
-        recommended: z.array(article),
-        remaining: z.array(article),
+        recommended: z.array(article).meta({ count: 5 }),
+        remaining: z.array(article).meta({ count: 20 }),
       });
 
       const outputSchema = z.object({
@@ -576,50 +579,54 @@ Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
         'financialNotifications',
         'shipping',
       ]);
-      const enriched = <T extends z.ZodTypeAny>(schema: T) =>
-        z.array(z.tuple([thread, schema]));
+      const enriched = <T extends z.ZodType>(schema: T) =>
+        z.array(z.object({ thread, value: schema }));
       const inputSchema = z.object({
-        emails: z.array(z.object({ thread, category: emailCategory })),
+        emails: z
+          .array(z.object({ thread, category: emailCategory }))
+          .meta({ count: 12 }),
         childrenEnriched: enriched(
           z.object({ summary: z.string(), actionItem: z.string().nullable() })
-        ),
+        ).meta({ count: 3 }),
         billingEnriched: enriched(
           z.object({
             description: z.string(),
             amount: z.string(),
             dueDate: z.string().nullable(),
           })
-        ),
+        ).meta({ count: 4 }),
         receiptsEnriched: enriched(
           z.object({
             merchant: z.string(),
             amount: z.string(),
             items: z.array(z.string()),
           })
-        ),
+        ).meta({ count: 6 }),
         newslettersEnriched: enriched(
           z.object({ summary: z.string(), keyTopics: z.array(z.string()) })
-        ),
+        ).meta({ count: 5 }),
         financialEnriched: enriched(
           z.object({
             description: z.string(),
             amount: z.string(),
             direction: z.enum(['credit', 'debit']),
           })
-        ),
+        ).meta({ count: 5 }),
         shippingEnriched: enriched(
           z.object({
             carrier: z.string(),
             trackingStatus: z.string(),
             estimatedDelivery: z.string().nullable(),
           })
-        ),
+        ).meta({ count: 3 }),
         npmSummary: z.string(),
         securityAlertsSummary: z.string(),
         confirmationCodesSummary: z.string(),
         remindersSummary: z.string(),
         financialSummary: z.string(),
-        shippingSummary: enriched(z.object({ summary: z.string() })),
+        shippingSummary: enriched(z.object({ summary: z.string() })).meta({
+          count: 2,
+        }),
       });
 
       const outputSchema = z.object({
@@ -629,6 +636,8 @@ Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
       });
 
       const prompt = `Create an email digest page that summarizes a user's inbox.
+
+Each *Enriched array (childrenEnriched, billingEnriched, etc.) contains entries shaped as { thread, value } — thread carries the email metadata, value carries the category-specific payload (summary, amount, etc.).
 
 The page should have these sections, each with a colored header/accent:
 
@@ -696,19 +705,23 @@ Make the overall layout clean and scannable. Pick whichever layout primitives fi
         summary: z
           .string()
           .describe('One sentence about what they focused on this period'),
-        accomplishments: z.array(
-          z.object({
-            text: z
-              .string()
-              .describe('Complete sentence explaining what was done and why'),
-            relatedPRs: z.array(
-              z.object({
-                repo: z.string(),
-                number: z.number(),
-              })
-            ),
-          })
-        ),
+        accomplishments: z
+          .array(
+            z.object({
+              text: z
+                .string()
+                .describe('Complete sentence explaining what was done and why'),
+              relatedPRs: z
+                .array(
+                  z.object({
+                    repo: z.string(),
+                    number: z.number(),
+                  })
+                )
+                .meta({ count: 2 }),
+            })
+          )
+          .meta({ count: 3 }),
       });
 
       const inputSchema = z.object({
@@ -721,32 +734,33 @@ Make the overall layout clean and scannable. Pick whichever layout primitives fi
           .string()
           .describe('Human-readable label, e.g. "last week"'),
         developerSummaries: z
-          .array(z.tuple([developerInput, developerResult]))
+          .array(z.object({ input: developerInput, result: developerResult }))
+          .meta({ count: 6 })
           .describe(
-            'One tuple per developer: [input data, generated summary result]'
+            'One entry per developer: { input: stats, result: generated summary }'
           ),
       });
 
       const prompt = `Create a weekly developer activity summary page for a software team.
 
-The page shows each developer's work across a reporting period. Data comes in as tuples pairing each developer's stats with a generated summary.
+The page shows each developer's work across a reporting period. Each entry in developerSummaries is an object { input, result } pairing the developer's stats (input) with the generated summary (result).
 
 **Header**
 - Clear title like "Weekly Dev Summary" or "Developer Activity"
 - Display the date range prominently (format weekStart and weekEnd as readable dates, e.g. "Oct 14 – Oct 20, 2024")
 - Show the periodLabel somewhere for context (e.g. as a subtle subtitle or badge)
 
-**Per-Developer Section** (one section per tuple in developerSummaries — skip any where result.summary is an empty string)
+**Per-Developer Section** (one section per entry in developerSummaries — skip any where entry.result.summary is an empty string)
 Each section should include:
-- Developer name as a prominent heading
-- Three small stat signals: totalPRs merged, prsReviewed, prComments — compact and visually grouped (badges, inline metadata, or a small stat row; your call)
-- The summary sentence (result.summary), set apart visually — consider italic, muted color, or a quote-style treatment
-- An accomplishments list — each list item shows the accomplishment text followed by small pill-shaped PR links. Each related PR renders as "#{number}" and links to https://github.com/{org}/{repo}/pull/{number}. If an accomplishment has no relatedPRs, just show the text.
+- Developer name (entry.input.name) as a prominent heading
+- Three small stat signals from entry.input.meta: totalPRs merged, prsReviewed, prComments — compact and visually grouped (badges, inline metadata, or a small stat row; your call)
+- The summary sentence (entry.result.summary), set apart visually — consider italic, muted color, or a quote-style treatment
+- An accomplishments list from entry.result.accomplishments — each list item shows the accomplishment text followed by small pill-shaped PR links. Each related PR renders as "#{number}" and links to https://github.com/{org}/{repo}/pull/{number}. If an accomplishment has no relatedPRs, just show the text.
 
 How you visually separate developers from each other is up to you — a Separator with typographic hierarchy, a subtle background alternation, bordered cards if that genuinely fits, or just spacing. Pick what best reads as an editorial digest rather than an enterprise dashboard. Do not reflexively wrap each developer in a bordered Card; a stack of seven identical bordered boxes is usually the wrong choice for this kind of report.
 
 **Empty State**
-If developerSummaries is empty OR every entry has an empty result.summary, show a clean empty state that says something like "No developer activity this period." (Pick a component that fits — Empty, a simple centered text block, whatever reads well.)
+If developerSummaries is empty OR every entry has an empty entry.result.summary, show a clean empty state that says something like "No developer activity this period." (Pick a component that fits — Empty, a simple centered text block, whatever reads well.)
 
 The overall feel should be that of a scannable internal team digest — think Notion or Linear's weekly summary emails. Quiet, professional, strong typography hierarchy, generous whitespace. This is a read-only report, NOT a dashboard with charts and NOT a marketing page. No buttons, no forms — just content.`;
 

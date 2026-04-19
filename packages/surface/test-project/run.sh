@@ -26,12 +26,9 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
 
   case "$TYPE" in
     fake_data_done)
-      echo "[fake_data] Generated fake datasets (empty / sparse / typical / large)"
-      echo "$line" | jq '.datasets.empty'   > "${DIR}/fake-data.empty.json"
-      echo "$line" | jq '.datasets.sparse'  > "${DIR}/fake-data.sparse.json"
-      echo "$line" | jq '.datasets.typical' > "${DIR}/fake-data.typical.json"
-      echo "$line" | jq '.datasets.large'   > "${DIR}/fake-data.large.json"
-      echo "  Wrote ${DIR}/fake-data.{empty,sparse,typical,large}.json"
+      echo "[fake_data] Generated fake dataset"
+      echo "$line" | jq '.data' > "${DIR}/fake-data.json"
+      echo "  Wrote ${DIR}/fake-data.json"
       ;;
     tool_start)
       TOOL=$(echo "$line" | jq -r '.tool')

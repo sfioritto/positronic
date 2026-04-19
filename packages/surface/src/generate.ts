@@ -2,10 +2,7 @@ import type { ObjectGenerator, JsonValue, StreamTool } from '@positronic/core';
 import type { ZodObject } from 'zod';
 import type { SandboxInstance, RenderPage } from './sandbox.js';
 import { buildBundle, makeRender } from './sandbox.js';
-import {
-  generateFakeDatasets,
-  type FakeDatasets,
-} from './lib/generate-fake-datasets.js';
+import { generateFakeData } from './lib/generate-fake-data.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
 import type { Viewport } from './screenshot.js';
 import { writeComponentTool } from './tools/write-component.js';
@@ -15,9 +12,8 @@ import { previewTool } from './tools/preview.js';
 import { submitTool } from './tools/submit.js';
 
 interface GenerateDebugLog {
-  fakeDataConversation: JsonValue[];
   componentConversation: JsonValue[];
-  datasets: FakeDatasets;
+  data: Record<string, unknown>;
   totalDurationMs: number;
 }
 
@@ -31,7 +27,7 @@ export interface GenerateResult {
 }
 
 export type ProgressEvent =
-  | { type: 'fake_data_done'; datasets: FakeDatasets }
+  | { type: 'fake_data_done'; data: Record<string, unknown> }
   | { type: 'tool_start'; tool: string }
   | { type: 'tool_result'; tool: string; result: unknown };
 
@@ -82,16 +78,18 @@ export async function generate(params: {
   const screenshots: PreviewScreenshots[] = [];
   const reviewState = { approved: false };
 
-  // Step 1: Generate four fake-data variants (empty / sparse / typical / large)
-  // in sequence, each type-checked against the input schema. Preview uses
-  // `typical` for the generator's feedback loop; other variants are kept for
-  // future multi-data-size review passes.
-  const { datasets, responseMessages: fakeDataMessages } =
-    await generateFakeDatasets(client, sandbox, inputSchemaTs);
+  // Step 1: Generate one dataset by walking the input schema. Fans out at
+  // array-of-object boundaries (each must carry `.meta({ count: N })`) and
+  // one-shots any subtree that contains no annotated arrays. The resulting
+  // data matches the real shape exactly, so the UI feedback loop only needs
+  // to cover viewports — not data volume.
+  const previewData = (await generateFakeData({
+    client,
+    schema: inputSchema,
+    prompt,
+  })) as Record<string, unknown>;
 
-  await onProgress?.({ type: 'fake_data_done', datasets });
-
-  const previewData = datasets.typical;
+  await onProgress?.({ type: 'fake_data_done', data: previewData });
 
   // Step 2: Define tools
   const rawTools: Record<string, StreamTool> = {
@@ -181,9 +179,8 @@ Instructions:
   if (debug) {
     result.screenshots = screenshots;
     result.log = {
-      fakeDataConversation: truncateImages(fakeDataMessages),
       componentConversation: truncateImages(componentResult.responseMessages),
-      datasets,
+      data: previewData,
       totalDurationMs: Date.now() - startTime,
     };
   }
