@@ -76,7 +76,7 @@ export interface WebhookRegistration {
  */
 export interface IterateContext {
   stepId: string;
-  accumulatedResults: ([any, any] | undefined)[];
+  accumulatedResults: ({ item: any; result: any } | undefined)[];
   processedCount: number;
   totalItems: number;
   stateKey: string;
@@ -689,7 +689,9 @@ const iterateItemComplete = reduce<BrainExecutionContext, any>(
       ? [...existing.accumulatedResults]
       : [];
     newResults[payload.itemIndex] =
-      payload.result != null ? [payload.item, payload.result] : undefined;
+      payload.result != null
+        ? { item: payload.item, result: payload.result }
+        : undefined;
     return {
       ...ctx,
       iterateContext: {

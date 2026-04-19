@@ -52,9 +52,18 @@ describe('.map()', () => {
     });
 
     expect(finalState.results).toHaveLength(3);
-    expect(finalState.results[0]).toEqual([{ n: 3 }, { value: 6 }]);
-    expect(finalState.results[1]).toEqual([{ n: 5 }, { value: 10 }]);
-    expect(finalState.results[2]).toEqual([{ n: 7 }, { value: 14 }]);
+    expect(finalState.results[0]).toEqual({
+      item: { n: 3 },
+      result: { value: 6 },
+    });
+    expect(finalState.results[1]).toEqual({
+      item: { n: 5 },
+      result: { value: 10 },
+    });
+    expect(finalState.results[2]).toEqual({
+      item: { n: 7 },
+      result: { value: 14 },
+    });
   });
 
   it('should forward inner brain events', async () => {
@@ -385,8 +394,8 @@ describe('.map()', () => {
         stepIndex: 1,
         iterateProgress: {
           accumulatedResults: [
-            [{ n: 1 }, { value: 2 }],
-            [{ n: 2 }, { value: 4 }],
+            { item: { n: 1 }, result: { value: 2 } },
+            { item: { n: 2 }, result: { value: 4 } },
             undefined,
             undefined,
           ],
@@ -521,16 +530,15 @@ describe('.map()', () => {
       currentUser: { name: 'test-user' },
     });
 
-    // Results are IterateResult tuples
     expect(finalState.categories).toHaveLength(2);
-    expect(finalState.categories[0]).toEqual([
-      { subject: 'Meeting tomorrow', from: 'boss@work.com' },
-      { category: 'work', priority: 'high' },
-    ]);
-    expect(finalState.categories[1]).toEqual([
-      { subject: 'Weekend plans', from: 'friend@home.com' },
-      { category: 'personal', priority: 'low' },
-    ]);
+    expect(finalState.categories[0]).toEqual({
+      item: { subject: 'Meeting tomorrow', from: 'boss@work.com' },
+      result: { category: 'work', priority: 'high' },
+    });
+    expect(finalState.categories[1]).toEqual({
+      item: { subject: 'Weekend plans', from: 'friend@home.com' },
+      result: { category: 'personal', priority: 'low' },
+    });
 
     // Should emit ITERATE_ITEM_COMPLETE for each item
     const itemEvents = events.filter(
@@ -577,12 +585,18 @@ describe('.map()', () => {
     });
 
     expect(finalState.summaries).toHaveLength(3);
-    expect(finalState.summaries[0]).toEqual(['a', { summary: 'Good result' }]);
-    expect(finalState.summaries[1]).toEqual(['b', { summary: 'fallback' }]);
-    expect(finalState.summaries[2]).toEqual([
-      'c',
-      { summary: 'Another result' },
-    ]);
+    expect(finalState.summaries[0]).toEqual({
+      item: 'a',
+      result: { summary: 'Good result' },
+    });
+    expect(finalState.summaries[1]).toEqual({
+      item: 'b',
+      result: { summary: 'fallback' },
+    });
+    expect(finalState.summaries[2]).toEqual({
+      item: 'c',
+      result: { summary: 'Another result' },
+    });
   });
 
   it('should use per-step client override in prompt mode', async () => {
@@ -614,10 +628,10 @@ describe('.map()', () => {
     // Custom client was used, not the default one
     expect(customMockGenerateObject).toHaveBeenCalledTimes(1);
     expect(mockGenerateObject).not.toHaveBeenCalled();
-    expect(finalState.results[0]).toEqual([
-      { n: 1 },
-      { result: 'from custom client' },
-    ]);
+    expect(finalState.results[0]).toEqual({
+      item: { n: 1 },
+      result: { result: 'from custom client' },
+    });
   });
 
   it('should use brain-level client for prompt steps', async () => {
@@ -646,10 +660,10 @@ describe('.map()', () => {
     // Brain-level client was used, not the runner's default
     expect(brainMockGenerateObject).toHaveBeenCalledTimes(1);
     expect(mockGenerateObject).not.toHaveBeenCalled();
-    expect(finalState.summaries[0]).toEqual([
-      'a',
-      { summary: 'from brain client' },
-    ]);
+    expect(finalState.summaries[0]).toEqual({
+      item: 'a',
+      result: { summary: 'from brain client' },
+    });
   });
 
   it('should let step-level client override brain-level client', async () => {
@@ -793,8 +807,14 @@ describe('.map()', () => {
 
     // Only 2 items in results (item b was skipped)
     expect(finalState.summaries).toHaveLength(2);
-    expect(finalState.summaries[0]).toEqual(['a', { summary: 'Good' }]);
-    expect(finalState.summaries[1]).toEqual(['c', { summary: 'Also good' }]);
+    expect(finalState.summaries[0]).toEqual({
+      item: 'a',
+      result: { summary: 'Good' },
+    });
+    expect(finalState.summaries[1]).toEqual({
+      item: 'c',
+      result: { summary: 'Also good' },
+    });
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('[map] Item 1 in "Summarize" failed:'),
@@ -874,7 +894,10 @@ describe('.map()', () => {
     expect(capturedContext.state.items).toEqual([{ id: 1 }]);
     expect(capturedContext.client).toBeDefined();
     expect(finalState.results).toHaveLength(1);
-    expect(finalState.results[0]).toEqual([{ id: 1 }, { result: 'ok' }]);
+    expect(finalState.results[0]).toEqual({
+      item: { id: 1 },
+      result: { result: 'ok' },
+    });
   });
 
   it('should pass step context as second argument to prompt system function', async () => {

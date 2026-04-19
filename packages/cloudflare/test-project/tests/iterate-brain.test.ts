@@ -105,9 +105,9 @@ describe('Iterate Brain Tests', () => {
     // fewer than 7 results will be returned
     expect(results.length).toBe(7);
 
-    // Verify each result is a [item, innerState] tuple with correct values
+    // Verify each result is a { item, result } pair with correct values
     for (let i = 0; i < 7; i++) {
-      const [item, innerState] = results[i];
+      const { item, result: innerState } = results[i];
       expect(item).toBe(i + 1);
       expect(innerState.value).toBe(i + 1);
       expect(innerState.doubled).toBe((i + 1) * 2);

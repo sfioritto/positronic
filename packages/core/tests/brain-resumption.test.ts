@@ -126,11 +126,12 @@ describe('IterateResult rehydration on resume', () => {
         state: {
           itemsA: [{ id: 'a1' }, { id: 'a2' }],
           itemsB: [{ id: 'b1' }],
-          // This is what IterateResult.toJSON() produces — a plain array of tuples.
-          // After JSON patch reconstruction, it's just a regular array.
+          // This is what IterateResult.toJSON() produces — a plain array of
+          // {item, result} objects. After JSON patch reconstruction, it's just
+          // a regular array.
           resultsA: [
-            [{ id: 'a1' }, { doubled: 2 }],
-            [{ id: 'a2' }, { doubled: 2 }],
+            { item: { id: 'a1' }, result: { doubled: 2 } },
+            { item: { id: 'a2' }, result: { doubled: 2 } },
           ],
         },
         stepIndex: 2, // Skip Init and MapA, resume at MapB

@@ -1,7 +1,7 @@
 export class IterateResult<TItem, TResult> {
-  private data: [TItem, TResult][];
+  private data: { item: TItem; result: TResult }[];
 
-  constructor(data: [TItem, TResult][]) {
+  constructor(data: { item: TItem; result: TResult }[]) {
     this.data = data;
   }
 
@@ -10,34 +10,36 @@ export class IterateResult<TItem, TResult> {
   }
 
   get items(): TItem[] {
-    return this.data.map(([item]) => item);
+    return this.data.map((d) => d.item);
   }
 
   get values(): TResult[] {
-    return this.data.map(([, result]) => result);
+    return this.data.map((d) => d.result);
   }
 
   get entries(): [TItem, TResult][] {
-    return [...this.data];
+    return this.data.map((d) => [d.item, d.result]);
   }
 
   filter(
     predicate: (item: TItem, result: TResult) => boolean
   ): IterateResult<TItem, TResult> {
     return new IterateResult(
-      this.data.filter(([item, result]) => predicate(item, result))
+      this.data.filter((d) => predicate(d.item, d.result))
     );
   }
 
   map<U>(fn: (item: TItem, result: TResult) => U): U[] {
-    return this.data.map(([item, result]) => fn(item, result));
+    return this.data.map((d) => fn(d.item, d.result));
   }
 
-  [Symbol.iterator](): Iterator<[TItem, TResult]> {
-    return this.data[Symbol.iterator]();
+  *[Symbol.iterator](): Iterator<[TItem, TResult]> {
+    for (const d of this.data) {
+      yield [d.item, d.result];
+    }
   }
 
-  toJSON(): [TItem, TResult][] {
+  toJSON(): { item: TItem; result: TResult }[] {
     return this.data;
   }
 }

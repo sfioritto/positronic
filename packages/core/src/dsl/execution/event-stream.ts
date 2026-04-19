@@ -1277,7 +1277,7 @@ The output must conform to the provided schema.`,
 
   /**
    * Execute a map step. Runs the inner brain once per item
-   * from the `over` list, collects [item, innerState] tuples under `outputKey`.
+   * from the `over` list, collects `{item, result}` objects under `stateKey`.
    */
   private async *executeMap(step: Step): AsyncGenerator<BrainEvent<TOptions>> {
     const block = step.block as MapBlock;
@@ -1290,7 +1290,7 @@ The output must conform to the provided schema.`,
     // Resume support
     const iterateProgress = this.resume?.iterateProgress;
     const startIndex = iterateProgress?.processedCount ?? 0;
-    const resultsMap = new Map<number, [any, any]>();
+    const resultsMap = new Map<number, { item: any; result: any }>();
     if (iterateProgress?.accumulatedResults) {
       for (let k = 0; k < iterateProgress.accumulatedResults.length; k++) {
         const r = iterateProgress.accumulatedResults[k];
@@ -1327,7 +1327,7 @@ The output must conform to the provided schema.`,
       }
 
       const item = items[i];
-      let result: [any, any] | undefined;
+      let result: { item: any; result: any } | undefined;
 
       try {
         if (config.prompt) {
@@ -1358,7 +1358,7 @@ The output must conform to the provided schema.`,
               config.prompt.outputSchema,
               config.prompt.loop
             );
-            result = [item, loopResult];
+            result = { item, result: loopResult };
           } else {
             // Prompt mode: call generateObject directly per item
             const response = await client.generateObject({
@@ -1366,7 +1366,7 @@ The output must conform to the provided schema.`,
               prompt,
               system: itemSystem,
             });
-            result = [item, response.object];
+            result = { item, result: response.object };
           }
         } else {
           // Brain mode: run inner brain per item
@@ -1400,7 +1400,7 @@ The output must conform to the provided schema.`,
           }
 
           const innerState = applyPatches(initialState, patches);
-          result = [item, innerState];
+          result = { item, result: innerState };
         }
       } catch (error) {
         // Webhook-in-map is a programming mistake — always re-throw
@@ -1413,7 +1413,7 @@ The output must conform to the provided schema.`,
 
         if (config.error) {
           const fallback = config.error(item, error as Error);
-          result = fallback !== null ? [item, fallback] : undefined;
+          result = fallback !== null ? { item, result: fallback } : undefined;
         } else {
           // Default: log and skip
           console.error(`[map] Item ${i} in "${block.title}" failed:`, error);
@@ -1431,7 +1431,7 @@ The output must conform to the provided schema.`,
         stepId: step.id,
         itemIndex: i,
         item,
-        result: result ? result[1] : undefined,
+        result: result ? result.result : undefined,
         processedCount: i + 1,
         totalItems,
         stateKey: block.stateKey,

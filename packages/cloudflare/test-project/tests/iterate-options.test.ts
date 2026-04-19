@@ -94,9 +94,9 @@ describe('Iterate with Options Tests', () => {
     expect(results).toBeDefined();
     expect(results.length).toBe(3);
 
-    // Each result should be [item, { value, result }] where result = item * multiplier(10)
+    // Each result should be { item, result: { value, result } } where result = item * multiplier(10)
     for (let i = 0; i < 3; i++) {
-      const [item, innerState] = results[i];
+      const { item, result: innerState } = results[i];
       expect(item).toBe(i + 1);
       expect(innerState.value).toBe(i + 1);
       expect(innerState.result).toBe((i + 1) * 10);

@@ -459,7 +459,13 @@ describe('.map() with prompt + loop', () => {
     });
 
     expect(finalState.summaries).toHaveLength(2);
-    expect(finalState.summaries[0]).toEqual(['A', { summary: 'Summary of A' }]);
-    expect(finalState.summaries[1]).toEqual(['B', { summary: 'Summary of B' }]);
+    expect(finalState.summaries[0]).toEqual({
+      item: 'A',
+      result: { summary: 'Summary of A' },
+    });
+    expect(finalState.summaries[1]).toEqual({
+      item: 'B',
+      result: { summary: 'Summary of B' },
+    });
   });
 });
