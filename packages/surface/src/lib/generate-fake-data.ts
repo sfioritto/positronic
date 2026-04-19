@@ -25,6 +25,7 @@
 
 import { z, type ZodType } from 'zod';
 import type { ObjectGenerator } from '@positronic/core';
+import { zodToTypescript } from './zod-to-typescript.js';
 
 function isScalar(schema: unknown): boolean {
   if (schema instanceof z.ZodObject) return false;
@@ -64,19 +65,34 @@ export async function generateFakeData<Schema extends z.ZodObject>({
   schema: Schema;
   prompt: string;
 }): Promise<z.infer<Schema>> {
-  const data = await generate({ client, schema, prompt });
+  // Compose the per-walk-constant system prompt ONCE. Every leaf call in the
+  // walk uses the identical system string so Gemini implicit-caches it.
+  // Including the full TS schema gives each leaf call visibility into its
+  // siblings and ancestors, which matters for disambiguation: a field named
+  // `financialSummary` (string) sitting next to `financialEnriched` (array of
+  // objects) now gets generated with awareness of both, instead of the model
+  // having to guess intent from the name alone.
+  const schemaTs = zodToTypescript(schema, 'Data');
+  const systemPrompt = `Domain: ${prompt}
+
+Full data schema for context:
+\`\`\`typescript
+${schemaTs}
+\`\`\``;
+
+  const data = await generate({ client, schema, systemPrompt });
   return schema.parse(data);
 }
 
 async function generate<InputSchema extends ZodType>({
   client,
   schema,
-  prompt,
+  systemPrompt,
   path = '',
 }: {
   client: ObjectGenerator;
   schema: InputSchema;
-  prompt: string;
+  systemPrompt: string;
   path?: string;
 }): Promise<z.infer<InputSchema>> {
   // Unwrap nullable/optional wrappers on non-scalar types (e.g. a nullable
@@ -86,7 +102,7 @@ async function generate<InputSchema extends ZodType>({
     return generate({
       client,
       schema: schema.unwrap() as ZodType,
-      prompt,
+      systemPrompt,
       path,
     }) as Promise<z.infer<InputSchema>>;
   }
@@ -108,7 +124,7 @@ async function generate<InputSchema extends ZodType>({
           generate({
             client,
             schema: schema.element as ZodType,
-            prompt,
+            systemPrompt,
             path: `${path}[${i}]`,
           })
         )
@@ -119,14 +135,18 @@ async function generate<InputSchema extends ZodType>({
     // Array-of-scalar with meta: one-shot with count in prompt. Without meta,
     // fall through so it can be absorbed into a parent one-shot via isGenerable.
     if (count !== undefined) {
-      return generateWhole({ client, schema, prompt, path, count }) as Promise<
-        z.infer<InputSchema>
-      >;
+      return generateWhole({
+        client,
+        schema,
+        systemPrompt,
+        path,
+        count,
+      }) as Promise<z.infer<InputSchema>>;
     }
   }
 
   if (isGenerable(schema))
-    return generateWhole({ client, schema, prompt, path });
+    return generateWhole({ client, schema, systemPrompt, path });
 
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape as Record<string, ZodType>;
@@ -135,7 +155,7 @@ async function generate<InputSchema extends ZodType>({
         const value = await generate({
           client,
           schema: subSchema,
-          prompt,
+          systemPrompt,
           path: path ? `${path}.${key}` : key,
         });
         return [key, value] as const;
@@ -150,13 +170,13 @@ async function generate<InputSchema extends ZodType>({
 async function generateWhole<S extends ZodType>({
   client,
   schema,
-  prompt,
+  systemPrompt,
   path,
   count,
 }: {
   client: ObjectGenerator;
   schema: S;
-  prompt: string;
+  systemPrompt: string;
   path: string;
   count?: number;
 }): Promise<z.infer<S>> {
@@ -172,8 +192,7 @@ async function generateWhole<S extends ZodType>({
 
   const { object } = await client.generateObject({
     schema: wrapped,
-    // `system` for the per-run-constant part so Gemini can implicit-cache it.
-    system: `Domain: ${prompt}`,
+    system: systemPrompt,
     prompt: promptLines.join('\n'),
   });
 
