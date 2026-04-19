@@ -1,16 +1,10 @@
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { MockSignalProvider } from './mock-signal-provider.js';
-import { jest } from '@jest/globals';
-import type { ObjectGenerator } from '../src/clients/types.js';
+import { createMockClient } from './brain-test-helpers.js';
 
-// Mock ObjectGenerator
-const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
-const mockClient: jest.Mocked<ObjectGenerator> = {
-  generateObject: mockGenerateObject,
-  streamText: mockStreamText,
-};
+const mockClient = createMockClient();
+const mockGenerateObject = mockClient.generateObject;
 
 describe('signal handling', () => {
   let signalProvider: MockSignalProvider;

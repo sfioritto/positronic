@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import type {
   MemoryEntry,
   MemoryProvider,
@@ -5,7 +6,19 @@ import type {
   MemoryMessage,
   ObjectGenerator,
 } from '@positronic/core';
-import { jest } from '@jest/globals';
+
+export function createMockClient(
+  overrides: Partial<jest.Mocked<ObjectGenerator>> = {}
+): jest.Mocked<ObjectGenerator> {
+  return {
+    generateObject: jest.fn<ObjectGenerator['generateObject']>(),
+    streamText: jest.fn<ObjectGenerator['streamText']>(),
+    generateText: jest.fn<NonNullable<ObjectGenerator['generateText']>>(),
+    createToolResultMessage:
+      jest.fn<NonNullable<ObjectGenerator['createToolResultMessage']>>(),
+    ...overrides,
+  } as unknown as jest.Mocked<ObjectGenerator>;
+}
 
 /**
  * A mock memory provider that tracks calls for testing.
@@ -93,25 +106,6 @@ export function createMockProvider(): MockMemoryProvider {
       searchCalls.length = 0;
       seededMemories = [];
     },
-  };
-}
-
-/**
- * Creates a mock ObjectGenerator for testing brains.
- *
- * @example
- * ```typescript
- * const client = createMockClient();
- *
- * // Run brain
- * const testBrain = brain('test').step('process', () => ({ done: true }));
- * await collectEvents(testBrain.run({ client }));
- * ```
- */
-export function createMockClient(): jest.Mocked<ObjectGenerator> {
-  return {
-    generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-    streamText: jest.fn<ObjectGenerator['streamText']>(),
   };
 }
 

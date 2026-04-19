@@ -1,7 +1,6 @@
-import { jest } from '@jest/globals';
 import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
-import type { ObjectGenerator } from '../src/clients/types.js';
+import { createMockClient } from './brain-test-helpers.js';
 import type { CurrentUser } from '../src/dsl/types.js';
 import type { BrainStartEvent } from '../src/dsl/definitions/events.js';
 
@@ -15,12 +14,6 @@ const collectEvents = async <T>(
   }
   return events;
 };
-
-// Mock ObjectGenerator for testing
-const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-  streamText: jest.fn<ObjectGenerator['streamText']>(),
-});
 
 describe('currentUser', () => {
   it('should be available in step context when provided via run params', async () => {

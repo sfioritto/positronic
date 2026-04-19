@@ -67,12 +67,25 @@ export const mockGenerateText =
   jest.fn<NonNullable<ObjectGenerator['generateText']>>();
 export const mockCreateToolResultMessage =
   jest.fn<NonNullable<ObjectGenerator['createToolResultMessage']>>();
-export const mockClient: jest.Mocked<ObjectGenerator> = {
+export const mockClient = {
   generateObject: mockGenerateObject,
   streamText: mockStreamText,
   generateText: mockGenerateText,
   createToolResultMessage: mockCreateToolResultMessage,
-};
+} as unknown as jest.Mocked<ObjectGenerator>;
+
+export function createMockClient(
+  overrides: Partial<jest.Mocked<ObjectGenerator>> = {}
+): jest.Mocked<ObjectGenerator> {
+  return {
+    generateObject: jest.fn<ObjectGenerator['generateObject']>(),
+    streamText: jest.fn<ObjectGenerator['streamText']>(),
+    generateText: jest.fn<NonNullable<ObjectGenerator['generateText']>>(),
+    createToolResultMessage:
+      jest.fn<NonNullable<ObjectGenerator['createToolResultMessage']>>(),
+    ...overrides,
+  } as unknown as jest.Mocked<ObjectGenerator>;
+}
 
 export const dummyOutputSchema = z.object({ result: z.string() });
 export const dummyStateKey = 'agentResult' as const;

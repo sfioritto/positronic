@@ -1,7 +1,6 @@
-import { jest } from '@jest/globals';
 import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
-import type { ObjectGenerator } from '../src/clients/types.js';
+import { createMockClient } from './brain-test-helpers.js';
 import type {
   Files,
   FileHandle,
@@ -107,66 +106,59 @@ function createInMemoryFiles(
     return handle;
   }
 
-  const service: Files & { storage: Map<string, string | Uint8Array> } =
-    {
-      storage,
-      open(name: string, options?: FileOptions) {
-        return createHandle(name, options);
-      },
-      async write(name: string, content: FileInput, options?: FileOptions) {
-        const handle = createHandle(name, options);
-        return handle.write(content);
-      },
-      async list() {
-        const prefix = 'files/user/test-user/test-brain/';
-        const refs: FileRef[] = [];
-        for (const key of storage.keys()) {
-          if (key.startsWith(prefix)) {
-            const name = key.slice(prefix.length);
-            if (!name.startsWith('runs/')) {
-              refs.push({ name });
-            }
+  const service: Files & { storage: Map<string, string | Uint8Array> } = {
+    storage,
+    open(name: string, options?: FileOptions) {
+      return createHandle(name, options);
+    },
+    async write(name: string, content: FileInput, options?: FileOptions) {
+      const handle = createHandle(name, options);
+      return handle.write(content);
+    },
+    async list() {
+      const prefix = 'files/user/test-user/test-brain/';
+      const refs: FileRef[] = [];
+      for (const key of storage.keys()) {
+        if (key.startsWith(prefix)) {
+          const name = key.slice(prefix.length);
+          if (!name.startsWith('runs/')) {
+            refs.push({ name });
           }
         }
-        return refs;
-      },
-      async delete(name: string) {
-        const handle = createHandle(name);
-        await handle.delete();
-      },
-      zip(name: string, options?: FileOptions): ZipBuilder {
-        const entries: Array<{ name: string; content: string | Uint8Array }> =
-          [];
-        return {
-          async write(entryName: string, content: FileInput) {
-            if (typeof content === 'string') {
-              entries.push({ name: entryName, content });
-            } else if (content instanceof Uint8Array) {
-              entries.push({ name: entryName, content });
-            } else if ('read' in (content as any)) {
-              const text = await (content as FileHandle).read();
-              entries.push({ name: entryName, content: text });
-            } else {
-              entries.push({ name: entryName, content: '[stream]' });
-            }
-          },
-          async finalize() {
-            // Store entries as JSON so tests can inspect what went into the zip
-            const key = resolveKey(name, options);
-            storage.set(key, JSON.stringify(entries.map((e) => e.name)));
-            return { name };
-          },
-        };
-      },
-    };
+      }
+      return refs;
+    },
+    async delete(name: string) {
+      const handle = createHandle(name);
+      await handle.delete();
+    },
+    zip(name: string, options?: FileOptions): ZipBuilder {
+      const entries: Array<{ name: string; content: string | Uint8Array }> = [];
+      return {
+        async write(entryName: string, content: FileInput) {
+          if (typeof content === 'string') {
+            entries.push({ name: entryName, content });
+          } else if (content instanceof Uint8Array) {
+            entries.push({ name: entryName, content });
+          } else if ('read' in (content as any)) {
+            const text = await (content as FileHandle).read();
+            entries.push({ name: entryName, content: text });
+          } else {
+            entries.push({ name: entryName, content: '[stream]' });
+          }
+        },
+        async finalize() {
+          // Store entries as JSON so tests can inspect what went into the zip
+          const key = resolveKey(name, options);
+          storage.set(key, JSON.stringify(entries.map((e) => e.name)));
+          return { name };
+        },
+      };
+    },
+  };
 
   return service;
 }
-
-const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-  streamText: jest.fn<ObjectGenerator['streamText']>(),
-});
 
 describe('files service', () => {
   it('should inject files into step context', async () => {
@@ -257,9 +249,7 @@ describe('files service', () => {
   });
 
   it('should compute url from origin', async () => {
-    const filesService = createInMemoryFiles(
-      'https://myapp.workers.dev'
-    );
+    const filesService = createInMemoryFiles('https://myapp.workers.dev');
 
     const file = filesService.open('report.txt');
     expect(file.url).toBe(

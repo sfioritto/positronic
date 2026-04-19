@@ -2,8 +2,6 @@ import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain } from '../src/dsl/brain.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
-import { ObjectGenerator } from '../src/clients/types.js';
 import { createWebhook } from '../src/index.js';
 import {
   nextStep,
@@ -11,6 +9,7 @@ import {
   mockClient,
   mockResourceLoad,
   mockResources,
+  createMockClient,
 } from './brain-test-helpers.js';
 
 describe('brain creation', () => {
@@ -288,12 +287,10 @@ describe('brain creation', () => {
   });
 
   it('should allow overriding client per step', async () => {
-    const overrideClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest
-        .fn<ObjectGenerator['generateObject']>()
-        .mockResolvedValue({ object: { override: true } }),
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
-    };
+    const overrideClient = createMockClient();
+    overrideClient.generateObject.mockResolvedValue({
+      object: { override: true },
+    });
 
     // Make sure that for the default prompt the default client returns a known value.
     mockClient.generateObject.mockResolvedValueOnce({
@@ -343,12 +340,10 @@ describe('brain creation', () => {
   });
 
   it('should use a plain ObjectGenerator override on prompt step', async () => {
-    const overrideClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest
-        .fn<ObjectGenerator['generateObject']>()
-        .mockResolvedValue({ object: { derived: true } }),
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
-    };
+    const overrideClient = createMockClient();
+    overrideClient.generateObject.mockResolvedValue({
+      object: { derived: true },
+    });
 
     const testBrain = brain('Client Plain Override Test').prompt(
       'Use override client',
@@ -384,12 +379,10 @@ describe('brain creation', () => {
   });
 
   it('should use brain-level client for prompt steps', async () => {
-    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest
-        .fn<ObjectGenerator['generateObject']>()
-        .mockResolvedValue({ object: { result: 'from brain client' } }),
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
-    };
+    const brainLevelClient = createMockClient();
+    brainLevelClient.generateObject.mockResolvedValue({
+      object: { result: 'from brain client' },
+    });
 
     const testBrain = brain({
       title: 'Brain Level Client Test',
@@ -420,19 +413,15 @@ describe('brain creation', () => {
   });
 
   it('should let step-level client override brain-level client in prompt', async () => {
-    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest
-        .fn<ObjectGenerator['generateObject']>()
-        .mockResolvedValue({ object: { result: 'from brain' } }),
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
-    };
+    const brainLevelClient = createMockClient();
+    brainLevelClient.generateObject.mockResolvedValue({
+      object: { result: 'from brain' },
+    });
 
-    const stepLevelClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest
-        .fn<ObjectGenerator['generateObject']>()
-        .mockResolvedValue({ object: { result: 'from step' } }),
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
-    };
+    const stepLevelClient = createMockClient();
+    stepLevelClient.generateObject.mockResolvedValue({
+      object: { result: 'from step' },
+    });
 
     const testBrain = brain({
       title: 'Step Override Brain Client',

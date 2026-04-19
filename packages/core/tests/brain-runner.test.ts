@@ -6,7 +6,6 @@ import {
   sendEvent,
 } from '../src/dsl/brain-state-machine.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ObjectGenerator } from '../src/clients/types.js';
 import { Adapter } from '../src/adapters/types.js';
 import { createResources, type Resources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
@@ -15,14 +14,11 @@ import { z } from 'zod';
 import { MockSignalProvider } from './mock-signal-provider.js';
 import { createBrain } from '../src/dsl/create-brain.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
+import { createMockClient } from './brain-test-helpers.js';
 
 describe('BrainRunner', () => {
-  const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-  const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
-  const mockClient: jest.Mocked<ObjectGenerator> = {
-    generateObject: mockGenerateObject,
-    streamText: mockStreamText,
-  };
+  const mockClient = createMockClient();
+  const mockGenerateObject = mockClient.generateObject;
 
   const mockDispatch = jest.fn<Adapter['dispatch']>();
   const mockAdapter: jest.Mocked<Adapter> = {
@@ -246,14 +242,8 @@ describe('BrainRunner', () => {
   });
 
   it('should replace client with withClient method', async () => {
-    const originalClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest.fn(),
-      streamText: jest.fn(),
-    };
-    const newClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest.fn(),
-      streamText: jest.fn(),
-    };
+    const originalClient = createMockClient();
+    const newClient = createMockClient();
 
     // Configure the new client's response
     newClient.generateObject.mockResolvedValue({

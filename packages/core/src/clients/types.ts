@@ -92,7 +92,7 @@ export interface ObjectGenerator {
    * This method supports both simple single-string prompts and more complex
    * multi-turn conversations via the `messages` array.
    */
-  generateObject<T extends z.AnyZodObject>(params: {
+  generateObject<T extends z.ZodObject>(params: {
     /** The Zod schema defining the expected output object structure. */
     schema: T;
     /** Optional name passed to the underlying LLM provider (e.g., tool name for Claude, output name for Vercel AI SDK). Not used by the brain layer. */

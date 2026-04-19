@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Store, StoreProvider } from '../src/store/types.js';
 import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
-import type { ObjectGenerator } from '../src/clients/types.js';
+import { createMockClient } from './brain-test-helpers.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
 
 // Helper function to collect all events from a brain run
@@ -73,12 +73,6 @@ const createInMemoryStoreProvider = (): StoreProvider & {
 
   return factory;
 };
-
-// Mock ObjectGenerator for testing
-const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-  streamText: jest.fn<ObjectGenerator['streamText']>(),
-});
 
 describe('Brain.withStore', () => {
   it('should inject store into step context', async () => {

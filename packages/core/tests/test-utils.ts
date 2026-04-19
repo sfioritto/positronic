@@ -24,7 +24,7 @@ export class MockObjectGenerator implements ObjectGenerator {
     this.generateObjectMock = jest.fn();
   }
 
-  async generateObject<T extends z.AnyZodObject>(
+  async generateObject<T extends z.ZodObject>(
     params: Parameters<ObjectGenerator['generateObject']>[0]
   ): Promise<{
     object: z.infer<T>;

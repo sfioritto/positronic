@@ -8,7 +8,7 @@
   "dependencies": {
     "@positronic/core": "<%= positronicCoreVersion %>", <% if (backend === 'cloudflare') { %>
     "@positronic/cloudflare": "<%= positronicCloudflareVersion %>", <% } %>
-    "zod": "^3.24.1"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240405.0",

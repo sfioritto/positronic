@@ -213,7 +213,7 @@ export class BrainEventStream<
               url: resume.currentPage.url,
               webhook: {
                 ...resume.currentPage.webhook,
-                schema: z.record(z.unknown()),
+                schema: z.record(z.string(), z.unknown()),
               },
             }
           : { url: resume.currentPage.url };

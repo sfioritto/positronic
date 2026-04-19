@@ -111,7 +111,7 @@ RETURNS: The webhook payload when triggered. For UI forms, this contains all for
     const webhook: WebhookRegistration = {
       slug: input.slug,
       identifier: input.identifier,
-      schema: z.record(z.unknown()),
+      schema: z.record(z.string(), z.unknown()),
       token: input.token,
     };
 

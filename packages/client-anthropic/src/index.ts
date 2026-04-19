@@ -10,7 +10,6 @@ import Instructor from '@instructor-ai/instructor';
 import { createLLMClient } from 'llm-polyglot';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { config } from 'dotenv';
 import type { InstructorClient } from '@instructor-ai/instructor';
 
@@ -73,7 +72,7 @@ export class AnthropicClient implements ObjectGenerator {
     } as ResponseMessage;
   }
 
-  async generateObject<T extends z.AnyZodObject>(params: {
+  async generateObject<T extends z.ZodObject>(params: {
     schema: T;
     schemaName?: string;
     schemaDescription?: string;
@@ -108,7 +107,7 @@ export class AnthropicClient implements ObjectGenerator {
       messages,
       model,
       response_model: {
-        schema: params.schema,
+        schema: params.schema as any,
         name: params.schemaName ?? 'Data',
         description: params.schemaDescription,
       },
@@ -117,7 +116,7 @@ export class AnthropicClient implements ObjectGenerator {
       ...(top_p !== undefined ? { top_p } : {}),
       extra_options,
     });
-    return { object: response };
+    return { object: response as z.infer<T> };
   }
 
   async generateText(params: {
@@ -197,7 +196,7 @@ export class AnthropicClient implements ObjectGenerator {
       ([name, tool]) => ({
         name,
         description: tool.description,
-        input_schema: zodToJsonSchema(
+        input_schema: z.toJSONSchema(
           tool.inputSchema
         ) as Anthropic.Tool.InputSchema,
       })
@@ -283,7 +282,7 @@ export class AnthropicClient implements ObjectGenerator {
       ([name, tool]) => ({
         name,
         description: tool.description,
-        input_schema: zodToJsonSchema(
+        input_schema: z.toJSONSchema(
           tool.inputSchema
         ) as Anthropic.Tool.InputSchema,
       })

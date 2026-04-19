@@ -2,13 +2,9 @@ import { brain } from '../src/dsl/brain.js';
 import { createWebhook } from '../src/dsl/webhook.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { z } from 'zod';
-import type { ObjectGenerator } from '../src/clients/types.js';
-import { jest } from '@jest/globals';
+import { createMockClient } from './brain-test-helpers.js';
 
-const mockClient: ObjectGenerator = {
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-  streamText: jest.fn<ObjectGenerator['streamText']>(),
-};
+const mockClient = createMockClient();
 
 describe('webhook type inference', () => {
   it('should infer webhook response types correctly', () => {

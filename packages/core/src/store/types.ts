@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JsonValue, CurrentUser } from '../dsl/types.js';
+import type { CurrentUser, JsonValue } from '../dsl/types.js';
 
 /**
  * Per-user field marker for store field definitions.
@@ -17,15 +17,26 @@ export interface PerUserField<T extends z.ZodType = z.ZodType> {
 export type StoreSchema = Record<string, z.ZodType | PerUserField<any>>;
 
 /**
+ * Ensure a type is JSON-serializable. Non-JSON types (Date, Map, class instances,
+ * functions, etc.) resolve to `never`, which makes `store.set(key, nonJsonValue)`
+ * fail to typecheck at the call site.
+ */
+type EnsureJsonValue<T> = T extends JsonValue | undefined ? T : never;
+
+/**
  * Extract the value types from store field definitions.
  * PerUserField<T> extracts z.infer<T>, plain ZodType extracts z.infer.
+ * Each field is filtered through EnsureJsonValue so non-serializable zod
+ * schemas (e.g. z.date()) surface as a compile error on .set().
  */
 export type InferStoreTypes<T extends StoreSchema> = {
-  [K in keyof T]: T[K] extends PerUserField<infer V>
-    ? z.infer<V>
-    : T[K] extends z.ZodType
-    ? z.infer<T[K]>
-    : never;
+  [K in keyof T]: EnsureJsonValue<
+    T[K] extends PerUserField<infer V>
+      ? z.infer<V>
+      : T[K] extends z.ZodType
+      ? z.infer<T[K]>
+      : never
+  >;
 };
 
 /**
@@ -33,7 +44,7 @@ export type InferStoreTypes<T extends StoreSchema> = {
  * Raw backend: Store<any> (string keys, any values)
  * Typed store: Store<{counter: number, pref: string}> (constrained keys, typed values)
  */
-export interface Store<T extends Record<string, JsonValue | undefined>> {
+export interface Store<T extends Record<string, unknown>> {
   get<K extends keyof T & string>(key: K): Promise<T[K] | undefined>;
   set<K extends keyof T & string>(key: K, value: T[K]): Promise<void>;
   delete<K extends keyof T & string>(key: K): Promise<void>;

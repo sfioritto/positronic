@@ -66,7 +66,7 @@ export class VercelClient implements ObjectGenerator {
     return createToolResultMessage(toolCallId, toolName, result);
   }
 
-  async generateObject<T extends z.AnyZodObject>(params: {
+  async generateObject<T extends z.ZodObject>(params: {
     schema: T;
     schemaName?: string;
     schemaDescription?: string;

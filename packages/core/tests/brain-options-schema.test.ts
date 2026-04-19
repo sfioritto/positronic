@@ -1,19 +1,13 @@
 import { z } from 'zod';
-import { jest } from '@jest/globals';
 import { brain, BRAIN_EVENTS } from '../src/index.js';
-import type { ObjectGenerator, BrainEvent } from '../src/index.js';
+import type { BrainEvent } from '../src/index.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
+import { createMockClient } from './brain-test-helpers.js';
 
 describe('Brain withOptions', () => {
-  const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const mockClient = createMockClient();
+  const mockGenerateObject = mockClient.generateObject;
   mockGenerateObject.mockResolvedValue({ object: { result: 'test' } } as any);
-
-  const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
-
-  const mockClient: ObjectGenerator = {
-    generateObject: mockGenerateObject,
-    streamText: mockStreamText,
-  };
 
   // Helper to collect all events
   async function collectAllEvents<

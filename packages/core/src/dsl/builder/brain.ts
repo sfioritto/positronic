@@ -150,13 +150,18 @@ export class Brain<
     };
   }
 
-  withOptions<TSchema extends z.ZodSchema>(
+  withOptions<TSchema extends z.ZodObject>(
     schema: TSchema
-  ): Brain<z.infer<TSchema>, TState, TPlugins> {
-    const nextBrain = new Brain<z.infer<TSchema>, TState, TPlugins>(
-      this.title,
-      this.description
-    ).withBlocks(this.blocks as any);
+  ): Brain<
+    z.infer<TSchema> extends JsonObject ? z.infer<TSchema> : never,
+    TState,
+    TPlugins
+  > {
+    const nextBrain = new Brain<
+      z.infer<TSchema> extends JsonObject ? z.infer<TSchema> : never,
+      TState,
+      TPlugins
+    >(this.title, this.description).withBlocks(this.blocks as any);
     this.copyConfigTo(nextBrain);
     nextBrain.optionsSchema = schema;
     return nextBrain;

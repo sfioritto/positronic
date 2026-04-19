@@ -1,15 +1,14 @@
 import { jest } from '@jest/globals';
-import { brain, BRAIN_EVENTS, type ObjectGenerator } from '@positronic/core';
+import { brain, BRAIN_EVENTS } from '@positronic/core';
 import { mem0 } from '../src/plugin.js';
 import type { Mem0PluginConfig } from '../src/plugin.js';
-import { createMockProvider, collectEvents } from './test-helpers.js';
+import {
+  createMockProvider,
+  collectEvents,
+  createMockClient,
+} from './test-helpers.js';
 
-const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
-const mockClient: jest.Mocked<ObjectGenerator> = {
-  generateObject: mockGenerateObject,
-  streamText: mockStreamText,
-};
+const mockClient = createMockClient();
 
 describe('Mem0 API calls', () => {
   const mockFetch = jest.fn<typeof global.fetch>();

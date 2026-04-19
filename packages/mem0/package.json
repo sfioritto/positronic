@@ -26,7 +26,7 @@
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
-    "zod": "^3.24.1"
+    "zod": "^4.0.0"
   },
   "peerDependencies": {
     "@positronic/core": "^0.0.78"

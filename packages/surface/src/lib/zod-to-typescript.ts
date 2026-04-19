@@ -1,122 +1,138 @@
-import type { ZodObject, ZodTypeAny } from 'zod';
+import { z, type ZodType } from 'zod';
 
 /**
  * Convert a Zod schema to a TypeScript type alias string (e.g.
- * `export type Data = { ... };`). Written by hand to avoid shipping
- * the TypeScript compiler into a Worker bundle — `zod-to-ts` depends
- * on `typescript`, which reads `__filename` at module init and breaks
- * under V8 isolates.
+ * `export type Data = { ... };`). Written by hand using `instanceof`
+ * checks rather than TypeScript-compiler AST because the TS compiler
+ * reads `__filename` at module init and breaks under V8 isolates.
  */
-export function zodToTypescript(schema: ZodObject<any>, name = 'Data'): string {
+export function zodToTypescript(schema: z.ZodObject, name = 'Data'): string {
   return `export type ${name} = ${renderType(schema, 0)};`;
 }
 
-function renderType(schema: ZodTypeAny, depth: number): string {
-  const def = schema._def as { typeName: string } & Record<string, unknown>;
-  switch (def.typeName) {
-    case 'ZodString':
-      return 'string';
-    case 'ZodNumber':
-      return 'number';
-    case 'ZodBigInt':
-      return 'bigint';
-    case 'ZodBoolean':
-      return 'boolean';
-    case 'ZodDate':
-      return 'Date';
-    case 'ZodSymbol':
-      return 'symbol';
-    case 'ZodUndefined':
-      return 'undefined';
-    case 'ZodNull':
-      return 'null';
-    case 'ZodAny':
-      return 'any';
-    case 'ZodUnknown':
-      return 'unknown';
-    case 'ZodNever':
-      return 'never';
-    case 'ZodVoid':
-      return 'void';
-    case 'ZodLiteral':
-      return JSON.stringify(def.value);
-    case 'ZodEnum':
-      return (def.values as string[]).map((v) => JSON.stringify(v)).join(' | ');
-    case 'ZodNativeEnum':
-      return Object.values(def.values as Record<string, string | number>)
-        .filter((v) => typeof v === 'string' || typeof v === 'number')
-        .map((v) => JSON.stringify(v))
-        .join(' | ');
-    case 'ZodArray':
-      return `${wrapIfUnion(
-        renderType(def.type as ZodTypeAny, depth),
-        def.type as ZodTypeAny
-      )}[]`;
-    case 'ZodObject':
-      return renderObject(schema as ZodObject<any>, depth);
-    case 'ZodOptional':
-      return `${renderType(def.innerType as ZodTypeAny, depth)} | undefined`;
-    case 'ZodNullable':
-      return `${renderType(def.innerType as ZodTypeAny, depth)} | null`;
-    case 'ZodDefault':
-      return renderType(def.innerType as ZodTypeAny, depth);
-    case 'ZodEffects':
-      return renderType(def.schema as ZodTypeAny, depth);
-    case 'ZodBranded':
-      return renderType(def.type as ZodTypeAny, depth);
-    case 'ZodCatch':
-      return renderType(def.innerType as ZodTypeAny, depth);
-    case 'ZodPipeline':
-      return renderType(def.out as ZodTypeAny, depth);
-    case 'ZodLazy':
-      return renderType((def.getter as () => ZodTypeAny)(), depth);
-    case 'ZodUnion':
-    case 'ZodDiscriminatedUnion':
-      return (def.options as ZodTypeAny[])
-        .map((o) => renderType(o, depth))
-        .join(' | ');
-    case 'ZodIntersection':
-      return `${renderType(def.left as ZodTypeAny, depth)} & ${renderType(
-        def.right as ZodTypeAny,
-        depth
-      )}`;
-    case 'ZodTuple':
-      return `[${(def.items as ZodTypeAny[])
-        .map((i) => renderType(i, depth))
-        .join(', ')}]`;
-    case 'ZodRecord':
-      return `Record<${
-        def.keyType ? renderType(def.keyType as ZodTypeAny, depth) : 'string'
-      }, ${renderType(def.valueType as ZodTypeAny, depth)}>`;
-    case 'ZodMap':
-      return `Map<${renderType(def.keyType as ZodTypeAny, depth)}, ${renderType(
-        def.valueType as ZodTypeAny,
-        depth
-      )}>`;
-    case 'ZodSet':
-      return `Set<${renderType(def.valueType as ZodTypeAny, depth)}>`;
-    default:
-      return 'unknown';
+function renderType(schema: ZodType, depth: number): string {
+  if (schema instanceof z.ZodString) return 'string';
+  if (schema instanceof z.ZodNumber) return 'number';
+  if (schema instanceof z.ZodBigInt) return 'bigint';
+  if (schema instanceof z.ZodBoolean) return 'boolean';
+  if (schema instanceof z.ZodDate) return 'Date';
+  if (schema instanceof z.ZodSymbol) return 'symbol';
+  if (schema instanceof z.ZodUndefined) return 'undefined';
+  if (schema instanceof z.ZodNull) return 'null';
+  if (schema instanceof z.ZodAny) return 'any';
+  if (schema instanceof z.ZodUnknown) return 'unknown';
+  if (schema instanceof z.ZodNever) return 'never';
+  if (schema instanceof z.ZodVoid) return 'void';
+
+  if (schema instanceof z.ZodLiteral) {
+    const values = (schema as z.ZodLiteral<any>).def.values;
+    return values.map((v: unknown) => JSON.stringify(v)).join(' | ');
   }
+  if (schema instanceof z.ZodEnum) {
+    return Object.values((schema as z.ZodEnum<any>).def.entries)
+      .filter((v) => typeof v === 'string' || typeof v === 'number')
+      .map((v) => JSON.stringify(v))
+      .join(' | ');
+  }
+
+  if (schema instanceof z.ZodArray) {
+    const el = (schema as z.ZodArray<any>).element as ZodType;
+    return `${wrapIfUnion(renderType(el, depth), el)}[]`;
+  }
+
+  if (schema instanceof z.ZodObject) {
+    return renderObject(schema as z.ZodObject, depth);
+  }
+
+  if (schema instanceof z.ZodOptional) {
+    const inner = (schema as z.ZodOptional<any>).unwrap() as ZodType;
+    return `${renderType(inner, depth)} | undefined`;
+  }
+  if (schema instanceof z.ZodNullable) {
+    const inner = (schema as z.ZodNullable<any>).unwrap() as ZodType;
+    return `${renderType(inner, depth)} | null`;
+  }
+  if (schema instanceof z.ZodDefault) {
+    return renderType(
+      (schema as z.ZodDefault<any>).def.innerType as ZodType,
+      depth
+    );
+  }
+  if (schema instanceof z.ZodCatch) {
+    return renderType(
+      (schema as z.ZodCatch<any>).def.innerType as ZodType,
+      depth
+    );
+  }
+  if (schema instanceof z.ZodPipe) {
+    // Pipe's output matches its `out` schema.
+    return renderType(
+      (schema as z.ZodPipe<any, any>).def.out as ZodType,
+      depth
+    );
+  }
+  if (schema instanceof z.ZodLazy) {
+    return renderType(
+      ((schema as z.ZodLazy<any>).def.getter as () => ZodType)(),
+      depth
+    );
+  }
+
+  if (
+    schema instanceof z.ZodUnion ||
+    schema instanceof z.ZodDiscriminatedUnion
+  ) {
+    const opts = (schema as z.ZodUnion<any>).def.options as ZodType[];
+    return opts.map((o) => renderType(o, depth)).join(' | ');
+  }
+  if (schema instanceof z.ZodIntersection) {
+    const def = (schema as z.ZodIntersection<any, any>).def;
+    return `${renderType(def.left as ZodType, depth)} & ${renderType(
+      def.right as ZodType,
+      depth
+    )}`;
+  }
+  if (schema instanceof z.ZodTuple) {
+    const items = (schema as z.ZodTuple<any>).def.items as ZodType[];
+    return `[${items.map((i) => renderType(i, depth)).join(', ')}]`;
+  }
+
+  if (schema instanceof z.ZodRecord) {
+    const def = (schema as z.ZodRecord<any, any>).def;
+    const keyType = def.keyType
+      ? renderType(def.keyType as ZodType, depth)
+      : 'string';
+    return `Record<${keyType}, ${renderType(def.valueType as ZodType, depth)}>`;
+  }
+  if (schema instanceof z.ZodMap) {
+    const def = (schema as z.ZodMap<any, any>).def;
+    return `Map<${renderType(def.keyType as ZodType, depth)}, ${renderType(
+      def.valueType as ZodType,
+      depth
+    )}>`;
+  }
+  if (schema instanceof z.ZodSet) {
+    return `Set<${renderType(
+      (schema as z.ZodSet<any>).def.valueType as ZodType,
+      depth
+    )}>`;
+  }
+
+  return 'unknown';
 }
 
-function renderObject(schema: ZodObject<any>, depth: number): string {
-  const rawShape = schema._def.shape;
-  const shape =
-    typeof rawShape === 'function'
-      ? (rawShape as () => Record<string, ZodTypeAny>)()
-      : rawShape;
-  const entries = Object.entries(shape as Record<string, ZodTypeAny>);
+function renderObject(schema: z.ZodObject, depth: number): string {
+  const shape = schema.shape as Record<string, ZodType>;
+  const entries = Object.entries(shape);
   if (entries.length === 0) return '{}';
 
   const indent = '  '.repeat(depth + 1);
   const close = '  '.repeat(depth);
 
   const lines = entries.map(([key, value]) => {
-    const isOptional =
-      (value._def as { typeName: string }).typeName === 'ZodOptional';
+    const isOptional = value instanceof z.ZodOptional;
     const inner = isOptional
-      ? ((value._def as { innerType: ZodTypeAny }).innerType as ZodTypeAny)
+      ? ((value as z.ZodOptional<any>).unwrap() as ZodType)
       : value;
     return `${indent}${safeKey(key)}${isOptional ? '?' : ''}: ${renderType(
       inner,
@@ -127,12 +143,11 @@ function renderObject(schema: ZodObject<any>, depth: number): string {
   return `{\n${lines.join('\n')}\n${close}}`;
 }
 
-function wrapIfUnion(str: string, schema: ZodTypeAny): string {
-  const kind = (schema._def as { typeName: string }).typeName;
+function wrapIfUnion(str: string, schema: ZodType): string {
   if (
-    kind === 'ZodUnion' ||
-    kind === 'ZodDiscriminatedUnion' ||
-    kind === 'ZodIntersection'
+    schema instanceof z.ZodUnion ||
+    schema instanceof z.ZodDiscriminatedUnion ||
+    schema instanceof z.ZodIntersection
   ) {
     return `(${str})`;
   }
