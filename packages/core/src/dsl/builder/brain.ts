@@ -414,33 +414,30 @@ export class Brain<
     return this.nextBrain<any>();
   }
 
-  // Overload 1: Generated page with formSchema (auto-merge response onto state)
+  // Overload 1: Generated page with outputSchema (auto-merge response onto state)
   page<
-    TInputSchema extends z.ZodObject<any>,
-    TFormSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TFormSchema>
+    TOutputSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & z.infer<TOutputSchema>
   >(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       message: TemplateReturn;
-      inputSchema: TInputSchema;
-      data: z.infer<TInputSchema>;
-      formSchema: TFormSchema;
+      inputData: unknown;
+      outputSchema: TOutputSchema;
       system?: TemplateReturn;
-      onCreated?: (page: GeneratedPage<TFormSchema>) => void | Promise<void>;
+      onCreated?: (page: GeneratedPage<TOutputSchema>) => void | Promise<void>;
       slug?: string;
       ttl?: number;
       persist?: boolean;
     }
   ): Brain<TOptions, TNewState, TPlugins>;
 
-  // Overload 2: Generated page without formSchema (read-only)
-  page<TInputSchema extends z.ZodObject<any>>(
+  // Overload 2: Generated page without outputSchema (read-only)
+  page(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       message: TemplateReturn;
-      inputSchema: TInputSchema;
-      data: z.infer<TInputSchema>;
+      inputData: unknown;
       system?: TemplateReturn;
       onCreated?: (page: GeneratedPage) => void | Promise<void>;
       slug?: string;
@@ -449,22 +446,22 @@ export class Brain<
     }
   ): Brain<TOptions, TState, TPlugins>;
 
-  // Overload 3: Custom HTML with formSchema
+  // Overload 3: Custom HTML with outputSchema
   page<
-    TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TSchema>
+    TOutputSchema extends z.ZodObject<any>,
+    TNewState extends State = TState & z.infer<TOutputSchema>
   >(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
       html: TemplateChild;
-      formSchema: TSchema;
-      onCreated?: (page: GeneratedPage<TSchema>) => void | Promise<void>;
+      outputSchema: TOutputSchema;
+      onCreated?: (page: GeneratedPage<TOutputSchema>) => void | Promise<void>;
       ttl?: number;
       persist?: boolean;
     }
   ): Brain<TOptions, TNewState, TPlugins>;
 
-  // Overload 4: Custom HTML without formSchema
+  // Overload 4: Custom HTML without outputSchema
   page(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {

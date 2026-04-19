@@ -468,7 +468,7 @@ Most generated brains should not have try-catch blocks. Only use them when the e
 
 ## Page Steps for Forms
 
-When you need to collect user input, use the `.page()` method with `html` and `formSchema`. The brain auto-suspends after creating the page, then auto-merges the form response directly onto state. Use the `onCreated` callback for side effects.
+When you need to collect user input, use the `.page()` method with `html` and `outputSchema`. The brain auto-suspends after creating the page, then auto-merges the form response directly onto state. Use the `onCreated` callback for side effects.
 
 ```tsx
 import { z } from 'zod';
@@ -488,7 +488,7 @@ brain('feedback-collector')
         <button type="submit">Submit</button>
       </Form>
     ),
-    formSchema: z.object({
+    outputSchema: z.object({
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
@@ -507,13 +507,13 @@ brain('feedback-collector')
 Key points:
 - `page` is available inside the `onCreated` callback, not in a separate step
 - `page.url` - where to send users
-- The brain auto-suspends after `.page()` with `formSchema`
+- The brain auto-suspends after `.page()` with `outputSchema`
 - Form data is spread directly onto state (e.g., `state.rating`, `state.comments`)
 - You control how users are notified (Slack, email, etc.) inside `onCreated`
 
 ### When to use generated pages vs custom HTML
 
-**Use generated pages** (`message` + `inputSchema` + `data`) when:
+**Use generated pages** (`message` + `inputData`) when:
 - You want a professional-looking page without writing React/HTML
 - The page displays data from brain state (emails, metrics, reports)
 - You want the AI to handle layout, styling, and component selection
@@ -527,8 +527,7 @@ Key points:
 // Generated — AI creates a polished dashboard
 .page('Dashboard', ({ state: { metrics } }) => ({
   message: 'Show a metrics dashboard with KPIs and trend charts',
-  inputSchema: z.object({ metrics: z.array(z.object({ name: z.string(), value: z.number() })) }),
-  data: { metrics },
+  inputData: { metrics },
 }))
 
 // Custom HTML — simple form, full control
@@ -539,7 +538,7 @@ Key points:
       <button type="submit">Save</button>
     </Form>
   ),
-  formSchema: z.object({ theme: z.string() }),
+  outputSchema: z.object({ theme: z.string() }),
 }))
 ```
 

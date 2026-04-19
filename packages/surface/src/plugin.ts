@@ -6,6 +6,7 @@ import {
   type GenerateResult,
   type ProgressEvent,
 } from './generate.js';
+import { schemaFromData } from './lib/schema-from-data.js';
 import type { SandboxInstance } from './sandbox.js';
 import systemPromptTemplate from './system-prompt.gen.js';
 
@@ -60,12 +61,13 @@ export const surface = definePlugin({
       generate: async (params: {
         prompt: string;
         system?: string;
-        inputSchema: ZodObject<any>;
+        inputData: unknown;
         outputSchema?: ZodObject<any>;
         debug?: boolean;
         onProgress?: (event: ProgressEvent) => void | Promise<void>;
       }): Promise<GenerateResult> => {
-        const { system, ...rest } = params;
+        const { system, inputData, ...rest } = params;
+        const inputSchema = schemaFromData(inputData);
         return generate({
           client: config.client,
           reviewClient: config.reviewClient ?? config.client,
@@ -73,6 +75,7 @@ export const surface = definePlugin({
           systemPrompt: system ? `${systemPrompt}\n\n${system}` : systemPrompt,
           accountId: config.accountId,
           apiToken: config.apiToken,
+          inputSchema,
           ...rest,
         });
       },

@@ -1449,7 +1449,7 @@ The output must conform to the provided schema.`,
     yield* this.completeStep(step, prevState);
   }
 
-  private buildFormAction(step: Step, formSchema: z.ZodObject<any>) {
+  private buildFormAction(step: Step, outputSchema: z.ZodObject<any>) {
     const webhookIdentifier = `${this.brainRunId}-${step.id}`;
     const formToken = crypto.randomUUID();
     const formAction = `${
@@ -1457,7 +1457,7 @@ The output must conform to the provided schema.`,
     }/webhooks/system/page-form?identifier=${encodeURIComponent(
       webhookIdentifier
     )}&token=${encodeURIComponent(formToken)}`;
-    return { formAction, webhookIdentifier, formToken, formSchema };
+    return { formAction, webhookIdentifier, formToken, outputSchema };
   }
 
   private async *executePageStep(
@@ -1469,7 +1469,7 @@ The output must conform to the provided schema.`,
     const pageConfig = await pageConfigFn(this.buildStepContext(step));
 
     // Resume path: form response already available, spread onto state and complete
-    if (this.currentResponse && pageConfig.formSchema) {
+    if (this.currentResponse && pageConfig.outputSchema) {
       this.currentState = {
         ...this.currentState,
         ...this.currentResponse,
@@ -1486,8 +1486,8 @@ The output must conform to the provided schema.`,
     }
 
     // Build form info once — shared between HTML generation and webhook registration
-    const formInfo = pageConfig.formSchema
-      ? this.buildFormAction(step, pageConfig.formSchema)
+    const formInfo = pageConfig.outputSchema
+      ? this.buildFormAction(step, pageConfig.outputSchema)
       : undefined;
 
     // Step 1: Produce the HTML string
@@ -1519,7 +1519,7 @@ The output must conform to the provided schema.`,
       const webhook: WebhookRegistration = {
         slug: 'page-form',
         identifier: formInfo.webhookIdentifier,
-        schema: formInfo.formSchema,
+        schema: formInfo.outputSchema,
         token: formInfo.formToken,
       };
 
@@ -1568,17 +1568,6 @@ The output must conform to the provided schema.`,
       );
     }
 
-    // Validate data against inputSchema at runtime (fail fast on shape mismatch)
-    if (pageConfig.inputSchema && pageConfig.data) {
-      try {
-        pageConfig.inputSchema.parse(pageConfig.data);
-      } catch (e: any) {
-        throw new Error(
-          `Page step "${stepBlock.title}": data does not match inputSchema — ${e.message}`
-        );
-      }
-    }
-
     const prompt = await resolveTemplate(
       pageConfig.message!,
       this.templateContext
@@ -1590,12 +1579,12 @@ The output must conform to the provided schema.`,
     const result = await surfacePlugin.generate({
       prompt,
       system,
-      inputSchema: pageConfig.inputSchema!,
-      outputSchema: pageConfig.formSchema,
+      inputData: pageConfig.inputData,
+      outputSchema: pageConfig.outputSchema,
     });
 
     return result.render({
-      data: pageConfig.data,
+      data: pageConfig.inputData,
       formConfig: formInfo
         ? {
             action: formInfo.formAction,

@@ -209,7 +209,7 @@ brain('email-checker')
   })
   .guard(({ state }) => state.emails.some(e => e.important))
   // everything below only runs if guard passes
-  .page('Review emails', (ctx) => ({ ..., formSchema: ... }))
+  .page('Review emails', (ctx) => ({ ..., outputSchema: ... }))
   // form data auto-merges onto state
 ```
 
@@ -245,7 +245,7 @@ Each step receives these parameters:
 - `env` - Runtime environment containing `origin` (base URL) and `secrets` (typed secrets object)
 - Custom plugin-provided values (if configured with `.withPlugin()` or `createBrain()`)
 
-> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.page()` with `formSchema`, the response is spread directly onto state. See [Page Steps](#page-steps) and [Webhooks](#webhooks) for details.
+> **Note**: `response` is only available inside `.handle()` callbacks after `.wait()`. For `.page()` with `outputSchema`, the response is spread directly onto state. See [Page Steps](#page-steps) and [Webhooks](#webhooks) for details.
 
 ## Configuration Methods
 
@@ -1486,7 +1486,7 @@ The created page object contains:
 
 ### Page Steps
 
-Page steps create HTML pages with optional forms. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically. When `formSchema` is provided, the brain auto-suspends and spreads the form response directly onto state.
+Page steps create HTML pages with optional forms. The framework handles CSRF tokens, webhook registration, suspension, and form data merging automatically. When `outputSchema` is provided, the brain auto-suspends and spreads the form response directly onto state.
 
 Rename your brain file to `.tsx` and use JSX to build the page:
 
@@ -1510,7 +1510,7 @@ brain('Archive Workflow')
         <button type="submit">Confirm</button>
       </Form>
     ),
-    formSchema: z.object({ selectedIds: z.array(z.string()) }),
+    outputSchema: z.object({ selectedIds: z.array(z.string()) }),
     onCreated: async (page) => {
       // Notify user — page.url is the public URL
     },
@@ -1527,7 +1527,7 @@ brain('Archive Workflow')
 - **`html`** accepts JSX directly, a string, or a function component.
 - The page is wrapped in a full HTML document with the step title as `<title>`.
 - You can use any HTML elements (`<div>`, `<input>`, `<table>`, etc.) and include `<style>` tags for custom CSS.
-- Read-only pages (no `formSchema`) work too — they complete immediately without suspending.
+- Read-only pages (no `outputSchema`) work too — they complete immediately without suspending.
 
 #### Extracting Page JSX into Separate Files
 
@@ -1559,7 +1559,7 @@ import { ReviewPage } from './pages/review-page.js';
 brain('Archive Workflow')
   .page('Review', ({ state }) => ({
     html: <ReviewPage items={state.items} />,
-    formSchema: z.object({ selectedIds: z.array(z.string()) }),
+    outputSchema: z.object({ selectedIds: z.array(z.string()) }),
   }))
 ```
 
@@ -1588,7 +1588,7 @@ For interactive UI (tabs, toggles), use `<details>`/`<summary>`:
 
 ### AI-Generated Pages
 
-Instead of writing HTML by hand, use `message` + `inputSchema` + `data` to have an AI generate the page. The framework calls the surface plugin to produce a full React page with shadcn components and Tailwind styling.
+Instead of writing HTML by hand, use `message` + `inputData` to have an AI generate the page. The framework calls the surface plugin to produce a full React page with shadcn components and Tailwind styling.
 
 ```typescript
 import { z } from 'zod';
@@ -1600,16 +1600,8 @@ brain('Email Digest')
   })
   .page('Review Emails', ({ state: { emails } }) => ({
     message: 'Show an email digest grouped by category with checkboxes to deselect threads',
-    inputSchema: z.object({
-      emails: z.array(z.object({
-        id: z.string(),
-        subject: z.string(),
-        from: z.string(),
-        category: z.enum(['important', 'newsletter', 'notification']),
-      })),
-    }),
-    data: { emails },
-    formSchema: z.object({
+    inputData: { emails },
+    outputSchema: z.object({
       deselectedThreadIds: z.array(z.string()),
     }),
     onCreated: async (page) => {
@@ -1625,11 +1617,9 @@ brain('Email Digest')
 **Key details:**
 
 - **`message`** describes what the page should look like. Same type as `.prompt()` and `.map()` — supports strings, JSX, and async functions.
-- **`inputSchema`** is a Zod schema describing the data shape. TypeScript enforces that `data` matches this schema at compile time, and the framework validates at runtime.
-- **`data`** is the actual data the page displays. Wrap state fields in an object — field names carry semantic signal for the AI (e.g., `{ emails }` tells it to generate email-shaped UI).
+- **`inputData`** is the actual data the page displays. Wrap state fields in an object — field names carry semantic signal for the AI (e.g., `{ emails }` tells it to generate email-shaped UI). The framework infers a Gemini-compatible schema from the runtime shape and stamps array counts automatically, so you don't hand-author either.
 - **`system`** (optional) adds extra instructions appended to the generation prompt. Use for domain-specific guidance like "use conservative colors for financial data."
-- **`formSchema`** works identically to custom HTML pages — auto-suspend, auto-merge onto state.
-- The surface plugin never sees your real data — only the schema shape. Real data is injected locally after generation.
+- **`outputSchema`** works identically to custom HTML pages — auto-suspend, auto-merge onto state.
 
 **Requires the surface plugin.** Generated pages need the surface plugin configured. If deployed to Cloudflare with sandbox bindings, it's auto-wired. Otherwise, add it explicitly:
 
@@ -1651,22 +1641,15 @@ const brain = createBrain({
 ```typescript
 .page('Dashboard', ({ state: { metrics } }) => ({
   message: 'Display a metrics dashboard with KPIs and trend charts',
-  inputSchema: z.object({
-    metrics: z.array(z.object({
-      name: z.string(),
-      value: z.number(),
-      trend: z.enum(['up', 'down', 'flat']),
-    })),
-  }),
-  data: { metrics },
+  inputData: { metrics },
 }))
 ```
 
 ### How Page Steps Work
 
-1. **HTML or Generation**: Provide `html` for custom pages, or `message` + `inputSchema` + `data` for AI-generated pages
+1. **HTML or Generation**: Provide `html` for custom pages, or `message` + `inputData` for AI-generated pages
 2. **onCreated**: The optional `onCreated` callback runs with a `page` object containing `url`. Use it to notify users (Slack, email, etc.)
-3. **Auto-Suspend**: With `formSchema`, the brain automatically suspends and waits for the form submission
+3. **Auto-Suspend**: With `outputSchema`, the brain automatically suspends and waits for the form submission
 4. **Auto-Spread**: The form data is automatically spread onto state (`{ ...state, ...formData }`)
 
 ### The `page` Object
@@ -1692,7 +1675,7 @@ brain('User Onboarding')
         <button type="submit">Next</button>
       </Form>
     ),
-    formSchema: z.object({
+    outputSchema: z.object({
       firstName: z.string(),
       lastName: z.string(),
       dob: z.string(),
@@ -1717,7 +1700,7 @@ brain('User Onboarding')
         <button type="submit">Complete</button>
       </Form>
     ),
-    formSchema: z.object({
+    outputSchema: z.object({
       newsletter: z.boolean(),
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),

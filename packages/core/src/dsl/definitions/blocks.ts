@@ -112,15 +112,14 @@ export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
 };
 
 export type PageConfig = {
-  // Generation mode (message + inputSchema + data)
+  // Generation mode (message + inputData)
   message?: TemplateReturn;
   system?: TemplateReturn;
-  inputSchema?: z.ZodObject<any>;
-  data?: Record<string, unknown>;
+  inputData?: unknown;
   // Custom HTML mode
   html?: TemplateChild;
   // Shared
-  formSchema?: z.ZodObject<any>;
+  outputSchema?: z.ZodObject<any>;
   onCreated?: (page: GeneratedPage) => void | Promise<void>;
   slug?: string;
   ttl?: number;
