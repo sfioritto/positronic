@@ -124,6 +124,14 @@ export interface ObjectGenerator {
 
     /** File attachments to include with the prompt (PDFs, images, etc.) */
     attachments?: Attachment[];
+
+    /**
+     * Optional AbortSignal. When aborted, any in-flight HTTP request is
+     * cancelled and the call rejects with an AbortError. Used by callers that
+     * fan out many parallel generateObject calls and want to stop siblings
+     * fast on the first failure.
+     */
+    abortSignal?: AbortSignal;
   }): Promise<{
     object: z.infer<T>;
     usage?: { totalTokens: number };

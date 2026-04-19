@@ -88,15 +88,27 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
       ;;
     error)
       MSG=$(echo "$line" | jq -r '.message')
+      NAME=$(echo "$line" | jq -r '.name // empty')
+      STACK=$(echo "$line" | jq -r '.stack // empty')
+      HAS_CAUSE=$(echo "$line" | jq 'has("cause")')
       echo ""
-      echo "ERROR: ${MSG}"
-      # If the error includes diagnostic responseMessages (e.g. from a
-      # failed fake-data variant), save the full LLM conversation to disk.
-      HAS_MESSAGES=$(echo "$line" | jq 'has("responseMessages")')
-      if [ "$HAS_MESSAGES" = "true" ]; then
-        echo "$line" | jq '{variant: .variant, responseMessages: .responseMessages}' > "${DIR}/fake-data-error.json"
-        echo "Saved diagnostic conversation to ${DIR}/fake-data-error.json"
+      if [ -n "$NAME" ]; then
+        echo "ERROR (${NAME}): ${MSG}"
+      else
+        echo "ERROR: ${MSG}"
       fi
+      if [ "$HAS_CAUSE" = "true" ]; then
+        echo "  caused by:"
+        echo "$line" | jq -r '.cause | if type == "object" then "    " + (.name // "Error") + ": " + (.message // "") else "    " + tostring end'
+      fi
+      if [ -n "$STACK" ]; then
+        echo "  stack:"
+        echo "$STACK" | sed 's/^/    /'
+      fi
+      # Save the full error payload to disk for post-mortem — includes
+      # responseMessages if present, plus stack/cause.
+      echo "$line" | jq '.' > "${DIR}/error.json"
+      echo "Saved full error to ${DIR}/error.json"
       ;;
     *)
       # Unknown event type — dump it

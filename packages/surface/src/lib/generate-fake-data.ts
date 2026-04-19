@@ -80,19 +80,50 @@ Full data schema for context:
 ${schemaTs}
 \`\`\``;
 
-  const data = await generate({ client, schema, systemPrompt });
-  return schema.parse(data);
+  // Single AbortController shared across the entire walk. On the first leaf
+  // rejection, every other in-flight fetch gets cancelled so we stop burning
+  // subrequests against the model immediately. (Unhandled-rejection protection
+  // is a separate concern handled by trackChild below.)
+  const controller = new AbortController();
+  try {
+    const data = await generate({
+      client,
+      schema,
+      systemPrompt,
+      controller,
+    });
+    return schema.parse(data);
+  } finally {
+    controller.abort();
+  }
+}
+
+/**
+ * Wrap a child promise so its first rejection aborts all siblings sharing the
+ * same controller. Attaching the catch handler also prevents the rejection
+ * from being reported as unhandled — important because Promise.all only
+ * awaits the first rejection, and unhandled rejections in the Worker kill
+ * the invocation and replace our streamed error body with Cloudflare's
+ * `internal error; reference = ...` page.
+ */
+function trackChild<T>(p: Promise<T>, controller: AbortController): Promise<T> {
+  return p.catch((err) => {
+    controller.abort();
+    throw err;
+  });
 }
 
 async function generate<InputSchema extends ZodType>({
   client,
   schema,
   systemPrompt,
+  controller,
   path = '',
 }: {
   client: ObjectGenerator;
   schema: InputSchema;
   systemPrompt: string;
+  controller: AbortController;
   path?: string;
 }): Promise<z.infer<InputSchema>> {
   // Unwrap nullable/optional wrappers on non-scalar types (e.g. a nullable
@@ -103,6 +134,7 @@ async function generate<InputSchema extends ZodType>({
       client,
       schema: schema.unwrap() as ZodType,
       systemPrompt,
+      controller,
       path,
     }) as Promise<z.infer<InputSchema>>;
   }
@@ -121,12 +153,16 @@ async function generate<InputSchema extends ZodType>({
       }
       const elements = await Promise.all(
         Array.from({ length: count }, (_, i) =>
-          generate({
-            client,
-            schema: schema.element as ZodType,
-            systemPrompt,
-            path: `${path}[${i}]`,
-          })
+          trackChild(
+            generate({
+              client,
+              schema: schema.element as ZodType,
+              systemPrompt,
+              controller,
+              path: `${path}[${i}]`,
+            }),
+            controller
+          )
         )
       );
       return elements as z.infer<InputSchema>;
@@ -139,6 +175,7 @@ async function generate<InputSchema extends ZodType>({
         client,
         schema,
         systemPrompt,
+        controller,
         path,
         count,
       }) as Promise<z.infer<InputSchema>>;
@@ -146,20 +183,26 @@ async function generate<InputSchema extends ZodType>({
   }
 
   if (isGenerable(schema))
-    return generateWhole({ client, schema, systemPrompt, path });
+    return generateWhole({ client, schema, systemPrompt, controller, path });
 
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape as Record<string, ZodType>;
     const entries = await Promise.all(
-      Object.entries(shape).map(async ([key, subSchema]) => {
-        const value = await generate({
-          client,
-          schema: subSchema,
-          systemPrompt,
-          path: path ? `${path}.${key}` : key,
-        });
-        return [key, value] as const;
-      })
+      Object.entries(shape).map(([key, subSchema]) =>
+        trackChild(
+          (async () => {
+            const value = await generate({
+              client,
+              schema: subSchema,
+              systemPrompt,
+              controller,
+              path: path ? `${path}.${key}` : key,
+            });
+            return [key, value] as const;
+          })(),
+          controller
+        )
+      )
     );
     return Object.fromEntries(entries) as z.infer<InputSchema>;
   }
@@ -171,12 +214,14 @@ async function generateWhole<S extends ZodType>({
   client,
   schema,
   systemPrompt,
+  controller,
   path,
   count,
 }: {
   client: ObjectGenerator;
   schema: S;
   systemPrompt: string;
+  controller: AbortController;
   path: string;
   count?: number;
 }): Promise<z.infer<S>> {
@@ -190,13 +235,22 @@ async function generateWhole<S extends ZodType>({
   const promptLines = [`Generate realistic data for: \`${path || 'root'}\``];
   if (count !== undefined) promptLines.push(`Produce exactly ${count} items.`);
 
-  const { object } = await client.generateObject({
-    schema: wrapped,
-    system: systemPrompt,
-    prompt: promptLines.join('\n'),
-  });
+  try {
+    const { object } = await client.generateObject({
+      schema: wrapped,
+      system: systemPrompt,
+      prompt: promptLines.join('\n'),
+      abortSignal: controller.signal,
+    });
 
-  return (
-    isObject ? object : (object as { value: unknown }).value
-  ) as z.infer<S>;
+    return (
+      isObject ? object : (object as { value: unknown }).value
+    ) as z.infer<S>;
+  } catch (err) {
+    // Wrap with the walk path in the message so the surfaced error tells us
+    // which leaf actually failed. Original error is preserved via `cause`.
+    throw new Error(`fake-data generation failed at \`${path || 'root'}\``, {
+      cause: err,
+    });
+  }
 }

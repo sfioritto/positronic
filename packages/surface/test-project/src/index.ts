@@ -69,6 +69,20 @@ function streamGenerate(
         type: 'error',
         message: err instanceof Error ? err.message : String(err),
       };
+      if (err instanceof Error) {
+        payload.name = err.name;
+        if (err.stack) payload.stack = err.stack;
+        if (err.cause !== undefined) {
+          payload.cause =
+            err.cause instanceof Error
+              ? {
+                  name: err.cause.name,
+                  message: err.cause.message,
+                  stack: err.cause.stack,
+                }
+              : err.cause;
+        }
+      }
       // Surface diagnostic data attached to fake-data convergence failures
       // so run.sh can save the LLM conversation to disk.
       const errWithExtras = err as {

@@ -74,6 +74,7 @@ export class VercelClient implements ObjectGenerator {
     messages?: Message[];
     system?: string;
     attachments?: Attachment[];
+    abortSignal?: AbortSignal;
   }): Promise<{
     object: z.infer<T>;
     usage?: { totalTokens: number };
@@ -87,6 +88,7 @@ export class VercelClient implements ObjectGenerator {
       messages,
       system,
       attachments,
+      abortSignal,
     } = params;
 
     const coreMessages: ModelMessage[] = [];
@@ -131,6 +133,7 @@ export class VercelClient implements ObjectGenerator {
         }),
         messages: coreMessages,
         maxRetries: 2,
+        abortSignal,
       });
       return {
         object: output as z.infer<T>,
@@ -148,6 +151,7 @@ export class VercelClient implements ObjectGenerator {
         }),
         prompt: prompt || '',
         maxRetries: 2,
+        abortSignal,
       });
       return {
         object: output as z.infer<T>,
