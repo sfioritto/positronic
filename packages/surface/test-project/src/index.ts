@@ -201,7 +201,8 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      const result = await typeCheck(sandbox, source, dataShape);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      const result = await typeCheck(sandbox, dataShape);
       return Response.json(result);
     }
 
@@ -232,7 +233,8 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      const result = await typeCheck(sandbox, source, dataShape);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      const result = await typeCheck(sandbox, dataShape);
       return Response.json(result);
     }
 
@@ -254,7 +256,8 @@ export default function Page({ data }: Props) {
   return <Button variant="nonexistent">{data.title}</Button>;
 }`;
 
-      const result = await typeCheck(sandbox, source, dataShape);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      const result = await typeCheck(sandbox, dataShape);
       return Response.json(result);
     }
 
@@ -286,7 +289,8 @@ export default function Page({ data }: Props) {
 }`;
 
       // Write the files first (typeCheck does this)
-      await typeCheck(sandbox, source, dataShape);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      await typeCheck(sandbox, dataShape);
 
       // Then bundle
       const result = await bundle(sandbox);
@@ -304,12 +308,7 @@ export default function Page({ data }: Props) {
     // Validate a form with all required fields
     if (url.pathname === '/sandbox/form/valid') {
       const dataShape = `export interface Data {}`;
-
-      const formSchemaSource = `import { z } from 'zod';
-export const formSchema = z.object({
-  name: z.string(),
-  email: z.string(),
-});`;
+      const fieldNames = ['name', 'email'];
 
       const source = `import React from 'react';
 import type { Data } from './types';
@@ -328,9 +327,10 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      await typeCheck(sandbox, source, dataShape, formSchemaSource);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      await typeCheck(sandbox, dataShape);
       await bundle(sandbox);
-      const result = await validateForm(sandbox, formSchemaSource, {
+      const result = await validateForm(sandbox, fieldNames, {
         name: 'Alice Johnson',
         email: 'alice@example.com',
       });
@@ -340,13 +340,7 @@ export default function Page({ data }: Props) {
     // Validate a form missing a required field
     if (url.pathname === '/sandbox/form/missing-field') {
       const dataShape = `export interface Data {}`;
-
-      const formSchemaSource = `import { z } from 'zod';
-export const formSchema = z.object({
-  name: z.string(),
-  email: z.string(),
-  phone: z.string(),
-});`;
+      const fieldNames = ['name', 'email', 'phone'];
 
       // Missing the phone field
       const source = `import React from 'react';
@@ -366,9 +360,10 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      await typeCheck(sandbox, source, dataShape, formSchemaSource);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      await typeCheck(sandbox, dataShape);
       await bundle(sandbox);
-      const result = await validateForm(sandbox, formSchemaSource, {
+      const result = await validateForm(sandbox, fieldNames, {
         name: 'Alice Johnson',
         email: 'alice@example.com',
         phone: '555-0123',
@@ -381,11 +376,7 @@ export default function Page({ data }: Props) {
       const dataShape = `export interface Data {
   items: Array<{ id: string; label: string }>;
 }`;
-
-      const formSchemaSource = `import { z } from 'zod';
-export const formSchema = z.object({
-  selectedIds: z.array(z.string()),
-});`;
+      const fieldNames = ['selectedIds'];
 
       const source = `import { Checkbox } from '@surface/components';
 import type { Data } from './types';
@@ -408,9 +399,10 @@ export default function Page({ data }: Props) {
   );
 }`;
 
-      await typeCheck(sandbox, source, dataShape, formSchemaSource);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      await typeCheck(sandbox, dataShape);
       await bundle(sandbox, 'external-react');
-      const result = await validateForm(sandbox, formSchemaSource, {
+      const result = await validateForm(sandbox, fieldNames, {
         items: [
           { id: 'a', label: 'Item A' },
           { id: 'b', label: 'Item B' },
@@ -450,7 +442,8 @@ export default function Page({ data }: Props) {
 }`;
 
       // Type-check
-      const tcResult = await typeCheck(sandbox, source, dataShape);
+      await sandbox.writeFile('/workspace/component.tsx', source);
+      const tcResult = await typeCheck(sandbox, dataShape);
       if (!tcResult.success) return Response.json(tcResult);
 
       // Build self-contained HTML
@@ -468,7 +461,7 @@ export default function Page({ data }: Props) {
           accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
           apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
         });
-        return new Response(jpeg, {
+        return new Response(jpeg as BodyInit, {
           headers: { 'Content-Type': 'image/jpeg' },
         });
       }
