@@ -13,6 +13,9 @@ PORT="${2:-8787}"
 URL="http://localhost:${PORT}/sandbox/${ENDPOINT}"
 DIR="output/${ENDPOINT}"
 
+# Wipe any prior run's artifacts so screenshot indices, logs, and the
+# final HTML all reflect only the current run.
+rm -rf "$DIR"
 mkdir -p "$DIR"
 
 echo "Fetching ${URL} (streaming) ..."
