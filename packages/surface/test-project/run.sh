@@ -77,7 +77,10 @@ curl "${CURL_ARGS[@]}" "$URL" | while IFS= read -r line; do
         echo "$line" | jq -r '.result.images.desktop' | base64 -d > "${DIR}/screenshot-${SIDX}-desktop.jpg"
         APPROVED=$(echo "$line" | jq -r '.result.verdict.approved')
         ISSUE_COUNT=$(echo "$line" | jq -r '.result.verdict.issues | length')
-        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}-{mobile,tablet,desktop}.jpg (approved=${APPROVED}, ${ISSUE_COUNT} issues)"
+        BUDGET_EXHAUSTED=$(echo "$line" | jq -r '.result.budgetExhausted // false')
+        SUFFIX=""
+        [ "$BUDGET_EXHAUSTED" = "true" ] && SUFFIX=" [BUDGET EXHAUSTED — forcing submit]"
+        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}-{mobile,tablet,desktop}.jpg (approved=${APPROVED}, ${ISSUE_COUNT} issues)${SUFFIX}"
         if [ "$APPROVED" = "false" ] && [ "$ISSUE_COUNT" -gt 0 ]; then
           echo "$line" | jq -r '.result.verdict.issues[] | "  - " + .'
         fi

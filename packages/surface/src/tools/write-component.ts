@@ -16,6 +16,13 @@ export function writeComponentTool(
         .describe('The complete TSX source code for the component'),
     }),
     async execute({ source }: any) {
+      if (/\bdata\s*:\s*(any|unknown)\b/.test(source)) {
+        return {
+          status: 'error',
+          message:
+            'Refusing to accept component: the data prop is typed as `any` or `unknown`, which bypasses schema checking. Declare `data` with the Data interface (e.g. `interface Props { data: Data }`) so the type checker can verify your field accesses match the schema.',
+        };
+      }
       await sandbox.writeFile('/workspace/component.tsx', source);
       const result = await typeCheck(sandbox, inputSchema);
       if (result.success) {

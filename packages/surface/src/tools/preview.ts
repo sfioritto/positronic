@@ -11,11 +11,27 @@ import {
 
 export interface ReviewState {
   approved: boolean;
+  /**
+   * Count of respond_to_feedback cycles the generator has spent revising.
+   * Bumped by the respond_to_feedback tool after each successful sub-agent
+   * run. Preview uses this to force-approve once the budget is exhausted —
+   * prevents infinite review/revise loops on complex pages.
+   */
+  feedbackAttempts: number;
 }
+
+/**
+ * Maximum number of respond_to_feedback cycles before the preview tool
+ * force-approves the page regardless of the reviewer's verdict. Keeps
+ * a pathological loop from running past the caller's request timeout.
+ */
+export const MAX_FEEDBACK_ATTEMPTS = 3;
 
 const REVIEW_SYSTEM = `You are a strict UI quality reviewer for a code-generation system.
 
-Another LLM just generated a React component and rendered it. You will see THREE screenshots of the same page — the mobile viewport (${VIEWPORT_DIMENSIONS.mobile.width}px wide), the tablet viewport (${VIEWPORT_DIMENSIONS.tablet.width}px wide), and the desktop viewport (${VIEWPORT_DIMENSIONS.desktop.width}px wide). They are attached in that order.
+Another LLM just generated a React component and rendered it. You will see THREE full-page screenshots of the same page — the mobile viewport (${VIEWPORT_DIMENSIONS.mobile.width}px wide), the tablet viewport (${VIEWPORT_DIMENSIONS.tablet.width}px wide), and the desktop viewport (${VIEWPORT_DIMENSIONS.desktop.width}px wide). They are attached in that order. Each screenshot captures the entire document height, so you can evaluate every section, not just the above-the-fold portion.
+
+IMPORTANT note about \`position: sticky\` elements: a full-page screenshot has no scrolling viewport, so an element styled \`position: sticky; bottom: 0\` renders at its **natural flow position** in the capture — wherever it lives in the source order — not pinned to the viewport bottom. If a submit button appears mid-document in the screenshot, that usually means the button is placed inside a content section in the source (a genuine bug — it should live at the end of the form/document). Flag it with language that describes the *source placement* ("the submit button is nested inside the Billing section instead of at the end of the form"), not the *visual effect* ("the button is floating"). That helps the generator know what to change.
 
 Your job is to decide whether the layout (a) satisfies every explicit visual requirement in the user's prompt AND (b) looks polished across ALL three viewports.
 
@@ -139,7 +155,7 @@ ${reviewConfig.outputSchemaTs}
 `
     : ''
 }
-Attached: three screenshots of the same page at mobile (${
+Attached: three full-page screenshots of the same page at mobile (${
         VIEWPORT_DIMENSIONS.mobile.width
       }px), tablet (${VIEWPORT_DIMENSIONS.tablet.width}px), and desktop (${
         VIEWPORT_DIMENSIONS.desktop.width
@@ -157,7 +173,15 @@ Attached: three screenshots of the same page at mobile (${
         })),
       });
 
-      reviewState.approved = verdict.approved;
+      const budgetExhausted =
+        !verdict.approved &&
+        reviewState.feedbackAttempts >= MAX_FEEDBACK_ATTEMPTS;
+
+      // Force approval once the revision budget is spent. Keeps the outer
+      // loop from running forever on pages where the reviewer and generator
+      // can't fully converge. The real verdict is still surfaced in the
+      // tool result so the caller's log reflects what the reviewer thought.
+      reviewState.approved = verdict.approved || budgetExhausted;
 
       const images: Record<Viewport, string> = {
         mobile: uint8ToBase64(shots.mobile),
@@ -169,6 +193,8 @@ Attached: three screenshots of the same page at mobile (${
         type: 'preview',
         images,
         verdict,
+        budgetExhausted,
+        feedbackAttempts: reviewState.feedbackAttempts,
       };
     },
     toModelOutput({ output }: { output: unknown }) {
@@ -177,6 +203,8 @@ Attached: three screenshots of the same page at mobile (${
             type: 'preview';
             images: Record<Viewport, string>;
             verdict: ReviewResult;
+            budgetExhausted?: boolean;
+            feedbackAttempts?: number;
           }
         | { status: 'error'; message: string; errors?: unknown };
 
@@ -188,16 +216,24 @@ Attached: three screenshots of the same page at mobile (${
       }
 
       if ('type' in result && result.type === 'preview') {
-        const { verdict, images } = result;
+        const { verdict, images, budgetExhausted } = result;
         const reviewText = verdict.approved
-          ? `REVIEW: APPROVED across mobile, tablet, and desktop viewports. The reviewer confirms the layout is production-quality. You may call submit.`
-          : `REVIEW: NEEDS WORK. Your next action is write_component with a revised version that addresses every issue below. If any issue names a specific component (e.g. "Button renders as plain text", "Checkbox looks wrong"), call show_component_source for that component first to see how it's implemented.
+          ? `REVIEW: APPROVED across mobile, tablet, and desktop viewports. The reviewer confirms the layout is production-quality. Your next action is submit. After submit returns success, stop — do not call any more tools.`
+          : budgetExhausted
+          ? `REVIEW: BUDGET EXHAUSTED. The revision budget of ${MAX_FEEDBACK_ATTEMPTS} respond_to_feedback cycles is spent and the reviewer still has ${
+              verdict.issues.length
+            } issue(s) open, listed below for the record. The current component is the best result we have — call submit now. Do NOT call respond_to_feedback again.
+
+Remaining issues (informational; will be logged but not fixed):
+
+${verdict.issues.map((i) => `- ${i}`).join('\n')}`
+          : `REVIEW: NEEDS WORK. Your next action is respond_to_feedback — pass the issue list (or your own tighter rewrite of it) as the instructions argument. A sub-agent will revise the component; you do NOT rewrite it yourself here.
 
 Issues (evaluated across mobile, tablet, and desktop — screenshots attached below in that order):
 
 ${verdict.issues.map((i) => `- ${i}`).join('\n')}
 
-Look at each viewport screenshot, then call write_component with your fix.`;
+Look at each viewport screenshot so you can judge the fix, then call respond_to_feedback. After it finishes, call preview again.`;
 
         return {
           type: 'content',

@@ -252,6 +252,12 @@ export interface ObjectGenerator {
      * callback are not caught.
      */
     onStepFinish?: (step: StreamStepInfo) => void | Promise<void>;
+    /**
+     * Optional stop predicate in addition to maxSteps. Receives all completed
+     * steps after each iteration; returning true terminates the loop.
+     * Use this to stop early when a specific tool has succeeded.
+     */
+    stopWhen?: (options: { steps: unknown[] }) => boolean | Promise<boolean>;
   }): Promise<{
     /** All tool calls made across all steps, with their results */
     toolCalls: Array<{

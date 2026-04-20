@@ -1,2 +1,3 @@
 src/system-prompt.gen.ts
 src/component-sources.gen.ts
+dist/

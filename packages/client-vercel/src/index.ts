@@ -286,6 +286,7 @@ export class VercelClient implements ObjectGenerator {
     maxSteps?: number;
     toolChoice?: ToolChoice;
     onStepFinish?: (step: StreamStepInfo) => void | Promise<void>;
+    stopWhen?: (options: { steps: unknown[] }) => boolean | Promise<boolean>;
   }): Promise<{
     toolCalls: Array<{
       toolCallId: string;
@@ -306,6 +307,7 @@ export class VercelClient implements ObjectGenerator {
       maxSteps = 10,
       toolChoice = 'required',
       onStepFinish,
+      stopWhen,
     } = params;
 
     // Build messages array
@@ -372,13 +374,18 @@ export class VercelClient implements ObjectGenerator {
     // Add the initial prompt
     modelMessages.push({ role: 'user', content: prompt });
 
+    const stopConditions: any[] = [stepCountIs(maxSteps)];
+    if (stopWhen) {
+      stopConditions.push(stopWhen);
+    }
+
     const stream = vercelStreamText({
       model: this.model,
       messages: modelMessages,
       tools: tools as any,
       toolChoice,
       maxRetries: 0,
-      stopWhen: stepCountIs(maxSteps),
+      stopWhen: stopConditions,
       onStepFinish: onStepFinish
         ? (event) =>
             onStepFinish({

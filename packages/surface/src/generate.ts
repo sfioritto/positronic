@@ -12,6 +12,7 @@ import { zodToTypescript } from './lib/zod-to-typescript.js';
 import type { Viewport } from './screenshot.js';
 import { writeComponentTool } from './tools/write-component.js';
 import { showComponentSourceTool } from './tools/show-component-source.js';
+import { respondToFeedbackTool } from './tools/respond-to-feedback.js';
 
 import { previewTool } from './tools/preview.js';
 import { submitTool } from './tools/submit.js';
@@ -89,7 +90,7 @@ export async function generate(params: {
 
   const startTime = Date.now();
   const screenshots: PreviewScreenshots[] = [];
-  const reviewState = { approved: false };
+  const reviewState = { approved: false, feedbackAttempts: 0 };
 
   // Step 1: Generate one dataset by walking the input schema. Fans out at
   // array-of-object boundaries (each must carry `.meta({ count: N })`) and
@@ -111,6 +112,14 @@ export async function generate(params: {
   const rawTools: Record<string, StreamTool> = {
     write_component: writeComponentTool(sandbox, inputSchemaTs),
     show_component_source: showComponentSourceTool(),
+    respond_to_feedback: respondToFeedbackTool(
+      client,
+      sandbox,
+      systemPrompt,
+      inputSchemaTs,
+      outputSchemaTs,
+      reviewState
+    ),
     preview: previewTool(
       sandbox,
       previewData,
@@ -168,11 +177,13 @@ ${outputSchemaTs}
     : ''
 }
 Instructions:
-1. Write the component using write_component — it will be type-checked automatically
+1. Write the initial component using write_component — it will be type-checked automatically
 2. Fix any type errors and call write_component again
-3. Preview it to see how it looks
-4. Iterate until satisfied
-5. Call submit when done — it will validate form fields against the schema if applicable`;
+3. Call preview to see how it looks and get a reviewer verdict
+4. If the reviewer rejects it, call respond_to_feedback with the issues — a sub-agent will revise the component for you. Do NOT rewrite the component yourself at this point.
+5. Call preview again after respond_to_feedback finishes
+6. Repeat 4-5 until the reviewer approves
+7. Call submit — this ends the task. Do not call any tool after submit returns success.`;
 
   // Step 4: Run the generation loop
   const componentResult = await client.streamText({
@@ -180,10 +191,22 @@ Instructions:
     prompt: userPrompt,
     tools,
     maxSteps: 20,
-    toolChoice: 'auto',
+    toolChoice: 'required',
     onStepFinish: onProgress
       ? (step) => onProgress({ type: 'step_finish', step })
       : undefined,
+    stopWhen: ({ steps }) => {
+      const last = steps[steps.length - 1] as
+        | { toolResults?: Array<{ toolName: string; output: unknown }> }
+        | undefined;
+      return (
+        last?.toolResults?.some(
+          (r) =>
+            r.toolName === 'submit' &&
+            (r.output as { status?: string } | undefined)?.status === 'success'
+        ) ?? false
+      );
+    },
   });
 
   // Step 5: Build the bundle once; return a render closure so the caller
