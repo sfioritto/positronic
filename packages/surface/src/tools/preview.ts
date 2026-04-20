@@ -191,13 +191,13 @@ Attached: three screenshots of the same page at mobile (${
         const { verdict, images } = result;
         const reviewText = verdict.approved
           ? `REVIEW: APPROVED across mobile, tablet, and desktop viewports. The reviewer confirms the layout is production-quality. You may call submit.`
-          : `REVIEW: NEEDS WORK. The reviewer flagged these issues (evaluated across mobile, tablet, and desktop viewports):
+          : `REVIEW: NEEDS WORK. Your next action is write_component with a revised version that addresses every issue below. If any issue names a specific component (e.g. "Button renders as plain text", "Checkbox looks wrong"), call show_component_source for that component first to see how it's implemented.
+
+Issues (evaluated across mobile, tablet, and desktop — screenshots attached below in that order):
 
 ${verdict.issues.map((i) => `- ${i}`).join('\n')}
 
-Before rewriting: if any issue above names a specific component (e.g. "Button is rendering as plain text", "Checkbox looks wrong"), you MUST call show_component_source for that component first to see how it is actually implemented. Only after reading the source should you call write_component. Do NOT call submit — it will be refused until the reviewer approves.
-
-The three screenshots are attached in order: mobile, tablet, desktop. Look at each before deciding what to change.`;
+Look at each viewport screenshot, then call write_component with your fix.`;
 
         return {
           type: 'content',
