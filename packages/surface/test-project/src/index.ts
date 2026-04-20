@@ -1,7 +1,6 @@
 import { getSandbox, type Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import {
   typeCheck,
-  typeCheckData,
   bundle,
   validateForm,
   buildBundle,
