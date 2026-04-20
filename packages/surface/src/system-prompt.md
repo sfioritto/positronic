@@ -110,6 +110,20 @@ Icons are available from `lucide-react`:
 import { ArrowRight, Check, X, MoreHorizontal } from 'lucide-react';
 ```
 
+## Available Runtime Dependencies
+
+The sandbox has a FIXED set of packages installed. You may import ONLY from these; any other import will fail the final bundle step and your work will be discarded:
+
+- `react`, `react-dom` — framework primitives
+- `__IMPORT_PATH__` — the shadcn components listed above (preferred — always use these instead of writing your own)
+- `lucide-react` — icons
+- `sonner` — toasts (use `toast()` from sonner; there is also a shadcn `Toaster` wrapper)
+- `clsx`, `tailwind-merge`, `class-variance-authority` — only needed if you write a component variant; normally unnecessary
+- `react-hook-form`, `@hookform/resolvers`, `zod` — form helpers if you truly need client-side validation (the framework already validates submissions server-side)
+- `dayjs` — lightweight date/time formatting when you need it
+
+Do NOT import any other package (no `date-fns`, no `moment`, no `lodash`, no `framer-motion`, no custom libs). For anything date-related that `dayjs` doesn't cover, reach for the built-in `Intl.DateTimeFormat` / `Intl.NumberFormat` instead. There is no network access at render time, so browser/fetch calls are pointless as well.
+
 ## Component Structure
 
 Your component must:

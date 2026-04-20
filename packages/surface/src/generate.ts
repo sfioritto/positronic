@@ -209,8 +209,20 @@ Instructions:
     },
   });
 
-  // Step 5: Build the bundle once; return a render closure so the caller
-  // can interpolate real data and form config without seeing it here.
+  // Step 5: The stream must have reached a successful submit before we try
+  // to bundle. Otherwise the sandbox holds whatever garbage the model last
+  // wrote (or never wrote), and buildBundle would surface a misleading
+  // esbuild error instead of the real cause — the loop terminated early.
+  // reviewState.approved is set true by submit (natural success) or by the
+  // budget cap in preview (graceful force-submit); both are acceptable.
+  if (!reviewState.approved) {
+    throw new Error(
+      'Generation loop exited without a successful submit. The model gave up before producing a reviewable component — check the conversation log for the last tool error. Common causes: type errors it could not resolve, repeated rejection from the reviewer, or the model emitting finish=stop after two consecutive tool errors.'
+    );
+  }
+
+  // Build the bundle once; return a render closure so the caller can
+  // interpolate real data and form config without seeing it here.
   const bundleResult = await buildBundle(sandbox);
   if (!bundleResult.success) {
     throw new Error(`Failed to build final bundle: ${bundleResult.errors}`);
