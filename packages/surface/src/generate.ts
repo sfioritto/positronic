@@ -22,7 +22,7 @@ interface GenerateDebugLog {
   totalDurationMs: number;
 }
 
-export type PreviewScreenshots = Record<Viewport, Uint8Array>;
+type PreviewScreenshots = Record<Viewport, Uint8Array>;
 
 export interface GenerateResult {
   render: RenderPage;

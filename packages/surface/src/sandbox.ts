@@ -1,31 +1,31 @@
-export interface TypeCheckResult {
+interface TypeCheckResult {
   success: boolean;
   errors?: string;
 }
 
-export interface BundleResult {
+interface BundleResult {
   success: boolean;
   js?: string;
   errors?: string;
 }
 
-export interface FormValidationResult {
+interface FormValidationResult {
   success: boolean;
   errors?: string;
 }
 
-export interface PageBundle {
+interface PageBundle {
   js: string;
   css: string;
 }
 
-export interface BuildBundleResult {
+interface BuildBundleResult {
   success: boolean;
   bundle?: PageBundle;
   errors?: string;
 }
 
-export type FormConfig = {
+type FormConfig = {
   action: string;
   method: string;
   token?: string;
