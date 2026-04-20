@@ -131,18 +131,30 @@ export async function validateForm(
 }
 
 export async function buildBundle(
-  sandbox: SandboxInstance
+  sandbox: SandboxInstance,
+  options?: { entryPath?: string; outPrefix?: string }
 ): Promise<BuildBundleResult> {
+  // Per-section previews pass their own mount entry + an outPrefix so parallel
+  // sub-agents don't fight over /workspace/page.bundle.js. Defaults preserve the
+  // single-agent path.
+  const entryPath = options?.entryPath ?? '/workspace/mount.tsx';
+  const outPrefix = options?.outPrefix ?? 'page';
+  const jsOut = `/workspace/${outPrefix}.bundle.js`;
+  const cssOut = `/workspace/${outPrefix}.css`;
+
   const bundleResult = await sandbox.exec(
-    'esbuild /workspace/mount.tsx --bundle --format=iife --jsx=automatic --outfile=/workspace/page.bundle.js --loader:.tsx=tsx'
+    `esbuild ${entryPath} --bundle --format=iife --jsx=automatic --outfile=${jsOut} --loader:.tsx=tsx`
   );
 
   if (!bundleResult.success) {
     return { success: false, errors: parseErrors(bundleResult) };
   }
 
+  // Tailwind content glob covers every file that could carry class names —
+  // main component, per-section components, shadcn library. Harmless when a
+  // directory is empty.
   const cssResult = await sandbox.exec(
-    'npx @tailwindcss/cli -i /workspace/tailwind.css -o /workspace/page.css --content "/workspace/component.tsx,/workspace/surface/components/*.tsx" --minify'
+    `npx @tailwindcss/cli -i /workspace/tailwind.css -o ${cssOut} --content "/workspace/component.tsx,/workspace/sections/*.tsx,/workspace/surface/components/*.tsx" --minify`
   );
 
   if (!cssResult.success) {
@@ -150,8 +162,8 @@ export async function buildBundle(
   }
 
   const [jsFile, cssFile] = await Promise.all([
-    sandbox.readFile('/workspace/page.bundle.js'),
-    sandbox.readFile('/workspace/page.css'),
+    sandbox.readFile(jsOut),
+    sandbox.readFile(cssOut),
   ]);
 
   return {

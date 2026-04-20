@@ -93,7 +93,7 @@ COPY <<'EOF' /workspace/tsconfig.json
       "@surface/*": ["/workspace/surface/*"]
     }
   },
-  "include": ["component.tsx", "types.ts", "mount.tsx", "surface/components/**/*", "surface/lib/utils.ts"]
+  "include": ["component.tsx", "types.ts", "mount.tsx", "mount-*.tsx", "sections/**/*", "surface/components/**/*", "surface/lib/utils.ts"]
 }
 EOF
 
