@@ -23,6 +23,7 @@ export type {
 export type {
   ObjectGenerator,
   StreamTool,
+  StreamStepInfo,
   Message,
   ToolMessage,
   ToolCall,

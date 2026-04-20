@@ -34,20 +34,34 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
       TOOL=$(echo "$line" | jq -r '.tool')
       echo "[${TOOL}] Starting..."
       ;;
+    step_finish)
+      # Per-turn token usage from the Vercel AI SDK's onStepFinish callback.
+      # We count steps and accumulate the running total here (not in the
+      # client) so every consumer doesn't have to reimplement it.
+      STEP_N=$((${STEP_N:-0} + 1))
+      IN=$(echo "$line" | jq -r '.step.usage.inputTokens // 0')
+      OUT=$(echo "$line" | jq -r '.step.usage.outputTokens // 0')
+      CACHED=$(echo "$line" | jq -r '.step.usage.cachedInputTokens // 0')
+      TOTAL=$(echo "$line" | jq -r '.step.usage.totalTokens // 0')
+      RUNNING=$((${RUNNING:-0} + TOTAL))
+      FINISH=$(echo "$line" | jq -r '.step.finishReason // "?"')
+      printf '[step %s] in=%s out=%s cached=%s total=%s  running=%s  finish=%s\n' \
+        "$STEP_N" "$IN" "$OUT" "$CACHED" "$TOTAL" "$RUNNING" "$FINISH"
+      ;;
     tool_result)
       TOOL=$(echo "$line" | jq -r '.tool')
       RESULT_TYPE=$(echo "$line" | jq -r '.result.type // empty')
       if [ "$TOOL" = "preview" ] && [ "$RESULT_TYPE" = "preview" ]; then
         # Extract three screenshots (mobile/tablet/desktop) + verdict from
         # preview tool result. Each preview iteration writes three files
-        # named screenshot-${iteration}-{mobile,tablet,desktop}.png.
-        SIDX=$(find "${DIR}" -maxdepth 1 -name 'screenshot-*-desktop.png' ! -name 'screenshot-final-*' | wc -l | tr -d ' ')
-        echo "$line" | jq -r '.result.images.mobile'  | base64 -d > "${DIR}/screenshot-${SIDX}-mobile.png"
-        echo "$line" | jq -r '.result.images.tablet'  | base64 -d > "${DIR}/screenshot-${SIDX}-tablet.png"
-        echo "$line" | jq -r '.result.images.desktop' | base64 -d > "${DIR}/screenshot-${SIDX}-desktop.png"
+        # named screenshot-${iteration}-{mobile,tablet,desktop}.jpg.
+        SIDX=$(find "${DIR}" -maxdepth 1 -name 'screenshot-*-desktop.jpg' ! -name 'screenshot-final-*' | wc -l | tr -d ' ')
+        echo "$line" | jq -r '.result.images.mobile'  | base64 -d > "${DIR}/screenshot-${SIDX}-mobile.jpg"
+        echo "$line" | jq -r '.result.images.tablet'  | base64 -d > "${DIR}/screenshot-${SIDX}-tablet.jpg"
+        echo "$line" | jq -r '.result.images.desktop' | base64 -d > "${DIR}/screenshot-${SIDX}-desktop.jpg"
         APPROVED=$(echo "$line" | jq -r '.result.verdict.approved')
         ISSUE_COUNT=$(echo "$line" | jq -r '.result.verdict.issues | length')
-        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}-{mobile,tablet,desktop}.png (approved=${APPROVED}, ${ISSUE_COUNT} issues)"
+        echo "[preview] Wrote ${DIR}/screenshot-${SIDX}-{mobile,tablet,desktop}.jpg (approved=${APPROVED}, ${ISSUE_COUNT} issues)"
         if [ "$APPROVED" = "false" ] && [ "$ISSUE_COUNT" -gt 0 ]; then
           echo "$line" | jq -r '.result.verdict.issues[] | "  - " + .'
         fi
@@ -76,10 +90,10 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
       COUNT=$(echo "$line" | jq '.screenshots // [] | length')
       if [ "$COUNT" -gt 0 ]; then
         for i in $(seq 0 $((COUNT - 1))); do
-          echo "$line" | jq -r ".screenshots[$i].mobile"  | base64 -d > "${DIR}/screenshot-final-${i}-mobile.png"
-          echo "$line" | jq -r ".screenshots[$i].tablet"  | base64 -d > "${DIR}/screenshot-final-${i}-tablet.png"
-          echo "$line" | jq -r ".screenshots[$i].desktop" | base64 -d > "${DIR}/screenshot-final-${i}-desktop.png"
-          echo "Wrote ${DIR}/screenshot-final-${i}-{mobile,tablet,desktop}.png"
+          echo "$line" | jq -r ".screenshots[$i].mobile"  | base64 -d > "${DIR}/screenshot-final-${i}-mobile.jpg"
+          echo "$line" | jq -r ".screenshots[$i].tablet"  | base64 -d > "${DIR}/screenshot-final-${i}-tablet.jpg"
+          echo "$line" | jq -r ".screenshots[$i].desktop" | base64 -d > "${DIR}/screenshot-final-${i}-desktop.jpg"
+          echo "Wrote ${DIR}/screenshot-final-${i}-{mobile,tablet,desktop}.jpg"
         done
       fi
       TOTAL=$(echo "$line" | jq '.log.totalDurationMs // "N/A"')

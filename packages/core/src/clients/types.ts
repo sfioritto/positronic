@@ -73,6 +73,25 @@ export interface StreamTool {
 }
 
 /**
+ * Per-step information surfaced via streamText's onStepFinish callback.
+ * Provider-agnostic: each client maps its SDK's step result onto this shape.
+ * Counting steps and running token totals is the consumer's job — we only
+ * report raw per-step facts here.
+ */
+export interface StreamStepInfo {
+  /** Token usage for just this step. All fields optional because providers vary. */
+  usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    reasoningTokens?: number;
+    cachedInputTokens?: number;
+  };
+  /** Provider-reported reason this step ended ('stop', 'tool-calls', 'length', ...). */
+  finishReason?: string;
+}
+
+/**
  * Interface for AI model interactions, focused on generating structured objects
  * and potentially other types of content in the future.
  */
@@ -226,6 +245,13 @@ export interface ObjectGenerator {
      * Defaults to 'auto' for streamText since it often needs to produce final text.
      */
     toolChoice?: ToolChoice;
+    /**
+     * Called after each step in the multi-step loop finishes, before the next
+     * request fires. Receives per-step token usage and the finish reason.
+     * Use for progress reporting / budgeting. Errors thrown from this
+     * callback are not caught.
+     */
+    onStepFinish?: (step: StreamStepInfo) => void | Promise<void>;
   }): Promise<{
     /** All tool calls made across all steps, with their results */
     toolCalls: Array<{

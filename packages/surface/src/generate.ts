@@ -1,4 +1,9 @@
-import type { ObjectGenerator, JsonValue, StreamTool } from '@positronic/core';
+import type {
+  ObjectGenerator,
+  JsonValue,
+  StreamTool,
+  StreamStepInfo,
+} from '@positronic/core';
 import type { ZodObject } from 'zod';
 import type { SandboxInstance, RenderPage } from './sandbox.js';
 import { buildBundle, makeRender } from './sandbox.js';
@@ -22,14 +27,15 @@ export type PreviewScreenshots = Record<Viewport, Uint8Array>;
 export interface GenerateResult {
   render: RenderPage;
   log?: GenerateDebugLog;
-  /** One entry per preview call, each containing mobile/tablet/desktop PNGs. */
+  /** One entry per preview call, each containing mobile/tablet/desktop JPEGs. */
   screenshots?: PreviewScreenshots[];
 }
 
 export type ProgressEvent =
   | { type: 'fake_data_done'; data: Record<string, unknown> }
   | { type: 'tool_start'; tool: string }
-  | { type: 'tool_result'; tool: string; result: unknown };
+  | { type: 'tool_result'; tool: string; result: unknown }
+  | { type: 'step_finish'; step: StreamStepInfo };
 
 /**
  * Generate a self-contained HTML page using an LLM + sandbox loop.
@@ -165,6 +171,9 @@ Instructions:
     tools,
     maxSteps: 20,
     toolChoice: 'auto',
+    onStepFinish: onProgress
+      ? (step) => onProgress({ type: 'step_finish', step })
+      : undefined,
   });
 
   // Step 5: Build the bundle once; return a render closure so the caller

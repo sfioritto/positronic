@@ -151,8 +151,8 @@ Attached: three screenshots of the same page at mobile (${
         system: REVIEW_SYSTEM,
         prompt: reviewPrompt,
         attachments: VIEWPORTS.map((viewport) => ({
-          name: `screenshot-${viewport}.png`,
-          mimeType: 'image/png',
+          name: `screenshot-${viewport}.jpg`,
+          mimeType: 'image/jpeg',
           data: shots[viewport],
         })),
       });
@@ -210,7 +210,7 @@ The three screenshots are attached in order: mobile, tablet, desktop. Look at ea
             {
               type: 'media',
               data: images.mobile,
-              mediaType: 'image/png',
+              mediaType: 'image/jpeg',
             },
             {
               type: 'text',
@@ -219,7 +219,7 @@ The three screenshots are attached in order: mobile, tablet, desktop. Look at ea
             {
               type: 'media',
               data: images.tablet,
-              mediaType: 'image/png',
+              mediaType: 'image/jpeg',
             },
             {
               type: 'text',
@@ -228,7 +228,7 @@ The three screenshots are attached in order: mobile, tablet, desktop. Look at ea
             {
               type: 'media',
               data: images.desktop,
-              mediaType: 'image/png',
+              mediaType: 'image/jpeg',
             },
           ],
         };

@@ -11,7 +11,7 @@ import {
 import { screenshot } from '../../src/screenshot.js';
 import { generate, type ProgressEvent } from '../../src/generate.js';
 import { VercelClient } from '@positronic/client-vercel';
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
 import systemPromptRaw from '../../src/system-prompt.md';
 
@@ -119,12 +119,11 @@ function getGenerateContext(rawEnv: Env) {
   ) {
     return null;
   }
-  const generatorModel = google('gemini-flash-lite-latest', {
+  const google = createGoogleGenerativeAI({
     apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
   });
-  const reviewerModel = google('gemini-flash-lite-latest', {
-    apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
-  });
+  const generatorModel = google('gemini-flash-lite-latest');
+  const reviewerModel = google('gemini-flash-lite-latest');
   const client = new VercelClient(
     generatorModel,
     rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
@@ -447,13 +446,13 @@ export default function Page({ data }: Props) {
 
       // If CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are available, screenshot
       if (rawEnv.CLOUDFLARE_ACCOUNT_ID && rawEnv.CLOUDFLARE_API_TOKEN) {
-        const png = await screenshot({
+        const jpeg = await screenshot({
           html,
           accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
           apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
         });
-        return new Response(png, {
-          headers: { 'Content-Type': 'image/png' },
+        return new Response(jpeg, {
+          headers: { 'Content-Type': 'image/jpeg' },
         });
       }
 

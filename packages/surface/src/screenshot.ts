@@ -1,7 +1,14 @@
+// JPEG quality for all captures. Full-page PNG screenshots at desktop width
+// routinely weigh in at 500KB–2MB, which balloons conversation payloads and
+// (on some providers) pushes us into model input-token / request-size limits
+// as tool results accumulate. JPEG at 70 lands in the 50–200KB range with
+// quality that's plenty for a UI-review agent.
+const SCREENSHOT_JPEG_QUALITY = 70;
+
 /**
  * Take a screenshot of an HTML page using Cloudflare Browser Rendering REST API.
  *
- * Returns the PNG as a Uint8Array.
+ * Returns the JPEG as a Uint8Array.
  */
 export async function screenshot(params: {
   html: string;
@@ -33,6 +40,8 @@ export async function screenshot(params: {
         },
         screenshotOptions: {
           fullPage: true,
+          type: 'jpeg',
+          quality: SCREENSHOT_JPEG_QUALITY,
         },
       }),
     }
@@ -68,7 +77,7 @@ export const VIEWPORT_DIMENSIONS: Record<
 
 /**
  * Take the same page at all three viewports in parallel. Returns a keyed
- * object mapping viewport name to PNG bytes. Used by the preview tool so
+ * object mapping viewport name to JPEG bytes. Used by the preview tool so
  * the reviewer can evaluate responsive layout breakage, not just desktop.
  */
 export async function screenshotAllViewports(params: {
@@ -80,13 +89,13 @@ export async function screenshotAllViewports(params: {
 
   const entries = await Promise.all(
     VIEWPORTS.map(async (viewport) => {
-      const png = await screenshot({
+      const jpeg = await screenshot({
         html,
         accountId,
         apiToken,
         viewport: VIEWPORT_DIMENSIONS[viewport],
       });
-      return [viewport, png] as const;
+      return [viewport, jpeg] as const;
     })
   );
 

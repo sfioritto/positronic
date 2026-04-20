@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/google": "^2.0.0",
+    "@ai-sdk/google": "^3.0.0",
     "@positronic/client-vercel": "file:../../../packages/client-vercel",
     "@positronic/core": "file:../../../packages/core",
     "ai": "^6.0.0",

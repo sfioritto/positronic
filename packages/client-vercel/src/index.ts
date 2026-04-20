@@ -1,6 +1,7 @@
 import type {
   ObjectGenerator,
   StreamTool,
+  StreamStepInfo,
   Message,
   ToolMessage,
   ResponseMessage,
@@ -284,6 +285,7 @@ export class VercelClient implements ObjectGenerator {
     tools: Record<string, StreamTool>;
     maxSteps?: number;
     toolChoice?: ToolChoice;
+    onStepFinish?: (step: StreamStepInfo) => void | Promise<void>;
   }): Promise<{
     toolCalls: Array<{
       toolCallId: string;
@@ -303,6 +305,7 @@ export class VercelClient implements ObjectGenerator {
       tools,
       maxSteps = 10,
       toolChoice = 'required',
+      onStepFinish,
     } = params;
 
     // Build messages array
@@ -376,6 +379,13 @@ export class VercelClient implements ObjectGenerator {
       toolChoice,
       maxRetries: 0,
       stopWhen: stepCountIs(maxSteps),
+      onStepFinish: onStepFinish
+        ? (event) =>
+            onStepFinish({
+              usage: event.usage ?? {},
+              finishReason: event.finishReason,
+            })
+        : undefined,
     });
 
     const [steps, text, usage, response] = await Promise.all([
