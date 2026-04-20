@@ -26,13 +26,12 @@
 import { z, type ZodType } from 'zod';
 import type { ObjectGenerator } from '@positronic/core';
 import { zodToTypescript } from './zod-to-typescript.js';
-import { bottleneck } from './bottleneck.js';
+import { governor } from './governor.js';
 
-// Throttle rate for the fan-out walk. Cloudflare Workers cap simultaneous
-// outbound connections per invocation, and the fake-data walk on deep schemas
-// (company-os, etc.) can fan out to hundreds of parallel generateObject calls.
-// At ~3s per call, 2 rps keeps average concurrency in the single-digits.
-const FAKE_DATA_RPS = 2;
+// Cloudflare's April 2026 relaxation moved the 6-connection cap to apply
+// only to connections still waiting for headers, so 20 in-flight is safe.
+// https://developers.cloudflare.com/changelog/post/2026-04-09-relaxed-connection-limiting/
+const FAN_OUT_CONCURRENCY = 20;
 
 function isScalar(schema: unknown): boolean {
   if (schema instanceof z.ZodObject) return false;
@@ -92,10 +91,10 @@ ${schemaTs}
   // subrequests against the model immediately. (Unhandled-rejection protection
   // is a separate concern handled by trackChild below.)
   const controller = new AbortController();
-  // One bottleneck per walk throttles the rate at which generateObject calls
-  // are released. Keeps burst concurrency below the Worker's outbound-connection
-  // cap and below the model's RPM limit.
-  const limit = bottleneck({ rps: FAKE_DATA_RPS });
+  // One governor per walk caps in-flight generateObject calls. Per-walk (not
+  // module-global) so concurrent Worker invocations don't serialize against
+  // each other — the cap is a per-invocation concern.
+  const limit = governor(FAN_OUT_CONCURRENCY);
   try {
     const data = await generate({
       client,
