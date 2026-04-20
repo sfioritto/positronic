@@ -13,15 +13,28 @@ PORT="${2:-8787}"
 URL="http://localhost:${PORT}/sandbox/${ENDPOINT}"
 DIR="output/${ENDPOINT}"
 
+# Cache fake data as a sibling of $DIR (not inside it) so the ephemeral
+# per-run artifacts can be wiped with `rm -rf $DIR` without special-casing.
+# Delete output/<endpoint>.fake-data.json manually to re-roll.
+FAKE_DATA="output/${ENDPOINT}.fake-data.json"
+
 # Wipe any prior run's artifacts so screenshot indices, logs, and the
 # final HTML all reflect only the current run.
 rm -rf "$DIR"
 mkdir -p "$DIR"
 
+# If we have cached fake data, POST it so the Worker skips the fake-data
+# walk. Otherwise GET and let the Worker generate fresh.
+CURL_ARGS=(-sN --max-time 600)
+if [ -f "$FAKE_DATA" ]; then
+  echo "Using cached ${FAKE_DATA} (skipping fake-data generation)"
+  CURL_ARGS+=(-X POST -H 'Content-Type: application/json' --data-binary "@${FAKE_DATA}")
+fi
+
 echo "Fetching ${URL} (streaming) ..."
 
 # Stream NDJSON — each line is a JSON event
-curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
+curl "${CURL_ARGS[@]}" "$URL" | while IFS= read -r line; do
   # Skip empty lines
   [ -z "$line" ] && continue
 
@@ -30,8 +43,8 @@ curl -sN --max-time 600 "$URL" | while IFS= read -r line; do
   case "$TYPE" in
     fake_data_done)
       echo "[fake_data] Generated fake dataset"
-      echo "$line" | jq '.data' > "${DIR}/fake-data.json"
-      echo "  Wrote ${DIR}/fake-data.json"
+      echo "$line" | jq '.data' > "$FAKE_DATA"
+      echo "  Wrote $FAKE_DATA"
       ;;
     tool_start)
       TOOL=$(echo "$line" | jq -r '.tool')

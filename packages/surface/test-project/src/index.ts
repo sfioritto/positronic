@@ -25,9 +25,22 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function streamGenerate(
+async function streamGenerate(
+  request: Request,
   generateParams: Parameters<typeof generate>[0]
-): Response {
+): Promise<Response> {
+  // When the caller POSTs a JSON body, treat it as cached fake data and
+  // hand it to generate() to skip the fake-data walk. Lets run.sh feed back
+  // a prior run's fake-data.json so iterative tweaks of the component loop
+  // don't pay for fan-out generation every time. An empty or malformed
+  // body falls back to generating fresh.
+  const cachedPreviewData =
+    request.method === 'POST'
+      ? ((await request.json().catch(() => undefined)) as
+          | Record<string, unknown>
+          | undefined)
+      : undefined;
+
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
@@ -48,7 +61,11 @@ function streamGenerate(
 
   (async () => {
     try {
-      const result = await generate({ ...generateParams, onProgress });
+      const result = await generate({
+        ...generateParams,
+        onProgress,
+        previewData: cachedPreviewData,
+      });
       const html = result.render({ data: previewData });
       // result.screenshots is an array of { mobile, tablet, desktop } PNGs,
       // one entry per preview call. Base64-encode each viewport.
@@ -493,7 +510,7 @@ export default function Page({ data }: Props) {
           .meta({ count: 8 }),
       });
 
-      return streamGenerate({
+      return streamGenerate(request, {
         ...ctx,
         sandbox,
         prompt:
@@ -548,7 +565,7 @@ For each article show:
 Include a "Mark Selected as Read" submit button at the bottom.
 Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
 
-      return streamGenerate({
+      return streamGenerate(request, {
         ...ctx,
         sandbox,
         prompt,
@@ -685,7 +702,7 @@ The page should have these sections, each with a colored header/accent:
 
 Make the overall layout clean and scannable. Pick whichever layout primitives fit the content — typography and whitespace, separators, plain containers, or cards where they genuinely help. The page should feel like a morning email briefing — scannable in 30 seconds, not an enterprise dashboard.`;
 
-      return streamGenerate({
+      return streamGenerate(request, {
         ...ctx,
         sandbox,
         prompt,
@@ -777,7 +794,7 @@ If developerSummaries is empty OR every entry has an empty entry.result.summary,
 
 The overall feel should be that of a scannable internal team digest — think Notion or Linear's weekly summary emails. Quiet, professional, strong typography hierarchy, generous whitespace. This is a read-only report, NOT a dashboard with charts and NOT a marketing page. No buttons, no forms — just content.`;
 
-      return streamGenerate({
+      return streamGenerate(request, {
         ...ctx,
         sandbox,
         prompt,
@@ -1212,7 +1229,7 @@ The overall feel should be that of a scannable internal team digest — think No
 
 The page is read-only — no forms, no buttons, no checkboxes. Think internal quarterly report: dense enough to be informative, visual enough to scan. Prioritize typographic hierarchy and whitespace over heavy card borders. Don't reflexively wrap every item in a bordered card — a stack of dozens of identical bordered boxes is almost always the wrong choice. Separators, headings, and spacing do most of the work.`;
 
-      return streamGenerate({
+      return streamGenerate(request, {
         ...ctx,
         sandbox,
         prompt,

@@ -56,6 +56,12 @@ export async function generate(params: {
   outputSchema?: ZodObject<any>;
   debug?: boolean;
   onProgress?: (event: ProgressEvent) => void | Promise<void>;
+  /**
+   * Pre-generated dataset to use instead of invoking generateFakeData. Must
+   * already conform to inputSchema. When provided, the schema walk is
+   * skipped entirely — saves the model calls the walk would fan out to.
+   */
+  previewData?: Record<string, unknown>;
 }): Promise<GenerateResult> {
   const {
     client,
@@ -69,6 +75,7 @@ export async function generate(params: {
     outputSchema,
     debug,
     onProgress,
+    previewData: cachedPreviewData,
   } = params;
 
   // Convert Zod schemas to TypeScript strings at the boundary
@@ -88,12 +95,15 @@ export async function generate(params: {
   // array-of-object boundaries (each must carry `.meta({ count: N })`) and
   // one-shots any subtree that contains no annotated arrays. The resulting
   // data matches the real shape exactly, so the UI feedback loop only needs
-  // to cover viewports — not data volume.
-  const previewData = (await generateFakeData({
-    client,
-    schema: inputSchema,
-    prompt,
-  })) as Record<string, unknown>;
+  // to cover viewports — not data volume. Skipped when the caller hands us
+  // a cached dataset (e.g. run.sh re-feeding an earlier run's fake-data.json).
+  const previewData =
+    cachedPreviewData ??
+    ((await generateFakeData({
+      client,
+      schema: inputSchema,
+      prompt,
+    })) as Record<string, unknown>);
 
   await onProgress?.({ type: 'fake_data_done', data: previewData });
 
