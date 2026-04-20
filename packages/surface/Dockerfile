@@ -194,8 +194,13 @@ const root = createRoot(document.getElementById('root')!);
 flushSync(() => {
   root.render(<Page data={data} />);
 });
-requestAnimationFrame(() => {
-  document.body.dataset.rendered = 'true';
+
+// fullPage measures scrollHeight when body[data-rendered] appears. Wait
+// for fonts.ready so post-font reflow is included in that measurement.
+document.fonts.ready.then(() => {
+  requestAnimationFrame(() => {
+    document.body.dataset.rendered = 'true';
+  });
 });
 EOF
 
