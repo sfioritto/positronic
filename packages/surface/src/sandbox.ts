@@ -56,11 +56,19 @@ function parseErrors(result: { stdout: string; stderr: string }) {
 
 export async function typeCheck(
   sandbox: SandboxInstance,
-  dataShape: string
+  dataShape: string,
+  options?: { configPath?: string }
 ): Promise<TypeCheckResult> {
   await sandbox.writeFile('/workspace/types.ts', dataShape);
 
-  const result = await sandbox.exec('npx tsc --noEmit');
+  // Parallel section sub-agents each run tsc against a narrow per-section
+  // tsconfig so they don't fail on each other's half-written peer sections
+  // (or on mount-*.tsx entries whose import targets haven't been written
+  // yet). Single-agent flow stays on the default project-wide tsconfig.
+  const cmd = options?.configPath
+    ? `npx tsc --noEmit --project ${options.configPath}`
+    : 'npx tsc --noEmit';
+  const result = await sandbox.exec(cmd);
 
   if (result.success) {
     return { success: true };

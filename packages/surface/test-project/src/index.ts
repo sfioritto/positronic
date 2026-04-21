@@ -8,11 +8,16 @@ import {
   type SandboxInstance,
 } from '../../src/sandbox.js';
 import { screenshot } from '../../src/screenshot.js';
-import { generate, type ProgressEvent } from '../../src/generate.js';
+import {
+  orchestrate,
+  type ProgressEvent as OrchestratorProgressEvent,
+} from '../../src/orchestrator.js';
 import { VercelClient } from '@positronic/client-vercel';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
 import systemPromptRaw from '../../src/system-prompt.md';
+import orchestratorSystemPromptRaw from '../../src/orchestrator-system-prompt.md';
+import { buildCompanyOsSchemaAndPrompt } from './company-os-schema.js';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
@@ -24,15 +29,15 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function streamGenerate(
+/**
+ * Orchestrator-mode streaming wrapper — same NDJSON protocol as
+ * streamGenerate, but runs the sectioned orchestrator pipeline. Bubbles sub-
+ * agent + composed-page progress events through to the client.
+ */
+async function streamOrchestrate(
   request: Request,
-  generateParams: Parameters<typeof generate>[0]
+  orchestrateParams: Parameters<typeof orchestrate>[0]
 ): Promise<Response> {
-  // When the caller POSTs a JSON body, treat it as cached fake data and
-  // hand it to generate() to skip the fake-data walk. Lets run.sh feed back
-  // a prior run's fake-data.json so iterative tweaks of the component loop
-  // don't pay for fan-out generation every time. An empty or malformed
-  // body falls back to generating fresh.
   const cachedPreviewData =
     request.method === 'POST'
       ? ((await request.json().catch(() => undefined)) as
@@ -49,10 +54,8 @@ async function streamGenerate(
   };
 
   let previewData: Record<string, unknown> = {};
-  const onProgress = (event: ProgressEvent) => {
+  const onProgress = (event: OrchestratorProgressEvent) => {
     if (event.type === 'fake_data_done') {
-      // Mirror the generator's dataset for the final render so the caller
-      // sees the same shape the component was designed against.
       previewData = event.data;
     }
     send(event);
@@ -60,14 +63,12 @@ async function streamGenerate(
 
   (async () => {
     try {
-      const result = await generate({
-        ...generateParams,
+      const result = await orchestrate({
+        ...orchestrateParams,
         onProgress,
         previewData: cachedPreviewData,
       });
       const html = result.render({ data: previewData });
-      // result.screenshots is an array of { mobile, tablet, desktop } PNGs,
-      // one entry per preview call. Base64-encode each viewport.
       const screenshotBase64 = result.screenshots?.map((shots) => ({
         mobile: uint8ToBase64(shots.mobile),
         tablet: uint8ToBase64(shots.tablet),
@@ -99,16 +100,6 @@ async function streamGenerate(
               : err.cause;
         }
       }
-      // Surface diagnostic data attached to fake-data convergence failures
-      // so run.sh can save the LLM conversation to disk.
-      const errWithExtras = err as {
-        responseMessages?: unknown;
-        variant?: unknown;
-      };
-      if (errWithExtras?.responseMessages) {
-        payload.responseMessages = errWithExtras.responseMessages;
-        payload.variant = errWithExtras.variant;
-      }
       await send(payload);
     } finally {
       writer.close();
@@ -138,14 +129,19 @@ function getGenerateContext(rawEnv: Env) {
   const google = createGoogleGenerativeAI({
     apiKey: rawEnv.GOOGLE_GENERATIVE_AI_API_KEY,
   });
-  const generatorModel = google('gemini-flash-lite-latest');
-  const reviewerModel = google('gemini-flash-lite-latest');
+  // Cheap model for sub-agents + per-section reviewers (lots of parallel
+  // calls, each narrow in scope). Strong model for the orchestrator which
+  // does taxonomy + cohesion review across the whole composed page.
   const client = new VercelClient(
-    generatorModel,
+    google('gemini-flash-lite-latest'),
     rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
   );
   const reviewClient = new VercelClient(
-    reviewerModel,
+    google('gemini-flash-lite-latest'),
+    rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
+  );
+  const orchestratorClient = new VercelClient(
+    google('gemini-3.1-pro-preview'),
     rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
   );
   const systemPrompt = systemPromptRaw.replaceAll(
@@ -155,6 +151,7 @@ function getGenerateContext(rawEnv: Env) {
   return {
     client,
     reviewClient,
+    orchestratorClient,
     systemPrompt,
     accountId: rawEnv.CLOUDFLARE_ACCOUNT_ID,
     apiToken: rawEnv.CLOUDFLARE_API_TOKEN,
@@ -502,17 +499,22 @@ export default function Page({ data }: Props) {
           .meta({ count: 8 }),
       });
 
-      return streamGenerate(request, {
+      return streamOrchestrate(request, {
         ...ctx,
         sandbox,
         prompt:
           'Create a dashboard page showing key metrics at the top and a list of recent users below. Pick the layout primitives that fit — you do not have to use cards.',
         inputSchema,
+        sectionSystemPrompt: ctx.systemPrompt,
+        orchestratorSystemPrompt: orchestratorSystemPromptRaw,
         debug: true,
       });
     }
 
-    // HN Reader test — realistic page with form
+    // HN Reader — originally had a form (readArticleIds), but the orchestrator
+    // pattern doesn't support forms in v1 so this is now a read-only reading
+    // list. Reintroduce form support at the orchestrator level before wiring
+    // outputSchema back in.
     if (url.pathname === '/sandbox/hn-reader') {
       const ctx = getGenerateContext(rawEnv);
       if (!ctx) {
@@ -532,13 +534,7 @@ export default function Page({ data }: Props) {
         remaining: z.array(article).meta({ count: 20 }),
       });
 
-      const outputSchema = z.object({
-        readArticleIds: z
-          .array(z.string())
-          .describe('Array of article IDs marked as read'),
-      });
-
-      const prompt = `Create a reading list page for Hacker News articles.
+      const prompt = `Create a read-only reading list page for Hacker News articles.
 
 Show TWO sections:
 
@@ -552,17 +548,16 @@ For each article show:
 - Title as a clickable link to the article URL
 - Points count (e.g., "142 points")
 - Comment count with link to HN comments (https://news.ycombinator.com/item?id={id})
-- A checkbox to mark as "read"
 
-Include a "Mark Selected as Read" submit button at the bottom.
 Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
 
-      return streamGenerate(request, {
+      return streamOrchestrate(request, {
         ...ctx,
         sandbox,
         prompt,
         inputSchema,
-        outputSchema,
+        sectionSystemPrompt: ctx.systemPrompt,
+        orchestratorSystemPrompt: orchestratorSystemPromptRaw,
         debug: true,
       });
     }
@@ -651,13 +646,7 @@ Keep the UI clean and scannable — this is a reading list, not a dashboard.`;
         }),
       });
 
-      const outputSchema = z.object({
-        threadIds: z
-          .array(z.string())
-          .describe('Thread IDs the user wants to keep in inbox (not archive)'),
-      });
-
-      const prompt = `Create an email digest page that summarizes a user's inbox.
+      const prompt = `Create a read-only email digest page that summarizes a user's inbox.
 
 Each *Enriched array (childrenEnriched, billingEnriched, etc.) contains entries shaped as { thread, value } — thread carries the email metadata, value carries the category-specific payload (summary, amount, etc.).
 
@@ -686,20 +675,15 @@ The page should have these sections, each with a colored header/accent:
 - Show the text summaries for npm, security alerts, confirmation codes, reminders, and financial notifications
 - These are pre-summarized strings, so just display them in a clean readable format
 
-**Thread Management**
-- Each email thread across ALL sections should have a checkbox
-- The checkbox name should be "threadIds" with the thread's threadId as value
-- Checked = keep in inbox, unchecked = archive
-- Include a "Archive Unchecked" submit button at the bottom
-
 Make the overall layout clean and scannable. Pick whichever layout primitives fit the content — typography and whitespace, separators, plain containers, or cards where they genuinely help. The page should feel like a morning email briefing — scannable in 30 seconds, not an enterprise dashboard.`;
 
-      return streamGenerate(request, {
+      return streamOrchestrate(request, {
         ...ctx,
         sandbox,
         prompt,
         inputSchema,
-        outputSchema,
+        sectionSystemPrompt: ctx.systemPrompt,
+        orchestratorSystemPrompt: orchestratorSystemPromptRaw,
         debug: true,
       });
     }
@@ -786,11 +770,13 @@ If developerSummaries is empty OR every entry has an empty entry.result.summary,
 
 The overall feel should be that of a scannable internal team digest — think Notion or Linear's weekly summary emails. Quiet, professional, strong typography hierarchy, generous whitespace. This is a read-only report, NOT a dashboard with charts and NOT a marketing page. No buttons, no forms — just content.`;
 
-      return streamGenerate(request, {
+      return streamOrchestrate(request, {
         ...ctx,
         sandbox,
         prompt,
         inputSchema,
+        sectionSystemPrompt: ctx.systemPrompt,
+        orchestratorSystemPrompt: orchestratorSystemPromptRaw,
         debug: true,
       });
     }
@@ -804,428 +790,15 @@ The overall feel should be that of a scannable internal team digest — think No
         return Response.json({ error: 'Missing env vars' }, { status: 500 });
       }
 
-      const address = z.object({
-        street: z.string(),
-        city: z.string(),
-        state: z.string(),
-        postalCode: z.string(),
-        country: z.enum(['US', 'CA', 'UK', 'DE', 'FR', 'JP', 'AU', 'IN']),
-      });
+      const { inputSchema, prompt } = buildCompanyOsSchemaAndPrompt();
 
-      const money = z.object({
-        amount: z.number(),
-        currency: z.enum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD']),
-      });
-
-      const inputSchema = z.object({
-        organization: z.object({
-          id: z.string(),
-          legalName: z.string(),
-          dba: z.string().nullable(),
-          foundedYear: z.number(),
-          taxId: z.string(),
-          website: z.string(),
-          supportEmail: z.string(),
-          mainPhone: z.string(),
-          mission: z.string(),
-          vision: z.string(),
-          structure: z.enum([
-            'llc',
-            'c-corp',
-            's-corp',
-            'partnership',
-            'non-profit',
-          ]),
-          headquarters: address,
-          logoUrls: z.object({
-            light: z.string(),
-            dark: z.string(),
-            mono: z.string(),
-          }),
-        }),
-
-        employees: z
-          .array(
-            z.object({
-              id: z.string(),
-              firstName: z.string(),
-              lastName: z.string(),
-              preferredName: z.string().nullable(),
-              email: z.string(),
-              phone: z.string().nullable(),
-              title: z.string(),
-              department: z.enum([
-                'engineering',
-                'product',
-                'design',
-                'sales',
-                'marketing',
-                'finance',
-                'operations',
-                'people',
-              ]),
-              managerId: z.string().nullable(),
-              startDate: z.string(),
-              employmentType: z.enum([
-                'full-time',
-                'part-time',
-                'contract',
-                'intern',
-              ]),
-              status: z.enum([
-                'active',
-                'on-leave',
-                'terminated',
-                'pending-start',
-              ]),
-              compensation: z.object({
-                baseSalary: money,
-                bonusTargetPercentage: z.number().nullable(),
-                equityShares: z.number().nullable(),
-                benefits: z.object({
-                  healthPlan: z.enum([
-                    'basic',
-                    'standard',
-                    'premium',
-                    'opt-out',
-                  ]),
-                  vacationDays: z.number(),
-                  sickDays: z.number(),
-                  stockOptionsGranted: z.number(),
-                  retirementMatchPercentage: z.number(),
-                }),
-              }),
-              location: z.object({
-                office: z.enum(['hq', 'nyc', 'london', 'tokyo', 'remote']),
-                remotePercentage: z.number(),
-                timezone: z.string(),
-                address: address.nullable(),
-              }),
-              profile: z.object({
-                bio: z.string(),
-                linkedinUrl: z.string().nullable(),
-                githubUrl: z.string().nullable(),
-                pronouns: z.string().nullable(),
-                languagesSpoken: z.array(z.string()).meta({ count: 3 }),
-                hobbies: z.array(z.string()),
-              }),
-              emergencyContacts: z
-                .array(
-                  z.object({
-                    name: z.string(),
-                    relationship: z.enum([
-                      'spouse',
-                      'parent',
-                      'sibling',
-                      'child',
-                      'friend',
-                      'other',
-                    ]),
-                    phone: z.string(),
-                    email: z.string().nullable(),
-                    primary: z.boolean(),
-                  })
-                )
-                .meta({ count: 2 }),
-              certifications: z
-                .array(
-                  z.object({
-                    name: z.string(),
-                    issuingOrg: z.string(),
-                    issueDate: z.string(),
-                    expirationDate: z.string().nullable(),
-                    credentialId: z.string(),
-                  })
-                )
-                .meta({ count: 2 }),
-            })
-          )
-          .meta({ count: 5 }),
-
-        projects: z
-          .array(
-            z.object({
-              id: z.string(),
-              code: z.string(),
-              name: z.string(),
-              description: z.string(),
-              status: z.enum([
-                'proposed',
-                'planning',
-                'in-progress',
-                'paused',
-                'completed',
-                'cancelled',
-              ]),
-              priority: z.enum(['low', 'medium', 'high', 'critical']),
-              phase: z.enum([
-                'discovery',
-                'design',
-                'build',
-                'launch',
-                'maintenance',
-              ]),
-              startDate: z.string(),
-              targetEndDate: z.string(),
-              actualEndDate: z.string().nullable(),
-              budget: money,
-              actualSpend: money,
-              confidenceLevel: z.enum(['low', 'medium', 'high']),
-              ownerId: z.string(),
-              sponsorId: z.string(),
-              clientId: z.string().nullable(),
-              tags: z.array(z.string()).meta({ count: 4 }),
-              milestones: z
-                .array(
-                  z.object({
-                    id: z.string(),
-                    name: z.string(),
-                    description: z.string(),
-                    targetDate: z.string(),
-                    actualDate: z.string().nullable(),
-                    status: z.enum([
-                      'pending',
-                      'in-progress',
-                      'complete',
-                      'missed',
-                    ]),
-                    deliverables: z.array(z.string()),
-                    acceptanceCriteria: z.array(z.string()),
-                  })
-                )
-                .meta({ count: 3 }),
-              tasks: z
-                .array(
-                  z.object({
-                    id: z.string(),
-                    title: z.string(),
-                    description: z.string(),
-                    status: z.enum([
-                      'backlog',
-                      'todo',
-                      'in-progress',
-                      'in-review',
-                      'done',
-                      'cancelled',
-                    ]),
-                    priority: z.enum(['low', 'medium', 'high', 'urgent']),
-                    type: z.enum([
-                      'feature',
-                      'bug',
-                      'chore',
-                      'spike',
-                      'incident',
-                    ]),
-                    assigneeId: z.string().nullable(),
-                    reporterId: z.string(),
-                    estimateHours: z.number(),
-                    actualHours: z.number().nullable(),
-                    createdAt: z.string(),
-                    updatedAt: z.string(),
-                    completedAt: z.string().nullable(),
-                    labels: z.array(z.string()),
-                    dependencies: z.array(z.string()),
-                    subtasks: z
-                      .array(
-                        z.object({
-                          id: z.string(),
-                          title: z.string(),
-                          done: z.boolean(),
-                          estimateHours: z.number(),
-                          actualHours: z.number().nullable(),
-                        })
-                      )
-                      .meta({ count: 2 }),
-                    comments: z
-                      .array(
-                        z.object({
-                          id: z.string(),
-                          authorId: z.string(),
-                          createdAt: z.string(),
-                          body: z.string(),
-                          edited: z.boolean(),
-                        })
-                      )
-                      .meta({ count: 2 }),
-                  })
-                )
-                .meta({ count: 3 }),
-              risks: z
-                .array(
-                  z.object({
-                    id: z.string(),
-                    description: z.string(),
-                    category: z.enum([
-                      'technical',
-                      'schedule',
-                      'budget',
-                      'scope',
-                      'resource',
-                      'external',
-                    ]),
-                    probability: z.enum([
-                      'unlikely',
-                      'possible',
-                      'likely',
-                      'almost-certain',
-                    ]),
-                    impact: z.enum([
-                      'negligible',
-                      'minor',
-                      'moderate',
-                      'major',
-                      'severe',
-                    ]),
-                    mitigation: z.string(),
-                    ownerId: z.string(),
-                    dueDate: z.string(),
-                  })
-                )
-                .meta({ count: 2 }),
-            })
-          )
-          .meta({ count: 3 }),
-
-        clients: z
-          .array(
-            z.object({
-              id: z.string(),
-              legalName: z.string(),
-              tier: z.enum(['platinum', 'gold', 'silver', 'bronze', 'trial']),
-              industry: z.string(),
-              website: z.string(),
-              accountManagerId: z.string(),
-              headquarters: address,
-              primaryContact: z.object({
-                name: z.string(),
-                title: z.string(),
-                email: z.string(),
-                phone: z.string(),
-              }),
-              secondaryContacts: z
-                .array(
-                  z.object({
-                    name: z.string(),
-                    title: z.string(),
-                    email: z.string(),
-                    phone: z.string().nullable(),
-                    department: z.string(),
-                  })
-                )
-                .meta({ count: 2 }),
-              contracts: z
-                .array(
-                  z.object({
-                    id: z.string(),
-                    type: z.enum(['msa', 'sow', 'nda', 'license', 'retainer']),
-                    title: z.string(),
-                    startDate: z.string(),
-                    endDate: z.string(),
-                    totalValue: money,
-                    autoRenew: z.boolean(),
-                    renewalTerms: z.string().nullable(),
-                    keyTerms: z.array(z.string()),
-                    paymentSchedule: z
-                      .array(
-                        z.object({
-                          id: z.string(),
-                          amount: money,
-                          dueDate: z.string(),
-                          paidDate: z.string().nullable(),
-                          invoiceNumber: z.string(),
-                          status: z.enum([
-                            'scheduled',
-                            'sent',
-                            'paid',
-                            'overdue',
-                            'disputed',
-                          ]),
-                        })
-                      )
-                      .meta({ count: 3 }),
-                  })
-                )
-                .meta({ count: 2 }),
-            })
-          )
-          .meta({ count: 3 }),
-
-        meetings: z
-          .array(
-            z.object({
-              id: z.string(),
-              title: z.string(),
-              scheduledAt: z.string(),
-              durationMinutes: z.number(),
-              location: z.enum(['in-person', 'video', 'phone', 'hybrid']),
-              organizerId: z.string(),
-              status: z.enum([
-                'scheduled',
-                'completed',
-                'cancelled',
-                'rescheduled',
-              ]),
-              relatedProjectId: z.string().nullable(),
-              agenda: z.array(z.string()),
-              attendeeIds: z.array(z.string()).meta({ count: 4 }),
-              actionItems: z
-                .array(
-                  z.object({
-                    description: z.string(),
-                    ownerId: z.string(),
-                    dueDate: z.string().nullable(),
-                    status: z.enum(['open', 'in-progress', 'done']),
-                  })
-                )
-                .meta({ count: 3 }),
-            })
-          )
-          .meta({ count: 4 }),
-
-        generatedAt: z.string(),
-        reportPeriodStart: z.string(),
-        reportPeriodEnd: z.string(),
-        totalActiveEmployees: z.number(),
-        totalOpenProjects: z.number(),
-        totalActiveClients: z.number(),
-        quarterlyRevenueUsd: z.number(),
-        quarterlyExpensesUsd: z.number(),
-      });
-
-      const prompt = `Create a company operations overview page — a quarterly briefing that an executive could scan in a few minutes to understand the state of the business.
-
-**Header**
-- Organization name (organization.legalName, with dba as a subtle subtitle if present) and mission
-- Report period (format reportPeriodStart and reportPeriodEnd as a readable range)
-- Four headline KPIs in a compact row: totalActiveEmployees, totalOpenProjects, totalActiveClients, and quarterly net (quarterlyRevenueUsd − quarterlyExpensesUsd shown with revenue and expenses as context)
-
-**People** (section)
-- A roster of employees grouped or sorted by department — show name (preferredName or firstName + lastName), title, department, office location, and status
-- Surface on-leave and pending-start statuses visibly (badge or accent) — don't hide them in small text
-- Keep each row compact; this is a directory, not a profile page
-
-**Projects** (section — the most detail-rich section)
-- One block per project. Show: code + name, status, priority, phase, confidence level, owner, date range, budget vs actual spend (visual treatment showing over/under budget)
-- Nested: milestones as a compact list with status indicators, tasks as a compact list with status + assignee, and risks with probability/impact signals
-- Give critical priority or high-severity risks visual weight
-
-**Clients** (section)
-- One block per client. Show: legal name, tier (visually distinguish platinum/gold/silver/bronze), industry, account manager, primary contact
-- Contracts as a compact sub-list per client — type, title, value, date range, autoRenew indicator
-- Payment schedule rollup per contract — just totals and count of overdue/disputed payments; don't enumerate every single payment line
-
-**Meetings** (section)
-- Upcoming and recent meetings grouped by status
-- Show: title, scheduled time, duration, location mode, organizer, related project (if any)
-- Action items as a compact sub-list with status + owner
-
-The page is read-only — no forms, no buttons, no checkboxes. Think internal quarterly report: dense enough to be informative, visual enough to scan. Prioritize typographic hierarchy and whitespace over heavy card borders. Don't reflexively wrap every item in a bordered card — a stack of dozens of identical bordered boxes is almost always the wrong choice. Separators, headings, and spacing do most of the work.`;
-
-      return streamGenerate(request, {
+      return streamOrchestrate(request, {
         ...ctx,
         sandbox,
         prompt,
         inputSchema,
+        sectionSystemPrompt: ctx.systemPrompt,
+        orchestratorSystemPrompt: orchestratorSystemPromptRaw,
         debug: true,
       });
     }

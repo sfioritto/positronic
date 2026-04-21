@@ -119,6 +119,56 @@ curl "${CURL_ARGS[@]}" "$URL" | while IFS= read -r line; do
       echo ""
       echo "Done. Total duration: ${TOTAL}ms"
       ;;
+    composed_page)
+      # Orchestrator emitted a composed-page screenshot after a knit round.
+      # Save the 3 viewports to disk as composed-N-{mobile,tablet,desktop}.jpg
+      # so we can inspect them without printing 400KB of base64 to stdout.
+      CIDX=$((${COMPOSED_N:-0}))
+      COMPOSED_N=$((CIDX + 1))
+      echo "$line" | jq -r '.screenshots.mobile'  | base64 -d > "${DIR}/composed-${CIDX}-mobile.jpg"
+      echo "$line" | jq -r '.screenshots.tablet'  | base64 -d > "${DIR}/composed-${CIDX}-tablet.jpg"
+      echo "$line" | jq -r '.screenshots.desktop' | base64 -d > "${DIR}/composed-${CIDX}-desktop.jpg"
+      echo "[composed-page] Wrote ${DIR}/composed-${CIDX}-{mobile,tablet,desktop}.jpg"
+      ;;
+    subagent_tool_start)
+      SEC=$(echo "$line" | jq -r '.section')
+      TOOL=$(echo "$line" | jq -r '.tool')
+      echo "  [${SEC}/${TOOL}] ..."
+      ;;
+    subagent_tool_result)
+      SEC=$(echo "$line" | jq -r '.section')
+      TOOL=$(echo "$line" | jq -r '.tool')
+      STATUS=$(echo "$line" | jq -r '.result.status // .result.type // "ok"')
+      MSG=$(echo "$line" | jq -r '.result.message // empty')
+      if [ -n "$MSG" ]; then
+        echo "  [${SEC}/${TOOL}] ${STATUS}: ${MSG}"
+      else
+        echo "  [${SEC}/${TOOL}] ${STATUS}"
+      fi
+      if [ "$STATUS" = "preview" ]; then
+        APPROVED=$(echo "$line" | jq -r '.result.verdict.approved // false')
+        ISSUE_COUNT=$(echo "$line" | jq -r '.result.verdict.issues // [] | length')
+        BUDGET_EXHAUSTED=$(echo "$line" | jq -r '.result.budgetExhausted // false')
+        SUFFIX=""
+        [ "$BUDGET_EXHAUSTED" = "true" ] && SUFFIX=" [BUDGET EXHAUSTED]"
+        echo "    (approved=${APPROVED}, ${ISSUE_COUNT} issues)${SUFFIX}"
+        if [ "$APPROVED" = "false" ] && [ "$ISSUE_COUNT" -gt 0 ]; then
+          echo "$line" | jq -r '.result.verdict.issues[] | "      - " + .'
+        fi
+      fi
+      ;;
+    subagent_step_finish)
+      # Per-turn sub-agent token usage. Concise summary; the orchestrator-
+      # level step_finish still shows the main running total.
+      SEC=$(echo "$line" | jq -r '.section')
+      IN=$(echo "$line" | jq -r '.step.usage.inputTokens // 0')
+      OUT=$(echo "$line" | jq -r '.step.usage.outputTokens // 0')
+      CACHED=$(echo "$line" | jq -r '.step.usage.cachedInputTokens // 0')
+      TOTAL=$(echo "$line" | jq -r '.step.usage.totalTokens // 0')
+      FINISH=$(echo "$line" | jq -r '.step.finishReason // "?"')
+      printf '  [%s/step] in=%s out=%s cached=%s total=%s  finish=%s\n' \
+        "$SEC" "$IN" "$OUT" "$CACHED" "$TOTAL" "$FINISH"
+      ;;
     error)
       MSG=$(echo "$line" | jq -r '.message')
       NAME=$(echo "$line" | jq -r '.name // empty')
@@ -144,8 +194,10 @@ curl "${CURL_ARGS[@]}" "$URL" | while IFS= read -r line; do
       echo "Saved full error to ${DIR}/error.json"
       ;;
     *)
-      # Unknown event type — dump it
-      echo "[unknown] $line"
+      # Unknown event type — print the type and first 200 chars of the line.
+      # Truncation guards against silently dumping a future media-carrying
+      # event whose handler hasn't been wired up.
+      echo "[unknown:${TYPE}] $(echo "$line" | cut -c1-200)"
       ;;
   esac
 done

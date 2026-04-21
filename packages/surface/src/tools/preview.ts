@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uint8ToBase64 } from '../lib/progress-sanitize.js';
 import type { ObjectGenerator, StreamTool } from '@positronic/core';
 import type { SandboxInstance } from '../sandbox.js';
 import { buildBundle, makeRender } from '../sandbox.js';
@@ -27,7 +28,7 @@ export interface ReviewState {
  */
 export const MAX_FEEDBACK_ATTEMPTS = 3;
 
-const REVIEW_SYSTEM = `You are a strict UI quality reviewer for a code-generation system.
+export const REVIEW_SYSTEM = `You are a strict UI quality reviewer for a code-generation system.
 
 Another LLM just generated a React component and rendered it. You will see THREE full-page screenshots of the same page — the mobile viewport (${VIEWPORT_DIMENSIONS.mobile.width}px wide), the tablet viewport (${VIEWPORT_DIMENSIONS.tablet.width}px wide), and the desktop viewport (${VIEWPORT_DIMENSIONS.desktop.width}px wide). They are attached in that order. Each screenshot captures the entire document height, so you can evaluate every section, not just the above-the-fold portion.
 
@@ -77,20 +78,12 @@ Rules that apply to both passes:
 - Do not suggest code fixes. Describe the visual problem only; the generator will figure out how to fix it.
 - Do not comment on copy/content unless it is obviously broken (e.g. placeholder "Lorem ipsum" left in).`;
 
-const ReviewVerdict = z.object({
+export const ReviewVerdict = z.object({
   approved: z.boolean(),
   issues: z.array(z.string()),
 });
 
 type ReviewResult = z.infer<typeof ReviewVerdict>;
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
 
 export function previewTool(
   sandbox: SandboxInstance,
