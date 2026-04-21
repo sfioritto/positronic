@@ -14,6 +14,7 @@ import {
 } from './screenshot.js';
 import { showComponentSourceTool } from './tools/show-component-source.js';
 import { REVIEW_SYSTEM, ReviewVerdict } from './tools/preview.js';
+import type { RunMetrics } from './lib/metrics.js';
 import {
   stripProgressImageBytes,
   uint8ToBase64,
@@ -201,7 +202,8 @@ function sectionPreviewTool(
   apiToken: string,
   reviewClient: ObjectGenerator,
   inputSchemaTs: string,
-  reviewState: SectionReviewState
+  reviewState: SectionReviewState,
+  metrics?: RunMetrics
 ): StreamTool {
   return {
     description:
@@ -221,11 +223,13 @@ function sectionPreviewTool(
       }
 
       const html = makeRender(bundleResult.bundle!)({ data: previewData });
+      const shotStart = Date.now();
       const shots = await screenshotAllViewports({
         html,
         accountId,
         apiToken,
       });
+      metrics?.record('screenshot', Date.now() - shotStart);
 
       const reviewPrompt = `This is one SECTION of a larger page. Evaluate it against the section brief only — cross-section cohesion is not your concern here.
 
@@ -240,6 +244,7 @@ ${inputSchemaTs}
 
 Attached: three full-page screenshots of this section at mobile (${VIEWPORT_DIMENSIONS.mobile.width}px), tablet (${VIEWPORT_DIMENSIONS.tablet.width}px), and desktop (${VIEWPORT_DIMENSIONS.desktop.width}px), in that order. Approve only if the section fulfills the brief AND is polished across all three viewports.`;
 
+      const reviewStart = Date.now();
       const { object: verdict } = await reviewClient.generateObject({
         schema: ReviewVerdict,
         schemaName: 'ReviewVerdict',
@@ -251,6 +256,7 @@ Attached: three full-page screenshots of this section at mobile (${VIEWPORT_DIME
           data: shots[viewport],
         })),
       });
+      metrics?.record('review', Date.now() - reviewStart);
 
       reviewState.rounds += 1;
       const budgetExhausted =
@@ -345,6 +351,7 @@ export async function runSectionSubagent(params: {
     orchestratorFeedback: string;
   };
   onProgress?: (event: SubagentProgressEvent) => void | Promise<void>;
+  metrics?: RunMetrics;
 }): Promise<SubagentState> {
   const {
     section,
@@ -358,6 +365,7 @@ export async function runSectionSubagent(params: {
     apiToken,
     resumeFrom,
     onProgress,
+    metrics,
   } = params;
 
   validateSectionName(section.name);
@@ -385,7 +393,8 @@ export async function runSectionSubagent(params: {
       apiToken,
       reviewClient,
       inputSchemaTs,
-      reviewState
+      reviewState,
+      metrics
     ),
   };
 
@@ -409,7 +418,9 @@ export async function runSectionSubagent(params: {
           section: section.name,
           tool: name,
         });
+        const toolStart = Date.now();
         const result = await original(input);
+        metrics?.record(`subagent-tool:${name}`, Date.now() - toolStart);
         await onProgress?.({
           type: 'subagent_tool_result',
           section: section.name,

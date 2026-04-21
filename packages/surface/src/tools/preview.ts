@@ -3,6 +3,7 @@ import { uint8ToBase64 } from '../lib/progress-sanitize.js';
 import type { ObjectGenerator, StreamTool } from '@positronic/core';
 import type { SandboxInstance } from '../sandbox.js';
 import { buildBundle, makeRender } from '../sandbox.js';
+import type { RunMetrics } from '../lib/metrics.js';
 import {
   screenshotAllViewports,
   VIEWPORTS,
@@ -100,6 +101,7 @@ export function previewTool(
   options?: {
     debug?: boolean;
     screenshots?: Array<Record<Viewport, Uint8Array>>;
+    metrics?: RunMetrics;
   }
 ): StreamTool {
   return {
@@ -118,11 +120,13 @@ export function previewTool(
 
       const html = makeRender(bundleResult.bundle!)({ data: fakeData });
 
+      const shotStart = Date.now();
       const shots = await screenshotAllViewports({
         html,
         accountId,
         apiToken,
       });
+      options?.metrics?.record('screenshot', Date.now() - shotStart);
 
       if (options?.debug && options.screenshots) {
         options.screenshots.push(shots);
@@ -154,6 +158,7 @@ Attached: three full-page screenshots of the same page at mobile (${
         VIEWPORT_DIMENSIONS.desktop.width
       }px) viewports, in that order. Approve only if the layout satisfies the user's requirements AND is polished across ALL three viewports.`;
 
+      const reviewStart = Date.now();
       const { object: verdict } = await reviewConfig.client.generateObject({
         schema: ReviewVerdict,
         schemaName: 'ReviewVerdict',
@@ -165,6 +170,7 @@ Attached: three full-page screenshots of the same page at mobile (${
           data: shots[viewport],
         })),
       });
+      options?.metrics?.record('review', Date.now() - reviewStart);
 
       const budgetExhausted =
         !verdict.approved &&

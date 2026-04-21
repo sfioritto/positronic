@@ -10,6 +10,7 @@ import type { SandboxInstance, RenderPage } from './sandbox.js';
 import { buildBundle, makeRender } from './sandbox.js';
 import { generateFakeData } from './lib/generate-fake-data.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
+import { RunMetrics, instrumentClient } from './lib/metrics.js';
 import { screenshotAllViewports, type Viewport } from './screenshot.js';
 import {
   runSectionSubagent,
@@ -87,6 +88,7 @@ interface OrchestratorRuntime {
   onProgress?: (event: ProgressEvent) => void | Promise<void>;
   debugScreenshots: PreviewScreenshots[];
   debug: boolean;
+  metrics: RunMetrics;
 }
 
 /**
@@ -104,11 +106,13 @@ async function composedPageScreenshots(
     );
   }
   const html = makeRender(bundleResult.bundle!)({ data: runtime.previewData });
+  const shotStart = Date.now();
   const shots = await screenshotAllViewports({
     html,
     accountId: runtime.accountId,
     apiToken: runtime.apiToken,
   });
+  runtime.metrics.record('screenshot', Date.now() - shotStart);
   return {
     raw: shots,
     record: {
@@ -160,6 +164,7 @@ function dispatchSectionsTool(runtime: OrchestratorRuntime): StreamTool {
             accountId: runtime.accountId,
             apiToken: runtime.apiToken,
             onProgress: runtime.onProgress,
+            metrics: runtime.metrics,
           });
           runtime.subagentStates.set(section.name, state);
         })
@@ -239,6 +244,7 @@ function sendFeedbackTool(runtime: OrchestratorRuntime): StreamTool {
             apiToken: runtime.apiToken,
             resumeFrom: { state: priorState, orchestratorFeedback: fb },
             onProgress: runtime.onProgress,
+            metrics: runtime.metrics,
           });
           runtime.subagentStates.set(name, newState);
         })
@@ -337,9 +343,9 @@ export async function orchestrate(params: {
   previewData?: Record<string, unknown>;
 }): Promise<GenerateResult> {
   const {
-    client,
-    orchestratorClient,
-    reviewClient,
+    client: rawClient,
+    orchestratorClient: rawOrchestratorClient,
+    reviewClient: rawReviewClient,
     sandbox,
     sectionSystemPrompt,
     orchestratorSystemPrompt,
@@ -352,18 +358,32 @@ export async function orchestrate(params: {
     previewData: cachedPreviewData,
   } = params;
 
+  const metrics = new RunMetrics();
+  const client = instrumentClient(rawClient, metrics);
+  const reviewClient = rawReviewClient
+    ? instrumentClient(rawReviewClient, metrics)
+    : client;
+  const orchestratorClient = rawOrchestratorClient
+    ? instrumentClient(rawOrchestratorClient, metrics)
+    : client;
+
   const startTime = Date.now();
   const inputSchemaTs = zodToTypescript(inputSchema, 'Data');
 
   // Fake data — cached from run.sh or regenerated. Orchestrator pattern is
   // read-only for v1 (no outputSchema).
-  const previewData =
-    cachedPreviewData ??
-    ((await generateFakeData({
+  let previewData: Record<string, unknown>;
+  if (cachedPreviewData) {
+    previewData = cachedPreviewData;
+  } else {
+    const fakeDataStart = Date.now();
+    previewData = (await generateFakeData({
       client,
       schema: inputSchema,
       prompt,
-    })) as Record<string, unknown>);
+    })) as Record<string, unknown>;
+    metrics.record('fake-data', Date.now() - fakeDataStart);
+  }
 
   await onProgress?.({ type: 'fake_data_done', data: previewData });
 
@@ -372,7 +392,7 @@ export async function orchestrate(params: {
     previewData,
     inputSchemaTs,
     client,
-    reviewClient: reviewClient ?? client,
+    reviewClient,
     sectionSystemPrompt,
     accountId,
     apiToken,
@@ -382,6 +402,7 @@ export async function orchestrate(params: {
     onProgress,
     debugScreenshots: [],
     debug,
+    metrics,
   };
 
   const rawTools: Record<string, StreamTool> = {
@@ -401,7 +422,9 @@ export async function orchestrate(params: {
       ...tool,
       async execute(input: unknown) {
         await onProgress?.({ type: 'tool_start', tool: name });
+        const toolStart = Date.now();
         const result = await original(input);
+        metrics.record(`tool:${name}`, Date.now() - toolStart);
         await onProgress?.({
           type: 'tool_result',
           tool: name,
@@ -436,9 +459,7 @@ Keep section briefs tight and specific. A sub-agent given "render the people sec
 
 Do NOT rewrite sections yourself — that's the sub-agent's job. You orchestrate.`;
 
-  const orchestrator = orchestratorClient ?? client;
-
-  const result = await orchestrator.streamText({
+  const result = await orchestratorClient.streamText({
     system: orchestratorSystemPrompt,
     prompt: userPrompt,
     tools,
@@ -498,6 +519,9 @@ Do NOT rewrite sections yourself — that's the sub-agent's job. You orchestrate
       totalDurationMs: Date.now() - startTime,
     };
   }
+
+  metrics.markEnd();
+  console.log(metrics.report());
 
   return finalResult;
 }

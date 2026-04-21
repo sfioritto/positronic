@@ -9,6 +9,7 @@ import type { SandboxInstance, RenderPage } from './sandbox.js';
 import { buildBundle, makeRender } from './sandbox.js';
 import { generateFakeData } from './lib/generate-fake-data.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
+import { RunMetrics, instrumentClient } from './lib/metrics.js';
 import type { Viewport } from './screenshot.js';
 import { writeComponentTool } from './tools/write-component.js';
 import { showComponentSourceTool } from './tools/show-component-source.js';
@@ -65,8 +66,8 @@ export async function generate(params: {
   previewData?: Record<string, unknown>;
 }): Promise<GenerateResult> {
   const {
-    client,
-    reviewClient,
+    client: rawClient,
+    reviewClient: rawReviewClient,
     sandbox,
     systemPrompt,
     accountId,
@@ -78,6 +79,12 @@ export async function generate(params: {
     onProgress,
     previewData: cachedPreviewData,
   } = params;
+
+  const metrics = new RunMetrics();
+  const client = instrumentClient(rawClient, metrics);
+  const reviewClient = rawReviewClient
+    ? instrumentClient(rawReviewClient, metrics)
+    : client;
 
   // Convert Zod schemas to TypeScript strings at the boundary
   const inputSchemaTs = zodToTypescript(inputSchema, 'Data');
@@ -98,13 +105,18 @@ export async function generate(params: {
   // data matches the real shape exactly, so the UI feedback loop only needs
   // to cover viewports — not data volume. Skipped when the caller hands us
   // a cached dataset (e.g. run.sh re-feeding an earlier run's fake-data.json).
-  const previewData =
-    cachedPreviewData ??
-    ((await generateFakeData({
+  let previewData: Record<string, unknown>;
+  if (cachedPreviewData) {
+    previewData = cachedPreviewData;
+  } else {
+    const fakeDataStart = Date.now();
+    previewData = (await generateFakeData({
       client,
       schema: inputSchema,
       prompt,
-    })) as Record<string, unknown>);
+    })) as Record<string, unknown>;
+    metrics.record('fake-data', Date.now() - fakeDataStart);
+  }
 
   await onProgress?.({ type: 'fake_data_done', data: previewData });
 
@@ -126,13 +138,13 @@ export async function generate(params: {
       accountId,
       apiToken,
       {
-        client: reviewClient ?? client,
+        client: reviewClient,
         userPrompt: prompt,
         inputSchemaTs,
         outputSchemaTs,
       },
       reviewState,
-      { debug, screenshots }
+      { debug, screenshots, metrics }
     ),
     submit: submitTool(sandbox, outputFieldNames, previewData, reviewState),
   };
@@ -150,7 +162,9 @@ export async function generate(params: {
       ...tool,
       async execute(input: unknown) {
         await onProgress?.({ type: 'tool_start', tool: name });
+        const toolStart = Date.now();
         const result = await original(input);
+        metrics.record(`tool:${name}`, Date.now() - toolStart);
         await onProgress?.({ type: 'tool_result', tool: name, result });
         return result;
       },
@@ -238,6 +252,9 @@ Instructions:
       totalDurationMs: Date.now() - startTime,
     };
   }
+
+  metrics.markEnd();
+  console.log(metrics.report());
 
   return result;
 }
