@@ -7,10 +7,10 @@ import type {
 import type { SandboxInstance } from './sandbox.js';
 import { buildBundle, makeRender, typeCheck } from './sandbox.js';
 import {
-  screenshotAllViewports,
   VIEWPORTS,
   VIEWPORT_DIMENSIONS,
   type Viewport,
+  screenshotAllViewports,
 } from './screenshot.js';
 import { showComponentSourceTool } from './tools/show-component-source.js';
 import { REVIEW_SYSTEM, ReviewVerdict } from './tools/preview.js';
@@ -70,11 +70,9 @@ function validateSectionName(name: string) {
 }
 
 /**
- * Stamp a per-section mount entry that renders ONLY this section as the page
- * root. Bundled separately from other sections so parallel sub-agents don't
- * collide on /workspace/page.bundle.js. Content mirrors the Dockerfile's
- * base mount template (flushSync → fonts.ready → data-rendered) so the
- * screenshot timing fix still applies.
+ * Stamp a per-section mount entry so each sub-agent's preview builds only
+ * its own section. Parallel sub-agents each get their own bundle namespace
+ * via the outPrefix passed to buildBundle.
  */
 async function stampSectionMount(
   sandbox: SandboxInstance,
@@ -189,9 +187,9 @@ interface SectionReviewState {
 }
 
 /**
- * Section-scoped preview tool. Builds only this section's mount entry,
- * screenshots it at the three viewports, and runs the reviewer against the
- * section brief (not the whole-page prompt).
+ * Section-scoped preview tool. Hands the currently-on-disk section source to
+ * the PreviewSession, which waits for Vite's HMR to land the update on this
+ * section's persistent preview page and screenshots at three viewports.
  */
 function sectionPreviewTool(
   sandbox: SandboxInstance,
@@ -213,6 +211,8 @@ function sectionPreviewTool(
       const bundleResult = await buildBundle(sandbox, {
         entryPath: `/workspace/mount-${sectionName}.tsx`,
         outPrefix: `section-${sectionName}`,
+        label: `section:${sectionName}`,
+        metrics,
       });
       if (!bundleResult.success) {
         return {
@@ -224,11 +224,7 @@ function sectionPreviewTool(
 
       const html = makeRender(bundleResult.bundle!)({ data: previewData });
       const shotStart = Date.now();
-      const shots = await screenshotAllViewports({
-        html,
-        accountId,
-        apiToken,
-      });
+      const shots = await screenshotAllViewports({ html, accountId, apiToken });
       metrics?.record('screenshot', Date.now() - shotStart);
 
       const reviewPrompt = `This is one SECTION of a larger page. Evaluate it against the section brief only — cross-section cohesion is not your concern here.

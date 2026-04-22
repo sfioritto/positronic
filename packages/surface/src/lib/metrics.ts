@@ -104,34 +104,77 @@ function fmtMs(ms: number): string {
 
 /**
  * Wrap an ObjectGenerator so every generateObject / streamText call records
- * token usage against `metrics`, keyed by the client's declared modelId.
- * Preserves modelId/identity/apiKey so callers that read them still work.
+ * token usage + per-step duration against `metrics`. `tag` labels the client
+ * (orchestrator / subagent / reviewer) so metric keys stay separable when
+ * roles share a model — without it they'd collapse into one metric line,
+ * hiding which role was slow.
  *
- * For streamText, records one LLM call per step (each step is a round-trip)
- * via the onStepFinish hook — chains through to the caller's own
- * onStepFinish so existing progress reporting is untouched.
+ * Each call also emits a `[llm-trace]` stdout line so wrangler's log can be
+ * grepped for slow calls and correlated with input size / token counts.
  */
 export function instrumentClient(
   base: ObjectGenerator,
-  metrics: RunMetrics
+  metrics: RunMetrics,
+  tag: string = 'default'
 ): ObjectGenerator {
+  const modelKey = base.modelId ?? 'unknown';
+  const labelBase = `${modelKey}:${tag}`;
+
   return {
     identity: base.identity,
     modelId: base.modelId,
     apiKey: base.apiKey,
 
     async generateObject(params) {
+      const start = Date.now();
+      const p = params as { attachments?: Array<{ data?: Uint8Array }> };
+      const attachmentKB = Math.round(
+        (p.attachments ?? []).reduce(
+          (s, a) => s + (a?.data?.byteLength ?? 0),
+          0
+        ) / 1024
+      );
       const result = await base.generateObject(params);
+      const ms = Date.now() - start;
       metrics.recordLLMCall(base.modelId, result.usage?.totalTokens);
+      metrics.record(`llm-call:${labelBase}`, ms);
+      const usage = result.usage as
+        | { inputTokens?: number; outputTokens?: number }
+        | undefined;
+      console.log(
+        `[llm-trace] ${labelBase} generateObject dur=${ms}ms ` +
+          `in=${usage?.inputTokens ?? '?'} out=${usage?.outputTokens ?? '?'} ` +
+          `attachmentKB=${attachmentKB}`
+      );
       return result;
     },
 
     streamText: (params) => {
       const outerOnStepFinish = params.onStepFinish;
+      let stepStart = Date.now();
+      let stepIdx = 0;
       return base.streamText({
         ...params,
         onStepFinish: async (step) => {
+          const ms = Date.now() - stepStart;
+          stepStart = Date.now();
+          stepIdx += 1;
           metrics.recordLLMCall(base.modelId, step.usage?.totalTokens);
+          metrics.record(`llm-step:${labelBase}`, ms);
+          const u = step.usage as
+            | {
+                inputTokens?: number;
+                outputTokens?: number;
+                cachedInputTokens?: number;
+              }
+            | undefined;
+          console.log(
+            `[llm-trace] ${labelBase} step=${stepIdx} dur=${ms}ms ` +
+              `in=${u?.inputTokens ?? '?'} out=${u?.outputTokens ?? '?'} ` +
+              `cached=${u?.cachedInputTokens ?? '?'} finish=${
+                step.finishReason ?? '?'
+              }`
+          );
           if (outerOnStepFinish) await outerOnStepFinish(step);
         },
       });

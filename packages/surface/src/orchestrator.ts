@@ -11,7 +11,7 @@ import { buildBundle, makeRender } from './sandbox.js';
 import { generateFakeData } from './lib/generate-fake-data.js';
 import { zodToTypescript } from './lib/zod-to-typescript.js';
 import { RunMetrics, instrumentClient } from './lib/metrics.js';
-import { screenshotAllViewports, type Viewport } from './screenshot.js';
+import { type Viewport, screenshotAllViewports } from './screenshot.js';
 import {
   runSectionSubagent,
   type Section,
@@ -99,7 +99,10 @@ interface OrchestratorRuntime {
 async function composedPageScreenshots(
   runtime: OrchestratorRuntime
 ): Promise<{ record: Record<Viewport, string>; raw: PreviewScreenshots }> {
-  const bundleResult = await buildBundle(runtime.sandbox);
+  const bundleResult = await buildBundle(runtime.sandbox, {
+    label: 'composed',
+    metrics: runtime.metrics,
+  });
   if (!bundleResult.success) {
     throw new Error(
       `Failed to build composed page: ${bundleResult.errors ?? 'unknown'}`
@@ -112,7 +115,7 @@ async function composedPageScreenshots(
     accountId: runtime.accountId,
     apiToken: runtime.apiToken,
   });
-  runtime.metrics.record('screenshot', Date.now() - shotStart);
+  runtime.metrics.record('composed:screenshot', Date.now() - shotStart);
   return {
     raw: shots,
     record: {
@@ -359,13 +362,13 @@ export async function orchestrate(params: {
   } = params;
 
   const metrics = new RunMetrics();
-  const client = instrumentClient(rawClient, metrics);
+  const client = instrumentClient(rawClient, metrics, 'subagent');
   const reviewClient = rawReviewClient
-    ? instrumentClient(rawReviewClient, metrics)
-    : client;
+    ? instrumentClient(rawReviewClient, metrics, 'reviewer')
+    : instrumentClient(rawClient, metrics, 'reviewer');
   const orchestratorClient = rawOrchestratorClient
-    ? instrumentClient(rawOrchestratorClient, metrics)
-    : client;
+    ? instrumentClient(rawOrchestratorClient, metrics, 'orchestrator')
+    : instrumentClient(rawClient, metrics, 'orchestrator');
 
   const startTime = Date.now();
   const inputSchemaTs = zodToTypescript(inputSchema, 'Data');
@@ -482,17 +485,16 @@ Do NOT rewrite sections yourself — that's the sub-agent's job. You orchestrate
     },
   });
 
-  // If the orchestrator never called dispatch_sections (pathological —
-  // model bailed before doing anything), there's no composed page to render.
   if (runtime.sections.length === 0) {
     throw new Error(
       'Orchestrator terminated without dispatching any sections — no page was composed.'
     );
   }
 
-  // Final bundle using the knitted /workspace/component.tsx that the last
-  // dispatch/feedback call wrote.
-  const bundleResult = await buildBundle(sandbox);
+  const bundleResult = await buildBundle(sandbox, {
+    label: 'final',
+    metrics,
+  });
   if (!bundleResult.success) {
     throw new Error(`Failed to build final bundle: ${bundleResult.errors}`);
   }
@@ -506,9 +508,7 @@ Do NOT rewrite sections yourself — that's the sub-agent's job. You orchestrate
     const truncatedSubagentStates = Object.fromEntries(
       Array.from(runtime.subagentStates.entries()).map(([name, state]) => [
         name,
-        {
-          componentSource: state.componentSource,
-        },
+        { componentSource: state.componentSource },
       ])
     );
     finalResult.log = {

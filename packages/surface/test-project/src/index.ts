@@ -7,7 +7,7 @@ import {
   makeRender,
   type SandboxInstance,
 } from '../../src/sandbox.js';
-import { screenshot } from '../../src/screenshot.js';
+import { screenshot, screenshotAllViewports } from '../../src/screenshot.js';
 import {
   orchestrate,
   type ProgressEvent as OrchestratorProgressEvent,
@@ -140,8 +140,12 @@ function getGenerateContext(rawEnv: Env) {
     google('gemini-flash-lite-latest'),
     rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
   );
+  // Was gemini-3.1-pro-preview — measured at avg 23s/step, max 63s/step, 5
+  // calls per dev-summary run ≈ 115s of serial orchestrator time. Flash-lite
+  // matches the sub-agent/reviewer model — if taxonomy + cohesion review
+  // hold up at the cheaper tier, this is the biggest single wall-clock lever.
   const orchestratorClient = new VercelClient(
-    google('gemini-3.1-pro-preview'),
+    google('gemini-flash-lite-latest'),
     rawEnv.GOOGLE_GENERATIVE_AI_API_KEY
   );
   const systemPrompt = systemPromptRaw.replaceAll(

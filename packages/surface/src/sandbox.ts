@@ -1,3 +1,5 @@
+import type { RunMetrics } from './lib/metrics.js';
+
 interface TypeCheckResult {
   success: boolean;
   errors?: string;
@@ -65,9 +67,11 @@ export async function typeCheck(
   // tsconfig so they don't fail on each other's half-written peer sections
   // (or on mount-*.tsx entries whose import targets haven't been written
   // yet). Single-agent flow stays on the default project-wide tsconfig.
+  // Invoke tsc directly rather than via npx — npx adds ~600ms of resolve/
+  // cache overhead per call.
   const cmd = options?.configPath
-    ? `npx tsc --noEmit --project ${options.configPath}`
-    : 'npx tsc --noEmit';
+    ? `tsc --noEmit --project ${options.configPath}`
+    : 'tsc --noEmit';
   const result = await sandbox.exec(cmd);
 
   if (result.success) {
@@ -140,31 +144,51 @@ export async function validateForm(
 
 export async function buildBundle(
   sandbox: SandboxInstance,
-  options?: { entryPath?: string; outPrefix?: string }
+  options?: {
+    entryPath?: string;
+    outPrefix?: string;
+    label?: string;
+    metrics?: RunMetrics;
+  }
 ): Promise<BuildBundleResult> {
   // Per-section previews pass their own mount entry + an outPrefix so parallel
   // sub-agents don't fight over /workspace/page.bundle.js. Defaults preserve the
-  // single-agent path.
+  // single-agent path. `label` + `metrics` together record per-build esbuild
+  // and tailwind durations for flame-graph-style inspection.
   const entryPath = options?.entryPath ?? '/workspace/mount.tsx';
   const outPrefix = options?.outPrefix ?? 'page';
   const jsOut = `/workspace/${outPrefix}.bundle.js`;
   const cssOut = `/workspace/${outPrefix}.css`;
+  const label = options?.label;
+  const metrics = options?.metrics;
 
-  const bundleResult = await sandbox.exec(
-    `esbuild ${entryPath} --bundle --format=iife --jsx=automatic --outfile=${jsOut} --loader:.tsx=tsx`
-  );
+  const runEsbuild = async () => {
+    const start = Date.now();
+    const r = await sandbox.exec(
+      `esbuild ${entryPath} --bundle --format=iife --jsx=automatic --outfile=${jsOut} --loader:.tsx=tsx`
+    );
+    if (metrics && label)
+      metrics.record(`esbuild:${label}`, Date.now() - start);
+    return r;
+  };
+  const runTailwind = async () => {
+    const start = Date.now();
+    const r = await sandbox.exec(
+      `tailwindcss -i /workspace/tailwind.css -o ${cssOut} --content "/workspace/component.tsx,/workspace/sections/*.tsx,/workspace/surface/components/*.tsx" --minify`
+    );
+    if (metrics && label)
+      metrics.record(`tailwind:${label}`, Date.now() - start);
+    return r;
+  };
+
+  const [bundleResult, cssResult] = await Promise.all([
+    runEsbuild(),
+    runTailwind(),
+  ]);
 
   if (!bundleResult.success) {
     return { success: false, errors: parseErrors(bundleResult) };
   }
-
-  // Tailwind content glob covers every file that could carry class names —
-  // main component, per-section components, shadcn library. Harmless when a
-  // directory is empty.
-  const cssResult = await sandbox.exec(
-    `npx @tailwindcss/cli -i /workspace/tailwind.css -o ${cssOut} --content "/workspace/component.tsx,/workspace/sections/*.tsx,/workspace/surface/components/*.tsx" --minify`
-  );
-
   if (!cssResult.success) {
     return { success: false, errors: parseErrors(cssResult) };
   }
