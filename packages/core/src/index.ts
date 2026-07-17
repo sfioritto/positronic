@@ -159,7 +159,7 @@ export type { UIComponent } from './ui/types.js';
 
 // UI utilities
 export { generateFormToken } from './ui/generate-page-html.js';
-export { parseFormData } from './ui/parse-form-data.js';
+export { parseFormData, coerceFormResponse } from './ui/parse-form-data.js';
 
 // Webhook token validation
 export { validateWebhookToken } from './validate-webhook-token.js';
