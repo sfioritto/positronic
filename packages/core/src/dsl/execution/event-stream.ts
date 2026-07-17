@@ -27,6 +27,7 @@ import type { Pages } from '../pages.js';
 import type { UIComponent } from '../../ui/types.js';
 import { generatePage } from '../../ui/generate-page.js';
 import { generatePageHtml } from '../../ui/generate-page-html.js';
+import { coerceFormResponse } from '../../ui/parse-form-data.js';
 import type { Store, StoreProvider } from '../../store/types.js';
 import type { Files } from '../../files/types.js';
 import type { PluginAdapter, ConfiguredPlugin } from '../../plugins/types.js';
@@ -1500,7 +1501,7 @@ The output must conform to the provided schema.`,
     if (this.currentResponse && pageConfig.formSchema) {
       this.currentState = {
         ...this.currentState,
-        ...this.currentResponse,
+        ...coerceFormResponse(pageConfig.formSchema, this.currentResponse),
       };
       this.currentResponse = undefined;
       yield* this.completeStep(step, prevState);

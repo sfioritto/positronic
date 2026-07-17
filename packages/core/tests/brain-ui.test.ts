@@ -353,6 +353,73 @@ describe('Custom HTML pages (.page() with html)', () => {
     expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
   });
 
+  it('should coerce form values to arrays when the schema expects them', async () => {
+    const testBrain = brain('HTML Array Coercion Test')
+      .step('Init', () => ({ items: ['a'] }))
+      .page('Review', ({ state }) => ({
+        html: node(
+          Form,
+          {},
+          node('select', { name: 'selections' }),
+          node('input', { type: 'checkbox', name: 'picked' })
+        ),
+        formSchema: z.object({
+          selections: z.array(z.string()),
+          picked: z.array(z.string()),
+          tags: z.array(z.string()).optional(),
+          skipped: z.array(z.string()).optional(),
+          confirmed: z.array(z.string()),
+          note: z.string(),
+        }),
+      }))
+      .step('After', ({ state }) => ({
+        ...state,
+        count: state.selections.length + state.picked.length,
+      }));
+
+    const events: BrainEvent<any>[] = [];
+    for await (const event of testBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      pages: mockPages as any,
+      env: { origin: 'https://example.com', secrets: {} },
+      brainRunId: 'test-run',
+      resume: {
+        state: { items: ['a'] },
+        stepIndex: 1,
+        // HTML form encoding submits a lone select/checkbox as a scalar
+        // and omits a group with nothing checked entirely
+        webhookResponse: {
+          selections: 'thread-1|receipt-1',
+          tags: 'urgent',
+          confirmed: ['x', 'y'],
+          note: 'hi',
+        },
+      },
+    })) {
+      events.push(event);
+    }
+
+    let finalState: any = { items: ['a'] };
+    for (const event of events) {
+      if (event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+        finalState = applyPatches(finalState, [(event as any).patch]);
+      }
+    }
+
+    // Lone scalars wrapped, including behind .optional()
+    expect(finalState.selections).toEqual(['thread-1|receipt-1']);
+    expect(finalState.tags).toEqual(['urgent']);
+    // Missing required array defaults to [], missing optional stays unset
+    expect(finalState.picked).toEqual([]);
+    expect(finalState.skipped).toBeUndefined();
+    // Real arrays and non-array fields pass through untouched
+    expect(finalState.confirmed).toEqual(['x', 'y']);
+    expect(finalState.note).toBe('hi');
+    expect(finalState.count).toBe(1);
+    expect(events.some((e) => e.type === BRAIN_EVENTS.COMPLETE)).toBe(true);
+  });
+
   it('should call onCreated callback for html pages', async () => {
     const onCreated = jest.fn<(page: any) => void>();
 
