@@ -154,7 +154,7 @@ describe('renderHtml', () => {
       expect(html).toContain('<title>Test</title>');
       expect(html).toContain('<h1>Hello</h1>');
       expect(html).toContain('<meta charset="UTF-8">');
-      expect(html).toContain("script-src 'none'");
+      expect(html).toContain("script-src 'unsafe-inline'");
       expect(html).toContain('</html>');
     });
 
@@ -162,6 +162,23 @@ describe('renderHtml', () => {
       const html = wrapHtmlDocument('content');
       expect(html).toContain('<!DOCTYPE html>');
       expect(html).not.toContain('<title>');
+    });
+  });
+
+  describe('raw-text elements', () => {
+    it('does not entity-escape style contents', () => {
+      const tree = node('style', {}, "body { font-family: 'Segoe UI'; }");
+      expect(renderHtml(tree)).toBe("<style>body { font-family: 'Segoe UI'; }</style>");
+    });
+
+    it('does not entity-escape script contents', () => {
+      const tree = node('script', {}, 'if (a && b) { alert("hi"); }');
+      expect(renderHtml(tree)).toBe('<script>if (a && b) { alert("hi"); }</script>');
+    });
+
+    it('neutralizes closing tags inside raw text', () => {
+      const tree = node('script', {}, 'var s = "</script>";');
+      expect(renderHtml(tree)).toBe('<script>var s = "<\\/script>";</script>');
     });
   });
 
