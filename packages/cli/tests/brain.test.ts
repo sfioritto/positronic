@@ -1931,6 +1931,66 @@ describe('CLI Integration: positronic brain commands', () => {
       }
     });
 
+    it('should pass startsAt through when using --starts-at=N syntax', async () => {
+      const env = await createTestEnv();
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'rerun',
+          'run-123',
+          '--starts-at=12',
+        ]);
+
+        const foundSuccess = await waitForOutput(
+          /Brain rerun started successfully/i,
+          30
+        );
+        expect(foundSuccess).toBe(true);
+
+        const foundStepInfo = await waitForOutput(/from step 12/i, 30);
+        expect(foundStepInfo).toBe(true);
+
+        // Verify the server received startsAt as the number 12
+        const calls = env.server.getLogs();
+        const rerunCall = calls.find((c) => c.method === 'rerunBrain');
+        expect(rerunCall).toBeDefined();
+        expect(rerunCall?.args[0]).toBe('run-123');
+        expect(rerunCall?.args[1]).toBe(12);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
+    it('should show the server error when starts-at is beyond the completed steps', async () => {
+      const env = await createTestEnv();
+      const { server } = env;
+
+      // The run only completed 4 steps, so starts-at=12 is out of range
+      server.setRerunCompletedSteps('run-123', 4);
+
+      const px = await env.start();
+
+      try {
+        const { waitForOutput } = await px([
+          'rerun',
+          'run-123',
+          '--starts-at=12',
+        ]);
+
+        const foundErrorTitle = await waitForOutput(/Brain Rerun Failed/i, 30);
+        expect(foundErrorTitle).toBe(true);
+
+        const foundRangeError = await waitForOutput(
+          /Cannot rerun from step 12: run only has 4 completed steps/i,
+          30
+        );
+        expect(foundRangeError).toBe(true);
+      } finally {
+        await env.stopAndCleanup();
+      }
+    });
+
     it('should handle run ID not found error', async () => {
       const env = await createTestEnv();
       const px = await env.start();

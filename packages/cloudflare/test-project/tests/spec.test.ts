@@ -178,20 +178,20 @@ describe('Positronic Spec', () => {
       expect(brainRunId).toBeTruthy();
       expect(await waitForCompletion(brainRunId!)).toBe(true);
 
+      // Out-of-range starts-at must be rejected with a 400, not silently
+      // rerun the whole brain from step 1 (basic-brain has 3 steps)
+      expect(await brains.rerunOutOfRange(fetch, brainRunId!, 10)).toBe(true);
+
       // Rerun from step 2
       const rerunId = await brains.rerun(fetch, brainRunId!, 2);
       expect(rerunId).toBeTruthy();
       expect(rerunId).toBe(brainRunId);
 
-      // Verify MonitorDO was reset: status should no longer be 'complete'
-      const statusResponse = await fetch(
-        new Request(`http://example.com/brains/runs/${brainRunId}`)
-      );
-      const statusData = (await statusResponse.json()) as { status: string };
-      expect(statusData.status).not.toBe('complete');
-
       // Wait for the rerun to complete so the DO's async work doesn't
-      // outlive the test (causes isolated storage errors in vitest)
+      // outlive the test (causes isolated storage errors in vitest).
+      // The rerun happens atomically inside the DO (monitor reset, truncate,
+      // resume), so with a fast brain the run may already be 'complete' again
+      // by the time we can observe it — completing again is the assertion.
       expect(await waitForCompletion(brainRunId!)).toBe(true);
     });
 

@@ -571,12 +571,30 @@ export class BrainRunnerDO extends DurableObject<Env> {
         topLevelStepCount++;
         if (topLevelStepCount === stepsToKeep) {
           cutoffEventId = eventId;
-          break;
         }
       }
     }
 
     // If startsAt is 1, cutoff stays at the START event's ID
+
+    // starts-at may point at most one past the last completed step. Anything
+    // beyond that has no cutoff point and would silently fall back to
+    // rerunning the whole brain from step 1.
+    if (stepsToKeep > topLevelStepCount) {
+      return {
+        success: false as const,
+        error: `Cannot rerun from step ${startsAt}: run only has ${topLevelStepCount} completed steps (starts-at must be between 1 and ${
+          topLevelStepCount + 1
+        })`,
+      };
+    }
+
+    // Reset MonitorDO tracking state now that the rerun is validated, before
+    // wakeUp() starts emitting events for the resumed execution
+    const monitorStub = this.env.MONITOR_DO.get(
+      this.env.MONITOR_DO.idFromName('singleton')
+    );
+    await monitorStub.prepareForRerun(this.brainRunId);
 
     // Find R2 keys that need to be deleted (overflow events beyond the cutoff)
     const r2Rows = this.sql
@@ -605,6 +623,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
     // Resume from the truncation point
     await this.wakeUp(this.brainRunId);
+
+    return { success: true as const };
   }
 
   async alarm() {
