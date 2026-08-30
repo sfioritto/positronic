@@ -28,6 +28,8 @@ const VOID_ELEMENTS = new Set([
   'wbr',
 ]);
 
+const RAW_TEXT_ELEMENTS = new Set(['script', 'style']);
+
 const PROP_ALIASES: Record<string, string> = {
   className: 'class',
   htmlFor: 'for',
@@ -152,6 +154,22 @@ function renderNode(node: TemplateChild, context: RenderHtmlContext): string {
       return `<${tag}${attrs}>`;
     }
 
+    // script and style are raw-text elements: entity-escaping their contents
+    // corrupts CSS/JS. Only string/number children the author wrote end up
+    // here, so emit them verbatim (a closing tag in the content is the one
+    // thing that could break out, so neutralize it).
+    if (RAW_TEXT_ELEMENTS.has(tag)) {
+      const raw = templateNode.children
+        .filter(
+          (child): child is string | number =>
+            typeof child === 'string' || typeof child === 'number'
+        )
+        .map(String)
+        .join('')
+        .replace(new RegExp(`</${tag}`, 'gi'), `<\\/${tag}`);
+      return `<${tag}${attrs}>${raw}</${tag}>`;
+    }
+
     const body = renderChildren(templateNode.children, context);
     return `<${tag}${attrs}>${body}</${tag}>`;
   }
@@ -185,7 +203,7 @@ export function wrapHtmlDocument(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="script-src 'none';">
+<meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline';">
 ${title ? `<title>${escapeHtml(title)}</title>` : ''}
 </head>
 <body>
