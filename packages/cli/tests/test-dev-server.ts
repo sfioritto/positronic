@@ -205,6 +205,7 @@ export class TestDevServer implements PositronicDevServer {
   private nockScope: nock.Scope | null = null;
   private logCallbacks: Array<(message: string) => void> = [];
   private killBrainRunErrors: Map<string, number> = new Map();
+  private rerunCompletedSteps: Map<string, number> = new Map();
   private errorCallbacks: Array<(message: string) => void> = [];
   private warningCallbacks: Array<(message: string) => void> = [];
 
@@ -369,6 +370,22 @@ export class TestDevServer implements PositronicDevServer {
       // Check if run ID exists
       if (body.runId === 'non-existent-run') {
         return [404, { error: `Brain run '${body.runId}' not found` }];
+      }
+
+      // Mirror the backend contract: starts-at beyond the run's completed
+      // steps is rejected rather than silently rerunning from step 1
+      const completedSteps = this.rerunCompletedSteps.get(body.runId);
+      if (completedSteps !== undefined && body.startsAt > completedSteps + 1) {
+        return [
+          400,
+          {
+            error: `Cannot rerun from step ${
+              body.startsAt
+            }: run only has ${completedSteps} completed steps (starts-at must be between 1 and ${
+              completedSteps + 1
+            })`,
+          },
+        ];
       }
 
       // Destructive rerun returns the same run ID plus the brain title
@@ -1687,6 +1704,10 @@ export class TestDevServer implements PositronicDevServer {
 
   getSchedules(): MockSchedule[] {
     return Array.from(this.schedules.values());
+  }
+
+  setRerunCompletedSteps(runId: string, completedSteps: number) {
+    this.rerunCompletedSteps.set(runId, completedSteps);
   }
 
   setProjectTimezone(timezone: string) {

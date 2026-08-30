@@ -975,6 +975,53 @@ export const brains = {
       return null;
     }
   },
+
+  /**
+   * Test POST /brains/runs/rerun with a startsAt beyond the run's completed
+   * steps - must return 400 with an error message rather than silently
+   * rerunning the whole brain from step 1.
+   */
+  async rerunOutOfRange(
+    fetch: Fetch,
+    runId: string,
+    startsAt: number
+  ): Promise<boolean> {
+    try {
+      const request = new Request('http://example.com/brains/runs/rerun', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ runId, startsAt }),
+      });
+
+      const response = await fetch(request);
+
+      if (response.status !== 400) {
+        console.error(
+          `POST /brains/runs/rerun with out-of-range startsAt returned ${response.status}, expected 400`
+        );
+        return false;
+      }
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!data.error || typeof data.error !== 'string') {
+        console.error(
+          `Expected error to be a string, got ${typeof data.error}`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to test POST /brains/runs/rerun out-of-range:`,
+        error
+      );
+      return false;
+    }
+  },
   /**
    * Test DELETE /brains/runs/:runId - Kill/cancel a running brain run
    */

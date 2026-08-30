@@ -37,6 +37,34 @@ const basicBrain = brain({
     message: `${state.hello}, ${state.world}`,
   }));
 
+// Module-level execution counter so tests can observe which steps actually
+// re-execute on a destructive rerun (state alone can't distinguish a kept
+// step from a re-executed one — these steps are otherwise deterministic).
+const rerunStepRuns: Record<string, number> = {};
+const countStepRun = (name: string) =>
+  (rerunStepRuns[name] = (rerunStepRuns[name] ?? 0) + 1);
+
+const rerunTestBrain = brain({
+  title: 'rerun-test-brain',
+  description: 'Each step records how many times it has executed',
+})
+  .step('Step 1', ({ state }) => ({
+    ...state,
+    step1Runs: countStepRun('step1'),
+  }))
+  .step('Step 2', ({ state }) => ({
+    ...state,
+    step2Runs: countStepRun('step2'),
+  }))
+  .step('Step 3', ({ state }) => ({
+    ...state,
+    step3Runs: countStepRun('step3'),
+  }))
+  .step('Step 4', ({ state }) => ({
+    ...state,
+    step4Runs: countStepRun('step4'),
+  }));
+
 const delayedBrain = brain({
   title: 'delayed-brain',
   description: 'A brain that includes delays',
@@ -561,6 +589,11 @@ const brainManifest = {
     filename: 'basic-brain',
     path: 'brains/basic-brain.ts',
     brain: basicBrain,
+  },
+  'rerun-test-brain': {
+    filename: 'rerun-test-brain',
+    path: 'brains/rerun-test-brain.ts',
+    brain: rerunTestBrain,
   },
   'delayed-brain': {
     filename: 'delayed-brain',

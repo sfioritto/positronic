@@ -32,9 +32,9 @@ export const BrainRerun = ({ runId, startsAt }: BrainRerunProps) => {
           };
           setBrainTitle(data.brainTitle);
           setSuccess(true);
-        } else if (response.status === 404) {
+        } else if (response.status === 404 || response.status === 400) {
           const errorData = await response.json();
-          setError(errorData.error || `Run not found`);
+          setError(errorData.error || `Rerun failed`);
         } else {
           const errorText = await response.text();
           setError(`Server returned ${response.status}: ${errorText}`);

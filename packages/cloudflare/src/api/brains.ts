@@ -138,8 +138,10 @@ brains.post('/runs/rerun', async (context: Context) => {
   const stub = namespace.get(doId);
 
   try {
-    await monitorStub.prepareForRerun(runId);
-    await stub.rerun(startsAt);
+    const result = await stub.rerun(startsAt);
+    if (!result.success) {
+      return context.json({ error: result.error }, 400);
+    }
   } catch (error: any) {
     return context.json({ error: error.message || 'Rerun failed' }, 500);
   }
