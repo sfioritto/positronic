@@ -77,8 +77,13 @@ export function coerceFormResponse(
 
     const value = coerced[key];
     if (value === undefined) {
-      if (!fieldSchema.isOptional()) {
+      // .default() makes isOptional() true, so ask zod what undefined parses
+      // to; never assign undefined back — it clobbers state on spread.
+      const parsed = fieldSchema.safeParse(undefined);
+      if (!parsed.success) {
         coerced[key] = [];
+      } else if (parsed.data !== undefined) {
+        coerced[key] = parsed.data;
       }
     } else if (!Array.isArray(value)) {
       coerced[key] = [value];
