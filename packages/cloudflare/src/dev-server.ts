@@ -920,6 +920,8 @@ export class CloudflareDevServer implements PositronicDevServer {
     // Ensure .positronic directory and manifest are up to date, but don't force regeneration
     await this.setup();
 
+    this.loadProjectEnv(projectRoot);
+
     // Check for required Cloudflare credentials in environment variables
     if (
       !process.env.CLOUDFLARE_API_TOKEN ||
@@ -1052,6 +1054,23 @@ export class CloudflareDevServer implements PositronicDevServer {
   }
 
   /**
+   * Load the project .env into process.env for deploys. Values already
+   * present in the environment (e.g. shell exports) take precedence.
+   */
+  private loadProjectEnv(projectRoot: string): void {
+    const envPath = path.join(projectRoot, '.env');
+    if (!fs.existsSync(envPath)) {
+      return;
+    }
+    const parsed = dotenv.parse(fs.readFileSync(envPath));
+    for (const [key, value] of Object.entries(parsed)) {
+      if (process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    }
+  }
+
+  /**
    * Set up secrets required for the secrets management API.
    * This allows the deployed worker to manage its own secrets via HTTP API.
    */
@@ -1064,6 +1083,7 @@ export class CloudflareDevServer implements PositronicDevServer {
       { name: 'CLOUDFLARE_ACCOUNT_ID', value: accountId },
       { name: 'CF_SCRIPT_NAME', value: projectName },
     ];
+
 
     for (const secret of secrets) {
       await this.setWorkerSecret(
