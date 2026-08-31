@@ -3,6 +3,7 @@ import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { Fragment, Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
+import { coerceFormResponse } from '../src/ui/parse-form-data.js';
 import { z } from 'zod';
 import { jest } from '@jest/globals';
 import {
@@ -19,6 +20,30 @@ function node(
 ): TemplateNode {
   return { type, props, children };
 }
+
+describe('coerceFormResponse', () => {
+  // .default() makes isOptional() true, so a missing form field needs
+  // explicit handling — otherwise it stays undefined and crashes any step
+  // that iterates it, the same as an unhandled required array field would.
+  it('applies .default([]) for an array field missing from the response', () => {
+    const schema = z.object({ decisions: z.array(z.string()).default([]) });
+    expect(coerceFormResponse(schema, {})).toEqual({ decisions: [] });
+  });
+
+  it('applies a non-empty .default() for an array field missing from the response', () => {
+    const schema = z.object({
+      notes: z.array(z.string()).default(['fallback']),
+    });
+    expect(coerceFormResponse(schema, {})).toEqual({ notes: ['fallback'] });
+  });
+
+  it('leaves a field present in the response untouched by its default', () => {
+    const schema = z.object({ notes: z.array(z.string()).default(['x']) });
+    expect(coerceFormResponse(schema, { notes: ['y'] })).toEqual({
+      notes: ['y'],
+    });
+  });
+});
 
 describe('UI steps', () => {
   // Mock components for UI generation
