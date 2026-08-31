@@ -1084,6 +1084,25 @@ export class CloudflareDevServer implements PositronicDevServer {
       { name: 'CF_SCRIPT_NAME', value: projectName },
     ];
 
+    const rootPublicKey = process.env.ROOT_PUBLIC_KEY;
+    if (rootPublicKey) {
+      // Compact multi-line JWK values to a single line, same as .dev.vars sync
+      let compacted = rootPublicKey;
+      try {
+        compacted = JSON.stringify(JSON.parse(rootPublicKey));
+      } catch {
+        // Not valid JSON, push as-is
+      }
+      secrets.push({ name: 'ROOT_PUBLIC_KEY', value: compacted });
+    } else {
+      console.warn(
+        '⚠️  ROOT_PUBLIC_KEY not found in the environment or project .env.\n' +
+          '   The deployed server will reject all API requests until it is set.\n' +
+          '   Add ROOT_PUBLIC_KEY to your .env and run `px deploy` again — the\n' +
+          '   CLI will offer to create one from your SSH key if it is missing.'
+      );
+    }
+
 
     for (const secret of secrets) {
       await this.setWorkerSecret(

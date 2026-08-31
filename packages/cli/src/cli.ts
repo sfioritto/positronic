@@ -6,6 +6,7 @@ import type { PositronicDevServer } from '@positronic/spec';
 import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { parse as parseEnv } from 'dotenv';
 
 // Brain components
 import { BrainList } from './components/brain-list.js';
@@ -56,6 +57,7 @@ import { ProjectSelect } from './components/project-select.js';
 import { ProjectShow } from './components/project-show.js';
 import { ProjectCreate } from './components/project-create.js';
 import { ProjectRemove } from './components/project-remove.js';
+import { ProjectAuthSetup } from './components/project-auth-setup.js';
 
 // Store components
 import { StoreExplorer } from './components/store-explorer.js';
@@ -101,6 +103,20 @@ function parseKeyValueOptions(
     parsed[key] = value;
   }
   return parsed;
+}
+
+// Check whether the project has a root public key available for deploys,
+// either in the environment or in the project .env file
+function hasRootPublicKey(projectRootDir: string): boolean {
+  if (process.env.ROOT_PUBLIC_KEY) {
+    return true;
+  }
+  const envPath = join(projectRootDir, '.env');
+  if (!existsSync(envPath)) {
+    return false;
+  }
+  const parsed = parseEnv(readFileSync(envPath));
+  return Boolean(parsed.ROOT_PUBLIC_KEY);
 }
 
 // Helper function to parse key=value state values with type coercion
@@ -687,15 +703,32 @@ export function buildCli(options: CliOptions) {
       'Deploy the project to production',
       () => {},
       async () => {
-        try {
-          // Deploy
-          await server.deploy();
-        } catch (error) {
-          console.error(
-            'Deployment failed:',
-            error instanceof Error ? error.message : String(error)
+        const runDeploy = async () => {
+          try {
+            await server.deploy();
+          } catch (error) {
+            console.error(
+              'Deployment failed:',
+              error instanceof Error ? error.message : String(error)
+            );
+            process.exit(1);
+          }
+        };
+
+        // The deployed server rejects every API request until a root public
+        // key is configured, so make sure one exists before deploying.
+        if (hasRootPublicKey(server.projectRootDir)) {
+          await runDeploy();
+        } else {
+          console.log(
+            'No ROOT_PUBLIC_KEY found in the project .env — the deployed server needs one to authenticate you.'
           );
-          process.exit(1);
+          render(
+            React.createElement(ProjectAuthSetup, {
+              projectDir: server.projectRootDir,
+              onComplete: runDeploy,
+            })
+          );
         }
       }
     );

@@ -19,11 +19,19 @@ export interface DiscoveredKey {
 }
 
 /**
+ * The directory searched for SSH keys. Defaults to ~/.ssh; overridable
+ * via POSITRONIC_SSH_DIR for tests and non-standard setups.
+ */
+function sshKeyDir(): string {
+  return process.env.POSITRONIC_SSH_DIR || join(homedir(), '.ssh');
+}
+
+/**
  * Discover available SSH keys in the ~/.ssh directory
  * Scans for common key files and returns metadata about each key
  */
 export function discoverSSHKeys(): DiscoveredKey[] {
-  const sshDir = join(homedir(), '.ssh');
+  const sshDir = sshKeyDir();
 
   if (!existsSync(sshDir)) {
     return [];
@@ -255,13 +263,11 @@ export interface GenerateSSHKeyResult {
  * Generate a new SSH key using ssh-keygen
  * Creates an Ed25519 key with no passphrase
  */
-export function generateSSHKey(
-  keyPath: string = join(homedir(), '.ssh', 'id_ed25519')
-): GenerateSSHKeyResult {
-  const expandedPath = expandPath(keyPath);
+export function generateSSHKey(keyPath?: string): GenerateSSHKeyResult {
+  const expandedPath = expandPath(keyPath ?? join(sshKeyDir(), 'id_ed25519'));
 
   // Ensure the .ssh directory exists
-  const sshDir = join(homedir(), '.ssh');
+  const sshDir = sshKeyDir();
   if (!existsSync(sshDir)) {
     mkdirSync(sshDir, { mode: 0o700 });
   }
