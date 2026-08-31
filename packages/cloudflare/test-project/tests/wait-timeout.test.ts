@@ -73,7 +73,7 @@ describe('Wait Timeout Tests', () => {
     const doId = testEnv.BRAIN_RUNNER_DO.idFromName(brainRunId);
     const stub = testEnv.BRAIN_RUNNER_DO.get(doId);
     await stub.queueSignal({ type: 'KILL' });
-    await stub.wakeUp(brainRunId);
+    await stub.wakeUp();
 
     // Step 4: Watch again — should see CANCELLED event
     const resumeWatchRequest = await createAuthenticatedRequest(watchUrl);
@@ -347,7 +347,7 @@ describe('Wait Timeout Tests', () => {
     const doId = testEnv.BRAIN_RUNNER_DO.idFromName(brainRunId);
     const stub = testEnv.BRAIN_RUNNER_DO.get(doId);
     await stub.queueSignal({ type: 'KILL' });
-    await stub.wakeUp(brainRunId);
+    await stub.wakeUp();
 
     // Step 6: Watch again — should see CANCELLED event
     const watch3Request = await createAuthenticatedRequest(watchUrl);

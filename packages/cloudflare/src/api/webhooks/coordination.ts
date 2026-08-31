@@ -92,7 +92,7 @@ export async function queueWebhookAndWakeUp(
 
     // Queue the signal first, then wake up the brain
     await stub.queueSignal({ type: 'WEBHOOK_RESPONSE', response });
-    await stub.wakeUp(brainRunId);
+    await stub.wakeUp();
 
     return {
       received: true,
