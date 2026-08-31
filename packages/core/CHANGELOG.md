@@ -1,5 +1,32 @@
 # @positronic/core
 
+## 0.0.79
+
+### Patch Changes
+
+- Page, rerun, and .map() improvements:
+
+  **Features**
+
+  - `.page()` accepts a `slug` option for stable page URLs
+  - Pages may now include JavaScript (CSP relaxed to allow js in pages)
+  - Brain-level `client` option; `.map()` defaults to skip-on-error
+  - `.map()` prompt `message`/`system` functions receive the step context as an optional second argument
+
+  **Bug fixes**
+
+  - Rerun: run UUID is derived inside `wakeUp()` and passed to `MonitorDO.prepareForRerun`, so alarm/rerun resumes attribute pages, run-scoped files, and rerun resets to the correct run instead of the DO hex id
+  - Rerun: `--starts-at` values beyond the run's completed steps are rejected instead of silently rerunning from step 1
+  - Page forms: responses are coerced to match `formSchema` array fields, zod `.default()` values are applied for fields missing from a response, and an inner brain's page form response can no longer be swallowed by a later outer page step
+  - Fixed `IterateResult` inflation caused by structuredClone/toJSON mismatch
+  - Fixed `Heading.tsx` JSX namespace lookup under the automatic JSX runtime
+
+  **Internal**
+
+  - Renamed `PagesService` to `Pages` (`createPagesService` → `createPages`)
+  - Simplified CLI (deduped commands, merged confirm hooks, removed dead code) and core (DRYed event-stream and resources)
+  - Tightened store typing and platform service interfaces; added state isolation tests
+
 ## 0.0.78
 
 ### Patch Changes
