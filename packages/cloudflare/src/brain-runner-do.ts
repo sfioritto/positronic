@@ -594,7 +594,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const monitorStub = this.env.MONITOR_DO.get(
       this.env.MONITOR_DO.idFromName('singleton')
     );
-    await monitorStub.prepareForRerun(this.brainRunId);
+    // MonitorDO keys on the run UUID from the START event, not the DO's own id
+    await monitorStub.prepareForRerun((startEntry.event as any).brainRunId);
 
     // Find R2 keys that need to be deleted (overflow events beyond the cutoff)
     const r2Rows = this.sql
