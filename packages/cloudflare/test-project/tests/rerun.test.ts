@@ -188,4 +188,59 @@ describe('POST /brains/runs/rerun --starts-at', () => {
     const eventsAfter = await watchToCompletion(testEnv, brainRunId);
     expect(finalStateFromEvents(eventsAfter)).toEqual(firstRunState);
   });
+
+  // rerun() resumes execution via wakeUp(), which must hand the pages/files
+  // services the original run UUID rather than the DO's own hex id — otherwise
+  // pages created after a rerun would be attributed to an id no other
+  // component (like MonitorDO) knows about.
+  it('attributes pages created after rerun to the original run UUID', async () => {
+    const testEnv = env as TestEnv;
+
+    // --- Run auto-slug-brain to completion ---
+    const createRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brainTitle: 'auto-slug-brain' }),
+      }
+    );
+    const createContext = createExecutionContext();
+    const createResponse = await worker.fetch(
+      createRequest,
+      testEnv,
+      createContext
+    );
+    expect(createResponse.status).toBe(201);
+    const { brainRunId } = await createResponse.json<{ brainRunId: string }>();
+    await waitOnExecutionContext(createContext);
+
+    await watchToCompletion(testEnv, brainRunId);
+
+    // --- Rerun from step 1 ---
+    const rerunRequest = await createAuthenticatedRequest(
+      'http://example.com/brains/runs/rerun',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId: brainRunId, startsAt: 1 }),
+      }
+    );
+    const rerunContext = createExecutionContext();
+    const rerunResponse = await worker.fetch(
+      rerunRequest,
+      testEnv,
+      rerunContext
+    );
+    expect(rerunResponse.status).toBe(200);
+    await waitOnExecutionContext(rerunContext);
+
+    // --- Watch the rerun to completion and inspect the resulting page slug ---
+    const rerunEvents = await watchToCompletion(testEnv, brainRunId);
+    const rerunState = finalStateFromEvents(rerunEvents);
+
+    expect(rerunState.pageSlug).toMatch(
+      new RegExp(`^page-${brainRunId.slice(0, 8)}-`)
+    );
+  });
 });

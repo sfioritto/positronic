@@ -622,7 +622,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     await this.ctx.storage.deleteAlarm();
 
     // Resume from the truncation point
-    await this.wakeUp(this.brainRunId);
+    await this.wakeUp();
 
     return { success: true as const };
   }
@@ -633,7 +633,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       this.clearWaitTimeout(timeout.brainRunId);
       await this.queueSignal({ type: 'KILL' });
     }
-    await this.wakeUp(this.brainRunId);
+    await this.wakeUp();
   }
 
   /**
@@ -801,7 +801,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * Webhook response data comes from signals, not as a parameter.
    * This method reconstructs state and calls BrainRunner.resume().
    */
-  async wakeUp(brainRunId: string) {
+  async wakeUp() {
     // Clear any pending timeout and cancel the alarm to prevent spurious alarm
     // fires after explicit resume. Safe because wakeUp() is only called when a
     // brain is suspended (waiting/paused), never during active iterate execution.
@@ -821,7 +821,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     );
 
     if (!startEvent) {
-      throw new Error(`No START event found for brain run ${brainRunId}`);
+      throw new Error(`No START event found for brain run ${this.brainRunId}`);
     }
 
     const brainTitle = (startEvent as any).brainTitle;
@@ -831,19 +831,18 @@ export class BrainRunnerDO extends DurableObject<Env> {
     // Read run owner from durable storage (set once in start(), not from events)
     const ownerId = this.getRunOwner();
     if (!ownerId) {
-      throw new Error(`No run owner found for brain run ${brainRunId}`);
+      throw new Error(`No run owner found for brain run ${this.brainRunId}`);
     }
     const currentUser = { name: ownerId };
 
-    // Use the brainRunId from the START event, not the parameter.
-    // alarm() passes state.id.toString() (the DO hex ID), but the brain was
-    // originally started with a UUID. Events must use the original UUID so
-    // MonitorDO can correlate them with the existing brain_runs row.
-    const originalBrainRunId = (startEvent as any).brainRunId || brainRunId;
+    // Every brain run is started with a UUID, and that UUID always appears
+    // on its START event. Use it (not the DO's hex id) so resumed pages and
+    // run-scoped files are attributed to the same run other components know.
+    const brainRunId = (startEvent as any).brainRunId;
 
     if (!brainTitle) {
       throw new Error(
-        `Brain title not found in START event for brain run ${brainRunId}`
+        `Brain title not found in START event for brain run ${this.brainRunId}`
       );
     }
 
@@ -864,15 +863,12 @@ export class BrainRunnerDO extends DurableObject<Env> {
       .resume(brainToRun, {
         currentUser,
         machine,
-        brainRunId: originalBrainRunId,
+        brainRunId,
         options,
         signal: this.abortController!.signal,
       })
       .catch((err: any) => {
-        console.error(
-          `[DO ${originalBrainRunId}] BrainRunner wakeUp failed:`,
-          err
-        );
+        console.error(`[DO ${brainRunId}] BrainRunner wakeUp failed:`, err);
         throw err;
       })
       .finally(() => {
