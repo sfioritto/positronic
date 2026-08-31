@@ -578,9 +578,12 @@ export class BrainEventStream<
           });
 
       // Context has been forwarded to the inner brain — clear so outer
-      // brain's later steps don't consume them.
+      // brain's later steps don't consume them. The webhook response belongs
+      // to the suspended step inside the inner brain, not to a later outer
+      // page step.
       if (hasInnerResume) {
         this.resume = undefined;
+        this.currentResponse = undefined;
       }
 
       // Track nesting depth so we only collect patches from the direct

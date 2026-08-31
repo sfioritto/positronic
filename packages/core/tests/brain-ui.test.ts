@@ -506,4 +506,75 @@ describe('Custom HTML pages (.page() with html)', () => {
       }
     }).rejects.toThrow("cannot have both 'prompt' and 'html'");
   });
+
+  it("creates the later outer page instead of consuming the inner page's webhook response", async () => {
+    const outerOnCreated = jest.fn<(page: any) => void>();
+
+    const innerBrain = brain<{}, { proposals: string[] }>('Inner Review').page(
+      'Inner review page',
+      () => ({
+        html: node(
+          Form,
+          {},
+          node('input', { type: 'text', name: 'decisions' })
+        ),
+        formSchema: z.object({ decisions: z.string() }),
+      })
+    );
+
+    const outerBrain = brain('Outer With Two Pages')
+      .step('Init', () => ({ proposals: ['a'] }))
+      .brain('Inner review', innerBrain, {
+        initialState: ({ state }) => state,
+      })
+      .page('Later outer page', () => ({
+        html: node(Form, {}, node('input', { type: 'text', name: 'answers' })),
+        formSchema: z.object({ answers: z.string() }),
+        onCreated: outerOnCreated,
+      }));
+
+    // Resume exactly as the DO would after the inner page's form was
+    // submitted: outer at the .brain() step, inner at its page step, with
+    // the form response attached.
+    const events: BrainEvent<any>[] = [];
+    for await (const event of outerBrain.run({
+      client: mockClient,
+      currentUser: { name: 'test-user' },
+      pages: mockPages as any,
+      env: { origin: 'https://example.com', secrets: {} },
+      brainRunId: 'test-run',
+      resume: {
+        state: { proposals: ['a'] },
+        stepIndex: 1,
+        innerStack: [{ state: { proposals: ['a'] }, stepIndex: 0 }],
+        webhookResponse: { decisions: 'keep' },
+      },
+    })) {
+      events.push(event);
+      if (event.type === BRAIN_EVENTS.WEBHOOK) {
+        break;
+      }
+    }
+
+    // The inner page step consumed the response and completed
+    const innerComplete = events.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        (e as any).stepTitle === 'Inner review page'
+    );
+    expect(innerComplete).toBeDefined();
+
+    // The later outer page must be created and suspend on its own webhook.
+    // It must NOT swallow the already-consumed inner response and complete
+    // silently (skipping page creation and onCreated).
+    expect(mockPages.create).toHaveBeenCalledTimes(1);
+    expect(outerOnCreated).toHaveBeenCalledTimes(1);
+    expect(events.some((e) => e.type === BRAIN_EVENTS.WEBHOOK)).toBe(true);
+    const laterPageComplete = events.find(
+      (e) =>
+        e.type === BRAIN_EVENTS.STEP_COMPLETE &&
+        (e as any).stepTitle === 'Later outer page'
+    );
+    expect(laterPageComplete).toBeUndefined();
+  });
 });
