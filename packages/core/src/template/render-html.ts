@@ -55,7 +55,7 @@ const BOOLEAN_ATTRS = new Set([
   'selected',
 ]);
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

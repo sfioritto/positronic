@@ -1,7 +1,7 @@
 import { brain as coreBrain, Brain } from './builder/brain.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { State, JsonObject } from './types.js';
-import type { UIComponent } from '../ui/types.js';
+import type { PageCatalog } from '../page/schema.js';
 import type { ConfiguredPlugin, PluginsFromArray } from '../plugins/types.js';
 
 /**
@@ -9,16 +9,15 @@ import type { ConfiguredPlugin, PluginsFromArray } from '../plugins/types.js';
  */
 export interface CreateBrainConfig<
   TPlugins extends readonly ConfiguredPlugin[] = readonly ConfiguredPlugin[],
-  TComponents extends Record<string, UIComponent<any>> = {},
 > {
   /** Plugins available to all brains */
   plugins?: TPlugins;
-  /** UI components for generative UI steps */
-  components?: TComponents;
+  /** Component catalog for generated pages */
+  catalog?: PageCatalog;
 }
 
 /**
- * Creates a project-level brain function with pre-configured plugins and components.
+ * Creates a project-level brain function with pre-configured plugins and page catalog.
  *
  * Plugin types are inferred from the array and propagated to all brains
  * created by the returned factory function.
@@ -27,19 +26,18 @@ export interface CreateBrainConfig<
  * ```typescript
  * import { createBrain } from '@positronic/core';
  * import { mem0 } from '@positronic/mem0';
- * import { components } from './components/index.js';
+ * import { catalog } from './components/index.js';
  *
  * export const brain = createBrain({
  *   plugins: [mem0.setup({ provider })],
- *   components,
+ *   catalog,
  * });
  * ```
  */
 export function createBrain<
   const TPlugins extends readonly ConfiguredPlugin[] = readonly [],
-  TComponents extends Record<string, UIComponent<any>> = {},
->(config: { plugins?: TPlugins; components?: TComponents }) {
-  const { plugins, components } = config;
+>(config: CreateBrainConfig<TPlugins>) {
+  const { plugins, catalog } = config;
 
   // Overload 1: Builder pattern with title string
   function brain<
@@ -65,8 +63,8 @@ export function createBrain<
   ): any {
     let base = coreBrain(titleOrConfig as any);
 
-    if (components) {
-      base = base.withComponents(components) as any;
+    if (catalog) {
+      base = base.withCatalog(catalog) as any;
     }
 
     if (plugins) {

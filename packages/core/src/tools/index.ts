@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { Tool, ToolWaitFor, StepContext } from '../dsl/types.js';
 import type { WebhookRegistration } from '../dsl/webhook.js';
-import { generatePage as generatePageCore } from '../ui/generate-page.js';
-import { generatePageHtml } from '../ui/generate-page-html.js';
+import { generateSpec } from '../page/generate-spec.js';
+import { generatePageHtml } from '../page/page-html.js';
 import { parseDuration } from '../dsl/duration.js';
 
 /**
@@ -69,9 +69,9 @@ const generatePageInputSchema = z.object({
     .record(z.string(), z.unknown())
     .optional()
     .describe(
-      'Structured data for template bindings ({{path.to.value}} syntax). ' +
-        'Pass the objects/arrays you want to display. The UI generator infers the shape ' +
-        'and creates bindings to render all items. Example: { articles: [...], user: { name: "..." } }'
+      'Structured data the page displays. Pass the objects/arrays you want shown; ' +
+        'the page generator sees their shape and binds the page to them. ' +
+        'Example: { articles: [...], user: { name: "..." } }'
     ),
 });
 
@@ -87,7 +87,7 @@ const generatePageInputSchema = z.object({
  * you must call waitForWebhook to pause and wait for the form submission.
  * Before calling waitForWebhook, ensure the user knows the page URL.
  *
- * Requires components and pages to be configured via createBrain or withComponents().
+ * Requires a catalog and pages to be configured via createBrain or withCatalog().
  *
  * The description is enriched at runtime with available component information.
  */
@@ -96,7 +96,7 @@ export const generatePage: Tool<typeof generatePageInputSchema> = {
 
 Sometimes you need more than simple notifications to communicate with users. This tool creates web pages that can display formatted content, dashboards, or forms to collect information.
 
-Pass structured data via the 'data' parameter to populate the page with dynamic content. The page generator uses {{path.to.value}} template bindings to render your data.
+Pass structured data via the 'data' parameter to populate the page with dynamic content. The page generator binds the page to your data.
 
 RETURNS: { url: string, webhook: { slug: string, identifier: string, token: string } | null }
 - url: The page URL
@@ -111,37 +111,23 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     url: string;
     webhook: { slug: string; identifier: string; token: string } | null;
   }> {
-    const { components, pages, client, env, brainRunId, stepId } = context;
+    const { catalog, pages, client, env, brainRunId, stepId } = context;
     const hasForm = input.hasForm ?? true;
 
-    if (!components || Object.keys(components).length === 0) {
+    if (!catalog) {
       throw new Error(
-        'generatePage requires components to be configured. ' +
-          'Use createBrain({ components }) or brain.withComponents() to register UI components.'
+        'generatePage requires a catalog to be configured. ' +
+          'Use createBrain({ catalog }) or brain.withCatalog() to register UI components.'
       );
     }
 
-    const uiResult = await generatePageCore({
+    const { spec } = await generateSpec({
       client,
       prompt: input.prompt,
-      components,
-      data: (input.data ?? {}) as Record<string, unknown>,
+      catalog,
+      props: input.data,
+      hasForm,
     });
-
-    if (!uiResult.rootId) {
-      const placementCount = uiResult.placements.length;
-      if (placementCount === 0) {
-        throw new Error(
-          `Page generation failed - no components were generated. ` +
-            `The LLM may not have understood the prompt. Try being more specific.`
-        );
-      } else {
-        throw new Error(
-          `Page generation failed - no root component found. ` +
-            `${placementCount} component(s) were placed but all have a parentId.`
-        );
-      }
-    }
 
     // Create webhook info only if hasForm is true
     let webhookInfo: {
@@ -169,9 +155,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
 
     // Generate HTML page
     const html = generatePageHtml({
-      placements: uiResult.placements,
-      rootId: uiResult.rootId,
-      data: (input.data ?? {}) as Record<string, unknown>,
+      spec,
       title: hasForm ? 'Generated Form' : 'Generated Page',
       formAction,
     });

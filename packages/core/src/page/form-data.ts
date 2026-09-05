@@ -34,7 +34,7 @@ export function parseFormData(formData: FormData): Record<string, unknown> {
 // Inspect _zod.def.type instead of using instanceof: brain bundles carry
 // their own copy of zod, so schema instances that cross a bundle boundary
 // fail instanceof checks against this module's zod classes.
-function schemaType(schema: z.ZodTypeAny): string | undefined {
+export function schemaType(schema: z.ZodTypeAny): string | undefined {
   return (schema as any)?._zod?.def?.type;
 }
 
@@ -48,7 +48,7 @@ const WRAPPERS = new Set([
   'nonoptional',
 ]);
 
-function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
+export function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
   let current: any = schema;
   while (true) {
     const type = schemaType(current);

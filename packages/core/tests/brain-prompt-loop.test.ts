@@ -10,6 +10,7 @@ import {
   mockClient,
 } from './brain-test-helpers.js';
 import type { Tool, SignalProvider } from '../src/dsl/types.js';
+import { testCatalog } from './page-catalog.js';
 
 // Helper: make a generateText response with a tool call
 function toolCallResponse(
@@ -322,12 +323,8 @@ describe('.prompt() with loop', () => {
       toolCallResponse('done', { result: 'ok' }, 'call-2')
     );
 
-    const fakeComponents = {
-      MyComponent: { component: () => null, description: 'A test component' },
-    };
-
     const testBrain = brain('test')
-      .withComponents(fakeComponents)
+      .withCatalog(testCatalog)
       .prompt('Cap', () => ({
         message: 'Capture context',
         outputSchema: z.object({ result: z.string() }),
@@ -343,7 +340,7 @@ describe('.prompt() with loop', () => {
     expect(receivedContext.client).toBeDefined();
     expect(receivedContext.brainRunId).toBeDefined();
     expect(receivedContext.currentUser).toEqual({ name: 'test-user' });
-    expect(receivedContext.components).toBe(fakeComponents);
+    expect(receivedContext.catalog).toBe(testCatalog);
   });
 
   it('text and tool calls in same response', async () => {

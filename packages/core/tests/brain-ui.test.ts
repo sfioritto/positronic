@@ -3,7 +3,7 @@ import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
-import { coerceFormResponse } from '../src/ui/parse-form-data.js';
+import { coerceFormResponse } from '../src/page/form-data.js';
 import { z } from 'zod';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -12,6 +12,7 @@ import {
   mockGenerateObject,
   mockClient,
 } from './brain-test-helpers.js';
+import { testCatalog, jsonl, element, submitButton } from './page-catalog.js';
 
 function node(
   type: any,
@@ -46,18 +47,6 @@ describe('coerceFormResponse', () => {
 });
 
 describe('UI steps', () => {
-  // Mock components for UI generation
-  const mockComponents = {
-    Form: {
-      component: () => null,
-      description: 'A form container',
-    },
-    Input: {
-      component: () => null,
-      description: 'A text input',
-    },
-  };
-
   // Mock pages service
   const mockPages = {
     create: vi.fn<any>().mockResolvedValue({
@@ -77,17 +66,28 @@ describe('UI steps', () => {
     mockGenerateObject.mockClear();
     mockPages.create.mockClear();
 
-    // Mock streamText to return a valid YAML template for generatePage
+    // Mock streamText to return a valid spec for generateSpec: one rating
+    // input bound under /form plus the submit button
     mockStreamText.mockResolvedValue({
       toolCalls: [],
-      text: `Form:\n  children:\n    - Input:\n        name: "field1"\n        label: "Field 1"`,
+      text: jsonl(
+        { op: 'add', path: '/root', value: 'page' },
+        element('page', 'Stack', {}, { children: ['rating', 'submit'] }),
+        element('rating', 'Input', {
+          label: 'Rating',
+          name: 'rating',
+          type: 'number',
+          value: { $bindState: '/form/rating' },
+        }),
+        submitButton
+      ),
       usage: { totalTokens: 100 },
     });
   });
 
   it('should suspend at WEBHOOK when outputSchema is provided (initial run)', async () => {
     const testBrain = brain('UI Form Test')
-      .withComponents(mockComponents)
+      .withCatalog(testCatalog)
       .step('Init', () => ({ userName: 'Alice' }))
       .page('Collect Feedback', ({ state }) => ({
         prompt: `Create a form for ${state.userName}`,
@@ -127,7 +127,7 @@ describe('UI steps', () => {
     });
 
     const testBrain = brain('UI Resume Test')
-      .withComponents(mockComponents)
+      .withCatalog(testCatalog)
       .step('Init', () => ({ userName: 'Alice' }))
       .page('Collect Feedback', ({ state }) => ({
         prompt: `Create a form for ${state.userName}`,
@@ -182,7 +182,7 @@ describe('UI steps', () => {
 
   it('should complete immediately for read-only UI (no outputSchema)', async () => {
     const testBrain = brain('Read-only UI Test')
-      .withComponents(mockComponents)
+      .withCatalog(testCatalog)
       .step('Init', () => ({ data: 'hello' }))
       .page('Dashboard', ({ state }) => ({
         prompt: `Show dashboard for ${state.data}`,
@@ -293,7 +293,7 @@ describe('Custom HTML pages (.page() with html)', () => {
   });
 
   it('should NOT require components for html pages', async () => {
-    // No withComponents() call — should still work for html pages
+    // No withCatalog() call — should still work for html pages
     const testBrain = brain('No Components HTML Test').page('Simple', () => ({
       html: node('p', {}, 'World'),
     }));

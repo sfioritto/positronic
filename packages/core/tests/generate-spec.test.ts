@@ -1,17 +1,8 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { z } from 'zod'; // Still needed for schema in tests
-import { generatePage } from '../src/ui/generate-page.js';
+import { z } from 'zod';
+import { generateSpec } from '../src/page/generate-spec.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
-import type { UIComponent } from '../src/ui/types.js';
-import type { ResolvedBinding } from '../src/yaml/types.js';
-
-// Type for the validation result returned by validate_template tool
-type ValidationResult = {
-  valid: boolean;
-  errors: Array<{ type: string; message: string }>;
-  extractedFields?: Array<{ name: string; type: string }>;
-  resolvedBindings?: ResolvedBinding[];
-};
+import { testCatalog, jsonl, element, submitButton } from './page-catalog.js';
 
 const mockStreamText = vi.fn<ObjectGenerator['streamText']>();
 const mockClient: ObjectGenerator = {
@@ -19,779 +10,237 @@ const mockClient: ObjectGenerator = {
   streamText: mockStreamText,
 };
 
-// Simple test components
-const Input: UIComponent<{ name: string; label: string }> = {
-  component: () => null,
-  description: 'A text input field',
-};
+function respond(text: string, totalTokens = 100) {
+  mockStreamText.mockResolvedValueOnce({
+    toolCalls: [],
+    text,
+    usage: { totalTokens },
+  });
+}
 
-const Button: UIComponent<{ text: string }> = {
-  component: () => null,
-  description: 'A button',
-};
+const root = { op: 'add', path: '/root', value: 'page' };
 
-const Form: UIComponent<{ submitLabel?: string }> = {
-  component: () => null,
-  description: 'A form container',
-};
-
-describe('generatePage', () => {
+describe('generateSpec', () => {
   beforeEach(() => {
     mockStreamText.mockClear();
   });
 
-  it('should parse YAML template and return placements', async () => {
-    // Mock LLM returns YAML template
-    mockStreamText.mockResolvedValueOnce({
-      toolCalls: [],
-      text: `Form:
-  submitLabel: "Send"
-  children:
-    - Input:
-        name: "email"
-        label: "Email Address"
-    - Button:
-        text: "Submit"`,
-      usage: { totalTokens: 150 },
-    });
+  it('compiles the JSONL patches into a spec and seeds state from props', async () => {
+    respond(
+      jsonl(
+        root,
+        element('page', 'Stack', {}, { children: ['title', 'list'] }),
+        element('title', 'Heading', { text: 'Inbox' }),
+        element(
+          'list',
+          'Stack',
+          {},
+          { repeat: { statePath: '/emails', key: 'id' }, children: ['row'] }
+        ),
+        element('row', 'Text', { content: { $item: 'subject' } }),
+        // The model invents sample data despite instructions; props must win
+        {
+          op: 'add',
+          path: '/state',
+          value: { emails: [{ id: 'fake', subject: 'Fake' }], theme: 'dark' },
+        }
+      ),
+      150
+    );
+    const emails = [{ id: '1', subject: 'Hello' }];
 
-    const result = await generatePage({
+    const result = await generateSpec({
       client: mockClient,
-      prompt: 'Create a form with an email input and submit button',
-      components: { Form, Input, Button },
+      prompt: 'Show my inbox',
+      catalog: testCatalog,
+      props: { emails },
     });
 
-    expect(result.placements).toHaveLength(3);
-
-    // Root component is Form
-    const formPlacement = result.placements.find((p) => p.component === 'Form');
-    expect(formPlacement).toBeDefined();
-    expect(formPlacement!.parentId).toBeNull();
-    expect(formPlacement!.props.submitLabel).toBe('Send');
-
-    // Input is child of Form
-    const inputPlacement = result.placements.find(
-      (p) => p.component === 'Input'
-    );
-    expect(inputPlacement).toBeDefined();
-    expect(inputPlacement!.parentId).toBe(formPlacement!.id);
-    expect(inputPlacement!.props).toEqual({
-      name: 'email',
-      label: 'Email Address',
-    });
-
-    // Button is child of Form
-    const buttonPlacement = result.placements.find(
-      (p) => p.component === 'Button'
-    );
-    expect(buttonPlacement).toBeDefined();
-    expect(buttonPlacement!.parentId).toBe(formPlacement!.id);
-
-    // Root ID should be the Form
-    expect(result.rootId).toBe(formPlacement!.id);
-
-    expect(result.yaml).toContain('Form:');
+    expect(result.spec.root).toBe('page');
+    expect(Object.keys(result.spec.elements)).toEqual([
+      'page',
+      'title',
+      'list',
+      'row',
+    ]);
+    expect(result.spec.state).toEqual({ emails, theme: 'dark' });
+    expect(result.repairs).toEqual([]);
     expect(result.usage.totalTokens).toBe(150);
-  });
-
-  it('should return empty placements when no YAML is returned', async () => {
-    mockStreamText.mockResolvedValueOnce({
-      toolCalls: [],
-      text: 'I cannot create a UI for that request.',
-      usage: { totalTokens: 30 },
-    });
-
-    const result = await generatePage({
-      client: mockClient,
-      prompt: 'Show a blank page',
-      components: { Input },
-    });
-
-    expect(result.placements).toHaveLength(0);
-    expect(result.rootId).toBeUndefined();
-  });
-
-  it('should strip markdown code fences from YAML', async () => {
-    mockStreamText.mockResolvedValueOnce({
-      toolCalls: [],
-      text: `Here's your form:
-
-\`\`\`yaml
-Form:
-  children:
-    - Input:
-        name: "name"
-        label: "Name"
-\`\`\`
-
-This form collects a name.`,
-      usage: { totalTokens: 100 },
-    });
-
-    const result = await generatePage({
-      client: mockClient,
-      prompt: 'Create a name form',
-      components: { Form, Input },
-    });
-
-    expect(result.placements).toHaveLength(2);
-    expect(result.placements[0].component).toBe('Form');
-  });
-
-  it('should include validate_template tool and pass schema validation', async () => {
-    const schema = z.object({
-      email: z.string(),
-      name: z.string(),
-    });
-
-    // Mock LLM calls validate_template and returns valid YAML
-    mockStreamText.mockImplementationOnce(async (params) => {
-      // Verify validate_template tool is present
-      expect(params.tools.validate_template).toBeDefined();
-      expect(params.tools.validate_template.description).toContain('Validate');
-
-      // Simulate LLM calling validate_template with valid YAML
-      const validationResult = (await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Input:
-        name: "name"
-        label: "Name"
-    - Button:
-        text: "Submit"`,
-      })) as ValidationResult;
-
-      expect(validationResult.valid).toBe(true);
-      expect(validationResult.errors).toHaveLength(0);
-
-      return {
-        toolCalls: [
-          {
-            toolCallId: 'c1',
-            toolName: 'validate_template',
-            args: { yaml: '...' },
-            result: validationResult,
-          },
-        ],
-        text: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Input:
-        name: "name"
-        label: "Name"
-    - Button:
-        text: "Submit"`,
-        usage: { totalTokens: 100 },
-      };
-    });
-
-    const result = await generatePage({
-      client: mockClient,
-      prompt: 'Create a contact form',
-      components: { Form, Input, Button },
-      schema,
-    });
-
-    expect(result.placements).toHaveLength(4);
-  });
-
-  it('should detect missing required fields in schema validation', async () => {
-    // Note: Input component maps to 'string' type in the schema extractor
-    // So we use string fields in the schema
-    const schema = z.object({
-      email: z.string(),
-      name: z.string(),
-      subscribe: z.boolean().optional(),
-    });
-
-    const validationResults: unknown[] = [];
-
-    mockStreamText.mockImplementationOnce(async (params) => {
-      // First validation - only email field (missing name, also missing Button)
-      const v1 = await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Button:
-        text: "Submit"`,
-      });
-      validationResults.push(v1);
-
-      // Second validation - email and name with Button
-      const v2 = await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Input:
-        name: "name"
-        label: "Name"
-    - Button:
-        text: "Submit"`,
-      });
-      validationResults.push(v2);
-
-      return {
-        toolCalls: [],
-        text: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Input:
-        name: "name"
-        label: "Name"
-    - Button:
-        text: "Submit"`,
-        usage: { totalTokens: 200 },
-      };
-    });
-
-    await generatePage({
-      client: mockClient,
-      prompt: 'Create a signup form',
-      components: { Form, Input, Button },
-      schema,
-    });
-
-    // First validation: missing name (subscribe is optional)
-    const v1 = validationResults[0] as {
-      valid: boolean;
-      errors: Array<{ message: string }>;
-    };
-    expect(v1.valid).toBe(false);
-    expect(v1.errors.map((e) => e.message)).toContain(
-      'Missing required form field: "name"'
-    );
-
-    // Second validation: all required fields present
-    const v2 = validationResults[1] as {
-      valid: boolean;
-      errors: Array<{ message: string }>;
-    };
-    expect(v2.valid).toBe(true);
-    expect(v2.errors).toHaveLength(0);
-  });
-
-  it('should handle data bindings in props', async () => {
-    mockStreamText.mockResolvedValueOnce({
-      toolCalls: [],
-      text: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-        defaultValue: "{{user.email}}"`,
-      usage: { totalTokens: 100 },
-    });
-
-    const result = await generatePage({
-      client: mockClient,
-      prompt: 'Create a form with default email',
-      components: { Form, Input },
-      data: { user: { email: 'test@example.com' } },
-    });
-
-    expect(result.placements).toHaveLength(2);
-    const inputPlacement = result.placements.find(
-      (p) => p.component === 'Input'
-    );
-    expect(inputPlacement!.props.defaultValue).toBe('{{user.email}}');
-  });
-
-  it('should validate data bindings against provided data', async () => {
-    mockStreamText.mockImplementationOnce(async (params) => {
-      const bindingErrors = (result: { errors: Array<{ type: string }> }) =>
-        result.errors.filter((e) => e.type === 'invalid-binding');
-
-      const valid = await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "{{labels.email}}"`,
-      });
-      expect(bindingErrors(valid)).toEqual([]);
-
-      const invalid = await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "{{nonexistent.path}}"`,
-      });
-      expect(bindingErrors(invalid)).toHaveLength(1);
-
-      return {
-        toolCalls: [],
-        text: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "{{labels.email}}"`,
-        usage: { totalTokens: 100 },
-      };
-    });
-
-    await generatePage({
-      client: mockClient,
-      prompt: 'Create a form',
-      components: { Form, Input },
-      data: { labels: { email: 'Email Address' } },
-    });
 
     expect(mockStreamText).toHaveBeenCalledTimes(1);
+    const call = mockStreamText.mock.calls[0][0];
+    expect(call.system).toContain('AVAILABLE COMPONENTS (7)');
+    expect(call.system).toContain('- Checkbox:');
+    expect(call.system).toContain('- submitForm:');
+    // The prompt describes the shape of props, never their values
+    expect(call.prompt).toContain('## State');
+    expect(call.prompt).toContain('subject: string');
+    expect(call.prompt).not.toContain('Hello');
+    expect(call.prompt).toContain('## Instructions\nShow my inbox');
+    expect(call.prompt).not.toContain('## Form');
   });
 
-  it('should return yaml in result', async () => {
-    const yamlContent = `Form:
-  submitLabel: "Go"`;
+  it('ignores prose and code fences around the patches', async () => {
+    respond(
+      `Here is the page:\n\`\`\`jsonl\n${jsonl(root, element('page', 'Text', { content: 'Hi' }))}\n\`\`\`\nLet me know!`
+    );
 
-    mockStreamText.mockResolvedValueOnce({
-      toolCalls: [],
-      text: yamlContent,
-      usage: { totalTokens: 50 },
-    });
-
-    const result = await generatePage({
+    const { spec } = await generateSpec({
       client: mockClient,
-      prompt: 'Simple form',
-      components: { Form },
+      prompt: 'Say hi',
+      catalog: testCatalog,
     });
 
-    expect(result.yaml).toBe(yamlContent);
+    expect(spec.root).toBe('page');
+    expect(spec.elements.page.props).toEqual({ content: 'Hi' });
   });
 
-  it('should fail validation when Form has no Button', async () => {
-    mockStreamText.mockImplementationOnce(async (params) => {
-      // Form without a Button - should fail validation
-      const result = (await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"`,
-      })) as ValidationResult;
+  it('sends validation issues back as a patch request and applies the fixes', async () => {
+    // First attempt references a child that was never added
+    respond(
+      jsonl(
+        root,
+        element('page', 'Stack', {}, { children: ['greeting', 'missing'] }),
+        element('greeting', 'Text', { content: { $state: '/user/name' } })
+      )
+    );
+    respond(jsonl(element('missing', 'Text', { content: 'Now present' })));
+    const props = { user: { name: 'secret-name' } };
 
-      expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].type).toBe('form-missing-submit-button');
-      expect(result.errors[0].message).toBe(
-        'Form component requires a Button for submission'
-      );
-
-      return {
-        toolCalls: [],
-        text: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"`,
-        usage: { totalTokens: 100 },
-      };
-    });
-
-    await generatePage({
+    const result = await generateSpec({
       client: mockClient,
-      prompt: 'Create a form',
-      components: { Form, Input },
+      prompt: 'Greet the user',
+      catalog: testCatalog,
+      props,
     });
+
+    expect(mockStreamText).toHaveBeenCalledTimes(2);
+    const repair = mockStreamText.mock.calls[1][0];
+    expect(repair.system).toBe(mockStreamText.mock.calls[0][0].system);
+    expect(repair.prompt).toContain('references child "missing"');
+    // The current spec goes back for patching, without the seeded data
+    expect(repair.prompt).toContain('CURRENT UI STATE');
+    expect(repair.prompt).toContain('"greeting"');
+    expect(repair.prompt).not.toContain('secret-name');
+
+    expect(result.repairs).toEqual([
+      [expect.stringContaining('references child "missing"')],
+    ]);
+    expect(result.spec.elements.missing.props).toEqual({
+      content: 'Now present',
+    });
+    expect(result.spec.state).toEqual(props);
   });
 
-  it('should pass validation when Form has a Button', async () => {
-    mockStreamText.mockImplementationOnce(async (params) => {
-      // Form with a Button - should pass validation
-      const result = (await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Button:
-        text: "Submit"`,
-      })) as ValidationResult;
+  it('prunes dangling children on the last round instead of failing', async () => {
+    respond(
+      jsonl(
+        root,
+        element('page', 'Stack', {}, { children: ['greeting', 'missing'] }),
+        element('greeting', 'Text', { content: 'Hi' })
+      )
+    );
+    respond(''); // the model returns nothing useful
 
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-
-      return {
-        toolCalls: [],
-        text: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Button:
-        text: "Submit"`,
-        usage: { totalTokens: 100 },
-      };
-    });
-
-    await generatePage({
+    const { spec, repairs } = await generateSpec({
       client: mockClient,
-      prompt: 'Create a form with submit button',
-      components: { Form, Input, Button },
+      prompt: 'Greet',
+      catalog: testCatalog,
+      maxRepairs: 1,
     });
+
+    expect(repairs).toHaveLength(1);
+    expect(spec.elements.page.children).toEqual(['greeting']);
   });
 
-  it('should pass validation when Form has nested Button', async () => {
-    const Container: UIComponent<Record<string, never>> = {
-      component: () => null,
-      description: 'A container',
-    };
+  it('fails once the repair rounds are used up', async () => {
+    const broken = jsonl(root, element('page', 'Carousel', {}));
+    respond(broken);
+    respond('');
+    respond('');
 
-    mockStreamText.mockImplementationOnce(async (params) => {
-      // Form with Button nested inside a Container - should pass
-      const result = (await params.tools.validate_template.execute!({
-        yaml: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Container:
-        children:
-          - Button:
-              text: "Submit"`,
-      })) as ValidationResult;
+    await expect(
+      generateSpec({
+        client: mockClient,
+        prompt: 'Spin',
+        catalog: testCatalog,
+        maxRepairs: 2,
+      })
+    ).rejects.toThrow(/after 2 repair round\(s\):\n- elements\/page\/type/);
+    expect(mockStreamText).toHaveBeenCalledTimes(3);
+  });
 
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-
-      return {
-        toolCalls: [],
-        text: `Form:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"
-    - Container:
-        children:
-          - Button:
-              text: "Submit"`,
-        usage: { totalTokens: 100 },
-      };
+  it('lists the form fields and requires each to be bound', async () => {
+    const formSchema = z.object({
+      email: z.string().describe('Where to send the receipt'),
+      agree: z.boolean(),
+      plan: z.enum(['free', 'pro']).optional(),
     });
+    respond(
+      jsonl(
+        root,
+        element('page', 'Stack', {}, { children: ['email', 'submit'] }),
+        element('email', 'Input', {
+          label: 'Email',
+          name: 'email',
+          value: { $bindState: '/form/email' },
+        }),
+        submitButton
+      )
+    );
+    respond(
+      jsonl(
+        element('agree', 'Checkbox', {
+          label: 'I agree',
+          name: 'agree',
+          checked: { $bindState: '/form/agree' },
+        }),
+        { op: 'add', path: '/elements/page/children/-', value: 'agree' }
+      )
+    );
 
-    await generatePage({
+    const { spec, repairs } = await generateSpec({
       client: mockClient,
-      prompt: 'Create a form with nested button',
-      components: { Form, Input, Button, Container },
+      prompt: 'Sign up',
+      catalog: testCatalog,
+      formSchema,
     });
+
+    const first = mockStreamText.mock.calls[0][0].prompt;
+    expect(first).toContain('## Form');
+    expect(first).toContain('- email: string - Where to send the receipt');
+    expect(first).toContain('- agree: boolean');
+    expect(first).toContain('- plan: "free" | "pro" (optional)');
+
+    expect(repairs).toEqual([
+      [expect.stringContaining('Missing form field "agree"')],
+    ]);
+    expect(spec.elements.page.children).toEqual(['email', 'submit', 'agree']);
   });
 
-  it('should not require Button for non-Form components', async () => {
-    const Container: UIComponent<Record<string, never>> = {
-      component: () => null,
-      description: 'A container',
-    };
+  it('describes a schema-less form for the generatePage tool', async () => {
+    respond(
+      jsonl(
+        root,
+        element('page', 'Stack', {}, { children: ['name', 'submit'] }),
+        element('name', 'Input', {
+          label: 'Name',
+          name: 'name',
+          value: { $bindState: '/form/name' },
+        }),
+        submitButton
+      )
+    );
 
-    mockStreamText.mockImplementationOnce(async (params) => {
-      // Container without Form - no Button required
-      const result = (await params.tools.validate_template.execute!({
-        yaml: `Container:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"`,
-      })) as ValidationResult;
-
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-
-      return {
-        toolCalls: [],
-        text: `Container:
-  children:
-    - Input:
-        name: "email"
-        label: "Email"`,
-        usage: { totalTokens: 100 },
-      };
-    });
-
-    await generatePage({
+    await generateSpec({
       client: mockClient,
-      prompt: 'Create a container with input',
-      components: { Container, Input },
-    });
-  });
-
-  describe('resolvedBindings', () => {
-    const Text: UIComponent<{ content: string }> = {
-      component: () => null,
-      description: 'A text display',
-    };
-
-    const Heading: UIComponent<{ content: string; level?: string }> = {
-      component: () => null,
-      description: 'A heading',
-    };
-
-    const Container: UIComponent<Record<string, never>> = {
-      component: () => null,
-      description: 'A container',
-    };
-
-    const List: UIComponent<{ items: unknown[]; as?: string }> = {
-      component: () => null,
-      description: 'A list loop',
-    };
-
-    it('should resolve bindings to correct values', async () => {
-      mockStreamText.mockImplementationOnce(async (params) => {
-        const result = (await params.tools.validate_template.execute!({
-          yaml: `Container:
-  children:
-    - Heading:
-        content: "{{user.name}}"
-    - Text:
-        content: "{{user.email}}"`,
-        })) as ValidationResult;
-
-        expect(result.resolvedBindings).toBeDefined();
-        expect(result.resolvedBindings).toHaveLength(2);
-
-        const nameBinding = result.resolvedBindings!.find(
-          (b) => b.path === 'user.name'
-        );
-        expect(nameBinding).toEqual({
-          path: 'user.name',
-          component: 'Heading',
-          prop: 'content',
-          resolved: true,
-        });
-
-        const emailBinding = result.resolvedBindings!.find(
-          (b) => b.path === 'user.email'
-        );
-        expect(emailBinding).toEqual({
-          path: 'user.email',
-          component: 'Text',
-          prop: 'content',
-          resolved: true,
-        });
-
-        return {
-          toolCalls: [],
-          text: `Container:
-  children:
-    - Heading:
-        content: "{{user.name}}"`,
-          usage: { totalTokens: 100 },
-        };
-      });
-
-      await generatePage({
-        client: mockClient,
-        prompt: 'Show user info',
-        components: { Container, Heading, Text },
-        data: { user: { name: 'John Smith', email: 'john@example.com' } },
-      });
+      prompt: 'Ask for a name',
+      catalog: testCatalog,
+      hasForm: true,
     });
 
-    it('should mark unresolved bindings with resolved: false', async () => {
-      mockStreamText.mockImplementationOnce(async (params) => {
-        const result = (await params.tools.validate_template.execute!({
-          yaml: `Container:
-  children:
-    - Text:
-        content: "{{user.inbox}}"`,
-        })) as ValidationResult;
-
-        expect(result.resolvedBindings).toBeDefined();
-        expect(result.resolvedBindings).toHaveLength(1);
-        expect(result.resolvedBindings![0]).toEqual({
-          path: 'user.inbox',
-          component: 'Text',
-          prop: 'content',
-          resolved: false,
-        });
-
-        return {
-          toolCalls: [],
-          text: `Container:
-  children:
-    - Text:
-        content: "hello"`,
-          usage: { totalTokens: 100 },
-        };
-      });
-
-      await generatePage({
-        client: mockClient,
-        prompt: 'Show inbox',
-        components: { Container, Text },
-        data: { user: { name: 'John' } },
-      });
-    });
-
-    it('should resolve bindings inside List using first array element', async () => {
-      mockStreamText.mockImplementationOnce(async (params) => {
-        const result = (await params.tools.validate_template.execute!({
-          yaml: `List:
-  items: "{{emails}}"
-  as: "email"
-  children:
-    - Text:
-        content: "{{email.subject}}"`,
-        })) as ValidationResult;
-
-        expect(result.resolvedBindings).toBeDefined();
-
-        // The items binding itself
-        const itemsBinding = result.resolvedBindings!.find(
-          (b) => b.path === 'emails'
-        );
-        expect(itemsBinding).toBeDefined();
-        expect(itemsBinding!.resolved).toBe(true);
-
-        // The loop body binding resolved against first element
-        const subjectBinding = result.resolvedBindings!.find(
-          (b) => b.path === 'email.subject'
-        );
-        expect(subjectBinding).toEqual({
-          path: 'email.subject',
-          component: 'Text',
-          prop: 'content',
-          resolved: true,
-        });
-
-        return {
-          toolCalls: [],
-          text: `List:
-  items: "{{emails}}"
-  as: "email"
-  children:
-    - Text:
-        content: "{{email.subject}}"`,
-          usage: { totalTokens: 100 },
-        };
-      });
-
-      await generatePage({
-        client: mockClient,
-        prompt: 'Show emails',
-        components: { Container, Text, List },
-        data: {
-          emails: [
-            { subject: 'Hello', from: 'alice@example.com' },
-            { subject: 'World', from: 'bob@example.com' },
-          ],
-        },
-      });
-    });
-
-    it('should mark loop body bindings as unresolved when array is empty', async () => {
-      mockStreamText.mockImplementationOnce(async (params) => {
-        const result = (await params.tools.validate_template.execute!({
-          yaml: `List:
-  items: "{{emails}}"
-  as: "email"
-  children:
-    - Text:
-        content: "{{email.subject}}"`,
-        })) as ValidationResult;
-
-        expect(result.resolvedBindings).toBeDefined();
-
-        // items binding resolves to empty array
-        const itemsBinding = result.resolvedBindings!.find(
-          (b) => b.path === 'emails'
-        );
-        expect(itemsBinding!.resolved).toBe(true);
-
-        // Loop body binding is unresolved because no sample element
-        const subjectBinding = result.resolvedBindings!.find(
-          (b) => b.path === 'email.subject'
-        );
-        expect(subjectBinding).toEqual({
-          path: 'email.subject',
-          component: 'Text',
-          prop: 'content',
-          resolved: false,
-        });
-
-        return {
-          toolCalls: [],
-          text: `Container:
-  children:
-    - Text:
-        content: "No emails"`,
-          usage: { totalTokens: 100 },
-        };
-      });
-
-      await generatePage({
-        client: mockClient,
-        prompt: 'Show emails',
-        components: { Container, Text, List },
-        data: { emails: [] },
-      });
-    });
-
-    it('should return empty resolvedBindings when template has no bindings', async () => {
-      mockStreamText.mockImplementationOnce(async (params) => {
-        const result = (await params.tools.validate_template.execute!({
-          yaml: `Container:
-  children:
-    - Text:
-        content: "Hello world"`,
-        })) as ValidationResult;
-
-        expect(result.resolvedBindings).toBeDefined();
-        expect(result.resolvedBindings).toHaveLength(0);
-
-        return {
-          toolCalls: [],
-          text: `Container:
-  children:
-    - Text:
-        content: "Hello world"`,
-          usage: { totalTokens: 100 },
-        };
-      });
-
-      await generatePage({
-        client: mockClient,
-        prompt: 'Static page',
-        components: { Container, Text },
-        data: {},
-      });
-    });
-
-    it('should not include resolvedBindings when YAML fails to parse', async () => {
-      mockStreamText.mockImplementationOnce(async (params) => {
-        const result = (await params.tools.validate_template.execute!({
-          yaml: `:::invalid yaml[[[`,
-        })) as ValidationResult;
-
-        expect(result.valid).toBe(false);
-        expect(result.resolvedBindings).toBeUndefined();
-
-        return {
-          toolCalls: [],
-          text: `Container:
-  children:
-    - Text:
-        content: "fallback"`,
-          usage: { totalTokens: 100 },
-        };
-      });
-
-      await generatePage({
-        client: mockClient,
-        prompt: 'Broken template',
-        components: { Container, Text },
-        data: {},
-      });
-    });
+    expect(mockStreamText.mock.calls[0][0].prompt).toContain(
+      '## Form\nThis page collects user input.'
+    );
   });
 });

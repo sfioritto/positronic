@@ -1,75 +1,59 @@
 import { describe, it, expect } from 'vitest';
-import {
-  generatePageHtml,
-  generateFormToken,
-} from '../src/ui/generate-page-html.js';
-import type { Placement } from '../src/ui/types.js';
+import type { Spec } from '@json-render/core';
+import { generatePageHtml, generateFormToken } from '../src/page/page-html.js';
+
+const spec: Spec = {
+  root: 'page',
+  elements: {
+    page: { type: 'Stack', props: {}, children: ['email'] },
+    email: {
+      type: 'Input',
+      props: { name: 'email', value: { $bindState: '/form/email' } },
+      children: [],
+    },
+  },
+  state: { user: { name: 'John' } },
+};
 
 describe('generatePageHtml', () => {
-  it('should generate valid HTML with all required elements', () => {
-    const placements: Placement[] = [
-      { id: 'form-1', component: 'Form', props: {}, parentId: null },
-      {
-        id: 'input-1',
-        component: 'Input',
-        props: { name: 'email', label: 'Email' },
-        parentId: 'form-1',
-      },
-    ];
-
+  it('embeds the spec for the component bundle to render', () => {
     const html = generatePageHtml({
-      placements,
-      rootId: 'form-1',
-      data: { user: { name: 'John' } },
+      spec,
       title: 'Test Page',
+      formAction: '/api/submit?token=abc',
     });
 
-    // Check basic HTML structure
     expect(html).toContain('<!DOCTYPE html>');
-    expect(html).toContain('<html lang="en">');
     expect(html).toContain('<title>Test Page</title>');
-
-    // Check React/ReactDOM CDN
+    expect(html).toContain('<div id="root"></div>');
     expect(html).toContain(
-      'https://unpkg.com/react@18/umd/react.production.min.js'
+      '<link rel="stylesheet" href="/bundle/components.css">'
     );
-    expect(html).toContain(
-      'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js'
-    );
+    expect(html).toContain('<script src="/bundle/components.js"></script>');
 
-    // Check Tailwind CDN
-    expect(html).toContain('https://cdn.tailwindcss.com');
+    const embedded = html.match(/window\.__POSITRONIC_PAGE__ = (.*);/);
+    expect(embedded).not.toBeNull();
+    expect(JSON.parse(embedded![1])).toEqual({
+      title: 'Test Page',
+      spec,
+      formAction: '/api/submit?token=abc',
+    });
 
-    // Check component bundle script src is included
-    expect(html).toContain('/bundle/components.js');
-
-    // Check data is embedded
-    expect(html).toContain('window.__POSITRONIC_DATA__');
-    expect(html).toContain('"user"');
-    expect(html).toContain('"John"');
-
-    // Check placements are embedded
-    expect(html).toContain('window.__POSITRONIC_TREE__');
-    expect(html).toContain('"form-1"');
-    expect(html).toContain('"input-1"');
-
-    // Check root ID is embedded
-    expect(html).toContain('window.__POSITRONIC_ROOT__');
-
-    // Check bootstrap runtime is included
-    expect(html).toContain('function resolveBinding');
-    expect(html).toContain('function buildElement');
+    // The page no longer depends on CDNs
+    expect(html).not.toContain('unpkg.com');
+    expect(html).not.toContain('cdn.tailwindcss.com');
   });
 
-  it('should escape HTML in title', () => {
-    const placements: Placement[] = [
-      { id: 'root', component: 'Form', props: {}, parentId: null },
-    ];
+  it('defaults the title and leaves formAction null for read-only pages', () => {
+    const html = generatePageHtml({ spec });
 
+    expect(html).toContain('<title>Generated Page</title>');
+    expect(html).toContain('"formAction":null');
+  });
+
+  it('escapes HTML in the title', () => {
     const html = generatePageHtml({
-      placements,
-      rootId: 'root',
-      data: {},
+      spec,
       title: '<script>alert("xss")</script>',
     });
 
@@ -77,110 +61,27 @@ describe('generatePageHtml', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 
-  it('should safely serialize data with special characters', () => {
-    const placements: Placement[] = [
-      { id: 'root', component: 'Form', props: {}, parentId: null },
-    ];
-
+  it('keeps script-closing sequences in the spec from ending the script', () => {
     const html = generatePageHtml({
-      placements,
-      rootId: 'root',
-      data: { html: '<script>alert("xss")</script>' },
-    });
-
-    // Script tags in data should be escaped
-    expect(html).not.toContain('<script>alert("xss")</script>');
-    expect(html).toContain('\\u003cscript\\u003e');
-  });
-
-  it('should include form action when provided', () => {
-    const placements: Placement[] = [
-      { id: 'form-1', component: 'Form', props: {}, parentId: null },
-    ];
-
-    const html = generatePageHtml({
-      placements,
-      rootId: 'form-1',
-      data: {},
-      formAction: '/api/submit',
-    });
-
-    expect(html).toContain('window.__POSITRONIC_FORM_ACTION__');
-    expect(html).toContain('/api/submit');
-  });
-
-  it('should use default title when not provided', () => {
-    const placements: Placement[] = [
-      { id: 'root', component: 'Form', props: {}, parentId: null },
-    ];
-
-    const html = generatePageHtml({
-      placements,
-      rootId: 'root',
-      data: {},
-    });
-
-    expect(html).toContain('<title>Generated Page</title>');
-  });
-
-  it('should preserve data binding syntax in props', () => {
-    const placements: Placement[] = [
-      { id: 'root', component: 'Form', props: {}, parentId: null },
-      {
-        id: 'input-1',
-        component: 'Input',
-        props: { name: 'email', defaultValue: '{{user.email}}' },
-        parentId: 'root',
+      spec: {
+        ...spec,
+        state: { html: '</script><script>alert("xss")</script>' },
       },
-    ];
-
-    const html = generatePageHtml({
-      placements,
-      rootId: 'root',
-      data: { user: { email: 'test@example.com' } },
     });
 
-    // Binding syntax should be preserved in placements
-    expect(html).toContain('{{user.email}}');
-  });
-
-  it('should not include token-related globals or hidden inputs', () => {
-    const placements: Placement[] = [
-      { id: 'form-1', component: 'Form', props: {}, parentId: null },
-      {
-        id: 'input-1',
-        component: 'Input',
-        props: { name: 'email' },
-        parentId: 'form-1',
-      },
-    ];
-
-    const html = generatePageHtml({
-      placements,
-      rootId: 'form-1',
-      data: {},
-      formAction: '/api/submit?token=test-csrf-token-123',
-    });
-
-    // Token should be in the form action URL, not as a separate global
-    expect(html).toContain('test-csrf-token-123');
-    expect(html).not.toContain('window.__POSITRONIC_FORM_TOKEN__');
-    expect(html).not.toContain('__positronic_token');
+    expect(html).not.toContain('</script><script>alert');
+    expect(html).toContain('\\u003c/script\\u003e');
   });
 
   describe('generateFormToken', () => {
-    it('should return a UUID string', () => {
-      const token = generateFormToken();
-      expect(typeof token).toBe('string');
-      expect(token).toMatch(
+    it('returns a UUID string', () => {
+      expect(generateFormToken()).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
       );
     });
 
-    it('should return unique tokens', () => {
-      const token1 = generateFormToken();
-      const token2 = generateFormToken();
-      expect(token1).not.toBe(token2);
+    it('returns unique tokens', () => {
+      expect(generateFormToken()).not.toBe(generateFormToken());
     });
   });
 });
