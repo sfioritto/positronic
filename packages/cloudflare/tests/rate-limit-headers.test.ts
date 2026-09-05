@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseRateLimitHeaders,
-  getGoogleModelDefaults,
+  getModelDefaults,
 } from '../src/rate-limit-headers.js';
 
 describe('parseRateLimitHeaders', () => {
@@ -103,69 +103,92 @@ describe('parseRateLimitHeaders', () => {
   });
 });
 
-describe('getGoogleModelDefaults', () => {
-  it('returns defaults for gemini-2.5-pro', () => {
-    const result = getGoogleModelDefaults('gemini-2.5-pro');
-    expect(result).not.toBeNull();
-    expect(result!.rpm).toBe(150);
-    expect(result!.tpm).toBe(2_000_000);
+describe('getModelDefaults', () => {
+  it('returns Anthropic Start tier limits', () => {
+    const result = getModelDefaults('claude-opus-5');
+    expect(result).toEqual({ rpm: 1_000, tpm: 2_000_000 });
   });
 
-  it('returns defaults for gemini-3-flash', () => {
-    const result = getGoogleModelDefaults('gemini-3-flash');
-    expect(result).not.toBeNull();
-    expect(result!.rpm).toBe(1_000);
-    expect(result!.tpm).toBe(1_000_000);
+  it('returns OpenAI Tier 1 limits', () => {
+    expect(getModelDefaults('gpt-5')).toEqual({ rpm: 500, tpm: 500_000 });
+    expect(getModelDefaults('gpt-4o')).toEqual({ rpm: 500, tpm: 30_000 });
   });
 
-  it('returns defaults for gemini-2.5-flash-lite', () => {
-    const result = getGoogleModelDefaults('gemini-2.5-flash-lite');
-    expect(result).not.toBeNull();
-    expect(result!.rpm).toBe(4_000);
-    expect(result!.tpm).toBe(4_000_000);
+  it('returns Google Tier 1 limits', () => {
+    const result = getModelDefaults('gemini-2.5-pro');
+    expect(result).toEqual({ rpm: 150, tpm: 2_000_000 });
   });
 
-  it('returns defaults for gemini-2.5-flash', () => {
-    const result = getGoogleModelDefaults('gemini-2.5-flash');
-    expect(result).not.toBeNull();
-    expect(result!.rpm).toBe(1_000);
-    expect(result!.tpm).toBe(1_000_000);
+  it('resolves dated snapshots to their family', () => {
+    expect(getModelDefaults('claude-sonnet-4-5-20250929')).toEqual(
+      getModelDefaults('claude-sonnet-4')
+    );
+    expect(getModelDefaults('claude-haiku-4-5-20251001')).toEqual(
+      getModelDefaults('claude-haiku-4-5')
+    );
+    expect(getModelDefaults('gpt-4o-2024-08-06')).toEqual(
+      getModelDefaults('gpt-4o')
+    );
+    expect(getModelDefaults('gemini-2.5-pro-002')).toEqual(
+      getModelDefaults('gemini-2.5-pro')
+    );
   });
 
-  it('returns null for unknown version suffixes', () => {
-    expect(getGoogleModelDefaults('gemini-2.5-pro-002')).toBeNull();
+  it('resolves previews and variants to their family', () => {
+    expect(getModelDefaults('gemini-3.1-pro-preview')).toEqual(
+      getModelDefaults('gemini-3.1-pro')
+    );
+    expect(getModelDefaults('gemini-3-flash-preview')).toEqual(
+      getModelDefaults('gemini-3-flash')
+    );
+    expect(getModelDefaults('gpt-5.6-terra')).toEqual(
+      getModelDefaults('gpt-5.6')
+    );
+    expect(getModelDefaults('claude-opus-4-8')).toEqual(
+      getModelDefaults('claude-opus-4')
+    );
+  });
+
+  it('prefers the longest matching family', () => {
+    // gpt-5-nano-... must not fall back to the gpt-5 row
+    expect(getModelDefaults('gpt-5-nano-2025-08-07')).toEqual(
+      getModelDefaults('gpt-5-nano')
+    );
+    expect(getModelDefaults('gpt-5-nano')!.tpm).not.toBe(
+      getModelDefaults('gpt-5')!.tpm
+    );
+    expect(getModelDefaults('gemini-2.5-flash-lite-preview-06-17')).toEqual(
+      getModelDefaults('gemini-2.5-flash-lite')
+    );
+  });
+
+  it('does not match across a dot suffix', () => {
+    // gpt-5.1 is its own row, not a snapshot of gpt-5
+    expect(getModelDefaults('gpt-5.1')).toEqual({ rpm: 500, tpm: 500_000 });
+    expect(getModelDefaults('gpt-5.3')).toBeNull();
+  });
+
+  it('knows the Google -latest aliases', () => {
+    expect(getModelDefaults('gemini-flash-latest')).toEqual(
+      getModelDefaults('gemini-2.5-flash')
+    );
+    expect(getModelDefaults('gemini-flash-lite-latest')).toEqual(
+      getModelDefaults('gemini-2.5-flash-lite')
+    );
+    expect(getModelDefaults('gemini-pro-latest')).toEqual(
+      getModelDefaults('gemini-2.5-pro')
+    );
   });
 
   it('strips models/ prefix used by Google SDKs', () => {
-    const result = getGoogleModelDefaults('models/gemini-2.5-pro');
+    const result = getModelDefaults('models/gemini-2.5-pro');
     expect(result).not.toBeNull();
     expect(result!.rpm).toBe(150);
   });
 
   it('returns null for unknown models', () => {
-    expect(getGoogleModelDefaults('claude-sonnet-4-5-20250929')).toBeNull();
-    expect(getGoogleModelDefaults('gpt-4o')).toBeNull();
-    expect(getGoogleModelDefaults('unknown-model')).toBeNull();
-  });
-
-  it('returns defaults for all listed Google models', () => {
-    const models = [
-      'gemini-3.1-pro',
-      'gemini-3-pro',
-      'gemini-3-flash',
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-2-flash',
-      'gemini-2-flash-exp',
-      'gemini-2-flash-lite',
-    ];
-
-    for (const model of models) {
-      const result = getGoogleModelDefaults(model);
-      expect(result).not.toBeNull();
-      expect(result!.rpm).toBeGreaterThan(0);
-      expect(result!.tpm).toBeGreaterThan(0);
-    }
+    expect(getModelDefaults('unknown-model')).toBeNull();
+    expect(getModelDefaults('gpt-3.5-turbo')).toBeNull();
+    expect(getModelDefaults('claude-3-opus-20240229')).toBeNull();
   });
 });

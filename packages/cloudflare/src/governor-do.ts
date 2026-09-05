@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   parseRateLimitHeaders,
-  getGoogleModelDefaults,
+  getModelDefaults,
 } from './rate-limit-headers.js';
 
 export interface Env {
@@ -70,7 +70,7 @@ export class GovernorDO extends DurableObject<Env> {
     estimatedTokens: number
   ): Promise<void> {
     if (!this.limitsLoaded) {
-      const defaults = getGoogleModelDefaults(modelId);
+      const defaults = getModelDefaults(modelId);
       if (defaults) {
         this.rpmLimit = defaults.rpm;
         this.tpmLimit = defaults.tpm;
