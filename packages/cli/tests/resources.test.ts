@@ -439,9 +439,12 @@ describe('CLI Integration: positronic resources types', () => {
 
         const { waitForOutput, instance } = await px(['resources', 'list']);
 
-        // Should show loading message initially
-        const foundLoading = await waitForOutput(/Loading resources\.\.\./);
-        expect(foundLoading).toBe(true);
+        // The loading frame is replaced before the first poll, so look at the
+        // frame history rather than waiting for it
+        const showedLoading = instance.frames.some((frame) =>
+          /Loading resources\.\.\./.test(frame)
+        );
+        expect(showedLoading).toBe(true);
 
         // Should eventually show error when server is down
         const foundError = await waitForOutput(/Error connecting/);
@@ -696,14 +699,17 @@ describe('CLI Integration: positronic resources types', () => {
       // Don't start the server to simulate connection error
 
       try {
-        const { waitForOutput } = await px(
+        const { waitForOutput, instance } = await px(
           ['resources', 'upload', '-d', 'any-resource.txt'],
           { server: env.server }
         );
 
-        // Should show checking message first
-        const foundChecking = await waitForOutput(/Checking resource\.\.\./);
-        expect(foundChecking).toBe(true);
+        // The checking frame is replaced before the first poll, so look at
+        // the frame history rather than waiting for it
+        const showedChecking = instance.frames.some((frame) =>
+          /Checking resource\.\.\./.test(frame)
+        );
+        expect(showedChecking).toBe(true);
 
         // Should eventually show connection error
         const foundError = await waitForOutput(/Error connecting/);
@@ -799,16 +805,19 @@ describe('CLI Integration: positronic resources types', () => {
         // Stop server to simulate slow loading
         env.server.stop();
 
-        const { waitForOutput } = await px([
+        const { waitForOutput, instance } = await px([
           'resources',
           'upload',
           '-d',
           'any-file.txt',
         ]);
 
-        // Should show checking message
-        const foundChecking = await waitForOutput(/Checking resource\.\.\./);
-        expect(foundChecking).toBe(true);
+        // The checking frame is replaced before the first poll, so look at
+        // the frame history rather than waiting for it
+        const showedChecking = instance.frames.some((frame) =>
+          /Checking resource\.\.\./.test(frame)
+        );
+        expect(showedChecking).toBe(true);
 
         // Should eventually show error when server is down
         const foundError = await waitForOutput(/Error/);

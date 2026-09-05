@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { render } from 'ink-testing-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -140,19 +140,10 @@ interface PxResult {
   waitForTypesFile: (types: string | string[]) => Promise<string>;
   instance: {
     lastFrame: () => string | undefined;
-    rerender: (element: React.ReactElement) => void;
     unmount: () => void;
     frames: string[];
     stdin: {
       write: (data: string) => void;
-    };
-    stdout: {
-      lastFrame: () => string | undefined;
-      frames: string[];
-    };
-    stderr: {
-      lastFrame: () => string | undefined;
-      frames: string[];
     };
   };
 }
@@ -175,7 +166,13 @@ export async function px(
     projectRootPath: projectRootDir,
   });
 
-  // const { lastFrame, rerender, unmount, frames, stdin, stdout, stderr } = instance!;
+  // Ink writes a bare newline when the app unmounts in the non-interactive
+  // debug mode ink-testing-library renders with. That write is not a frame.
+  const lastFrame = () => {
+    const frames = instance?.frames ?? [];
+    const last = frames.at(-1);
+    return last === '\n' ? frames.at(-2) : last;
+  };
 
   return {
     waitForOutput: async (regex?: RegExp, maxTries = 10) => {
@@ -189,14 +186,17 @@ export async function px(
 
       let tries = 0;
       while (tries < maxTries) {
-        const lastFrame = instance!.lastFrame() ?? '';
-        if (regex!.test(lastFrame)) {
+        if (regex!.test(lastFrame() ?? '')) {
+          // The frame is written during commit; the effects of that render
+          // (Ink's input subscriptions among them) run on the next task.
+          // Yield once so a stdin.write right after this call is received.
+          await new Promise((resolve) => setImmediate(resolve));
           return true;
         }
         await new Promise((resolve) => setTimeout(resolve, 10));
         tries++;
       }
-      console.error('waitForOutput failed, last frame:', instance!.lastFrame());
+      console.error('waitForOutput failed, last frame:', lastFrame());
       return false;
     },
     waitForTypesFile: async (types: string | string[]) => {
@@ -211,22 +211,16 @@ export async function px(
     },
     instance: instance
       ? {
-          lastFrame: instance.lastFrame,
-          rerender: instance.rerender,
+          lastFrame,
           unmount: instance.unmount,
           frames: instance.frames,
           stdin: instance.stdin,
-          stdout: instance.stdout,
-          stderr: instance.stderr,
         }
       : {
           lastFrame: () => undefined,
-          rerender: () => {},
           unmount: () => {},
           frames: [],
           stdin: { write: () => {} },
-          stdout: { lastFrame: () => undefined, frames: [] },
-          stderr: { lastFrame: () => undefined, frames: [] },
         },
   };
 }
@@ -276,7 +270,18 @@ async function runCli(
     projectRootPath,
   });
 
-  await testCli.parse();
+  // act() flushes the effects of the initial render before returning, so the
+  // first frame a test reads is the one after data loading and exit handling.
+  const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  const wasActEnvironment = actEnvironment.IS_REACT_ACT_ENVIRONMENT;
+  actEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+  try {
+    await act(async () => {
+      await testCli.parse();
+    });
+  } finally {
+    actEnvironment.IS_REACT_ACT_ENVIRONMENT = wasActEnvironment;
+  }
 
   return capturedElement;
 }
