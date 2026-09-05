@@ -106,7 +106,7 @@ function promptTemplate({
       path: '/elements/item',
       value: {
         type: leaf,
-        props: { content: { $item: 'title' } },
+        props: { text: { $item: 'title' } },
         children: [],
       },
     }),

@@ -22,6 +22,10 @@ export default defineConfig({
         replacement: `${root}packages/core/src/$1.ts`,
       },
       {
+        find: /^@positronic\/core\/page$/,
+        replacement: `${root}packages/core/src/page/schema.ts`,
+      },
+      {
         find: /^@positronic\/([^/]+)$/,
         replacement: `${root}packages/$1/src`,
       },
