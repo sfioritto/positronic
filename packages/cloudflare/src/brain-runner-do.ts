@@ -789,8 +789,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
         signal: this.abortController!.signal,
       })
       .catch((err: any) => {
+        // The run is fire-and-forget; the runner already emitted the ERROR
+        // event. Rethrowing here would only produce an unhandled rejection.
         console.error(`[DO ${brainRunId}] BrainRunner run failed:`, err);
-        throw err;
       })
       .finally(() => {
         this.abortController = null;
@@ -869,8 +870,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
         signal: this.abortController!.signal,
       })
       .catch((err: any) => {
+        // Fire-and-forget, same as run(): log, do not rethrow.
         console.error(`[DO ${brainRunId}] BrainRunner wakeUp failed:`, err);
-        throw err;
       })
       .finally(() => {
         this.abortController = null;
