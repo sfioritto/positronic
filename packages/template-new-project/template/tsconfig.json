@@ -13,6 +13,6 @@
     "jsx": "react-jsx",
     "jsxImportSource": "@positronic/core"
   },
-  "include": ["brains/**/*.ts", "brains/**/*.tsx", "resources.d.ts"],
+  "include": ["src/**/*", "tests/**/*", "resources.d.ts"],
   "exclude": ["node_modules", ".positronic"]
 }
