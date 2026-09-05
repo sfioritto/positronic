@@ -4,6 +4,14 @@
   "description": "",
   "private": true,
   "type": "module",
+  "engines": {
+    "npm": ">=12"
+  },
+  "allowScripts": {
+    "workerd": true,
+    "esbuild": true,
+    "fsevents": true
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
@@ -22,7 +30,7 @@
     "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
   },
   "devDependencies": {<% if (backend === 'cloudflare') { %>
-    "wrangler": "^4.37.0",<% } %>
+    "wrangler": "^4.129.0",<% } %>
     "typescript": "^5.0.0",
     "vitest": "^4.1.11",
     "esbuild": "^0.27.2",

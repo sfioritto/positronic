@@ -35,6 +35,7 @@ const templateRoot = path.join(packageRoot, 'template');
 const renames: Record<string, string> = {
   _gitignore: '.gitignore',
   _env: '.env',
+  _npmrc: '.npmrc',
 };
 
 // The template files carry JS template literals, so `${}` must pass through
