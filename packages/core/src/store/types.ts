@@ -5,7 +5,7 @@ import type { JsonValue, CurrentUser } from '../dsl/types.js';
  * Per-user field marker for store field definitions.
  * Wraps a Zod type and marks the field as per-user scoped.
  */
-export interface PerUserField<T extends z.ZodType = z.ZodType> {
+export interface PerUserField<T extends z.ZodType<any> = z.ZodType<any>> {
   type: T;
   perUser: true;
 }
@@ -14,7 +14,7 @@ export interface PerUserField<T extends z.ZodType = z.ZodType> {
  * Store field definitions — the shape declaration for withStore().
  * Values are either Zod types (shared) or { type: ZodType, perUser: true } (per-user).
  */
-export type StoreSchema = Record<string, z.ZodType | PerUserField<any>>;
+export type StoreSchema = Record<string, z.ZodType<any> | PerUserField<any>>;
 
 /**
  * Extract the value types from store field definitions.
@@ -23,7 +23,7 @@ export type StoreSchema = Record<string, z.ZodType | PerUserField<any>>;
 export type InferStoreTypes<T extends StoreSchema> = {
   [K in keyof T]: T[K] extends PerUserField<infer V>
     ? z.infer<V>
-    : T[K] extends z.ZodType
+    : T[K] extends z.ZodType<any>
       ? z.infer<T[K]>
       : never;
 };

@@ -31,25 +31,34 @@ export function parseFormData(formData: FormData): Record<string, unknown> {
   return result;
 }
 
-// Inspect _def.typeName instead of using instanceof: brain bundles carry
+// Inspect _zod.def.type instead of using instanceof: brain bundles carry
 // their own copy of zod, so schema instances that cross a bundle boundary
 // fail instanceof checks against this module's zod classes.
-function schemaTypeName(schema: z.ZodTypeAny): string | undefined {
-  return (schema as any)?._def?.typeName;
+function schemaType(schema: z.ZodTypeAny): string | undefined {
+  return (schema as any)?._zod?.def?.type;
 }
+
+const WRAPPERS = new Set([
+  'optional',
+  'nullable',
+  'default',
+  'prefault',
+  'catch',
+  'readonly',
+  'nonoptional',
+]);
 
 function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
   let current: any = schema;
   while (true) {
-    const typeName = schemaTypeName(current);
-    if (
-      typeName === 'ZodOptional' ||
-      typeName === 'ZodNullable' ||
-      typeName === 'ZodDefault'
-    ) {
-      current = current._def.innerType;
-    } else if (typeName === 'ZodEffects') {
-      current = current._def.schema;
+    const type = schemaType(current);
+    if (type !== undefined && WRAPPERS.has(type)) {
+      current = current._zod.def.innerType;
+    } else if (type === 'pipe') {
+      // .transform() pipes the schema into a transform; z.preprocess() pipes
+      // a transform into the schema. Follow whichever side is the schema.
+      const { in: input, out: output } = current._zod.def;
+      current = schemaType(input) === 'transform' ? output : input;
     } else {
       return current;
     }
@@ -73,7 +82,7 @@ export function coerceFormResponse(
   for (const [key, fieldSchema] of Object.entries<z.ZodTypeAny>(
     formSchema.shape
   )) {
-    if (schemaTypeName(unwrapSchema(fieldSchema)) !== 'ZodArray') continue;
+    if (schemaType(unwrapSchema(fieldSchema)) !== 'array') continue;
 
     const value = coerced[key];
     if (value === undefined) {

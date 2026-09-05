@@ -1,7 +1,7 @@
 import { Tiktoken } from 'js-tiktoken/lite';
 import cl100k_base from 'js-tiktoken/ranks/cl100k_base';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { z } from 'zod';
+import { toJsonSchema } from './json-schema.js';
 
 const encoder = new Tiktoken(cl100k_base);
 
@@ -38,7 +38,7 @@ export function estimateRequestTokens({
   messages?: Array<ToolMessageLike>;
   system?: string;
   tools?: Record<string, ToolDefinition>;
-  schema?: z.AnyZodObject;
+  schema?: z.ZodType<any>;
 }): number {
   const parts: string[] = [];
 
@@ -74,12 +74,12 @@ export function estimateRequestTokens({
     for (const [name, tool] of Object.entries(tools)) {
       parts.push(name);
       parts.push(tool.description);
-      parts.push(JSON.stringify(zodToJsonSchema(tool.inputSchema)));
+      parts.push(JSON.stringify(toJsonSchema(tool.inputSchema)));
     }
   }
 
   if (schema) {
-    parts.push(JSON.stringify(zodToJsonSchema(schema)));
+    parts.push(JSON.stringify(toJsonSchema(schema)));
   }
 
   return estimateTokens(parts.join('\n'));

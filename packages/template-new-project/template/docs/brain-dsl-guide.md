@@ -546,7 +546,7 @@ brain('Tool Brain')
           description: 'Fetch data from an external API',
           inputSchema: z.object({
             endpoint: z.string(),
-            params: z.record(z.string()).optional()
+            params: z.record(z.string(), z.string()).optional()
           }),
           execute: async ({ endpoint, params }) => {
             const url = new URL(endpoint);

@@ -66,7 +66,7 @@ const generatePageInputSchema = z.object({
         'Set to true: Page survives brain completion and remains accessible. Use for shared dashboards, permanent reference pages, or pages that need to outlive the workflow.'
     ),
   data: z
-    .record(z.unknown())
+    .record(z.string(), z.unknown())
     .optional()
     .describe(
       'Structured data for template bindings ({{path.to.value}} syntax). ' +
@@ -262,7 +262,7 @@ RETURNS: The webhook payload when triggered. For UI forms, this contains all for
     const webhook: WebhookRegistration = {
       slug: input.slug,
       identifier: input.identifier,
-      schema: z.record(z.unknown()),
+      schema: z.record(z.string(), z.unknown()),
       token: input.token,
     };
 

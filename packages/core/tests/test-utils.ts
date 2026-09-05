@@ -23,7 +23,7 @@ export class MockObjectGenerator implements ObjectGenerator {
     this.generateObjectMock = vi.fn();
   }
 
-  async generateObject<T extends z.AnyZodObject>(
+  async generateObject<T extends z.ZodType<any>>(
     params: Parameters<ObjectGenerator['generateObject']>[0]
   ): Promise<{
     object: z.infer<T>;

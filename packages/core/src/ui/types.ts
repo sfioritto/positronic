@@ -76,7 +76,7 @@ export type FormPrimitive =
   | z.ZodString
   | z.ZodNumber
   | z.ZodBoolean
-  | z.ZodEnum<[string, ...string[]]>;
+  | z.ZodEnum<Record<string, string>>;
 
 /**
  * A form field is either a primitive or an optional/array wrapper around a primitive.
@@ -126,7 +126,7 @@ export function isFormSchema(schema: z.ZodSchema): schema is FormSchema {
 /**
  * Type guard to check if a Zod schema is a valid form field.
  */
-function isFormField(schema: z.ZodSchema): schema is FormField {
+function isFormField(schema: z.core.$ZodType): schema is FormField {
   // Check for optional wrapper
   if (schema instanceof z.ZodOptional) {
     return isFormPrimitive(schema.unwrap());
@@ -144,7 +144,7 @@ function isFormField(schema: z.ZodSchema): schema is FormField {
 /**
  * Type guard to check if a Zod schema is a form primitive.
  */
-function isFormPrimitive(schema: z.ZodSchema): schema is FormPrimitive {
+function isFormPrimitive(schema: z.core.$ZodType): schema is FormPrimitive {
   return (
     schema instanceof z.ZodString ||
     schema instanceof z.ZodNumber ||

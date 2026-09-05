@@ -5,7 +5,7 @@
  * Also validates extracted schema against expected Zod schemas.
  */
 
-import { z, type ZodType, type ZodTypeDef } from 'zod';
+import { z } from 'zod';
 import type {
   ComponentNode,
   ExtractedFormSchema,
@@ -112,7 +112,7 @@ export function fieldsToShape(
 /**
  * Check if a Zod schema expects an array type.
  */
-function isZodArray(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
+function isZodArray(schema: z.core.$ZodType): boolean {
   if (schema instanceof z.ZodArray) {
     return true;
   }
@@ -125,7 +125,7 @@ function isZodArray(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
 /**
  * Check if a Zod schema expects a string type.
  */
-function isZodString(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
+function isZodString(schema: z.core.$ZodType): boolean {
   if (schema instanceof z.ZodString) {
     return true;
   }
@@ -138,7 +138,7 @@ function isZodString(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
 /**
  * Check if a Zod schema expects a number type.
  */
-function isZodNumber(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
+function isZodNumber(schema: z.core.$ZodType): boolean {
   if (schema instanceof z.ZodNumber) {
     return true;
   }
@@ -151,7 +151,7 @@ function isZodNumber(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
 /**
  * Check if a Zod schema expects a boolean type.
  */
-function isZodBoolean(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
+function isZodBoolean(schema: z.core.$ZodType): boolean {
   if (schema instanceof z.ZodBoolean) {
     return true;
   }
@@ -166,7 +166,7 @@ function isZodBoolean(schema: ZodType<unknown, ZodTypeDef, unknown>): boolean {
  */
 function fieldTypeMatchesSchema(
   fieldType: FormFieldType,
-  zodSchema: ZodType<unknown, ZodTypeDef, unknown>
+  zodSchema: z.core.$ZodType
 ): boolean {
   // Handle array types
   if (fieldType === 'string[]' || fieldType === 'number[]') {
@@ -215,7 +215,7 @@ function fieldTypeMatchesSchema(
  */
 export function validateAgainstZod(
   extracted: ExtractedFormSchema,
-  zodSchema: ZodType<unknown, ZodTypeDef, unknown>
+  zodSchema: z.core.$ZodType
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
@@ -228,10 +228,7 @@ export function validateAgainstZod(
     return errors;
   }
 
-  const expectedShape = zodSchema.shape as Record<
-    string,
-    ZodType<unknown, ZodTypeDef, unknown>
-  >;
+  const expectedShape = zodSchema.shape as Record<string, z.core.$ZodType>;
   const extractedFieldNames = new Set(extracted.fields.map((f) => f.name));
 
   // Check for missing required fields

@@ -22,13 +22,12 @@ import type {
 /**
  * Get the type name from a Zod schema for documentation.
  */
-function getZodTypeName(schema: z.ZodTypeAny): string {
+function getZodTypeName(schema: z.core.$ZodType): string {
   if (schema instanceof z.ZodString) return 'string';
   if (schema instanceof z.ZodNumber) return 'number';
   if (schema instanceof z.ZodBoolean) return 'boolean';
   if (schema instanceof z.ZodEnum) {
-    const values = schema._def.values as string[];
-    return values.map((v) => `"${v}"`).join(' | ');
+    return schema.options.map((v) => `"${String(v)}"`).join(' | ');
   }
   if (schema instanceof z.ZodArray) {
     return `${getZodTypeName(schema.element)}[]`;
@@ -37,7 +36,7 @@ function getZodTypeName(schema: z.ZodTypeAny): string {
     return getZodTypeName(schema.unwrap());
   }
   if (schema instanceof z.ZodDefault) {
-    return getZodTypeName(schema._def.innerType);
+    return getZodTypeName(schema.unwrap());
   }
   if (schema instanceof z.ZodObject) {
     return 'object';
@@ -57,7 +56,7 @@ function formatPropsSchema(schema: z.ZodObject<z.ZodRawShape>): string {
     const isOptional =
       zodField instanceof z.ZodOptional || zodField instanceof z.ZodDefault;
     const typeName = getZodTypeName(zodField);
-    const description = zodField._def.description || '';
+    const description = zodField.description || '';
 
     const optionalMarker = isOptional ? '?' : '';
     const descPart = description ? ` - ${description}` : '';

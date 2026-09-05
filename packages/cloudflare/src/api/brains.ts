@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { Cron } from 'croner';
 import Fuse from 'fuse.js';
 import { isSignalValid, brainMachineDefinition } from '@positronic/core';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { toJsonSchema } from '../json-schema.js';
 import { getManifest, startBrainRun } from '../brain-runner-do.js';
 import type {
   Bindings,
@@ -591,7 +591,7 @@ brains.get('/:identifier', async (context: Context) => {
     description: structure.description || `${structure.title} brain`,
     steps: structure.steps,
     ...(brain.optionsSchema && {
-      options: zodToJsonSchema(brain.optionsSchema),
+      options: toJsonSchema(brain.optionsSchema),
     }),
   });
 });

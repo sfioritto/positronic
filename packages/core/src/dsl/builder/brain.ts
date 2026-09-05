@@ -145,7 +145,7 @@ export class Brain<
     };
   }
 
-  withOptions<TSchema extends z.ZodSchema>(
+  withOptions<TSchema extends z.ZodType<any>>(
     schema: TSchema
   ): Brain<z.infer<TSchema>, TState, TPlugins> {
     const nextBrain = new Brain<z.infer<TSchema>, TState, TPlugins>(
