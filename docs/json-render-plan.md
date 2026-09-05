@@ -1,6 +1,6 @@
 # json-render plan
 
-**Status:** steps 1–2 implemented, step 3 pending
+**Status:** shipped 2026-09-05 (commits ebecf333..79ca6ad5)
 **Started:** 2026-09-05
 **Evaluation:** `docs/journal/2026-09-04-json-render-evaluation.md`
 
@@ -110,6 +110,8 @@ npm run typecheck
 **Tweaks.**
 
 ## Step 3: Cloudflare bundle build and the project template
+
+**Implemented and verified end to end 2026-09-05**; see `docs/journal/2026-09-05-json-render-step-3-bundle-template.md`. Deviations from the scope below: the template splits `src/components/` into `index.ts` (catalog, server-safe) and `browser.ts` (React implementations, bundle only); the Tailwind `@source` paths live in gen-ui's `theme.css` so the project stylesheet is three lines; the CLI watcher had never forwarded `src/components/` changes, so that was fixed in `packages/cli`; `bundle.ts` imports `../src/components/` directly instead of through the dev server's symlink; the template's retired default model became `gemini-flash-latest`.
 
 **Scope.** This step also closes the modernization step 7 leftover: the component bundle in a fresh project has bare `require("react/jsx-runtime")` calls because gen-ui-components compiles with `jsx: react-jsx` and esbuild's `external: ['react']` externalises `react/jsx-runtime` too, inside an IIFE that has no `require`. Removing the externals is the fix, and React 19 (no UMD build) plus `@json-render/react`'s React 19 peer make it the only option.
 

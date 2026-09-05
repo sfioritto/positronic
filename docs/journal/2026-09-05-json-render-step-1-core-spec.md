@@ -1,7 +1,9 @@
 # json-render step 1: core generates a json-render Spec
 
-**Status:** active
+**Status:** shipped
 **Started:** 2026-09-05
+**Shipped:** 2026-09-05
+**Commit:** ddbe48e3
 **Plan:** `docs/json-render-plan.md` (step 1)
 **Evaluation:** `docs/journal/2026-09-04-json-render-evaluation.md`
 

@@ -1,7 +1,9 @@
 # json-render step 2: gen-ui-components becomes catalog + browser runtime
 
-**Status:** active
+**Status:** shipped
 **Started:** 2026-09-05
+**Shipped:** 2026-09-05
+**Commit:** 43b64afd
 **Plan:** `docs/json-render-plan.md` (step 2)
 **Previous step:** `docs/journal/2026-09-05-json-render-step-1-core-spec.md`
 

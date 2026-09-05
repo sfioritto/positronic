@@ -1,7 +1,8 @@
 # json-render as a replacement for gen-ui-components + the YAML page generator
 
-**Status:** active
+**Status:** shipped
 **Started:** 2026-09-04
+**Shipped:** 2026-09-05 (implemented in three steps; see `docs/json-render-plan.md`)
 
 ## Goal
 
