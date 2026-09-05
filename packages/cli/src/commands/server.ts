@@ -49,6 +49,11 @@ export class ServerCommand {
     fs.writeFileSync(pidFile, String(process.pid));
 
     const brainsDir = path.join(this.server.projectRootDir, 'src', 'brains');
+    const componentsDir = path.join(
+      this.server.projectRootDir,
+      'src',
+      'components'
+    );
     const resourcesDir = path.join(this.server.projectRootDir, 'resources');
 
     let serverHandle: ServerHandle | null = null;
@@ -195,7 +200,8 @@ export class ServerCommand {
         // Don't exit here - let the server continue running
       }
 
-      // Watcher setup - target the user's brains, resources directories, and .env file
+      // Watcher setup - target the user's brains, page components, resources
+      // directories, and .env file
       const { projectRootDir } = this.server;
       const envFilePath = path.join(projectRootDir, '.env');
       // chokidar 5 takes directories, not globs; dotfiles and node_modules
@@ -207,7 +213,7 @@ export class ServerCommand {
           .split(/[\\/]/)
           .some((s) => s === 'node_modules' || s.startsWith('.'));
 
-      watcher = watch([brainsDir, resourcesDir, envFilePath], {
+      watcher = watch([brainsDir, componentsDir, resourcesDir, envFilePath], {
         ignored: isIgnored,
         persistent: true,
         ignoreInitial: true,
@@ -236,6 +242,12 @@ export class ServerCommand {
         } else if (filePath.startsWith(resourcesDir)) {
           await handleResourceChange();
         } else if (filePath.startsWith(brainsDir) && /\.tsx?$/.test(filePath)) {
+          await this.server.watch?.(filePath, event);
+        } else if (
+          filePath.startsWith(componentsDir) &&
+          /\.(tsx?|css)$/.test(filePath)
+        ) {
+          // The backend rebuilds the page bundle from these
           await this.server.watch?.(filePath, event);
         }
       };
