@@ -148,5 +148,6 @@ export {
   auth,
   scoping,
   store,
+  users,
 } from './api/index.js';
 export type { AuthSetupResponse, Fetch, FetchFactory } from './api/index.js';

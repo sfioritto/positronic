@@ -111,3 +111,41 @@ agent system it references was removed.
 **Cost.** Including spec pulls the cloudflare vitest aggregate from 76% to
 59%, because the spec files are now in the denominator. Read the per-file
 rows, not the total.
+
+### 2026-09-04 — wiring the unenforced spec contracts
+
+**What we did.** Added spec.test.ts cases for every contract function the
+coverage report showed at 0%: the users and pages groups, brain search,
+active-runs, both ambiguous-identifier cases, schedule timezone get/set,
+whoami, and the bundle endpoint (both 404 and 200 paths). The two store
+scoping checks went into user-scoping.test.ts, which already had the
+fetchFactory they need. Removed the two USER_MESSAGE signal contracts.
+
+**The users contract was never exported.** `packages/spec/src/index.ts`
+re-exported every group except `users`, so `users.*` showed as 0% not because
+nobody wrote a test but because nobody could import it. The `api/index.ts`
+barrel had it; the top-level one didn't. Coverage found a packaging bug, not
+a testing gap.
+
+**USER_MESSAGE is dead on the server.** The signals route accepts KILL,
+PAUSE, RESUME, and WEBHOOK_RESPONSE and returns 400 for anything else. The
+spec's `sendMessage` expected 202 and `sendMessageNoAgent` expected 409, both
+from the removed agent system. Deleted rather than wired. The CLI's watch
+view still sends USER_MESSAGE from `watch-machine.ts`; that's a dead code
+path in the CLI and is out of scope here, but worth pulling.
+
+**'brain' is the ambiguous identifier.** The resolver's partial match
+includes path substring, and every fixture lives at `brains/*.ts`, so the
+bare word matches all of them and produces the 300 Multiple Choices the spec
+wants. No new fixture needed.
+
+**Per-user store keys need a real user.** The old test for
+GET /store/:brainTitle/user/:key only asserted root gets a 404, with a
+comment admitting it was a placeholder. Root has no userName, so the path
+never resolves. The real contract runs through `createUserFetch` with a key
+seeded under that user's name. Kept the root-404 assertion as its own test.
+
+**Result.** 102 of 103 spec functions run (the last is an inline arrow, not a
+contract). Vitest went from 208 to 235 tests. Spec files sit at ~50% line
+coverage, which is correct: the other half is the console.error branches
+that only execute when a backend fails the contract.

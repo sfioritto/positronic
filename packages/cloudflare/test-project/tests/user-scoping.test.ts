@@ -11,7 +11,7 @@ import {
   createAuthenticatedFetchWrapper,
   createUserFetch,
 } from './test-auth-helper';
-import { scoping } from '@positronic/spec';
+import { scoping, store } from '@positronic/spec';
 import type { Fetch, FetchFactory } from '@positronic/spec';
 
 describe('User-scoped authorization (spec)', () => {
@@ -64,6 +64,16 @@ describe('User-scoped authorization (spec)', () => {
 
   it('passes secrets require root spec', async () => {
     const result = await scoping.secretsRequireRoot(rootFetch, fetchFactory);
+    expect(result).toBe(true);
+  });
+
+  it('passes shared store keys require root spec', async () => {
+    const result = await store.sharedKeyRequiresRoot(fetchFactory);
+    expect(result).toBe(true);
+  });
+
+  it('passes per-user store key isolation spec', async () => {
+    const result = await store.userKeyIsolation(rootFetch, fetchFactory);
     expect(result).toBe(true);
   });
 });

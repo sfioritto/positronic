@@ -17,22 +17,26 @@ import {
   signals,
   auth,
   store,
+  bundle,
+  users,
 } from '@positronic/spec';
 import { resetMockState } from '../src/runner';
-import { createAuthenticatedFetchWrapper } from './test-auth-helper';
+import {
+  createAuthenticatedFetchWrapper,
+  createUserFetch,
+  TEST_PUBLIC_KEY_JWK,
+} from './test-auth-helper';
 
 describe('Positronic Spec', () => {
   // Helper function to create fetch wrapper for Cloudflare workers
   // Wraps requests with authentication
-  const createFetch = () => {
-    const baseFetch = async (request: Request) => {
-      const context = createExecutionContext();
-      const response = await worker.fetch(request, env, context);
-      await waitOnExecutionContext(context);
-      return response;
-    };
-    return createAuthenticatedFetchWrapper(baseFetch);
+  const baseFetch = async (request: Request) => {
+    const context = createExecutionContext();
+    const response = await worker.fetch(request, env, context);
+    await waitOnExecutionContext(context);
+    return response;
   };
+  const createFetch = () => createAuthenticatedFetchWrapper(baseFetch);
 
   // Reset mock state before each test
   beforeEach(() => {
@@ -88,6 +92,28 @@ describe('Positronic Spec', () => {
 
     it('passes GET /brains/:brainName test (brain info)', async () => {
       const result = await brains.getBrainInfo(createFetch(), 'basic-brain');
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /brains?q= test (search)', async () => {
+      const result = await brains.search(createFetch(), 'brain');
+      expect(result).not.toBeNull();
+      expect(result!.count).toBeGreaterThan(1);
+    });
+
+    it('passes GET /brains/:brainName/active-runs test', async () => {
+      const result = await brains.activeRuns(createFetch(), 'basic-brain');
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /brains/:identifier with ambiguous identifier test (300)', async () => {
+      // 'brain' partially matches every fixture path (brains/*.ts)
+      const result = await brains.getBrainInfoAmbiguous(createFetch(), 'brain');
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /brains/runs with ambiguous identifier test', async () => {
+      const result = await brains.runAmbiguous(createFetch(), 'brain');
       expect(result).toBe(true);
     });
 
@@ -244,6 +270,20 @@ describe('Positronic Spec', () => {
       const result = await schedules.runs(createFetch());
       expect(result).toBe(true);
     });
+
+    it('passes GET /brains/schedules/timezone test', async () => {
+      const timezone = await schedules.getTimezone(createFetch());
+      expect(timezone).toBeTruthy();
+    });
+
+    it('passes PUT /brains/schedules/timezone test', async () => {
+      const fetch = createFetch();
+      const result = await schedules.setTimezone(fetch, 'America/Chicago');
+      expect(result).toBe(true);
+
+      const timezone = await schedules.getTimezone(fetch);
+      expect(timezone).toBe('America/Chicago');
+    });
   });
 
   describe('Webhooks', () => {
@@ -337,6 +377,68 @@ describe('Positronic Spec', () => {
   });
 
   describe('Pages', () => {
+    const html = '<html><body><h1>Spec page</h1></body></html>';
+
+    it('passes GET /pages test', async () => {
+      const fetch = createFetch();
+      await pages.create(fetch, 'spec-list-page', html, 'spec-run-1');
+
+      const result = await pages.list(fetch);
+      expect(result).toBe(true);
+    });
+
+    it('passes POST /pages test', async () => {
+      const slug = await pages.create(
+        createFetch(),
+        'spec-create-page',
+        html,
+        'spec-run-1',
+        { persist: true, ttl: 3600 }
+      );
+      expect(slug).toBe('spec-create-page');
+    });
+
+    it('passes GET /pages/:slug test', async () => {
+      const fetch = createFetch();
+      await pages.create(fetch, 'spec-get-page', html, 'spec-run-1');
+
+      const result = await pages.get(fetch, 'spec-get-page');
+      expect(result).toBe(html);
+    });
+
+    it('passes GET /pages/:slug/meta test', async () => {
+      const fetch = createFetch();
+      await pages.create(fetch, 'spec-meta-page', html, 'spec-run-1');
+
+      const meta = await pages.getMeta(fetch, 'spec-meta-page');
+      expect(meta).not.toBeNull();
+      expect(meta!.brainRunId).toBe('spec-run-1');
+    });
+
+    it('passes PUT /pages/:slug test', async () => {
+      const fetch = createFetch();
+      await pages.create(fetch, 'spec-update-page', html, 'spec-run-1');
+
+      const updated = '<html><body><h1>Updated</h1></body></html>';
+      const result = await pages.update(fetch, 'spec-update-page', updated);
+      expect(result).toBe(true);
+      expect(await pages.get(fetch, 'spec-update-page')).toBe(updated);
+    });
+
+    it('passes DELETE /pages/:slug test', async () => {
+      const fetch = createFetch();
+      await pages.create(fetch, 'spec-delete-page', html, 'spec-run-1');
+
+      const result = await pages.delete(fetch, 'spec-delete-page');
+      expect(result).toBe(true);
+      expect(await pages.notFound(fetch, 'spec-delete-page')).toBe(true);
+    });
+
+    it('passes GET /pages/:slug with non-existent page test (404)', async () => {
+      const result = await pages.notFound(createFetch(), 'no-such-page');
+      expect(result).toBe(true);
+    });
+
     it('passes DELETE /pages preserves resources test', async () => {
       const result = await pages.deletePreservesResources(createFetch());
       expect(result).toBe(true);
@@ -433,6 +535,101 @@ describe('Positronic Spec', () => {
   describe('Auth', () => {
     it('passes GET /auth/setup test', async () => {
       const result = await auth.setup(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /auth/whoami test', async () => {
+      const result = await auth.whoami(createFetch());
+      expect(result).toEqual({ name: 'root', isRoot: true });
+    });
+  });
+
+  describe('Bundle', () => {
+    it('passes GET /bundle/components.js test when no bundle exists (404)', async () => {
+      const result = await bundle.get(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /bundle/components.js test when a bundle exists (200)', async () => {
+      const resourcesBucket = (env as { RESOURCES_BUCKET: R2Bucket })
+        .RESOURCES_BUCKET;
+      await resourcesBucket.put(
+        'bundle/components.js',
+        'window.PositronicComponents = {};'
+      );
+
+      const result = await bundle.get(createFetch());
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('Users', () => {
+    const fingerprint = 'SHA256:spec-user-key';
+
+    it('passes POST /users test', async () => {
+      const name = await users.create(createFetch(), 'spec-user');
+      expect(name).toBe('spec-user');
+    });
+
+    it('passes GET /users test', async () => {
+      const fetch = createFetch();
+      await users.create(fetch, 'spec-user');
+
+      const result = await users.list(fetch);
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /users/:name test', async () => {
+      const fetch = createFetch();
+      await users.create(fetch, 'spec-user');
+
+      const user = await users.get(fetch, 'spec-user');
+      expect(user?.name).toBe('spec-user');
+    });
+
+    it('passes GET /users/:name with non-existent user test (404)', async () => {
+      const user = await users.get(createFetch(), 'no-such-user');
+      expect(user).toBeNull();
+    });
+
+    it('passes DELETE /users/:name test', async () => {
+      const fetch = createFetch();
+      await users.create(fetch, 'spec-user');
+
+      const result = await users.delete(fetch, 'spec-user');
+      expect(result).toBe(true);
+      expect(await users.get(fetch, 'spec-user')).toBeNull();
+    });
+
+    it('passes POST /users/:name/keys test', async () => {
+      const fetch = createFetch();
+      await users.create(fetch, 'spec-user');
+
+      const result = await users.addKey(
+        fetch,
+        'spec-user',
+        TEST_PUBLIC_KEY_JWK,
+        fingerprint,
+        'laptop'
+      );
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /users/:name/keys test', async () => {
+      const fetch = createFetch();
+      await users.create(fetch, 'spec-user');
+      await users.addKey(fetch, 'spec-user', TEST_PUBLIC_KEY_JWK, fingerprint);
+
+      const result = await users.listKeys(fetch, 'spec-user');
+      expect(result).toBe(true);
+    });
+
+    it('passes DELETE /users/:name/keys/:fingerprint test', async () => {
+      const fetch = createFetch();
+      await users.create(fetch, 'spec-user');
+      await users.addKey(fetch, 'spec-user', TEST_PUBLIC_KEY_JWK, fingerprint);
+
+      const result = await users.removeKey(fetch, 'spec-user', fingerprint);
       expect(result).toBe(true);
     });
   });
@@ -661,23 +858,33 @@ describe('Positronic Spec', () => {
     });
 
     it('passes GET /store/:brainTitle/user/:key test', async () => {
-      // Root user won't have a userName for per-user lookup, so we seed one for root
-      // Actually, root user has userName=null, so per-user endpoint needs a real user.
-      // Let's test this with a user-scoped fetch instead.
-      // For now, test that the endpoint returns properly for existing data.
-      // Root can't access per-user keys via /user/:key since userName is null.
-      // We'll skip this for the root-only fetch and test it in userKeyIsolation.
+      // Per-user keys resolve against the caller's userName, which root does
+      // not have, so this contract needs a real non-root user.
+      const { fetch: userFetch, userName } = await createUserFetch(
+        baseFetch,
+        createFetch(),
+        'store-user'
+      );
+      const bucket = (env as { RESOURCES_BUCKET: R2Bucket }).RESOURCES_BUCKET;
+      await bucket.put(
+        `store/test-brain/user/${userName}/preferences.json`,
+        JSON.stringify({ notifications: false })
+      );
 
-      // Seed a per-user key for root test (won't match since root has no userName)
-      // Instead, just verify the endpoint returns 404 for root (no userName)
+      const result = await store.getUserValue(
+        userFetch,
+        'test-brain',
+        'preferences'
+      );
+      expect(result).toBe(true);
+    });
+
+    it('returns 404 from GET /store/:brainTitle/user/:key for root (no userName)', async () => {
       const request = new Request(
         'http://example.com/store/test-brain/user/preferences',
-        {
-          method: 'GET',
-        }
+        { method: 'GET' }
       );
       const response = await createFetch()(request);
-      // Root user has null userName, so the key path won't match - expect 404
       expect(response.status).toBe(404);
     });
 
