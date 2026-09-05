@@ -1,11 +1,12 @@
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 
-const here = fileURLToPath(new URL('.', import.meta.url));
+const here = dirname(fileURLToPath(import.meta.url));
 // The spec package is the API contract. Including it here means a spec
 // function at 0% is a contract no backend test enforces.
-const specSrc = fileURLToPath(new URL('../../spec/src', import.meta.url));
+const specSrc = join(here, '../../spec/src');
 
 export default defineConfig({
   plugins: [cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })],
@@ -27,7 +28,7 @@ export default defineConfig({
       // of them. Without the glob nothing external is reported at all.
       allowExternal: true,
       include: ['**/*.ts'],
-      exclude: [`${here}src/**`, `${here}tests/**`, `${here}webhooks/**`],
+      exclude: [`${here}/src/**`, `${here}/tests/**`, `${here}/webhooks/**`],
       reporter: ['text', 'lcov'],
     },
   },
