@@ -4,29 +4,47 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Default UI components for Positronic generative UI",
+  "description": "Component catalog and browser runtime for Positronic generated pages",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
   "files": [
     "dist",
+    "theme.css",
     "package.json"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "import": "./dist/catalog.js"
+    },
+    "./theme.css": "./theme.css"
+  },
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {
+    "@json-render/core": "0.20.0",
+    "@json-render/react": "0.20.0",
+    "@json-render/shadcn": "0.20.0",
     "@positronic/core": "^0.0.79"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.3",
     "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "zod": "^4.5.4"
   },
   "peerDependencies": {
     "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "zod": "^4.5.4"
   }
 }

@@ -16,7 +16,7 @@
     "clean:workspaces": "npm run clean --workspaces && rm -rf node_modules",
     "build:workspaces": "npm run build --workspaces",
     "build:watch": "tsc --build --watch packages/core packages/spec packages/template-new-project packages/client-vercel packages/gen-ui-components packages/mem0 packages/cloudflare packages/cli",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/core/tests/tsconfig.json && (cd packages/cloudflare/test-project && npm run typecheck)",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/core/tests/tsconfig.json && tsc --noEmit -p packages/gen-ui-components/tests/tsconfig.json && (cd packages/cloudflare/test-project && npm run typecheck)",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "changeset publish --no-git-tag"
@@ -26,6 +26,7 @@
     "@cloudflare/workers-types": "^5.20260905.1",
     "@types/node": "^26.4.1",
     "@vitest/coverage-v8": "^4.1.11",
+    "jsdom": "^30.0.1",
     "oxfmt": "^0.66.0",
     "oxlint": "^1.81.0",
     "typescript": "^7.0.2",
