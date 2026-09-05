@@ -1,7 +1,7 @@
 import type { ObjectGenerator } from '@positronic/core';
 import type { BrainEvent } from '@positronic/core';
 import { BRAIN_EVENTS, applyPatches } from '@positronic/core';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 export interface MockClient extends ObjectGenerator {
   mockResponses: (...responses: any[]) => void;
@@ -12,14 +12,14 @@ export function createMockClient(): MockClient {
   const responses: any[] = [];
   let responseIndex = 0;
 
-  const generateObject = jest.fn(async () => {
+  const generateObject = vi.fn(async () => {
     if (responseIndex >= responses.length) {
       throw new Error('No more mock responses available');
     }
     return responses[responseIndex++];
   });
 
-  const streamText = jest.fn(async () => {
+  const streamText = vi.fn(async () => {
     throw new Error('streamText not implemented in mock');
   });
 

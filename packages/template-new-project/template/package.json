@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:components": "node .positronic/esbuild.config.mjs"
   },
@@ -24,10 +24,7 @@
   "devDependencies": {<% if (backend === 'cloudflare') { %>
     "wrangler": "^4.37.0",<% } %>
     "typescript": "^5.0.0",
-    "jest": "^30.0.4",
-    "@jest/globals": "^30.0.4",
-    "ts-jest": "^29.2.6",
-    "@types/jest": "^30.0.0",
+    "vitest": "^4.1.11",
     "esbuild": "^0.27.2",
     "@types/react": "^18.2.0"
   }

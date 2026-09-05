@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { vi, type Mocked, type MockedFunction } from 'vitest';
 import { z } from 'zod';
 import { ObjectGenerator } from '../src/clients/types.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
@@ -47,7 +47,7 @@ interface Logger {
 
 // Mock services for testing
 export const testLogger: Logger = {
-  log: jest.fn(),
+  log: vi.fn(),
 };
 
 export type AssertEquals<T, U> = 0 extends 1 & T
@@ -61,13 +61,13 @@ export type AssertEquals<T, U> = 0 extends 1 & T
   : false;
 
 // Mock ObjectGenerator for testing
-export const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-export const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
+export const mockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+export const mockStreamText = vi.fn<ObjectGenerator['streamText']>();
 export const mockGenerateText =
-  jest.fn<NonNullable<ObjectGenerator['generateText']>>();
+  vi.fn<NonNullable<ObjectGenerator['generateText']>>();
 export const mockCreateToolResultMessage =
-  jest.fn<NonNullable<ObjectGenerator['createToolResultMessage']>>();
-export const mockClient: jest.Mocked<ObjectGenerator> = {
+  vi.fn<NonNullable<ObjectGenerator['createToolResultMessage']>>();
+export const mockClient: Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
   streamText: mockStreamText,
   generateText: mockGenerateText,
@@ -78,7 +78,7 @@ export const dummyOutputSchema = z.object({ result: z.string() });
 export const dummyStateKey = 'agentResult' as const;
 
 // Mock Resources for testing
-export const mockResourceLoad = jest.fn(
+export const mockResourceLoad = vi.fn(
   async (
     resourceName: string,
     type?: 'text' | 'binary'
@@ -87,7 +87,7 @@ export const mockResourceLoad = jest.fn(
       return Buffer.from(`mock ${resourceName} binary content`);
     return `mock ${resourceName} text content`;
   }
-) as jest.MockedFunction<ResourceLoader['load']>;
+) as MockedFunction<ResourceLoader['load']>;
 
 export const mockResourceLoader: ResourceLoader = {
   load: mockResourceLoad,

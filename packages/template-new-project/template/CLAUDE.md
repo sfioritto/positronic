@@ -31,7 +31,7 @@ This is a Positronic project - an AI-powered framework for building and running 
 
 ### Testing & Building
 
-- `npm test` - Run tests (uses Jest with local test utilities)
+- `npm test` - Run tests (uses Vitest with local test utilities)
 - `npm run build` - Build the project
 - `npm run dev` - Start development mode with hot reload
 

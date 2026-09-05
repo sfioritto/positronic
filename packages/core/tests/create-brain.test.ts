@@ -2,12 +2,12 @@ import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import { createBrain } from '../src/dsl/create-brain.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect } from 'vitest';
 import { mockClient } from './brain-test-helpers.js';
 
 describe('createBrain plugin type inference', () => {
   it('should propagate plugin types from createBrain to all brains', async () => {
-    const logMock = jest.fn();
+    const logMock = vi.fn();
     const logger = definePlugin({
       name: 'logger',
       create: () => ({ log: logMock }),
@@ -42,8 +42,8 @@ describe('createBrain plugin type inference', () => {
   });
 
   it('should propagate multiple plugin types', async () => {
-    const logMock = jest.fn();
-    const trackMock = jest.fn();
+    const logMock = vi.fn();
+    const trackMock = vi.fn();
 
     const logger = definePlugin({
       name: 'logger',
@@ -134,8 +134,8 @@ describe('createBrain plugin type inference', () => {
   });
 
   it('should allow per-brain withPlugin to add more plugins', async () => {
-    const logMock = jest.fn();
-    const trackMock = jest.fn();
+    const logMock = vi.fn();
+    const trackMock = vi.fn();
 
     const logger = definePlugin({
       name: 'logger',

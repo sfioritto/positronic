@@ -6,7 +6,7 @@ import {
   type BrainErrorEvent,
 } from '../src/dsl/brain.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, describe, it, test, expect } from 'vitest';
 import { createWebhook } from '../src/index.js';
 import {
   finalStateFromEvents,
@@ -421,10 +421,10 @@ describe('nested brains', () => {
 
     // Create mock pages service
     const mockPages = {
-      create: jest.fn(),
-      get: jest.fn(),
-      exists: jest.fn(),
-      update: jest.fn(),
+      create: vi.fn(),
+      get: vi.fn(),
+      exists: vi.fn(),
+      update: vi.fn(),
     };
     const mockEnv = { origin: 'http://test.com', secrets: {} };
 

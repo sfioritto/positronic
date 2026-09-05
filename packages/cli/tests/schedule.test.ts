@@ -1,13 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  describe,
-  it,
-  expect,
-  jest,
-  beforeEach,
-  afterEach,
-} from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createTestEnv, px, type TestEnv } from './test-utils.js';
 
 describe('schedule command', () => {
@@ -236,7 +229,7 @@ describe('schedule command', () => {
       // Mock process.exit to prevent it from killing the test process
       // The middleware calls process.exit(0) after rendering completes
       originalExit = process.exit;
-      process.exit = jest.fn() as any;
+      process.exit = vi.fn() as any;
     });
 
     afterEach(() => {
@@ -393,7 +386,7 @@ describe('schedule command', () => {
       // Mock process.exit to prevent it from killing the test process
       // The middleware calls process.exit(0) after rendering completes
       originalExit = process.exit;
-      process.exit = jest.fn() as any;
+      process.exit = vi.fn() as any;
     });
 
     afterEach(() => {

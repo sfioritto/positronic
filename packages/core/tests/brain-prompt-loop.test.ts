@@ -1,7 +1,7 @@
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   runWithStateMachine,
   mockGenerateObject,
@@ -32,7 +32,7 @@ const searchTool: Tool = {
 
 describe('.prompt() with loop', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockCreateToolResultMessage.mockImplementation(
       (toolCallId, toolName, result) => ({
         role: 'tool',
@@ -428,7 +428,7 @@ describe('.prompt() with loop', () => {
 
 describe('.map() with prompt + loop', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockCreateToolResultMessage.mockImplementation(
       (toolCallId, toolName, result) => ({
         role: 'tool',

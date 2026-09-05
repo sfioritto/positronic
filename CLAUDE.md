@@ -149,7 +149,7 @@ The project template (`packages/template-new-project/template/.positronic/`) is 
 
 - testing philosophy: @docs/testing-philosophy.md
 - CLI testing guide: @docs/cli-testing-guide.md
-- Jest is the test framework
+- Vitest is the test framework. Import `describe`, `it`, `expect`, and `vi` from `vitest` explicitly; globals are not enabled.
 - **IMPORTANT**: Before creating or updating any tests, always read and load a few different test suites to follow the same patterns
 
 ## Developer Journal

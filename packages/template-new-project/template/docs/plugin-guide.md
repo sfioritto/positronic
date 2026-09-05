@@ -201,7 +201,7 @@ In tests, create a plugin with mock behavior:
 const mockSlack = definePlugin({
   name: 'slack',
   create: () => ({
-    post: jest.fn(async () => {}),
+    post: vi.fn(async () => {}),
   }),
 });
 

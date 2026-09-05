@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Fragment, File, Resource } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import {
@@ -7,7 +8,7 @@ import {
 } from '../src/template/render.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, type Mocked } from 'vitest';
 import type { ObjectGenerator } from '../src/clients/types.js';
 import { finalStateFromEvents } from './brain-test-helpers.js';
 
@@ -179,13 +180,13 @@ describe('resolveTemplate', () => {
 });
 
 describe('brain integration with JSX templates', () => {
-  const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-  const mockClient: jest.Mocked<ObjectGenerator> = {
+  const mockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+  const mockClient: Mocked<ObjectGenerator> = {
     generateObject: mockGenerateObject,
   } as any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('prompt step renders TemplateNode from template function', async () => {

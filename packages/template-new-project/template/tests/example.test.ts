@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { createMockClient, runBrainTest } from './test-utils.js';
 import exampleBrain from '../src/brains/example.js';
 

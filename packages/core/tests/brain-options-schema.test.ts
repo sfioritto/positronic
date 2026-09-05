@@ -1,14 +1,14 @@
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect } from 'vitest';
 import { brain, BRAIN_EVENTS } from '../src/index.js';
 import type { ObjectGenerator, BrainEvent } from '../src/index.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
 
 describe('Brain withOptions', () => {
-  const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
+  const mockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
   mockGenerateObject.mockResolvedValue({ object: { result: 'test' } } as any);
 
-  const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
+  const mockStreamText = vi.fn<ObjectGenerator['streamText']>();
 
   const mockClient: ObjectGenerator = {
     generateObject: mockGenerateObject,

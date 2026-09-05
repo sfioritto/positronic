@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { createTestEnv, px } from './test-utils.js';
 import nock from 'nock';
 

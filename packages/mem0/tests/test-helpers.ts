@@ -5,7 +5,7 @@ import type {
   MemoryMessage,
   ObjectGenerator,
 } from '@positronic/core';
-import { jest } from '@jest/globals';
+import { vi, expect, type Mocked } from 'vitest';
 
 /**
  * A mock memory provider that tracks calls for testing.
@@ -108,10 +108,10 @@ export function createMockProvider(): MockMemoryProvider {
  * await collectEvents(testBrain.run({ client }));
  * ```
  */
-export function createMockClient(): jest.Mocked<ObjectGenerator> {
+export function createMockClient(): Mocked<ObjectGenerator> {
   return {
-    generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-    streamText: jest.fn<ObjectGenerator['streamText']>(),
+    generateObject: vi.fn<ObjectGenerator['generateObject']>(),
+    streamText: vi.fn<ObjectGenerator['streamText']>(),
   };
 }
 

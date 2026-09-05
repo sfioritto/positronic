@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import {
   brain,

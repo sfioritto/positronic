@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Response } from 'node-fetch';
 import { syncResources, generateTypes } from '../src/commands/helpers.js';
 import { createMockApiClient } from './mock-api-client.js';

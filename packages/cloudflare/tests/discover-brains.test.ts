@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { discoverBrains } from '../src/dev-server.js';
 import fs from 'fs';
 import path from 'path';

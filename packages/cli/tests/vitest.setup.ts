@@ -1,5 +1,5 @@
 /**
- * Global Jest setup for CLI tests.
+ * Global Vitest setup for CLI tests.
  *
  * This setup provides a "safety net" by disabling all real network connections
  * by default. Tests can only make HTTP requests through nock interceptors.
@@ -9,7 +9,7 @@
  * designed to verify "connection error" behavior.
  */
 import nock from 'nock';
-import { beforeEach, afterEach } from '@jest/globals';
+import { beforeEach, afterEach } from 'vitest';
 
 beforeEach(() => {
   // Disable all real network connections for this test.

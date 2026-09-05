@@ -724,7 +724,7 @@ Start by following the brain testing guide (`/docs/brain-testing-guide.md`) and 
 
 ```typescript
 // tests/my-new-brain.test.ts
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { createMockClient, runBrainTest } from './test-utils.js';
 import myNewBrain from '../src/brains/my-new-brain.js';
 

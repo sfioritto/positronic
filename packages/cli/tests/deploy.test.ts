@@ -2,14 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync } from 'child_process';
-import {
-  describe,
-  it,
-  expect,
-  jest,
-  beforeEach,
-  afterEach,
-} from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createTestEnv, px, type TestEnv } from './test-utils.js';
 import type { TestDevServer } from './test-dev-server.js';
 
@@ -30,7 +23,7 @@ describe('CLI Integration: px deploy', () => {
 
   beforeEach(async () => {
     env = await createTestEnv();
-    exitSpy = jest
+    exitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
     savedRootPublicKey = process.env.ROOT_PUBLIC_KEY;

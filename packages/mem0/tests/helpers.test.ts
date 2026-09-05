@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect } from 'vitest';
 import {
   formatMemories,
   createMemorySystemPrompt,
@@ -15,13 +15,13 @@ import type {
 // Create a mock Memory for testing
 function createMockMemory(searchResult: MemoryEntry[] = []): Memory {
   return {
-    search: jest.fn(
+    search: vi.fn(
       async (
         query: string,
         options?: MemorySearchOptions
       ): Promise<MemoryEntry[]> => searchResult
     ),
-    add: jest.fn(
+    add: vi.fn(
       async (
         messages: MemoryMessage[],
         options?: MemoryAddOptions

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createTestEnv,
   waitForTypesFile,
@@ -15,7 +15,7 @@ describe('CLI Integration: positronic server', () => {
   beforeEach(async () => {
     // Stub process.exit so cleanup doesn't terminate Jest
     env = await createTestEnv();
-    exitSpy = jest
+    exitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
   });
@@ -135,30 +135,28 @@ describe('CLI Integration: positronic server', () => {
       const originalStart = server.start.bind(server);
       let errorCallback: ((error: Error) => void) | undefined;
 
-      server.start = jest.fn(
-        async (port?: number): Promise<TestServerHandle> => {
-          const handle = await originalStart(port);
+      server.start = vi.fn(async (port?: number): Promise<TestServerHandle> => {
+        const handle = await originalStart(port);
 
-          // Intercept the onError callback
-          const originalOnError = handle.onError.bind(handle);
-          handle.onError = (callback: (error: Error) => void) => {
-            errorCallback = callback;
-            originalOnError(callback);
-          };
+        // Intercept the onError callback
+        const originalOnError = handle.onError.bind(handle);
+        handle.onError = (callback: (error: Error) => void) => {
+          errorCallback = callback;
+          originalOnError(callback);
+        };
 
-          // Emit error after a short delay
-          setTimeout(() => {
-            if (errorCallback) {
-              errorCallback(new Error('Mock server error'));
-            }
-          }, 10);
+        // Emit error after a short delay
+        setTimeout(() => {
+          if (errorCallback) {
+            errorCallback(new Error('Mock server error'));
+          }
+        }, 10);
 
-          return handle;
-        }
-      );
+        return handle;
+      });
 
       // Use a console spy to capture error output
-      const consoleErrorSpy = jest
+      const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
@@ -186,20 +184,18 @@ describe('CLI Integration: positronic server', () => {
 
       // Mock the server handle to simulate timeout
       const originalStart = server.start.bind(server);
-      server.start = jest.fn(
-        async (port?: number): Promise<TestServerHandle> => {
-          const handle = await originalStart(port);
+      server.start = vi.fn(async (port?: number): Promise<TestServerHandle> => {
+        const handle = await originalStart(port);
 
-          // Override waitUntilReady to always return false (timeout)
-          handle.waitUntilReady = jest
-            .fn<() => Promise<boolean>>()
-            .mockResolvedValue(false);
+        // Override waitUntilReady to always return false (timeout)
+        handle.waitUntilReady = vi
+          .fn<() => Promise<boolean>>()
+          .mockResolvedValue(false);
 
-          return handle;
-        }
-      );
+        return handle;
+      });
 
-      const consoleErrorSpy = jest
+      const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
@@ -225,7 +221,7 @@ describe('CLI Integration: positronic server', () => {
 
     it('should handle resource sync with successful upload count', async () => {
       const { server } = env;
-      const consoleLogSpy = jest
+      const consoleLogSpy = vi
         .spyOn(console, 'log')
         .mockImplementation(() => {});
 
@@ -310,27 +306,25 @@ describe('CLI Integration: positronic server', () => {
       const originalStart = server.start.bind(server);
       let closeCallback: ((code?: number | null) => void) | undefined;
 
-      server.start = jest.fn(
-        async (port?: number): Promise<TestServerHandle> => {
-          const handle = await originalStart(port);
+      server.start = vi.fn(async (port?: number): Promise<TestServerHandle> => {
+        const handle = await originalStart(port);
 
-          // Intercept the onClose callback
-          const originalOnClose = handle.onClose.bind(handle);
-          handle.onClose = (callback: (code?: number | null) => void) => {
-            closeCallback = callback;
-            originalOnClose(callback);
-          };
+        // Intercept the onClose callback
+        const originalOnClose = handle.onClose.bind(handle);
+        handle.onClose = (callback: (code?: number | null) => void) => {
+          closeCallback = callback;
+          originalOnClose(callback);
+        };
 
-          // Emit close event after a delay
-          setTimeout(() => {
-            if (closeCallback) {
-              closeCallback(42); // Custom exit code
-            }
-          }, 100);
+        // Emit close event after a delay
+        setTimeout(() => {
+          if (closeCallback) {
+            closeCallback(42); // Custom exit code
+          }
+        }, 100);
 
-          return handle;
-        }
-      );
+        return handle;
+      });
 
       try {
         await px(['server'], { server });

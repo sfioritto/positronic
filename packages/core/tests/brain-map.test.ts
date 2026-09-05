@@ -1,7 +1,7 @@
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
 import { ObjectGenerator } from '../src/clients/types.js';
 import {
   createBrainExecutionMachine,
@@ -586,11 +586,10 @@ describe('.map()', () => {
   });
 
   it('should use per-step client override in prompt mode', async () => {
-    const customMockGenerateObject =
-      jest.fn<ObjectGenerator['generateObject']>();
-    const customClient: jest.Mocked<ObjectGenerator> = {
+    const customMockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+    const customClient: Mocked<ObjectGenerator> = {
       generateObject: customMockGenerateObject,
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
+      streamText: vi.fn<ObjectGenerator['streamText']>(),
     };
 
     customMockGenerateObject.mockResolvedValue({
@@ -625,11 +624,10 @@ describe('.map()', () => {
   });
 
   it('should use brain-level client for prompt steps', async () => {
-    const brainMockGenerateObject =
-      jest.fn<ObjectGenerator['generateObject']>();
-    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
+    const brainMockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+    const brainLevelClient: Mocked<ObjectGenerator> = {
       generateObject: brainMockGenerateObject,
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
+      streamText: vi.fn<ObjectGenerator['streamText']>(),
     };
 
     brainMockGenerateObject.mockResolvedValue({
@@ -661,17 +659,16 @@ describe('.map()', () => {
   });
 
   it('should let step-level client override brain-level client', async () => {
-    const brainMockGenerateObject =
-      jest.fn<ObjectGenerator['generateObject']>();
-    const brainLevelClient: jest.Mocked<ObjectGenerator> = {
+    const brainMockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+    const brainLevelClient: Mocked<ObjectGenerator> = {
       generateObject: brainMockGenerateObject,
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
+      streamText: vi.fn<ObjectGenerator['streamText']>(),
     };
 
-    const stepMockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-    const stepLevelClient: jest.Mocked<ObjectGenerator> = {
+    const stepMockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+    const stepLevelClient: Mocked<ObjectGenerator> = {
       generateObject: stepMockGenerateObject,
-      streamText: jest.fn<ObjectGenerator['streamText']>(),
+      streamText: vi.fn<ObjectGenerator['streamText']>(),
     };
 
     stepMockGenerateObject.mockResolvedValue({
@@ -735,7 +732,9 @@ describe('.map()', () => {
   });
 
   it('should log and skip failed items by default (brain mode)', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     let callCount = 0;
     const innerBrain = brain<{}, { value: number }>('Inner').step(
@@ -780,7 +779,9 @@ describe('.map()', () => {
   });
 
   it('should log and skip failed items by default (prompt mode)', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     mockGenerateObject
       .mockResolvedValueOnce({ object: { summary: 'Good' } })

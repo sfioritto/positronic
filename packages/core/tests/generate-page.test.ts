@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { z } from 'zod'; // Still needed for schema in tests
 import { generatePage } from '../src/ui/generate-page.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
@@ -13,9 +13,9 @@ type ValidationResult = {
   resolvedBindings?: ResolvedBinding[];
 };
 
-const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
+const mockStreamText = vi.fn<ObjectGenerator['streamText']>();
 const mockClient: ObjectGenerator = {
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
+  generateObject: vi.fn<ObjectGenerator['generateObject']>(),
   streamText: mockStreamText,
 };
 

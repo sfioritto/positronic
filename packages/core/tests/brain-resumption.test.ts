@@ -2,13 +2,13 @@ import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import { State } from '../src/dsl/types.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect } from 'vitest';
 import { ObjectGenerator } from '../src/clients/types.js';
 
 describe('brain resumption', () => {
   const mockClient = {
-    generateObject: jest.fn(),
-    streamText: jest.fn(),
+    generateObject: vi.fn(),
+    streamText: vi.fn(),
   };
 
   it('should resume brain from the correct step when given resumeContext', async () => {
@@ -82,8 +82,8 @@ describe('brain resumption', () => {
 describe('IterateResult rehydration on resume', () => {
   it('should re-wrap plain arrays as IterateResult when resuming after a completed map step', async () => {
     const mockClient = {
-      generateObject: jest.fn(),
-      streamText: jest.fn(),
+      generateObject: vi.fn(),
+      streamText: vi.fn(),
     };
 
     const innerBrain = brain<{}, { doubled: number }>('Doubler').step(

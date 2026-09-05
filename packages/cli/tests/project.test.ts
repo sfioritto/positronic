@@ -18,12 +18,12 @@
  * while still verifying that core functionality works correctly.
  */
 
-// Import nock to use in tests, but configuration happens in jest.setup.js
+// Import nock to use in tests, but configuration happens in vitest.setup.ts
 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { describe, it, expect, afterEach, jest } from '@jest/globals';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { createTestEnv, px } from './test-utils.js';
 
 describe('CLI Integration: positronic server with project', () => {

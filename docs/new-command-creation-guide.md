@@ -244,7 +244,7 @@ nockInstance.get(/^\/your\/endpoint\/(.+)$/).reply((uri) => {
 In `packages/cli/tests/your-category.test.ts`:
 
 ```typescript
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { createTestEnv, px } from './test-utils.js';
 
 describe('your command', () => {

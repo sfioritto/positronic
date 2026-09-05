@@ -1,7 +1,7 @@
 import { brain } from '../src/dsl/brain.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, describe, it, test, expect, beforeEach } from 'vitest';
 import {
   mockClient,
   mockGenerateObject,
@@ -65,7 +65,7 @@ describe('plugin system', () => {
 
   describe('withPlugin on Brain', () => {
     it('should replace plugin by name on collision', async () => {
-      const createSpy = jest.fn(({ config }: any) => ({
+      const createSpy = vi.fn(({ config }: any) => ({
         level: config?.level ?? 'info',
       }));
 
@@ -91,7 +91,7 @@ describe('plugin system', () => {
     });
 
     it('should preserve plugins through step chaining and withOptions', async () => {
-      const createSpy = jest.fn(() => ({ value: 42 }));
+      const createSpy = vi.fn(() => ({ value: 42 }));
 
       const plugin = definePlugin({
         name: 'test',
@@ -215,7 +215,7 @@ describe('plugin system', () => {
 
   describe('runtime integration', () => {
     it('should inject plugin service methods onto StepContext', async () => {
-      const searchMock = jest.fn(async (query: string) => ['result1']);
+      const searchMock = vi.fn(async (query: string) => ['result1']);
       const plugin = definePlugin({
         name: 'search',
         create: () => ({
@@ -240,7 +240,7 @@ describe('plugin system', () => {
     });
 
     it('should pass config to plugin create', async () => {
-      const createSpy = jest.fn(({ config }: any) => ({
+      const createSpy = vi.fn(({ config }: any) => ({
         scope: config?.scope ?? 'default',
       }));
 
@@ -272,7 +272,7 @@ describe('plugin system', () => {
     });
 
     it('should make plugin tools accessible on context', async () => {
-      const executeMock = jest.fn(async (input: { input: string }) => ({
+      const executeMock = vi.fn(async (input: { input: string }) => ({
         ok: true,
       }));
 
@@ -308,7 +308,7 @@ describe('plugin system', () => {
     });
 
     it('should dispatch events to plugin adapter', async () => {
-      const dispatchMock = jest.fn<(event: any) => void>();
+      const dispatchMock = vi.fn<(event: any) => void>();
 
       const plugin = definePlugin({
         name: 'eventLogger',
@@ -370,7 +370,7 @@ describe('plugin system', () => {
     });
 
     it('should propagate plugins to nested brains', async () => {
-      const createSpy = jest.fn(() => ({
+      const createSpy = vi.fn(() => ({
         value: 42,
       }));
 

@@ -121,7 +121,7 @@ server.stop(); // or mock to return errors
 ## Quick Test Template
 
 ```typescript
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { createTestEnv, px } from './test-utils.js';
 
 describe('command name', () => {

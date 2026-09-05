@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { createTestEnv } from './test-utils.js';
 import { STATUS } from '@positronic/core';
 

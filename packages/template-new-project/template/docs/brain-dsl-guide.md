@@ -491,13 +491,13 @@ Plugins make testing easier by allowing you to inject mocks:
 import { createMockClient, runBrainTest } from '../tests/test-utils.js';
 
 const mockLogger = {
-  info: jest.fn(),
-  error: jest.fn()
+  info: vi.fn(),
+  error: vi.fn()
 };
 
 const mockDatabase = {
-  save: jest.fn().mockResolvedValue(undefined),
-  find: jest.fn().mockResolvedValue({ id: '123', name: 'Test' })
+  save: vi.fn().mockResolvedValue(undefined),
+  find: vi.fn().mockResolvedValue({ id: '123', name: 'Test' })
 };
 
 const testBrain = brain('Test Brain')

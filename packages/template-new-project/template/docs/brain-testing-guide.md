@@ -92,7 +92,7 @@ mockClient.clearMocks();
 
 ### Assertions
 
-Use standard Jest assertions on the mock:
+Use standard Vitest assertions on the mock:
 
 ```typescript
 // Check call count
@@ -149,7 +149,7 @@ To test error handling, create a mock client that throws:
 it('should handle API failures gracefully', async () => {
   // Arrange - create a mock that throws on the first call
   const errorClient = {
-    generateObject: jest.fn().mockRejectedValue(
+    generateObject: vi.fn().mockRejectedValue(
       new Error('Service temporarily unavailable')
     )
   };
@@ -206,23 +206,23 @@ const mockGmail = definePlugin({
   name: 'gmail',
   create: () => ({
     getAccounts: () => [{ name: 'test-account', refreshToken: 'test-token' }],
-    searchThreads: jest.fn().mockResolvedValue([
+    searchThreads: vi.fn().mockResolvedValue([
       { threadId: 'thread-1' },
     ]),
-    getThreadDetails: jest.fn().mockResolvedValue({
+    getThreadDetails: vi.fn().mockResolvedValue({
       threadId: 'thread-1',
       subject: 'Test Email',
       from: 'sender@example.com',
       body: 'Email body content',
     }),
-    archiveMessages: jest.fn().mockResolvedValue(undefined),
+    archiveMessages: vi.fn().mockResolvedValue(undefined),
   }),
 });
 
 const mockNtfy = definePlugin({
   name: 'ntfy',
   create: () => ({
-    send: jest.fn().mockResolvedValue(undefined),
+    send: vi.fn().mockResolvedValue(undefined),
   }),
 });
 
@@ -329,7 +329,7 @@ describe('analysis-brain', () => {
   it('should handle analysis service outages', async () => {
     // Arrange: Simulate service failure
     const errorClient = {
-      generateObject: jest.fn().mockRejectedValue(
+      generateObject: vi.fn().mockRejectedValue(
         new Error('Analysis service unavailable')
       )
     };

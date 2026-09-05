@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect, type Mocked } from 'vitest';
 import { z } from 'zod';
 import type { Store, StoreProvider } from '../src/store/types.js';
 import { brain } from '../src/dsl/builder/brain.js';
@@ -75,9 +75,9 @@ const createInMemoryStoreProvider = (): StoreProvider & {
 };
 
 // Mock ObjectGenerator for testing
-const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-  streamText: jest.fn<ObjectGenerator['streamText']>(),
+const createMockClient = (): Mocked<ObjectGenerator> => ({
+  generateObject: vi.fn<ObjectGenerator['generateObject']>(),
+  streamText: vi.fn<ObjectGenerator['streamText']>(),
 });
 
 describe('Brain.withStore', () => {
@@ -173,7 +173,7 @@ describe('Brain.withStore', () => {
     const storeFactory = createInMemoryStoreProvider();
     const mockClient = createMockClient();
 
-    const mockLog = jest.fn();
+    const mockLog = vi.fn();
     const loggerPlugin = definePlugin({
       name: 'logger',
       create: () => ({ log: mockLog }),

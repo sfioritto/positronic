@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestEnv, px } from './test-utils.js';
 import nock from 'nock';
 

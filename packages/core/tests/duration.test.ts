@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { parseDuration } from '../src/dsl/duration.js';
 
 describe('parseDuration', () => {

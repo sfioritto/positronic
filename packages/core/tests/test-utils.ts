@@ -1,6 +1,6 @@
 import type { ObjectGenerator, Message } from '../src/clients/types.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, expect, type Mock } from 'vitest';
 import type { Adapter } from '../src/adapters/types.js';
 import type { BrainEvent, Brain } from '../src/dsl/brain.js';
 import type { State } from '../src/dsl/types.js';
@@ -13,14 +13,14 @@ import type { Resources } from '../src/resources/resources.js';
  * Mock implementation of ObjectGenerator for testing
  */
 export class MockObjectGenerator implements ObjectGenerator {
-  private generateObjectMock: jest.Mock<any>;
+  private generateObjectMock: Mock;
   private calls: Array<{
     params: Parameters<ObjectGenerator['generateObject']>[0];
     timestamp: Date;
   }> = [];
 
   constructor() {
-    this.generateObjectMock = jest.fn();
+    this.generateObjectMock = vi.fn();
   }
 
   async generateObject<T extends z.AnyZodObject>(
@@ -72,9 +72,9 @@ export class MockObjectGenerator implements ObjectGenerator {
   }
 
   /**
-   * Get the underlying jest.Mock for advanced mocking scenarios
+   * Get the underlying Mock for advanced mocking scenarios
    */
-  get mock(): jest.Mock<any> {
+  get mock(): Mock {
     return this.generateObjectMock;
   }
 

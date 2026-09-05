@@ -3,11 +3,11 @@ import { createWebhook } from '../src/dsl/webhook.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { z } from 'zod';
 import type { ObjectGenerator } from '../src/clients/types.js';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect } from 'vitest';
 
 const mockClient: ObjectGenerator = {
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-  streamText: jest.fn<ObjectGenerator['streamText']>(),
+  generateObject: vi.fn<ObjectGenerator['generateObject']>(),
+  streamText: vi.fn<ObjectGenerator['streamText']>(),
 };
 
 describe('webhook type inference', () => {

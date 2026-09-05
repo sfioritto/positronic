@@ -5,7 +5,7 @@ import { Fragment, Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import { coerceFormResponse } from '../src/ui/parse-form-data.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   finalStateFromEvents,
   mockStreamText,
@@ -60,16 +60,16 @@ describe('UI steps', () => {
 
   // Mock pages service
   const mockPages = {
-    create: jest.fn<any>().mockResolvedValue({
+    create: vi.fn<any>().mockResolvedValue({
       slug: 'test-page',
       url: 'https://example.com/pages/test-page',
       brainRunId: 'test-run',
       persist: false,
       createdAt: new Date().toISOString(),
     }),
-    get: jest.fn(),
-    exists: jest.fn(),
-    update: jest.fn(),
+    get: vi.fn(),
+    exists: vi.fn(),
+    update: vi.fn(),
   };
 
   beforeEach(() => {
@@ -221,16 +221,16 @@ describe('UI steps', () => {
 
 describe('Custom HTML pages (.page() with html)', () => {
   const mockPages = {
-    create: jest.fn<any>().mockResolvedValue({
+    create: vi.fn<any>().mockResolvedValue({
       slug: 'custom-page',
       url: 'https://example.com/pages/custom-page',
       brainRunId: 'test-run',
       persist: false,
       createdAt: new Date().toISOString(),
     }),
-    get: jest.fn(),
-    exists: jest.fn(),
-    update: jest.fn(),
+    get: vi.fn(),
+    exists: vi.fn(),
+    update: vi.fn(),
   };
 
   beforeEach(() => {
@@ -446,7 +446,7 @@ describe('Custom HTML pages (.page() with html)', () => {
   });
 
   it('should call onCreated callback for html pages', async () => {
-    const onCreated = jest.fn<(page: any) => void>();
+    const onCreated = vi.fn<(page: any) => void>();
 
     const testBrain = brain('HTML onCreated Test').page('Page', () => ({
       html: 'content',
@@ -508,7 +508,7 @@ describe('Custom HTML pages (.page() with html)', () => {
   });
 
   it("creates the later outer page instead of consuming the inner page's webhook response", async () => {
-    const outerOnCreated = jest.fn<(page: any) => void>();
+    const outerOnCreated = vi.fn<(page: any) => void>();
 
     const innerBrain = brain<{}, { proposals: string[] }>('Inner Review').page(
       'Inner review page',

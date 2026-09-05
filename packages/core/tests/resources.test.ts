@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createResources, type Manifest } from '../src/resources/resources.js';
 import { ResourceLoader } from '../src/resources/resource-loader.js';
 

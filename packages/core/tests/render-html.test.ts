@@ -1,3 +1,4 @@
+import { describe, it, test, expect } from 'vitest';
 import { Fragment, File, Resource, Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import { renderHtml, wrapHtmlDocument } from '../src/template/render-html.js';
@@ -168,12 +169,16 @@ describe('renderHtml', () => {
   describe('raw-text elements', () => {
     it('does not entity-escape style contents', () => {
       const tree = node('style', {}, "body { font-family: 'Segoe UI'; }");
-      expect(renderHtml(tree)).toBe("<style>body { font-family: 'Segoe UI'; }</style>");
+      expect(renderHtml(tree)).toBe(
+        "<style>body { font-family: 'Segoe UI'; }</style>"
+      );
     });
 
     it('does not entity-escape script contents', () => {
       const tree = node('script', {}, 'if (a && b) { alert("hi"); }');
-      expect(renderHtml(tree)).toBe('<script>if (a && b) { alert("hi"); }</script>');
+      expect(renderHtml(tree)).toBe(
+        '<script>if (a && b) { alert("hi"); }</script>'
+      );
     });
 
     it('neutralizes closing tags inside raw text', () => {

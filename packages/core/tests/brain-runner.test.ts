@@ -5,7 +5,15 @@ import {
   createBrainExecutionMachine,
   sendEvent,
 } from '../src/dsl/brain-state-machine.js';
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  type Mocked,
+  type MockedFunction,
+} from 'vitest';
 import { ObjectGenerator } from '../src/clients/types.js';
 import { Adapter } from '../src/adapters/types.js';
 import { createResources, type Resources } from '../src/resources/resources.js';
@@ -17,20 +25,20 @@ import { createBrain } from '../src/dsl/create-brain.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
 
 describe('BrainRunner', () => {
-  const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-  const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
-  const mockClient: jest.Mocked<ObjectGenerator> = {
+  const mockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+  const mockStreamText = vi.fn<ObjectGenerator['streamText']>();
+  const mockClient: Mocked<ObjectGenerator> = {
     generateObject: mockGenerateObject,
     streamText: mockStreamText,
   };
 
-  const mockDispatch = jest.fn<Adapter['dispatch']>();
-  const mockAdapter: jest.Mocked<Adapter> = {
+  const mockDispatch = vi.fn<Adapter['dispatch']>();
+  const mockAdapter: Mocked<Adapter> = {
     dispatch: mockDispatch,
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should run a brain and dispatch events to adapters', async () => {
@@ -143,7 +151,7 @@ describe('BrainRunner', () => {
   });
 
   it('should pass resources to step actions', async () => {
-    const mockLoad = jest.fn(
+    const mockLoad = vi.fn(
       async (
         resourceName: string,
         type?: 'text' | 'binary'
@@ -153,7 +161,7 @@ describe('BrainRunner', () => {
         }
         return `content of ${resourceName}`;
       }
-    ) as jest.MockedFunction<ResourceLoader['load']>;
+    ) as MockedFunction<ResourceLoader['load']>;
 
     const mockResourceLoader: ResourceLoader = {
       load: mockLoad,
@@ -203,11 +211,11 @@ describe('BrainRunner', () => {
   });
 
   it('should chain adapters with withAdapters method', async () => {
-    const mockAdapter2: jest.Mocked<Adapter> = {
-      dispatch: jest.fn(),
+    const mockAdapter2: Mocked<Adapter> = {
+      dispatch: vi.fn(),
     };
-    const mockAdapter3: jest.Mocked<Adapter> = {
-      dispatch: jest.fn(),
+    const mockAdapter3: Mocked<Adapter> = {
+      dispatch: vi.fn(),
     };
 
     const runner = new BrainRunner({
@@ -246,13 +254,13 @@ describe('BrainRunner', () => {
   });
 
   it('should replace client with withClient method', async () => {
-    const originalClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest.fn(),
-      streamText: jest.fn(),
+    const originalClient: Mocked<ObjectGenerator> = {
+      generateObject: vi.fn(),
+      streamText: vi.fn(),
     };
-    const newClient: jest.Mocked<ObjectGenerator> = {
-      generateObject: jest.fn(),
-      streamText: jest.fn(),
+    const newClient: Mocked<ObjectGenerator> = {
+      generateObject: vi.fn(),
+      streamText: vi.fn(),
     };
 
     // Configure the new client's response
@@ -590,7 +598,7 @@ describe('BrainRunner', () => {
   });
 
   it('should dispatch events to plugin adapters via BrainRunner', async () => {
-    const pluginDispatchMock = jest.fn<(event: any) => void>();
+    const pluginDispatchMock = vi.fn<(event: any) => void>();
 
     const testPlugin = definePlugin({
       name: 'testPlugin',

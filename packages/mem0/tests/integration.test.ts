@@ -1,18 +1,26 @@
-import { jest } from '@jest/globals';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterAll,
+  type Mocked,
+} from 'vitest';
 import { brain, BRAIN_EVENTS, type ObjectGenerator } from '@positronic/core';
 import { mem0 } from '../src/plugin.js';
 import type { Mem0PluginConfig } from '../src/plugin.js';
 import { createMockProvider, collectEvents } from './test-helpers.js';
 
-const mockGenerateObject = jest.fn<ObjectGenerator['generateObject']>();
-const mockStreamText = jest.fn<ObjectGenerator['streamText']>();
-const mockClient: jest.Mocked<ObjectGenerator> = {
+const mockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();
+const mockStreamText = vi.fn<ObjectGenerator['streamText']>();
+const mockClient: Mocked<ObjectGenerator> = {
   generateObject: mockGenerateObject,
   streamText: mockStreamText,
 };
 
 describe('Mem0 API calls', () => {
-  const mockFetch = jest.fn<typeof global.fetch>();
+  const mockFetch = vi.fn<typeof global.fetch>();
   const originalFetch = global.fetch;
 
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect, type Mocked } from 'vitest';
 import { brain } from '../src/dsl/builder/brain.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import type { ObjectGenerator } from '../src/clients/types.js';
@@ -17,9 +17,9 @@ const collectEvents = async <T>(
 };
 
 // Mock ObjectGenerator for testing
-const createMockClient = (): jest.Mocked<ObjectGenerator> => ({
-  generateObject: jest.fn<ObjectGenerator['generateObject']>(),
-  streamText: jest.fn<ObjectGenerator['streamText']>(),
+const createMockClient = (): Mocked<ObjectGenerator> => ({
+  generateObject: vi.fn<ObjectGenerator['generateObject']>(),
+  streamText: vi.fn<ObjectGenerator['streamText']>(),
 });
 
 describe('currentUser', () => {

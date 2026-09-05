@@ -27,8 +27,7 @@
     "tsc": "tsc --project tsconfig.json",
     "swc": "swc src -d dist",
     "build": "npm run tsc && npm run swc",
-    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules",
-    "test": "jest --silent"
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "peerDependencies": {
     "zod": "^3.24.1"

@@ -1,6 +1,5 @@
 node_modules
 tsconfig.tsbuildinfo
-tsconfig.test.tsbuildinfo
 dist/
 coverage/
 .swc/

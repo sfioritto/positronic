@@ -2,7 +2,7 @@ import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain } from '../src/dsl/brain.js';
 import { z } from 'zod';
-import { jest } from '@jest/globals';
+import { vi, describe, it, expect } from 'vitest';
 import { mockClient, testLogger } from './brain-test-helpers.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
 
@@ -113,7 +113,7 @@ describe('brain options', () => {
 
 describe('plugin support', () => {
   it('should allow adding plugins to brains', async () => {
-    const logMock = jest.fn();
+    const logMock = vi.fn();
     const loggerPlugin = definePlugin({
       name: 'logger',
       create: () => ({ log: logMock }),
@@ -204,7 +204,7 @@ describe('plugin support', () => {
   it('should make parent plugins available to child without withPlugin', async () => {
     let childReceivedLogger: any;
 
-    const logMock = jest.fn();
+    const logMock = vi.fn();
     const loggerPlugin = definePlugin({
       name: 'logger',
       create: () => ({ log: logMock }),
