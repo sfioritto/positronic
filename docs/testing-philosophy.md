@@ -26,7 +26,7 @@ Rather than the traditional testing pyramid, we follow the "Testing Trophy" appr
 Unit Tests & Static
 ```
 
-- **Static Analysis**: TypeScript, ESLint (foundation)
+- **Static Analysis**: TypeScript, oxlint (foundation)
 - **Unit Tests**: For complex business logic and utilities
 - **Integration Tests**: The bulk of our tests (best ROI)
 - **E2E Tests**: Critical user paths only

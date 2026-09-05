@@ -459,7 +459,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
           actualBrainRunId = startEvent.brainRunId;
           actualBrainTitle = startEvent.brainTitle;
         }
-      } catch (err) {
+      } catch {
         // Table doesn't exist - brain was killed before any events were written to DO's SQLite
         console.log(
           `[DO ${this.brainRunId}] kill() could not query brain_events (table may not exist)`
@@ -922,7 +922,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
               throw err;
             }
           },
-          cancel: (reason) => {
+          cancel: () => {
             if (streamController)
               eventStreamAdapter.unsubscribe(streamController);
           },

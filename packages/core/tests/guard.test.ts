@@ -393,8 +393,8 @@ describe('guard', () => {
       .guard(({ state }) => state.count > 0)
       .step('After', ({ state }) => {
         // If type inference works, state has count: number and name: string
-        const _count: number = state.count;
-        const _name: string = state.name;
+        state.count satisfies number;
+        state.name satisfies string;
         return { ...state, processed: true };
       });
 

@@ -340,10 +340,7 @@ export const secrets = {
    * Test GET /secrets - Should not include ROOT_PUBLIC_KEY in list
    * ROOT_PUBLIC_KEY is filtered from the secrets list for security
    */
-  async listExcludesRootKey(
-    fetch: Fetch,
-    hasRootKey: boolean
-  ): Promise<boolean> {
+  async listExcludesRootKey(fetch: Fetch): Promise<boolean> {
     try {
       const request = new Request('http://example.com/secrets', {
         method: 'GET',

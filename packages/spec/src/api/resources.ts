@@ -387,7 +387,7 @@ export const resources = {
       try {
         new URL(data.url);
         console.log('Presigned URL structure validated successfully');
-      } catch (error) {
+      } catch {
         console.error(`Invalid URL returned: ${data.url}`);
         return false;
       }

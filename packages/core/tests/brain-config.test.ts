@@ -3,7 +3,7 @@ import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain } from '../src/dsl/brain.js';
 import { z } from 'zod';
 import { vi, describe, it, expect } from 'vitest';
-import { mockClient, testLogger } from './brain-test-helpers.js';
+import { mockClient } from './brain-test-helpers.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
 
 describe('brain options', () => {
@@ -161,11 +161,12 @@ describe('plugin support', () => {
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any);
 
-    for await (const event of parentBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-    })) {
-    }
+    await Array.fromAsync(
+      parentBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })
+    );
 
     expect(childReceivedApi).toBe('parent-api-url');
   });
@@ -191,11 +192,12 @@ describe('plugin support', () => {
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain);
 
-    for await (const event of parentBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-    })) {
-    }
+    await Array.fromAsync(
+      parentBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })
+    );
 
     // Child's own withPlugin() should win over parent's
     expect(childReceivedUrl).toBe('child-api-url');
@@ -223,11 +225,12 @@ describe('plugin support', () => {
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any);
 
-    for await (const event of parentBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-    })) {
-    }
+    await Array.fromAsync(
+      parentBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })
+    );
 
     expect(childReceivedLogger).toBeDefined();
     expect(childReceivedLogger.log).toBe(logMock);
@@ -257,12 +260,13 @@ describe('plugin support', () => {
       .step('Init', () => ({ started: true }))
       .brain('Run child', childBrain as any);
 
-    for await (const event of parentBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-      storeProvider: mockStoreProvider,
-    })) {
-    }
+    await Array.fromAsync(
+      parentBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        storeProvider: mockStoreProvider,
+      })
+    );
 
     expect(storeData.get('Store Child:counter')).toBe(42);
   });

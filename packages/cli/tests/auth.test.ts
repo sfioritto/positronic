@@ -80,7 +80,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should error when key file not found', async () => {
-      const { waitForOutput, instance } = await px(
+      const { waitForOutput } = await px(
         ['login', '--path', '/nonexistent/key'],
         { configDir }
       );
@@ -90,7 +90,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should error when --project flag used without selected project', async () => {
-      const { waitForOutput, instance } = await px(
+      const { waitForOutput } = await px(
         ['login', '--project', '--path', testKeyPath],
         { configDir }
       );
@@ -137,7 +137,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
       await px(['login', '--path', testKeyPath], { configDir });
 
       // Then logout
-      const { waitForOutput, instance } = await px(['logout'], {
+      const { waitForOutput } = await px(['logout'], {
         configDir,
       });
 
@@ -151,7 +151,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should show message when no key is configured', async () => {
-      const { waitForOutput, instance } = await px(['logout'], {
+      const { waitForOutput } = await px(['logout'], {
         configDir,
       });
 
@@ -160,7 +160,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
     });
 
     it('should error when --project flag used without selected project', async () => {
-      const { waitForOutput, instance } = await px(['logout', '--project'], {
+      const { waitForOutput } = await px(['logout', '--project'], {
         configDir,
       });
 
@@ -187,7 +187,7 @@ kr22i3BEWoZjTEAolRP5ZXtzTc88Z8kbFdAAAAANIQAAABF0ZXN0QGV4YW1wbGUuY29t
       });
 
       // Then logout with --project flag
-      const { waitForOutput, instance } = await px(['logout', '--project'], {
+      const { waitForOutput } = await px(['logout', '--project'], {
         configDir,
       });
 

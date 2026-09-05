@@ -88,7 +88,7 @@ export class Brain<
 > {
   declare readonly __optionsType: TOptions;
   private blocks: Block<any, any, TOptions, TPlugins, any, any>[] = [];
-  public type: 'brain' = 'brain';
+  public type = 'brain' as const;
   public optionsSchema?: z.ZodSchema<any>;
   private components?: Record<string, UIComponent<any>>;
   private storeSchema?: StoreSchema;
@@ -596,15 +596,14 @@ export class Brain<
     TResponse
   > {
     const blocks = this.blocks;
-    const self = this;
     return new Continuation<TOptions, TState, TPlugins, TResponse>(
       (block) => blocks.push(block),
       <TNewState extends State>() => {
         const next = new Brain<TOptions, TNewState, TPlugins>(
-          self.title,
-          self.description
+          this.title,
+          this.description
         ).withBlocks(blocks as any);
-        self.copyConfigTo(next);
+        this.copyConfigTo(next);
         return next;
       }
     );

@@ -1,4 +1,4 @@
-import { describe, it, test, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Fragment, File, Resource, Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import { renderHtml, wrapHtmlDocument } from '../src/template/render-html.js';

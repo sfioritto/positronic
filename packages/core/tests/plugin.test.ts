@@ -1,14 +1,12 @@
 import { brain } from '../src/dsl/brain.js';
 import { definePlugin } from '../src/plugins/define-plugin.js';
 import { z } from 'zod';
-import { vi, describe, it, test, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   mockClient,
   mockGenerateObject,
   runWithStateMachine,
-  AssertEquals,
 } from './brain-test-helpers.js';
-import type { PluginInjection } from '../src/plugins/types.js';
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 
 describe('plugin system', () => {
@@ -163,7 +161,7 @@ describe('plugin system', () => {
         .step('Use Plugin', ({ logger: l }) => {
           // l should be PluginInjection of the create return
           l.log('hello');
-          const level: 'info' = l.level;
+          l.level satisfies 'info';
           return { logged: true };
         });
     });

@@ -10,11 +10,7 @@ import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readSseStream } from './sse-helpers';
-import type {
-  BrainEvent,
-  BrainCompleteEvent,
-  StepCompletedEvent,
-} from '@positronic/core';
+import type { BrainCompleteEvent, StepCompletedEvent } from '@positronic/core';
 
 describe('Iterate Brain Tests', () => {
   beforeEach(() => {

@@ -4,7 +4,7 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import worker from '../src/index';
 import { brains } from '@positronic/spec';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';

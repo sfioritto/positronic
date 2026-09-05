@@ -344,14 +344,14 @@ describe('brain integration with JSX templates', () => {
       })
     );
 
-    for await (const event of testBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test' },
-      files: files as any,
-      resources: resources as any,
-    })) {
-      // collect events
-    }
+    await Array.fromAsync(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test' },
+        files: files as any,
+        resources: resources as any,
+      })
+    );
 
     expect(mockGenerateObject).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -399,13 +399,13 @@ describe('brain integration with JSX templates', () => {
       })
     );
 
-    for await (const event of testBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test' },
-      files: files as any,
-    })) {
-      // collect
-    }
+    await Array.fromAsync(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test' },
+        files: files as any,
+      })
+    );
 
     expect(mockGenerateObject).toHaveBeenCalledWith(
       expect.objectContaining({

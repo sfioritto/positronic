@@ -13,12 +13,7 @@ describe('brain kill command', () => {
     const runId = 'run-456';
 
     try {
-      const { waitForOutput, instance } = await px([
-        'brain',
-        'kill',
-        runId,
-        '--force',
-      ]);
+      const { waitForOutput } = await px(['brain', 'kill', runId, '--force']);
 
       // Should NOT show warning message (force flag skips confirmation)
       const foundWarning = await waitForOutput(

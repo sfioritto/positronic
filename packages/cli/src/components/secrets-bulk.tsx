@@ -71,7 +71,7 @@ export const SecretsBulk = ({ file = '.env', projectDir }: SecretBulkProps) => {
         const response = await execute({ secrets });
         setResult(response);
         setCompleted(true);
-      } catch (err) {
+      } catch {
         // Error is already handled by useApiPost
       }
     };

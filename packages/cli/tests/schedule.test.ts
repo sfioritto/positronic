@@ -1,7 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTestEnv, px, type TestEnv } from './test-utils.js';
+import { createTestEnv, px } from './test-utils.js';
 
 describe('schedule command', () => {
   describe('schedule create', () => {
@@ -125,7 +123,7 @@ describe('schedule command', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px([
+        const { waitForOutput } = await px([
           'schedule',
           'create',
           'test-brain',
@@ -172,7 +170,7 @@ describe('schedule command', () => {
       const px = await env.start();
 
       try {
-        const { waitForOutput, instance } = await px([
+        const { waitForOutput } = await px([
           'schedule',
           'create',
           'test-brain',

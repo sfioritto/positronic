@@ -39,7 +39,7 @@ export const SecretsCreate = ({ name, value }: SecretCreateProps) => {
         const result = await execute({ name, value });
         setSecret(result);
         setCreated(true);
-      } catch (err) {
+      } catch {
         // Error is already handled by useApiPost
       }
     };

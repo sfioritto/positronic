@@ -5,7 +5,7 @@ import type {
   MemoryMessage,
   ObjectGenerator,
 } from '@positronic/core';
-import { vi, expect, type Mocked } from 'vitest';
+import { vi, type Mocked } from 'vitest';
 
 /**
  * A mock memory provider that tracks calls for testing.

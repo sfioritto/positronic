@@ -15,13 +15,8 @@ describe('error handling', () => {
         value: 1,
       }))
       // Step 2: Error step
-      .step('Error step', () => {
-        if (true) {
-          throw new Error('Test error');
-        }
-        return {
-          value: 1,
-        };
+      .step('Error step', (): { value: number } => {
+        throw new Error('Test error');
       })
       // Step 3: Should never execute
       .step('Never reached', ({ state }) => ({
@@ -41,7 +36,7 @@ describe('error handling', () => {
           finalStepStatusEvent = event;
         }
       }
-    } catch (error) {
+    } catch {
       // Error is expected to be thrown
     }
 

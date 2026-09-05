@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    "no-unused-vars": [
+      "error",
+      { "vars": "all", "args": "after-used", "ignoreRestSiblings": true }
+    ],
+    "react/rules-of-hooks": "error",
+    // The React Compiler rules reported 31 sites in the CLI when oxlint was
+    // adopted (docs/journal/2026-09-05-modernization-step-6-oxlint.md).
+    // Turn each on once its sites are fixed.
+    "react/exhaustive-deps": "off",
+    "react/set-state-in-effect": "off",
+    "react/refs": "off",
+    "react/purity": "off",
+    "react/immutability": "off"
+  },
+  "overrides": [
+    {
+      // Tests mock interfaces; a parameter the mock ignores is not a bug.
+      "files": ["**/tests/**"],
+      "rules": {
+        "no-unused-vars": [
+          "error",
+          { "vars": "all", "args": "none", "ignoreRestSiblings": true }
+        ]
+      }
+    },
+    {
+      // cli.ts passes render-prop children to createElement in a .ts file.
+      "files": ["packages/cli/src/cli.ts"],
+      "rules": { "react/no-children-prop": "off" }
+    }
+  ]
+}

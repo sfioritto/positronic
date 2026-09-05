@@ -16,7 +16,7 @@ export class ServerCommand {
   async handle(argv: ArgumentsCamelCase<any>) {
     // Handle kill option
     if (argv.k) {
-      return this.handleKill(argv);
+      return this.handleKill();
     }
 
     // Validate arguments
@@ -204,7 +204,7 @@ export class ServerCommand {
       ];
 
       watcher = chokidar.watch(watchPaths, {
-        ignored: [/(^|[\/\\])\../, '**/node_modules/**'],
+        ignored: [/(^|[/\\])\../, '**/node_modules/**'],
         persistent: true,
         ignoreInitial: true,
         awaitWriteFinish: {
@@ -326,12 +326,12 @@ export class ServerCommand {
       // This sends signal 0 which doesn't kill the process, just checks if it exists
       process.kill(pid, 0);
       return true;
-    } catch (e) {
+    } catch {
       return false;
     }
   }
 
-  private async handleKill(argv: ArgumentsCamelCase<any>) {
+  private async handleKill() {
     const pidFile = path.join(
       this.server.projectRootDir,
       '.positronic-server.pid'

@@ -132,7 +132,7 @@ describe('users command', () => {
       const pxFn = await env.start();
 
       try {
-        const { waitForOutput, instance } = await pxFn([
+        const { waitForOutput } = await pxFn([
           'users',
           'delete',
           'admin',
@@ -156,7 +156,7 @@ describe('users command', () => {
       const pxFn = await env.start();
 
       try {
-        const { waitForOutput, instance } = await pxFn([
+        const { waitForOutput } = await pxFn([
           'users',
           'delete',
           'nonexistent',
@@ -184,11 +184,7 @@ describe('users command', () => {
       const pxFn = await env.start();
 
       try {
-        const { waitForOutput, instance } = await pxFn([
-          'users',
-          'list-keys',
-          'admin',
-        ]);
+        const { waitForOutput } = await pxFn(['users', 'list-keys', 'admin']);
 
         const foundMessage = await waitForOutput(/No keys found/i, 30);
         expect(foundMessage).toBe(true);
@@ -252,7 +248,7 @@ describe('users command', () => {
       const pxFn = await env.start();
 
       try {
-        const { waitForOutput, instance } = await pxFn([
+        const { waitForOutput } = await pxFn([
           'users',
           'remove-key',
           'admin',

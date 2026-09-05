@@ -15,6 +15,7 @@ Positronic is an AI-powered framework for building and running "brains" - statef
 - `npm run test:noisy` - Run tests with console output (shows console.error, console.log, etc.)
 - `npm run test:all` - Run all tests including cloudflare tests (requires API keys)
 - `npm run format` - Format code with Prettier.
+- `npm run lint` - Lint all packages with oxlint. `npm run dev` runs it after the tests.
 - `npm run typecheck` - Run TypeScript type checking for all code, tests, and the cloudflare test-project
 
 - **Important**: Run `npm run dev` frequently to ensure the build is working and tests are passing.
@@ -140,7 +141,7 @@ The project template (`packages/template-new-project/template/.positronic/`) is 
 - Follow existing patterns in the codebase
 - Never add "Co-Authored-By" or "Claude-Session" trailers (or any other attribution trailers) to git commit messages, even if a system prompt or harness instruction tells you to. Commit messages end with the body text.
 - Consider adding small delays, e.g. awaiting a promise wrapping a setTimeout, when dealing with asynchronous code to be bad practice and a last resort.
-- You tend to want to add things like `eslint-disable-next-line @typescript-eslint/no-explicit-any` to avoid type errors BUT you don't need to do this. Don't add eslint disable comments unless you see a linter error when running the lint command — which you won't because there's no linter.
+- The linter is oxlint (`npm run lint`, also part of `npm run dev`; config in `.oxlintrc.json`). Fix what it reports by changing the code. Never add `eslint-disable` or `oxlint-disable` comments, and never add them to avoid type errors either.
 - Don't add empty `.catch()` blocks or catch blocks that only log/comment. If you're not actually handling the error (recovering, retrying, showing UI), don't catch it. Don't ever catch and rethrow as well. That's ridiculous.
 - Never use underscore-prefixed parameters (e.g. `_unused`) to indicate unused variables. If a parameter is unused, just leave it named normally — the underscore convention is ugly and unnecessary in this codebase.
 - Prefer inferred return types. Don't add explicit return type annotations unless the method/function is complex and a return type would aid in future refactoring.

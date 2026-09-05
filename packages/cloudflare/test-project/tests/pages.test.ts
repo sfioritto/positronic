@@ -4,16 +4,12 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readSseStream } from './sse-helpers';
-import type {
-  BrainEvent,
-  BrainCompleteEvent,
-  StepCompletedEvent,
-} from '@positronic/core';
+import type { BrainCompleteEvent, StepCompletedEvent } from '@positronic/core';
 
 describe('Pages API Tests', () => {
   // Clean up pages after each test
@@ -549,7 +545,6 @@ describe('Pages API Tests', () => {
       expect(response1.status).toBe(201);
       const body1 = await response1.json<{ slug: string; createdAt: string }>();
       expect(body1.slug).toBe(slug);
-      const firstCreatedAt = body1.createdAt;
 
       // Second call with same slug overwrites
       const request2 = await createAuthenticatedRequest(

@@ -481,7 +481,7 @@ export function buildCli(options: CliOptions) {
     const packageJsonPath = join(__dirname, '..', '..', 'package.json');
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
     version = packageJson.version;
-  } catch (error) {
+  } catch {
     // In test environment, the relative path to package.json is different
     // so we use 'TEST' as the version to avoid breaking tests
   }

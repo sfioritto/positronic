@@ -347,12 +347,12 @@ describe('.map()', () => {
 
     let error: Error | undefined;
     try {
-      for await (const event of outerBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-      })) {
-        // consume events
-      }
+      await Array.fromAsync(
+        outerBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
     } catch (e) {
       error = e as Error;
     }
@@ -686,7 +686,7 @@ describe('.map()', () => {
         over: state.items,
       }));
 
-    const { finalState } = await runWithStateMachine(testBrain, {
+    await runWithStateMachine(testBrain, {
       client: mockClient,
       currentUser: { name: 'test-user' },
     });
@@ -840,12 +840,12 @@ describe('.map()', () => {
 
     let error: Error | undefined;
     try {
-      for await (const event of outerBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-      })) {
-        // consume events
-      }
+      await Array.fromAsync(
+        outerBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
     } catch (e) {
       error = e as Error;
     }

@@ -1,7 +1,6 @@
 import {
   BrainRunner,
   type ObjectGenerator,
-  type Message,
   type ToolMessage,
   type ResponseMessage,
 } from '@positronic/core';
@@ -9,12 +8,7 @@ import { z } from 'zod';
 
 // Track generateText calls for testing - allows mocking specific tool calls
 let generateTextCallCount = 0;
-let pendingToolResponse: unknown | null = null;
 let mockError: Error | null = null;
-
-export function setMockToolResponse(response: unknown) {
-  pendingToolResponse = response;
-}
 
 /**
  * Configure the mock client to throw an error on the next generateText call.
@@ -26,7 +20,6 @@ export function setMockError(error: Error | null) {
 
 export function resetMockState() {
   generateTextCallCount = 0;
-  pendingToolResponse = null;
   mockError = null;
 }
 
@@ -83,14 +76,7 @@ function buildResponseMessages(
 
 // A simple mock client for testing purposes
 const mockClient: ObjectGenerator = {
-  generateObject: async <T>(params: {
-    schema: T;
-    schemaName?: string;
-    schemaDescription?: string;
-    prompt?: string;
-    messages?: Message[];
-    system?: string;
-  }) => {
+  generateObject: async () => {
     return Promise.resolve({} as any);
   },
 

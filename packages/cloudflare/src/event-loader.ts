@@ -86,7 +86,10 @@ export class EventLoader {
   private async hydrateEvents(rows: EventRow[]): Promise<BrainEvent[]> {
     // Identify which rows need R2 fetching
     const r2Fetches: Array<{ index: number; key: string }> = [];
-    const events: (BrainEvent | null)[] = new Array(rows.length).fill(null);
+    const events: (BrainEvent | null)[] = Array.from(
+      { length: rows.length },
+      () => null
+    );
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];

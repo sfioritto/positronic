@@ -67,13 +67,13 @@ const bootstrapRuntime = `
       return value;
     }
     // Check if the entire value is a single binding - return the actual value (preserves arrays/objects)
-    var fullBindingMatch = value.match(/^\{\{([^}]+)\}\}$/);
+    var fullBindingMatch = value.match(/^{{([^}]+)}}$/);
     if (fullBindingMatch) {
       var resolved = resolveBinding(fullBindingMatch[1].trim(), ctx);
       return resolved !== undefined ? resolved : value;
     }
     // Otherwise replace embedded bindings as strings
-    return value.replace(/\{\{([^}]+)\}\}/g, function(match, path) {
+    return value.replace(/{{([^}]+)}}/g, function(match, path) {
       var resolved = resolveBinding(path.trim(), ctx);
       return resolved !== undefined ? String(resolved) : match;
     });

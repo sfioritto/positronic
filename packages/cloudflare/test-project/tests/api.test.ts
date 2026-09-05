@@ -18,7 +18,6 @@ import type {
   StepStatusEvent,
   StepCompletedEvent,
   StepStartedEvent,
-  WebhookResponseEvent,
 } from '@positronic/core';
 
 describe('Hono API Tests', () => {

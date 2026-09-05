@@ -12,7 +12,6 @@ import { resetMockState, setMockError } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { parseSseEvent, readSseStreamIncludingErrors } from './sse-helpers';
 import type {
-  BrainEvent,
   BrainStartEvent,
   BrainErrorEvent,
   StepStatusEvent,

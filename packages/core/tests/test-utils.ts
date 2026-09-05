@@ -261,7 +261,7 @@ export async function runBrainTest<
       initialState,
       options: brainOptions,
     });
-  } catch (error) {
+  } catch {
     // Brain might throw after emitting ERROR event
     // This is expected behavior, so we don't re-throw
   }

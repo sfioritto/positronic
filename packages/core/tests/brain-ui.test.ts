@@ -1,7 +1,7 @@
 import { BRAIN_EVENTS } from '../src/dsl/constants.js';
 import { applyPatches } from '../src/dsl/json-patch.js';
 import { brain, type BrainEvent } from '../src/dsl/brain.js';
-import { Fragment, Form } from '../src/jsx-runtime.js';
+import { Form } from '../src/jsx-runtime.js';
 import type { TemplateNode, TemplateChild } from '../src/jsx-runtime.js';
 import { coerceFormResponse } from '../src/ui/parse-form-data.js';
 import { z } from 'zod';
@@ -453,14 +453,14 @@ describe('Custom HTML pages (.page() with html)', () => {
       onCreated,
     }));
 
-    for await (const event of testBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-      pages: mockPages as any,
-      env: { origin: 'https://example.com', secrets: {} },
-    })) {
-      // collect
-    }
+    await Array.fromAsync(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        pages: mockPages as any,
+        env: { origin: 'https://example.com', secrets: {} },
+      })
+    );
 
     expect(onCreated).toHaveBeenCalledWith(
       expect.objectContaining({ url: 'https://example.com/pages/custom-page' })
@@ -474,14 +474,14 @@ describe('Custom HTML pages (.page() with html)', () => {
     );
 
     await expect(async () => {
-      for await (const event of testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        pages: mockPages as any,
-        env: { origin: 'https://example.com', secrets: {} },
-      })) {
-        // consume
-      }
+      await Array.fromAsync(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+          pages: mockPages as any,
+          env: { origin: 'https://example.com', secrets: {} },
+        })
+      );
     }).rejects.toThrow("requires either 'prompt' or 'html'");
   });
 
@@ -496,14 +496,14 @@ describe('Custom HTML pages (.page() with html)', () => {
     );
 
     await expect(async () => {
-      for await (const event of testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-        pages: mockPages as any,
-        env: { origin: 'https://example.com', secrets: {} },
-      })) {
-        // consume
-      }
+      await Array.fromAsync(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+          pages: mockPages as any,
+          env: { origin: 'https://example.com', secrets: {} },
+        })
+      );
     }).rejects.toThrow("cannot have both 'prompt' and 'html'");
   });
 

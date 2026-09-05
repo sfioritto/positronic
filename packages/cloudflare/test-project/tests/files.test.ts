@@ -224,7 +224,7 @@ describe('createFiles', () => {
 
     const bytes = new Uint8Array([1, 2, 3, 4, 5]);
     await zip.write('data.bin', bytes);
-    const ref = await zip.finalize();
+    await zip.finalize();
 
     const zipBytes = await service.open('binary.zip').readBytes();
     const unzipped = unzipSync(zipBytes);
@@ -241,7 +241,7 @@ describe('createFiles', () => {
     // Add it to a zip via handle
     const zip = service.zip('from-handle.zip');
     await zip.write('included.txt', sourceHandle);
-    const ref = await zip.finalize();
+    await zip.finalize();
 
     const zipBytes = await service.open('from-handle.zip').readBytes();
     const unzipped = unzipSync(zipBytes);

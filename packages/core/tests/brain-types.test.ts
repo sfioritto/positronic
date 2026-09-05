@@ -56,7 +56,7 @@ describe('type inference', () => {
     >[0]['state'];
 
     type TypeTest = AssertEquals<ActualState, ExpectedState>;
-    const _typeAssert: TypeTest = true;
+    true satisfies TypeTest;
 
     // Collect all events
     const events = [];
@@ -145,7 +145,7 @@ describe('type inference', () => {
         };
         type ActualState = typeof state;
         type StateTest = AssertEquals<ActualState, ExpectedState>;
-        const _stateAssert: StateTest = true;
+        true satisfies StateTest;
 
         return state;
       });
@@ -236,7 +236,7 @@ describe('type inference', () => {
         };
         type ActualState = typeof state;
         type StateTest = AssertEquals<ActualState, ExpectedState>;
-        const _stateAssert: StateTest = true;
+        true satisfies StateTest;
 
         return {
           ...state,
@@ -281,7 +281,7 @@ describe('type inference', () => {
         };
         type ActualState = typeof state;
         type StateTest = AssertEquals<ActualState, ExpectedState>;
-        const _stateAssert: StateTest = true;
+        true satisfies StateTest;
 
         return {
           ...state,

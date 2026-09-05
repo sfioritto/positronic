@@ -1,5 +1,5 @@
 import { BrainRunner } from '../src/dsl/brain-runner.js';
-import { brain, type SerializedStep } from '../src/dsl/brain.js';
+import { brain } from '../src/dsl/brain.js';
 import { BRAIN_EVENTS, STATUS } from '../src/dsl/constants.js';
 import {
   createBrainExecutionMachine,
@@ -16,7 +16,7 @@ import {
 } from 'vitest';
 import { ObjectGenerator } from '../src/clients/types.js';
 import { Adapter } from '../src/adapters/types.js';
-import { createResources, type Resources } from '../src/resources/resources.js';
+import { createResources } from '../src/resources/resources.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
 import { createWebhook } from '../src/index.js';
 import { z } from 'zod';
@@ -116,7 +116,7 @@ describe('BrainRunner', () => {
 
     try {
       await runner.run(errorBrain, { currentUser: { name: 'test-user' } });
-    } catch (error) {
+    } catch {
       // Expected error
     }
 

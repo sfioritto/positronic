@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
+    "lint": "oxlint",
     "test:noisy": "vitest run",
     "test": "vitest run --silent",
     "test:coverage": "vitest run --silent --coverage",
     "test:coverage:all": "npm run test:coverage && cd packages/cloudflare/test-project && npm run test:coverage",
     "test:watch": "vitest",
     "test:all": "npm run test && cd packages/cloudflare/test-project && npm run test",
-    "dev": "npm run build:workspaces && npm run test:all || /usr/local/bin/terminal-notifier -title \"Positronic\" -message \"Build/Test failed\"",
+    "dev": "npm run build:workspaces && npm run test:all && npm run lint || /usr/local/bin/terminal-notifier -title \"Positronic\" -message \"Build/Test failed\"",
     "dev:watch": "nodemon --exec 'npm run dev'",
     "clean:workspaces": "npm run clean --workspaces && rm -rf node_modules",
     "build:workspaces": "npm run build --workspaces",
@@ -27,6 +28,7 @@
     "@types/node": "^20.11.17",
     "@vitest/coverage-v8": "^4.1.11",
     "nodemon": "^3.1.10",
+    "oxlint": "^1.81.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   },

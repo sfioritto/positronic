@@ -309,23 +309,26 @@ This form collects a name.`,
 
   it('should validate data bindings against provided data', async () => {
     mockStreamText.mockImplementationOnce(async (params) => {
-      // Valid binding
-      const v1 = await params.tools.validate_template.execute!({
+      const bindingErrors = (result: { errors: Array<{ type: string }> }) =>
+        result.errors.filter((e) => e.type === 'invalid-binding');
+
+      const valid = await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
     - Input:
         name: "email"
         label: "{{labels.email}}"`,
       });
+      expect(bindingErrors(valid)).toEqual([]);
 
-      // Invalid binding
-      const v2 = await params.tools.validate_template.execute!({
+      const invalid = await params.tools.validate_template.execute!({
         yaml: `Form:
   children:
     - Input:
         name: "email"
         label: "{{nonexistent.path}}"`,
       });
+      expect(bindingErrors(invalid)).toHaveLength(1);
 
       return {
         toolCalls: [],
@@ -345,8 +348,7 @@ This form collects a name.`,
       data: { labels: { email: 'Email Address' } },
     });
 
-    // The mock implementation tests the validation internally
-    // We just verify it runs without error
+    expect(mockStreamText).toHaveBeenCalledTimes(1);
   });
 
   it('should return yaml in result', async () => {

@@ -67,7 +67,7 @@ class ProcessServerHandle implements ServerHandle {
             return true;
           }
         }
-      } catch (error) {
+      } catch {
         // Server not ready yet, continue polling
       }
 

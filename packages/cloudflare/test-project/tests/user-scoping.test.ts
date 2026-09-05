@@ -4,7 +4,7 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
 import { resetMockState } from '../src/runner';
 import {

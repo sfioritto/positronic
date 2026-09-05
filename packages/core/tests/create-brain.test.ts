@@ -103,12 +103,12 @@ describe('createBrain plugin type inference', () => {
       return { url: api.url };
     });
 
-    for await (const event of testBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-    })) {
-      // consume events
-    }
+    await Array.fromAsync(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+      })
+    );
 
     expect(capturedUrl).toBe('https://example.com');
   });

@@ -231,12 +231,12 @@ describe('.prompt() with loop', () => {
     }));
 
     await expect(async () => {
-      for await (const event of testBrain.run({
-        client: mockClient,
-        currentUser: { name: 'test-user' },
-      })) {
-        // drain
-      }
+      await Array.fromAsync(
+        testBrain.run({
+          client: mockClient,
+          currentUser: { name: 'test-user' },
+        })
+      );
     }).rejects.toThrow(/Unknown tool "nonexistent"/);
   });
 

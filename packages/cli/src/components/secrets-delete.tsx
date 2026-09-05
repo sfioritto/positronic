@@ -17,7 +17,7 @@ export const SecretsDelete = ({ name }: SecretDeleteProps) => {
       try {
         await execute(`/secrets/${encodeURIComponent(name)}`);
         setDeleted(true);
-      } catch (err) {
+      } catch {
         // Error is already handled by useApiDelete
       }
     };

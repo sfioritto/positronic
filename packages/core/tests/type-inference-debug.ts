@@ -29,7 +29,7 @@ const test1 = brain('test-1')
     // state.count should be number
     const count: number = state.count;
     // state.initialized should be boolean
-    const init: boolean = state.initialized;
+    state.initialized satisfies boolean;
     return {
       ...state,
       count: count + 1,
@@ -68,7 +68,7 @@ const test2 = brain('test-2')
     const firstThread = threads[0];
     // These accesses should type-check without casts
     const subject: string = firstThread.subject;
-    const from: string = firstThread.from;
+    firstThread.from satisfies string;
 
     return {
       ...state,
@@ -123,9 +123,9 @@ const test4 = brain('test-4')
   }))
   .step('After prompt', ({ state }) => {
     // state.summary should be string (spread from outputSchema)
-    const summaryText: string = state.summary;
+    state.summary satisfies string;
     // state.count should still be number
-    const count: number = state.count;
+    state.count satisfies number;
     return {
       ...state,
       processed: true,
@@ -149,8 +149,8 @@ const test5 = brain('test-5')
     const results = state.results;
 
     // Access first item and result via IterateResult API
-    const firstItem: string = results.items[0];
-    const firstResult: string = results.values[0].result;
+    results.items[0] satisfies string;
+    results.values[0].result satisfies string;
 
     return {
       ...state,

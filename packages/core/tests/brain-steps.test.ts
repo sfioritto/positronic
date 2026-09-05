@@ -148,13 +148,13 @@ describe('state isolation', () => {
       ({ state }) => ({ value: 99, nested: { count: 42 } })
     );
 
-    for await (const event of testBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-      initialState,
-    })) {
-      // consume all events
-    }
+    await Array.fromAsync(
+      testBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        initialState,
+      })
+    );
 
     expect(initialState).toEqual(original);
   });

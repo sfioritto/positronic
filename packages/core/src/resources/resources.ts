@@ -203,7 +203,7 @@ export function createResources<M extends Manifest>(
         }
         return Reflect.has(target, prop);
       },
-      ownKeys: (target): string[] => {
+      ownKeys: (): string[] => {
         // Combine special methods with manifest keys
         return ['loadText', 'loadBinary', ...Object.keys(manifestNode)];
       },

@@ -729,7 +729,7 @@ describe('Positronic Spec', () => {
         { name: 'ROOT_PUBLIC_KEY', type: 'secret_text' },
         { name: 'OTHER_SECRET', type: 'secret_text' },
       ];
-      const result = await secrets.listExcludesRootKey(createFetch(), true);
+      const result = await secrets.listExcludesRootKey(createFetch());
       expect(result).toBe(true);
     });
   });

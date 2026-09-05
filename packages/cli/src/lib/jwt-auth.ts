@@ -407,7 +407,7 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
     // createToken() will handle agent fallback for encrypted keys
     const token = await provider.createToken();
     return { Authorization: `Bearer ${token}` };
-  } catch (error) {
+  } catch {
     // Token creation failed (e.g., ssh-agent not running for encrypted key)
     // Return empty headers and let the server reject if auth is required
     return {};

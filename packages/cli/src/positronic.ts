@@ -16,7 +16,7 @@ function findProjectRootSync(startDir: string): string | null {
     try {
       fs.accessSync(configPath);
       return currentDir;
-    } catch (e) {
+    } catch {
       const parentDir = path.dirname(currentDir);
       if (parentDir === currentDir) {
         return null;

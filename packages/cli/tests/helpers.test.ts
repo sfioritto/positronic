@@ -352,7 +352,7 @@ describe('Helper Functions Unit Tests', () => {
 
   describe('generateTypes', () => {
     it('should generate types file for empty resources', async () => {
-      const result = await generateTypes(projectPath, mockClient);
+      await generateTypes(projectPath, mockClient);
 
       const typesPath = path.join(projectPath, 'resources.d.ts');
       expect(fs.existsSync(typesPath)).toBe(true);

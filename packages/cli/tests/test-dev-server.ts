@@ -921,13 +921,11 @@ export class TestDevServer implements PositronicDevServer {
 
     // GET /brains/watch (SSE endpoint for watching all running brains)
     // Note: Must be defined BEFORE the catch-all /brains/:identifier routes
-    // Store reference to this for the callback
-    const self = this;
     nockInstance.get('/brains/watch').reply(
       200,
-      function () {
-        self.logCall('watchAllBrains', []);
-        const data = { runningBrains: self.runningBrainsForWatch };
+      () => {
+        this.logCall('watchAllBrains', []);
+        const data = { runningBrains: this.runningBrainsForWatch };
         return `data: ${JSON.stringify(data)}\n\n`;
       },
       {
@@ -1900,39 +1898,35 @@ export class TestDevServer implements PositronicDevServer {
   async bulkSecrets(filePath: string): Promise<void> {
     this.logCall('bulkSecrets', [filePath]);
 
-    try {
-      // Read and parse the .env file
-      if (!fs.existsSync(filePath)) {
-        throw new Error(`File not found: ${filePath}`);
-      }
-
-      const envContent = fs.readFileSync(filePath, 'utf8');
-      const secrets = parse(envContent);
-
-      const secretsArray = Object.entries(secrets);
-
-      if (secretsArray.length === 0) {
-        throw new Error('No secrets found in the .env file');
-      }
-
-      // Simulate the bulk upload - just store them
-      const now = new Date().toISOString();
-      for (const [name, value] of secretsArray) {
-        const existing = this.secrets.has(name);
-        this.secrets.set(name, {
-          name,
-          value,
-          createdAt: existing ? this.secrets.get(name)!.createdAt : now,
-          updatedAt: now,
-        });
-      }
-
-      // Simulate console output
-      this.logCallbacks.forEach((cb) =>
-        cb(`✨ Successfully uploaded ${secretsArray.length} secrets\n`)
-      );
-    } catch (error) {
-      throw error;
+    // Read and parse the .env file
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
     }
+
+    const envContent = fs.readFileSync(filePath, 'utf8');
+    const secrets = parse(envContent);
+
+    const secretsArray = Object.entries(secrets);
+
+    if (secretsArray.length === 0) {
+      throw new Error('No secrets found in the .env file');
+    }
+
+    // Simulate the bulk upload - just store them
+    const now = new Date().toISOString();
+    for (const [name, value] of secretsArray) {
+      const existing = this.secrets.has(name);
+      this.secrets.set(name, {
+        name,
+        value,
+        createdAt: existing ? this.secrets.get(name)!.createdAt : now,
+        updatedAt: now,
+      });
+    }
+
+    // Simulate console output
+    this.logCallbacks.forEach((cb) =>
+      cb(`✨ Successfully uploaded ${secretsArray.length} secrets\n`)
+    );
   }
 }

@@ -49,7 +49,7 @@ export const ScheduleCreate = ({
         });
         setSchedule(result);
         setCreated(true);
-      } catch (err) {
+      } catch {
         // Error is already handled by useApiPost
       }
     };

@@ -501,8 +501,7 @@ describe('brain creation', () => {
         resources: mockResources,
       });
       // Iterate through to completion
-      for await (const _ of run) {
-      }
+      await Array.fromAsync(run);
 
       expect(mockResourceLoad).toHaveBeenCalledWith('myFile', 'text');
       expect(loadedText).toBe('mock myFile text content');
@@ -617,8 +616,7 @@ describe('brain creation', () => {
         currentUser: { name: 'test-user' },
         resources: mockResources,
       });
-      for await (const _ of run) {
-      }
+      await Array.fromAsync(run);
 
       expect(mockResourceLoad).toHaveBeenCalledWith('myBinaryFile', 'binary');
       expect(nestedLoadedText).toBe('mock myBinaryFile binary content');

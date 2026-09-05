@@ -6,7 +6,7 @@ import {
   type BrainErrorEvent,
 } from '../src/dsl/brain.js';
 import { z } from 'zod';
-import { vi, describe, it, test, expect } from 'vitest';
+import { vi, describe, it, expect } from 'vitest';
 import { createWebhook } from '../src/index.js';
 import {
   finalStateFromEvents,
@@ -428,14 +428,15 @@ describe('nested brains', () => {
     };
     const mockEnv = { origin: 'http://test.com', secrets: {} };
 
-    for await (const _ of outerBrain.run({
-      client: mockClient,
-      currentUser: { name: 'test-user' },
-      resources: mockResources,
-      pages: mockPages as any,
-      env: mockEnv,
-    })) {
-    }
+    await Array.fromAsync(
+      outerBrain.run({
+        client: mockClient,
+        currentUser: { name: 'test-user' },
+        resources: mockResources,
+        pages: mockPages as any,
+        env: mockEnv,
+      })
+    );
 
     // Inner brain steps should receive the same defined params as outer brain steps
     expect(innerDefinedKeys).toEqual(outerDefinedKeys);

@@ -36,7 +36,7 @@ export function createR2ZipBuilder(
       httpMetadata: { contentType: 'application/zip' },
     });
 
-    zip = new Zip((err, data, final) => {
+    zip = new Zip((err, data) => {
       if (err) return; // Error handled at the call site
       if (data.length > 0) {
         buffer.push(data);
