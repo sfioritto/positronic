@@ -111,8 +111,7 @@ IMPORTANT: Users have no way to discover the page URL on their own. After genera
     url: string;
     webhook: { slug: string; identifier: string; token: string } | null;
   }> {
-    const { components, pages, client, state, env, brainRunId, stepId } =
-      context;
+    const { components, pages, client, env, brainRunId, stepId } = context;
     const hasForm = input.hasForm ?? true;
 
     if (!components || Object.keys(components).length === 0) {

@@ -1,5 +1,4 @@
 import type { CurrentUser } from '../dsl/types.js';
-import type { Adapter } from '../adapters/types.js';
 import type { WebhookFunction } from '../dsl/webhook.js';
 
 /**

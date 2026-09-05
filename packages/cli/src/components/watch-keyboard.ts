@@ -63,19 +63,7 @@ export function handleKeyboardInput(
   key: Key,
   ctx: WatchKeyboardContext
 ): WatchKeyboardEvent | null {
-  const {
-    viewMode,
-    eventsViewMode,
-    confirmingKill,
-    isKilling,
-    isKilled,
-    isComplete,
-    isPaused,
-    isPausing,
-    isResuming,
-    hasAgents,
-    manageScreenBuffer,
-  } = ctx;
+  const { viewMode, confirmingKill } = ctx;
 
   // Kill confirmation mode takes priority
   if (confirmingKill) {

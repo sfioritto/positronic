@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet } from '../hooks/useApi.js';
@@ -156,7 +155,6 @@ export const ScheduleList = ({ brainFilter }: ScheduleListProps) => {
           const nextRunDate = schedule.nextRunAt
             ? new Date(schedule.nextRunAt)
             : null;
-          const createdDate = new Date(schedule.createdAt);
           const isOverdue = nextRunDate && nextRunDate.getTime() < Date.now();
 
           return (

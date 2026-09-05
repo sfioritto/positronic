@@ -345,7 +345,6 @@ export const resources = {
 
       // If credentials are not configured, expect 400
       if (response.status === 400) {
-        const data = (await response.json()) as { error?: string };
         // This is acceptable - implementation may not have credentials configured
         console.log(
           'Presigned URL generation not available - this is acceptable'

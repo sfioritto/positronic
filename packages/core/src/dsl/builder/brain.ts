@@ -34,14 +34,8 @@ import type {
   PromptLoopConfig,
   TemplateReturn,
 } from '../definitions/blocks.js';
-import type { GeneratedPage, BrainConfig } from '../definitions/brain-types.js';
-import {
-  resolveTemplate,
-  buildTemplateContext,
-} from '../../template/render.js';
+import type { GeneratedPage } from '../definitions/brain-types.js';
 import type { TemplateChild } from '../../jsx-runtime.js';
-import type { FileHandle } from '../../files/types.js';
-import { guessMimeType } from '../../files/mime.js';
 import type {
   InitialRunParams,
   ResumeRunParams,

@@ -1,18 +1,19 @@
 import type { Adapter, BrainEvent } from '@positronic/core';
 import { BRAIN_EVENTS } from '@positronic/core';
-import type { MonitorDO } from './monitor-do.js';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
 /**
  * Adapter that handles page cleanup when brains terminate.
  * Non-persistent pages are deleted from R2 when a brain completes, errors, or is cancelled.
  */
+type PageMonitor = {
+  getNonPersistentPagesForRun: (brainRunId: string) => Promise<string[]>;
+  clearPageRegistrations: (brainRunId: string) => Promise<void>;
+};
+
 export class PageAdapter implements Adapter {
   constructor(
-    private monitorStub: {
-      getNonPersistentPagesForRun: (brainRunId: string) => Promise<string[]>;
-      clearPageRegistrations: (brainRunId: string) => Promise<void>;
-    },
+    private monitorStub: PageMonitor,
     private resourcesBucket: R2Bucket
   ) {}
 

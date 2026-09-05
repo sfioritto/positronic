@@ -1,6 +1,6 @@
 import pkg from 'fast-json-patch';
 const { compare, applyPatch } = pkg;
-import { JsonPatch, State } from './types.js';
+import type { JsonPatch, State } from './types.js';
 
 export type { JsonPatch };
 

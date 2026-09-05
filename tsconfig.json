@@ -11,6 +11,8 @@
     "skipLibCheck": true,
     "incremental": true,
     "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
     "strictNullChecks": true,
     "composite": true,
     "declaration": true,

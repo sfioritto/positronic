@@ -18,7 +18,7 @@
     "@positronic/spec": "file:../../spec",
     "@vitest/coverage-istanbul": "^4.1.11",
     "jose": "^5.2.0",
-    "typescript": "^5.5.2",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "wrangler": "^4.129.0",
     "zod": "^3.24.1"

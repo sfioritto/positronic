@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Text, Box, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { EventSource } from 'eventsource';
@@ -13,11 +13,7 @@ import {
 } from '@positronic/core';
 import type { RunningBrain, StepInfo } from '@positronic/core';
 import { useMachine } from 'react-robot';
-import {
-  getApiBaseUrl,
-  isApiLocalDevMode,
-  apiClient,
-} from '../commands/helpers.js';
+import { getApiBaseUrl, isApiLocalDevMode } from '../commands/helpers.js';
 import { authenticatedFetch } from '../lib/jwt-auth.js';
 import { ErrorComponent } from './error.js';
 import {
@@ -28,14 +24,11 @@ import {
 import { StateView } from './state-view.js';
 import {
   handleKeyboardInput,
-  type ViewMode,
   type WatchKeyboardContext,
 } from './watch-keyboard.js';
 import { useAlternateScreen } from '../hooks/useAlternateScreen.js';
 import { useWatchReducer, type PreviousView } from './watch-machine.js';
 import { getStatusColor } from '../lib/format.js';
-
-type JsonObject = { [key: string]: unknown };
 
 // Get the index of the currently running step (or last completed if none running)
 const getCurrentStepIndex = (steps: StepInfo[]): number => {
@@ -223,12 +216,9 @@ export const Watch = ({
 
   const {
     viewMode,
-    previousView: previousViewMode,
     stateSnapshot,
     stateTitle,
     stateScrollOffset,
-    selectedAgentId,
-    agentChatScrollOffset,
     eventsSelectedIndex,
     killStatus,
     killError,

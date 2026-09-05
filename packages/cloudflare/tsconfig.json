@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "noUnusedLocals": true,
     "rootDir": "./src",
     "outDir": "./dist",
     "types": ["@cloudflare/workers-types", "node"]

@@ -446,8 +446,6 @@ export class ScheduleDO extends DurableObject<Env> {
       return;
     }
 
-    const scheduledRun = result[0];
-
     const completedAt = Date.now();
     const status = event.type === BRAIN_EVENTS.COMPLETE ? 'complete' : 'failed';
     const error =

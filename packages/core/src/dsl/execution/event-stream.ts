@@ -1643,7 +1643,7 @@ The output must conform to the provided schema.`,
     step: Step,
     waitBlock: WaitBlock<any, any, any, any>
   ): AsyncGenerator<BrainEvent<TOptions>> {
-    const { steps, options, brainRunId } = this;
+    const { options, brainRunId } = this;
 
     // Emit STEP_START for the wait block
     yield {

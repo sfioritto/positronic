@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';
-import { ResourceEntry } from '@positronic/core';
+import type { ResourceEntry } from '@positronic/core';
 import { formatSize } from '../lib/format.js';
 
 interface ApiResourceEntry extends ResourceEntry {

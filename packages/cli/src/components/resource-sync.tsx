@@ -1,4 +1,3 @@
-import React from 'react';
 import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
@@ -7,7 +6,7 @@ import {
   generateTypes,
   type SyncProgressCallback,
 } from '../commands/helpers.js';
-import { ResourceEntry } from '@positronic/core';
+import type { ResourceEntry } from '@positronic/core';
 
 interface SyncStats {
   uploadCount: number;

@@ -1,5 +1,4 @@
 import { Hono, type Context } from 'hono';
-import { requireRoot } from './auth-middleware.js';
 import type { Bindings } from './types.js';
 
 const store = new Hono<{ Bindings: Bindings }>();

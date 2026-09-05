@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
 import {
   createMachine,
@@ -14,10 +14,7 @@ import { ErrorComponent } from './error.js';
 import { SelectList } from './select-list.js';
 import { Watch } from './watch.js';
 import { apiClient } from '../commands/helpers.js';
-import {
-  getConnectionErrorMessage,
-  handleNetworkError,
-} from '../hooks/useApi.js';
+import { handleNetworkError } from '../hooks/useApi.js';
 
 // Types
 interface Brain {

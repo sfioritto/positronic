@@ -2,7 +2,7 @@ import sshpk from 'sshpk';
 import { readFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { createPublicKey, JsonWebKey } from 'crypto';
+import { createPublicKey, type JsonWebKey } from 'crypto';
 import { execSync } from 'child_process';
 
 export interface SSHKeyInfo {

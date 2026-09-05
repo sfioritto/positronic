@@ -290,9 +290,10 @@ export async function syncResources(
         const fileContent = fs.readFileSync(resource.path);
         const formData = new FormData();
 
+        // A Node Buffer may sit on a SharedArrayBuffer, which BlobPart rejects; copy it.
         formData.append(
           'file',
-          new Blob([fileContent]),
+          new Blob([new Uint8Array(fileContent)]),
           path.basename(resource.path)
         );
         formData.append('type', resource.type);

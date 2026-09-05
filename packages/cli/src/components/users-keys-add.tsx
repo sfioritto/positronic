@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiPost, useApiGet } from '../hooks/useApi.js';
@@ -49,7 +49,7 @@ export const UsersKeysAdd = ({
     fingerprint: string;
     algorithm: string;
   } | null>(null);
-  const [pasteMode, setPasteMode] = useState(paste && !pubkeyPath);
+  const [pasteMode] = useState(paste && !pubkeyPath);
   const [pastedKey, setPastedKey] = useState('');
   const [pasteSubmitted, setPasteSubmitted] = useState(false);
 

@@ -77,7 +77,6 @@ brains.post('/runs', async (context: Context) => {
   // Validate that the brain exists before starting it
   const result = resolveBrain(context, identifier, 409);
   if (!('brain' in result)) return result;
-  const { brain } = result;
 
   // Read auth context for currentUser (every brain run must have an owner)
   const auth = context.get('auth');

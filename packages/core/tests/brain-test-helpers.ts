@@ -1,6 +1,6 @@
 import { vi, type Mocked, type MockedFunction } from 'vitest';
 import { z } from 'zod';
-import { ObjectGenerator } from '../src/clients/types.js';
+import type { ObjectGenerator } from '../src/clients/types.js';
 import type { ResourceLoader } from '../src/resources/resource-loader.js';
 import { createResources } from '../src/resources/resources.js';
 import type { BrainEvent } from '../src/dsl/brain.js';

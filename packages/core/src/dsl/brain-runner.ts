@@ -5,7 +5,7 @@ import {
   type BrainStateMachine,
 } from './brain-state-machine.js';
 import type { Adapter } from '../adapters/types.js';
-import { DEFAULT_ENV, type Brain, type BrainEvent } from './brain.js';
+import { DEFAULT_ENV, type Brain } from './brain.js';
 import type {
   State,
   JsonObject,
@@ -38,20 +38,20 @@ function createCancelledEvent<TOptions extends JsonObject>(
   };
 }
 
+type BrainRunnerConfig = {
+  client: ObjectGenerator;
+  adapters: Adapter[];
+  env?: RuntimeEnv;
+  resources?: Resources;
+  signalProvider?: SignalProvider;
+  governor?: (client: ObjectGenerator) => ObjectGenerator;
+  files?: Files;
+  pages?: Pages;
+  storeProvider?: StoreProvider;
+};
+
 export class BrainRunner {
-  constructor(
-    private config: {
-      client: ObjectGenerator;
-      adapters: Adapter[];
-      env?: RuntimeEnv;
-      resources?: Resources;
-      signalProvider?: SignalProvider;
-      governor?: (client: ObjectGenerator) => ObjectGenerator;
-      files?: Files;
-      pages?: Pages;
-      storeProvider?: StoreProvider;
-    }
-  ) {}
+  constructor(private config: BrainRunnerConfig) {}
 
   get client(): ObjectGenerator {
     return this.config.client;

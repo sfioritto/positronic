@@ -1,4 +1,3 @@
-import { BRAIN_EVENTS } from '@positronic/core';
 import type { Fetch } from './types.js';
 
 /**

@@ -1,4 +1,4 @@
-import { ResourceLoader } from './resource-loader.js';
+import type { ResourceLoader } from './resource-loader.js';
 
 // Runtime array of valid resource types
 export const RESOURCE_TYPES = ['text', 'binary'] as const;
