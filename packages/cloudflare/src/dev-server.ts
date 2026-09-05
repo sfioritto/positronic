@@ -501,62 +501,54 @@ export class CloudflareDevServer implements PositronicDevServer {
   }
 
   /**
-   * Build the component bundle and upload it to local R2.
-   * Uses esbuild to bundle components/bundle.ts and uploads to R2 for serving.
+   * Build the page bundle and upload it to R2.
+   *
+   * esbuild bundles .positronic/bundle.ts with React inside (React 19 has no
+   * UMD build, so nothing is external) and the Tailwind CLI compiles
+   * .positronic/styles.css. Generated pages load both from /bundle/.
    */
   private async buildAndUploadBundle(
     projectRoot: string,
     options: { local?: boolean } = { local: true }
   ): Promise<void> {
     const serverDir = path.join(projectRoot, '.positronic');
-    const bundleEntryPath = path.join(serverDir, 'bundle.ts');
     const distDir = path.join(serverDir, 'dist');
-    const bundleOutputPath = path.join(distDir, 'components.js');
+    const bundleEntryPath = path.join(serverDir, 'bundle.ts');
+    const stylesEntryPath = path.join(serverDir, 'styles.css');
+    const outputs = {
+      'bundle/components.js': path.join(distDir, 'components.js'),
+      'bundle/components.css': path.join(distDir, 'components.css'),
+    };
 
-    // Check if components directory exists
-    const componentsDir = path.join(projectRoot, 'src', 'components');
-    const hasComponents = await fsPromises
-      .access(componentsDir)
-      .then(() => true)
-      .catch(() => false);
+    const exists = (file: string) =>
+      fsPromises
+        .access(file)
+        .then(() => true)
+        .catch(() => false);
 
-    if (!hasComponents) {
+    if (!(await exists(path.join(projectRoot, 'src', 'components')))) {
       console.log(
         '📦 No src/components/ directory found, skipping bundle build'
       );
       return;
     }
 
-    // Check if bundle.ts exists
-    const hasBundleEntry = await fsPromises
-      .access(bundleEntryPath)
-      .then(() => true)
-      .catch(() => false);
-
-    if (!hasBundleEntry) {
+    if (!(await exists(bundleEntryPath))) {
       console.log('📦 No .positronic/bundle.ts found, skipping bundle build');
       return;
     }
 
     try {
       console.log('📦 Building component bundle...');
-
-      // Ensure dist directory exists
       await fsPromises.mkdir(distDir, { recursive: true });
 
-      // Run esbuild to build the bundle
       execSync(
-        `npx esbuild "${bundleEntryPath}" --bundle --external:react --external:react-dom --format=iife --outfile="${bundleOutputPath}" --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment`,
-        {
-          cwd: projectRoot,
-          stdio: 'inherit',
-        }
+        `npx esbuild "${bundleEntryPath}" --bundle --format=iife --platform=browser --jsx=automatic --minify --outfile="${outputs['bundle/components.js']}"`,
+        { cwd: projectRoot, stdio: 'inherit' }
       );
-
-      // Read the built bundle
-      const bundleContent = await fsPromises.readFile(
-        bundleOutputPath,
-        'utf-8'
+      execSync(
+        `npx @tailwindcss/cli -i "${stylesEntryPath}" -o "${outputs['bundle/components.css']}" --minify`,
+        { cwd: projectRoot, stdio: 'inherit' }
       );
 
       // Get bucket name from wrangler config
@@ -573,31 +565,15 @@ export class CloudflareDevServer implements PositronicDevServer {
         return;
       }
 
-      const r2Key = 'bundle/components.js';
-      const r2Path = `${bucketName}/${r2Key}`;
-
-      // Write bundle to a temp file for wrangler r2 object put
-      const tempBundlePath = path.join(
-        os.tmpdir(),
-        `positronic-bundle-${Date.now()}.js`
-      );
-      await fsPromises.writeFile(tempBundlePath, bundleContent);
-
-      try {
-        const locationFlag = options.local ? ' --local' : ' --remote';
+      const locationFlag = options.local ? ' --local' : ' --remote';
+      for (const [r2Key, file] of Object.entries(outputs)) {
         execSync(
-          `npx wrangler r2 object put "${r2Path}" --file="${tempBundlePath}"${locationFlag}`,
-          {
-            cwd: serverDir,
-            stdio: 'pipe',
-          }
+          `npx wrangler r2 object put "${bucketName}/${r2Key}" --file="${file}"${locationFlag}`,
+          { cwd: serverDir, stdio: 'pipe' }
         );
-        const target = options.local ? 'local' : 'production';
-        console.log(`✅ Component bundle built and uploaded to ${target}`);
-      } finally {
-        // Clean up temp file
-        await fsPromises.unlink(tempBundlePath).catch(() => {});
       }
+      const target = options.local ? 'local' : 'production';
+      console.log(`✅ Component bundle built and uploaded to ${target}`);
     } catch (error) {
       console.warn(
         '⚠️  Warning: Failed to build component bundle:',

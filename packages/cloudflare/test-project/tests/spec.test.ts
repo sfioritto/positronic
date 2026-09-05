@@ -552,12 +552,23 @@ describe('Positronic Spec', () => {
     it('passes GET /bundle/components.js test when a bundle exists (200)', async () => {
       const resourcesBucket = (env as { RESOURCES_BUCKET: R2Bucket })
         .RESOURCES_BUCKET;
-      await resourcesBucket.put(
-        'bundle/components.js',
-        'window.PositronicComponents = {};'
-      );
+      await resourcesBucket.put('bundle/components.js', 'mount(root);');
 
       const result = await bundle.get(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /bundle/components.css test when no bundle exists (404)', async () => {
+      const result = await bundle.getCss(createFetch());
+      expect(result).toBe(true);
+    });
+
+    it('passes GET /bundle/components.css test when a bundle exists (200)', async () => {
+      const resourcesBucket = (env as { RESOURCES_BUCKET: R2Bucket })
+        .RESOURCES_BUCKET;
+      await resourcesBucket.put('bundle/components.css', 'body{margin:0}');
+
+      const result = await bundle.getCss(createFetch());
       expect(result).toBe(true);
     });
   });

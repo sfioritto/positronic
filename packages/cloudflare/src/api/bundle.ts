@@ -4,52 +4,55 @@ import type { Bindings } from './types.js';
 const bundle = new Hono<{ Bindings: Bindings }>();
 
 /**
- * Serve the component bundle.
- * In development, the bundle is stored in R2 bucket under 'bundle/components.js'.
- * The dev server builds this bundle on startup from the project's components/ directory.
+ * The files the dev server (and deploy) build from the project's
+ * .positronic/bundle.ts and .positronic/styles.css and upload under bundle/.
+ * Generated pages load both.
  */
-bundle.get('/components.js', async (context: Context) => {
+const files: Record<string, { contentType: string; notFound: string }> = {
+  'components.js': {
+    contentType: 'application/javascript; charset=utf-8',
+    notFound:
+      '// Bundle not found. Run the dev server to build the component bundle.\n' +
+      'console.error("Component bundle not found. Make sure the dev server is running and has built the bundle.");',
+  },
+  'components.css': {
+    contentType: 'text/css; charset=utf-8',
+    notFound:
+      '/* Bundle not found. Run the dev server to build the component bundle. */',
+  },
+};
+
+bundle.get('/:file', async (context: Context) => {
+  const name = context.req.param('file');
+  const file = files[name];
+  if (!file) {
+    return context.notFound();
+  }
+
   const bucket = context.env.RESOURCES_BUCKET;
-  const key = 'bundle/components.js';
+  const headers = { 'Content-Type': file.contentType };
 
   try {
-    const r2Object = await bucket.get(key);
+    const r2Object = await bucket.get(`bundle/${name}`);
 
     if (!r2Object) {
-      // Return a helpful error message if the bundle doesn't exist
-      return new Response(
-        '// Bundle not found. Run the dev server to build the component bundle.\n' +
-          'console.error("Component bundle not found. Make sure the dev server is running and has built the bundle.");',
-        {
-          status: 404,
-          headers: {
-            'Content-Type': 'application/javascript; charset=utf-8',
-          },
-        }
-      );
+      return new Response(file.notFound, { status: 404, headers });
     }
 
-    const js = await r2Object.text();
-
-    return new Response(js, {
+    return new Response(await r2Object.text(), {
       status: 200,
       headers: {
-        'Content-Type': 'application/javascript; charset=utf-8',
+        ...headers,
         'Cache-Control': 'no-cache', // Don't cache during development
       },
     });
   } catch (error) {
     console.error('Error serving bundle:', error);
     return new Response(
-      `// Error loading bundle: ${
+      `/* Error loading bundle: ${
         error instanceof Error ? error.message : 'Unknown error'
-      }`,
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/javascript; charset=utf-8',
-        },
-      }
+      } */`,
+      { status: 500, headers }
     );
   }
 });
