@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -11,17 +11,6 @@ import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readSseStream } from './sse-helpers';
 import type { BrainCompleteEvent, StepCompletedEvent } from '@positronic/core';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('Iterate with Options Tests', () => {
   beforeEach(() => {
@@ -29,7 +18,7 @@ describe('Iterate with Options Tests', () => {
   });
 
   it('should preserve options across DO resume during iterate', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'iterate-options-test';
 
     // Create the brain run with options

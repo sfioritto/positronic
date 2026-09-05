@@ -1,15 +1,11 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { z } from 'zod';
 import { createR2Backend } from '../../src/create-r2-store.js';
 import type { Store } from '@positronic/core';
 
-interface TestEnv {
-  TEST_RESOURCES_BUCKET: R2Bucket;
-}
-
 describe('createR2Backend', () => {
-  const testEnv = env as TestEnv;
+  const testEnv = env;
 
   beforeEach(async () => {
     // Clean up store keys from previous tests

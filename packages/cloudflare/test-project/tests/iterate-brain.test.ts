@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -15,17 +15,6 @@ import type {
   BrainCompleteEvent,
   StepCompletedEvent,
 } from '@positronic/core';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('Iterate Brain Tests', () => {
   beforeEach(() => {
@@ -33,7 +22,7 @@ describe('Iterate Brain Tests', () => {
   });
 
   it('should process all 7 items in a .brain() iterate step', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'iterate-brain-test';
 
     // Create the brain run

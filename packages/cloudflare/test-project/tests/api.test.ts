@@ -1,7 +1,8 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
+  reset,
 } from 'cloudflare:test';
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -19,26 +20,16 @@ import type {
   StepStartedEvent,
   WebhookResponseEvent,
 } from '@positronic/core';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('Hono API Tests', () => {
   // Reset mock state before each test
-  beforeEach(() => {
+  beforeEach(async () => {
+    await reset();
     resetMockState();
   });
 
   it('POST /brains/runs without brainName should return 400', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     const request = await createAuthenticatedRequest(
       'http://example.com/brains/runs',
@@ -60,7 +51,7 @@ describe('Hono API Tests', () => {
   });
 
   it('POST /brains/runs with non-existent brain should return 404', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const request = await createAuthenticatedRequest(
       'http://example.com/brains/runs',
       {
@@ -80,7 +71,7 @@ describe('Hono API Tests', () => {
   });
 
   it('Create and watch a brain run', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'basic-brain';
 
     // --- Create the brain run ---
@@ -158,7 +149,7 @@ describe('Hono API Tests', () => {
   });
 
   it('Create and watch a delayed brain run', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'delayed-brain';
 
     // Create the brain run
@@ -248,7 +239,7 @@ describe('Hono API Tests', () => {
   });
 
   it('Asserts brainRunId is present in SSE events', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'basic-brain';
 
     // Create brain run
@@ -302,7 +293,7 @@ describe('Hono API Tests', () => {
   });
 
   it('Monitor receives brain events (checking brain run)', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'basic-brain';
 
     // Start the brain run
@@ -347,7 +338,7 @@ describe('Hono API Tests', () => {
   });
 
   it('Watches brain run as it runs', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'basic-brain';
 
     // Run the brain run twice
@@ -438,7 +429,7 @@ describe('Hono API Tests', () => {
   });
 
   it('Watch endpoint streams running brains', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'delayed-brain';
     const brainRuns: string[] = [];
 
@@ -545,7 +536,7 @@ describe('Hono API Tests', () => {
   });
 
   it('Loads resources from the resource manifest', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const brainName = 'resource-brain';
 
     // First, set up test resources in R2
@@ -719,7 +710,7 @@ describe('Hono API Tests', () => {
 
   describe('Brain Schedules API Tests', () => {
     it('POST /brains/schedules creates a new schedule', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const identifier = 'basic-brain';
       const cronExpression = '0 3 * * *'; // Daily at 3am
 
@@ -755,7 +746,7 @@ describe('Hono API Tests', () => {
     });
 
     it('GET /brains/schedules lists all schedules', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a few schedules first
       const brainNames = ['basic-brain', 'delayed-brain', 'resource-brain'];
@@ -811,7 +802,7 @@ describe('Hono API Tests', () => {
     });
 
     it('DELETE /brains/schedules/:scheduleId deletes a schedule', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a schedule
       const createRequest = await createAuthenticatedRequest(
@@ -863,7 +854,7 @@ describe('Hono API Tests', () => {
     });
 
     it('GET /brains/schedules/runs lists scheduled run history', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/brains/schedules/runs'
@@ -889,7 +880,7 @@ describe('Hono API Tests', () => {
     });
 
     it('GET /brains/schedules/runs with scheduleId filter', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const scheduleId = 'test-schedule-123';
 
       const request = await createAuthenticatedRequest(
@@ -918,7 +909,7 @@ describe('Hono API Tests', () => {
     });
 
     it('POST /brains/schedules validates cron expression', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/brains/schedules',
@@ -941,7 +932,7 @@ describe('Hono API Tests', () => {
     });
 
     it('POST /brains/schedules allows multiple schedules per brain', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const identifier = 'basic-brain';
 
       // Create first schedule
@@ -1003,7 +994,7 @@ describe('Hono API Tests', () => {
 
   describe('Brain title vs filename resolution', () => {
     it('should handle brain run creation with brain title (not filename)', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create brain run using the brain's title instead of filename
       const request = await createAuthenticatedRequest(
@@ -1053,7 +1044,7 @@ describe('Hono API Tests', () => {
     });
 
     it('should handle brain run creation with filename', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create brain run using the filename
       const request = await createAuthenticatedRequest(
@@ -1105,7 +1096,7 @@ describe('Hono API Tests', () => {
 
   describe('Webhook Brain Resumption', () => {
     it('should pause brain on webhook and resume when webhook is received', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'webhook-brain';
       const webhookIdentifier = 'test-thread-123';
 
@@ -1273,7 +1264,7 @@ describe('Hono API Tests', () => {
     });
 
     it('should handle webhook verification challenge', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const challengeString = 'verification-challenge-xyz123';
 
       // Send a verification request to the webhook endpoint
@@ -1302,7 +1293,7 @@ describe('Hono API Tests', () => {
     });
 
     it('should resume inner brain when webhook is received', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'inner-webhook-brain';
       const webhookIdentifier = 'inner-test-id';
 
@@ -1479,7 +1470,7 @@ describe('Hono API Tests', () => {
 
   describe('Iterate + Webhook Resumption', () => {
     it('should preserve brainRunId across alarm-based iterate restarts so webhooks work', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'iterate-webhook-brain';
       const webhookIdentifier = 'iterate-webhook-test';
 

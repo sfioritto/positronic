@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -10,17 +10,6 @@ import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readUntilEvent } from './sse-helpers';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('Wait Timeout Tests', () => {
   beforeEach(() => {
@@ -28,7 +17,7 @@ describe('Wait Timeout Tests', () => {
   });
 
   it('should cancel brain when wait timeout fires', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // Step 1: Start the timeout-webhook-brain
     const createRequest = await createAuthenticatedRequest(
@@ -101,7 +90,7 @@ describe('Wait Timeout Tests', () => {
   });
 
   it('should complete normally when webhook arrives before timeout', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const webhookIdentifier = 'timeout-test-123';
 
     // Step 1: Start the timeout-webhook-brain
@@ -193,7 +182,7 @@ describe('Wait Timeout Tests', () => {
   });
 
   it('should clean up timeout alarm when brain is manually killed', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // Step 1: Start the timeout-webhook-brain
     const createRequest = await createAuthenticatedRequest(
@@ -267,7 +256,7 @@ describe('Wait Timeout Tests', () => {
   });
 
   it('should handle sequential waits with timeouts', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // Step 1: Start the multi-wait-brain
     const createRequest = await createAuthenticatedRequest(

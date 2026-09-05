@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
-  fetchMock,
 } from 'cloudflare:test';
 import worker from '../src/index';
 import {
@@ -635,51 +634,56 @@ describe('Positronic Spec', () => {
   });
 
   describe('Secrets', () => {
-    // Mock the Cloudflare API for secrets management
-    const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com';
-    const SECRETS_PATH =
-      '/client/v4/accounts/test-account-id/workers/scripts/test-project/secrets';
+    // The secrets routes call the Cloudflare API through the global fetch.
+    // Stub it with a small in-memory version of the secrets endpoint.
+    const SECRETS_URL =
+      'https://api.cloudflare.com/client/v4/accounts/test-account-id/workers/scripts/test-project/secrets';
 
-    // Track mock secrets for realistic responses
     let mockSecrets: Array<{ name: string; type: string }> = [];
 
-    beforeAll(() => {
-      fetchMock.activate();
-      fetchMock.disableNetConnect();
+    const cloudflareApi = async (
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ) => {
+      const url = input instanceof Request ? input.url : String(input);
+      const method = init?.method ?? 'GET';
+      if (!url.startsWith(SECRETS_URL)) {
+        throw new Error(`Unexpected outbound request: ${method} ${url}`);
+      }
+      const ok = (result: unknown) =>
+        Response.json({ success: true, result, errors: [] });
+      if (method === 'GET') {
+        return ok(mockSecrets);
+      }
+      if (method === 'PUT') {
+        const { name } = JSON.parse(String(init?.body)) as { name: string };
+        const secret = { name, type: 'secret_text' };
+        mockSecrets.push(secret);
+        return ok(secret);
+      }
+      if (method === 'DELETE') {
+        const name = url.slice(SECRETS_URL.length + 1);
+        mockSecrets = mockSecrets.filter((s) => s.name !== name);
+        return ok(null);
+      }
+      throw new Error(`Unexpected outbound request: ${method} ${url}`);
+    };
+
+    beforeEach(() => {
+      mockSecrets = [];
+      vi.stubGlobal('fetch', cloudflareApi);
     });
 
     afterEach(() => {
-      fetchMock.assertNoPendingInterceptors();
-      mockSecrets = [];
+      vi.unstubAllGlobals();
     });
 
     it('passes GET /secrets test', async () => {
-      // Mock Cloudflare API list secrets response
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'GET' })
-        .reply(200, {
-          success: true,
-          result: mockSecrets,
-          errors: [],
-        });
-
       const result = await secrets.list(createFetch());
       expect(result).toBe(true);
     });
 
     it('passes POST /secrets test', async () => {
-      // Mock Cloudflare API create secret response
-      // Note: The API sends the secret name in the body, not the URL
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'PUT' })
-        .reply(200, {
-          success: true,
-          result: { name: 'TEST_SECRET', type: 'secret_text' },
-          errors: [],
-        });
-
       const result = await secrets.create(
         createFetch(),
         'TEST_SECRET',
@@ -689,85 +693,18 @@ describe('Positronic Spec', () => {
     });
 
     it('passes DELETE /secrets/:name test', async () => {
-      // Mock create first (secret name in body, not URL)
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'PUT' })
-        .reply(200, {
-          success: true,
-          result: { name: 'SECRET_TO_DELETE', type: 'secret_text' },
-          errors: [],
-        });
-
-      // First create a secret to delete
       await secrets.create(createFetch(), 'SECRET_TO_DELETE', 'temp-value');
-
-      // Mock delete (delete still uses name in URL)
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({
-          path: `${SECRETS_PATH}/SECRET_TO_DELETE`,
-          method: 'DELETE',
-        })
-        .reply(200, {
-          success: true,
-          result: null,
-          errors: [],
-        });
-
-      // Then delete it
       const result = await secrets.delete(createFetch(), 'SECRET_TO_DELETE');
       expect(result).toBe(true);
     });
 
     it('passes GET /secrets/:name/exists test', async () => {
-      // Add a secret to the mock list
       mockSecrets = [{ name: 'TEST_SECRET', type: 'secret_text' }];
-
-      // Mock list to check existence
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'GET' })
-        .reply(200, {
-          success: true,
-          result: mockSecrets,
-          errors: [],
-        });
-
       const result = await secrets.exists(createFetch(), 'TEST_SECRET');
       expect(result).toBe(true);
     });
 
     it('passes POST /secrets/bulk test', async () => {
-      // Mock list to check existing secrets
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'GET' })
-        .reply(200, {
-          success: true,
-          result: [],
-          errors: [],
-        });
-
-      // Mock create for each secret (secret name in body, not URL)
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'PUT' })
-        .reply(200, {
-          success: true,
-          result: { name: 'BULK_SECRET_1', type: 'secret_text' },
-          errors: [],
-        });
-
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'PUT' })
-        .reply(200, {
-          success: true,
-          result: { name: 'BULK_SECRET_2', type: 'secret_text' },
-          errors: [],
-        });
-
       const result = await secrets.bulk(createFetch(), [
         { name: 'BULK_SECRET_1', value: 'value1' },
         { name: 'BULK_SECRET_2', value: 'value2' },
@@ -776,33 +713,22 @@ describe('Positronic Spec', () => {
     });
 
     it('passes POST /secrets rejects ROOT_PUBLIC_KEY test', async () => {
-      // No Cloudflare API mocking needed - the endpoint should reject before calling API
+      // No Cloudflare API call expected; the endpoint rejects first.
       const result = await secrets.createRootKeyRejected(createFetch());
       expect(result).toBe(true);
     });
 
     it('passes DELETE /secrets/ROOT_PUBLIC_KEY rejected test', async () => {
-      // No Cloudflare API mocking needed - the endpoint should reject before calling API
+      // No Cloudflare API call expected; the endpoint rejects first.
       const result = await secrets.deleteRootKeyRejected(createFetch());
       expect(result).toBe(true);
     });
 
     it('passes GET /secrets excludes ROOT_PUBLIC_KEY test', async () => {
-      // Mock Cloudflare API response that includes ROOT_PUBLIC_KEY
       mockSecrets = [
         { name: 'ROOT_PUBLIC_KEY', type: 'secret_text' },
         { name: 'OTHER_SECRET', type: 'secret_text' },
       ];
-
-      fetchMock
-        .get(CLOUDFLARE_API_BASE)
-        .intercept({ path: SECRETS_PATH, method: 'GET' })
-        .reply(200, {
-          success: true,
-          result: mockSecrets,
-          errors: [],
-        });
-
       const result = await secrets.listExcludesRootKey(createFetch(), true);
       expect(result).toBe(true);
     });

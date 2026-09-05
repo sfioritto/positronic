@@ -1,44 +1,18 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
+  reset,
 } from 'cloudflare:test';
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
 import { createAuthenticatedRequest } from './test-auth-helper';
 
-interface TestEnv {
-  RESOURCES_BUCKET: R2Bucket;
-  NODE_ENV?: string;
-}
-
 describe('Resources API Tests', () => {
-  const testEnv = env as TestEnv;
+  const testEnv = env;
 
-  beforeAll(async () => {
-    // Clean up any existing test resources
-    try {
-      const listed = await testEnv.RESOURCES_BUCKET.list();
-      for (const obj of listed.objects) {
-        await testEnv.RESOURCES_BUCKET.delete(obj.key);
-      }
-    } catch (e) {
-      // Ignore errors if bucket is empty
-    }
-  });
-
-  afterAll(async () => {
-    // Clean up after all tests
-    try {
-      const listed = await testEnv.RESOURCES_BUCKET.list();
-      for (const obj of listed.objects) {
-        await testEnv.RESOURCES_BUCKET.delete(obj.key);
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-  });
+  beforeEach(reset);
 
   it('POST /resources with path only', async () => {
     const formData = new FormData();

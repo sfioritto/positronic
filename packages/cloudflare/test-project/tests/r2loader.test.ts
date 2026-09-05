@@ -1,19 +1,10 @@
-import { env } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { CloudflareR2Loader } from '../../src/r2-loader.js';
 import { Buffer } from 'buffer';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  DB: D1Database;
-  TEST_RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('CloudflareR2Loader Tests', () => {
-  const testEnv = env as TestEnv;
+  const testEnv = env;
   let r2Loader: CloudflareR2Loader;
   const textFileName = 'test.txt';
   const textFileContent = 'Hello R2!';

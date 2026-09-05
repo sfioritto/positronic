@@ -1,7 +1,8 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
+  reset,
 } from 'cloudflare:test';
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -16,17 +17,6 @@ import type {
   BrainErrorEvent,
   StepStatusEvent,
 } from '@positronic/core';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 /**
  * Creates an error object that simulates what the Anthropic API returns
@@ -58,7 +48,8 @@ function createAnthropicTooManyTokensError(): Error {
 }
 
 describe('Brain API Error Handling', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await reset();
     resetMockState();
   });
 
@@ -89,7 +80,7 @@ describe('Brain API Error Handling', () => {
    */
   describe('Fire-and-forget pattern (design verification)', () => {
     it('successful brain shows "running" without SSE watching (expected behavior)', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'basic-brain';
 
       const createRequest = await createAuthenticatedRequest(
@@ -132,7 +123,7 @@ describe('Brain API Error Handling', () => {
     });
 
     it('errored brain shows "running" without SSE watching (expected behavior)', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'agent-error-brain';
 
       setMockError(createAnthropicTooManyTokensError());
@@ -193,7 +184,7 @@ describe('Brain API Error Handling', () => {
      */
 
     it('should emit ERROR event and update history status to ERROR when API call fails', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an Anthropic-like error
@@ -304,7 +295,7 @@ describe('Brain API Error Handling', () => {
     });
 
     it('should show correct step status when error occurs in agent step', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an error
@@ -363,7 +354,7 @@ describe('Brain API Error Handling', () => {
     });
 
     it('should clean up webhook registrations when brain errors', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an error
@@ -417,7 +408,7 @@ describe('Brain API Error Handling', () => {
     });
 
     it('should not show errored brain in running brains list', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'agent-error-brain';
 
       // Configure the mock client to throw an error

@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -10,18 +10,8 @@ import { BRAIN_EVENTS } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readSseStream } from './sse-helpers';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { GovernorDO } from '../../src/governor-do.js';
 
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  GOVERNOR_DO: DurableObjectNamespace<GovernorDO>;
-  RESOURCES_BUCKET: R2Bucket;
-}
-
-function getGovernorStub(testEnv: TestEnv, identity = 'test-identity') {
+function getGovernorStub(testEnv: Cloudflare.Env, identity = 'test-identity') {
   const id = testEnv.GOVERNOR_DO.idFromName(identity);
   return testEnv.GOVERNOR_DO.get(id);
 }
@@ -32,7 +22,7 @@ describe('GovernorDO Integration Tests', () => {
   });
 
   it('should admit immediately for unknown model (no limits)', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const stub = getGovernorStub(testEnv, 'unknown-model-identity');
 
     // waitForCapacity should resolve immediately for an unknown model
@@ -40,7 +30,7 @@ describe('GovernorDO Integration Tests', () => {
   });
 
   it('should seed Google defaults and throttle', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const stub = getGovernorStub(testEnv, 'google-identity');
 
     // First call seeds limits from Google defaults and resolves
@@ -48,7 +38,7 @@ describe('GovernorDO Integration Tests', () => {
   });
 
   it('should update limits from reportHeaders', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const stub = getGovernorStub(testEnv, 'header-update-identity');
 
     // Report headers with Anthropic-style limits, then verify
@@ -62,7 +52,7 @@ describe('GovernorDO Integration Tests', () => {
   });
 
   it('should update limits from OpenAI-style headers', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const stub = getGovernorStub(testEnv, 'openai-identity');
 
     await stub.reportHeaders({
@@ -74,7 +64,7 @@ describe('GovernorDO Integration Tests', () => {
   });
 
   it('should process multiple concurrent requests in order', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const stub = getGovernorStub(testEnv, 'concurrent-identity');
 
     // Seed limits first (high RPM so delays are very small)
@@ -100,7 +90,7 @@ describe('GovernorDO Integration Tests', () => {
   });
 
   it('should complete brain execution through governor', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // Create a brain run that uses a prompt step (exercises rateGoverned wrapper)
     const request = await createAuthenticatedRequest(
@@ -140,7 +130,7 @@ describe('GovernorDO Integration Tests', () => {
   });
 
   it('should ignore reportHeaders with unrecognized headers', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const stub = getGovernorStub(testEnv, 'noop-headers-identity');
 
     await stub.reportHeaders({

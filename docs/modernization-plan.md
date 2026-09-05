@@ -57,7 +57,7 @@ Coverage should still report 160 or so files under the root runner, with the clo
 
 ## Step 2: Bump the Cloudflare test-project
 
-**Scope.** Move `packages/cloudflare/test-project` from Vitest 3.0.9 to the same 4.x as the root. That pulls `@cloudflare/vitest-pool-workers` from 0.12 to 0.22 and wrangler from 4.37 to 4.129. The coverage provider stays Istanbul (workerd can't do V8 coverage); bump `@vitest/coverage-istanbul` to match.
+**Scope.** Move `packages/cloudflare/test-project` from Vitest 3.0.9 to the same 4.x as the root. Done 2026-09-05: `@cloudflare/vitest-pool-workers` 0.12 became `@cloudflare/vitest-plugin` 1.1 (the renamed v1 of the same package), wrangler went 4.37 to 4.129, and `@vitest/coverage-istanbul` matches Vitest. Storage isolation is per test file under the new plugin, so a handful of tests that assumed a fresh slate per test now clean up in `beforeEach`. See the step 2 journal.
 
 Split out from step 1 because the wrangler jump is the larger change and may surface Durable Object test breakage that has nothing to do with the runner. The memory notes about `runDurableObjectAlarm` and isolated storage came from 0.12.18; recheck them against the new pool.
 
@@ -211,4 +211,4 @@ npm run typecheck
 - ~~`packages/cli/package.json` still depends on `@positronic/template-new-project` and `caz`, and so does cloudflare.~~ Done 2026-09-04: caz is gone, the template package renders itself with Eta, and both packages import `scaffoldProject` from it.
 - `packages/spec/package.json` pins its own `typescript` and `@types/node`. Hoist to the root.
 - The template's `tests/example.test.ts` fails when scaffolded. It never registers a mock response and asserts on state the example brain does not produce. Broken before the Vitest migration.
-- npm 11 cannot install vitest 4.1.x (arborist crash in peer resolution). npm 12 can and needs Node 24.15+. Both are installed now. Worth an `engines` field in the template so scaffolded projects say so up front.
+- npm 11 cannot install vitest 4.1.x (arborist crash in peer resolution). npm 12 can and needs Node 24.15+. Both are installed now, and the template declares `npm >=12` in `engines` (done in step 2). No Node floor, since npm 12 also runs on Node 22.22+.

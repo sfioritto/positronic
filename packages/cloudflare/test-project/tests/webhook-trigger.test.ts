@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -10,18 +10,7 @@ import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readSseStream } from './sse-helpers';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
 import type { BrainCompleteEvent } from '@positronic/core';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('Webhook Trigger Tests', () => {
   beforeEach(() => {
@@ -29,7 +18,7 @@ describe('Webhook Trigger Tests', () => {
   });
 
   it('should start a new brain run when trigger webhook fires', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // Send a webhook that triggers a new brain run
     const webhookRequest = await createAuthenticatedRequest(
@@ -75,7 +64,7 @@ describe('Webhook Trigger Tests', () => {
   });
 
   it('should return ignored for ignore result type', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     const webhookRequest = await createAuthenticatedRequest(
       'http://example.com/webhooks/trigger-webhook',
@@ -96,7 +85,7 @@ describe('Webhook Trigger Tests', () => {
   });
 
   it('should handle verification challenge for trigger webhooks', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     const webhookRequest = await createAuthenticatedRequest(
       'http://example.com/webhooks/trigger-webhook',
@@ -119,7 +108,7 @@ describe('Webhook Trigger Tests', () => {
   });
 
   it('should return 400 when webhook without triggers config returns trigger type', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // trigger-no-config returns { type: 'trigger' } but has no triggers config
     const webhookRequest = await createAuthenticatedRequest(

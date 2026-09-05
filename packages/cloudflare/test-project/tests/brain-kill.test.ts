@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -8,29 +8,20 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import worker from '../src/index';
 import { brains } from '@positronic/spec';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
 import {
   createAuthenticatedRequest,
   createAuthenticatedFetchWrapper,
 } from './test-auth-helper';
 
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
-
 describe('Brain Kill API', () => {
   // Helper to create authenticated fetch for spec tests
-  const createAuthFetch = (testEnv: TestEnv, ctx: ExecutionContext) => {
+  const createAuthFetch = (testEnv: Cloudflare.Env, ctx: ExecutionContext) => {
     const baseFetch = async (req: Request) => worker.fetch(req, testEnv, ctx);
     return createAuthenticatedFetchWrapper(baseFetch);
   };
 
   it('should pass the spec test for killing a brain run', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const ctx = createExecutionContext();
 
     // First create a brain run
@@ -60,7 +51,7 @@ describe('Brain Kill API', () => {
   });
 
   it('should return 404 for non-existent brain run', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const ctx = createExecutionContext();
     const runId = 'non-existent-run';
 
@@ -78,7 +69,7 @@ describe('Brain Kill API', () => {
   });
 
   it('should kill an active brain run', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const ctx = createExecutionContext();
 
     // First create a brain run
@@ -132,7 +123,7 @@ describe('Brain Kill API', () => {
   });
 
   it('should kill a brain suspended on a webhook via spec test', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const ctx = createExecutionContext();
 
     const result = await brains.killSuspended(
@@ -150,7 +141,7 @@ describe('Brain Kill API', () => {
   });
 
   it('should kill a brain suspended on a webhook and update status to CANCELLED', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const ctx = createExecutionContext();
 
     // Step 1: Start the agent-webhook-brain
@@ -245,7 +236,7 @@ describe('Brain Kill API', () => {
   });
 
   it('should clean up non-persistent pages when killing a suspended brain', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const ctx = createExecutionContext();
 
     // Step 1: Start the page-webhook-brain (creates a page and waits for webhook)

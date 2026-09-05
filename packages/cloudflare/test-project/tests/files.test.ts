@@ -1,15 +1,14 @@
-import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createFiles } from '../../src/files-service.js';
 import type { Files } from '@positronic/core';
 import { unzipSync } from 'fflate';
 
-interface TestEnv {
-  TEST_RESOURCES_BUCKET: R2Bucket;
-}
-
 describe('createFiles', () => {
-  const testEnv = env as TestEnv;
+  const testEnv = env;
+
+  beforeEach(reset);
 
   function createService(
     brainTitle = 'test-brain',

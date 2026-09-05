@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -14,22 +14,11 @@ import type {
   BrainCompleteEvent,
   StepCompletedEvent,
 } from '@positronic/core';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('Pages API Tests', () => {
   // Clean up pages after each test
   afterEach(async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
     const bucket = testEnv.RESOURCES_BUCKET;
 
     // List and delete all pages
@@ -41,7 +30,7 @@ describe('Pages API Tests', () => {
 
   describe('Pages CRUD API', () => {
     it('POST /pages creates a new page', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/pages',
@@ -78,7 +67,7 @@ describe('Pages API Tests', () => {
     });
 
     it('POST /pages with persist:true creates a persistent page', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/pages',
@@ -112,7 +101,7 @@ describe('Pages API Tests', () => {
     });
 
     it('POST /pages validates required fields', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Note: slug is now optional - if not provided, one is auto-generated
 
@@ -156,7 +145,7 @@ describe('Pages API Tests', () => {
     });
 
     it('POST /pages validates slug format', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/pages',
@@ -181,7 +170,7 @@ describe('Pages API Tests', () => {
     });
 
     it('GET /pages lists all pages', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a few pages first
       for (let i = 0; i < 3; i++) {
@@ -242,7 +231,7 @@ describe('Pages API Tests', () => {
     });
 
     it('GET /pages/:slug returns page HTML content', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const htmlContent = '<html><body><h1>Test Content</h1></body></html>';
 
       // Create a page
@@ -277,7 +266,7 @@ describe('Pages API Tests', () => {
     });
 
     it('GET /pages/:slug returns 404 for non-existent page', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/pages/non-existent-page'
@@ -290,7 +279,7 @@ describe('Pages API Tests', () => {
     });
 
     it('GET /pages/:slug/meta returns page metadata', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a page
       const createRequest = await createAuthenticatedRequest(
@@ -342,7 +331,7 @@ describe('Pages API Tests', () => {
     });
 
     it('PUT /pages/:slug updates page content', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a page
       const createRequest = await createAuthenticatedRequest(
@@ -402,7 +391,7 @@ describe('Pages API Tests', () => {
     });
 
     it('PUT /pages/:slug returns 404 for non-existent page', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/pages/non-existent-page',
@@ -422,7 +411,7 @@ describe('Pages API Tests', () => {
     });
 
     it('DELETE /pages/:slug deletes a page', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a page
       const createRequest = await createAuthenticatedRequest(
@@ -472,7 +461,7 @@ describe('Pages API Tests', () => {
 
   describe('Optional Slug Behavior', () => {
     it('POST /pages without slug generates a unique slug', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const request = await createAuthenticatedRequest(
         'http://example.com/pages',
@@ -504,7 +493,7 @@ describe('Pages API Tests', () => {
     });
 
     it('POST /pages without slug generates unique slugs for each call', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const slugs: string[] = [];
 
       // Create 3 pages without slugs
@@ -536,7 +525,7 @@ describe('Pages API Tests', () => {
     });
 
     it('POST /pages with explicit slug reuses same page (overwrites)', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const slug = 'shared-page';
 
       // First call creates the page
@@ -603,7 +592,7 @@ describe('Pages API Tests', () => {
     });
 
     it('Brain with no slug creates unique page each run', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'auto-slug-brain';
 
       // Run the brain twice and collect the page slugs
@@ -666,7 +655,7 @@ describe('Pages API Tests', () => {
     });
 
     it('Brain with explicit slug reuses same page across runs', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'fixed-slug-brain';
 
       // Run the brain twice
@@ -746,7 +735,7 @@ describe('Pages API Tests', () => {
 
   describe('Pages Service in Brain', () => {
     it('Brain can create and manage pages via pages service', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'pages-brain';
 
       // Start the brain
@@ -859,7 +848,7 @@ describe('Pages API Tests', () => {
     });
 
     it('Brain can create persistent pages', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
       const brainName = 'persistent-page-brain';
 
       // Start the brain

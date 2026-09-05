@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -9,17 +9,6 @@ import worker from '../src/index';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readSseStream } from './sse-helpers';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-import type { ScheduleDO } from '../../src/schedule-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  SCHEDULE_DO: DurableObjectNamespace<ScheduleDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 describe('Signal API Tests', () => {
   beforeEach(() => {
@@ -27,7 +16,7 @@ describe('Signal API Tests', () => {
   });
 
   async function createRunAndWaitForComplete(
-    testEnv: TestEnv,
+    testEnv: Cloudflare.Env,
     brainTitle: string
   ): Promise<string> {
     const createRequest = await createAuthenticatedRequest(
@@ -64,7 +53,7 @@ describe('Signal API Tests', () => {
 
   describe('POST /brains/runs/:runId/signals', () => {
     it('should return 400 for invalid signal type', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a brain run first
       const createRequest = await createAuthenticatedRequest(
@@ -109,7 +98,7 @@ describe('Signal API Tests', () => {
     });
 
     it('should return 409 when PAUSE signal sent to completed brain', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a brain run and wait for it to complete via SSE
       const brainRunId = await createRunAndWaitForComplete(
@@ -140,7 +129,7 @@ describe('Signal API Tests', () => {
     });
 
     it('should return 409 when KILL signal sent to completed brain', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a brain run and wait for it to complete via SSE
       const brainRunId = await createRunAndWaitForComplete(
@@ -171,7 +160,7 @@ describe('Signal API Tests', () => {
     });
 
     it('should return 404 for non-existent run', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const signalRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/non-existent-id/signals`,
@@ -193,7 +182,7 @@ describe('Signal API Tests', () => {
     });
 
     it('should return 202 and queue PAUSE signal', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a brain run
       const createRequest = await createAuthenticatedRequest(
@@ -245,7 +234,7 @@ describe('Signal API Tests', () => {
 
   describe('POST /brains/runs/:runId/resume', () => {
     it('should return 404 for non-existent run', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       const resumeRequest = await createAuthenticatedRequest(
         `http://example.com/brains/runs/non-existent-id/resume`,
@@ -266,7 +255,7 @@ describe('Signal API Tests', () => {
     });
 
     it('should return 409 when brain is not paused', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a brain run and wait for it to complete via SSE
       const brainRunId = await createRunAndWaitForComplete(
@@ -298,7 +287,7 @@ describe('Signal API Tests', () => {
 
   describe('pause and resume integration', () => {
     it('should pause delayed brain and verify paused state', async () => {
-      const testEnv = env as TestEnv;
+      const testEnv = env;
 
       // Create a delayed brain run (takes 1.5s on first step)
       const createRequest = await createAuthenticatedRequest(

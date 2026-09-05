@@ -1,5 +1,5 @@
+import { env } from 'cloudflare:workers';
 import {
-  env,
   createExecutionContext,
   waitOnExecutionContext,
 } from 'cloudflare:test';
@@ -14,15 +14,6 @@ import type {
 } from '@positronic/core';
 import { createAuthenticatedRequest } from './test-auth-helper';
 import { readSseStream } from './sse-helpers';
-import type { BrainRunnerDO } from '../../src/brain-runner-do.js';
-import type { MonitorDO } from '../../src/monitor-do.js';
-
-interface TestEnv {
-  BRAIN_RUNNER_DO: DurableObjectNamespace<BrainRunnerDO>;
-  MONITOR_DO: DurableObjectNamespace<MonitorDO>;
-  DB: D1Database;
-  RESOURCES_BUCKET: R2Bucket;
-}
 
 // rerun-test-brain is flat (no nested brains), so applying every
 // STEP_COMPLETE patch in order reconstructs the final state.
@@ -39,7 +30,7 @@ function finalStateFromEvents(events: BrainEvent[]) {
   return state;
 }
 
-async function watchToCompletion(testEnv: TestEnv, brainRunId: string) {
+async function watchToCompletion(testEnv: Cloudflare.Env, brainRunId: string) {
   const watchRequest = await createAuthenticatedRequest(
     `http://example.com/brains/runs/${brainRunId}/watch`
   );
@@ -54,7 +45,7 @@ async function watchToCompletion(testEnv: TestEnv, brainRunId: string) {
 
 describe('POST /brains/runs/rerun --starts-at', () => {
   it('re-executes only the steps from starts-at onward', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // --- Run rerun-test-brain to completion ---
     const createRequest = await createAuthenticatedRequest(
@@ -123,7 +114,7 @@ describe('POST /brains/runs/rerun --starts-at', () => {
   });
 
   it('rejects starts-at beyond the number of completed steps instead of silently rerunning everything', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // --- Run the 4-step brain to completion ---
     const createRequest = await createAuthenticatedRequest(
@@ -194,7 +185,7 @@ describe('POST /brains/runs/rerun --starts-at', () => {
   // pages created after a rerun would be attributed to an id no other
   // component (like MonitorDO) knows about.
   it('attributes pages created after rerun to the original run UUID', async () => {
-    const testEnv = env as TestEnv;
+    const testEnv = env;
 
     // --- Run auto-slug-brain to completion ---
     const createRequest = await createAuthenticatedRequest(
