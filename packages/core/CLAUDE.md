@@ -96,7 +96,7 @@ Tests use Jest and are located alongside source files and must be run from the m
 - **Step Counting**: Tracks step number for `endAfter` early termination
 - **Restart Logic**: Applies patches from `initialCompletedSteps` before execution begins
 - **Type Parameters**: Properly threads through brain's generic types for type safety
-- **Return Value**: Returns final state after all events processed (or early termination)
+- **Return Value**: Always resolves with the current state, however the run ended (complete, paused, cancelled, or errored). How a run ended is reported through the event stream, never by rejecting.
 
 ### Adapter Pattern (`src/adapters/types.ts`)
 
@@ -106,7 +106,7 @@ Tests use Jest and are located alongside source files and must be run from the m
 - **Async Support**: Can return `void` or `Promise<void>` for async operations
 - **Generic Options**: `Adapter<Options>` allows type-safe event options
 - **Event Handling**: Adapters receive ALL events - must filter if only interested in specific types
-- **Error Handling**: BrainRunner doesn't catch adapter errors - adapters must handle their own errors
+- **Error Handling**: If an adapter's `dispatch` throws, the run ends. BrainRunner synthesizes a terminal ERROR event (one per brain on the nesting stack, innermost first) and dispatches it to every adapter, then resolves. Adapters should still handle their own recoverable errors; a throw is treated as fatal to the run.
 
 ## Testing
 

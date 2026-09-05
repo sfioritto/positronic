@@ -57,15 +57,17 @@ describe('Brain API Error Handling', () => {
    *
    * The brain-runner-do.ts intentionally does NOT await the brain run:
    *
-   *   runnerWithResources
-   *     .withAdapters([...])
+   *   runner
    *     .run(brainToRun, {...})  // NOT awaited!
-   *     .catch((err) => { console.error(...); throw err; })
+   *     .finally(() => { this.abortController = null; });
    *
    * This is intentional because:
    * 1. Long-running brains would timeout HTTP requests if awaited
    * 2. The SSE streaming pattern is the expected way to monitor completion
    * 3. POST /brains/runs returns immediately with brainRunId for the client
+   *
+   * How a run ended is reported only through the event stream; run() always
+   * resolves, so there is nothing for the DO to catch.
    *
    * Consequences:
    * - If you query history immediately after POST (without watching SSE),

@@ -110,15 +110,18 @@ describe('BrainRunner', () => {
       client: mockClient,
     });
 
-    const errorBrain = brain('Error Brain').step('Error Step', () => {
-      throw new Error('Test error');
-    });
+    const errorBrain = brain('Error Brain')
+      .step('Before', () => ({ reached: true }))
+      .step('Error Step', () => {
+        throw new Error('Test error');
+      });
 
-    try {
-      await runner.run(errorBrain, { currentUser: { name: 'test-user' } });
-    } catch {
-      // Expected error
-    }
+    // A brain error is reported through the event stream, not by rejecting.
+    // The run resolves with the state as it stood when the step threw.
+    const finalState = await runner.run(errorBrain, {
+      currentUser: { name: 'test-user' },
+    });
+    expect(finalState).toEqual({ reached: true });
 
     // Verify error event was dispatched
     expect(mockAdapter.dispatch).toHaveBeenCalledWith(
@@ -129,6 +132,133 @@ describe('BrainRunner', () => {
         }),
       })
     );
+  });
+
+  it('ends the run with an ERROR event when an adapter fails to dispatch', async () => {
+    let failed = false;
+    const receivedEvents: any[] = [];
+    const failingAdapter: Adapter = {
+      dispatch: async (event) => {
+        receivedEvents.push(event);
+        if (!failed && event.type === BRAIN_EVENTS.STEP_COMPLETE) {
+          failed = true;
+          throw new Error('Adapter unavailable');
+        }
+      },
+    };
+    const runner = new BrainRunner({
+      adapters: [failingAdapter, mockAdapter],
+      client: mockClient,
+    });
+
+    const testBrain = brain('Test Brain').step('Only Step', () => ({
+      value: 1,
+    }));
+
+    // The failure happens in the runner's dispatch loop, outside the event
+    // stream's try/catch, so the runner has to write the terminal ERROR
+    // event itself instead of letting the run die silently.
+    const finalState = await runner.run(testBrain, {
+      currentUser: { name: 'test-user' },
+    });
+    expect(finalState).toEqual({ value: 1 });
+
+    // The adapter that failed still receives the terminal ERROR event.
+    const errorEvent = receivedEvents.find(
+      (event) => event.type === BRAIN_EVENTS.ERROR
+    );
+    expect(errorEvent?.error.message).toBe('Adapter unavailable');
+
+    const mockDispatchedTypes = mockDispatch.mock.calls.map(
+      ([event]) => event.type
+    );
+    expect(mockDispatchedTypes).not.toContain(BRAIN_EVENTS.COMPLETE);
+  });
+
+  it('unwinds every nested brain with an ERROR event when an adapter fails inside an inner brain', async () => {
+    let failed = false;
+    const receivedEvents: any[] = [];
+    const failingAdapter: Adapter = {
+      dispatch: async (event) => {
+        receivedEvents.push(event);
+        if (
+          !failed &&
+          event.type === BRAIN_EVENTS.STEP_COMPLETE &&
+          (event as any).stepTitle === 'Inner Step'
+        ) {
+          failed = true;
+          throw new Error('Adapter unavailable');
+        }
+      },
+    };
+    const runner = new BrainRunner({
+      adapters: [failingAdapter, mockAdapter],
+      client: mockClient,
+    });
+
+    const innerBrain = brain('Inner Brain').step('Inner Step', ({ state }) => ({
+      ...state,
+      inner: true,
+    }));
+    const outerBrain = brain('Outer Brain')
+      .step('Outer Step', () => ({ outer: true }))
+      .brain('Run inner', innerBrain);
+
+    await runner.run(outerBrain, { currentUser: { name: 'test-user' } });
+
+    const errorBrainTitles = mockDispatch.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === BRAIN_EVENTS.ERROR)
+      .map((event) => (event as any).brainTitle);
+    expect(errorBrainTitles).toEqual(['Inner Brain', 'Outer Brain']);
+
+    const machine = createBrainExecutionMachine();
+    for (const [event] of mockDispatch.mock.calls) {
+      sendEvent(machine, event as any);
+    }
+    expect(machine.context.isError).toBe(true);
+  });
+
+  it('still ends the run as errored when the adapter fails on the ERROR event itself', async () => {
+    // The runner feeds each event to its own state machine before dispatching
+    // it. If the dispatch that throws is the one carrying the brain's ERROR,
+    // the runner's machine already says "error" while no consumer has heard.
+    // The synthesized ERROR has to go out anyway.
+    let failed = false;
+    const accepted: any[] = [];
+    const failingAdapter: Adapter = {
+      dispatch: async (event) => {
+        if (!failed && event.type === BRAIN_EVENTS.ERROR) {
+          failed = true;
+          throw new Error('Adapter unavailable');
+        }
+        accepted.push(event);
+      },
+    };
+    const runner = new BrainRunner({
+      adapters: [failingAdapter],
+      client: mockClient,
+    });
+
+    const errorBrain = brain('Error Brain').step('Error Step', () => {
+      throw new Error('Test error');
+    });
+
+    await runner.run(errorBrain, { currentUser: { name: 'test-user' } });
+
+    // The brain's own ERROR was rejected; the synthesized one got through.
+    const errorEvents = accepted.filter((e) => e.type === BRAIN_EVENTS.ERROR);
+    expect(errorEvents.map((e) => e.error.message)).toEqual([
+      'Adapter unavailable',
+    ]);
+
+    // What this adapter accepted is what a consumer saw, and it must end in
+    // the terminal error state.
+    const machine = createBrainExecutionMachine();
+    for (const event of accepted) {
+      sendEvent(machine, event as any);
+    }
+    expect(machine.context.isError).toBe(true);
   });
 
   it('should maintain state between steps', async () => {

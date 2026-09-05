@@ -15,7 +15,11 @@ import type {
 } from './types.js';
 import type { ObjectGenerator } from '../clients/types.js';
 import type { Resources } from '../resources/resources.js';
-import type { BrainCancelledEvent } from './definitions/events.js';
+import type {
+  BrainEvent,
+  BrainCancelledEvent,
+  BrainErrorEvent,
+} from './definitions/events.js';
 import type { ResumeParams } from './definitions/run-params.js';
 import type { Files } from '../files/types.js';
 import type { Pages } from './pages.js';
@@ -35,6 +39,32 @@ function createCancelledEvent<TOptions extends JsonObject>(
     brainTitle: '',
     status: STATUS.CANCELLED,
     options,
+  };
+}
+
+/**
+ * Create an ERROR event for when execution fails outside the brain's event
+ * stream (an adapter's dispatch rejecting, a reducer throwing). This is
+ * synthesized by the runner, not yielded from the brain's event stream.
+ */
+function createErrorEvent<TOptions extends JsonObject>(
+  brainTitle: string,
+  brainRunId: string,
+  options: TOptions,
+  error: unknown
+): BrainErrorEvent<TOptions> {
+  const serializedError =
+    error instanceof Error
+      ? { name: error.name, message: error.message, stack: error.stack }
+      : { name: 'Error', message: String(error) };
+
+  return {
+    type: BRAIN_EVENTS.ERROR,
+    status: STATUS.ERROR,
+    brainTitle,
+    brainRunId,
+    options,
+    error: serializedError,
   };
 }
 
@@ -230,16 +260,22 @@ export class BrainRunner {
           storeProvider,
         });
 
+    const dispatch = (event: BrainEvent<TOptions>) =>
+      Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
+    const runOptions = (options ?? {}) as TOptions;
+
+    // The machine's view as of the last event every adapter received. Events
+    // are fed to the machine before they are dispatched, so when a dispatch
+    // throws the machine is one event ahead of every consumer. Anything
+    // synthesized on failure has to reason from what consumers actually saw.
+    let delivered = { isError: false, brainIdStack: [] as string[] };
+
     try {
       for await (const event of brainRun) {
         // Check if we've been cancelled
         if (signal?.aborted) {
-          const cancelledEvent = createCancelledEvent(
-            machine.context.brainRunId ?? '',
-            (options ?? {}) as TOptions
-          );
-          await Promise.all(
-            adapters.map((adapter) => adapter.dispatch(cancelledEvent))
+          await dispatch(
+            createCancelledEvent(machine.context.brainRunId ?? '', runOptions)
           );
           // Cast is safe: state started as TState and patches maintain the structure
           return machine.context.currentState as TState;
@@ -248,8 +284,9 @@ export class BrainRunner {
         // Feed event to state machine - this updates currentState, isTopLevel, stepCount, etc.
         sendEvent(machine, event);
 
-        // Dispatch event to all adapters
-        await Promise.all(adapters.map((adapter) => adapter.dispatch(event)));
+        await dispatch(event);
+        const { isError, brainIdStack } = machine.context;
+        delivered = { isError, brainIdStack };
 
         // Check if we should stop after this step (only for top-level steps)
         // The machine's topLevelStepCount tracks steps since this run started,
@@ -275,17 +312,32 @@ export class BrainRunner {
     } catch (error) {
       // If aborted while awaiting, check signal and emit cancelled event
       if (signal?.aborted) {
-        const cancelledEvent = createCancelledEvent(
-          machine.context.brainRunId ?? '',
-          (options ?? {}) as TOptions
-        );
-        await Promise.all(
-          adapters.map((adapter) => adapter.dispatch(cancelledEvent))
+        await dispatch(
+          createCancelledEvent(machine.context.brainRunId ?? '', runOptions)
         );
         // Cast is safe: state started as TState and patches maintain the structure
         return machine.context.currentState as TState;
       }
-      throw error;
+      if (!delivered.isError) {
+        // No consumer has seen a terminal ERROR. Either the failure happened
+        // outside the event stream (an adapter's dispatch, a reducer) so the
+        // generator never emitted one, or the generator did emit one and its
+        // dispatch is what threw. Write one for every brain consumers still
+        // have open, innermost first, the way the stream's own catch blocks
+        // do when brain code throws, so a consumer replaying these events
+        // lands the outer brain in error instead of "running". Adapters that
+        // accepted the failing event see a second ERROR; the terminal state
+        // ignores it. Nothing was delivered if START itself failed, and
+        // there is nothing to end in that case.
+        const runId = machine.context.brainRunId ?? '';
+        for (const title of [...delivered.brainIdStack].reverse()) {
+          await dispatch(createErrorEvent(title, runId, runOptions, error));
+        }
+      }
+      // Resolving here keeps error in line with cancel and completion: the
+      // event stream is the one place that says how a run ended.
+      // Cast is safe: state started as TState and patches maintain the structure
+      return machine.context.currentState as TState;
     }
 
     // Cast is safe: state started as TState and patches maintain the structure

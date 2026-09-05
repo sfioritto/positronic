@@ -254,17 +254,12 @@ export async function runBrainTest<
     resources,
   });
 
-  try {
-    // Run the brain
-    await runner.run(brain, {
-      currentUser: { name: 'test-user' },
-      initialState,
-      options: brainOptions,
-    });
-  } catch {
-    // Brain might throw after emitting ERROR event
-    // This is expected behavior, so we don't re-throw
-  }
+  // A brain error is reported through the event stream; run() resolves.
+  await runner.run(brain, {
+    currentUser: { name: 'test-user' },
+    initialState,
+    options: brainOptions,
+  });
 
   return {
     finalState: testAdapter.getFinalState(),

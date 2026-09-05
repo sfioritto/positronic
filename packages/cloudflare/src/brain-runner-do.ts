@@ -778,6 +778,9 @@ export class BrainRunnerDO extends DurableObject<Env> {
       currentUser
     );
 
+    // Fire-and-forget: the run outlives this request. How it ends is reported
+    // through the event stream, and the runner resolves for brain errors and
+    // for failures outside the stream alike, so there is nothing to catch.
     runner
       .run(brainToRun, {
         currentUser,
@@ -785,11 +788,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
         brainRunId,
         ...(options && { options }),
         signal: this.abortController!.signal,
-      })
-      .catch((err: any) => {
-        // The run is fire-and-forget; the runner already emitted the ERROR
-        // event. Rethrowing here would only produce an unhandled rejection.
-        console.error(`[DO ${brainRunId}] BrainRunner run failed:`, err);
       })
       .finally(() => {
         this.abortController = null;
@@ -859,6 +857,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
       currentUser
     );
 
+    // Fire-and-forget, same as start().
     runner
       .resume(brainToRun, {
         currentUser,
@@ -866,10 +865,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
         brainRunId,
         options,
         signal: this.abortController!.signal,
-      })
-      .catch((err: any) => {
-        // Fire-and-forget, same as run(): log, do not rethrow.
-        console.error(`[DO ${brainRunId}] BrainRunner wakeUp failed:`, err);
       })
       .finally(() => {
         this.abortController = null;
