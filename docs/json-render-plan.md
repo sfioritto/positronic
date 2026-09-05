@@ -1,6 +1,6 @@
 # json-render plan
 
-**Status:** step 1 implemented (uncommitted), steps 2–3 pending
+**Status:** steps 1–2 implemented, step 3 pending
 **Started:** 2026-09-05
 **Evaluation:** `docs/journal/2026-09-04-json-render-evaluation.md`
 
@@ -80,6 +80,8 @@ npm run typecheck
 **Tweaks.**
 
 ## Step 2: Rewrite `@positronic/gen-ui-components`
+
+**Implemented 2026-09-05**; see `docs/journal/2026-09-05-json-render-step-2-gen-ui.md`. Deviations from the scope below: `Hidden` was dropped (brain state survives the suspend, so nothing needs to round-trip through the form); the catalog entry exports `definitions`, `actions`, and `catalog`, the root exports `components` (React implementations) and `mount(rootEl, { catalog?, components? })` for projects that add components; core gained the `@positronic/core/page` subpath so the browser bundle never imports core's root and its `node:` modules; the Checkbox definition is shadcn's plus a `value` prop for checkbox groups bound to one array; root got `jsdom` for the mount test.
 
 **Scope.** The package keeps its name and becomes the Positronic catalog and browser runtime, in three entry points.
 
