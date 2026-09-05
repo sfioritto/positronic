@@ -53,12 +53,12 @@ export const testLogger: Logger = {
 export type AssertEquals<T, U> = 0 extends 1 & T
   ? false // fails if T is any
   : 0 extends 1 & U
-  ? false // fails if U is any
-  : [T] extends [U]
-  ? [U] extends [T]
-    ? true
-    : false
-  : false;
+    ? false // fails if U is any
+    : [T] extends [U]
+      ? [U] extends [T]
+        ? true
+        : false
+      : false;
 
 // Mock ObjectGenerator for testing
 export const mockGenerateObject = vi.fn<ObjectGenerator['generateObject']>();

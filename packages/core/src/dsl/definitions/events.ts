@@ -21,61 +21,70 @@ interface BaseEvent<TOptions extends JsonObject = JsonObject> {
 }
 
 // Brain Events (all include brain title/description)
-interface BrainBaseEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+interface BrainBaseEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   brainTitle: string;
   brainDescription?: string;
 }
 
-export interface BrainStartEvent<TOptions extends JsonObject = JsonObject>
-  extends BrainBaseEvent<TOptions> {
+export interface BrainStartEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.START;
   initialState: object; // Always included now (no longer optional)
   status: typeof STATUS.RUNNING;
   currentUser: CurrentUser;
 }
 
-export interface BrainCompleteEvent<TOptions extends JsonObject = JsonObject>
-  extends BrainBaseEvent<TOptions> {
+export interface BrainCompleteEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.COMPLETE;
   status: typeof STATUS.COMPLETE;
 }
 
-export interface BrainErrorEvent<TOptions extends JsonObject = JsonObject>
-  extends BrainBaseEvent<TOptions> {
+export interface BrainErrorEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.ERROR;
   status: typeof STATUS.ERROR;
   error: SerializedError;
 }
 
-export interface BrainCancelledEvent<TOptions extends JsonObject = JsonObject>
-  extends BrainBaseEvent<TOptions> {
+export interface BrainCancelledEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.CANCELLED;
   status: typeof STATUS.CANCELLED;
 }
 
-export interface BrainPausedEvent<TOptions extends JsonObject = JsonObject>
-  extends BrainBaseEvent<TOptions> {
+export interface BrainPausedEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PAUSED;
   status: typeof STATUS.PAUSED;
 }
 
-export interface BrainResumedEvent<TOptions extends JsonObject = JsonObject>
-  extends BrainBaseEvent<TOptions> {
+export interface BrainResumedEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BrainBaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.RESUMED;
   status: typeof STATUS.RUNNING;
 }
 
 // Step Status Event (just steps array and base event properties)
-export interface StepStatusEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface StepStatusEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.STEP_STATUS;
   steps: SerializedStepStatus[];
 }
 
 // Step Events (include step-specific properties)
-export interface StepStartedEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface StepStartedEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.STEP_START;
   status: typeof STATUS.RUNNING;
   stepTitle: string;
@@ -83,8 +92,9 @@ export interface StepStartedEvent<TOptions extends JsonObject = JsonObject>
   stepIndex: number; // 0-based index of the step within the current brain
 }
 
-export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface StepCompletedEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.STEP_COMPLETE;
   status: typeof STATUS.RUNNING;
   stepTitle: string;
@@ -95,21 +105,23 @@ export interface StepCompletedEvent<TOptions extends JsonObject = JsonObject>
 }
 
 // Webhook Event
-export interface WebhookEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface WebhookEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK;
   waitFor: SerializedWebhookRegistration[];
   timeout?: number;
 }
 
-export interface WebhookResponseEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface WebhookResponseEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.WEBHOOK_RESPONSE;
   response: JsonObject;
 }
 
 export interface IterateItemCompleteEvent<
-  TOptions extends JsonObject = JsonObject
+  TOptions extends JsonObject = JsonObject,
 > extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.ITERATE_ITEM_COMPLETE;
   stepTitle: string;
@@ -123,15 +135,16 @@ export interface IterateItemCompleteEvent<
   canRelease: boolean;
 }
 
-export interface FileWriteStartEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface FileWriteStartEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.FILE_WRITE_START;
   fileName: string;
   stepTitle: string;
 }
 
 export interface FileWriteCompleteEvent<
-  TOptions extends JsonObject = JsonObject
+  TOptions extends JsonObject = JsonObject,
 > extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.FILE_WRITE_COMPLETE;
   fileName: string;
@@ -139,8 +152,9 @@ export interface FileWriteCompleteEvent<
 }
 
 // Prompt Loop Events
-export interface PromptStartEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface PromptStartEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_START;
   stepTitle: string;
   stepId: string;
@@ -149,8 +163,9 @@ export interface PromptStartEvent<TOptions extends JsonObject = JsonObject>
   tools: string[];
 }
 
-export interface PromptIterationEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface PromptIterationEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_ITERATION;
   stepTitle: string;
   stepId: string;
@@ -159,8 +174,9 @@ export interface PromptIterationEvent<TOptions extends JsonObject = JsonObject>
   totalTokens: number;
 }
 
-export interface PromptToolCallEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface PromptToolCallEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_TOOL_CALL;
   stepTitle: string;
   stepId: string;
@@ -170,8 +186,9 @@ export interface PromptToolCallEvent<TOptions extends JsonObject = JsonObject>
   iteration: number;
 }
 
-export interface PromptToolResultEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface PromptToolResultEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_TOOL_RESULT;
   stepTitle: string;
   stepId: string;
@@ -183,7 +200,7 @@ export interface PromptToolResultEvent<TOptions extends JsonObject = JsonObject>
 }
 
 export interface PromptAssistantMessageEvent<
-  TOptions extends JsonObject = JsonObject
+  TOptions extends JsonObject = JsonObject,
 > extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_ASSISTANT_MESSAGE;
   stepTitle: string;
@@ -192,8 +209,9 @@ export interface PromptAssistantMessageEvent<
   iteration: number;
 }
 
-export interface PromptCompleteEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface PromptCompleteEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_COMPLETE;
   stepTitle: string;
   stepId: string;
@@ -203,8 +221,9 @@ export interface PromptCompleteEvent<TOptions extends JsonObject = JsonObject>
   totalTokens: number;
 }
 
-export interface PromptTokenLimitEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface PromptTokenLimitEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_TOKEN_LIMIT;
   stepTitle: string;
   stepId: string;
@@ -213,7 +232,7 @@ export interface PromptTokenLimitEvent<TOptions extends JsonObject = JsonObject>
 }
 
 export interface PromptIterationLimitEvent<
-  TOptions extends JsonObject = JsonObject
+  TOptions extends JsonObject = JsonObject,
 > extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_ITERATION_LIMIT;
   stepTitle: string;
@@ -223,7 +242,7 @@ export interface PromptIterationLimitEvent<
 }
 
 export interface PromptRawResponseMessageEvent<
-  TOptions extends JsonObject = JsonObject
+  TOptions extends JsonObject = JsonObject,
 > extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_RAW_RESPONSE_MESSAGE;
   stepTitle: string;
@@ -232,8 +251,9 @@ export interface PromptRawResponseMessageEvent<
   message: ResponseMessage[];
 }
 
-export interface PromptWebhookEvent<TOptions extends JsonObject = JsonObject>
-  extends BaseEvent<TOptions> {
+export interface PromptWebhookEvent<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseEvent<TOptions> {
   type: typeof BRAIN_EVENTS.PROMPT_WEBHOOK;
   stepTitle: string;
   stepId: string;

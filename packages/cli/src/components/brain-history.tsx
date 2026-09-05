@@ -117,8 +117,8 @@ export const BrainHistory = ({ brainName, limit }: BrainHistoryProps) => {
             run.startedAt && run.completedAt
               ? formatDuration(run.startedAt, run.completedAt)
               : run.status === STATUS.RUNNING
-              ? 'Running...'
-              : 'N/A';
+                ? 'Running...'
+                : 'N/A';
 
           return (
             <Box key={run.brainRunId}>

@@ -37,7 +37,7 @@ export type PluginCreateReturn = {
 export interface PluginDefinition<
   TName extends string,
   TConfig,
-  TCreate extends PluginCreateReturn
+  TCreate extends PluginCreateReturn,
 > {
   name: TName;
   setup?: (config: TConfig) => TConfig;
@@ -65,7 +65,7 @@ export type PluginInjection<TCreate extends PluginCreateReturn> = Omit<
 export interface ConfiguredPlugin<
   TName extends string = string,
   TConfig = any,
-  TCreate extends PluginCreateReturn = PluginCreateReturn
+  TCreate extends PluginCreateReturn = PluginCreateReturn,
 > {
   readonly __plugin: PluginDefinition<TName, TConfig, TCreate>;
   readonly __config: TConfig;
@@ -100,7 +100,7 @@ export type PluginsFromArray<T extends readonly ConfiguredPlugin[]> =
 export interface ConfiguredPluginWithSetup<
   TName extends string,
   TConfig,
-  TCreate extends PluginCreateReturn
+  TCreate extends PluginCreateReturn,
 > extends ConfiguredPlugin<TName, TConfig, TCreate> {
   setup(config: TConfig): ConfiguredPlugin<TName, TConfig, TCreate>;
 }

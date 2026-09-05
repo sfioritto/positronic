@@ -17,7 +17,7 @@ import type {
 export function definePlugin<
   TName extends string,
   TConfig,
-  TCreate extends PluginCreateReturn
+  TCreate extends PluginCreateReturn,
 >(
   definition: PluginDefinition<TName, TConfig, TCreate> & {
     setup: (config: TConfig) => TConfig;
@@ -34,7 +34,7 @@ export function definePlugin<
  */
 export function definePlugin<
   TName extends string,
-  TCreate extends PluginCreateReturn
+  TCreate extends PluginCreateReturn,
 >(
   definition: PluginDefinition<TName, undefined, TCreate> & { setup?: never }
 ): ConfiguredPlugin<TName, undefined, TCreate>;

@@ -68,7 +68,7 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 export class BrainEventStream<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
-  TPlugins extends object = object
+  TPlugins extends object = object,
 > {
   private currentState: TState;
   private steps: Step[];

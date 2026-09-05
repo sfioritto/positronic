@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "printWidth": 80,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "packages/template-new-project",
+    "packages/cli/.test-cache",
+    // oxfmt 0.66 rewrites `**bold with * inside**` into broken emphasis and
+    // reflows code fences differently from Prettier. Markdown stays unformatted.
+    "**/*.md"
+  ]
+}

@@ -18,7 +18,7 @@ export type StepAction<
   TPlugins extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
   TResponseOut extends JsonObject | undefined = undefined,
-  TPageIn extends GeneratedPage | undefined = undefined
+  TPageIn extends GeneratedPage | undefined = undefined,
 > = (
   params: {
     state: TStateIn;
@@ -42,7 +42,7 @@ export type StepBlock<
   TOptions extends JsonObject = JsonObject,
   TPlugins extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TPageIn extends GeneratedPage | undefined = undefined
+  TPageIn extends GeneratedPage | undefined = undefined,
 > = {
   type: 'step';
   title: string;
@@ -67,7 +67,7 @@ export type WaitBlock<
   TState,
   TOptions extends JsonObject = JsonObject,
   TPlugins extends object = object,
-  TPage extends GeneratedPage | undefined = undefined
+  TPage extends GeneratedPage | undefined = undefined,
 > = {
   type: 'wait';
   title: string;
@@ -169,7 +169,7 @@ export type Block<
   TOptions extends JsonObject = JsonObject,
   TPlugins extends object = object,
   TResponseIn extends JsonObject | undefined = undefined,
-  TPageIn extends GeneratedPage | undefined = undefined
+  TPageIn extends GeneratedPage | undefined = undefined,
 > =
   | StepBlock<TStateIn, TStateOut, TOptions, TPlugins, TResponseIn, TPageIn>
   | BrainBlock

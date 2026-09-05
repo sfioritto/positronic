@@ -9,7 +9,10 @@ export class Step {
   private patch?: JsonPatch;
   private status: (typeof STATUS)[keyof typeof STATUS] = STATUS.PENDING;
 
-  constructor(public block: Block<any, any, any, any, any, any>, id?: string) {
+  constructor(
+    public block: Block<any, any, any, any, any, any>,
+    id?: string
+  ) {
     this.id = id || uuidv4();
   }
 

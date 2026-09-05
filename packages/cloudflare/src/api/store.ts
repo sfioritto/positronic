@@ -10,7 +10,7 @@ const store = new Hono<{ Bindings: Bindings }>();
  */
 function scopeUserName(context: Context): string | null {
   const auth = context.get('auth');
-  return auth?.isRoot ? null : auth?.userName ?? null;
+  return auth?.isRoot ? null : (auth?.userName ?? null);
 }
 
 /**

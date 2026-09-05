@@ -17,7 +17,7 @@ describe('Brain withOptions', () => {
 
   // Helper to collect all events
   async function collectAllEvents<
-    T extends Record<string, any> = Record<string, any>
+    T extends Record<string, any> = Record<string, any>,
   >(generator: AsyncGenerator<BrainEvent<T>>): Promise<BrainEvent<T>[]> {
     const events: BrainEvent<T>[] = [];
     for await (const event of generator) {

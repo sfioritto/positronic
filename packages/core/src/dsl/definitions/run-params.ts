@@ -46,15 +46,17 @@ export interface BaseRunParams<TOptions extends JsonObject = JsonObject> {
   pluginConfigs?: ConfiguredPlugin[];
 }
 
-export interface InitialRunParams<TOptions extends JsonObject = JsonObject>
-  extends BaseRunParams<TOptions> {
+export interface InitialRunParams<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseRunParams<TOptions> {
   initialState?: State;
   resume?: never;
   brainRunId?: string;
 }
 
-export interface ResumeRunParams<TOptions extends JsonObject = JsonObject>
-  extends BaseRunParams<TOptions> {
+export interface ResumeRunParams<
+  TOptions extends JsonObject = JsonObject,
+> extends BaseRunParams<TOptions> {
   resume: ResumeParams;
   brainRunId: string;
 }

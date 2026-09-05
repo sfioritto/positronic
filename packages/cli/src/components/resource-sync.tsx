@@ -136,8 +136,8 @@ export const ResourceSync = ({
                 {currentAction === 'uploading'
                   ? '⬆️  Uploading'
                   : currentAction === 'deleting'
-                  ? '🗑️  Deleting'
-                  : '🔍 Checking'}{' '}
+                    ? '🗑️  Deleting'
+                    : '🔍 Checking'}{' '}
                 {currentFile}...
               </Text>
             </Box>

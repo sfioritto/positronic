@@ -470,7 +470,7 @@ describe('Custom HTML pages (.page() with html)', () => {
   it('should throw when neither prompt nor html is provided', async () => {
     const testBrain = brain('Missing Config Test').page(
       'Bad',
-      () => ({} as any)
+      () => ({}) as any
     );
 
     await expect(async () => {
@@ -492,7 +492,7 @@ describe('Custom HTML pages (.page() with html)', () => {
         ({
           prompt: 'Generate a page',
           html: node('div', {}, 'content'),
-        } as any)
+        }) as any
     );
 
     await expect(async () => {

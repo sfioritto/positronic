@@ -14,7 +14,7 @@ Positronic is an AI-powered framework for building and running "brains" - statef
 - `npm test` - Run all tests silently (including cloudflare tests)
 - `npm run test:noisy` - Run tests with console output (shows console.error, console.log, etc.)
 - `npm run test:all` - Run all tests including cloudflare tests (requires API keys)
-- `npm run format` - Format code with Prettier.
+- `npm run format` - Format code with oxfmt (config in `.oxfmtrc.json`; Markdown is excluded).
 - `npm run lint` - Lint all packages with oxlint. `npm run dev` runs it after the tests.
 - `npm run typecheck` - Run TypeScript type checking for all code, tests, and the cloudflare test-project
 

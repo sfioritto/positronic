@@ -232,9 +232,8 @@ describe('Resources API', () => {
 
     it('should handle ambiguous paths in loadText/loadBinary methods', async () => {
       // Should work with full path
-      const jsonContent = await ambiguousResources.loadText(
-        'nested/config.json'
-      );
+      const jsonContent =
+        await ambiguousResources.loadText('nested/config.json');
       expect(jsonContent).toBe('{"config": "json"}');
 
       // Should throw error for ambiguous path without extension

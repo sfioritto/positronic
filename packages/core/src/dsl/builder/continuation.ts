@@ -6,7 +6,7 @@ export class Continuation<
   TOptions extends JsonObject,
   TState extends State,
   TPlugins extends object,
-  TResponse
+  TResponse,
 > {
   constructor(
     private addBlock: (block: Block<any, any, any, any, any, any>) => void,

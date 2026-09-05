@@ -259,7 +259,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const content =
       signal.type === 'WEBHOOK_RESPONSE' && signal.response
         ? JSON.stringify(signal.response)
-        : signal.content ?? null;
+        : (signal.content ?? null);
 
     const queuedAt = Date.now();
     this.sql.exec(

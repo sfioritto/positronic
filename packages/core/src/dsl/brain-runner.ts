@@ -152,7 +152,7 @@ export class BrainRunner {
    */
   private async execute<
     TOptions extends JsonObject = {},
-    TState extends State = {}
+    TState extends State = {},
   >(
     brain: Brain<TOptions, TState, any>,
     params: {

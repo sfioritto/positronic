@@ -24,8 +24,8 @@ export type InferStoreTypes<T extends StoreSchema> = {
   [K in keyof T]: T[K] extends PerUserField<infer V>
     ? z.infer<V>
     : T[K] extends z.ZodType
-    ? z.infer<T[K]>
-    : never;
+      ? z.infer<T[K]>
+      : never;
 };
 
 /**

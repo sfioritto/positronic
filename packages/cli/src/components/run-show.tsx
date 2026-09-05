@@ -57,8 +57,8 @@ export const RunShow = ({ runId }: RunShowProps) => {
     data.startedAt && data.completedAt
       ? formatDuration(data.startedAt, data.completedAt)
       : data.status === STATUS.RUNNING
-      ? 'Running...'
-      : 'N/A';
+        ? 'Running...'
+        : 'N/A';
 
   return (
     <Box flexDirection="column" gap={1}>

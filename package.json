@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "format": "prettier --write .",
+    "format": "oxfmt",
     "lint": "oxlint",
     "test:noisy": "vitest run",
     "test": "vitest run --silent",
@@ -28,6 +28,7 @@
     "@types/node": "^20.11.17",
     "@vitest/coverage-v8": "^4.1.11",
     "nodemon": "^3.1.10",
+    "oxfmt": "^0.66.0",
     "oxlint": "^1.81.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
@@ -42,12 +43,6 @@
     "packages/cli",
     "packages/mem0"
   ],
-  "prettier": {
-    "semi": true,
-    "singleQuote": true,
-    "tabWidth": 2,
-    "trailingComma": "es5"
-  },
   "allowScripts": {
     "fsevents": true,
     "dtrace-provider": false

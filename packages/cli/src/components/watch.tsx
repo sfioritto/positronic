@@ -518,8 +518,8 @@ export const Watch = ({
       const pauseResumePart = isPaused
         ? ' | r resume'
         : !isComplete
-        ? ' | p pause'
-        : '';
+          ? ' | p pause'
+          : '';
       return `s state | e events | a agents${pauseResumePart}${msgPart} | x kill | esc quit`;
     }
   };

@@ -310,8 +310,8 @@ export const consoleLog = createTool({
       level === 'error'
         ? console.error
         : level === 'warn'
-        ? console.warn
-        : console.log;
+          ? console.warn
+          : console.log;
     logFn(`[Debug] ${message}`);
     return { logged: true };
   },

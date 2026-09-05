@@ -1157,8 +1157,8 @@ describe('Hono API Tests', () => {
             const eventList: BrainEvent[] = Array.isArray(parsed)
               ? parsed
               : parsed
-              ? [parsed]
-              : [];
+                ? [parsed]
+                : [];
             for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
@@ -1354,8 +1354,8 @@ describe('Hono API Tests', () => {
             const eventList: BrainEvent[] = Array.isArray(parsed)
               ? parsed
               : parsed
-              ? [parsed]
-              : [];
+                ? [parsed]
+                : [];
             for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {
@@ -1532,8 +1532,8 @@ describe('Hono API Tests', () => {
             const eventList: BrainEvent[] = Array.isArray(parsed)
               ? parsed
               : parsed
-              ? [parsed]
-              : [];
+                ? [parsed]
+                : [];
             for (const event of eventList) {
               events.push(event);
               if (event.type === BRAIN_EVENTS.WEBHOOK) {

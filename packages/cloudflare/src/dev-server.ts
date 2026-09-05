@@ -16,7 +16,10 @@ class ProcessServerHandle implements ServerHandle {
   private errorCallbacks: Array<(error: Error) => void> = [];
   private _killed = false;
 
-  constructor(private process: ChildProcess, private port?: number) {
+  constructor(
+    private process: ChildProcess,
+    private port?: number
+  ) {
     // Forward process events to registered callbacks
     process.on('close', (code) => {
       this.closeCallbacks.forEach((cb) => cb(code));
@@ -412,9 +415,9 @@ export class CloudflareDevServer implements PositronicDevServer {
   private hasCompleteR2Credentials(env: Record<string, string>): boolean {
     return Boolean(
       env.R2_ACCESS_KEY_ID?.trim() &&
-        env.R2_SECRET_ACCESS_KEY?.trim() &&
-        env.R2_ACCOUNT_ID?.trim() &&
-        env.R2_BUCKET_NAME?.trim()
+      env.R2_SECRET_ACCESS_KEY?.trim() &&
+      env.R2_ACCOUNT_ID?.trim() &&
+      env.R2_BUCKET_NAME?.trim()
     );
   }
 

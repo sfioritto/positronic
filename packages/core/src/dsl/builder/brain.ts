@@ -84,7 +84,7 @@ function resolvePlugins(
 export class Brain<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
-  TPlugins extends object = object
+  TPlugins extends object = object,
 > {
   declare readonly __optionsType: TOptions;
   private blocks: Block<any, any, TOptions, TPlugins, any, any>[] = [];
@@ -271,7 +271,7 @@ export class Brain<
   wait<
     TWaitFor extends
       | WebhookRegistration<any>
-      | readonly WebhookRegistration<any>[]
+      | readonly WebhookRegistration<any>[],
   >(
     title: string,
     action: (
@@ -316,7 +316,7 @@ export class Brain<
   brain<
     TInnerOptions extends JsonObject,
     TInnerState extends State,
-    TNewState extends State = TState & TInnerState
+    TNewState extends State = TState & TInnerState,
   >(
     title: string,
     innerBrain: Brain<TInnerOptions, TInnerState, any>,
@@ -345,7 +345,7 @@ export class Brain<
 
   prompt<
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TSchema>
+    TNewState extends State = TState & z.infer<TSchema>,
   >(
     title: string,
     configFn: (
@@ -369,7 +369,7 @@ export class Brain<
     TStateKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & {
       [K in TStateKey]: IterateResult<TItems[number], TInnerState>;
-    }
+    },
   >(
     title: string,
     stateKey: TStateKey & (string extends TStateKey ? never : unknown),
@@ -389,7 +389,7 @@ export class Brain<
     TStateKey extends string & { readonly brand?: unique symbol },
     TNewState extends State = TState & {
       [K in TStateKey]: IterateResult<TItems[number], z.infer<TSchema>>;
-    }
+    },
   >(
     title: string,
     stateKey: TStateKey & (string extends TStateKey ? never : unknown),
@@ -433,7 +433,7 @@ export class Brain<
   // Overload 1: With formSchema - auto-merges response onto state
   page<
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TSchema>
+    TNewState extends State = TState & z.infer<TSchema>,
   >(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
@@ -461,7 +461,7 @@ export class Brain<
   // Overload 3: Custom HTML with formSchema
   page<
     TSchema extends z.ZodObject<any>,
-    TNewState extends State = TState & z.infer<TSchema>
+    TNewState extends State = TState & z.infer<TSchema>,
   >(
     title: string,
     configFn: (context: StepContext<TState, TOptions> & TPlugins) => {
@@ -517,7 +517,7 @@ export class Brain<
     const brainRunId =
       'resume' in params && params.resume
         ? params.brainRunId
-        : (params as InitialRunParams<TOptions>).brainRunId ?? '';
+        : ((params as InitialRunParams<TOptions>).brainRunId ?? '');
 
     // Platform services
     const files = params.files;
@@ -631,14 +631,14 @@ function registerBrainName(title: string): void {
 // Overload 1: Builder pattern with title only
 export function brain<
   TOptions extends JsonObject = JsonObject,
-  TState extends State = object
+  TState extends State = object,
 >(title: string): Brain<TOptions, TState, object>;
 
 // Overload 2: Config object with optional plugins
 export function brain<
   TOptions extends JsonObject = JsonObject,
   TState extends State = object,
-  TPluginMap extends Record<string, ConfiguredPlugin> = {}
+  TPluginMap extends Record<string, ConfiguredPlugin> = {},
 >(config: {
   title: string;
   description?: string;

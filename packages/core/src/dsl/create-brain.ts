@@ -9,7 +9,7 @@ import type { ConfiguredPlugin, PluginsFromArray } from '../plugins/types.js';
  */
 export interface CreateBrainConfig<
   TPlugins extends readonly ConfiguredPlugin[] = readonly ConfiguredPlugin[],
-  TComponents extends Record<string, UIComponent<any>> = {}
+  TComponents extends Record<string, UIComponent<any>> = {},
 > {
   /** Plugins available to all brains */
   plugins?: TPlugins;
@@ -37,20 +37,20 @@ export interface CreateBrainConfig<
  */
 export function createBrain<
   const TPlugins extends readonly ConfiguredPlugin[] = readonly [],
-  TComponents extends Record<string, UIComponent<any>> = {}
+  TComponents extends Record<string, UIComponent<any>> = {},
 >(config: { plugins?: TPlugins; components?: TComponents }) {
   const { plugins, components } = config;
 
   // Overload 1: Builder pattern with title string
   function brain<
     TOptions extends JsonObject = {},
-    TState extends State = object
+    TState extends State = object,
   >(title: string): Brain<TOptions, TState, PluginsFromArray<TPlugins>>;
 
   // Overload 2: Builder pattern with config object
   function brain<
     TOptions extends JsonObject = {},
-    TState extends State = object
+    TState extends State = object,
   >(config: {
     title: string;
     description?: string;

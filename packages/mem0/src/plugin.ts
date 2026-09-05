@@ -76,7 +76,7 @@ function createMem0Provider(config: Mem0ApiConfig): MemoryProvider {
       const raw = await response.json();
       const results: Mem0SearchResult[] = Array.isArray(raw)
         ? raw
-        : raw.memories ?? [];
+        : (raw.memories ?? []);
       return results.map((result) => ({
         id: result.id,
         content: result.memory,

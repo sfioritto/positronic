@@ -261,8 +261,8 @@ export class TestDevServer implements PositronicDevServer {
       let bodyString = Buffer.isBuffer(requestBody)
         ? requestBody.toString('latin1')
         : typeof requestBody === 'string'
-        ? requestBody
-        : JSON.stringify(requestBody);
+          ? requestBody
+          : JSON.stringify(requestBody);
 
       // Check if the body string appears to be hex-encoded (all characters are hex)
       const isHexEncoded = /^[0-9a-fA-F]+$/.test(bodyString);

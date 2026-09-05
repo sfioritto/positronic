@@ -232,7 +232,7 @@ export interface TestRunResult<TState extends State = State> {
  */
 export async function runBrainTest<
   TOptions extends object = {},
-  TState extends State = {}
+  TState extends State = {},
 >(
   brain: Brain<TOptions, TState, any>,
   options: TestRunnerOptions<TState> & { brainOptions?: TOptions } = {}

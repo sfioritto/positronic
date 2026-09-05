@@ -89,8 +89,8 @@ export const AuthLogin = ({
       forProject && currentProject
         ? `project "${currentProject.name}"`
         : isDevMode
-        ? 'local project'
-        : 'global';
+          ? 'local project'
+          : 'global';
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
@@ -175,8 +175,8 @@ export const AuthLogin = ({
       forProject && currentProject
         ? ` for project "${currentProject.name}"`
         : isDevMode
-        ? ' (local project)'
-        : ' (global)';
+          ? ' (local project)'
+          : ' (global)';
 
     return (
       <SelectList
@@ -194,8 +194,8 @@ export const AuthLogin = ({
       forProject && currentProject
         ? `project "${currentProject.name}"`
         : isDevMode
-        ? 'local project'
-        : 'global';
+          ? 'local project'
+          : 'global';
 
     return (
       <Box flexDirection="column" paddingTop={1} paddingBottom={1}>
