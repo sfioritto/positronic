@@ -1,9 +1,9 @@
 # Modernization step 6: oxlint
 
-**Status:** shipped (oxfmt follow-up in progress)
+**Status:** shipped
 **Started:** 2026-09-05
 **Shipped:** 2026-09-05
-**Commits:** 9a123311 (useConfirm split), 15412016 (phantom type parameters), 62592fec (oxlint and the sweep)
+**Commits:** 9a123311 (useConfirm split), 15412016 (phantom type parameters), 62592fec (oxlint and the sweep), e96e06f0 (oxfmt)
 
 ## Goal
 
@@ -33,6 +33,14 @@ Sixth step of the modernization plan. Add oxlint with a `lint` script, enforce u
 
 **Small removals that changed no behaviour.** `hasRootKey` on the `listExcludesRootKey` spec contract (its one caller in the cloudflare test-project dropped the argument); the `setMockToolResponse` setter in the test-project runner, which nothing called and whose variable nothing read; a `try { ... } catch (error) { throw error }` in the test dev server; `const self = this` aliases in `brain.ts` and the test dev server where the closures were already arrows or could be; `if (true) { throw }` in an error test replaced by an explicit return type on the throwing step; `new Array(n).fill(null)` became `Array.from({ length: n }, () => null)`.
 
+### 2026-09-05 — oxfmt replaces Prettier
+
+Sean chose oxfmt over Prettier 3.9 to stay in the oxc toolchain. `oxfmt --migrate=prettier` read the `prettier` key in the root package.json and `.prettierignore` and wrote `.oxfmtrc.json`; the one thing it had to decide was `printWidth`, which Prettier defaulted to 80 and oxfmt to 100, and it kept 80. The `format` script and the PostToolUse hook now call `oxfmt`; the `prettier` key and `.prettierignore` are gone. The 2.8.8 Prettier that was formatting this repo was never a declared dependency, only the copy `@changesets/cli` pulls in.
+
+The reformat touched 33 code files, all Prettier 3 style: a trailing comma after the last type parameter, nested ternaries indented one level deeper, and trailing commas in `wrangler.jsonc` (Wrangler parses JSONC leniently; the cloudflare suite ran against the reformatted file). An earlier measurement of 261 files was with oxfmt's default printWidth of 100, which is why the migrated config matters.
+
+Markdown is excluded. oxfmt 0.66 turned `**Naming: Template*, not Prompt*.**` in `ideas.md` into `_*Naming: Template*, not Prompt_.**`, which is not the same document, and it also reflows code fences differently from Prettier (`tools: { /* ... */ }` collapsed onto one line, multi-line union types joined). It would also have stripped the blank lines changesets writes into every CHANGELOG, so each release would re-dirty five files. `**/*.md` is in `ignorePatterns` with a comment saying why; revisit when oxfmt's Markdown support settles.
+
 ## Learnings
 
 - oxlint ignores a rule whose plugin is not in `plugins`, without a warning. `react/rules-of-hooks` in `rules` alone does nothing.
@@ -43,7 +51,8 @@ Sixth step of the modernization plan. Add oxlint with a `lint` script, enforce u
 - `vi.fn()` with no implementation is `Mock<(...args: any[]) => any>`. Using it where a typed mock was is a silent loss of type coverage in the code the mock is injected into.
 - zsh does not word-split `$VAR`; `git checkout -- $FILES` with a newline-separated list is one bad pathspec. Pipe through `xargs`.
 - `git diff` in this checkout runs difftastic; use `git --no-pager diff --no-ext-diff` for a unified diff a script or reviewer can read.
-- Prettier is not a declared dependency of this repo. The `prettier` binary `npx` finds is the 2.8.8 that `@changesets/cli` pulls in. Whatever the formatter decision is, it should be a real devDependency.
+- Prettier was never a declared dependency of this repo. The `prettier` binary `npx` found was the 2.8.8 that `@changesets/cli` pulls in.
+- `oxfmt --migrate=prettier` reads the package.json `prettier` key and `.prettierignore`. Its Markdown formatter (0.66) has an emphasis bug; keep `**/*.md` ignored until that is fixed.
 
 ## Dead ends
 
@@ -72,4 +81,4 @@ Taken: lint moved to the end of `npm run dev` so a lint error never hides the te
 
 ## Solution
 
-oxlint 1.81 with one config file: default plugins plus react, `correctness` at error, `no-unused-vars` with `args: after-used` in source and `args: none` in tests, `react/rules-of-hooks`, the React Compiler rules off with their 31 sites recorded above. `npm run lint`, also the last step of `npm run dev`. The sweep fixed 190 findings; the two that were real bugs in waiting were a conditional hook call in `useConfirm` (now two hooks) and phantom type parameters on `BrainBlock` and `GuardBlock` (gone). Formatter decision open for Sean: Prettier 3.9 declared as a devDependency is the recommendation.
+oxlint 1.81 with one config file: default plugins plus react, `correctness` at error, `no-unused-vars` with `args: after-used` in source and `args: none` in tests, `react/rules-of-hooks`, the React Compiler rules off with their 31 sites recorded above. `npm run lint`, also the last step of `npm run dev`. The sweep fixed 190 findings; the two that were real bugs in waiting were a conditional hook call in `useConfirm` (now two hooks) and phantom type parameters on `BrainBlock` and `GuardBlock` (gone). The formatter is oxfmt with the migrated Prettier settings, Markdown excluded.
