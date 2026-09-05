@@ -34,7 +34,7 @@
     "@positronic/template-new-project": "^0.0.79",
     "aws4fetch": "^1.0.18",
     "croner": "^10.0.1",
-    "dotenv": "^16.0.3",
+    "dotenv": "^17.4.2",
     "fflate": "^0.8.2",
     "fuse.js": "^7.1.0",
     "hono": "^4.2.3",

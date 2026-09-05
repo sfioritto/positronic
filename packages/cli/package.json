@@ -25,7 +25,7 @@
     "@positronic/spec": "^0.0.79",
     "@positronic/template-new-project": "^0.0.79",
     "chokidar": "^3.6.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.4.2",
     "eventsource": "^3.0.6",
     "ink": "^7.1.1",
     "ink-text-input": "^6.0.0",
