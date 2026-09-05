@@ -7,3 +7,4 @@ coverage/
 # Test Cache
 .test-cache/
 .npmrc
+.claude/worktrees/
