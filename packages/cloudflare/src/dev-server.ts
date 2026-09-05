@@ -270,11 +270,6 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     // Build and upload component bundle
     await this.buildAndUploadBundle(projectRoot);
-
-    // Write origin URL to local R2 for dev server
-    await this.writeOriginToR2(projectRoot, 'http://localhost:8787', {
-      local: true,
-    });
   }
 
   private async ensureServerDirectory(
@@ -638,6 +633,14 @@ export class CloudflareDevServer implements PositronicDevServer {
     // Always specify a port - use 8787 as default if not provided
     const serverPort = port || 8787;
     wranglerArgs.push('--port', String(serverPort));
+
+    // Pages and webhooks build public URLs from the origin stored in R2,
+    // so it has to match the port wrangler is about to listen on.
+    await this.writeOriginToR2(
+      this.projectRootDir,
+      `http://localhost:${serverPort}`,
+      { local: true }
+    );
 
     const wranglerProcess = spawn('npx', ['wrangler', ...wranglerArgs], {
       cwd: serverDir,
