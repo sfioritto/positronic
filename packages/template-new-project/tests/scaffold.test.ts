@@ -79,6 +79,7 @@ describe('scaffoldProject', () => {
       'esbuild.config.mjs',
       'package.json',
       'src',
+      'styles.css',
       'tsconfig.json',
       'wrangler.jsonc',
     ]);

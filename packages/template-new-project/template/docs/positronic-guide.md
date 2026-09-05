@@ -14,7 +14,7 @@ A typical Positronic project has the following structure:
 │   ├── runner.ts        # Local runner for development
 │   ├── services/        # Service implementations
 │   ├── utils/           # Shared utilities
-│   └── components/      # Reusable UI/prompt components
+│   └── components/      # Component catalog for generated pages
 ├── resources/       # Files accessible to brains
 ├── tests/           # Test files
 ├── docs/            # Documentation

@@ -1,26 +1,32 @@
 /**
- * UI Components for this project.
+ * The component catalog for generated pages.
  *
- * This file re-exports the default Positronic components and is the place
- * to add your own custom components.
+ * This is what the page generator can place: shadcn/ui components from
+ * `@positronic/gen-ui-components` plus anything you add here. Each
+ * definition is a Zod props schema and a description the model reads.
+ * The React implementation for each one lives in ./browser.ts.
  *
- * To add a custom component:
- * 1. Create a component file (e.g., CustomButton.ts) with UIComponent structure
- * 2. Import and add it to the components object below
+ * To add a component:
  *
- * @example
  * ```typescript
- * import { CustomButton } from './CustomButton.js';
+ * import { z } from 'zod';
  *
- * export const components = {
- *   ...defaultComponents,
- *   CustomButton,
- * };
+ * export const catalog = definePageCatalog({
+ *   components: {
+ *     ...definitions,
+ *     PriceTag: {
+ *       props: z.object({ amount: z.number(), currency: z.string() }),
+ *       description: 'A formatted price. Use for money.',
+ *     },
+ *   },
+ *   actions,
+ * });
  * ```
+ *
+ * This file is imported by both the brain (server) and the page bundle
+ * (browser), so keep it free of React and Node-only imports.
  */
-import { components as defaultComponents } from '@positronic/gen-ui-components';
+import { definePageCatalog } from '@positronic/core/page';
+import { definitions, actions } from '@positronic/gen-ui-components/catalog';
 
-// Re-export default components - add your custom components here
-export const components = {
-  ...defaultComponents,
-};
+export const catalog = definePageCatalog({ components: definitions, actions });

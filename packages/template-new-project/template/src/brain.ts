@@ -1,8 +1,8 @@
 import { createBrain } from '@positronic/core';
-import { components } from './components/index.js';
+import { catalog } from './components/index.js';
 
 /**
- * Project-level brain function with pre-configured components.
+ * Project-level brain function with the page component catalog configured.
  *
  * All brains in your project should import from this file:
  *
@@ -42,12 +42,12 @@ import { components } from './components/index.js';
  *
  * ```typescript
  * import { createBrain } from '@positronic/core';
- * import { components } from './components/index.js';
+ * import { catalog } from './components/index.js';
  * import { mem0 } from '@positronic/mem0';
  *
  * export const brain = createBrain({
  *   plugins: [mem0.setup({ apiKey: process.env.MEM0_API_KEY! })],
- *   components,
+ *   catalog,
  * });
  * ```
  *
@@ -69,5 +69,5 @@ import { components } from './components/index.js';
  * ```
  */
 export const brain = createBrain({
-  components,
+  catalog,
 });

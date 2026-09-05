@@ -1,23 +1,13 @@
 /**
- * Bundle entry point for client-side rendering.
+ * Browser entry for generated pages.
  *
- * This file is bundled by esbuild into .positronic/dist/components.js which exposes
- * React components to window.PositronicComponents for use by generated pages.
- *
- * When you add custom components to components/index.ts, they will automatically
- * be included in the bundle.
+ * The dev server bundles this file (with React inside) into
+ * .positronic/dist/components.js and uploads it to R2, where pages load it
+ * as /bundle/components.js. Run `npm run build:components` to build it by
+ * hand.
  */
-import { components } from './components/index.js';
+import { mount } from '@positronic/gen-ui-components';
+import { catalog } from '../src/components/index.js';
+import { pageComponents } from '../src/components/browser.js';
 
-// Extract the React component from each UIComponent and expose to window
-const PositronicComponents: Record<string, React.ComponentType<any>> = {};
-
-for (const [name, uiComponent] of Object.entries(components)) {
-  PositronicComponents[name] = uiComponent.component;
-}
-
-// Expose to window for client-side rendering
-(window as unknown as { PositronicComponents: typeof PositronicComponents }).PositronicComponents =
-  PositronicComponents;
-
-export { PositronicComponents };
+mount(document.getElementById('root')!, { catalog, components: pageComponents });

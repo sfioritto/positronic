@@ -574,55 +574,40 @@ brain('Tool Brain')
 
 Tools are explicit on each `.prompt()` — there's no global tool registration.
 
-### Component Configuration with `withComponents()`
+### Component Catalog with `withCatalog()`
 
-The `withComponents()` method registers custom UI components for use in `.page()` steps:
+Generated pages are built from a catalog of components. The project's catalog lives in `src/components/index.ts` and is passed to `createBrain` in `src/brain.ts`, so every brain has it. `withCatalog()` swaps in a different catalog for one brain:
 
 ```typescript
-const brainWithComponents = brain('Custom UI Brain')
-  .withComponents({
-    CustomCard: {
-      description: 'A styled card component for displaying content',
+import { definePageCatalog } from '@positronic/core/page';
+import { definitions, actions } from '@positronic/gen-ui-components/catalog';
+import { z } from 'zod';
+
+const dashboardCatalog = definePageCatalog({
+  components: {
+    ...definitions,
+    Metric: {
       props: z.object({
-        title: z.string(),
-        content: z.string(),
-        variant: z.enum(['default', 'highlighted', 'warning']).default('default')
+        label: z.string(),
+        value: z.string(),
+        trend: z.enum(['up', 'down', 'flat']).nullable(),
       }),
-      render: (props) => `
-        <div class="card card-${props.variant}">
-          <h3>${props.title}</h3>
-          <p>${props.content}</p>
-        </div>
-      `
+      description: 'A single headline number with a label and trend arrow.',
     },
-    DataTable: {
-      description: 'A table for displaying structured data',
-      props: z.object({
-        headers: z.array(z.string()),
-        rows: z.array(z.array(z.string()))
-      }),
-      render: (props) => {
-        // Build table HTML from headers and rows
-        const headerRow = props.headers.map(h => '<th>' + h + '</th>').join('');
-        const bodyRows = props.rows.map(row =>
-          '<tr>' + row.map(cell => '<td>' + cell + '</td>').join('') + '</tr>'
-        ).join('');
-        return '<table><thead><tr>' + headerRow + '</tr></thead><tbody>' + bodyRows + '</tbody></table>';
-      }
-    }
-  })
+  },
+  actions,
+});
+
+const dashboardBrain = brain('Dashboard Brain')
+  .withCatalog(dashboardCatalog)
   .page('Dashboard', ({ state }) => ({
-    prompt: `
-      Create a dashboard using CustomCard components to display:
-      - User name: ${state.userName}
-      - Account status: ${state.status}
-      Use DataTable to show recent activity.
-    `,
-    formSchema: z.object({
-      acknowledged: z.boolean()
-    }),
+    prompt: 'Show each metric as a Metric card, then an acknowledgement checkbox.',
+    props: { metrics: state.metrics },
+    formSchema: z.object({ acknowledged: z.boolean() }),
   }));
 ```
+
+A definition is a Zod props schema plus a description the model reads; the React implementation for each component is registered in `src/components/browser.ts` and bundled for the browser. The default `definitions` are shadcn/ui components (Card, Stack, Grid, Heading, Text, Badge, Alert, Table, Input, Textarea, Select, Checkbox, Radio, Switch, Button, Link) plus `MultiTextInput`.
 
 ### Typed Store with `withStore()`
 
@@ -728,29 +713,15 @@ For project-wide configuration, use `createBrain()` in your `src/brain.ts` file:
 import { createBrain } from '@positronic/core';
 import { z } from 'zod';
 
+import { catalog } from './components/index.js';
+
 export const brain = createBrain({
   plugins: [logger, api],
-  tools: {
-    search: {
-      description: 'Search the web',
-      inputSchema: z.object({ query: z.string() }),
-      execute: async ({ query }) => searchWeb(query)
-    }
-  },
-  components: {
-    Alert: {
-      description: 'Alert banner',
-      props: z.object({ message: z.string(), type: z.enum(['info', 'warning', 'error']) }),
-      render: (props) => `<div class="alert alert-${props.type}">${props.message}</div>`
-    }
-  },
-  store: {
-    processedCount: z.number(),
-  }
+  catalog,
 });
 ```
 
-All brains created with this factory will have access to the configured plugins, tools, components, and store.
+All brains created with this factory will have access to the configured plugins and the page component catalog.
 
 #### Typing Initial State and Options
 
@@ -1675,7 +1646,7 @@ brain('Feedback Collector')
 ### How Page Steps Work
 
 1. **Prompt**: The `prompt` value describes the desired UI
-2. **AI Generation**: The AI creates a component tree based on the prompt
+2. **AI Generation**: The AI lays out components from the catalog, bound to the data in `props`
 3. **onCreated**: The optional `onCreated` callback runs with a `page` object containing `url` and `webhook`. Use it to notify users (Slack, email, etc.)
 4. **Auto-Suspend**: The brain automatically suspends and waits for the form submission
 5. **Auto-Spread**: The form data is automatically spread onto state (`{ ...state, ...formData }`)
@@ -1710,24 +1681,27 @@ Be specific about layout and content:
 }))
 ```
 
-### Data Bindings
+### Displaying Data with `props`
 
-Use `{{path}}` syntax to bind props to runtime data:
+Pass the data the page should show in `props`. The page generator sees only the shape of `props` (field names and types), never the values, and binds the page to it; the real values are filled in when the page renders. Refer to the fields by name in the prompt:
 
 ```typescript
 .page('Order Summary', ({ state }) => ({
   prompt: `
     Create an order summary showing:
-    - List of items from {{cart.items}}
-    - Total: {{cart.total}}
+    - Each item in cart.items with its name and price
+    - The total from cart.total
     - Shipping address input
     - Confirm button
   `,
+  props: { cart: state.cart },
   formSchema: z.object({
     shippingAddress: z.string(),
   }),
 }))
 ```
+
+Lists in `props` render one row per item. To let the user pick some of them, ask for a checkbox per item and give the form field an array type (`z.array(z.string())`); the selected items' ids arrive on state as an array.
 
 ### Multi-Step Forms
 

@@ -45,7 +45,7 @@ The project uses npm workspaces with the following packages:
 - **`/packages/spec`** - Interface specifications, notably `PositronicDevServer` for backend implementations
 - **`/packages/cloudflare`** - Cloudflare Workers backend with Durable Objects and R2 storage
 - **`/packages/client-vercel`** - Vercel client integration
-- **`/packages/gen-ui-components`** - AI-generated UI component library for dynamic form generation
+- **`/packages/gen-ui-components`** - Component catalog (shadcn/ui via json-render) and browser runtime for generated pages
 - **`/packages/template-new-project`** - Project scaffolding template
 
 ### Key Patterns
@@ -79,6 +79,10 @@ Templates in `.prompt()`, `.page()`, and `.map()` steps can return JSX (`Templat
 - **Monorepo JSX settings**: Each package's tsconfig owns its JSX settings. Core's source has no JSX; `packages/core/tests/tsconfig.json` sets `jsxImportSource` to `@positronic/core` (with a `paths` entry so typechecking sees the source runtime), so core tests can use JSX in `.test.tsx` files (see `packages/core/tests/jsx-syntax.test.tsx`). `packages/cli` and `packages/gen-ui-components` use React.
 - **Generated projects**: Use `jsxImportSource: "@positronic/core"` in their tsconfig
 - **Whitespace preservation**: `.positronic/build-brains.mjs` in generated projects — esbuild plugin (inlined) that preserves JSX text whitespace. Runs via wrangler's `build.command`. Without it, the JSX compiler collapses newlines in text to spaces.
+
+### Generated Pages
+
+`.page({ prompt })` and the `generatePage` tool build a json-render spec (`packages/core/src/page/`): `pageSchema` owns the spec shape and system prompt, `generateSpec()` runs generate/validate/repair, `checkFormSchema()` checks `/form/*` bindings against the step's form schema, and `generatePageHtml()` embeds the spec as `window.__POSITRONIC_PAGE__`. The page loads `/bundle/components.js` and `/bundle/components.css`, which the dev server builds from the project's `.positronic/bundle.ts` (esbuild, React inside) and `.positronic/styles.css` (Tailwind CLI) and uploads to R2. `@positronic/gen-ui-components` supplies the catalog (`/catalog` entry, server-safe) and the browser runtime (`mount()`); `@positronic/core/page` is the browser-safe core entry.
 
 ### Files Service
 

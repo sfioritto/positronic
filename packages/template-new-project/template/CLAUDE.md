@@ -14,7 +14,7 @@ This is a Positronic project - an AI-powered framework for building and running 
   - **`/src/runner.ts`** - The main entry point for running brains locally
   - **`/src/utils`** - Shared utilities (e.g., `bottleneck` for rate limiting)
   - **`/src/plugins`** - Plugin definitions for external integrations (see `/docs/plugin-guide.md`)
-  - **`/src/components`** - Reusable UI/prompt components
+  - **`/src/components`** - Component catalog for generated pages (`index.ts`, server-safe) and its React implementations (`browser.ts`, bundled for the browser)
 - **`/resources`** - Files and documents that brains can access via the resource system
 - **`/tests`** - Test files for brains (kept separate to avoid deployment issues)
 - **`/docs`** - Documentation including brain testing guide

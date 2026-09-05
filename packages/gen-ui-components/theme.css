@@ -4,6 +4,17 @@
  */
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Where Tailwind finds the classes the shared components use. Paths are
+ * relative to this file. The shadcn dist sits beside this package in a
+ * normal install; the second path covers a package linked from the
+ * Positronic monorepo, where it is hoisted to the repo's node_modules.
+ * Tailwind ignores paths that do not exist.
+ */
+@source "./dist";
+@source "../../@json-render/shadcn/dist";
+@source "../../node_modules/@json-render/shadcn/dist";
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

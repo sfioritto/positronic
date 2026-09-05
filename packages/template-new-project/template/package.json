@@ -15,7 +15,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build:components": "node .positronic/esbuild.config.mjs"
+    "build:components": "node .positronic/esbuild.config.mjs && tailwindcss -i .positronic/styles.css -o .positronic/dist/components.css --minify"
   },
   "keywords": [],
   "author": "",
@@ -26,7 +26,9 @@
     "@ai-sdk/google": "^3.0.13",
     "ai": "^6.0.48",
     "@positronic/core": "<%= positronicCoreVersion %>",
-    "@positronic/gen-ui-components": "<%= positronicGenUIComponentsVersion %>"<% if (backend === 'cloudflare') { %>,
+    "@positronic/gen-ui-components": "<%= positronicGenUIComponentsVersion %>",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"<% if (backend === 'cloudflare') { %>,
     "@positronic/cloudflare": "<%= positronicCloudflareVersion %>"<% } %>
   },
   "devDependencies": {<% if (backend === 'cloudflare') { %>
@@ -34,6 +36,9 @@
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "esbuild": "^0.27.2",
-    "@types/react": "^19.2.18"
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/cli": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.3"
   }
 }
