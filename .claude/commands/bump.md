@@ -59,8 +59,6 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
    "@positronic/spec": patch
    "@positronic/cli": patch
    "@positronic/cloudflare": patch
-   "@positronic/shell": patch
-   "@positronic/client-anthropic": patch
    "@positronic/client-vercel": patch
    "@positronic/template-new-project": patch
    ---

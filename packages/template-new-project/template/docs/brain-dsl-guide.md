@@ -135,10 +135,11 @@ Key points about prompt steps:
 You can use a different AI model for a specific prompt step by passing a `client` option. This is useful when some steps need a cheaper model for simple tasks and others need a more capable model for complex reasoning:
 
 ```typescript
-import { createAnthropicClient } from '@positronic/client-anthropic';
+import { VercelClient } from '@positronic/client-vercel';
+import { anthropic } from '@ai-sdk/anthropic';
 
-const fastModel = createAnthropicClient({ model: 'claude-haiku-4-5-20251001' });
-const smartModel = createAnthropicClient({ model: 'claude-sonnet-4-5-20250929' });
+const fastModel = new VercelClient(anthropic('claude-haiku-4-5-20251001'));
+const smartModel = new VercelClient(anthropic('claude-sonnet-4-5-20250929'));
 
 brain('Multi-Model Brain')
   .prompt('Quick summary', {

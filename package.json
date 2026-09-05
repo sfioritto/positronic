@@ -38,8 +38,6 @@
     "packages/core",
     "packages/spec",
     "packages/template-new-project",
-    "packages/shell",
-    "packages/client-anthropic",
     "packages/client-vercel",
     "packages/gen-ui-components",
     "packages/cloudflare",
