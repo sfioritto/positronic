@@ -55,7 +55,7 @@ import { google } from '@ai-sdk/google';
  *
  * See docs/memory-guide.md for more details.
  */
-const client = new VercelClient(google('gemini-3-pro-preview'));
+const client = new VercelClient(google('gemini-flash-latest'));
 
 export const runner = new BrainRunner({
   adapters: [],
