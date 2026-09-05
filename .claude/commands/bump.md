@@ -15,12 +15,11 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
 1. Validates git working directory is clean
 2. Creates a changeset for patch version bump
 3. Runs `changeset version` to update all package versions and inter-package dependencies
-4. Updates hardcoded versions in packages/template-new-project/index.js
-5. Cleans workspaces to ensure fresh build
-6. Reinstalls dependencies
-7. Builds all packages and runs tests via npm run dev
-8. Commits the version changes
-9. **STOPS** and provides manual commands for publish (requires OTP)
+4. Cleans workspaces to ensure fresh build
+5. Reinstalls dependencies
+6. Builds all packages and runs tests via npm run dev
+7. Commits the version changes
+8. **STOPS** and provides manual commands for publish (requires OTP)
 
 ## Pre-requisites
 
@@ -61,6 +60,7 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
    "@positronic/cloudflare": patch
    "@positronic/client-vercel": patch
    "@positronic/template-new-project": patch
+   "@positronic/gen-ui-components": patch
    ---
 
    [INSERT YOUR CUSTOM CHANGELOG MESSAGE HERE]
@@ -68,15 +68,14 @@ Always bumps patch version for all linked packages (e.g., 0.0.5 -> 0.0.6)
    ```
 
 6. [ ] Run `npx changeset version` to update versions and dependencies
-7. [ ] Get the new version number from any package.json (e.g., `grep '"version"' packages/core/package.json`)
-8. [ ] Update hardcoded versions in `packages/template-new-project/index.js` (lines 56-58) to match the new version
-9. [ ] Run `npm run clean:workspaces` to clean all build artifacts
-10. [ ] Run `npm install` to reinstall all dependencies fresh
-11. [ ] Run `npm run dev` to build all packages and run all tests
-12. [ ] Verify tests pass (if tests fail, STOP and fix issues)
-13. [ ] Stage all changes (`git add -A`)
-14. [ ] Create commit (`git commit -m "Bump to v{version}"`)
-15. [ ] **STOP HERE** - Tell the user to run these commands manually (OTP required):
+7. [ ] Get the new version number from any package.json (e.g., `grep '"version"' packages/core/package.json`). The template reads its own package.json version at scaffold time, so nothing else needs editing.
+8. [ ] Run `npm run clean:workspaces` to clean all build artifacts
+9. [ ] Run `npm install` to reinstall all dependencies fresh
+10. [ ] Run `npm run dev` to build all packages and run all tests
+11. [ ] Verify tests pass (if tests fail, STOP and fix issues)
+12. [ ] Stage all changes (`git add -A`)
+13. [ ] Create commit (`git commit -m "Bump to v{version}"`)
+14. [ ] **STOP HERE** - Tell the user to run these commands manually (OTP required):
     ```bash
     npx changeset publish --no-git-tag
     git tag v{version}
