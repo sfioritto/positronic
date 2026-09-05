@@ -20,9 +20,7 @@
     }
   },
   "scripts": {
-    "tsc": "tsc --project tsconfig.json",
-    "swc": "swc src -d dist",
-    "build": "npm run tsc && npm run swc",
+    "build": "tsc --project tsconfig.json",
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "devDependencies": {

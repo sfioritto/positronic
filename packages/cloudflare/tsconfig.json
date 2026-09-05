@@ -2,10 +2,9 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "emitDeclarationOnly": true,
-    "declarationDir": "./dist/types",
+    "outDir": "./dist",
     "types": ["@cloudflare/workers-types", "node"]
   },
-  "include": ["**/*"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "test-project"]
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"]
 }

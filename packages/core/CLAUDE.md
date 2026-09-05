@@ -17,10 +17,8 @@ This is the `@positronic/core` package - the core framework for building AI-powe
 ### Development
 
 - `npm test` - Run all tests silently
-- `npm run build` - Build the package (runs TypeScript compilation then SWC)
+- `npm run build` - Build the package with `tsc` (JavaScript and type declarations into `dist`)
 - `npm run clean` - Clean build artifacts and dependencies
-- `npm run tsc` - Run TypeScript compiler only (generates type declarations)
-- `npm run swc` - Run SWC transpilation only
 
 ### Testing
 
@@ -117,7 +115,7 @@ See the comprehensive testing guide: @docs/core-testing-guide.md
 ## Type System Implementation
 
 - **Module System**: Pure ESM with `.js` extensions in imports (even for `.ts` files)
-- **Type Exports**: Separate type declarations in `dist/types` via `tsc`
+- **Type Exports**: Type declarations are emitted alongside the JavaScript in `dist`
 - **Type Inference Chain**: Each step method updates state type while preserving options and services types
 - **Zod Integration**: Exported as peer dependency to avoid version conflicts
 - **Type Guards**: `isResourceEntry()` for discriminating union types in resources

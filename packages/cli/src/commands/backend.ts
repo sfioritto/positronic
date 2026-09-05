@@ -26,38 +26,19 @@ function loadBackendConfig(projectRootPath: string): PositronicConfig {
 }
 
 /**
- * Load the backend module based on the configuration
+ * Load the backend module based on the configuration. The package is either
+ * a `file:` path to a local checkout or a package name resolved from the
+ * project's node_modules; both expose the Node entry point at the same spot.
  */
 async function loadBackendModule(projectRootPath: string) {
   const config = loadBackendConfig(projectRootPath);
   const backendPackage = config.backend!.package;
 
-  let backendModule: any;
+  const packageRoot = backendPackage.startsWith('file:')
+    ? backendPackage.replace('file:', '')
+    : path.join(projectRootPath, 'node_modules', backendPackage);
 
-  if (backendPackage.startsWith('file:')) {
-    // Load from local file path
-    const packagePath = backendPackage.replace('file:', '');
-    const localModulePath = path.join(
-      packagePath,
-      'dist',
-      'src',
-      'node-index.js'
-    );
-    backendModule = await import(localModulePath);
-  } else {
-    // Load from npm package - resolve from project's node_modules
-    const backendPath = path.join(
-      projectRootPath,
-      'node_modules',
-      backendPackage,
-      'dist',
-      'src',
-      'node-index.js'
-    );
-    backendModule = await import(backendPath);
-  }
-
-  return backendModule;
+  return import(path.join(packageRoot, 'dist', 'node-index.js'));
 }
 
 /**

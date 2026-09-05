@@ -8,18 +8,16 @@
   "type": "module",
   "license": "MIT",
   "bin": {
-    "positronic": "./dist/src/positronic.js",
-    "px": "./dist/src/positronic.js"
+    "positronic": "./dist/positronic.js",
+    "px": "./dist/positronic.js"
   },
   "files": [
     "dist",
     "package.json"
   ],
   "scripts": {
-    "tsc": "tsc --project tsconfig.json",
-    "swc": "swc src -d dist",
-    "build": "npm run tsc && npm run swc",
-    "postbuild": "chmod +x ./dist/src/positronic.js",
+    "build": "tsc --project tsconfig.json",
+    "postbuild": "chmod +x ./dist/positronic.js",
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "dependencies": {

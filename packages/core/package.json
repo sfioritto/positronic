@@ -6,8 +6,8 @@
   },
   "description": "Core services and tools for positronic AI brains",
   "type": "module",
-  "main": "dist/src/index.js",
-  "types": "dist/types/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "license": "MIT",
   "files": [
     "dist",
@@ -15,18 +15,16 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/src/index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./jsx-runtime": {
-      "types": "./dist/types/jsx-runtime.d.ts",
-      "import": "./dist/src/jsx-runtime.js"
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js"
     }
   },
   "scripts": {
-    "tsc": "tsc --project tsconfig.json",
-    "swc": "swc src -d dist",
-    "build": "npm run tsc && npm run swc",
+    "build": "tsc --project tsconfig.json",
     "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
   "peerDependencies": {

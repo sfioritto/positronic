@@ -358,7 +358,7 @@ npm run build:workspaces
 npm run dev
 
 # In another terminal, test the command
-./packages/cli/dist/src/positronic.js your-command test-param
+./packages/cli/dist/positronic.js your-command test-param
 ```
 
 ## Key Patterns & Best Practices
