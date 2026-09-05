@@ -1,4 +1,4 @@
-import type { UIComponent } from '@positronic/core';
+import type { UIComponent } from '../types.js';
 import { z } from 'zod';
 
 const TextPropsSchema = z.object({

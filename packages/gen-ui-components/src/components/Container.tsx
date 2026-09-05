@@ -1,4 +1,4 @@
-import type { UIComponent } from '@positronic/core';
+import type { UIComponent } from '../types.js';
 import type { ReactNode } from 'react';
 import { z } from 'zod';
 
