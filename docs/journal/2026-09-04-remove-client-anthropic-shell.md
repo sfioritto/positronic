@@ -1,7 +1,9 @@
 # Remove @positronic/client-anthropic and @positronic/shell
 
-**Status:** active
+**Status:** shipped
 **Started:** 2026-09-04
+**Shipped:** 2026-09-04
+**Commit:** 5246e26
 
 ## Goal
 
@@ -46,5 +48,13 @@ in `packages/cloudflare/test-project`, which has its own lockfile and
 `node_modules`. The vitest run fails with exit 127 until that second install
 happens.
 
-**Left for after login.** The npm token in `~/.npmrc` returns 401, so the
-`npm deprecate` step is pending an `npm login`.
+**Unpublish, not deprecate.** Both packages qualify for npm's post-72-hour
+unpublish (under 300 weekly downloads, single maintainer, no dependents):
+client-anthropic had 63 downloads/week, shell had 5. Sean chose unpublish.
+The delete needs a 2FA one-time password, which npm prompts for
+interactively, so it has to be run from a real terminal, not an agent shell.
+
+**Merged fast-forward onto main.** The stale `dist/` and `node_modules/`
+under the deleted package directories survive a merge because they were
+never tracked; they had to be `rm -rf`'d by hand afterward. Jest went from
+47.2% to 48.2% purely from dropping two 0% packages.
