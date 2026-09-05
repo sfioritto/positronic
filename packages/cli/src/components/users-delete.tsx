@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete, useApiGet } from '../hooks/useApi.js';
-import { useConfirm } from '../hooks/useConfirm.js';
+import { useYesNoConfirm } from '../hooks/useConfirm.js';
 
 interface UsersDeleteProps {
   userName: string;
@@ -28,8 +28,7 @@ export const UsersDelete = ({ userName, force }: UsersDeleteProps) => {
   const [deleted, setDeleted] = useState(false);
   const [deletionStarted, setDeletionStarted] = useState(false);
 
-  const { confirmed } = useConfirm({
-    mode: 'y/n',
+  const { confirmed } = useYesNoConfirm({
     force,
     acting: deleting || deleted,
   });

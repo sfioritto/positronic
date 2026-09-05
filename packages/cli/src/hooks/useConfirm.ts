@@ -1,18 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useInput, useApp, useStdin } from 'ink';
 
-interface UseConfirmYesNo {
-  mode: 'y/n';
+interface UseYesNoConfirmOptions {
   force: boolean;
   acting: boolean;
 }
 
-interface UseConfirmTypeYes {
-  mode: 'type-yes';
+interface UseTypeYesConfirmOptions {
   force: boolean;
 }
-
-type UseConfirmOptions = UseConfirmYesNo | UseConfirmTypeYes;
 
 interface YesNoResult {
   confirmed: boolean;
@@ -24,31 +20,23 @@ interface TypeYesResult {
 }
 
 /**
- * Unified confirmation hook supporting two modes:
+ * Confirmation hooks. A component picks one; they are separate hooks
+ * rather than one hook with a mode so that each is called unconditionally.
  *
- * 'y/n' mode — uses Ink's useInput; single-key y/n response.
+ * useYesNoConfirm — uses Ink's useInput; single-key y/n response.
  *   Returns: { confirmed }
  *   Pressing 'n', Escape, or any key when not confirmed and not acting exits the app.
  *   Only active while the prompt is pending: !confirmed && !acting.
  *
- * 'type-yes' mode — raw-mode stdin; user types "yes" and presses Enter.
+ * useTypeYesConfirm — raw-mode stdin; user types "yes" and presses Enter.
  *   Returns: { confirmed, input }
  *   Pressing Enter with anything other than "yes", or Ctrl+C, exits the app.
  *   Backspace is handled correctly.
  */
-export function useConfirm(options: UseConfirmYesNo): YesNoResult;
-export function useConfirm(options: UseConfirmTypeYes): TypeYesResult;
-export function useConfirm(
-  options: UseConfirmOptions
-): YesNoResult | TypeYesResult {
-  if (options.mode === 'y/n') {
-    return useYesNoConfirmImpl(options.force, options.acting);
-  } else {
-    return useTypeYesConfirmImpl(options.force);
-  }
-}
-
-function useYesNoConfirmImpl(force: boolean, acting: boolean): YesNoResult {
+export function useYesNoConfirm({
+  force,
+  acting,
+}: UseYesNoConfirmOptions): YesNoResult {
   const [confirmed, setConfirmed] = useState(force);
   const { exit } = useApp();
 
@@ -65,7 +53,9 @@ function useYesNoConfirmImpl(force: boolean, acting: boolean): YesNoResult {
   return { confirmed };
 }
 
-function useTypeYesConfirmImpl(force: boolean): TypeYesResult {
+export function useTypeYesConfirm({
+  force,
+}: UseTypeYesConfirmOptions): TypeYesResult {
   const [confirmed, setConfirmed] = useState(force);
   const [input, setInput] = useState('');
   const inputRef = useRef('');

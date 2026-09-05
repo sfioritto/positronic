@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiDelete } from '../hooks/useApi.js';
-import { useConfirm } from '../hooks/useConfirm.js';
+import { useTypeYesConfirm } from '../hooks/useConfirm.js';
 
 interface PageDeleteProps {
   slug: string;
@@ -14,7 +14,7 @@ export const PageDelete = ({ slug, force }: PageDeleteProps) => {
   const isDeleting = useRef(false);
 
   const { execute: deletePage, loading, error } = useApiDelete('page');
-  const { confirmed, input } = useConfirm({ mode: 'type-yes', force });
+  const { confirmed, input } = useTypeYesConfirm({ force });
 
   useEffect(() => {
     if (confirmed && !deleted && !isDeleting.current) {
