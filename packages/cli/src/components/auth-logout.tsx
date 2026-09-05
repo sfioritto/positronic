@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Text } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
 import { resetJwtAuthProvider } from '../lib/jwt-auth.js';

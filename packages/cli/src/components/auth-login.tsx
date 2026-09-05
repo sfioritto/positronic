@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Box, Text, useApp } from 'ink';
 import type { ProjectConfigManager } from '../commands/project-config-manager.js';
 import { discoverSSHKeys, expandPath } from '../lib/ssh-key-utils.js';

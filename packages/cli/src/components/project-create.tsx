@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { scaffoldProject } from '@positronic/template-new-project';
 import { execFile } from 'child_process';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Text, Box, useInput, useApp } from 'ink';
 import { EventSource } from 'eventsource';
 import {

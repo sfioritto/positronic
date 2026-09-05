@@ -1,4 +1,3 @@
-import React from 'react';
 import { Text, Box, useStdout, useInput } from 'ink';
 import type { BrainEvent } from '@positronic/core';
 import { BRAIN_EVENTS } from '@positronic/core';

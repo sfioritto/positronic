@@ -1,4 +1,3 @@
-import React from 'react';
 import { Text, Box, useStdout, useInput } from 'ink';
 
 type JsonObject = { [key: string]: unknown };

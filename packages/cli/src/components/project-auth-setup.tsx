@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
 import { ProjectConfigManager } from '../commands/project-config-manager.js';
 import {

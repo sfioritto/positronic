@@ -1,4 +1,3 @@
-import React from 'react';
 import { Text, Box } from 'ink';
 import { useApiGet } from '../hooks/useApi.js';
 import { ErrorComponent } from './error.js';

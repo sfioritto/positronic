@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { ErrorComponent } from './error.js';
 import { useApiGet, useApiDelete } from '../hooks/useApi.js';

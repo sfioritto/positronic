@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text, useStdin } from 'ink';
 import { SelectList } from './select-list.js';
 import type {

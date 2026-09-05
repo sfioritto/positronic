@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Text, Box, useInput, useApp } from 'ink';
 import { apiClient } from '../commands/helpers.js';
 import { ErrorComponent } from './error.js';
