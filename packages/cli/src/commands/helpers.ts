@@ -1,13 +1,11 @@
 import process from 'process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { type ResourceEntry } from '@positronic/core';
 import { isText } from 'istextorbinary';
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
-import { createRequire } from 'module';
 import * as dotenv from 'dotenv';
 import { getAuthHeader } from '../lib/jwt-auth.js';
 
@@ -133,96 +131,6 @@ export const apiClient = {
     return fetch(fullUrl, options);
   },
 };
-
-export async function generateProject(projectName: string, projectDir: string) {
-  const devPath = process.env.POSITRONIC_LOCAL_PATH;
-  let newProjectTemplatePath = '@positronic/template-new-project';
-  let cazOptions: {
-    name: string;
-    backend?: string;
-    install?: boolean;
-    pm?: string;
-    claudemd?: boolean;
-  } = { name: projectName };
-
-  let templateSourcePath: string;
-
-  try {
-    if (devPath) {
-      // Copying templates, why you ask?
-      // Well because when caz runs if you pass it a path to the template module
-      // (e.g. for development environment setting POSITRONIC_LOCAL_PATH)
-      // it runs npm install --production in the template directory. This is a problem
-      // in our monorepo because this messes up the node_modules at the root of the
-      // monorepo which then causes the tests to fail. Also ny time I was generating a new
-      // project it was a pain to have to run npm install over and over again just
-      // to get back to a good state.
-      templateSourcePath = path.resolve(
-        devPath,
-        'packages',
-        'template-new-project'
-      );
-    } else {
-      // Resolve the installed template package location
-      const require = createRequire(import.meta.url);
-      const templatePackageJsonPath = require.resolve(
-        '@positronic/template-new-project/package.json'
-      );
-      templateSourcePath = path.dirname(templatePackageJsonPath);
-    }
-
-    // Always copy to a temporary directory to avoid CAZ modifying our source
-    // CAZ only supports local paths, GitHub repos, or ZIP URLs - not npm package names
-    // Additionally, CAZ runs 'npm install --production' in the template directory,
-    // which would modify our installed node_modules if we passed the path directly
-    const copiedNewProjectPkg = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'positronic-newproj-')
-    );
-    fs.cpSync(templateSourcePath, copiedNewProjectPkg, {
-      recursive: true,
-    });
-    newProjectTemplatePath = copiedNewProjectPkg;
-
-    // Set CAZ options for both local dev and installed package scenarios
-    if (devPath || !process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
-      cazOptions = {
-        name: projectName,
-        install: true,
-        pm: 'npm',
-      };
-    }
-
-    // In test or CI environments, skip interactive prompts and dependency installation
-    if (process.env.NODE_ENV === 'test') {
-      cazOptions = {
-        ...cazOptions,
-        backend: 'none',
-        install: false,
-        pm: 'npm',
-        claudemd: false,
-      };
-    }
-
-    // Dynamic import to avoid loading caz (and its signal-exit dependency) at module
-    // load time. This prevents ESM/CJS interop issues in tests that import this file.
-    // caz is a CJS module, so dynamic import wraps it - we need .default.default
-    const cazModule = await import('caz');
-    const caz = cazModule.default;
-    await caz.default(newProjectTemplatePath, projectDir, {
-      ...cazOptions,
-      force: false,
-    });
-  } finally {
-    // Clean up the temporary copied new project package
-    if (devPath) {
-      fs.rmSync(newProjectTemplatePath, {
-        recursive: true,
-        force: true,
-        maxRetries: 3,
-      });
-    }
-  }
-}
 
 export function scanLocalResources(resourcesDir: string): ResourceEntry[] {
   const localResources: ResourceEntry[] = [];

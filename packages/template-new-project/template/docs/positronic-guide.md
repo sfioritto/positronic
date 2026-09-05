@@ -56,8 +56,8 @@ import { definePlugin } from '@positronic/core';
 export const logger = definePlugin({
   name: 'logger',
   create: () => ({
-    info: (msg: string) => console.log(`[<%= '${new Date().toISOString()}' %>] INFO: <%= '${msg}' %>`),
-    error: (msg: string) => console.error(`[<%= '${new Date().toISOString()}' %>] ERROR: <%= '${msg}' %>`),
+    info: (msg: string) => console.log(`[${new Date().toISOString()}] INFO: ${msg}`),
+    error: (msg: string) => console.error(`[${new Date().toISOString()}] ERROR: ${msg}`),
   }),
 });
 ```
@@ -233,16 +233,16 @@ export const api = definePlugin({
   setup: (config: { baseUrl: string; apiKey: string }) => config,
   create: ({ config }) => ({
     get: async (path: string) => {
-      const response = await fetch(`<%= '${config!.baseUrl}${path}' %>`, {
-        headers: { 'Authorization': `Bearer <%= '${config!.apiKey}' %>` }
+      const response = await fetch(`${config!.baseUrl}${path}`, {
+        headers: { 'Authorization': `Bearer ${config!.apiKey}` }
       });
       return response.json();
     },
     post: async (path: string, data: any) => {
-      const response = await fetch(`<%= '${config!.baseUrl}${path}' %>`, {
+      const response = await fetch(`${config!.baseUrl}${path}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer <%= '${config!.apiKey}' %>`,
+          'Authorization': `Bearer ${config!.apiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)

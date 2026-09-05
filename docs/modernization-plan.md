@@ -208,7 +208,7 @@ npm run typecheck
 
 ## Leftovers noticed along the way
 
-- `packages/cli/package.json` still depends on `@positronic/template-new-project` and `caz`, and so does cloudflare. Check whether both need it.
+- ~~`packages/cli/package.json` still depends on `@positronic/template-new-project` and `caz`, and so does cloudflare.~~ Done 2026-09-04: caz is gone, the template package renders itself with Eta, and both packages import `scaffoldProject` from it.
 - `packages/spec/package.json` pins its own `typescript` and `@types/node`. Hoist to the root.
 - The template's `tests/example.test.ts` fails when scaffolded. It never registers a mock response and asserts on state the example brain does not produce. Broken before the Vitest migration.
 - npm 11 cannot install vitest 4.1.x (arborist crash in peer resolution). npm 12 can and needs Node 24.15+. Both are installed now. Worth an `engines` field in the template so scaffolded projects say so up front.

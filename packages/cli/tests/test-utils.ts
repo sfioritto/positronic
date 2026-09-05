@@ -1,5 +1,4 @@
 import React from 'react';
-import { inject } from 'vitest';
 import { render } from 'ink-testing-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,6 +9,7 @@ import type { TestServerHandle } from './test-dev-server.js';
 import { TestDevServer } from './test-dev-server.js';
 import { buildCli } from '../src/cli.js';
 import type { PositronicDevServer } from '@positronic/spec';
+import { scaffoldProject } from '@positronic/template-new-project';
 import {
   resetJwtAuthProvider,
   setAuthProjectRootPath,
@@ -34,8 +34,12 @@ function copyTestResources(targetDir: string) {
 
 // Helper function to create a minimal Positronic project structure
 export async function createMinimalProject(dir: string) {
-  // The template is scaffolded once per run in global-setup.ts.
-  fs.cpSync(inject('templatePath'), dir, { recursive: true });
+  scaffoldProject({
+    name: 'test-project',
+    dest: dir,
+    backend: 'none',
+    claudeMd: false,
+  });
   copyTestResources(dir);
   // Update positronic.config.json with the correct project name if it exists
   const configPath = path.join(dir, 'positronic.config.json');

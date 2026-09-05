@@ -5,8 +5,7 @@ import type { Dirent } from 'fs';
 import * as os from 'os';
 import { spawn, type ChildProcess, execSync } from 'child_process';
 import * as dotenv from 'dotenv';
-import caz from 'caz';
-import { createRequire } from 'module';
+import { scaffoldProject } from '@positronic/template-new-project';
 import type { PositronicDevServer, ServerHandle } from '@positronic/spec';
 
 /**
@@ -77,107 +76,6 @@ class ProcessServerHandle implements ServerHandle {
     }
 
     return false;
-  }
-}
-
-async function generateProject(
-  projectName: string,
-  projectDir: string,
-  onSuccess?: () => Promise<void> | void
-) {
-  let devPath = process.env.POSITRONIC_LOCAL_PATH;
-  let newProjectTemplatePath = '@positronic/template-new-project';
-  let cazOptions: {
-    name: string;
-    backend?: string;
-    install?: boolean;
-    pm?: string;
-    claudemd?: boolean;
-  } = { name: projectName };
-
-  let templateSourcePath: string;
-  let inferredDevPath = false;
-
-  try {
-    if (devPath) {
-      // Copying templates, why you ask?
-      // Well because when caz runs if you pass it a path to the template module
-      // (e.g. for development environment setting POSITRONIC_LOCAL_PATH)
-      // it runs npm install --production in the template directory. This is a problem
-      // in our monorepo because this messes up the node_modules at the root of the
-      // monorepo which then causes the tests to fail. Also any time I was generating a new
-      // project it was a pain to have to run npm install over and over again just
-      // to get back to a good state.
-      templateSourcePath = path.resolve(
-        devPath,
-        'packages',
-        'template-new-project'
-      );
-    } else {
-      // Resolve the installed template package location
-      const require = createRequire(import.meta.url);
-      const templatePackageJsonPath = require.resolve(
-        '@positronic/template-new-project/package.json'
-      );
-      templateSourcePath = path.dirname(templatePackageJsonPath);
-
-      // Auto-detect local workspace: if the template resolves to a real path
-      // outside node_modules, we're running from a local monorepo (e.g. the user's
-      // project uses file: references to @positronic/cloudflare). In that case,
-      // set POSITRONIC_LOCAL_PATH so the template generates file: references too.
-      const realPath = fs.realpathSync(templateSourcePath);
-      if (!realPath.includes(`${path.sep}node_modules${path.sep}`)) {
-        const potentialRoot = path.resolve(realPath, '..', '..');
-        if (
-          fs.existsSync(path.join(potentialRoot, 'packages', 'core')) &&
-          fs.existsSync(path.join(potentialRoot, 'packages', 'cloudflare'))
-        ) {
-          devPath = potentialRoot;
-          process.env.POSITRONIC_LOCAL_PATH = potentialRoot;
-          inferredDevPath = true;
-        }
-      }
-    }
-
-    // Always copy to a temporary directory to avoid CAZ modifying our source
-    // CAZ only supports local paths, GitHub repos, or ZIP URLs - not npm package names
-    // Additionally, CAZ runs 'npm install --production' in the template directory,
-    // which would modify our installed node_modules if we passed the path directly
-    const copiedNewProjectPkg = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'positronic-newproj-')
-    );
-    fs.cpSync(templateSourcePath, copiedNewProjectPkg, {
-      recursive: true,
-    });
-    newProjectTemplatePath = copiedNewProjectPkg;
-
-    // Set CAZ options for cloudflare backend
-    cazOptions = {
-      name: projectName,
-      backend: 'cloudflare',
-      install: true,
-      pm: 'npm',
-      claudemd: false, // Don't prompt for CLAUDE.md when regenerating .positronic directory
-    };
-
-    await caz.default(newProjectTemplatePath, projectDir, {
-      ...cazOptions,
-      force: false,
-    });
-
-    await onSuccess?.();
-  } finally {
-    // Clean up the temporarily set env var
-    if (inferredDevPath) {
-      delete process.env.POSITRONIC_LOCAL_PATH;
-    }
-
-    // Clean up the temporary copied new project package
-    fs.rmSync(newProjectTemplatePath, {
-      recursive: true,
-      force: true,
-      maxRetries: 3,
-    });
   }
 }
 
@@ -392,47 +290,28 @@ export class CloudflareDevServer implements PositronicDevServer {
           ? 'Forcing regeneration of .positronic environment...'
           : 'Missing .positronic environment, generating...'
       );
-      let tempDir: string | undefined;
-      try {
-        // Create a temp directory to generate the project in
-        // so we can copy the .positronic directory to the user's project
-        tempDir = fs.mkdtempSync(
-          path.join(os.tmpdir(), 'positronic-server-setup-')
-        );
 
-        // Read the actual project name from the config file
-        const configPath = path.join(projectRoot, 'positronic.config.json');
-        const configContent = await fsPromises.readFile(configPath, 'utf-8');
-        const config = JSON.parse(configContent);
-        const projectName = config.projectName;
+      // Read the actual project name from the config file
+      const configPath = path.join(projectRoot, 'positronic.config.json');
+      const configContent = await fsPromises.readFile(configPath, 'utf-8');
+      const config = JSON.parse(configContent);
+      const projectName = config.projectName;
 
-        if (!projectName) {
-          throw new Error('Project name not found in positronic.config.json');
-        }
-
-        await generateProject(projectName, tempDir, async () => {
-          const sourcePositronicDir = path.join(tempDir!, '.positronic');
-          const targetPositronicDir = serverDir;
-
-          // If forcing setup, remove existing target first
-          if (serverDirExists && force) {
-            await fsPromises.rm(targetPositronicDir, {
-              recursive: true,
-              force: true,
-            });
-          }
-
-          // Copy the generated .positronic directory
-          await fsPromises.cp(sourcePositronicDir, targetPositronicDir, {
-            recursive: true,
-          });
-        });
-      } finally {
-        // Clean up the temporary generation directory
-        if (tempDir) {
-          fs.rmSync(tempDir, { recursive: true, force: true });
-        }
+      if (!projectName) {
+        throw new Error('Project name not found in positronic.config.json');
       }
+
+      if (serverDirExists && force) {
+        await fsPromises.rm(serverDir, { recursive: true, force: true });
+      }
+
+      scaffoldProject({
+        name: projectName,
+        dest: serverDir,
+        backend: 'cloudflare',
+        claudeMd: false,
+        subdir: '.positronic',
+      });
     }
   }
 
@@ -1102,7 +981,6 @@ export class CloudflareDevServer implements PositronicDevServer {
           '   CLI will offer to create one from your SSH key if it is missing.'
       );
     }
-
 
     for (const secret of secrets) {
       await this.setWorkerSecret(

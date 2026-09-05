@@ -137,7 +137,7 @@ describe('CLI Integration: positronic resources types', () => {
         'resources',
         'sync',
       ]);
-      const isOutputRendered = await waitForOutput(/sync summary/i);
+      const isOutputRendered = await waitForOutput(/sync summary/i, 50);
       expect(isOutputRendered).toBe(true);
 
       // Wait for types file to be generated
@@ -212,7 +212,7 @@ describe('CLI Integration: positronic resources types', () => {
         'sync',
       ]);
 
-      const isOutputRendered = await waitForOutput(/sync summary/i);
+      const isOutputRendered = await waitForOutput(/sync summary/i, 50);
       expect(isOutputRendered).toBe(true);
 
       // Wait for types file to be generated with expected content

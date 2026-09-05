@@ -35,7 +35,6 @@
     "@positronic/spec": "^0.0.79",
     "@positronic/template-new-project": "^0.0.79",
     "aws4fetch": "^1.0.18",
-    "caz": "^2.0.0",
     "croner": "^10.0.1",
     "dotenv": "^16.0.3",
     "fflate": "^0.8.2",

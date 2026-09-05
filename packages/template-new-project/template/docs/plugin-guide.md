@@ -13,7 +13,7 @@ export const weather = definePlugin({
   name: 'weather',
   create: () => ({
     async forecast(city: string) {
-      const res = await fetch(<%= '\`https://api.weather.com/v1/${city}\`' %>);
+      const res = await fetch(`https://api.weather.com/v1/${city}`);
       return res.json();
     },
   }),

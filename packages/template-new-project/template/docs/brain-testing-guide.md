@@ -236,7 +236,7 @@ const testBrain = brain('email-processor')
     return { threads };
   })
   .step('Notify', async ({ state, ntfy }) => {
-    await ntfy.send(`Found <%= '${state.threads.length}' %> emails`);
+    await ntfy.send(`Found ${state.threads.length} emails`);
     return state;
   });
 

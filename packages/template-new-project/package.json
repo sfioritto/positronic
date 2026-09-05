@@ -4,20 +4,28 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Caz template for generating a new Positronic project.",
-  "main": "index.js",
+  "description": "Project template and scaffolder for new Positronic projects.",
+  "main": "./dist/index.js",
   "scripts": {
-    "build": "",
-    "clean": "rm -rf node_modules"
+    "build": "tsc --project tsconfig.json",
+    "clean": "rm -rf tsconfig.tsbuildinfo dist node_modules"
   },
-  "author": "",
   "license": "MIT",
   "files": [
-    "index.js",
-    "package.json",
-    "template"
+    "dist",
+    "template",
+    "package.json"
   ],
-  "devDependencies": {
-    "caz": "^2.0.0"
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "eta": "^4.6.0"
   }
 }

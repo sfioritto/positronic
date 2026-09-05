@@ -19,15 +19,30 @@
     "types": ["node"]
   },
   "exclude": [
-    "packages/template-new-project",
+    "packages/template-new-project/template",
     "packages/cloudflare/test-project"
   ],
   "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/cli" },
-    { "path": "./packages/client-vercel" },
-    { "path": "./packages/cloudflare" },
-    { "path": "./packages/spec" },
-    { "path": "./packages/gen-ui-components" }
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/cli"
+    },
+    {
+      "path": "./packages/client-vercel"
+    },
+    {
+      "path": "./packages/cloudflare"
+    },
+    {
+      "path": "./packages/spec"
+    },
+    {
+      "path": "./packages/gen-ui-components"
+    },
+    {
+      "path": "./packages/template-new-project"
+    }
   ]
 }

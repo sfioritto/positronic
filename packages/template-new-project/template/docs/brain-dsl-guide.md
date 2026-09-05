@@ -82,7 +82,7 @@ brain('AI Education Assistant')
   }))
   .prompt('Generate explanation', {
     message: ({ state: { topic, context } }) =>
-      `<%= '${context}' %>. Please provide a brief, beginner-friendly explanation of <%= '${topic}' %>.`,
+      `${context}. Please provide a brief, beginner-friendly explanation of ${topic}.`,
     outputSchema: z.object({
       explanation: z.string().describe('A clear explanation of the topic'),
       keyPoints: z.array(z.string()).describe('3-5 key points about the topic'),
@@ -94,7 +94,7 @@ brain('AI Education Assistant')
     formattedOutput: {
       topic: state.topic,
       explanation: state.explanation || '',
-      summary: `This explanation covers <%= '${state.keyPoints?.length || 0}' %> key points at a <%= '${state.difficulty || \'unknown\'}' %> level.`,
+      summary: `This explanation covers ${state.keyPoints?.length || 0} key points at a ${state.difficulty || 'unknown'} level.`,
       points: state.keyPoints || [],
     },
   }))
@@ -102,7 +102,7 @@ brain('AI Education Assistant')
     'Generate follow-up questions',
     {
       message: ({ state: { formattedOutput } }) =>
-        `Based on this explanation about <%= '${formattedOutput.topic}' %>: "<%= '${formattedOutput.explanation}' %>"
+        `Based on this explanation about ${formattedOutput.topic}: "${formattedOutput.explanation}"
 
         Generate 3 thoughtful follow-up questions that a student might ask.`,
       outputSchema: z.object({
@@ -143,13 +143,13 @@ const smartModel = new VercelClient(anthropic('claude-sonnet-4-5-20250929'));
 
 brain('Multi-Model Brain')
   .prompt('Quick summary', {
-    message: ({ state: { document } }) => `Summarize this briefly: <%= '${document}' %>`,
+    message: ({ state: { document } }) => `Summarize this briefly: ${document}`,
     outputSchema: z.object({ summary: z.string() }),
     client: fastModel,  // Use a fast, cheap model for summarization
   })
   .prompt('Deep analysis', {
     message: ({ state: { summary } }) =>
-      `Analyze the implications of this summary: <%= '${summary}' %>`,
+      `Analyze the implications of this summary: ${summary}`,
     outputSchema: z.object({
       insights: z.array(z.string()),
       risks: z.array(z.string()),
@@ -274,7 +274,7 @@ const notificationBrain = brain('Notification Brain')
   .step('Send Alert', async ({ state, options, slack }) => {
     // TypeScript knows the exact shape of options from the schema
     const message = options.includeTimestamp 
-      ? `[<%= '${new Date().toISOString()}' %>] <%= '${state.alert}' %>`
+      ? `[${new Date().toISOString()}] ${state.alert}`
       : state.alert;
     
     await slack.post(options.slackChannel, {
@@ -347,8 +347,8 @@ const notificationBrain = brain('Smart Notifier')
   .step('Process Alert', ({ state, options }) => ({
     ...state,
     formattedMessage: options.includeDetails === 'true'
-      ? `Alert: <%= '${state.message}' %> - Details: <%= '${state.details}' %>`
-      : `Alert: <%= '${state.message}' %>`,
+      ? `Alert: ${state.message} - Details: ${state.details}`
+      : `Alert: ${state.message}`,
     isPriority: options.priority === 'high'
   }))
   .step('Send Notification', async ({ state, options, slack, email }) => {
@@ -455,7 +455,7 @@ const analysisBrain = brain('Data Analysis')
     return { ...state, data };
   })
   .prompt('Analyze Data', {
-    message: ({ state: { data } }) => `Analyze this data: <%= '${JSON.stringify(data)}' %>`,
+    message: ({ state: { data } }) => `Analyze this data: ${JSON.stringify(data)}`,
     outputSchema: z.object({
       insights: z.array(z.string()),
       confidence: z.number()
@@ -589,9 +589,9 @@ const brainWithComponents = brain('Custom UI Brain')
         variant: z.enum(['default', 'highlighted', 'warning']).default('default')
       }),
       render: (props) => `
-        <div class="card card-<%= '${props.variant}' %>">
-          <h3><%= '${props.title}' %></h3>
-          <p><%= '${props.content}' %></p>
+        <div class="card card-${props.variant}">
+          <h3>${props.title}</h3>
+          <p>${props.content}</p>
         </div>
       `
     },
@@ -614,8 +614,8 @@ const brainWithComponents = brain('Custom UI Brain')
   .page('Dashboard', ({ state }) => ({
     prompt: `
       Create a dashboard using CustomCard components to display:
-      - User name: <%= '${state.userName}' %>
-      - Account status: <%= '${state.status}' %>
+      - User name: ${state.userName}
+      - Account status: ${state.status}
       Use DataTable to show recent activity.
     `,
     formSchema: z.object({
@@ -741,7 +741,7 @@ export const brain = createBrain({
     Alert: {
       description: 'Alert banner',
       props: z.object({ message: z.string(), type: z.enum(['info', 'warning', 'error']) }),
-      render: (props) => `<div class="alert alert-<%= '${props.type}' %>"><%= '${props.message}' %></div>`
+      render: (props) => `<div class="alert alert-${props.type}">${props.message}</div>`
     }
   },
   store: {
@@ -841,7 +841,7 @@ const typedBrain = brain('Typed Example')
     name: 'Test', // TypeScript knows state has 'count'
   }))
   .step('Use Both', ({ state }) => ({
-    message: `<%= '${state.name}' %>: <%= '${state.count}' %>`, // Both properties available
+    message: `${state.name}: ${state.count}`, // Both properties available
   }));
 ```
 
@@ -1007,7 +1007,7 @@ export const aiFilterPrompt = {
 
     // Build the prompt with state data
     const articleList = state.articles
-      .map((a, i) => `<%= '${i + 1}' %>. <%= '${a.title}' %> (score: <%= '${a.score}' %>)`)
+      .map((a, i) => `${i + 1}. ${a.title} (score: ${a.score})`)
       .join('\n');
 
     return template
@@ -1222,7 +1222,7 @@ brain('Item Processor')
   }))
   .map('Summarize Items', 'summaries', {
     prompt: {
-      message: ({ item }) => `Summarize this item: <%= '${item.title}' %>`,
+      message: ({ item }) => `Summarize this item: ${item.title}`,
       outputSchema: z.object({ summary: z.string() }),
     },
     over: ({ state }) => state.items,
@@ -1247,7 +1247,7 @@ To iterate an agent over items, wrap it in a brain and use `.map()`:
 const researchBrain = brain('Research Single')
   .brain('Research', ({ state, tools }) => ({
     system: 'You are a research assistant.',
-    prompt: `Research this topic: <%= '${state.name}' %>`,
+    prompt: `Research this topic: ${state.name}`,
     tools: { search: tools.search },
     outputSchema: z.object({ summary: z.string() }),
   }));
@@ -1297,7 +1297,7 @@ Since `over` receives the full step context, you can use options or plugin-provi
 const processItemBrain = brain('Process Single')
   .step('Process', ({ state }) => ({
     ...state,
-    result: `Processed item <%= '${state.id}' %>`,
+    result: `Processed item ${state.id}`,
   }));
 
 brain('Dynamic Processor')
@@ -1341,7 +1341,7 @@ brain('Research Assistant')
   }))
   .prompt('Research', ({ state }) => ({
     system: 'You are a helpful research assistant with access to search tools.',
-    message: `Research this topic: <%= '${state.query}' %>`,
+    message: `Research this topic: ${state.query}`,
     outputSchema: z.object({
       findings: z.array(z.string()),
       summary: z.string(),
@@ -1407,7 +1407,7 @@ import approvalWebhook from '../webhooks/approval.js';
 brain('Support Ticket Handler')
   .prompt('Handle Request', ({ state }) => ({
     system: 'You are a support agent. Escalate complex issues for human review.',
-    message: `Handle this support ticket: <%= '${state.ticket.description}' %>`,
+    message: `Handle this support ticket: ${state.ticket.description}`,
     outputSchema: z.object({
       resolution: z.string().describe('How the ticket was resolved'),
     }),
@@ -1505,7 +1505,7 @@ brain('Page Creator')
     const page = await pages.create(
       `<html>
         <body>
-          <h1>Hello, <%= '${state.userName}' %>!</h1>
+          <h1>Hello, ${state.userName}!</h1>
           <p>Your dashboard is ready.</p>
         </body>
       </html>`,
@@ -1519,7 +1519,7 @@ brain('Page Creator')
     };
   })
   .step('Notify User', async ({ state, slack }) => {
-    await slack.post('#general', `Your dashboard: <%= '${state.dashboardUrl}' %>`);
+    await slack.post('#general', `Your dashboard: ${state.dashboardUrl}`);
     return state;
   });
 ```
@@ -1653,7 +1653,7 @@ brain('Feedback Collector')
   // Generate the form, onCreated users, auto-suspend, auto-merge response
   .page('Collect Feedback', ({ state, slack }) => ({
     prompt: `
-      Create a feedback form for <%= '${state.userName}' %>.
+      Create a feedback form for ${state.userName}.
       Include fields for rating (1-5) and comments.
     `,
     formSchema: z.object({
@@ -1661,7 +1661,7 @@ brain('Feedback Collector')
       comments: z.string(),
     }),
     onCreated: async (page) => {
-      await slack.post('#feedback', `Please fill out: <%= '${page.url}' %>`);
+      await slack.post('#feedback', `Please fill out: ${page.url}`);
     },
   }))
   // No .handle() needed — form data spreads onto state
@@ -1696,7 +1696,7 @@ Be specific about layout and content:
     Create a contact form with:
     - Header: "Get in Touch"
     - Name field (required)
-    - Email field (required, pre-filled with "<%= '${state.email}' %>")
+    - Email field (required, pre-filled with "${state.email}")
     - Message textarea (required)
     - Submit button labeled "Send Message"
 
@@ -1751,7 +1751,7 @@ brain('User Onboarding')
       dob: z.string(),
     }),
     onCreated: async (page) => {
-      await notify(`Step 1: <%= '${page.url}' %>`);
+      await notify(`Step 1: ${page.url}`);
     },
   }))
   // No .handle() needed — form data spreads onto state
@@ -1759,7 +1759,7 @@ brain('User Onboarding')
   // Step 2: Preferences
   .page('Preferences', ({ state, notify }) => ({
     prompt: `
-      Create preferences form for <%= '${state.firstName}' %>:
+      Create preferences form for ${state.firstName}:
       - Newsletter subscription checkbox
       - Contact preference (email/phone/sms)
       - Complete button
@@ -1769,7 +1769,7 @@ brain('User Onboarding')
       contactMethod: z.enum(['email', 'phone', 'sms']),
     }),
     onCreated: async (page) => {
-      await notify(`Step 2: <%= '${page.url}' %>`);
+      await notify(`Step 2: ${page.url}`);
     },
   }))
   // No .handle() needed — form data spreads onto state
@@ -1812,7 +1812,7 @@ const completeBrain = brain({
     }),
   })
   .step('Process Plan', ({ state, logger, analytics }) => {
-    logger.log(`Plan generated with <%= '${state.tasks.length}' %> tasks`);
+    logger.log(`Plan generated with ${state.tasks.length} tasks`);
     analytics.track('plan_processed', {
       task_count: state.tasks.length,
       duration: state.duration

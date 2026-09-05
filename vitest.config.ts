@@ -24,11 +24,6 @@ export default defineConfig({
     ],
   },
   test: {
-    // Node gives a default import of a CommonJS package the whole
-    // module.exports object, and the CLI relies on that shape (it calls
-    // caz.default). Vitest flattens it by default; keep Node semantics so
-    // tests see what production sees.
-    deps: { interopDefault: false },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
@@ -58,7 +53,6 @@ export default defineConfig({
           include: ['packages/cli/**/*.test.ts'],
           exclude: [...ignored, 'packages/cli/tests/server.test.ts'],
           setupFiles: ['packages/cli/tests/vitest.setup.ts'],
-          globalSetup: ['packages/cli/tests/global-setup.ts'],
         },
       },
       {
@@ -68,7 +62,6 @@ export default defineConfig({
           name: 'cli-server',
           include: ['packages/cli/tests/server.test.ts'],
           exclude: ignored,
-          globalSetup: ['packages/cli/tests/global-setup.ts'],
         },
       },
       {

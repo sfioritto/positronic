@@ -10,7 +10,8 @@
       "@positronic/cli",
       "@positronic/cloudflare",
       "@positronic/client-vercel",
-      "@positronic/template-new-project"
+      "@positronic/template-new-project",
+      "@positronic/gen-ui-components"
     ]
   ],
   "access": "public",

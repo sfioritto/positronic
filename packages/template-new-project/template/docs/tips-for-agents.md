@@ -186,12 +186,12 @@ Always destructure properties off of `state` rather than accessing them through 
 ```typescript
 // ❌ DON'T DO THIS - accessing properties through state
 .brain('Find data', ({ state }) => ({
-    prompt: `Process <%= '${state.user.name}' %> from <%= '${state.user.email}' %>`,
+    prompt: `Process ${state.user.name} from ${state.user.email}`,
   }))
 
 // ✅ DO THIS - destructure in the parameter when state itself isn't needed
 .brain('Find data', ({ state: { user } }) => ({
-    prompt: `Process <%= '${user.name}' %> from <%= '${user.email}' %>`,
+    prompt: `Process ${user.name} from ${user.email}`,
   }))
 ```
 
@@ -199,10 +199,10 @@ The same applies to prompt templates:
 
 ```typescript
 // ❌ DON'T DO THIS
-message: ({ state }) => `Hello <%= '${state.user.name}' %>, your order <%= '${state.order.id}' %> is ready.`,
+message: ({ state }) => `Hello ${state.user.name}, your order ${state.order.id} is ready.`,
 
 // ✅ DO THIS
-message: ({ state: { user, order } }) => `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.`,
+message: ({ state: { user, order } }) => `Hello ${user.name}, your order ${order.id} is ready.`,
 ```
 
 When you still need `state` (e.g. for `...state` in the return value), destructure in the function body instead:
@@ -211,7 +211,7 @@ When you still need `state` (e.g. for `...state` in the return value), destructu
 // ❌ DON'T DO THIS
 .step('Format', ({ state }) => ({
     ...state,
-    summary: `<%= '${state.title}' %> by <%= '${state.author}' %>`,
+    summary: `${state.title} by ${state.author}`,
   }))
 
 // ✅ DO THIS - destructure in the body when you also need ...state
@@ -219,7 +219,7 @@ When you still need `state` (e.g. for `...state` in the return value), destructu
     const { title, author } = state;
     return {
       ...state,
-      summary: `<%= '${title}' %> by <%= '${author}' %>`,
+      summary: `${title} by ${author}`,
     };
   })
 ```
@@ -231,8 +231,8 @@ For complex, multi-line prompts, use JSX instead of template literals. Rename th
 ```tsx
 // Before (template literal — hard to read when indented in builder chain)
 message: ({ state: { user, order } }) =>
-  `Hello <%= '${user.name}' %>, your order <%= '${order.id}' %> is ready.
-<%= '${order.isExpress ? "\\nThis is an express order." : ""}' %>`,
+  `Hello ${user.name}, your order ${order.id} is ready.
+${order.isExpress ? "\nThis is an express order." : ""}`,
 
 // After (JSX — Prettier manages indentation, conditionals are clean)
 message: ({ state: { user, order } }) => (
@@ -403,7 +403,7 @@ If a brain receives its initial state from the outside — via `.map()`, `.brain
 // This brain is used inside .map() — it receives thread data as initial state
 const categorizeBrain = brain<{}, RawThread>('categorize-thread')
   .prompt('Categorize', {
-    message: ({ state }) => `Categorize: <%= '${state.subject}' %>`,
+    message: ({ state }) => `Categorize: ${state.subject}`,
     outputSchema: z.object({ category: z.string() }),
   });
 
@@ -480,18 +480,18 @@ brain('feedback-collector')
   }))
   // Generate the form, onCreated, auto-suspend, auto-merge response
   .page('Collect Feedback', ({ state, slack }) => ({
-    prompt: <%= '\`' %>
-      Create a feedback form for <%= '${state.userName}' %>:
+    prompt: `
+      Create a feedback form for ${state.userName}:
       - Rating (1-5)
       - Comments textarea
       - Submit button
-    <%= '\`' %>,
+    `,
     formSchema: z.object({
       rating: z.number().min(1).max(5),
       comments: z.string(),
     }),
     onCreated: async (page) => {
-      await slack.post('#feedback', `Fill out: <%= '${page.url}' %>`);
+      await slack.post('#feedback', `Fill out: ${page.url}`);
     },
   }))
   // No .handle() needed — form data auto-merges directly onto state
@@ -851,7 +851,7 @@ export default feedbackBrain;
 // Step 4: Add sentiment analysis step
   .prompt('Analyze sentiment', {
     message: ({ state: { feedback } }) =>
-      <%= '\`Analyze the sentiment of this feedback: "${feedback}"\`' %>,
+      `Analyze the sentiment of this feedback: "${feedback}"`,
     outputSchema: z.object({
       sentiment: z.enum(['positive', 'neutral', 'negative']),
       score: z.number().min(0).max(1)
@@ -862,7 +862,7 @@ export default feedbackBrain;
 // Step 6: Add response generation
   .prompt('Generate response', {
     message: ({ state: { sentiment, feedback } }) =>
-      <%= '\`Generate a brief response to this ${sentiment} feedback: "${feedback}"\`' %>,
+      `Generate a brief response to this ${sentiment} feedback: "${feedback}"`,
     outputSchema: z.object({
       response: z.string()
     }),
