@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
 import type {
   ObjectGenerator,
   ToolMessage,
@@ -232,7 +231,7 @@ export class BrainEventStream<
     }
 
     // Use provided ID if available, otherwise generate one
-    this.brainRunId = providedBrainRunId ?? uuidv4();
+    this.brainRunId = providedBrainRunId ?? crypto.randomUUID();
   }
 
   async *next(): AsyncGenerator<BrainEvent<TOptions>> {

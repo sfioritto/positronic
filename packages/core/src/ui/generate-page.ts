@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { ObjectGenerator } from '../clients/types.js';
 import { IterateResult } from '../dsl/iterate-result.js';
@@ -87,7 +86,7 @@ function treeToPlacementsRecursive(
   parentId: string | null,
   placements: Placement[]
 ): string {
-  const id = uuidv4();
+  const id = crypto.randomUUID();
 
   // Convert PropValue to raw values
   const props: Record<string, unknown> = {};

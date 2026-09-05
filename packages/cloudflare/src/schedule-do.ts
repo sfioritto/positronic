@@ -1,5 +1,4 @@
 import { DurableObject } from 'cloudflare:workers';
-import { v4 as uuidv4 } from 'uuid';
 import { Cron } from 'croner';
 import { BRAIN_EVENTS, type BrainEvent } from '@positronic/core';
 import { startBrainRun } from './brain-runner-do.js';
@@ -108,7 +107,7 @@ export class ScheduleDO extends DurableObject<Env> {
     options?: Record<string, string>,
     initialState?: Record<string, unknown>
   ): Promise<Schedule> {
-    const id = uuidv4();
+    const id = crypto.randomUUID();
     const createdAt = Date.now();
     if (this.env.IS_TEST !== 'true') {
       const alarm = await this.ctx.storage.getAlarm();

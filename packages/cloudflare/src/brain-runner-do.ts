@@ -31,8 +31,6 @@ import { createResources, type ResourceManifest } from '@positronic/core';
 import { getOrigin } from './origin.js';
 import type { R2Bucket } from '@cloudflare/workers-types';
 
-import { v4 as uuidv4 } from 'uuid';
-
 let manifest: PositronicManifest | null = null;
 export function setManifest(generatedManifest: PositronicManifest) {
   manifest = generatedManifest;
@@ -52,7 +50,7 @@ export async function startBrainRun(
   currentUser: { name: string },
   initialData?: Record<string, any>
 ): Promise<string> {
-  const brainRunId = uuidv4();
+  const brainRunId = crypto.randomUUID();
   const doId = namespace.idFromName(brainRunId);
   const stub = namespace.get(doId);
   await stub.start(brainTitle, brainRunId, currentUser, initialData);

@@ -40,12 +40,10 @@
     "hono": "^4.2.3",
     "jose": "^5.2.0",
     "js-tiktoken": "^1.0.21",
-    "uuid": "^9.0.1",
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250415.0",
-    "@types/node": "^26.4.1",
-    "@types/uuid": "^9.0.8"
+    "@types/node": "^26.4.1"
   }
 }

@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { STATUS } from '../constants.js';
 import type { JsonPatch } from '../types.js';
 import type { SerializedStep } from '../definitions/steps.js';
@@ -13,7 +12,7 @@ export class Step {
     public block: Block<any, any, any, any, any, any>,
     id?: string
   ) {
-    this.id = id || uuidv4();
+    this.id = id || crypto.randomUUID();
   }
 
   withPatch(patch: JsonPatch | undefined) {
