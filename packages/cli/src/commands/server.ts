@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import chokidar, { type FSWatcher } from 'chokidar';
+import { watch, type FSWatcher } from 'chokidar';
 import type { ArgumentsCamelCase } from 'yargs';
 import {
   syncResources,
@@ -196,15 +196,19 @@ export class ServerCommand {
       }
 
       // Watcher setup - target the user's brains, resources directories, and .env file
-      const envFilePath = path.join(this.server.projectRootDir, '.env');
-      const watchPaths = [
-        path.join(brainsDir, '**/*.{ts,tsx}'),
-        path.join(resourcesDir, '**/*'),
-        envFilePath,
-      ];
+      const { projectRootDir } = this.server;
+      const envFilePath = path.join(projectRootDir, '.env');
+      // chokidar 5 takes directories, not globs; dotfiles and node_modules
+      // are filtered here and brain files by extension in the handler.
+      const isIgnored = (filePath: string) =>
+        filePath !== envFilePath &&
+        path
+          .relative(projectRootDir, filePath)
+          .split(/[\\/]/)
+          .some((s) => s === 'node_modules' || s.startsWith('.'));
 
-      watcher = chokidar.watch(watchPaths, {
-        ignored: [/(^|[/\\])\../, '**/node_modules/**'],
+      watcher = watch([brainsDir, resourcesDir, envFilePath], {
+        ignored: isIgnored,
         persistent: true,
         ignoreInitial: true,
         awaitWriteFinish: {
@@ -223,43 +227,23 @@ export class ServerCommand {
         console.log('✅ Updated secrets.d.ts from .env');
       };
 
+      const handleFileEvent = async (
+        event: 'add' | 'change' | 'unlink',
+        filePath: string
+      ) => {
+        if (filePath === envFilePath) {
+          handleEnvChange();
+        } else if (filePath.startsWith(resourcesDir)) {
+          await handleResourceChange();
+        } else if (filePath.startsWith(brainsDir) && /\.tsx?$/.test(filePath)) {
+          await this.server.watch?.(filePath, event);
+        }
+      };
+
       watcher
-        .on('add', async (filePath) => {
-          if (filePath === envFilePath) {
-            handleEnvChange();
-          } else if (filePath.startsWith(resourcesDir)) {
-            await handleResourceChange();
-          } else if (filePath.startsWith(brainsDir)) {
-            // Call the dev server's watch method if it exists
-            if (this.server.watch) {
-              await this.server.watch(filePath, 'add');
-            }
-          }
-        })
-        .on('change', async (filePath) => {
-          if (filePath === envFilePath) {
-            handleEnvChange();
-          } else if (filePath.startsWith(resourcesDir)) {
-            await handleResourceChange();
-          } else if (filePath.startsWith(brainsDir)) {
-            // Call the dev server's watch method if it exists
-            if (this.server.watch) {
-              await this.server.watch(filePath, 'change');
-            }
-          }
-        })
-        .on('unlink', async (filePath) => {
-          if (filePath === envFilePath) {
-            handleEnvChange();
-          } else if (filePath.startsWith(resourcesDir)) {
-            await handleResourceChange();
-          } else if (filePath.startsWith(brainsDir)) {
-            // Call the dev server's watch method if it exists
-            if (this.server.watch) {
-              await this.server.watch(filePath, 'unlink');
-            }
-          }
-        })
+        .on('add', (filePath) => handleFileEvent('add', filePath))
+        .on('change', (filePath) => handleFileEvent('change', filePath))
+        .on('unlink', (filePath) => handleFileEvent('unlink', filePath))
         .on('error', (error) => console.error(`Watcher error: ${error}`));
     } catch (error) {
       console.error('An error occurred during server startup:', error);
