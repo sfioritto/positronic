@@ -8,12 +8,14 @@
     "start": "wrangler dev",
     "test": "vitest --silent --run",
     "cf-typegen": "wrangler types",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:coverage": "vitest --silent --run --coverage"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.18",
     "@positronic/core": "file:../../core",
     "@positronic/spec": "file:../../spec",
+    "@vitest/coverage-istanbul": "^3.0.9",
     "jose": "^5.2.0",
     "typescript": "^5.5.2",
     "vitest": "3.0.9",

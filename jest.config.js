@@ -28,10 +28,27 @@ const sharedConfig = {
   modulePathIgnorePatterns: [
     '<rootDir>/packages/template-new-project/template/',
   ],
+  // The worker-side cloudflare source runs under vitest in
+  // packages/cloudflare/test-project, which has its own coverage config. Only
+  // the Node-side entry points are exercised by Jest. (This is a per-project
+  // option, unlike collectCoverageFrom, so it lives here.)
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/packages/cloudflare/src/(?!dev-server|node-index)',
+  ],
 };
 
 /** @type {import('jest').Config} */
 const config = {
+  // Report coverage for every source file, not just the ones tests happen to
+  // import. The spec package is contract tests, not source; the cloudflare
+  // vitest suite reports it so unexercised contract functions show up there.
+  collectCoverageFrom: [
+    'packages/*/src/**/*.{ts,tsx}',
+    '!packages/*/src/**/*.d.ts',
+    '!packages/spec/**',
+    '!packages/template-new-project/**',
+  ],
   projects: [
     {
       // CLI package tests - with nock network safety net
