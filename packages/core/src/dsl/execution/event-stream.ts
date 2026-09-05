@@ -96,7 +96,7 @@ export class BrainEventStream<
   private templateContext: TemplateContext;
   private governor?: (client: ObjectGenerator) => ObjectGenerator;
   private currentUser: CurrentUser;
-  private guards: Map<number, GuardBlock<any, any>> = new Map();
+  private guards: Map<number, GuardBlock> = new Map();
   private waits: Map<number, WaitBlock<any, any, any, any>> = new Map();
   private stopped = false;
   private optionsSchema?: z.ZodSchema<any>;
@@ -167,7 +167,7 @@ export class BrainEventStream<
     this.steps = [];
     for (const block of blocks) {
       if (block.type === 'guard') {
-        const guardBlock = block as GuardBlock<any, any>;
+        const guardBlock = block as GuardBlock;
         this.guards.set(this.steps.length, guardBlock);
       } else if (block.type === 'wait') {
         const waitBlock = block as WaitBlock<any, any, any, any>;
@@ -536,7 +536,7 @@ export class BrainEventStream<
     }
 
     if (block.type === 'brain') {
-      const brainBlock = block as BrainBlock<any, any, any, TOptions, TPlugins>;
+      const brainBlock = block as BrainBlock;
       const initialState = brainBlock.initialState
         ? typeof brainBlock.initialState === 'function'
           ? brainBlock.initialState(this.buildStepContext(step))
@@ -1686,7 +1686,7 @@ The output must conform to the provided schema.`,
 
   private *executeGuard(
     step: Step,
-    guard: GuardBlock<any, any>
+    guard: GuardBlock
   ): Generator<BrainEvent<TOptions>> {
     const { steps, options, brainRunId } = this;
     const predicateResult = guard.predicate(this.buildStepContext(step));

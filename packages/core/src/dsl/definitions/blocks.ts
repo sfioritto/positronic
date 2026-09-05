@@ -90,14 +90,7 @@ export type WaitBlock<
 };
 
 // BrainBlock uses a generic TInnerBrain to avoid circular dependency with Brain class
-export type BrainBlock<
-  TOuterState,
-  TInnerState extends State,
-  TNewState,
-  TOptions extends JsonObject = JsonObject,
-  TPlugins extends object = object,
-  TInnerBrain = any
-> = {
+export type BrainBlock<TInnerBrain = any> = {
   type: 'brain';
   title: string;
   innerBrain: TInnerBrain;
@@ -105,7 +98,7 @@ export type BrainBlock<
   options?: JsonObject | ((context: any) => JsonObject);
 };
 
-export type GuardBlock<TStateIn, TOptions extends JsonObject = JsonObject> = {
+export type GuardBlock = {
   type: 'guard';
   title: string;
   predicate: (params: any) => boolean;
@@ -179,8 +172,8 @@ export type Block<
   TPageIn extends GeneratedPage | undefined = undefined
 > =
   | StepBlock<TStateIn, TStateOut, TOptions, TPlugins, TResponseIn, TPageIn>
-  | BrainBlock<TStateIn, any, TStateOut, TOptions, TPlugins>
-  | GuardBlock<TStateIn, TOptions>
+  | BrainBlock
+  | GuardBlock
   | WaitBlock<TStateIn, TOptions, TPlugins, TPageIn>
   | MapBlock
   | PromptBlock;

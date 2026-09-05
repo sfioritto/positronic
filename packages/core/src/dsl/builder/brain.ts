@@ -138,8 +138,7 @@ export class Brain<
           return {
             type: 'brain' as const,
             title: block.title,
-            innerBrain: (block as BrainBlock<any, any, any, TOptions, TPlugins>)
-              .innerBrain.structure,
+            innerBrain: (block as BrainBlock).innerBrain.structure,
           };
         }
       }),
@@ -304,7 +303,7 @@ export class Brain<
     predicate: (params: StepContext<TState, TOptions> & TPlugins) => boolean,
     title?: string
   ): Brain<TOptions, TState, TPlugins> {
-    const guardBlock: GuardBlock<TState, TOptions> = {
+    const guardBlock: GuardBlock = {
       type: 'guard',
       title: title ?? 'Guard',
       predicate,
@@ -333,7 +332,7 @@ export class Brain<
     }
   ): Brain<TOptions, TNewState, TPlugins> {
     const nestedConfig = config ?? {};
-    const nestedBlock: BrainBlock<TState, any, any, TOptions, TPlugins> = {
+    const nestedBlock: BrainBlock = {
       type: 'brain',
       title,
       innerBrain,
