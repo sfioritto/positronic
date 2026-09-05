@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "incremental": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@positronic/core",
+    "paths": {
+      "@positronic/core/jsx-runtime": ["../src/jsx-runtime.ts"]
+    }
+  },
+  "include": ["./**/*"]
+}

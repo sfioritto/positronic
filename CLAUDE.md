@@ -72,9 +72,10 @@ The project uses npm workspaces with the following packages:
 Templates in `.prompt()`, `.page()`, and `.map()` steps can return JSX (`TemplateNode`) in addition to strings. The runner resolves JSX to a string via `resolveTemplate()` before emitting events or passing to the LLM client.
 
 - **JSX runtime**: `packages/core/src/jsx-runtime.ts` — exports `jsx`, `jsxs`, `Fragment` for the automatic JSX transform
+- **Dev runtime**: `packages/core/src/jsx-dev-runtime.ts` — exports `jsxDEV` for dev-mode tooling such as Vite and Vitest, which import from `jsx-dev-runtime` instead
 - **Rendering**: `packages/core/src/template/render.ts` — `renderTemplate()`, `resolveTemplate()`, `isTemplateNode()`
 - **Subpath export**: `@positronic/core/jsx-runtime` is exported from core's `package.json`
-- **Monorepo caveat**: Do NOT use JSX syntax in core tests. The root `.swcrc` uses React as `importSource` (for CLI/Ink). Construct `TemplateNode` trees manually using `{ type: Fragment, props: {}, children: [...] }`.
+- **Monorepo JSX settings**: Each package's tsconfig owns its JSX settings. Core's source has no JSX; `packages/core/tests/tsconfig.json` sets `jsxImportSource` to `@positronic/core` (with a `paths` entry so typechecking sees the source runtime), so core tests can use JSX in `.test.tsx` files (see `packages/core/tests/jsx-syntax.test.tsx`). `packages/cli` and `packages/gen-ui-components` use React.
 - **Generated projects**: Use `jsxImportSource: "@positronic/core"` in their tsconfig
 - **Whitespace preservation**: `.positronic/build-brains.mjs` in generated projects — esbuild plugin (inlined) that preserves JSX text whitespace. Runs via wrangler's `build.command`. Without it, the JSX compiler collapses newlines in text to spaces.
 

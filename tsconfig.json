@@ -20,7 +20,8 @@
   },
   "exclude": [
     "packages/template-new-project/template",
-    "packages/cloudflare/test-project"
+    "packages/cloudflare/test-project",
+    "packages/core/tests"
   ],
   "references": [
     {

@@ -18,6 +18,10 @@ export default defineConfig({
     // build step and coverage lands on .ts files rather than dist.
     alias: [
       {
+        find: /^@positronic\/core\/(jsx-runtime|jsx-dev-runtime)$/,
+        replacement: `${root}packages/core/src/$1.ts`,
+      },
+      {
         find: /^@positronic\/([^/]+)$/,
         replacement: `${root}packages/$1/src`,
       },
@@ -69,7 +73,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'other',
-          include: ['packages/**/*.test.ts'],
+          include: ['packages/**/*.test.{ts,tsx}'],
           exclude: [...ignored, 'packages/cli/**'],
         },
       },
