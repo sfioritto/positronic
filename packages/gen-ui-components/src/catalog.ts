@@ -1,6 +1,6 @@
 import { definePageCatalog } from '@positronic/core/page';
 import { shadcnComponentDefinitions } from '@json-render/shadcn/catalog';
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * Component definitions for Positronic pages: a subset of shadcn/ui plus
