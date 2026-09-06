@@ -82,7 +82,7 @@ Templates in `.prompt()`, `.page()`, and `.map()` steps can return JSX (`Templat
 
 ### Generated Pages
 
-`.page({ prompt })` and the `generatePage` tool build a json-render spec (`packages/core/src/page/`): `pageSchema` owns the spec shape and system prompt, `generateSpec()` runs generate/validate/repair, `checkFormSchema()` checks `/form/*` bindings against the step's form schema, and `generatePageHtml()` embeds the spec as `window.__POSITRONIC_PAGE__`. The page loads `/bundle/components.js` and `/bundle/components.css`, which the dev server builds from the project's `.positronic/bundle.ts` (esbuild, React inside) and `.positronic/styles.css` (Tailwind CLI) and uploads to R2. `@positronic/gen-ui-components` supplies the catalog (`/catalog` entry, server-safe) and the browser runtime (`mount()`); `@positronic/core/page` is the browser-safe core entry.
+`.page({ prompt })` and the `generatePage` tool build a json-render spec (`packages/core/src/page/`): `pageSchema` owns the spec shape and system prompt, `generateSpec()` runs generate/validate/repair, `checkFormSchema()` checks `/form/*` bindings against the step's form schema, and `generatePageHtml()` embeds the spec as `window.__POSITRONIC_PAGE__`. The page loads `/bundle/components.js` and `/bundle/components.css`, which the dev server builds from the project's `.positronic/bundle.ts` (Vite, React inside) and `.positronic/styles.css` (Tailwind CLI) and uploads to R2. `@positronic/gen-ui-components` supplies the catalog (`/catalog` entry, server-safe) and the browser runtime (`mount()`); `@positronic/core/page` is the browser-safe core entry.
 
 ### Files Service
 

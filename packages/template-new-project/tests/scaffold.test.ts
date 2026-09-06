@@ -76,11 +76,11 @@ describe('scaffoldProject', () => {
     expect(fs.readdirSync(dest).sort()).toEqual([
       'build-brains.mjs',
       'bundle.ts',
-      'esbuild.config.mjs',
       'package.json',
       'src',
       'styles.css',
       'tsconfig.json',
+      'vite.config.mjs',
       'wrangler.jsonc',
     ]);
     expect(read('wrangler.jsonc')).toContain('"name": "demo"');

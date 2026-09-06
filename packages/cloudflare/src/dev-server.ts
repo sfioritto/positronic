@@ -498,9 +498,10 @@ export class CloudflareDevServer implements PositronicDevServer {
   /**
    * Build the page bundle and upload it to R2.
    *
-   * esbuild bundles .positronic/bundle.ts with React inside (React 19 has no
-   * UMD build, so nothing is external) and the Tailwind CLI compiles
-   * .positronic/styles.css. Generated pages load both from /bundle/.
+   * Vite bundles .positronic/bundle.ts with React inside (React 19 has no
+   * UMD build, so nothing is external) using .positronic/vite.config.mjs,
+   * and the Tailwind CLI compiles .positronic/styles.css. Generated pages
+   * load both from /bundle/.
    */
   private async buildAndUploadBundle(
     projectRoot: string,
@@ -509,6 +510,7 @@ export class CloudflareDevServer implements PositronicDevServer {
     const serverDir = path.join(projectRoot, '.positronic');
     const distDir = path.join(serverDir, 'dist');
     const bundleEntryPath = path.join(serverDir, 'bundle.ts');
+    const viteConfigPath = path.join(serverDir, 'vite.config.mjs');
     const stylesEntryPath = path.join(serverDir, 'styles.css');
     const outputs = {
       'bundle/components.js': path.join(distDir, 'components.js'),
@@ -533,14 +535,21 @@ export class CloudflareDevServer implements PositronicDevServer {
       return;
     }
 
+    if (!(await exists(viteConfigPath))) {
+      console.log(
+        '📦 No .positronic/vite.config.mjs found, skipping bundle build (run with --force to regenerate .positronic)'
+      );
+      return;
+    }
+
     try {
       console.log('📦 Building component bundle...');
       await fsPromises.mkdir(distDir, { recursive: true });
 
-      execSync(
-        `npx esbuild "${bundleEntryPath}" --bundle --format=iife --platform=browser --jsx=automatic --minify --outfile="${outputs['bundle/components.js']}"`,
-        { cwd: projectRoot, stdio: 'inherit' }
-      );
+      execSync(`npx vite build --config "${viteConfigPath}" --logLevel warn`, {
+        cwd: projectRoot,
+        stdio: 'inherit',
+      });
       execSync(
         `npx @tailwindcss/cli -i "${stylesEntryPath}" -o "${outputs['bundle/components.css']}" --minify`,
         { cwd: projectRoot, stdio: 'inherit' }
