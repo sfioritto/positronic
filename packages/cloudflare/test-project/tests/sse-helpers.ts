@@ -1,3 +1,4 @@
+import { vi, expect } from 'vitest';
 import {
   createBrainExecutionMachine,
   sendEvent,
@@ -159,12 +160,15 @@ export async function readSseStreamIncludingErrors(
 }
 
 /**
- * Read SSE events until a specific event type is found.
+ * Read SSE events until a specific event type is found, optionally narrowed
+ * by a predicate. The stream opens with the run's full history, so a test
+ * looking for the second event of a type has to say which one it means.
  * Cancels the reader once the target event is found.
  */
 export async function readUntilEvent(
   stream: ReadableStream<Uint8Array>,
-  targetType: string
+  targetType: string,
+  matches: (event: BrainEvent) => boolean = () => true
 ): Promise<{ events: BrainEvent[]; found: boolean }> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -187,7 +191,7 @@ export async function readUntilEvent(
           const parsed = parseSseEvent(message);
           for (const event of normalizeEvents(parsed)) {
             events.push(event);
-            if (event.type === targetType) {
+            if (event.type === targetType && matches(event)) {
               found = true;
               break;
             }
@@ -201,4 +205,29 @@ export async function readUntilEvent(
   }
 
   return { events, found };
+}
+
+/**
+ * Poll the Monitor until it reports the run with the given status and
+ * return that last event. The Monitor learns of an event by RPC after the
+ * watch stream has already broadcast it, so a test that saw the event on
+ * the stream still has to wait for the Monitor to catch up.
+ */
+export async function waitForRunStatus(
+  testEnv: Cloudflare.Env,
+  brainRunId: string,
+  status: string,
+  timeout = 5000
+) {
+  const monitorStub = testEnv.MONITOR_DO.get(
+    testEnv.MONITOR_DO.idFromName('singleton')
+  );
+  return vi.waitFor(
+    async () => {
+      const lastEvent = await monitorStub.getLastEvent(brainRunId);
+      expect(lastEvent?.status).toBe(status);
+      return lastEvent;
+    },
+    { timeout, interval: 50 }
+  );
 }

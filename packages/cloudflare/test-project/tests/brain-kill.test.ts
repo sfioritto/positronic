@@ -12,6 +12,7 @@ import {
   createAuthenticatedRequest,
   createAuthenticatedFetchWrapper,
 } from './test-auth-helper';
+import { waitForRunStatus } from './sse-helpers';
 
 describe('Brain Kill API', () => {
   // Helper to create authenticated fetch for spec tests
@@ -42,12 +43,18 @@ describe('Brain Kill API', () => {
       brainRunId: string;
     };
 
-    // Wait a bit to ensure the brain is running
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // The START event reaches the Monitor by RPC after the create request has
+    // returned, and kill looks the run up in the Monitor.
+    await waitForRunStatus(testEnv, brainRunId, STATUS.RUNNING);
 
     // Test via spec
     const result = await brains.kill(createAuthFetch(testEnv, ctx), brainRunId);
     expect(result).toBe(true);
+
+    // Killing an active brain aborts its run, but the step that is executing
+    // (the delayed brain's 1.5s sleep) finishes before the runner emits
+    // CANCELLED. Wait for that so the run does not outlive the test.
+    await waitForRunStatus(testEnv, brainRunId, STATUS.CANCELLED);
   });
 
   it('should return 404 for non-existent brain run', async () => {
@@ -90,8 +97,9 @@ describe('Brain Kill API', () => {
       brainRunId: string;
     };
 
-    // Wait a bit to ensure the brain is running
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // The START event reaches the Monitor by RPC after the create request has
+    // returned, and kill looks the run up in the Monitor.
+    await waitForRunStatus(testEnv, brainRunId, STATUS.RUNNING);
 
     // Kill the brain run
     const killRequest = await createAuthenticatedRequest(
@@ -105,7 +113,10 @@ describe('Brain Kill API', () => {
     await waitOnExecutionContext(ctx);
     expect(killResponse.status).toBe(204);
 
-    // Verify it was killed by checking the monitor
+    // The runner emits CANCELLED once the delayed brain's 1.5s step finishes.
+    await waitForRunStatus(testEnv, brainRunId, STATUS.CANCELLED);
+
+    // The killed run shows as cancelled in the brain's history
     const historyRequest = await createAuthenticatedRequest(
       `http://example.com/brains/delayed-brain/history?limit=1`
     );
@@ -117,9 +128,7 @@ describe('Brain Kill API', () => {
       runs: Array<{ brainRunId: string; status: string }>;
     };
     const killedRun = runs.find((r) => r.brainRunId === brainRunId);
-    expect(killedRun).toBeDefined();
-    // The status might still be RUNNING if the cancellation hasn't propagated yet
-    // But the important thing is that the kill endpoint returned 204
+    expect(killedRun?.status).toBe(STATUS.CANCELLED);
   });
 
   it('should kill a brain suspended on a webhook via spec test', async () => {

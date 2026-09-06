@@ -9,7 +9,7 @@ import worker from '../src/index';
 import { BRAIN_EVENTS, STATUS } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
-import { readUntilEvent } from './sse-helpers';
+import { readUntilEvent, waitForRunStatus } from './sse-helpers';
 
 describe('Wait Timeout Tests', () => {
   beforeEach(() => {
@@ -315,7 +315,9 @@ describe('Wait Timeout Tests', () => {
     expect(webhook1Result.action).toBe('resumed');
     await waitOnExecutionContext(webhook1Ctx);
 
-    // Step 4: Watch until second WEBHOOK event
+    // Step 4: Watch until the second wait's WEBHOOK event. The stream replays
+    // the run's history first, which already holds the first wait's WEBHOOK,
+    // so match on the registration or the kill below races the resumed run.
     const watch2Request = await createAuthenticatedRequest(watchUrl);
     const watch2Ctx = createExecutionContext();
     const watch2Response = await worker.fetch(
@@ -326,7 +328,12 @@ describe('Wait Timeout Tests', () => {
 
     const { found: foundSecondWebhook } = await readUntilEvent(
       watch2Response.body!,
-      BRAIN_EVENTS.WEBHOOK
+      BRAIN_EVENTS.WEBHOOK,
+      (event) =>
+        event.type === BRAIN_EVENTS.WEBHOOK &&
+        event.waitFor.some(
+          (registration) => registration.identifier === 'multi-wait-2'
+        )
     );
     expect(foundSecondWebhook).toBe(true);
     await waitOnExecutionContext(watch2Ctx);
@@ -354,12 +361,13 @@ describe('Wait Timeout Tests', () => {
     expect(foundCancelled).toBe(true);
     await waitOnExecutionContext(watch3Ctx);
 
-    // Step 7: Verify MonitorDO status is cancelled
-    const monitorId = testEnv.MONITOR_DO.idFromName('singleton');
-    const monitorStub = testEnv.MONITOR_DO.get(monitorId);
-    const lastEvent = await monitorStub.getLastEvent(brainRunId);
-    expect(lastEvent).toBeDefined();
+    // Step 7: Verify MonitorDO status is cancelled. The watch stream sees the
+    // event before the Monitor's RPC for it lands, so poll.
+    const lastEvent = await waitForRunStatus(
+      testEnv,
+      brainRunId,
+      STATUS.CANCELLED
+    );
     expect(lastEvent?.type).toBe(BRAIN_EVENTS.CANCELLED);
-    expect(lastEvent?.status).toBe(STATUS.CANCELLED);
   });
 });

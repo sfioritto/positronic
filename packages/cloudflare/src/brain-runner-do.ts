@@ -190,7 +190,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private brainRunId: string;
   private eventStreamAdapter = new EventStreamAdapter();
-  private abortController: AbortController | null = null;
+  private active: { run: Promise<unknown>; abort: AbortController } | null =
+    null;
   private pageAdapter: PageAdapter | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
@@ -413,7 +414,7 @@ export class BrainRunnerDO extends DurableObject<Env> {
 
   /**
    * Kill a brain run. This method handles multiple scenarios:
-   * 1. Brain is actively running (has abortController) - abort it
+   * 1. Brain is actively running (has an active run) - abort it
    * 2. Brain is suspended (waiting for webhook) - emit CANCELLED event
    * 3. Brain is a "zombie" (DO state missing due to IoContext timeout) - directly update MonitorDO
    *
@@ -425,8 +426,8 @@ export class BrainRunnerDO extends DurableObject<Env> {
     brainTitle?: string
   ): Promise<{ success: boolean; message: string }> {
     // If brain is actively running, abort it
-    if (this.abortController && !this.abortController.signal.aborted) {
-      this.abortController.abort();
+    if (this.active && !this.active.abort.signal.aborted) {
+      this.active.abort.abort();
       return { success: true, message: 'Brain run kill signal sent' };
     }
 
@@ -532,10 +533,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
    * startsAt is 1-indexed: --starts-at 3 keeps steps 1-2, re-executes from step 3.
    */
   async rerun(startsAt: number) {
-    if (this.abortController) {
-      throw new Error('Cannot rerun while brain is actively running');
-    }
-
     const eventLoader = new EventLoader(this.sql, this.env.RESOURCES_BUCKET);
     const eventsWithIds = await eventLoader.loadAllEventsWithIds();
 
@@ -586,6 +583,16 @@ export class BrainRunnerDO extends DurableObject<Env> {
         })`,
       };
     }
+
+    // A run whose terminal event is already in the history may still be
+    // delivering that event to the adapters (a watcher sees it on the event
+    // stream before the Monitor's RPC for it lands). Wait for that run to
+    // settle rather than refusing; only a run that is still running is
+    // refused.
+    if (this.active && machine.context.status === STATUS.RUNNING) {
+      throw new Error('Cannot rerun while brain is actively running');
+    }
+    await this.active?.run;
 
     // Reset MonitorDO tracking state now that the rerun is validated, before
     // wakeUp() starts emitting events for the resumed execution
@@ -719,8 +726,6 @@ export class BrainRunnerDO extends DurableObject<Env> {
     const bucket = this.env.RESOURCES_BUCKET;
     const storeBackend = createR2Backend(bucket);
 
-    this.abortController = new AbortController();
-
     const iterateItemAdapter = new IterateItemAdapter(
       (signal) => this.queueSignal(signal),
       (time) => this.ctx.storage.setAlarm(time)
@@ -755,6 +760,27 @@ export class BrainRunnerDO extends DurableObject<Env> {
     return { brainToRun, runner };
   }
 
+  /**
+   * Run the brain in the background and remember the run until it settles.
+   * The run outlives the request that started it. How it ends is reported
+   * through the event stream, and the runner never rejects, so there is
+   * nothing to catch.
+   *
+   * An alarm can start the next run before this one has settled: the iterate
+   * restart sets its alarm while the previous run is still dispatching its
+   * last event. Only clear the field if it still belongs to this run, so an
+   * old run settling cannot drop the handle on the new one.
+   */
+  private track(run: Promise<unknown>, abort: AbortController) {
+    const active = { run, abort };
+    this.active = active;
+    run.finally(() => {
+      if (this.active === active) {
+        this.active = null;
+      }
+    });
+  }
+
   async start(
     brainTitle: string,
     brainRunId: string,
@@ -778,20 +804,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
       currentUser
     );
 
-    // Fire-and-forget: the run outlives this request. How it ends is reported
-    // through the event stream, and the runner resolves for brain errors and
-    // for failures outside the stream alike, so there is nothing to catch.
-    runner
-      .run(brainToRun, {
+    const abort = new AbortController();
+    this.track(
+      runner.run(brainToRun, {
         currentUser,
         initialState,
         brainRunId,
         ...(options && { options }),
-        signal: this.abortController!.signal,
-      })
-      .finally(() => {
-        this.abortController = null;
-      });
+        signal: abort.signal,
+      }),
+      abort
+    );
   }
 
   /**
@@ -857,18 +880,17 @@ export class BrainRunnerDO extends DurableObject<Env> {
       currentUser
     );
 
-    // Fire-and-forget, same as start().
-    runner
-      .resume(brainToRun, {
+    const abort = new AbortController();
+    this.track(
+      runner.resume(brainToRun, {
         currentUser,
         machine,
         brainRunId,
         options,
-        signal: this.abortController!.signal,
-      })
-      .finally(() => {
-        this.abortController = null;
-      });
+        signal: abort.signal,
+      }),
+      abort
+    );
   }
 
   async fetch(request: Request) {

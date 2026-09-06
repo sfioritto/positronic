@@ -16,6 +16,10 @@ export default defineConfig({
     alias: { '@positronic/spec': `${specSrc}/index.ts` },
   },
   test: {
+    // Iterate steps restart the Durable Object between items (alarm, event
+    // replay, resource reload), which takes a few seconds when the machine
+    // is busy, so the default 5 second timeout is too tight for those tests.
+    testTimeout: 20000,
     coverage: {
       // The workers plugin does not support V8 coverage; Istanbul is required.
       // https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/

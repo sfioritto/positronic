@@ -6,9 +6,10 @@ import {
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import worker from '../src/index';
+import { STATUS } from '@positronic/core';
 import { resetMockState } from '../src/runner';
 import { createAuthenticatedRequest } from './test-auth-helper';
-import { readSseStream } from './sse-helpers';
+import { readSseStream, waitForRunStatus } from './sse-helpers';
 
 describe('Signal API Tests', () => {
   beforeEach(() => {
@@ -328,23 +329,9 @@ describe('Signal API Tests', () => {
 
       expect(signalResponse.status).toBe(202);
 
-      // Wait for brain to pause (after first step completes)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Verify brain is paused
-      const getRunRequest = await createAuthenticatedRequest(
-        `http://example.com/brains/runs/${brainRunId}`,
-        { method: 'GET' }
-      );
-      const getRunContext = createExecutionContext();
-      const getRunResponse = await worker.fetch(
-        getRunRequest,
-        testEnv,
-        getRunContext
-      );
-      await waitOnExecutionContext(getRunContext);
-      const runDetails = await getRunResponse.json<{ status: string }>();
-      expect(runDetails.status).toBe('paused');
+      // Signals are consumed between steps, so the brain pauses once its
+      // 1.5s first step completes. Poll the run until the Monitor sees it.
+      await waitForRunStatus(testEnv, brainRunId, STATUS.PAUSED);
 
       // Verify resume endpoint accepts the request (brain is in paused state)
       const resumeRequest = await createAuthenticatedRequest(

@@ -57,9 +57,7 @@ describe('Brain API Error Handling', () => {
    *
    * The brain-runner-do.ts intentionally does NOT await the brain run:
    *
-   *   runner
-   *     .run(brainToRun, {...})  // NOT awaited!
-   *     .finally(() => { this.abortController = null; });
+   *   this.track(runner.run(brainToRun, {...}), abort);  // NOT awaited!
    *
    * This is intentional because:
    * 1. Long-running brains would timeout HTTP requests if awaited
