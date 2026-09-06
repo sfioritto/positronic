@@ -496,12 +496,10 @@ export class CloudflareDevServer implements PositronicDevServer {
   }
 
   /**
-   * Build the page bundle and upload it to R2.
-   *
-   * Vite bundles .positronic/bundle.ts with React inside (React 19 has no
-   * UMD build, so nothing is external) using .positronic/vite.config.mjs,
-   * and the Tailwind CLI compiles .positronic/styles.css. Generated pages
-   * load both from /bundle/.
+   * Runs the project's Vite build (.positronic/vite.config.mjs) and uploads
+   * components.js and components.css from .positronic/dist to R2 under
+   * bundle/, where generated pages load them. The two names are fixed by
+   * generatePageHtml in core; anything else Vite emits is not published.
    */
   private async buildAndUploadBundle(
     projectRoot: string,
@@ -511,7 +509,6 @@ export class CloudflareDevServer implements PositronicDevServer {
     const distDir = path.join(serverDir, 'dist');
     const bundleEntryPath = path.join(serverDir, 'bundle.ts');
     const viteConfigPath = path.join(serverDir, 'vite.config.mjs');
-    const stylesEntryPath = path.join(serverDir, 'styles.css');
     const outputs = {
       'bundle/components.js': path.join(distDir, 'components.js'),
       'bundle/components.css': path.join(distDir, 'components.css'),
@@ -544,16 +541,11 @@ export class CloudflareDevServer implements PositronicDevServer {
 
     try {
       console.log('📦 Building component bundle...');
-      await fsPromises.mkdir(distDir, { recursive: true });
 
       execSync(`npx vite build --config "${viteConfigPath}" --logLevel warn`, {
         cwd: projectRoot,
         stdio: 'inherit',
       });
-      execSync(
-        `npx @tailwindcss/cli -i "${stylesEntryPath}" -o "${outputs['bundle/components.css']}" --minify`,
-        { cwd: projectRoot, stdio: 'inherit' }
-      );
 
       // Get bucket name from wrangler config
       const wranglerConfigPath = path.join(serverDir, 'wrangler.jsonc');

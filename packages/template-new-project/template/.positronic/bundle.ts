@@ -1,11 +1,9 @@
 /**
- * Browser entry for generated pages.
- *
- * The dev server bundles this file (with React inside) into
- * .positronic/dist/components.js and uploads it to R2, where pages load it
- * as /bundle/components.js. Run `npm run build:components` to build it by
- * hand.
+ * Browser entry for generated pages. Built by ./vite.config.mjs into
+ * .positronic/dist/components.js (this file, React included) and
+ * .positronic/dist/components.css (the stylesheet import below).
  */
+import './styles.css';
 import { mount } from '@positronic/gen-ui-components';
 import { catalog } from '../src/components/index.js';
 import { pageComponents } from '../src/components/browser.js';

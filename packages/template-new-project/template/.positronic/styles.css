@@ -1,6 +1,5 @@
 /*
- * Stylesheet for generated pages, compiled by the Tailwind CLI into
- * .positronic/dist/components.css and served as /bundle/components.css.
+ * Tailwind entry for the page bundle, imported by bundle.ts.
  *
  * The theme import brings in the shadcn/ui tokens and tells Tailwind where
  * the shared components live so their classes are generated.
