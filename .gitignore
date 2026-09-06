@@ -8,3 +8,6 @@ coverage/
 .test-cache/
 .npmrc
 .claude/worktrees/
+
+# build-brains.test.ts scaffolds here so compiled brains resolve root node_modules
+packages/template-new-project/.build-brains-*

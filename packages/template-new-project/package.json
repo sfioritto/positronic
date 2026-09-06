@@ -27,5 +27,9 @@
   },
   "dependencies": {
     "eta": "^4.6.0"
+  },
+  "devDependencies": {
+    "oxc-parser": "^0.148.0",
+    "oxc-transform": "^0.148.0"
   }
 }

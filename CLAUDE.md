@@ -78,7 +78,7 @@ Templates in `.prompt()`, `.page()`, and `.map()` steps can return JSX (`Templat
 - **Subpath export**: `@positronic/core/jsx-runtime` is exported from core's `package.json`
 - **Monorepo JSX settings**: Each package's tsconfig owns its JSX settings. Core's source has no JSX; `packages/core/tests/tsconfig.json` sets `jsxImportSource` to `@positronic/core` (with a `paths` entry so typechecking sees the source runtime), so core tests can use JSX in `.test.tsx` files (see `packages/core/tests/jsx-syntax.test.tsx`). `packages/cli` and `packages/gen-ui-components` use React.
 - **Generated projects**: Use `jsxImportSource: "@positronic/core"` in their tsconfig
-- **Whitespace preservation**: `.positronic/build-brains.mjs` in generated projects — esbuild plugin (inlined) that preserves JSX text whitespace. Runs via wrangler's `build.command`. Without it, the JSX compiler collapses newlines in text to spaces.
+- **Whitespace preservation**: `.positronic/build-brains.mjs` in generated projects wraps JSX text nodes in template literals (oxc-parser) before compiling with oxc-transform, so newlines in prompt text survive. Runs via wrangler's `build.command`. Without it, the JSX compiler collapses newlines in text to spaces. Tested in `packages/template-new-project/tests/build-brains.test.ts`.
 
 ### Generated Pages
 
